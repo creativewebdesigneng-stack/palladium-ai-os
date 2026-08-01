@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
+import { Route as AppDepartmentsIndexRouteImport } from './routes/app.departments.index'
 import { Route as AppDepartmentsSlugRouteImport } from './routes/app.departments.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const AppMissionControlRoute = AppMissionControlRouteImport.update({
   path: '/mission-control',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
+  id: '/departments/',
+  path: '/departments/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDepartmentsSlugRoute = AppDepartmentsSlugRouteImport.update({
   id: '/departments/$slug',
   path: '/departments/$slug',
@@ -47,12 +53,14 @@ export interface FileRoutesByFullPath {
   '/app/mission-control': typeof AppMissionControlRoute
   '/app/': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
+  '/app/departments/': typeof AppDepartmentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/mission-control': typeof AppMissionControlRoute
   '/app': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
+  '/app/departments': typeof AppDepartmentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -61,13 +69,24 @@ export interface FileRoutesById {
   '/app/mission-control': typeof AppMissionControlRoute
   '/app/': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
+  '/app/departments/': typeof AppDepartmentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/app' | '/app/mission-control' | '/app/' | '/app/departments/$slug'
+    | '/'
+    | '/app'
+    | '/app/mission-control'
+    | '/app/'
+    | '/app/departments/$slug'
+    | '/app/departments/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app/mission-control' | '/app' | '/app/departments/$slug'
+  to:
+    | '/'
+    | '/app/mission-control'
+    | '/app'
+    | '/app/departments/$slug'
+    | '/app/departments'
   id:
     | '__root__'
     | '/'
@@ -75,6 +94,7 @@ export interface FileRouteTypes {
     | '/app/mission-control'
     | '/app/'
     | '/app/departments/$slug'
+    | '/app/departments/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -112,6 +132,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMissionControlRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/departments/': {
+      id: '/app/departments/'
+      path: '/departments'
+      fullPath: '/app/departments/'
+      preLoaderRoute: typeof AppDepartmentsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/departments/$slug': {
       id: '/app/departments/$slug'
       path: '/departments/$slug'
@@ -126,12 +153,14 @@ interface AppRouteChildren {
   AppMissionControlRoute: typeof AppMissionControlRoute
   AppIndexRoute: typeof AppIndexRoute
   AppDepartmentsSlugRoute: typeof AppDepartmentsSlugRoute
+  AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppMissionControlRoute: AppMissionControlRoute,
   AppIndexRoute: AppIndexRoute,
   AppDepartmentsSlugRoute: AppDepartmentsSlugRoute,
+  AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
