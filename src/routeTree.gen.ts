@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
 import { Route as AppMarketplaceRouteImport } from './routes/app.marketplace'
 import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
@@ -32,6 +33,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
@@ -68,6 +74,7 @@ const AppDepartmentsSlugRoute = AppDepartmentsSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
@@ -90,6 +98,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/app/analytics'
     | '/app/integrations'
     | '/app/marketplace'
     | '/app/mission-control'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app/analytics'
     | '/app/integrations'
     | '/app/marketplace'
     | '/app/mission-control'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/app/analytics'
     | '/app/integrations'
     | '/app/marketplace'
     | '/app/mission-control'
@@ -159,6 +171,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/integrations': {
@@ -207,6 +226,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppIntegrationsRoute: typeof AppIntegrationsRoute
   AppMarketplaceRoute: typeof AppMarketplaceRoute
   AppMissionControlRoute: typeof AppMissionControlRoute
@@ -217,6 +237,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppIntegrationsRoute: AppIntegrationsRoute,
   AppMarketplaceRoute: AppMarketplaceRoute,
   AppMissionControlRoute: AppMissionControlRoute,
