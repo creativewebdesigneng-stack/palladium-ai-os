@@ -13,9 +13,20 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as AppBusinessRouteImport } from './routes/app.business'
+import { Route as AppCalendarRouteImport } from './routes/app.calendar'
+import { Route as AppCreativeStudioRouteImport } from './routes/app.creative-studio'
+import { Route as AppDevelopmentRouteImport } from './routes/app.development'
+import { Route as AppFinanceRouteImport } from './routes/app.finance'
+import { Route as AppHealthRouteImport } from './routes/app.health'
 import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
+import { Route as AppMarketingRouteImport } from './routes/app.marketing'
 import { Route as AppMarketplaceRouteImport } from './routes/app.marketplace'
+import { Route as AppMemoryRouteImport } from './routes/app.memory'
 import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
+import { Route as AppSalesRouteImport } from './routes/app.sales'
+import { Route as AppShoppingRouteImport } from './routes/app.shopping'
+import { Route as AppTravelRouteImport } from './routes/app.travel'
 import { Route as AppWorkforceRouteImport } from './routes/app.workforce'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/app.departments.index'
 import { Route as AppDepartmentsSlugRouteImport } from './routes/app.departments.$slug'
@@ -40,9 +51,44 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBusinessRoute = AppBusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCalendarRoute = AppCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCreativeStudioRoute = AppCreativeStudioRouteImport.update({
+  id: '/creative-studio',
+  path: '/creative-studio',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDevelopmentRoute = AppDevelopmentRouteImport.update({
+  id: '/development',
+  path: '/development',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceRoute = AppFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHealthRoute = AppHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMarketingRoute = AppMarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
@@ -50,9 +96,29 @@ const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
   path: '/marketplace',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMemoryRoute = AppMemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMissionControlRoute = AppMissionControlRouteImport.update({
   id: '/mission-control',
   path: '/mission-control',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalesRoute = AppSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShoppingRoute = AppShoppingRouteImport.update({
+  id: '/shopping',
+  path: '/shopping',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTravelRoute = AppTravelRouteImport.update({
+  id: '/travel',
+  path: '/travel',
   getParentRoute: () => AppRoute,
 } as any)
 const AppWorkforceRoute = AppWorkforceRouteImport.update({
@@ -75,9 +141,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/business': typeof AppBusinessRoute
+  '/app/calendar': typeof AppCalendarRoute
+  '/app/creative-studio': typeof AppCreativeStudioRoute
+  '/app/development': typeof AppDevelopmentRoute
+  '/app/finance': typeof AppFinanceRoute
+  '/app/health': typeof AppHealthRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/marketing': typeof AppMarketingRoute
   '/app/marketplace': typeof AppMarketplaceRoute
+  '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/shopping': typeof AppShoppingRoute
+  '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app/': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
@@ -86,9 +163,20 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/business': typeof AppBusinessRoute
+  '/app/calendar': typeof AppCalendarRoute
+  '/app/creative-studio': typeof AppCreativeStudioRoute
+  '/app/development': typeof AppDevelopmentRoute
+  '/app/finance': typeof AppFinanceRoute
+  '/app/health': typeof AppHealthRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/marketing': typeof AppMarketingRoute
   '/app/marketplace': typeof AppMarketplaceRoute
+  '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/shopping': typeof AppShoppingRoute
+  '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
@@ -99,9 +187,20 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/business': typeof AppBusinessRoute
+  '/app/calendar': typeof AppCalendarRoute
+  '/app/creative-studio': typeof AppCreativeStudioRoute
+  '/app/development': typeof AppDevelopmentRoute
+  '/app/finance': typeof AppFinanceRoute
+  '/app/health': typeof AppHealthRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/marketing': typeof AppMarketingRoute
   '/app/marketplace': typeof AppMarketplaceRoute
+  '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/sales': typeof AppSalesRoute
+  '/app/shopping': typeof AppShoppingRoute
+  '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app/': typeof AppIndexRoute
   '/app/departments/$slug': typeof AppDepartmentsSlugRoute
@@ -113,9 +212,20 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/analytics'
+    | '/app/business'
+    | '/app/calendar'
+    | '/app/creative-studio'
+    | '/app/development'
+    | '/app/finance'
+    | '/app/health'
     | '/app/integrations'
+    | '/app/marketing'
     | '/app/marketplace'
+    | '/app/memory'
     | '/app/mission-control'
+    | '/app/sales'
+    | '/app/shopping'
+    | '/app/travel'
     | '/app/workforce'
     | '/app/'
     | '/app/departments/$slug'
@@ -124,9 +234,20 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app/analytics'
+    | '/app/business'
+    | '/app/calendar'
+    | '/app/creative-studio'
+    | '/app/development'
+    | '/app/finance'
+    | '/app/health'
     | '/app/integrations'
+    | '/app/marketing'
     | '/app/marketplace'
+    | '/app/memory'
     | '/app/mission-control'
+    | '/app/sales'
+    | '/app/shopping'
+    | '/app/travel'
     | '/app/workforce'
     | '/app'
     | '/app/departments/$slug'
@@ -136,9 +257,20 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/analytics'
+    | '/app/business'
+    | '/app/calendar'
+    | '/app/creative-studio'
+    | '/app/development'
+    | '/app/finance'
+    | '/app/health'
     | '/app/integrations'
+    | '/app/marketing'
     | '/app/marketplace'
+    | '/app/memory'
     | '/app/mission-control'
+    | '/app/sales'
+    | '/app/shopping'
+    | '/app/travel'
     | '/app/workforce'
     | '/app/'
     | '/app/departments/$slug'
@@ -180,11 +312,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/business': {
+      id: '/app/business'
+      path: '/business'
+      fullPath: '/app/business'
+      preLoaderRoute: typeof AppBusinessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/calendar': {
+      id: '/app/calendar'
+      path: '/calendar'
+      fullPath: '/app/calendar'
+      preLoaderRoute: typeof AppCalendarRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/creative-studio': {
+      id: '/app/creative-studio'
+      path: '/creative-studio'
+      fullPath: '/app/creative-studio'
+      preLoaderRoute: typeof AppCreativeStudioRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/development': {
+      id: '/app/development'
+      path: '/development'
+      fullPath: '/app/development'
+      preLoaderRoute: typeof AppDevelopmentRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/finance': {
+      id: '/app/finance'
+      path: '/finance'
+      fullPath: '/app/finance'
+      preLoaderRoute: typeof AppFinanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/health': {
+      id: '/app/health'
+      path: '/health'
+      fullPath: '/app/health'
+      preLoaderRoute: typeof AppHealthRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/integrations': {
       id: '/app/integrations'
       path: '/integrations'
       fullPath: '/app/integrations'
       preLoaderRoute: typeof AppIntegrationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/marketing': {
+      id: '/app/marketing'
+      path: '/marketing'
+      fullPath: '/app/marketing'
+      preLoaderRoute: typeof AppMarketingRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/marketplace': {
@@ -194,11 +375,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMarketplaceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/memory': {
+      id: '/app/memory'
+      path: '/memory'
+      fullPath: '/app/memory'
+      preLoaderRoute: typeof AppMemoryRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/mission-control': {
       id: '/app/mission-control'
       path: '/mission-control'
       fullPath: '/app/mission-control'
       preLoaderRoute: typeof AppMissionControlRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/sales': {
+      id: '/app/sales'
+      path: '/sales'
+      fullPath: '/app/sales'
+      preLoaderRoute: typeof AppSalesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/shopping': {
+      id: '/app/shopping'
+      path: '/shopping'
+      fullPath: '/app/shopping'
+      preLoaderRoute: typeof AppShoppingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/travel': {
+      id: '/app/travel'
+      path: '/travel'
+      fullPath: '/app/travel'
+      preLoaderRoute: typeof AppTravelRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/workforce': {
@@ -227,9 +436,20 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppBusinessRoute: typeof AppBusinessRoute
+  AppCalendarRoute: typeof AppCalendarRoute
+  AppCreativeStudioRoute: typeof AppCreativeStudioRoute
+  AppDevelopmentRoute: typeof AppDevelopmentRoute
+  AppFinanceRoute: typeof AppFinanceRoute
+  AppHealthRoute: typeof AppHealthRoute
   AppIntegrationsRoute: typeof AppIntegrationsRoute
+  AppMarketingRoute: typeof AppMarketingRoute
   AppMarketplaceRoute: typeof AppMarketplaceRoute
+  AppMemoryRoute: typeof AppMemoryRoute
   AppMissionControlRoute: typeof AppMissionControlRoute
+  AppSalesRoute: typeof AppSalesRoute
+  AppShoppingRoute: typeof AppShoppingRoute
+  AppTravelRoute: typeof AppTravelRoute
   AppWorkforceRoute: typeof AppWorkforceRoute
   AppIndexRoute: typeof AppIndexRoute
   AppDepartmentsSlugRoute: typeof AppDepartmentsSlugRoute
@@ -238,9 +458,20 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
+  AppBusinessRoute: AppBusinessRoute,
+  AppCalendarRoute: AppCalendarRoute,
+  AppCreativeStudioRoute: AppCreativeStudioRoute,
+  AppDevelopmentRoute: AppDevelopmentRoute,
+  AppFinanceRoute: AppFinanceRoute,
+  AppHealthRoute: AppHealthRoute,
   AppIntegrationsRoute: AppIntegrationsRoute,
+  AppMarketingRoute: AppMarketingRoute,
   AppMarketplaceRoute: AppMarketplaceRoute,
+  AppMemoryRoute: AppMemoryRoute,
   AppMissionControlRoute: AppMissionControlRoute,
+  AppSalesRoute: AppSalesRoute,
+  AppShoppingRoute: AppShoppingRoute,
+  AppTravelRoute: AppTravelRoute,
   AppWorkforceRoute: AppWorkforceRoute,
   AppIndexRoute: AppIndexRoute,
   AppDepartmentsSlugRoute: AppDepartmentsSlugRoute,
