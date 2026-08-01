@@ -47,7 +47,7 @@ function LiveConsole() {
     let i = 5;
     const id = setInterval(() => {
       i += 1;
-      setLines((prev) => [...prev.slice(-40), consoleLines[i % consoleLines.length]]);
+      setLines((prev) => [...prev.slice(-40), consoleLines[i % consoleLines.length]!]);
     }, 1800);
     return () => clearInterval(id);
   }, []);
@@ -99,7 +99,7 @@ const approvals = [
 ];
 
 function MissionControl() {
-  const [selected, setSelected] = useState(missions[0]);
+  const [selected, setSelected] = useState(missions[0]!);
 
   return (
     <>
