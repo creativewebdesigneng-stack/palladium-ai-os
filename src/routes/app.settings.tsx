@@ -23,7 +23,7 @@ function ToggleRow({ label, hint, on }: { label: string; hint: string; on?: bool
         <p className="truncate text-sm font-medium">{label}</p>
         <p className="truncate text-[11px] text-muted-foreground">{hint}</p>
       </div>
-      <Switch defaultChecked={on} />
+      <Switch defaultChecked={on ?? false} />
     </div>
   );
 }
