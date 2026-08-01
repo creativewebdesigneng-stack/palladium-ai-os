@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as AppBillingRouteImport } from './routes/app.billing'
 import { Route as AppBusinessRouteImport } from './routes/app.business'
 import { Route as AppCalendarRouteImport } from './routes/app.calendar'
 import { Route as AppCreativeStudioRouteImport } from './routes/app.creative-studio'
@@ -24,7 +25,10 @@ import { Route as AppMarketingRouteImport } from './routes/app.marketing'
 import { Route as AppMarketplaceRouteImport } from './routes/app.marketplace'
 import { Route as AppMemoryRouteImport } from './routes/app.memory'
 import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
+import { Route as AppNotificationsRouteImport } from './routes/app.notifications'
+import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppShoppingRouteImport } from './routes/app.shopping'
 import { Route as AppTravelRouteImport } from './routes/app.travel'
 import { Route as AppWorkforceRouteImport } from './routes/app.workforce'
@@ -49,6 +53,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBillingRoute = AppBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBusinessRoute = AppBusinessRouteImport.update({
@@ -106,9 +115,24 @@ const AppMissionControlRoute = AppMissionControlRouteImport.update({
   path: '/mission-control',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSalesRoute = AppSalesRouteImport.update({
   id: '/sales',
   path: '/sales',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppShoppingRoute = AppShoppingRouteImport.update({
@@ -141,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/business': typeof AppBusinessRoute
   '/app/calendar': typeof AppCalendarRoute
   '/app/creative-studio': typeof AppCreativeStudioRoute
@@ -152,7 +177,10 @@ export interface FileRoutesByFullPath {
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/shopping': typeof AppShoppingRoute
   '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
@@ -163,6 +191,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/business': typeof AppBusinessRoute
   '/app/calendar': typeof AppCalendarRoute
   '/app/creative-studio': typeof AppCreativeStudioRoute
@@ -174,7 +203,10 @@ export interface FileRoutesByTo {
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/shopping': typeof AppShoppingRoute
   '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
@@ -187,6 +219,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/analytics': typeof AppAnalyticsRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/business': typeof AppBusinessRoute
   '/app/calendar': typeof AppCalendarRoute
   '/app/creative-studio': typeof AppCreativeStudioRoute
@@ -198,7 +231,10 @@ export interface FileRoutesById {
   '/app/marketplace': typeof AppMarketplaceRoute
   '/app/memory': typeof AppMemoryRoute
   '/app/mission-control': typeof AppMissionControlRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/profile': typeof AppProfileRoute
   '/app/sales': typeof AppSalesRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/shopping': typeof AppShoppingRoute
   '/app/travel': typeof AppTravelRoute
   '/app/workforce': typeof AppWorkforceRoute
@@ -212,6 +248,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/analytics'
+    | '/app/billing'
     | '/app/business'
     | '/app/calendar'
     | '/app/creative-studio'
@@ -223,7 +260,10 @@ export interface FileRouteTypes {
     | '/app/marketplace'
     | '/app/memory'
     | '/app/mission-control'
+    | '/app/notifications'
+    | '/app/profile'
     | '/app/sales'
+    | '/app/settings'
     | '/app/shopping'
     | '/app/travel'
     | '/app/workforce'
@@ -234,6 +274,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app/analytics'
+    | '/app/billing'
     | '/app/business'
     | '/app/calendar'
     | '/app/creative-studio'
@@ -245,7 +286,10 @@ export interface FileRouteTypes {
     | '/app/marketplace'
     | '/app/memory'
     | '/app/mission-control'
+    | '/app/notifications'
+    | '/app/profile'
     | '/app/sales'
+    | '/app/settings'
     | '/app/shopping'
     | '/app/travel'
     | '/app/workforce'
@@ -257,6 +301,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/analytics'
+    | '/app/billing'
     | '/app/business'
     | '/app/calendar'
     | '/app/creative-studio'
@@ -268,7 +313,10 @@ export interface FileRouteTypes {
     | '/app/marketplace'
     | '/app/memory'
     | '/app/mission-control'
+    | '/app/notifications'
+    | '/app/profile'
     | '/app/sales'
+    | '/app/settings'
     | '/app/shopping'
     | '/app/travel'
     | '/app/workforce'
@@ -310,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/app/analytics'
       preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/billing': {
+      id: '/app/billing'
+      path: '/billing'
+      fullPath: '/app/billing'
+      preLoaderRoute: typeof AppBillingRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/business': {
@@ -389,11 +444,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMissionControlRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/notifications': {
+      id: '/app/notifications'
+      path: '/notifications'
+      fullPath: '/app/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/profile': {
+      id: '/app/profile'
+      path: '/profile'
+      fullPath: '/app/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/sales': {
       id: '/app/sales'
       path: '/sales'
       fullPath: '/app/sales'
       preLoaderRoute: typeof AppSalesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/shopping': {
@@ -436,6 +512,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppBillingRoute: typeof AppBillingRoute
   AppBusinessRoute: typeof AppBusinessRoute
   AppCalendarRoute: typeof AppCalendarRoute
   AppCreativeStudioRoute: typeof AppCreativeStudioRoute
@@ -447,7 +524,10 @@ interface AppRouteChildren {
   AppMarketplaceRoute: typeof AppMarketplaceRoute
   AppMemoryRoute: typeof AppMemoryRoute
   AppMissionControlRoute: typeof AppMissionControlRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
+  AppProfileRoute: typeof AppProfileRoute
   AppSalesRoute: typeof AppSalesRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppShoppingRoute: typeof AppShoppingRoute
   AppTravelRoute: typeof AppTravelRoute
   AppWorkforceRoute: typeof AppWorkforceRoute
@@ -458,6 +538,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
+  AppBillingRoute: AppBillingRoute,
   AppBusinessRoute: AppBusinessRoute,
   AppCalendarRoute: AppCalendarRoute,
   AppCreativeStudioRoute: AppCreativeStudioRoute,
@@ -469,7 +550,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppMarketplaceRoute: AppMarketplaceRoute,
   AppMemoryRoute: AppMemoryRoute,
   AppMissionControlRoute: AppMissionControlRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
+  AppProfileRoute: AppProfileRoute,
   AppSalesRoute: AppSalesRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppShoppingRoute: AppShoppingRoute,
   AppTravelRoute: AppTravelRoute,
   AppWorkforceRoute: AppWorkforceRoute,
