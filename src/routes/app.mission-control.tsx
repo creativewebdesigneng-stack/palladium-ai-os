@@ -36,7 +36,7 @@ export const Route = createFileRoute("/app/mission-control")({
       },
     ],
   }),
-  component: MissionControl;
+  component: MissionControl,
 });
 
 function LiveConsole() {
