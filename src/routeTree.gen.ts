@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppMarketplaceRouteImport } from './routes/app.marketplace'
 import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
 import { Route as AppWorkforceRouteImport } from './routes/app.workforce'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/app.departments.index'
@@ -30,6 +31,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
+  id: '/marketplace',
+  path: '/marketplace',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMissionControlRoute = AppMissionControlRouteImport.update({
@@ -56,6 +62,7 @@ const AppDepartmentsSlugRoute = AppDepartmentsSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app/': typeof AppIndexRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app': typeof AppIndexRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/marketplace': typeof AppMarketplaceRoute
   '/app/mission-control': typeof AppMissionControlRoute
   '/app/workforce': typeof AppWorkforceRoute
   '/app/': typeof AppIndexRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/app/marketplace'
     | '/app/mission-control'
     | '/app/workforce'
     | '/app/'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app/marketplace'
     | '/app/mission-control'
     | '/app/workforce'
     | '/app'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/app/marketplace'
     | '/app/mission-control'
     | '/app/workforce'
     | '/app/'
@@ -137,6 +149,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/marketplace': {
+      id: '/app/marketplace'
+      path: '/marketplace'
+      fullPath: '/app/marketplace'
+      preLoaderRoute: typeof AppMarketplaceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/mission-control': {
       id: '/app/mission-control'
       path: '/mission-control'
@@ -169,6 +188,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppMarketplaceRoute: typeof AppMarketplaceRoute
   AppMissionControlRoute: typeof AppMissionControlRoute
   AppWorkforceRoute: typeof AppWorkforceRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -177,6 +197,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppMarketplaceRoute: AppMarketplaceRoute,
   AppMissionControlRoute: AppMissionControlRoute,
   AppWorkforceRoute: AppWorkforceRoute,
   AppIndexRoute: AppIndexRoute,
