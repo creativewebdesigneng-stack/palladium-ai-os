@@ -47,12 +47,38 @@ function monthStart(): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
-/** Resolves the effective plan + real usage for a user (or their organisation). */
+/**
+ * Resolves the effective plan + real usage for a user (or their organisation).
+ *
+ * `orgId` arrives from the client, so membership is verified here before it is
+ * used as the counting scope. Without that check a caller could pass an
+ * unrelated organisation id and be measured against an empty usage window,
+ * sidestepping their own personal allowance.
+ */
 export async function getEntitlements(
   sb: Sb,
   userId: string,
-  orgId: string | null = null,
+  requestedOrgId: string | null = null,
 ): Promise<Entitlements> {
+  let orgId: string | null = null;
+  if (requestedOrgId) {
+    const { data: membership } = await sb
+      .from("organisation_members")
+      .select("org_id")
+      .eq("org_id", requestedOrgId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!membership) {
+      throw new EntitlementError("You are not a member of this organisation.", {
+        metric: "organisation",
+        limit: 0,
+        used: 0,
+        planCode: "explorer",
+      });
+    }
+    orgId = requestedOrgId;
+  }
+
   const subQuery = sb
     .from("subscriptions")
     .select("plan_code,status,seats,current_period_end,cancel_at_period_end")
