@@ -85,10 +85,14 @@ const auth = {
     return true;
   },
   async loginWithProvider(provider) {
-    const { lovable } = await import("@/integrations/lovable/index");
-    return lovable.auth.signInWithOAuth(provider, {
-      redirect_uri: typeof window === "undefined" ? "" : window.location.origin,
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: typeof window === "undefined" ? undefined : window.location.origin,
+      },
     });
+    if (error) throw error;
+    return data;
   },
   async resetPasswordRequest(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
