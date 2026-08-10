@@ -12,12 +12,7 @@
  */
 
 export type BrowserStepKind =
-  | 'navigate'
-  | 'search'
-  | 'read'
-  | 'compare'
-  | 'fill_form'
-  | 'prepare_checkout';
+  "navigate" | "search" | "read" | "compare" | "fill_form" | "prepare_checkout";
 
 export type BrowserStep = {
   kind: BrowserStepKind;
@@ -67,7 +62,10 @@ export type BrowserTool = {
   readonly provider: string;
   steps(): BrowserStep[];
   navigate(url: string): Promise<{ ok: boolean; url: string; blocked?: string }>;
-  search(query: string, opts?: { budget?: number | null; currency?: string }): Promise<BrowserProductOffer[]>;
+  search(
+    query: string,
+    opts?: { budget?: number | null; currency?: string },
+  ): Promise<BrowserProductOffer[]>;
   read(url: string): Promise<{ url: string; text: string }>;
   compare(offers: BrowserProductOffer[]): Promise<BrowserProductOffer[]>;
   fillForm(url: string, fields: Record<string, string>): Promise<{ ok: boolean }>;
@@ -89,9 +87,9 @@ export function listBrowserProviders(): string[] {
 
 export function domainOf(url: string): string {
   try {
-    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '');
+    return new URL(url.startsWith("http") ? url : `https://${url}`).hostname.replace(/^www\./, "");
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -99,17 +97,27 @@ export function isDomainAllowed(url: string, allowed: string[]): boolean {
   const host = domainOf(url);
   if (!host) return false;
   return allowed.some((d) => {
-    const clean = d.replace(/^www\./, '').toLowerCase();
+    const clean = d.replace(/^www\./, "").toLowerCase();
     return host === clean || host.endsWith(`.${clean}`);
   });
 }
 
 const SELLERS: Array<{ name: string; domain: string; delivery: string; deliveryCost: number }> = [
-  { name: 'John Lewis', domain: 'johnlewis.com', delivery: 'Free delivery, 2–4 days', deliveryCost: 0 },
-  { name: 'Amazon UK', domain: 'amazon.co.uk', delivery: 'Next-day delivery', deliveryCost: 0 },
-  { name: 'Argos', domain: 'argos.co.uk', delivery: 'Click & collect today', deliveryCost: 3.95 },
-  { name: 'Currys', domain: 'currys.co.uk', delivery: 'Standard delivery, 3 days', deliveryCost: 4.99 },
-  { name: 'IKEA', domain: 'ikea.com', delivery: 'Delivery from £15', deliveryCost: 15 },
+  {
+    name: "John Lewis",
+    domain: "johnlewis.com",
+    delivery: "Free delivery, 2–4 days",
+    deliveryCost: 0,
+  },
+  { name: "Amazon UK", domain: "amazon.co.uk", delivery: "Next-day delivery", deliveryCost: 0 },
+  { name: "Argos", domain: "argos.co.uk", delivery: "Click & collect today", deliveryCost: 3.95 },
+  {
+    name: "Currys",
+    domain: "currys.co.uk",
+    delivery: "Standard delivery, 3 days",
+    deliveryCost: 4.99,
+  },
+  { name: "IKEA", domain: "ikea.com", delivery: "Delivery from £15", deliveryCost: 15 },
 ];
 
 /**
@@ -120,7 +128,11 @@ const SELLERS: Array<{ name: string; domain: string; delivery: string; deliveryC
 export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserTool {
   const steps: BrowserStep[] = [];
   const record = (kind: BrowserStepKind, target: string, detail?: string) => {
-    steps.push(detail === undefined ? { kind, target, at: new Date().toISOString() } : { kind, target, detail, at: new Date().toISOString() });
+    steps.push(
+      detail === undefined
+        ? { kind, target, at: new Date().toISOString() }
+        : { kind, target, detail, at: new Date().toISOString() },
+    );
   };
 
   const hash = (input: string) => {
@@ -130,65 +142,71 @@ export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserT
   };
 
   return {
-    provider: 'simulated',
+    provider: "simulated",
     steps: () => steps,
     async navigate(url) {
       if (!isDomainAllowed(url, config.allowedDomains)) {
-        record('navigate', url, 'blocked by allowlist');
-        return { ok: false, url, blocked: 'domain not in allowlist' };
+        record("navigate", url, "blocked by allowlist");
+        return { ok: false, url, blocked: "domain not in allowlist" };
       }
-      record('navigate', url);
+      record("navigate", url);
       return { ok: true, url };
     },
     async search(query, opts) {
-      record('search', query, 'supported retailers');
-      const currency = opts?.currency ?? 'GBP';
+      record("search", query, "supported retailers");
+      const currency = opts?.currency ?? "GBP";
       const budget = opts?.budget ?? null;
       const base = budget && budget > 0 ? budget : 120 + (hash(query) % 240);
       const allowed = SELLERS.filter((s) => isDomainAllowed(s.domain, config.allowedDomains));
       const sellers = allowed.length ? allowed : SELLERS.slice(0, 3);
-      const label = query.replace(/^(find|get|buy|i need|a|an|the)\s+/gi, '').trim() || 'product';
+      const label = query.replace(/^(find|get|buy|i need|a|an|the)\s+/gi, "").trim() || "product";
       return sellers.slice(0, 4).map((seller, i) => {
         const seed = hash(`${query}-${seller.name}`);
         const price = Math.max(9, Math.round((base * (0.62 + i * 0.13) + (seed % 17)) * 100) / 100);
         return {
-          product: `${['Ergo', 'Studio', 'Pro', 'Everyday'][i % 4]} ${label}`.replace(/\s+/g, ' '),
+          product: `${["Ergo", "Studio", "Pro", "Everyday"][i % 4]} ${label}`.replace(/\s+/g, " "),
           price,
           currency,
           seller: seller.name,
           delivery: seller.delivery,
           deliveryCost: seller.deliveryCost,
-          rating: Math.round((3.8 + ((seed % 12) / 10)) * 10) / 10 > 5 ? 4.9 : Math.round((3.8 + ((seed % 12) / 10)) * 10) / 10,
+          rating:
+            Math.round((3.8 + (seed % 12) / 10) * 10) / 10 > 5
+              ? 4.9
+              : Math.round((3.8 + (seed % 12) / 10) * 10) / 10,
           url: `https://${seller.domain}/search?q=${encodeURIComponent(label)}`,
           inStock: seed % 7 !== 0,
           specs: {
             Warranty: `${1 + (seed % 5)} years`,
-            Returns: '30 days',
-            Condition: 'New',
+            Returns: "30 days",
+            Condition: "New",
           },
-          reason: i === 0
-            ? 'Best balance of price, rating and delivery for your stated requirement.'
-            : i === 1
-              ? 'Cheapest in-budget option with acceptable reviews.'
-              : 'Alternative with a longer warranty or faster delivery.',
+          reason:
+            i === 0
+              ? "Best balance of price, rating and delivery for your stated requirement."
+              : i === 1
+                ? "Cheapest in-budget option with acceptable reviews."
+                : "Alternative with a longer warranty or faster delivery.",
         };
       });
     },
     async read(url) {
-      record('read', url);
+      record("read", url);
       return { url, text: `Simulated page summary for ${domainOf(url)}.` };
     },
     async compare(offers) {
-      record('compare', `${offers.length} offers`);
-      return [...offers].sort((a, b) => (b.rating - a.rating) || (a.price + a.deliveryCost) - (b.price + b.deliveryCost));
+      record("compare", `${offers.length} offers`);
+      return [...offers].sort(
+        (a, b) => b.rating - a.rating || a.price + a.deliveryCost - (b.price + b.deliveryCost),
+      );
     },
     async fillForm(url, fields) {
-      if (!config.allowedTools.includes('browser')) return { ok: false };
-      record('fill_form', url, Object.keys(fields).join(', '));
+      if (!config.allowedTools.includes("browser")) return { ok: false };
+      record("fill_form", url, Object.keys(fields).join(", "));
       return { ok: true };
     },
     async prepareCheckout(offer) {
-      record('prepare_checkout', offer.seller, offer.product);
+      record("prepare_checkout", offer.seller, offer.product);
       const itemPrice = offer.price;
       const deliveryCost = offer.deliveryCost;
       const tax = Math.round(itemPrice * 0.2 * 100) / 100;
@@ -213,14 +231,13 @@ export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserT
   };
 }
 
-registerBrowserProvider('simulated', createSimulatedBrowserTool);
+registerBrowserProvider("simulated", createSimulatedBrowserTool);
 
 export function createBrowserTool(provider: string, config: BrowserAgentConfig): BrowserTool {
-  const factory = registry.get(provider) ?? registry.get('simulated');
-  if (!factory) throw new Error('No browser provider registered');
+  const factory = registry.get(provider) ?? registry.get("simulated");
+  if (!factory) throw new Error("No browser provider registered");
   return guardBrowserTool(factory(config), config);
 }
-
 
 /* ------------------------------------------------------------------ providers */
 
@@ -236,7 +253,7 @@ export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig):
     provider: tool.provider,
     steps: () => tool.steps(),
     async navigate(url) {
-      if (denied(url)) return { ok: false, url, blocked: 'domain not in allowlist' };
+      if (denied(url)) return { ok: false, url, blocked: "domain not in allowlist" };
       return tool.navigate(url);
     },
     async read(url) {
@@ -244,15 +261,17 @@ export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig):
       return tool.read(url);
     },
     async fillForm(url, fields) {
-      if (denied(url) || !config.allowedTools.includes('browser')) return { ok: false };
+      if (denied(url) || !config.allowedTools.includes("browser")) return { ok: false };
       return tool.fillForm(url, fields);
     },
     async prepareCheckout(offer) {
-      if (denied(offer.url)) throw new Error('Seller domain is not on this agent\'s allowlist');
+      if (denied(offer.url)) throw new Error("Seller domain is not on this agent's allowlist");
       const draft = await tool.prepareCheckout(offer);
       const cap = config.spendCap ?? null;
       if (cap != null && draft.total > cap) {
-        throw new Error(`Prepared total ${draft.currency} ${draft.total} exceeds the spend cap of ${cap}`);
+        throw new Error(
+          `Prepared total ${draft.currency} ${draft.total} exceeds the spend cap of ${cap}`,
+        );
       }
       return { ...draft, paymentAuthorised: false as const };
     },
@@ -267,16 +286,25 @@ function unavailable(name: string, hint: string): BrowserProviderFactory {
   };
 }
 
-registerBrowserProvider('playwright', unavailable('playwright', 'Connect a Playwright worker endpoint to enable it.'));
-registerBrowserProvider('browserbase', unavailable('browserbase', 'Add a Browserbase API key to enable it.'));
-registerBrowserProvider('computer_use', unavailable('computer_use', 'Enable a computer-use model provider to use it.'));
+registerBrowserProvider(
+  "playwright",
+  unavailable("playwright", "Connect a Playwright worker endpoint to enable it."),
+);
+registerBrowserProvider(
+  "browserbase",
+  unavailable("browserbase", "Add a Browserbase API key to enable it."),
+);
+registerBrowserProvider(
+  "computer_use",
+  unavailable("computer_use", "Enable a computer-use model provider to use it."),
+);
 
 /**
  * Chooses the automation provider for a run: an explicit request wins, then the
  * environment default, then the always-available simulated provider.
  */
 export function resolveBrowserProvider(preferred?: string | null): string {
-  const configured = process.env['BROWSER_AGENT_PROVIDER'] ?? null;
-  const candidate = preferred || configured || 'simulated';
-  return registry.has(candidate) ? candidate : 'simulated';
+  const configured = process.env["BROWSER_AGENT_PROVIDER"] ?? null;
+  const candidate = preferred || configured || "simulated";
+  return registry.has(candidate) ? candidate : "simulated";
 }

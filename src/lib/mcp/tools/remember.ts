@@ -5,11 +5,16 @@ import { notAuthenticated, supabaseForUser } from "../supabase";
 export default defineTool({
   name: "remember",
   title: "Save personal memory",
-  description: "Save a preference or fact to the signed-in user's personal memory vault so agents can use it later.",
+  description:
+    "Save a preference or fact to the signed-in user's personal memory vault so agents can use it later.",
   inputSchema: {
     key: z.string().trim().min(1).max(120).describe("Memory key, e.g. 'preferred airline'."),
     value: z.string().trim().min(1).max(2000).describe("The value to remember."),
-    category: z.string().trim().default("general").describe("Memory category, e.g. shopping, health, travel."),
+    category: z
+      .string()
+      .trim()
+      .default("general")
+      .describe("Memory category, e.g. shopping, health, travel."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async ({ key, value, category }, ctx) => {
@@ -23,7 +28,8 @@ export default defineTool({
       .eq("key", key)
       .eq("category", cat)
       .maybeSingle();
-    if (existing.error) return { content: [{ type: "text", text: existing.error.message }], isError: true };
+    if (existing.error)
+      return { content: [{ type: "text", text: existing.error.message }], isError: true };
 
     const { data, error } = existing.data
       ? await supabase

@@ -4,7 +4,7 @@
  * the same numbers the server enforces.
  */
 
-export type ApiPlanCode = 'explorer' | 'builder' | 'business' | 'enterprise';
+export type ApiPlanCode = "explorer" | "builder" | "business" | "enterprise";
 
 export type ApiPlanLimits = {
   label: string;
@@ -20,7 +20,7 @@ export type ApiPlanLimits = {
 
 export const API_PLAN_LIMITS: Record<ApiPlanCode, ApiPlanLimits> = {
   explorer: {
-    label: 'Explorer',
+    label: "Explorer",
     requestsPerMinute: 20,
     requestsPerDay: 500,
     execution: false,
@@ -29,7 +29,7 @@ export const API_PLAN_LIMITS: Record<ApiPlanCode, ApiPlanLimits> = {
     maxWebhooks: 1,
   },
   builder: {
-    label: 'Builder',
+    label: "Builder",
     requestsPerMinute: 120,
     requestsPerDay: 20_000,
     execution: true,
@@ -38,7 +38,7 @@ export const API_PLAN_LIMITS: Record<ApiPlanCode, ApiPlanLimits> = {
     maxWebhooks: 5,
   },
   business: {
-    label: 'Business',
+    label: "Business",
     requestsPerMinute: 600,
     requestsPerDay: 200_000,
     execution: true,
@@ -47,7 +47,7 @@ export const API_PLAN_LIMITS: Record<ApiPlanCode, ApiPlanLimits> = {
     maxWebhooks: 25,
   },
   enterprise: {
-    label: 'Enterprise',
+    label: "Enterprise",
     requestsPerMinute: 3_000,
     requestsPerDay: 2_000_000,
     execution: true,
@@ -58,30 +58,30 @@ export const API_PLAN_LIMITS: Record<ApiPlanCode, ApiPlanLimits> = {
 };
 
 export function apiLimitsFor(planCode: string | null | undefined): ApiPlanLimits {
-  const code = (planCode ?? 'explorer') as ApiPlanCode;
+  const code = (planCode ?? "explorer") as ApiPlanCode;
   return API_PLAN_LIMITS[code] ?? API_PLAN_LIMITS.explorer;
 }
 
 export const API_SCOPES = [
-  'agents:read',
-  'agents:write',
-  'agents:run',
-  'tasks:read',
-  'tasks:write',
-  'workflows:read',
-  'workflows:run',
-  'workforces:read',
-  'marketplace:read',
-  'usage:read',
+  "agents:read",
+  "agents:write",
+  "agents:run",
+  "tasks:read",
+  "tasks:write",
+  "workflows:read",
+  "workflows:run",
+  "workforces:read",
+  "marketplace:read",
+  "usage:read",
 ] as const;
 
 export const WEBHOOK_EVENT_TYPES = [
-  'agent.completed',
-  'agent.failed',
-  'task.completed',
-  'workflow.completed',
-  'approval.required',
-  'purchase.completed',
+  "agent.completed",
+  "agent.failed",
+  "task.completed",
+  "workflow.completed",
+  "approval.required",
+  "purchase.completed",
 ] as const;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENT_TYPES)[number];

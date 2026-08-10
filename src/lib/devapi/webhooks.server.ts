@@ -5,8 +5,8 @@
  * signing secret (HMAC-SHA256) and sent with a timestamp so receivers can
  * reject replays. Deliveries are recorded for the developer portal.
  */
-import { hmacSha256Hex } from './keys.server';
-import type { WebhookEvent } from './plans';
+import { hmacSha256Hex } from "./keys.server";
+import type { WebhookEvent } from "./plans";
 
 const TIMEOUT_MS = 8000;
 
@@ -20,18 +20,18 @@ type DispatchArgs = {
 /** Sends an event to every active webhook subscribed to it. Never throws. */
 export async function dispatchWebhookEvent(args: DispatchArgs): Promise<{ delivered: number }> {
   try {
-    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin: any = supabaseAdmin;
 
     const query = admin
-      .from('webhooks')
-      .select('id,url,events,signing_secret,is_active,user_id,org_id,failure_count')
-      .eq('is_active', true)
-      .contains('events', [args.event]);
+      .from("webhooks")
+      .select("id,url,events,signing_secret,is_active,user_id,org_id,failure_count")
+      .eq("is_active", true)
+      .contains("events", [args.event]);
 
     const { data: hooks } = args.orgId
-      ? await query.eq('org_id', args.orgId)
-      : await query.eq('user_id', args.userId);
+      ? await query.eq("org_id", args.orgId)
+      : await query.eq("user_id", args.userId);
 
     if (!hooks?.length) return { delivered: 0 };
 
@@ -42,7 +42,7 @@ export async function dispatchWebhookEvent(args: DispatchArgs): Promise<{ delive
     }
     return { delivered };
   } catch (error) {
-    console.error('[webhooks] dispatch failed', error);
+    console.error("[webhooks] dispatch failed", error);
     return { delivered: 0 };
   }
 }
@@ -68,13 +68,13 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const res = await fetch(hook.url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
-        'user-agent': 'PalladiumAI-Webhooks/1.0',
-        'x-palladium-event': String(args.event),
-        'x-palladium-timestamp': String(timestamp),
-        ...(signature ? { 'x-palladium-signature': `v1=${signature}` } : {}),
+        "content-type": "application/json",
+        "user-agent": "PalladiumAI-Webhooks/1.0",
+        "x-palladium-event": String(args.event),
+        "x-palladium-timestamp": String(timestamp),
+        ...(signature ? { "x-palladium-signature": `v1=${signature}` } : {}),
       },
       body,
       signal: controller.signal,
@@ -83,18 +83,18 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
     status = res.status;
     if (!res.ok) error = `Endpoint responded ${res.status}`;
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Delivery failed';
+    error = e instanceof Error ? e.message : "Delivery failed";
   }
 
   const succeeded = status !== null && status >= 200 && status < 300;
 
-  await admin.from('webhook_deliveries').insert({
+  await admin.from("webhook_deliveries").insert({
     webhook_id: hook.id,
     user_id: hook.user_id,
     org_id: hook.org_id ?? null,
     event: args.event,
     payload: envelope,
-    status: succeeded ? 'delivered' : 'failed',
+    status: succeeded ? "delivered" : "failed",
     attempts: 1,
     response_status: status,
     error,
@@ -103,14 +103,14 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
   });
 
   await admin
-    .from('webhooks')
+    .from("webhooks")
     .update({
       last_delivery_at: new Date().toISOString(),
       delivery_count: (Number(hook.delivery_count) || 0) + 1,
       failure_count: succeeded ? 0 : (Number(hook.failure_count) || 0) + 1,
       is_active: !succeeded && (Number(hook.failure_count) || 0) + 1 >= 20 ? false : true,
     })
-    .eq('id', hook.id);
+    .eq("id", hook.id);
 
   return succeeded;
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
-import { setSubscriptionPlan, isDevAdminSession } from '@/lib/access';
 import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -25,20 +24,16 @@ export default function Payment() {
   const { checkUserAuth, user, isAuthenticated } = useAuth();
   const priceId = priceIdFor(plan.id, billing);
 
+  // Every account is on the free Explorer tier by default — it is the plan the
+  // server falls back to when no active subscription row exists, so no client
+  // call can "activate" anything. Paid tiers only become active when Stripe
+  // confirms payment through the signature-verified webhook.
   const activateFree = async () => {
     setDemoLoading(true);
-    try {
-      if (isDevAdminSession()) {
-        setSubscriptionPlan(plan.id);
-      } else {
-        await base44.functions.invoke('createSubscription', { plan: plan.id, interval: billing, currency: 'GBP' });
-        try { await checkUserAuth(); } catch {}
-      }
-    } catch {
-      setSubscriptionPlan(plan.id);
-    }
-    setTimeout(() => { window.location.href = '/dashboard'; }, 700);
+    try { await checkUserAuth(); } catch { /* plan resolves server-side anyway */ }
+    window.location.href = '/dashboard';
   };
+
 
 
   return (

@@ -5,10 +5,17 @@ import { notAuthenticated, supabaseForUser } from "../supabase";
 export default defineTool({
   name: "list_memories",
   title: "List personal memory",
-  description: "List entries from the signed-in user's PalladiumAI personal memory vault (preferences and facts agents use).",
+  description:
+    "List entries from the signed-in user's PalladiumAI personal memory vault (preferences and facts agents use).",
   inputSchema: {
     category: z.string().trim().optional().describe("Filter by memory category."),
-    limit: z.number().int().min(1).max(200).default(50).describe("Maximum number of entries to return."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .default(50)
+      .describe("Maximum number of entries to return."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ category, limit }, ctx) => {

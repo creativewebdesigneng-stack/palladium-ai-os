@@ -6,9 +6,9 @@
  * and needs no configuration; Pinecone and Weaviate are drop-in alternatives
  * that activate when their environment variables are present.
  */
-import { EMBEDDING_DIMENSIONS } from './embeddings.server';
+import { EMBEDDING_DIMENSIONS } from "./embeddings.server";
 
-export type VectorProvider = 'supabase' | 'pinecone' | 'weaviate';
+export type VectorProvider = "supabase" | "pinecone" | "weaviate";
 
 export type VectorRecord = {
   /** Row id in `agent_memories` / `memory_chunks` — the stable cross-provider key. */
@@ -25,13 +25,16 @@ export type VectorFilter = {
   userId: string;
   orgId?: string | null;
   agentId?: string | null;
-  namespace: 'memories' | 'chunks';
+  namespace: "memories" | "chunks";
 };
 
 export type VectorStore = {
   provider: VectorProvider;
   /** Writes/overwrites vectors. Returns the external ids when the backend mints them. */
-  upsert(records: VectorRecord[], filter: VectorFilter): Promise<{ externalIds: Record<string, string> }>;
+  upsert(
+    records: VectorRecord[],
+    filter: VectorFilter,
+  ): Promise<{ externalIds: Record<string, string> }>;
   /** Similarity search, always scoped to the caller's tenancy. */
   search(vector: number[], filter: VectorFilter, limit: number): Promise<VectorMatch[]>;
   remove(ids: string[], filter: VectorFilter): Promise<void>;
@@ -41,18 +44,24 @@ type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, un
 
 /** Reads the configured provider. Falls back to pgvector when unset/misconfigured. */
 export function resolveVectorProvider(preferred?: string | null): VectorProvider {
-  const wanted = (preferred ?? process.env['VECTOR_PROVIDER'] ?? 'supabase').toLowerCase();
-  if (wanted === 'pinecone' && process.env['PINECONE_API_KEY'] && process.env['PINECONE_INDEX_HOST']) return 'pinecone';
-  if (wanted === 'weaviate' && process.env['WEAVIATE_URL']) return 'weaviate';
-  return 'supabase';
+  const wanted = (preferred ?? process.env["VECTOR_PROVIDER"] ?? "supabase").toLowerCase();
+  if (
+    wanted === "pinecone" &&
+    process.env["PINECONE_API_KEY"] &&
+    process.env["PINECONE_INDEX_HOST"]
+  )
+    return "pinecone";
+  if (wanted === "weaviate" && process.env["WEAVIATE_URL"]) return "weaviate";
+  return "supabase";
 }
 
 /* ------------------------------------------------------------ pgvector (default) */
 
 function supabaseStore(sb: Sb): VectorStore {
-  const table = (filter: VectorFilter) => (filter.namespace === 'chunks' ? 'memory_chunks' : 'agent_memories');
+  const table = (filter: VectorFilter) =>
+    filter.namespace === "chunks" ? "memory_chunks" : "agent_memories";
   return {
-    provider: 'supabase',
+    provider: "supabase",
     async upsert(records, filter) {
       // Vectors live on the row itself; RLS guarantees the caller owns the row.
       for (const record of records) {
@@ -61,15 +70,15 @@ function supabaseStore(sb: Sb): VectorStore {
           .from(table(filter))
           .update({
             embedding: record.vector as unknown as string,
-            vector_provider: 'supabase',
-            ...(filter.namespace === 'memories' ? { vector_status: 'indexed' } : {}),
+            vector_provider: "supabase",
+            ...(filter.namespace === "memories" ? { vector_status: "indexed" } : {}),
           })
-          .eq('id', record.id);
+          .eq("id", record.id);
       }
       return { externalIds: {} };
     },
     async search(vector, filter, limit) {
-      const fn = filter.namespace === 'chunks' ? 'search_memory_chunks' : 'search_agent_memories';
+      const fn = filter.namespace === "chunks" ? "search_memory_chunks" : "search_agent_memories";
       const { data, error } = await sb.rpc(fn, {
         _embedding: vector as unknown as string,
         _match_count: limit,
@@ -84,7 +93,10 @@ function supabaseStore(sb: Sb): VectorStore {
     },
     async remove(ids, filter) {
       if (!ids.length) return;
-      await sb.from(table(filter)).update({ embedding: null, vector_status: 'disabled' }).in('id', ids);
+      await sb
+        .from(table(filter))
+        .update({ embedding: null, vector_status: "disabled" })
+        .in("id", ids);
     },
   };
 }
@@ -92,20 +104,24 @@ function supabaseStore(sb: Sb): VectorStore {
 /* ----------------------------------------------------------------------- Pinecone */
 
 function pineconeStore(): VectorStore {
-  const host = process.env['PINECONE_INDEX_HOST']!.replace(/\/$/, '');
-  const key = process.env['PINECONE_API_KEY']!;
-  const headers = { 'Api-Key': key, 'Content-Type': 'application/json' };
+  const host = process.env["PINECONE_INDEX_HOST"]!.replace(/\/$/, "");
+  const key = process.env["PINECONE_API_KEY"]!;
+  const headers = { "Api-Key": key, "Content-Type": "application/json" };
   const ns = (filter: VectorFilter) => `${filter.namespace}:${filter.orgId ?? filter.userId}`;
 
   return {
-    provider: 'pinecone',
+    provider: "pinecone",
     async upsert(records, filter) {
       const res = await fetch(`${host}/vectors/upsert`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           namespace: ns(filter),
-          vectors: records.map((r) => ({ id: r.id, values: r.vector, metadata: { ...r.metadata, content: r.content.slice(0, 2000) } })),
+          vectors: records.map((r) => ({
+            id: r.id,
+            values: r.vector,
+            metadata: { ...r.metadata, content: r.content.slice(0, 2000) },
+          })),
         }),
       });
       if (!res.ok) throw new Error(`Pinecone upsert failed (${res.status}).`);
@@ -113,7 +129,7 @@ function pineconeStore(): VectorStore {
     },
     async search(vector, filter, limit) {
       const res = await fetch(`${host}/query`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           namespace: ns(filter),
@@ -127,13 +143,19 @@ function pineconeStore(): VectorStore {
         }),
       });
       if (!res.ok) throw new Error(`Pinecone query failed (${res.status}).`);
-      const payload = (await res.json()) as { matches?: Array<{ id: string; score: number; metadata?: any }> };
-      return (payload.matches ?? []).map((m) => ({ id: m.id, similarity: m.score, content: m.metadata?.content }));
+      const payload = (await res.json()) as {
+        matches?: Array<{ id: string; score: number; metadata?: any }>;
+      };
+      return (payload.matches ?? []).map((m) => ({
+        id: m.id,
+        similarity: m.score,
+        content: m.metadata?.content,
+      }));
     },
     async remove(ids, filter) {
       if (!ids.length) return;
       await fetch(`${host}/vectors/delete`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({ namespace: ns(filter), ids }),
       });
@@ -144,17 +166,21 @@ function pineconeStore(): VectorStore {
 /* ----------------------------------------------------------------------- Weaviate */
 
 function weaviateStore(): VectorStore {
-  const base = process.env['WEAVIATE_URL']!.replace(/\/$/, '');
-  const key = process.env['WEAVIATE_API_KEY'];
-  const headers = { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) };
-  const className = (filter: VectorFilter) => (filter.namespace === 'chunks' ? 'PalladiumChunk' : 'PalladiumMemory');
+  const base = process.env["WEAVIATE_URL"]!.replace(/\/$/, "");
+  const key = process.env["WEAVIATE_API_KEY"];
+  const headers = {
+    "Content-Type": "application/json",
+    ...(key ? { Authorization: `Bearer ${key}` } : {}),
+  };
+  const className = (filter: VectorFilter) =>
+    filter.namespace === "chunks" ? "PalladiumChunk" : "PalladiumMemory";
 
   return {
-    provider: 'weaviate',
+    provider: "weaviate",
     async upsert(records, filter) {
       for (const record of records) {
         const res = await fetch(`${base}/v1/objects`, {
-          method: 'POST',
+          method: "POST",
           headers,
           body: JSON.stringify({
             class: className(filter),
@@ -166,7 +192,7 @@ function weaviateStore(): VectorStore {
         // 422 means the object already exists; replace it instead.
         if (res.status === 422) {
           await fetch(`${base}/v1/objects/${className(filter)}/${record.id}`, {
-            method: 'PUT',
+            method: "PUT",
             headers,
             body: JSON.stringify({
               class: className(filter),
@@ -189,15 +215,23 @@ function weaviateStore(): VectorStore {
           where: { path: ["user_id"], operator: Equal, valueText: ${JSON.stringify(filter.userId)} }
         ) { content _additional { id certainty } } }
       }`;
-      const res = await fetch(`${base}/v1/graphql`, { method: 'POST', headers, body: JSON.stringify({ query }) });
+      const res = await fetch(`${base}/v1/graphql`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ query }),
+      });
       if (!res.ok) throw new Error(`Weaviate query failed (${res.status}).`);
       const payload = (await res.json()) as any;
       const rows = payload?.data?.Get?.[className(filter)] ?? [];
-      return rows.map((r: any) => ({ id: r._additional?.id, similarity: Number(r._additional?.certainty ?? 0), content: r.content }));
+      return rows.map((r: any) => ({
+        id: r._additional?.id,
+        similarity: Number(r._additional?.certainty ?? 0),
+        content: r.content,
+      }));
     },
     async remove(ids, filter) {
       for (const id of ids) {
-        await fetch(`${base}/v1/objects/${className(filter)}/${id}`, { method: 'DELETE', headers });
+        await fetch(`${base}/v1/objects/${className(filter)}/${id}`, { method: "DELETE", headers });
       }
     },
   };
@@ -206,7 +240,7 @@ function weaviateStore(): VectorStore {
 /** Returns the active store. `sb` is the caller-scoped client used by pgvector. */
 export function getVectorStore(sb: Sb, preferred?: string | null): VectorStore {
   const provider = resolveVectorProvider(preferred);
-  if (provider === 'pinecone') return pineconeStore();
-  if (provider === 'weaviate') return weaviateStore();
+  if (provider === "pinecone") return pineconeStore();
+  if (provider === "weaviate") return weaviateStore();
   return supabaseStore(sb);
 }

@@ -7,7 +7,10 @@ export const Route = createFileRoute("/_shell/_app/agents/$id/")({
       { title: "Agent detail — PalladiumAI" },
       { name: "description", content: "Inspect an agent’s configuration, tools and performance." },
       { property: "og:title", content: "Agent detail — PalladiumAI" },
-      { property: "og:description", content: "Inspect an agent’s configuration, tools and performance." },
+      {
+        property: "og:description",
+        content: "Inspect an agent’s configuration, tools and performance.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

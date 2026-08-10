@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { Bot, Zap, Cpu, Workflow, BrainCircuit, HardDrive, Code2, Wrench, RotateCcw } from 'lucide-react';
+import { Bot, Zap, Cpu, Workflow, BrainCircuit, HardDrive, Code2, Wrench } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { getPlanKey, planDisplay } from '@/lib/permissions';
-import { useUsage, getPlanLimits, USAGE_METRIC_LABELS, resetUsage } from '@/lib/usage';
+import { useUsage, getPlanLimits, USAGE_METRIC_LABELS } from '@/lib/usage';
 
 const METRICS = [
   { key: 'agentExecutions', icon: Zap, unit: 'runs' },
@@ -48,15 +48,15 @@ function MetricCard({ icon: Icon, label, used, max, unit, i }) {
   );
 }
 
-// Dynamic usage dashboard: shows the current plan and this-month usage across
-// all tracked metrics vs the plan's limits. Usage is reactive to trackUsage();
-// limits scale dramatically for the Business / Business Plus tiers.
+// Usage dashboard. Plan and consumption are read from the backend only —
+// usage_records are written with elevated privileges, so the figures here
+// cannot be edited from the browser.
 export default function UsageDashboard() {
   const { user } = useAuth();
   const key = getPlanKey(user);
   const display = planDisplay(key);
   const limits = getPlanLimits(user);
-  const usage = useUsage(user);
+  const usage = useUsage();
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[.02] p-5">
@@ -66,9 +66,6 @@ export default function UsageDashboard() {
           <h2 className="text-xl font-semibold text-white">{display.name}{display.subtitle ? ` — ${display.subtitle}` : ''}</h2>
           <p className="mt-0.5 text-sm text-zinc-400">Usage this month · resets at the start of each billing cycle</p>
         </div>
-        <button onClick={resetUsage} className="flex w-fit items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/5 hover:text-white">
-          <RotateCcw className="h-3.5 w-3.5" /> Reset demo usage
-        </button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {METRICS.map((m, i) => (

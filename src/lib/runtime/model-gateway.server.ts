@@ -12,10 +12,10 @@
  * the caller and never leave this module.
  */
 
-export type Provider = 'lovable' | 'openai' | 'anthropic' | 'compatible';
+export type Provider = "lovable" | "openai" | "anthropic" | "compatible";
 
 export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant' | 'tool';
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
   tool_call_id?: string;
   name?: string;
@@ -39,9 +39,9 @@ export type ChatResult = {
 };
 
 export type StreamEvent =
-  | { type: 'text'; delta: string }
-  | { type: 'tool_calls'; toolCalls: ToolCall[] }
-  | { type: 'done'; result: ChatResult };
+  | { type: "text"; delta: string }
+  | { type: "tool_calls"; toolCalls: ToolCall[] }
+  | { type: "done"; result: ChatResult };
 
 export class ProviderError extends Error {
   constructor(
@@ -54,68 +54,74 @@ export class ProviderError extends Error {
 }
 
 const DEFAULT_MODEL: Record<Provider, string> = {
-  lovable: 'google/gemini-3-flash-preview',
-  openai: 'gpt-5-mini',
-  anthropic: 'claude-sonnet-4-5-20250929',
-  compatible: 'local-model',
+  lovable: "google/gemini-3-flash-preview",
+  openai: "gpt-5-mini",
+  anthropic: "claude-sonnet-4-5-20250929",
+  compatible: "local-model",
 };
 
 export function normaliseProvider(value?: string | null): Provider {
-  const v = (value ?? '').toLowerCase();
-  if (v === 'openai') return 'openai';
-  if (v === 'anthropic' || v === 'claude') return 'anthropic';
-  if (v === 'compatible' || v === 'openai-compatible' || v === 'local' || v === 'ollama') return 'compatible';
-  return 'lovable';
+  const v = (value ?? "").toLowerCase();
+  if (v === "openai") return "openai";
+  if (v === "anthropic" || v === "claude") return "anthropic";
+  if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
+    return "compatible";
+  return "lovable";
 }
 
 export function resolveModel(provider: Provider, model?: string | null): string {
-  const m = (model ?? '').trim();
+  const m = (model ?? "").trim();
   if (!m) return DEFAULT_MODEL[provider];
   // Lovable gateway models are namespaced (`vendor/model`); keep friendly names working.
-  if (provider === 'lovable' && !m.includes('/')) return DEFAULT_MODEL.lovable;
+  if (provider === "lovable" && !m.includes("/")) return DEFAULT_MODEL.lovable;
   return m;
 }
 
-type Endpoint = { url: string; headers: Record<string, string>; kind: 'chat' | 'anthropic' };
+type Endpoint = { url: string; headers: Record<string, string>; kind: "chat" | "anthropic" };
 
 function endpointFor(provider: Provider): Endpoint {
-  if (provider === 'openai') {
-    const key = process.env['OPENAI_API_KEY'];
-    if (!key) throw new ProviderError('OpenAI is not configured for this workspace.', 503, false);
+  if (provider === "openai") {
+    const key = process.env["OPENAI_API_KEY"];
+    if (!key) throw new ProviderError("OpenAI is not configured for this workspace.", 503, false);
     return {
-      url: 'https://api.openai.com/v1/chat/completions',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      kind: 'chat',
+      url: "https://api.openai.com/v1/chat/completions",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      kind: "chat",
     };
   }
-  if (provider === 'anthropic') {
-    const key = process.env['ANTHROPIC_API_KEY'];
-    if (!key) throw new ProviderError('Anthropic is not configured for this workspace.', 503, false);
+  if (provider === "anthropic") {
+    const key = process.env["ANTHROPIC_API_KEY"];
+    if (!key)
+      throw new ProviderError("Anthropic is not configured for this workspace.", 503, false);
     return {
-      url: 'https://api.anthropic.com/v1/messages',
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      kind: 'anthropic',
-    };
-  }
-  if (provider === 'compatible') {
-    const base = process.env['OPENAI_COMPATIBLE_BASE_URL'];
-    if (!base) throw new ProviderError('No OpenAI-compatible endpoint is configured.', 503, false);
-    const key = process.env['OPENAI_COMPATIBLE_API_KEY'];
-    return {
-      url: `${base.replace(/\/+$/, '')}/chat/completions`,
+      url: "https://api.anthropic.com/v1/messages",
       headers: {
-        'Content-Type': 'application/json',
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      kind: "anthropic",
+    };
+  }
+  if (provider === "compatible") {
+    const base = process.env["OPENAI_COMPATIBLE_BASE_URL"];
+    if (!base) throw new ProviderError("No OpenAI-compatible endpoint is configured.", 503, false);
+    const key = process.env["OPENAI_COMPATIBLE_API_KEY"];
+    return {
+      url: `${base.replace(/\/+$/, "")}/chat/completions`,
+      headers: {
+        "Content-Type": "application/json",
         ...(key ? { Authorization: `Bearer ${key}` } : {}),
       },
-      kind: 'chat',
+      kind: "chat",
     };
   }
-  const key = process.env['LOVABLE_API_KEY'];
-  if (!key) throw new ProviderError('The AI gateway is not configured.', 503, false);
+  const key = process.env["LOVABLE_API_KEY"];
+  if (!key) throw new ProviderError("The AI gateway is not configured.", 503, false);
   return {
-    url: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-    headers: { 'Lovable-API-Key': key, 'Content-Type': 'application/json' },
-    kind: 'chat',
+    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    headers: { "Lovable-API-Key": key, "Content-Type": "application/json" },
+    kind: "chat",
   };
 }
 
@@ -123,16 +129,16 @@ function endpointFor(provider: Provider): Endpoint {
 
 function chatBody(args: RunArgs, stream: boolean) {
   const messages = args.messages.map((m) => {
-    if (m.role === 'tool') {
-      return { role: 'tool', tool_call_id: m.tool_call_id, content: m.content };
+    if (m.role === "tool") {
+      return { role: "tool", tool_call_id: m.tool_call_id, content: m.content };
     }
-    if (m.role === 'assistant' && m.tool_calls?.length) {
+    if (m.role === "assistant" && m.tool_calls?.length) {
       return {
-        role: 'assistant',
+        role: "assistant",
         content: m.content || null,
         tool_calls: m.tool_calls.map((t) => ({
           id: t.id,
-          type: 'function',
+          type: "function",
           function: { name: t.name, arguments: JSON.stringify(t.arguments) },
         })),
       };
@@ -150,7 +156,7 @@ function chatBody(args: RunArgs, stream: boolean) {
     ...(args.tools?.length
       ? {
           tools: args.tools.map((t) => ({
-            type: 'function',
+            type: "function",
             function: { name: t.name, description: t.description, parameters: t.parameters },
           })),
         }
@@ -160,26 +166,31 @@ function chatBody(args: RunArgs, stream: boolean) {
 
 function anthropicBody(args: RunArgs, stream: boolean) {
   const system = args.messages
-    .filter((m) => m.role === 'system')
+    .filter((m) => m.role === "system")
     .map((m) => m.content)
-    .join('\n\n');
+    .join("\n\n");
 
   const messages: Array<Record<string, unknown>> = [];
   for (const m of args.messages) {
-    if (m.role === 'system') continue;
-    if (m.role === 'tool') {
+    if (m.role === "system") continue;
+    if (m.role === "tool") {
       messages.push({
-        role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: m.tool_call_id, content: m.content }],
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: m.tool_call_id, content: m.content }],
       });
       continue;
     }
-    if (m.role === 'assistant' && m.tool_calls?.length) {
+    if (m.role === "assistant" && m.tool_calls?.length) {
       messages.push({
-        role: 'assistant',
+        role: "assistant",
         content: [
-          ...(m.content ? [{ type: 'text', text: m.content }] : []),
-          ...m.tool_calls.map((t) => ({ type: 'tool_use', id: t.id, name: t.name, input: t.arguments })),
+          ...(m.content ? [{ type: "text", text: m.content }] : []),
+          ...m.tool_calls.map((t) => ({
+            type: "tool_use",
+            id: t.id,
+            name: t.name,
+            input: t.arguments,
+          })),
         ],
       });
       continue;
@@ -223,15 +234,26 @@ const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
 function providerError(status: number, body: string) {
   const trimmed = body.slice(0, 400);
-  if (status === 429) return new ProviderError('The model provider is rate limiting this workspace. Try again shortly.', 429, true);
-  if (status === 402) return new ProviderError('AI credits are exhausted for this workspace.', 402, false);
-  if (status === 401 || status === 403) return new ProviderError('The model provider rejected the runtime credentials.', status, false);
-  return new ProviderError(`Model provider error (${status}): ${trimmed}`, status, RETRY_STATUS.has(status));
+  if (status === 429)
+    return new ProviderError(
+      "The model provider is rate limiting this workspace. Try again shortly.",
+      429,
+      true,
+    );
+  if (status === 402)
+    return new ProviderError("AI credits are exhausted for this workspace.", 402, false);
+  if (status === 401 || status === 403)
+    return new ProviderError("The model provider rejected the runtime credentials.", status, false);
+  return new ProviderError(
+    `Model provider error (${status}): ${trimmed}`,
+    status,
+    RETRY_STATUS.has(status),
+  );
 }
 
 async function send(args: RunArgs, stream: boolean): Promise<Response> {
   const ep = endpointFor(args.provider);
-  const body = ep.kind === 'anthropic' ? anthropicBody(args, stream) : chatBody(args, stream);
+  const body = ep.kind === "anthropic" ? anthropicBody(args, stream) : chatBody(args, stream);
   const timeout = args.timeoutMs ?? 90_000;
 
   let lastError: unknown;
@@ -240,7 +262,7 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
     const signal = args.signal ? anySignal([args.signal, timer]) : timer;
     try {
       const res = await fetch(ep.url, {
-        method: 'POST',
+        method: "POST",
         headers: ep.headers,
         body: JSON.stringify(body),
         signal,
@@ -251,18 +273,20 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
       if (!err.retryable || attempt === 2) throw err;
       lastError = err;
     } catch (error) {
-      if (args.signal?.aborted) throw new ProviderError('Run cancelled.', 499, false);
+      if (args.signal?.aborted) throw new ProviderError("Run cancelled.", 499, false);
       if (error instanceof ProviderError && !error.retryable) throw error;
       if (attempt === 2) {
         throw error instanceof ProviderError
           ? error
-          : new ProviderError('The model provider did not respond in time.', 504, true);
+          : new ProviderError("The model provider did not respond in time.", 504, true);
       }
       lastError = error;
     }
     await new Promise((r) => setTimeout(r, 400 * 2 ** attempt));
   }
-  throw lastError instanceof Error ? lastError : new ProviderError('Model call failed.', 500, false);
+  throw lastError instanceof Error
+    ? lastError
+    : new ProviderError("Model call failed.", 500, false);
 }
 
 function anySignal(signals: AbortSignal[]): AbortSignal {
@@ -272,7 +296,7 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
       controller.abort(s.reason);
       break;
     }
-    s.addEventListener('abort', () => controller.abort(s.reason), { once: true });
+    s.addEventListener("abort", () => controller.abort(s.reason), { once: true });
   }
   return controller.signal;
 }
@@ -283,13 +307,21 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   const res = await send(args, false);
   const json = (await res.json()) as any;
 
-  if (args.provider === 'anthropic') {
+  if (args.provider === "anthropic") {
     const blocks: any[] = json.content ?? [];
     return {
-      text: blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim(),
+      text: blocks
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim(),
       toolCalls: blocks
-        .filter((b) => b.type === 'tool_use')
-        .map((b) => ({ id: b.id, name: b.name, arguments: (b.input ?? {}) as Record<string, unknown> })),
+        .filter((b) => b.type === "tool_use")
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          arguments: (b.input ?? {}) as Record<string, unknown>,
+        })),
       usage: { input: json.usage?.input_tokens ?? 0, output: json.usage?.output_tokens ?? 0 },
       provider: args.provider,
       model: args.model,
@@ -298,7 +330,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 
   const msg = json.choices?.[0]?.message ?? {};
   return {
-    text: (msg.content ?? '').trim(),
+    text: (msg.content ?? "").trim(),
     toolCalls: (msg.tool_calls ?? []).map((t: any) => ({
       id: t.id,
       name: t.function?.name,
@@ -311,9 +343,9 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 }
 
 function safeJson(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'string') return (value as Record<string, unknown>) ?? {};
+  if (typeof value !== "string") return (value as Record<string, unknown>) ?? {};
   try {
-    return JSON.parse(value || '{}');
+    return JSON.parse(value || "{}");
   } catch {
     return {};
   }
@@ -325,12 +357,12 @@ function safeJson(value: unknown): Record<string, unknown> {
  * assembled result (including any tool calls) so the caller can continue a loop. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   const res = await send(args, true);
-  if (!res.body) throw new ProviderError('The model provider returned an empty stream.', 502, true);
+  if (!res.body) throw new ProviderError("The model provider returned an empty stream.", 502, true);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
-  let text = '';
+  let buffer = "";
+  let text = "";
   const usage = { input: 0, output: 0 };
   const partialTools = new Map<number, { id: string; name: string; args: string }>();
   const anthropicTools = new Map<number, { id: string; name: string; args: string }>();
@@ -339,14 +371,14 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
 
     for (const raw of lines) {
       const line = raw.trim();
-      if (!line.startsWith('data:')) continue;
+      if (!line.startsWith("data:")) continue;
       const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
+      if (!payload || payload === "[DONE]") continue;
 
       let evt: any;
       try {
@@ -355,20 +387,24 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
         continue;
       }
 
-      if (args.provider === 'anthropic') {
-        if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
-          anthropicTools.set(evt.index, { id: evt.content_block.id, name: evt.content_block.name, args: '' });
-        } else if (evt.type === 'content_block_delta') {
-          if (evt.delta?.type === 'text_delta') {
+      if (args.provider === "anthropic") {
+        if (evt.type === "content_block_start" && evt.content_block?.type === "tool_use") {
+          anthropicTools.set(evt.index, {
+            id: evt.content_block.id,
+            name: evt.content_block.name,
+            args: "",
+          });
+        } else if (evt.type === "content_block_delta") {
+          if (evt.delta?.type === "text_delta") {
             text += evt.delta.text;
-            yield { type: 'text', delta: evt.delta.text };
-          } else if (evt.delta?.type === 'input_json_delta') {
+            yield { type: "text", delta: evt.delta.text };
+          } else if (evt.delta?.type === "input_json_delta") {
             const t = anthropicTools.get(evt.index);
-            if (t) t.args += evt.delta.partial_json ?? '';
+            if (t) t.args += evt.delta.partial_json ?? "";
           }
-        } else if (evt.type === 'message_start') {
+        } else if (evt.type === "message_start") {
           usage.input += evt.message?.usage?.input_tokens ?? 0;
-        } else if (evt.type === 'message_delta') {
+        } else if (evt.type === "message_delta") {
           usage.output += evt.usage?.output_tokens ?? 0;
         }
         continue;
@@ -377,11 +413,11 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
       const delta = evt.choices?.[0]?.delta;
       if (delta?.content) {
         text += delta.content;
-        yield { type: 'text', delta: delta.content };
+        yield { type: "text", delta: delta.content };
       }
       for (const tc of delta?.tool_calls ?? []) {
         const idx = tc.index ?? 0;
-        const current = partialTools.get(idx) ?? { id: tc.id ?? `call_${idx}`, name: '', args: '' };
+        const current = partialTools.get(idx) ?? { id: tc.id ?? `call_${idx}`, name: "", args: "" };
         if (tc.id) current.id = tc.id;
         if (tc.function?.name) current.name = tc.function.name;
         if (tc.function?.arguments) current.args += tc.function.arguments;
@@ -394,14 +430,14 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
     }
   }
 
-  const collected = args.provider === 'anthropic' ? anthropicTools : partialTools;
+  const collected = args.provider === "anthropic" ? anthropicTools : partialTools;
   const toolCalls: ToolCall[] = [...collected.values()]
     .filter((t) => t.name)
     .map((t) => ({ id: t.id, name: t.name, arguments: safeJson(t.args) }));
 
-  if (toolCalls.length) yield { type: 'tool_calls', toolCalls };
+  if (toolCalls.length) yield { type: "tool_calls", toolCalls };
   yield {
-    type: 'done',
+    type: "done",
     result: { text: text.trim(), toolCalls, usage, provider: args.provider, model: args.model },
   };
 }

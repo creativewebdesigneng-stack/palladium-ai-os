@@ -4,11 +4,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Loader2 } from "lucide-react";
 
-type OAuthResult = { redirect_url?: string; redirect_to?: string; client?: { name?: string } | null };
+type OAuthResult = {
+  redirect_url?: string;
+  redirect_to?: string;
+  client?: { name?: string } | null;
+};
 type OAuthApi = {
-  getAuthorizationDetails: (id: string) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
-  approveAuthorization: (id: string) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
-  denyAuthorization: (id: string) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
+  getAuthorizationDetails: (
+    id: string,
+  ) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
+  approveAuthorization: (
+    id: string,
+  ) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
+  denyAuthorization: (
+    id: string,
+  ) => Promise<{ data: OAuthResult | null; error: { message: string } | null }>;
 };
 const oauthApi = () => (supabase.auth as unknown as { oauth: OAuthApi }).oauth;
 
@@ -79,8 +89,8 @@ function Consent() {
         </div>
         <h1 className="text-2xl font-semibold mb-2">Connect {clientName} to PalladiumAI</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          {clientName} will be able to read and manage your agents, missions, approvals and personal memory as you.
-          You can revoke access at any time.
+          {clientName} will be able to read and manage your agents, missions, approvals and personal
+          memory as you. You can revoke access at any time.
         </p>
         {error && (
           <p role="alert" className="text-sm text-destructive mb-4">
@@ -92,7 +102,12 @@ function Consent() {
             {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Approve
           </Button>
-          <Button variant="outline" className="flex-1" disabled={busy} onClick={() => decide(false)}>
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={busy}
+            onClick={() => decide(false)}
+          >
             Deny
           </Button>
         </div>
