@@ -68,6 +68,7 @@ import { Route as ShellAppMarketingRouteImport } from './routes/_shell/_app/mark
 import { Route as ShellAppMarketplaceRouteImport } from './routes/_shell/_app/marketplace'
 import { Route as ShellAppMcpHubRouteImport } from './routes/_shell/_app/mcp-hub'
 import { Route as ShellAppMemoryRouteImport } from './routes/_shell/_app/memory'
+import { Route as ShellAppMissionControlRouteImport } from './routes/_shell/_app/mission-control'
 import { Route as ShellAppModelsRouteImport } from './routes/_shell/_app/models'
 import { Route as ShellAppNewsResearchRouteImport } from './routes/_shell/_app/news-research'
 import { Route as ShellAppNotificationsRouteImport } from './routes/_shell/_app/notifications'
@@ -402,6 +403,11 @@ const ShellAppMemoryRoute = ShellAppMemoryRouteImport.update({
   path: '/memory',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppMissionControlRoute = ShellAppMissionControlRouteImport.update({
+  id: '/mission-control',
+  path: '/mission-control',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppModelsRoute = ShellAppModelsRouteImport.update({
   id: '/models',
   path: '/models',
@@ -648,6 +654,7 @@ export interface FileRoutesByFullPath {
   '/marketplace': typeof ShellAppMarketplaceRoute
   '/mcp-hub': typeof ShellAppMcpHubRoute
   '/memory': typeof ShellAppMemoryRoute
+  '/mission-control': typeof ShellAppMissionControlRoute
   '/models': typeof ShellAppModelsRoute
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
@@ -743,6 +750,7 @@ export interface FileRoutesByTo {
   '/marketplace': typeof ShellAppMarketplaceRoute
   '/mcp-hub': typeof ShellAppMcpHubRoute
   '/memory': typeof ShellAppMemoryRoute
+  '/mission-control': typeof ShellAppMissionControlRoute
   '/models': typeof ShellAppModelsRoute
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
@@ -841,6 +849,7 @@ export interface FileRoutesById {
   '/_shell/_app/marketplace': typeof ShellAppMarketplaceRoute
   '/_shell/_app/mcp-hub': typeof ShellAppMcpHubRoute
   '/_shell/_app/memory': typeof ShellAppMemoryRoute
+  '/_shell/_app/mission-control': typeof ShellAppMissionControlRoute
   '/_shell/_app/models': typeof ShellAppModelsRoute
   '/_shell/_app/news-research': typeof ShellAppNewsResearchRoute
   '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
@@ -938,6 +947,7 @@ export interface FileRouteTypes {
     | '/marketplace'
     | '/mcp-hub'
     | '/memory'
+    | '/mission-control'
     | '/models'
     | '/news-research'
     | '/notifications'
@@ -1033,6 +1043,7 @@ export interface FileRouteTypes {
     | '/marketplace'
     | '/mcp-hub'
     | '/memory'
+    | '/mission-control'
     | '/models'
     | '/news-research'
     | '/notifications'
@@ -1130,6 +1141,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/marketplace'
     | '/_shell/_app/mcp-hub'
     | '/_shell/_app/memory'
+    | '/_shell/_app/mission-control'
     | '/_shell/_app/models'
     | '/_shell/_app/news-research'
     | '/_shell/_app/notifications'
@@ -1608,6 +1620,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppMemoryRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/mission-control': {
+      id: '/_shell/_app/mission-control'
+      path: '/mission-control'
+      fullPath: '/mission-control'
+      preLoaderRoute: typeof ShellAppMissionControlRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/models': {
       id: '/_shell/_app/models'
       path: '/models'
@@ -1900,6 +1919,7 @@ interface ShellAppRouteChildren {
   ShellAppMarketplaceRoute: typeof ShellAppMarketplaceRoute
   ShellAppMcpHubRoute: typeof ShellAppMcpHubRoute
   ShellAppMemoryRoute: typeof ShellAppMemoryRoute
+  ShellAppMissionControlRoute: typeof ShellAppMissionControlRoute
   ShellAppModelsRoute: typeof ShellAppModelsRoute
   ShellAppNewsResearchRoute: typeof ShellAppNewsResearchRoute
   ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
@@ -1975,6 +1995,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppMarketplaceRoute: ShellAppMarketplaceRoute,
   ShellAppMcpHubRoute: ShellAppMcpHubRoute,
   ShellAppMemoryRoute: ShellAppMemoryRoute,
+  ShellAppMissionControlRoute: ShellAppMissionControlRoute,
   ShellAppModelsRoute: ShellAppModelsRoute,
   ShellAppNewsResearchRoute: ShellAppNewsResearchRoute,
   ShellAppNotificationsRoute: ShellAppNotificationsRoute,

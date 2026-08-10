@@ -2,14 +2,16 @@ import { NavLink } from 'react-router-dom';
 import {
   Home, FolderKanban, Users, Bot, ListChecks, Workflow, Files, BookOpen, Rocket,
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
-  ShieldCheck, CreditCard, Building2, ScrollText, Activity, Cpu, Lock, ChevronRight,
+  ShieldCheck, CreditCard, Building2, ScrollText, Activity, Cpu, Lock, ChevronRight, Radar,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
 
 const MAIN = [
   ['Home', '/dashboard', Home],
+  ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
+
   ['AI Workforce', '/workforce', Users],
   ['Agents', '/agents', Bot],
   ['Tasks', '/tasks', ListChecks],
