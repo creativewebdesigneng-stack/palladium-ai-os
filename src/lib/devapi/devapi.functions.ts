@@ -314,7 +314,9 @@ export const getApiUsageFn = createServerFn({ method: 'POST' })
       requests: rows.length,
       errors,
       error_rate: rows.length ? Number(((errors / rows.length) * 100).toFixed(1)) : 0,
-      avg_latency_ms: latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0,
+      avg_latency_ms: latencies.length
+        ? Math.round(latencies.reduce((a: number, b: number) => a + b, 0) / latencies.length)
+        : 0,
       series: buckets,
       plan: { code: planCode, ...limits },
       top_keys: Array.from(perKey.entries())
