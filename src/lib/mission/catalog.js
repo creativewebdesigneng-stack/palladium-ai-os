@@ -70,11 +70,14 @@ export const AGENT_TEMPLATES = [
 ];
 
 export const MEMORY_CATEGORIES = [
-  { id: 'shopping', label: 'Shopping', hints: ['Preferred brands', 'Clothing size', 'Budget preference', 'Preferred retailers', 'Delivery preference'] },
-  { id: 'food', label: 'Food', hints: ['Favourite foods', 'Dietary preference', 'Cooking style', 'Allergies to avoid'] },
-  { id: 'travel', label: 'Travel', hints: ['Preferred airline', 'Hotel preference', 'Seat preference', 'Travel budget'] },
-  { id: 'general', label: 'General', hints: ['Personal preference', 'Important date', 'Routine'] },
+  { id: 'shopping', label: 'Shopping preferences', hints: ['Preferred brands', 'Clothing size', 'Budget preference', 'Preferred retailers', 'Delivery preference'] },
+  { id: 'food', label: 'Food preferences', hints: ['Favourite foods', 'Dietary preference', 'Cooking style', 'Allergies to avoid'] },
+  { id: 'travel', label: 'Travel preferences', hints: ['Preferred airline', 'Hotel preference', 'Seat preference', 'Travel budget'] },
+  { id: 'routines', label: 'Personal routines', hints: ['Morning routine', 'Workout days', 'Weekly shop day', 'Focus hours'] },
+  { id: 'dates', label: 'Important dates', hints: ['Birthday', 'Anniversary', 'Renewal date', 'Appointment'] },
+  { id: 'general', label: 'General preferences', hints: ['Personal preference', 'Communication style', 'Household detail'] },
 ];
+
 
 export const RISK_STYLE = {
   low: { label: 'Low risk', badge: 'bg-emerald-500/15 text-emerald-300', dot: 'bg-emerald-400' },

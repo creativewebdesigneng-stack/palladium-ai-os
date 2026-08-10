@@ -46,7 +46,11 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
 
-    const [agents, tasks, approvals, activities, purchases, memories, shoppingResults, audit] = await Promise.all([
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    const [agents, tasks, approvals, activities, purchases, memories, shoppingResults, audit, notifications, usage, agentRuns] = await Promise.all([
       sb.from('personal_agents').select('*').order('created_at', { ascending: false }),
       sb.from('personal_tasks').select('*').order('created_at', { ascending: false }).limit(80),
       sb.from('approval_requests').select('*').order('created_at', { ascending: false }).limit(60),
@@ -55,7 +59,11 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       sb.from('personal_memories').select('*').order('category', { ascending: true }),
       sb.from('shopping_results').select('*').order('created_at', { ascending: false }).limit(80),
       sb.from('mission_audit_logs').select('*').order('created_at', { ascending: false }).limit(30),
+      sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40),
+      sb.from('usage_records').select('metric, quantity, unit, occurred_at').gte('occurred_at', monthStart.toISOString()).limit(500),
+      sb.from('agent_tasks').select('status, tokens_in, tokens_out, cost_pence, created_at').order('created_at', { ascending: false }).limit(200),
     ]);
+
 
     const agentRows = agents.data ?? [];
     const taskRows = tasks.data ?? [];
@@ -80,6 +88,20 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       briefingFallback,
     );
 
+    const notificationRows = notifications.data ?? [];
+    const usageRows = usage.data ?? [];
+    const runRows = agentRuns.data ?? [];
+
+    const usageByMetric: Record<string, number> = {};
+    for (const r of usageRows as any[]) {
+      const key = String(r.metric);
+      usageByMetric[key] = (usageByMetric[key] ?? 0) + Number(r.quantity ?? 0);
+    }
+
+    const tokensIn = runRows.reduce((sum: number, r: any) => sum + Number(r.tokens_in ?? 0), 0);
+    const tokensOut = runRows.reduce((sum: number, r: any) => sum + Number(r.tokens_out ?? 0), 0);
+    const costPence = runRows.reduce((sum: number, r: any) => sum + Number(r.cost_pence ?? 0), 0);
+
     return {
       briefing,
       agents: agentRows,
@@ -90,6 +112,16 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       memories: memories.data ?? [],
       shoppingResults: shoppingResults.data ?? [],
       audit: audit.data ?? [],
+      notifications: notificationRows,
+      usage: {
+        byMetric: usageByMetric,
+        agentRuns: runRows.length,
+        succeededRuns: runRows.filter((r: any) => r.status === 'succeeded').length,
+        failedRuns: runRows.filter((r: any) => r.status === 'failed').length,
+        tokensIn,
+        tokensOut,
+        costPence,
+      },
       metrics: {
         activeAgents: counts.agents,
         totalAgents: agentRows.length,
@@ -100,8 +132,10 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
         personalTasks: taskRows.filter((t: any) => t.scope === 'personal').length,
         professionalTasks: taskRows.filter((t: any) => t.scope === 'professional').length,
         failedTasks: taskRows.filter((t: any) => t.status === 'failed').length,
+        unreadNotifications: notificationRows.filter((n: any) => !n.read_at).length,
       },
     };
+
   });
 
 /* -------------------------------------------------------------------- agents */
@@ -584,6 +618,34 @@ export const deleteMemory = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const res = await sb.from('personal_memories').delete().eq('id', data.id).eq('user_id', context.userId);
+    if (res.error) throw new Error(res.error.message);
+    return { ok: true };
+  });
+
+export const clearMemoryCategory = createServerFn({ method: 'POST' })
+  .inputValidator((input: { category: string }) => {
+    if (!input?.category) throw new Error('A category is required');
+    return input;
+  })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const res = await sb.from('personal_memories').delete().eq('user_id', context.userId).eq('category', data.category);
+    if (res.error) throw new Error(res.error.message);
+    await log(sb, context.userId, 'memory_category_cleared', { metadata: { category: data.category } });
+    return { ok: true };
+  });
+
+/* ------------------------------------------------------------- notifications */
+
+export const markNotifications = createServerFn({ method: 'POST' })
+  .inputValidator((input: { id?: string; all?: boolean }) => input ?? {})
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let q = sb.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', context.userId).is('read_at', null);
+    if (!data.all && data.id) q = q.eq('id', data.id);
+    const res = await q;
     if (res.error) throw new Error(res.error.message);
     return { ok: true };
   });
