@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, CreditCard, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
+import { Lock, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
 import { setSubscriptionPlan, isDevAdminSession } from '@/lib/access';
 import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { priceIdFor } from '@/lib/stripe';
+import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
+import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
 
-// Checkout page — structured for a future Stripe integration. No real payment
-// is processed here. Paid plans show a Stripe-ready checkout placeholder; the
-// Enterprise+ plan routes to a "Contact Sales" flow. A clearly-labelled demo
-// activation lets the gated app be previewed in this frontend-only build.
+// Checkout page — paid plans open the built-in embedded checkout; the free plan
+// activates instantly and Enterprise+ enquiries route to sales.
 export default function Payment() {
   const params = new URLSearchParams(window.location.search);
   const planId = params.get('plan') || 'pro';
@@ -20,13 +21,11 @@ export default function Payment() {
   const price = billing === 'yearly' ? plan.yearly : plan.monthly;
   const period = billing === 'yearly' ? '/year' : '/month';
   const [demoLoading, setDemoLoading] = useState(false);
-  const { checkUserAuth } = useAuth();
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const { checkUserAuth, user, isAuthenticated } = useAuth();
+  const priceId = priceIdFor(plan.id, billing);
 
-  // Records a real subscription on the backend (createSubscription persists
-  // plan + status on the User and Organisation), then reloads so the new plan
-  // is the source of truth. Dev-admin (frontend-only) sessions fall back to
-  // the localStorage plan; any backend failure also falls back gracefully.
-  const activateDemo = async () => {
+  const activateFree = async () => {
     setDemoLoading(true);
     try {
       if (isDevAdminSession()) {
@@ -40,6 +39,7 @@ export default function Payment() {
     }
     setTimeout(() => { window.location.href = '/dashboard'; }, 700);
   };
+
 
   return (
     <div className="min-h-screen bg-[#090a0f] px-4 py-10 text-zinc-100">
