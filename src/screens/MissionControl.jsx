@@ -48,11 +48,24 @@ export default function MissionControl() {
   const deleteMemoryFn = useServerFn(deleteMemory);
   const taskStatusFn = useServerFn(updateTaskStatus);
 
+  // Mission Control's server functions require a real backend session bearer
+  // token, so only query once a session exists on the client.
+  const [session, setSession] = useState('unknown');
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
+    return () => { alive = false; sub?.subscription?.unsubscribe(); };
+  }, []);
+
   const { data, isLoading } = useQuery({
     queryKey: ['mission-overview'],
     queryFn: () => overviewFn({ data: {} }),
+    enabled: session === 'yes',
+    retry: false,
     refetchInterval: 30000,
   });
+
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['mission-overview'] });
   const fail = (e) => toast({ title: 'Something went wrong', description: e?.message ?? 'Please try again.', variant: 'destructive' });
