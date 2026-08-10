@@ -21,6 +21,7 @@ import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PaymentRouteImport } from './routes/payment'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -29,10 +30,13 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as TwoFactorRouteImport } from './routes/two-factor'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as ShellAppRouteImport } from './routes/_shell/_app'
 import { Route as LegalIndexRouteImport } from './routes/legal.index'
 import { Route as LegalSlugRouteImport } from './routes/legal.$slug'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ShellAppAgentBuilderRouteImport } from './routes/_shell/_app/agent-builder'
 import { Route as ShellAppAgentMarketplaceRouteImport } from './routes/_shell/_app/agent-marketplace'
 import { Route as ShellAppAiBuilderRouteImport } from './routes/_shell/_app/ai-builder'
@@ -166,6 +170,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -206,6 +215,18 @@ const TwoFactorRoute = TwoFactorRouteImport.update({
   path: '/two-factor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShellAppRoute = ShellAppRouteImport.update({
   id: '/_app',
   getParentRoute: () => ShellRoute,
@@ -225,6 +246,12 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShellAppAgentBuilderRoute = ShellAppAgentBuilderRouteImport.update({
   id: '/agent-builder',
   path: '/agent-builder',
@@ -614,6 +641,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/onboarding': typeof OnboardingRoute
   '/payment': typeof PaymentRoute
   '/pricing': typeof PricingRoute
@@ -622,9 +650,12 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRoute
   '/tools': typeof ToolsRoute
   '/two-factor': typeof TwoFactorRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/legal/': typeof LegalIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/agent-builder': typeof ShellAppAgentBuilderRoute
   '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
@@ -711,6 +742,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/onboarding': typeof OnboardingRoute
   '/payment': typeof PaymentRoute
   '/pricing': typeof PricingRoute
@@ -719,9 +751,12 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesRoute
   '/tools': typeof ToolsRoute
   '/two-factor': typeof TwoFactorRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/legal': typeof LegalIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/agent-builder': typeof ShellAppAgentBuilderRoute
   '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
@@ -810,6 +845,7 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/onboarding': typeof OnboardingRoute
   '/payment': typeof PaymentRoute
   '/pricing': typeof PricingRoute
@@ -818,10 +854,13 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRoute
   '/tools': typeof ToolsRoute
   '/two-factor': typeof TwoFactorRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_shell/_app': typeof ShellAppRouteWithChildren
   '/legal/$slug': typeof LegalSlugRoute
   '/legal/': typeof LegalIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_shell/_app/agent-builder': typeof ShellAppAgentBuilderRoute
   '/_shell/_app/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/_shell/_app/ai-builder': typeof ShellAppAiBuilderRoute
@@ -910,6 +949,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/help'
     | '/login'
+    | '/mcp'
     | '/onboarding'
     | '/payment'
     | '/pricing'
@@ -918,9 +958,12 @@ export interface FileRouteTypes {
     | '/resources'
     | '/tools'
     | '/two-factor'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/legal/$slug'
     | '/legal/'
     | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/agent-builder'
     | '/agent-marketplace'
     | '/ai-builder'
@@ -1007,6 +1050,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/help'
     | '/login'
+    | '/mcp'
     | '/onboarding'
     | '/payment'
     | '/pricing'
@@ -1015,9 +1059,12 @@ export interface FileRouteTypes {
     | '/resources'
     | '/tools'
     | '/two-factor'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/legal/$slug'
     | '/legal'
     | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/agent-builder'
     | '/agent-marketplace'
     | '/ai-builder'
@@ -1105,6 +1152,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/help'
     | '/login'
+    | '/mcp'
     | '/onboarding'
     | '/payment'
     | '/pricing'
@@ -1113,10 +1161,13 @@ export interface FileRouteTypes {
     | '/resources'
     | '/tools'
     | '/two-factor'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_shell/_app'
     | '/legal/$slug'
     | '/legal/'
     | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/_shell/_app/agent-builder'
     | '/_shell/_app/agent-marketplace'
     | '/_shell/_app/ai-builder'
@@ -1205,6 +1256,7 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
+  McpRoute: typeof McpRoute
   OnboardingRoute: typeof OnboardingRoute
   PaymentRoute: typeof PaymentRoute
   PricingRoute: typeof PricingRoute
@@ -1213,9 +1265,12 @@ export interface RootRouteChildren {
   ResourcesRoute: typeof ResourcesRoute
   ToolsRoute: typeof ToolsRoute
   TwoFactorRoute: typeof TwoFactorRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   LegalSlugRoute: typeof LegalSlugRoute
   LegalIndexRoute: typeof LegalIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1304,6 +1359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -1360,6 +1422,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TwoFactorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/_app': {
       id: '/_shell/_app'
       path: ''
@@ -1386,6 +1462,13 @@ declare module '@tanstack/react-router' {
       path: '/.lovable/oauth/consent'
       fullPath: '/.lovable/oauth/consent'
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/_app/agent-builder': {
@@ -2081,6 +2164,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
+  McpRoute: McpRoute,
   OnboardingRoute: OnboardingRoute,
   PaymentRoute: PaymentRoute,
   PricingRoute: PricingRoute,
@@ -2089,9 +2173,13 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesRoute: ResourcesRoute,
   ToolsRoute: ToolsRoute,
   TwoFactorRoute: TwoFactorRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   LegalSlugRoute: LegalSlugRoute,
   LegalIndexRoute: LegalIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
