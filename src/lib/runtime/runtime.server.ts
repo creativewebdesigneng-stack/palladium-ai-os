@@ -10,6 +10,7 @@
  * time-boxed and retried, and every failure path closes the task row.
  */
 import { writeAudit } from '@/lib/platform/audit.server';
+import { renderMemoryPrompt, retrieveRelevantMemory } from '@/lib/memory/memory.server';
 import { assertWithinLimit, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import {
   normaliseProvider,
