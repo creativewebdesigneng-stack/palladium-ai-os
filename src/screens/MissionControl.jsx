@@ -179,13 +179,21 @@ export default function MissionControl() {
         }
       />
 
+      {session === 'no' && (
+        <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">
+          <p className="flex items-center gap-2 text-xs font-semibold text-amber-100"><ShieldAlert className="h-4 w-4" />Sign in to activate Mission Control</p>
+          <p className="mt-1 text-[11px] text-amber-200/80">Your agents, tasks, approvals and memory are private to your account, so Mission Control needs a signed-in session before it can load or run anything.</p>
+        </div>
+      )}
+
       <BriefingConsole
         briefing={data?.briefing}
-        loading={isLoading}
+        loading={isLoading && session !== 'no'}
         agents={agents}
         submitting={dispatch.isPending}
         onSubmit={(vars) => dispatch.mutate(vars)}
       />
+
 
       <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
         {TABS.map(([id, label, Icon]) => (
