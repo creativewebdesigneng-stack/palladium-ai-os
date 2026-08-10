@@ -13,7 +13,7 @@ import AgentBuilder from '@/components/mission/AgentBuilder';
 import MemoryVault from '@/components/mission/MemoryVault';
 import ShoppingBoard from '@/components/mission/ShoppingBoard';
 import TaskBoard from '@/components/mission/TaskBoard';
-import { AGENT_TEMPLATES, DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
+import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
 import {
   getMissionOverview, savePersonalAgent, deletePersonalAgent, submitPersonalTask,
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
