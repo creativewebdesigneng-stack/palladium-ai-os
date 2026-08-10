@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://gpvnkxxciuqzirpfsohx.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "palladiumai",
+      "version": "0.1.0",
+      "title": "PalladiumAI"
+    },
+    "tools": [
+      {
+        "name": "list_agents",
+        "title": "List AI agents",
+        "description": "List the signed-in user's PalladiumAI personal agents with their category, autonomy level and status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "status": {
+              "description": "Filter by agent status.",
+              "type": "string",
+              "enum": [
+                "active",
+                "paused",
+                "archived"
+              ]
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum number of agents to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_agent",
+        "title": "Create AI agent",
+        "description": "Create a new PalladiumAI personal agent for the signed-in user.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "description": "Agent name."
+            },
+            "category": {
+              "default": "custom",
+              "description": "Agent category, e.g. shopping, finance, health, business, custom.",
+              "type": "string",
+              "minLength": 1
+            },
+            "purpose": {
+              "description": "What the agent is responsible for.",
+              "type": "string",
+              "maxLength": 500
+            },
+            "autonomy": {
+              "default": "prepare",
+              "description": "How much the agent may do on its own.",
+              "type": "string",
+              "enum": [
+                "suggest",
+                "prepare",
+                "execute"
+              ]
+            },
+            "requires_approval": {
+              "default": true,
+              "description": "Require human approval before actions.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_tasks",
+        "title": "List missions",
+        "description": "List the signed-in user's PalladiumAI Mission Control tasks, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "status": {
+              "description": "Filter by task status.",
+              "type": "string",
+              "enum": [
+                "pending",
+                "in_progress",
+                "awaiting_approval",
+                "completed",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum number of tasks to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_task",
+        "title": "Create mission",
+        "description": "Create a new Mission Control task (mission) for the signed-in user, optionally assigned to an agent.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "request": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "What the user wants done."
+            },
+            "title": {
+              "description": "Short mission title.",
+              "type": "string",
+              "maxLength": 120
+            },
+            "category": {
+              "default": "custom",
+              "description": "Mission category, e.g. shopping, finance, health.",
+              "type": "string"
+            },
+            "agent_id": {
+              "description": "Agent to assign the mission to.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "priority": {
+              "default": "normal",
+              "description": "Mission priority.",
+              "type": "string",
+              "enum": [
+                "low",
+                "normal",
+                "high",
+                "urgent"
+              ]
+            },
+            "involves_money": {
+              "default": false,
+              "description": "Whether the mission may spend money.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "request"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_approvals",
+        "title": "List approval requests",
+        "description": "List Approval Centre requests awaiting the signed-in user's decision, including estimated cost and risk.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "status": {
+              "default": "pending",
+              "description": "Filter by decision status.",
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "expired"
+              ]
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum number of requests to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "decide_approval",
+        "title": "Approve or reject a request",
+        "description": "Record the signed-in user's decision on a pending approval request. Approving may authorise an agent to spend money or act on the user's behalf.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "approval_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "The approval request to decide."
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "approved",
+                "rejected"
+              ],
+              "description": "The user's decision."
+            },
+            "note": {
+              "description": "Optional note explaining the decision.",
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "approval_id",
+            "decision"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_memories",
+        "title": "List personal memory",
+        "description": "List entries from the signed-in user's PalladiumAI personal memory vault (preferences and facts agents use).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "category": {
+              "description": "Filter by memory category.",
+              "type": "string"
+            },
+            "limit": {
+              "default": 50,
+              "description": "Maximum number of entries to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "remember",
+        "title": "Save personal memory",
+        "description": "Save a preference or fact to the signed-in user's personal memory vault so agents can use it later.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Memory key, e.g. 'preferred airline'."
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "The value to remember."
+            },
+            "category": {
+              "default": "general",
+              "description": "Memory category, e.g. shopping, health, travel.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
