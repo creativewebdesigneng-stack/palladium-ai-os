@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import PageHeader from '@/components/palladium/PageHeader';
 import MemoryToolbar from '@/components/memory/MemoryToolbar';
 import MemoryCard from '@/components/memory/MemoryCard';
@@ -14,18 +14,45 @@ import { normalizeMemory } from '@/components/memory/normalizeMemory';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
+import { useSession, useActiveOrg } from '@/hooks/use-workspace';
+import {
+  createMemory,
+  editMemory,
+  ingestKnowledgeDocument,
+  listMemories,
+  pruneMemory,
+  reindexMemory,
+  removeMemory,
+  searchMemories,
+} from '@/lib/memory/memory.functions';
+
+const TEXT_TYPES = /^(text\/|application\/json$|application\/xml$)/;
+
+/** Reads a document client-side so the server only ever receives plain text. */
+async function readDocumentText(file) {
+  if (!file) return '';
+  if (TEXT_TYPES.test(file.type) || /\.(txt|md|markdown|csv|json|ya?ml|log)$/i.test(file.name)) {
+    return (await file.text()).slice(0, 400000);
+  }
+  return '';
+}
 
 export default function Memory() {
   const { toast } = useToast();
   const { gate } = useUpgrade();
+  const session = useSession();
+  const { orgId } = useActiveOrg();
+
   const [raw, setRaw] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [orgId, setOrgId] = useState('');
   const [settings, setSettings] = useState(MEMORY_SETTINGS);
+  const [loading, setLoading] = useState(true);
 
   const [type, setType] = useState('all');
   const [scope, setScope] = useState('all');
   const [query, setQuery] = useState('');
+  const [semantic, setSemantic] = useState(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -34,34 +61,66 @@ export default function Memory() {
   const [indexEntry, setIndexEntry] = useState(null);
   const [indexing, setIndexing] = useState(false);
 
-  const reload = async () => {
+  const fail = (title) => (e) => toast({ title, description: e?.message, variant: 'destructive' });
+
+  const reload = useCallback(async () => {
+    if (session !== 'yes') return;
     try {
-      const items = await base44.entities.AgentMemory.filter({}, '-created_date', 200);
-      setRaw(items || []);
-    } catch {
+      const res = await listMemories({ data: { limit: 300 } });
+      setRaw(res?.memories || []);
+      setDocuments(res?.documents || []);
+    } catch (e) {
       setRaw([]);
+      fail('Could not load memory')(e);
+    } finally {
+      setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   useEffect(() => {
+    if (session === 'no') setLoading(false);
+    if (session !== 'yes') return;
     (async () => {
-      try {
-        const me = await base44.auth.me();
-        setOrgId(me?.data?.organisation_id || me?.organisation_id || '');
-      } catch {
-        /* ignore */
-      }
       try {
         setAgents(await base44.entities.Agent.filter({}, '-created_date', 200));
       } catch {
         setAgents([]);
       }
+      pruneMemory().catch(() => {});
       await reload();
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session, reload]);
+
+  // Semantic recall: the vector search runs server-side, keyword filtering stays local.
+  useEffect(() => {
+    if (session !== 'yes' || query.trim().length < 3) {
+      setSemantic(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(async () => {
+      try {
+        const res = await searchMemories({ data: { query: query.trim(), limit: 24 } });
+        if (alive) setSemantic(res?.results || []);
+      } catch {
+        if (alive) setSemantic(null);
+      }
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [query, session]);
 
   const entries = useMemo(() => raw.map((m) => normalizeMemory(m, agents)), [raw, agents]);
+
+  const ranking = useMemo(() => {
+    if (!semantic) return null;
+    const map = new Map();
+    semantic.forEach((r, i) => map.set(r.id, { rank: i, similarity: r.similarity }));
+    return map;
+  }, [semantic]);
 
   const filtered = useMemo(() => {
     let list = entries;
@@ -69,18 +128,27 @@ export default function Memory() {
     if (scope !== 'all') list = list.filter((e) => e.scope === scope);
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((e) =>
-        e.content.toLowerCase().includes(q) ||
-        (e.title || '').toLowerCase().includes(q) ||
-        (e.source || '').toLowerCase().includes(q) ||
-        e.agent_name.toLowerCase().includes(q)
+      list = list.filter(
+        (e) =>
+          ranking?.has(e.id) ||
+          e.content.toLowerCase().includes(q) ||
+          (e.title || '').toLowerCase().includes(q) ||
+          (e.source || '').toLowerCase().includes(q) ||
+          e.agent_name.toLowerCase().includes(q)
       );
     }
-    return list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  }, [entries, type, scope, query]);
+    return [...list].sort((a, b) => {
+      if (ranking) {
+        const ra = ranking.get(a.id)?.rank ?? 999;
+        const rb = ranking.get(b.id)?.rank ?? 999;
+        if (ra !== rb) return ra - rb;
+      }
+      return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    }).map((e) => (ranking?.has(e.id) ? { ...e, similarity: ranking.get(e.id).similarity } : e));
+  }, [entries, type, scope, query, ranking]);
 
   const counts = useMemo(() => {
-    const c = { all: entries.length, short_term: 0, long_term: 0, knowledge: 0 };
+    const c = { all: entries.length, short_term: 0, long_term: 0, knowledge: 0, organisation: 0 };
     for (const e of entries) c[e.memory_type] = (c[e.memory_type] || 0) + 1;
     return c;
   }, [entries]);
@@ -88,22 +156,24 @@ export default function Memory() {
   const handleCreate = async (form) => {
     if (!gate('createAgents')) return;
     try {
-      await base44.entities.AgentMemory.create({
-        organisation_id: orgId,
-        memory_type: form.memory_type,
-        category: form.category,
-        scope: form.scope,
-        agent_id: form.agent_id || '',
-        title: form.title || '',
-        content: form.content,
-        source: form.source || 'manual',
-        importance: form.importance,
+      await createMemory({
+        data: {
+          memory_type: form.memory_type,
+          category: form.category,
+          scope: form.scope,
+          agent_id: form.agent_id || null,
+          org_id: form.scope === 'private' ? null : orgId,
+          title: form.title || null,
+          content: form.content,
+          source: form.source || 'manual',
+          importance: form.importance,
+        },
       });
-      toast({ title: 'Memory saved' });
+      toast({ title: 'Memory saved', description: 'Stored and indexed for recall.' });
       setAddOpen(false);
       await reload();
     } catch (e) {
-      toast({ title: 'Could not save memory', description: e.message, variant: 'destructive' });
+      fail('Could not save memory')(e);
     }
   };
 
@@ -111,24 +181,27 @@ export default function Memory() {
     if (!gate('createAgents')) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: form.file });
-      await base44.entities.AgentMemory.create({
-        organisation_id: orgId,
-        memory_type: 'knowledge',
-        category: form.category,
-        scope: form.scope,
-        agent_id: form.agent_id || '',
-        title: form.title || form.file.name,
-        content: form.content || `Uploaded document: ${form.file.name}`,
-        source: form.file.name,
-        importance: form.importance,
-        file_url,
+      const text = (form.content || '') || (await readDocumentText(form.file));
+      if (!text.trim()) {
+        throw new Error('Add a text summary — this file type cannot be read in the browser yet.');
+      }
+      const res = await ingestKnowledgeDocument({
+        data: {
+          title: form.title || form.file?.name || 'Untitled document',
+          text,
+          agent_id: form.agent_id || null,
+          org_id: form.scope === 'private' ? null : orgId,
+          scope: form.scope,
+          mime_type: form.file?.type || null,
+          size_bytes: form.file?.size || null,
+          source: form.file?.name || 'upload',
+        },
       });
-      toast({ title: 'Knowledge uploaded', description: form.file.name });
+      toast({ title: 'Knowledge ingested', description: `${res.chunks} chunks indexed for retrieval.` });
       setUploadOpen(false);
       await reload();
     } catch (e) {
-      toast({ title: 'Upload failed', description: e.message, variant: 'destructive' });
+      fail('Upload failed')(e);
     } finally {
       setUploading(false);
     }
@@ -136,43 +209,43 @@ export default function Memory() {
 
   const handlePin = async (entry) => {
     try {
-      await base44.entities.AgentMemory.update(entry.id, { pinned: !entry.pinned });
+      await editMemory({ data: { id: entry.id, patch: { pinned: !entry.pinned } } });
       await reload();
     } catch (e) {
-      toast({ title: 'Could not update', description: e.message, variant: 'destructive' });
+      fail('Could not update')(e);
     }
   };
 
   const handleDelete = async (entry) => {
     try {
-      await base44.entities.AgentMemory.delete(entry.id);
-      toast({ title: 'Memory deleted' });
+      await removeMemory({ data: { id: entry.id } });
+      toast({ title: 'Memory deleted', description: 'Removed from storage and the vector index.' });
       await reload();
     } catch (e) {
-      toast({ title: 'Could not delete', description: e.message, variant: 'destructive' });
+      fail('Could not delete')(e);
     }
   };
 
   const handleEdit = async (id, form) => {
     try {
-      await base44.entities.AgentMemory.update(id, form);
+      await editMemory({ data: { id, patch: form } });
       toast({ title: 'Memory updated' });
       setEditEntry(null);
       await reload();
     } catch (e) {
-      toast({ title: 'Could not update', description: e.message, variant: 'destructive' });
+      fail('Could not update')(e);
     }
   };
 
   const handleIndex = async (provider) => {
     setIndexing(true);
     try {
-      const res = await base44.functions.invoke('indexMemoryVector', { memory_id: indexEntry.id, provider });
+      const res = await reindexMemory({ data: { id: indexEntry.id, provider } });
       toast({ title: res.status === 'indexed' ? 'Indexed' : 'Queued for indexing', description: res.message });
       setIndexEntry(null);
       await reload();
     } catch (e) {
-      toast({ title: 'Indexing failed', description: e.message, variant: 'destructive' });
+      fail('Indexing failed')(e);
     } finally {
       setIndexing(false);
     }
@@ -187,20 +260,40 @@ export default function Memory() {
 
   return (
     <>
-      <PageHeader eyebrow="Cognition" title="AI Memory" description="Control what your agents remember — and what they forget." action={
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.length} memories</span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.filter((e) => e.pinned).length} pinned</span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{counts.knowledge} knowledge</span>
-        </div>
-      } />
+      <PageHeader
+        eyebrow="Cognition"
+        title="AI Memory"
+        description="Control what your agents remember — and what they forget."
+        action={
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.length} memories</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.filter((e) => e.pinned).length} pinned</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{documents.length} documents</span>
+          </div>
+        }
+      />
 
       <MemoryToolbar type={type} onType={setType} scope={scope} onScope={setScope} query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} counts={counts} />
 
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((e) => <MemoryCard key={e.id} entry={e} onAction={onAction} />)}
-      </div>
-      {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No memories match your filters. Add a memory or upload knowledge to get started.</div>}
+      {semantic && (
+        <div className="mb-3 text-[11px] text-zinc-400">
+          Semantic recall found {semantic.length} relevant {semantic.length === 1 ? 'entry' : 'entries'} — ranked by meaning, not keywords.
+        </div>
+      )}
+
+      {session === 'no' ? (
+        <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">Sign in to view your agent memory.</div>
+      ) : (
+        <>
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((e) => <MemoryCard key={e.id} entry={e} onAction={onAction} />)}
+          </div>
+          {!loading && filtered.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No memories match your filters. Add a memory or upload knowledge to get started.</div>
+          )}
+          {loading && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">Loading memory…</div>}
+        </>
+      )}
 
       <div className="mt-8"><VectorPanel /></div>
 
