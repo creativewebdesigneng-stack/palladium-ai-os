@@ -115,6 +115,7 @@ import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/ag
 import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
 import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
 import { Route as ApiPublicV1AgentsIdRouteImport } from './routes/api/public/v1/agents.$id'
+import { Route as ApiPublicV1AgentsIdRunRouteImport } from './routes/api/public/v1/agents.$id.run'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -659,6 +660,11 @@ const ApiPublicV1AgentsIdRoute = ApiPublicV1AgentsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiPublicV1AgentsRoute,
 } as any)
+const ApiPublicV1AgentsIdRunRoute = ApiPublicV1AgentsIdRunRouteImport.update({
+  id: '/run',
+  path: '/run',
+  getParentRoute: () => ApiPublicV1AgentsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -763,8 +769,9 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof ShellAppAdminIndexRoute
   '/agents/': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
-  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRoute
+  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id/': typeof ShellAppAgentsIdIndexRoute
+  '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -869,8 +876,9 @@ export interface FileRoutesByTo {
   '/admin': typeof ShellAppAdminIndexRoute
   '/agents': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
-  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRoute
+  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id': typeof ShellAppAgentsIdIndexRoute
+  '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -978,8 +986,9 @@ export interface FileRoutesById {
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
   '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
   '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
-  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRoute
+  '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/_shell/_app/agents/$id/': typeof ShellAppAgentsIdIndexRoute
+  '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1088,6 +1097,7 @@ export interface FileRouteTypes {
     | '/agents/$id/playground'
     | '/api/public/v1/agents/$id'
     | '/agents/$id/'
+    | '/api/public/v1/agents/$id/run'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1194,6 +1204,7 @@ export interface FileRouteTypes {
     | '/agents/$id/playground'
     | '/api/public/v1/agents/$id'
     | '/agents/$id'
+    | '/api/public/v1/agents/$id/run'
   id:
     | '__root__'
     | '/'
@@ -1302,6 +1313,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/agents/$id/playground'
     | '/api/public/v1/agents/$id'
     | '/_shell/_app/agents/$id/'
+    | '/api/public/v1/agents/$id/run'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2081,6 +2093,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicV1AgentsIdRouteImport
       parentRoute: typeof ApiPublicV1AgentsRoute
     }
+    '/api/public/v1/agents/$id/run': {
+      id: '/api/public/v1/agents/$id/run'
+      path: '/run'
+      fullPath: '/api/public/v1/agents/$id/run'
+      preLoaderRoute: typeof ApiPublicV1AgentsIdRunRouteImport
+      parentRoute: typeof ApiPublicV1AgentsIdRoute
+    }
   }
 }
 
@@ -2252,12 +2271,23 @@ const ShellRouteChildren: ShellRouteChildren = {
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
+interface ApiPublicV1AgentsIdRouteChildren {
+  ApiPublicV1AgentsIdRunRoute: typeof ApiPublicV1AgentsIdRunRoute
+}
+
+const ApiPublicV1AgentsIdRouteChildren: ApiPublicV1AgentsIdRouteChildren = {
+  ApiPublicV1AgentsIdRunRoute: ApiPublicV1AgentsIdRunRoute,
+}
+
+const ApiPublicV1AgentsIdRouteWithChildren =
+  ApiPublicV1AgentsIdRoute._addFileChildren(ApiPublicV1AgentsIdRouteChildren)
+
 interface ApiPublicV1AgentsRouteChildren {
-  ApiPublicV1AgentsIdRoute: typeof ApiPublicV1AgentsIdRoute
+  ApiPublicV1AgentsIdRoute: typeof ApiPublicV1AgentsIdRouteWithChildren
 }
 
 const ApiPublicV1AgentsRouteChildren: ApiPublicV1AgentsRouteChildren = {
-  ApiPublicV1AgentsIdRoute: ApiPublicV1AgentsIdRoute,
+  ApiPublicV1AgentsIdRoute: ApiPublicV1AgentsIdRouteWithChildren,
 }
 
 const ApiPublicV1AgentsRouteWithChildren =
