@@ -1,22 +1,29 @@
-import { base44 } from '@/api/base44Client';
+// Developer Platform client — calls the authenticated typed RPC layer directly.
+// No mock data: every value here comes from the caller's own workspace.
+import {
+  listApiKeysFn,
+  createApiKeyFn,
+  rotateApiKeyFn,
+  revokeApiKeyFn,
+  listWebhooksFn,
+  createWebhookFn,
+  updateWebhookFn,
+  deleteWebhookFn,
+  testWebhookFn,
+  getApiUsageFn,
+} from '@/lib/devapi/devapi.functions';
 
-// Thin wrapper around base44.functions.invoke for the Developer Platform
-// backend functions. base44.functions.invoke returns an axios response; the
-// JSON body lives in `res.data`.
-async function invoke(name, payload) {
-  const res = await base44.functions.invoke(name, payload);
-  return res.data ?? res;
-}
+export const listApiKeys = () => listApiKeysFn();
+export const createApiKey = (name, environment, scopes) =>
+  createApiKeyFn({ data: { name, environment, scopes } });
+export const rotateApiKey = (key_id) => rotateApiKeyFn({ data: { key_id } });
+export const revokeApiKey = (key_id) => revokeApiKeyFn({ data: { key_id } });
 
-export const listApiKeys = () => invoke('manageApiKey', { action: 'list' });
-export const createApiKey = (name, environment, scopes) => invoke('manageApiKey', { action: 'create', name, environment, scopes });
-export const rotateApiKey = (key_id) => invoke('manageApiKey', { action: 'rotate', key_id });
-export const revokeApiKey = (key_id) => invoke('manageApiKey', { action: 'revoke', key_id });
+export const listWebhooks = () => listWebhooksFn();
+export const createWebhook = (url, events, description) =>
+  createWebhookFn({ data: { url, events, description } });
+export const updateWebhook = (webhook_id, patch) => updateWebhookFn({ data: { webhook_id, ...patch } });
+export const deleteWebhook = (webhook_id) => deleteWebhookFn({ data: { webhook_id } });
+export const testWebhook = (webhook_id) => testWebhookFn({ data: { webhook_id } });
 
-export const listWebhooks = () => invoke('manageWebhook', { action: 'list' });
-export const createWebhook = (url, events, description) => invoke('manageWebhook', { action: 'create', url, events, description });
-export const updateWebhook = (webhook_id, patch) => invoke('manageWebhook', { action: 'update', webhook_id, ...patch });
-export const deleteWebhook = (webhook_id) => invoke('manageWebhook', { action: 'delete', webhook_id });
-export const testWebhook = (webhook_id) => invoke('manageWebhook', { action: 'test', webhook_id });
-
-export const getApiUsage = () => invoke('getApiUsage', {});
+export const getApiUsage = () => getApiUsageFn();

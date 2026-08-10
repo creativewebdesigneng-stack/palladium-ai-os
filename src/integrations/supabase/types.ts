@@ -339,13 +339,16 @@ export type Database = {
       api_keys: {
         Row: {
           created_at: string
+          environment: string
           expires_at: string | null
           id: string
           key_hash: string
           key_prefix: string
+          last_four: string | null
           last_used_at: string | null
           name: string
           org_id: string | null
+          request_count: number
           revoked_at: string | null
           scopes: string[]
           updated_at: string
@@ -353,13 +356,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          environment?: string
           expires_at?: string | null
           id?: string
           key_hash: string
           key_prefix: string
+          last_four?: string | null
           last_used_at?: string | null
           name: string
           org_id?: string | null
+          request_count?: number
           revoked_at?: string | null
           scopes?: string[]
           updated_at?: string
@@ -367,13 +373,16 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          environment?: string
           expires_at?: string | null
           id?: string
           key_hash?: string
           key_prefix?: string
+          last_four?: string | null
           last_used_at?: string | null
           name?: string
           org_id?: string | null
+          request_count?: number
           revoked_at?: string | null
           scopes?: string[]
           updated_at?: string
@@ -385,6 +394,62 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_request_logs: {
+        Row: {
+          api_key_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          ip: string | null
+          method: string
+          org_id: string | null
+          path: string
+          plan_code: string | null
+          status_code: number
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          ip?: string | null
+          method: string
+          org_id?: string | null
+          path: string
+          plan_code?: string | null
+          status_code: number
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          ip?: string | null
+          method?: string
+          org_id?: string | null
+          path?: string
+          plan_code?: string | null
+          status_code?: number
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
             referencedColumns: ["id"]
           },
         ]
@@ -2058,42 +2123,110 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          duration_ms: number | null
+          error: string | null
+          event: string
+          id: string
+          org_id: string | null
+          payload: Json
+          response_status: number | null
+          status: string
+          user_id: string
+          webhook_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          event: string
+          id?: string
+          org_id?: string | null
+          payload?: Json
+          response_status?: number | null
+          status?: string
+          user_id: string
+          webhook_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          event?: string
+          id?: string
+          org_id?: string | null
+          payload?: Json
+          response_status?: number | null
+          status?: string
+          user_id?: string
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhooks: {
         Row: {
           created_at: string
+          delivery_count: number
           events: string[]
           failure_count: number
           id: string
           is_active: boolean
           last_delivery_at: string | null
+          name: string | null
           org_id: string | null
           secret_hash: string | null
+          secret_prefix: string | null
+          signing_secret: string | null
           updated_at: string
           url: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          delivery_count?: number
           events?: string[]
           failure_count?: number
           id?: string
           is_active?: boolean
           last_delivery_at?: string | null
+          name?: string | null
           org_id?: string | null
           secret_hash?: string | null
+          secret_prefix?: string | null
+          signing_secret?: string | null
           updated_at?: string
           url: string
           user_id: string
         }
         Update: {
           created_at?: string
+          delivery_count?: number
           events?: string[]
           failure_count?: number
           id?: string
           is_active?: boolean
           last_delivery_at?: string | null
+          name?: string | null
           org_id?: string | null
           secret_hash?: string | null
+          secret_prefix?: string | null
+          signing_secret?: string | null
           updated_at?: string
           url?: string
           user_id?: string

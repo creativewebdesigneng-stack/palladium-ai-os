@@ -152,3 +152,13 @@ export async function aiBriefing(context: string, fallback: string): Promise<str
     return fallback;
   }
 }
+
+/** Emits a signed developer webhook. Best effort — never blocks the user flow. */
+export async function emitWebhook(userId: string, event: string, payload: Record<string, unknown>) {
+  try {
+    const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+    await dispatchWebhookEvent({ userId, event, payload });
+  } catch (error) {
+    console.error('[mission] webhook dispatch failed', error);
+  }
+}

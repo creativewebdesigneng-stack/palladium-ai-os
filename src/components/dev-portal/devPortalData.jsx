@@ -80,11 +80,16 @@ export const DOCS = {
 
 export const ENDPOINTS = [
   { method: 'GET', path: '/v1/agents', desc: 'List agents' },
-  { method: 'GET', path: '/v1/agents/:id', desc: 'Get an agent' },
   { method: 'POST', path: '/v1/agents', desc: 'Create an agent' },
-  { method: 'PUT', path: '/v1/agents/:id', desc: 'Update an agent' },
-  { method: 'DELETE', path: '/v1/agents/:id', desc: 'Delete an agent' },
-  { method: 'POST', path: '/v1/agents/:id/run', desc: 'Run an agent' },
+  { method: 'GET', path: '/v1/agents/:id', desc: 'Get an agent' },
+  { method: 'POST', path: '/v1/agents/:id/run', desc: 'Run an agent (execution API)' },
+  { method: 'GET', path: '/v1/tasks', desc: 'List tasks' },
+  { method: 'POST', path: '/v1/tasks', desc: 'Create a task' },
+  { method: 'GET', path: '/v1/workflows', desc: 'List workflows' },
+  { method: 'POST', path: '/v1/workflows/:id/run', desc: 'Run a workflow (execution API)' },
+  { method: 'GET', path: '/v1/workforces', desc: 'List workforces and members' },
+  { method: 'GET', path: '/v1/marketplace', desc: 'Browse published marketplace agents' },
+  { method: 'GET', path: '/v1/usage', desc: 'Usage and plan limits for this month' },
 ];
 
 export const METHOD_STYLE = {
@@ -107,7 +112,14 @@ export const WEBHOOKS = [
   { id: 'wh_8c0', url: 'https://app.example.com/hooks/deploys', event: 'deployment.failed', secret: 'whsec_••••••••6d8e', status: 'paused', deliveries: 31 },
 ];
 
-export const WEBHOOK_EVENTS = ['agent.run.started', 'agent.run.completed', 'task.created', 'task.status.changed', 'workflow.run.completed', 'deployment.created', 'deployment.failed'];
+export const WEBHOOK_EVENTS = [
+  'agent.completed',
+  'agent.failed',
+  'task.completed',
+  'workflow.completed',
+  'approval.required',
+  'purchase.completed',
+];
 
 export const SDKS = {
   JavaScript: {

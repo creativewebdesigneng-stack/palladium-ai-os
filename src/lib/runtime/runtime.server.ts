@@ -321,6 +321,20 @@ export async function completeRun(args: {
   ]);
 
   const { data } = await args.sb.from('agent_tasks').select('*').eq('id', run.taskId).maybeSingle();
+
+  // Notify developer webhook subscribers (signed, best effort).
+  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  const payload = {
+    agent_id: run.agent.id,
+    agent_name: run.agent.name,
+    task_id: run.taskId,
+    output: result.text,
+    tokens: { input: result.usage.input, output: result.usage.output },
+    duration_ms: duration,
+  };
+  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'agent.completed', payload });
+  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'task.completed', payload });
+
   return data;
 }
 
@@ -362,6 +376,14 @@ export async function failRun(args: {
     targetId: args.run.taskId,
     agentId: args.run.agent.id,
     metadata: { error: message },
+  });
+
+  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  await dispatchWebhookEvent({
+    userId: args.userId,
+    orgId: args.run.orgId,
+    event: 'agent.failed',
+    payload: { agent_id: args.run.agent.id, task_id: args.run.taskId, error: message },
   });
 
   console.error('[runtime] run failed', args.run.taskId, args.error);
