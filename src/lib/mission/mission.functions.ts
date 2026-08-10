@@ -46,7 +46,11 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
 
-    const [agents, tasks, approvals, activities, purchases, memories, shoppingResults, audit] = await Promise.all([
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    const [agents, tasks, approvals, activities, purchases, memories, shoppingResults, audit, notifications, usage, agentRuns] = await Promise.all([
       sb.from('personal_agents').select('*').order('created_at', { ascending: false }),
       sb.from('personal_tasks').select('*').order('created_at', { ascending: false }).limit(80),
       sb.from('approval_requests').select('*').order('created_at', { ascending: false }).limit(60),
@@ -55,7 +59,11 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       sb.from('personal_memories').select('*').order('category', { ascending: true }),
       sb.from('shopping_results').select('*').order('created_at', { ascending: false }).limit(80),
       sb.from('mission_audit_logs').select('*').order('created_at', { ascending: false }).limit(30),
+      sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40),
+      sb.from('usage_records').select('metric, quantity, unit, occurred_at').gte('occurred_at', monthStart.toISOString()).limit(500),
+      sb.from('agent_tasks').select('status, tokens_in, tokens_out, cost_pence, created_at').order('created_at', { ascending: false }).limit(200),
     ]);
+
 
     const agentRows = agents.data ?? [];
     const taskRows = tasks.data ?? [];
