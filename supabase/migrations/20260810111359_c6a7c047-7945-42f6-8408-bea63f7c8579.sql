@@ -1,0 +1,11 @@
+revoke all on function public.is_org_member(uuid) from anon;
+revoke all on function public.has_org_role(uuid, public.org_role[]) from anon;
+revoke all on function public.org_admin(uuid) from anon;
+revoke all on function public.can_access(uuid, uuid) from anon;
+revoke all on function public.team_org(uuid) from anon;
+revoke all on function public.agent_is_visible(uuid) from anon;
+revoke all on function public.workflow_is_visible(uuid) from anon;
+revoke all on function public.workforce_is_visible(uuid) from anon;
+revoke all on function public.effective_plan(uuid, uuid) from anon;
+revoke all on function public.handle_new_organisation() from anon, authenticated;
+revoke all on function public.has_role(uuid, public.app_role) from anon;
