@@ -88,6 +88,20 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       briefingFallback,
     );
 
+    const notificationRows = notifications.data ?? [];
+    const usageRows = usage.data ?? [];
+    const runRows = agentRuns.data ?? [];
+
+    const usageByMetric: Record<string, number> = {};
+    for (const r of usageRows as any[]) {
+      const key = String(r.metric);
+      usageByMetric[key] = (usageByMetric[key] ?? 0) + Number(r.quantity ?? 0);
+    }
+
+    const tokensIn = runRows.reduce((sum: number, r: any) => sum + Number(r.tokens_in ?? 0), 0);
+    const tokensOut = runRows.reduce((sum: number, r: any) => sum + Number(r.tokens_out ?? 0), 0);
+    const costPence = runRows.reduce((sum: number, r: any) => sum + Number(r.cost_pence ?? 0), 0);
+
     return {
       briefing,
       agents: agentRows,
@@ -98,6 +112,16 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
       memories: memories.data ?? [],
       shoppingResults: shoppingResults.data ?? [],
       audit: audit.data ?? [],
+      notifications: notificationRows,
+      usage: {
+        byMetric: usageByMetric,
+        agentRuns: runRows.length,
+        succeededRuns: runRows.filter((r: any) => r.status === 'succeeded').length,
+        failedRuns: runRows.filter((r: any) => r.status === 'failed').length,
+        tokensIn,
+        tokensOut,
+        costPence,
+      },
       metrics: {
         activeAgents: counts.agents,
         totalAgents: agentRows.length,
@@ -108,8 +132,10 @@ export const getMissionOverview = createServerFn({ method: 'POST' })
         personalTasks: taskRows.filter((t: any) => t.scope === 'personal').length,
         professionalTasks: taskRows.filter((t: any) => t.scope === 'professional').length,
         failedTasks: taskRows.filter((t: any) => t.status === 'failed').length,
+        unreadNotifications: notificationRows.filter((n: any) => !n.read_at).length,
       },
     };
+
   });
 
 /* -------------------------------------------------------------------- agents */
