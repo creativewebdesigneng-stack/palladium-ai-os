@@ -82,11 +82,15 @@ export type Database = {
           error: string | null
           id: string
           input: string
+          model: string | null
           org_id: string | null
           output: Json | null
+          output_text: string | null
+          provider: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["exec_status"]
           task_id: string | null
+          title: string | null
           tokens_in: number
           tokens_out: number
           updated_at: string
@@ -101,11 +105,15 @@ export type Database = {
           error?: string | null
           id?: string
           input: string
+          model?: string | null
           org_id?: string | null
           output?: Json | null
+          output_text?: string | null
+          provider?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           task_id?: string | null
+          title?: string | null
           tokens_in?: number
           tokens_out?: number
           updated_at?: string
@@ -120,11 +128,15 @@ export type Database = {
           error?: string | null
           id?: string
           input?: string
+          model?: string | null
           org_id?: string | null
           output?: Json | null
+          output_text?: string | null
+          provider?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           task_id?: string | null
+          title?: string | null
           tokens_in?: number
           tokens_out?: number
           updated_at?: string
@@ -884,10 +896,15 @@ export type Database = {
           created_at: string
           currency: string
           current_version: number
+          description: string | null
           icon: string | null
           id: string
           instructions: string | null
+          last_run_at: string | null
+          max_tokens: number
+          memory_enabled: boolean
           model: string
+          model_provider: string
           name: string
           org_id: string | null
           org_id_fk: string | null
@@ -914,10 +931,15 @@ export type Database = {
           created_at?: string
           currency?: string
           current_version?: number
+          description?: string | null
           icon?: string | null
           id?: string
           instructions?: string | null
+          last_run_at?: string | null
+          max_tokens?: number
+          memory_enabled?: boolean
           model?: string
+          model_provider?: string
           name: string
           org_id?: string | null
           org_id_fk?: string | null
@@ -944,10 +966,15 @@ export type Database = {
           created_at?: string
           currency?: string
           current_version?: number
+          description?: string | null
           icon?: string | null
           id?: string
           instructions?: string | null
+          last_run_at?: string | null
+          max_tokens?: number
+          memory_enabled?: boolean
           model?: string
+          model_provider?: string
           name?: string
           org_id?: string | null
           org_id_fk?: string | null
@@ -2163,6 +2190,7 @@ export type Database = {
       }
       is_org_member: { Args: { _org: string }; Returns: boolean }
       org_admin: { Args: { _org: string }; Returns: boolean }
+      reap_stale_agent_tasks: { Args: { _user?: string }; Returns: number }
       record_usage: {
         Args: {
           _metadata?: Json
