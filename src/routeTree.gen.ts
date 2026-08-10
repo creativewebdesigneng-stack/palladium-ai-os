@@ -32,6 +32,7 @@ import { Route as TwoFactorRouteImport } from './routes/two-factor'
 import { Route as ShellAppRouteImport } from './routes/_shell/_app'
 import { Route as LegalIndexRouteImport } from './routes/legal.index'
 import { Route as LegalSlugRouteImport } from './routes/legal.$slug'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ShellAppAgentBuilderRouteImport } from './routes/_shell/_app/agent-builder'
 import { Route as ShellAppAgentMarketplaceRouteImport } from './routes/_shell/_app/agent-marketplace'
 import { Route as ShellAppAiBuilderRouteImport } from './routes/_shell/_app/ai-builder'
@@ -217,6 +218,11 @@ const LegalIndexRoute = LegalIndexRouteImport.update({
 const LegalSlugRoute = LegalSlugRouteImport.update({
   id: '/legal/$slug',
   path: '/legal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellAppAgentBuilderRoute = ShellAppAgentBuilderRouteImport.update({
@@ -618,6 +624,7 @@ export interface FileRoutesByFullPath {
   '/two-factor': typeof TwoFactorRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/legal/': typeof LegalIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/agent-builder': typeof ShellAppAgentBuilderRoute
   '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
@@ -714,6 +721,7 @@ export interface FileRoutesByTo {
   '/two-factor': typeof TwoFactorRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/legal': typeof LegalIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/agent-builder': typeof ShellAppAgentBuilderRoute
   '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
@@ -813,6 +821,7 @@ export interface FileRoutesById {
   '/_shell/_app': typeof ShellAppRouteWithChildren
   '/legal/$slug': typeof LegalSlugRoute
   '/legal/': typeof LegalIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_shell/_app/agent-builder': typeof ShellAppAgentBuilderRoute
   '/_shell/_app/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
   '/_shell/_app/ai-builder': typeof ShellAppAiBuilderRoute
@@ -911,6 +920,7 @@ export interface FileRouteTypes {
     | '/two-factor'
     | '/legal/$slug'
     | '/legal/'
+    | '/.lovable/oauth/consent'
     | '/agent-builder'
     | '/agent-marketplace'
     | '/ai-builder'
@@ -1007,6 +1017,7 @@ export interface FileRouteTypes {
     | '/two-factor'
     | '/legal/$slug'
     | '/legal'
+    | '/.lovable/oauth/consent'
     | '/agent-builder'
     | '/agent-marketplace'
     | '/ai-builder'
@@ -1105,6 +1116,7 @@ export interface FileRouteTypes {
     | '/_shell/_app'
     | '/legal/$slug'
     | '/legal/'
+    | '/.lovable/oauth/consent'
     | '/_shell/_app/agent-builder'
     | '/_shell/_app/agent-marketplace'
     | '/_shell/_app/ai-builder'
@@ -1203,6 +1215,7 @@ export interface RootRouteChildren {
   TwoFactorRoute: typeof TwoFactorRoute
   LegalSlugRoute: typeof LegalSlugRoute
   LegalIndexRoute: typeof LegalIndexRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1366,6 +1379,13 @@ declare module '@tanstack/react-router' {
       path: '/legal/$slug'
       fullPath: '/legal/$slug'
       preLoaderRoute: typeof LegalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/_app/agent-builder': {
@@ -2071,6 +2091,7 @@ const rootRouteChildren: RootRouteChildren = {
   TwoFactorRoute: TwoFactorRoute,
   LegalSlugRoute: LegalSlugRoute,
   LegalIndexRoute: LegalIndexRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
