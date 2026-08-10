@@ -10,6 +10,7 @@ export const MEMORY_TYPES = [
   { id: 'short_term', label: 'Short-Term', icon: Clock, grad: 'from-sky-500 to-cyan-500', desc: 'Current conversations & active tasks' },
   { id: 'long_term', label: 'Long-Term', icon: History, grad: 'from-violet-500 to-indigo-500', desc: 'Preferences, previous work & important info' },
   { id: 'knowledge', label: 'Knowledge', icon: BookOpen, grad: 'from-emerald-500 to-teal-500', desc: 'Documents, company knowledge & agent info' },
+  { id: 'organisation', label: 'Organisation', icon: Building2, grad: 'from-amber-500 to-orange-500', desc: 'Company-wide facts shared by every agent' },
 ];
 
 // Agent-memory scoping.
@@ -17,6 +18,8 @@ export const MEMORY_SCOPES = [
   { id: 'private', label: 'Private', icon: Lock, grad: 'from-amber-500 to-orange-500', desc: 'This agent only' },
   { id: 'shared', label: 'Shared Org', icon: Building2, grad: 'from-indigo-500 to-violet-500', desc: 'All agents in the organisation' },
   { id: 'user', label: 'User', icon: User, grad: 'from-fuchsia-500 to-pink-500', desc: 'Tied to a specific user' },
+  { id: 'agent', label: 'Agent', icon: Bot, grad: 'from-sky-500 to-cyan-500', desc: 'Working memory for one agent' },
+  { id: 'organisation', label: 'Organisation', icon: Users, grad: 'from-emerald-500 to-teal-500', desc: 'Every member of the organisation' },
 ];
 
 // Sub-categories available within each tier (used by the create / upload forms).
@@ -35,6 +38,11 @@ export const CATEGORIES = {
     { id: 'company_knowledge', label: 'Company knowledge' },
     { id: 'agent_info', label: 'Agent information' },
   ],
+  organisation: [
+    { id: 'company_knowledge', label: 'Company knowledge' },
+    { id: 'policy', label: 'Policy' },
+    { id: 'procedure', label: 'Procedure' },
+  ],
 };
 
 export const CATEGORY_LABELS = {
@@ -46,6 +54,9 @@ export const CATEGORY_LABELS = {
   document: 'Document',
   company_knowledge: 'Company knowledge',
   agent_info: 'Agent info',
+  policy: 'Policy',
+  procedure: 'Procedure',
+  general: 'General',
 };
 
 export const IMPORTANCE_STYLE = {
