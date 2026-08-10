@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 
-import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2 } from 'lucide-react';
+import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2, Bell } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
 import BriefingConsole from '@/components/mission/BriefingConsole';
@@ -15,10 +15,12 @@ import AgentBuilder from '@/components/mission/AgentBuilder';
 import MemoryVault from '@/components/mission/MemoryVault';
 import ShoppingBoard from '@/components/mission/ShoppingBoard';
 import TaskBoard from '@/components/mission/TaskBoard';
+import SignalsPanel from '@/components/mission/SignalsPanel';
 import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
 import {
   getMissionOverview, savePersonalAgent, deletePersonalAgent, submitPersonalTask,
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
+  markNotifications, clearMemoryCategory,
 } from '@/lib/mission/mission.functions';
 
 const TABS = [
@@ -27,6 +29,7 @@ const TABS = [
   ['approvals', 'Approval centre', ShieldAlert],
   ['shopping', 'Shopping', ShoppingBag],
   ['tasks', 'Tasks', ListChecks],
+  ['signals', 'Notifications & usage', Bell],
   ['memory', 'Memory', Brain],
   ['audit', 'Audit trail', ScrollText],
 ];
@@ -47,6 +50,8 @@ export default function MissionControl() {
   const saveMemoryFn = useServerFn(saveMemory);
   const deleteMemoryFn = useServerFn(deleteMemory);
   const taskStatusFn = useServerFn(updateTaskStatus);
+  const markNotificationsFn = useServerFn(markNotifications);
+  const clearCategoryFn = useServerFn(clearMemoryCategory);
 
   // Mission Control's server functions require a real backend session bearer
   // token, so only query once a session exists on the client.
@@ -68,6 +73,20 @@ export default function MissionControl() {
 
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['mission-overview'] });
+
+  // Live updates: agent activity, tasks, approvals and notifications stream in.
+  useEffect(() => {
+    if (session !== 'yes') return undefined;
+    const channel = supabase
+      .channel('mission-control')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_activities' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_tasks' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
   const fail = (e) => toast({ title: 'Something went wrong', description: e?.message ?? 'Please try again.', variant: 'destructive' });
 
   const dispatch = useMutation({
@@ -137,6 +156,18 @@ export default function MissionControl() {
   const memoryDelete = useMutation({
     mutationFn: (id) => deleteMemoryFn({ data: { id } }),
     onSuccess: () => refresh(),
+    onError: fail,
+  });
+
+  const notificationsMutation = useMutation({
+    mutationFn: (vars) => markNotificationsFn({ data: vars }),
+    onSuccess: refresh,
+    onError: fail,
+  });
+
+  const clearCategory = useMutation({
+    mutationFn: (category) => clearCategoryFn({ data: { category } }),
+    onSuccess: () => { toast({ title: 'Category cleared' }); refresh(); },
     onError: fail,
   });
 
@@ -264,6 +295,16 @@ export default function MissionControl() {
 
         {tab === 'tasks' && <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />}
 
+        {tab === 'signals' && (
+          <SignalsPanel
+            notifications={data?.notifications ?? []}
+            usage={data?.usage}
+            loading={isLoading && session !== 'no'}
+            onRead={(n) => notificationsMutation.mutate({ id: n.id })}
+            onReadAll={() => notificationsMutation.mutate({ all: true })}
+          />
+        )}
+
         {tab === 'memory' && (
           <MemoryVault
             memories={data?.memories ?? []}
@@ -271,6 +312,7 @@ export default function MissionControl() {
             saving={memoryMutation.isPending}
             onSave={(m) => memoryMutation.mutate(m)}
             onDelete={(m) => memoryDelete.mutate(m.id)}
+            onClearCategory={(category) => clearCategory.mutate(category)}
           />
         )}
 
