@@ -1,4 +1,5 @@
 import { auth, defineMcp } from "@lovable.dev/mcp-js";
+import type { AnyToolDefinition } from "@lovable.dev/mcp-js";
 import listAgents from "./tools/list-agents";
 import createAgent from "./tools/create-agent";
 import listTasks from "./tools/list-tasks";
@@ -22,5 +23,14 @@ export default defineMcp({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [listAgents, createAgent, listTasks, createTask, listApprovals, decideApproval, listMemories, remember],
+  tools: [
+    listAgents,
+    createAgent,
+    listTasks,
+    createTask,
+    listApprovals,
+    decideApproval,
+    listMemories,
+    remember,
+  ] as unknown as AnyToolDefinition[],
 });
