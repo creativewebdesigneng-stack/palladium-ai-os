@@ -7,6 +7,7 @@ import { SectionHead } from '@/components/workforce/wfShared';
 import AgentCard from '@/components/workforce/AgentCard';
 import AgentProfileDrawer from '@/components/workforce/AgentProfileDrawer';
 import WorkforceCommandCentre from '@/components/workforce/WorkforceCommandCentre';
+import WorkforceOrchestrator from '@/components/workforce/WorkforceOrchestrator';
 import DepartmentGrid from '@/components/workforce/DepartmentGrid';
 import CreateDepartmentModal from '@/components/workforce/CreateDepartmentModal';
 import AgentCommsFeed from '@/components/workforce/AgentCommsFeed';
@@ -170,6 +171,8 @@ export default function Workforce() {
           </div>
         )}
       </section>
+
+      <WorkforceOrchestrator />
 
       <DepartmentGrid teams={teams} agents={agents} onCreate={() => { setEditTeam(null); setDeptOpen(true); }} onEdit={(t) => { setEditTeam(t); setDeptOpen(true); }} />
 
