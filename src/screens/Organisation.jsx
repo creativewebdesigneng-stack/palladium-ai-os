@@ -17,8 +17,6 @@ const ROLE_STYLE = {
   member: 'border-white/10 bg-white/5 text-zinc-300',
 };
 
-const money = (pence) => (pence === 0 ? 'Free' : `£${(pence / 100).toLocaleString('en-GB')}`);
-
 export default function Organisation() {
   const qc = useQueryClient();
   const { session, organisations, activeOrgId, selectOrg, entitlements, isLoading } = useWorkspace();
@@ -131,7 +129,7 @@ export default function Organisation() {
           entitlements && (
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[11px] text-zinc-400">
               <Gauge className="h-3.5 w-3.5 text-violet-400" />
-              {entitlements.planName} · {money(entitlements.limits?.seats === -1 ? 0 : 0)}
+              {entitlements.planName} ·{' '}
               {entitlements.limits?.seats === -1
                 ? 'Unlimited seats'
                 : `${entitlements.usage?.seats ?? 0}/${entitlements.limits?.seats ?? 1} seats`}
