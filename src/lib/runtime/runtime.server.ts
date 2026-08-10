@@ -10,7 +10,7 @@
  * time-boxed and retried, and every failure path closes the task row.
  */
 import { writeAudit } from '@/lib/platform/audit.server';
-import { renderMemoryPrompt, retrieveRelevantMemory } from '@/lib/memory/memory.server';
+import { renderMemoryPrompt, retrieveRelevantMemory, storeMemory } from '@/lib/memory/memory.server';
 import { assertWithinLimit, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import {
   normaliseProvider,
@@ -261,7 +261,7 @@ export async function completeRun(args: {
           org_id: run.orgId,
           metadata: { provider: run.provider, model: run.model },
         },
-      }).catch((error) => console.error('[runtime] short-term memory write failed', error)),
+      }).catch((error: unknown) => console.error('[runtime] short-term memory write failed', error)),
       args.sb.from('personal_memories').insert({
         user_id: args.userId,
         org_id: run.orgId,
