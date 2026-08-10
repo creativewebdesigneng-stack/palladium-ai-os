@@ -114,6 +114,7 @@ import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/agents'
 import { Route as ApiPublicV1MarketplaceRouteImport } from './routes/api/public/v1/marketplace'
 import { Route as ApiPublicV1TasksRouteImport } from './routes/api/public/v1/tasks'
+import { Route as ApiPublicV1UsageRouteImport } from './routes/api/public/v1/usage'
 import { Route as ApiPublicV1WorkflowsRouteImport } from './routes/api/public/v1/workflows'
 import { Route as ApiPublicV1WorkforcesRouteImport } from './routes/api/public/v1/workforces'
 import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
@@ -659,6 +660,11 @@ const ApiPublicV1TasksRoute = ApiPublicV1TasksRouteImport.update({
   path: '/api/public/v1/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicV1UsageRoute = ApiPublicV1UsageRouteImport.update({
+  id: '/api/public/v1/usage',
+  path: '/api/public/v1/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicV1WorkflowsRoute = ApiPublicV1WorkflowsRouteImport.update({
   id: '/api/public/v1/workflows',
   path: '/api/public/v1/workflows',
@@ -799,6 +805,7 @@ export interface FileRoutesByFullPath {
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
+  '/api/public/v1/usage': typeof ApiPublicV1UsageRoute
   '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/api/public/v1/workforces': typeof ApiPublicV1WorkforcesRoute
   '/admin/': typeof ShellAppAdminIndexRoute
@@ -911,6 +918,7 @@ export interface FileRoutesByTo {
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
+  '/api/public/v1/usage': typeof ApiPublicV1UsageRoute
   '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/api/public/v1/workforces': typeof ApiPublicV1WorkforcesRoute
   '/admin': typeof ShellAppAdminIndexRoute
@@ -1026,6 +1034,7 @@ export interface FileRoutesById {
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
+  '/api/public/v1/usage': typeof ApiPublicV1UsageRoute
   '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/api/public/v1/workforces': typeof ApiPublicV1WorkforcesRoute
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
@@ -1140,6 +1149,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
+    | '/api/public/v1/usage'
     | '/api/public/v1/workflows'
     | '/api/public/v1/workforces'
     | '/admin/'
@@ -1252,6 +1262,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
+    | '/api/public/v1/usage'
     | '/api/public/v1/workflows'
     | '/api/public/v1/workforces'
     | '/admin'
@@ -1366,6 +1377,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
+    | '/api/public/v1/usage'
     | '/api/public/v1/workflows'
     | '/api/public/v1/workforces'
     | '/_shell/_app/admin/'
@@ -1410,6 +1422,7 @@ export interface RootRouteChildren {
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
   ApiPublicV1MarketplaceRoute: typeof ApiPublicV1MarketplaceRoute
   ApiPublicV1TasksRoute: typeof ApiPublicV1TasksRoute
+  ApiPublicV1UsageRoute: typeof ApiPublicV1UsageRoute
   ApiPublicV1WorkflowsRoute: typeof ApiPublicV1WorkflowsRouteWithChildren
   ApiPublicV1WorkforcesRoute: typeof ApiPublicV1WorkforcesRoute
 }
@@ -2151,6 +2164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicV1TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/v1/usage': {
+      id: '/api/public/v1/usage'
+      path: '/api/public/v1/usage'
+      fullPath: '/api/public/v1/usage'
+      preLoaderRoute: typeof ApiPublicV1UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/workflows': {
       id: '/api/public/v1/workflows'
       path: '/api/public/v1/workflows'
@@ -2438,6 +2458,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
   ApiPublicV1MarketplaceRoute: ApiPublicV1MarketplaceRoute,
   ApiPublicV1TasksRoute: ApiPublicV1TasksRoute,
+  ApiPublicV1UsageRoute: ApiPublicV1UsageRoute,
   ApiPublicV1WorkflowsRoute: ApiPublicV1WorkflowsRouteWithChildren,
   ApiPublicV1WorkforcesRoute: ApiPublicV1WorkforcesRoute,
 }
