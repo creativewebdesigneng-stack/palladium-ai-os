@@ -6,12 +6,16 @@ import { Globe, FileText, BarChart3, Plug, Database, Code2, Eye, Pencil, Play, W
 
 export const TOOL_CATEGORIES = [
   { id: 'all', label: 'All', icon: Box },
-  { id: 'web', label: 'Web', icon: Globe },
-  { id: 'files', label: 'Files', icon: FileText },
-  { id: 'data', label: 'Data', icon: BarChart3 },
+  { id: 'research', label: 'Research', icon: Globe },
+  { id: 'automation', label: 'Automation', icon: Wifi },
   { id: 'api', label: 'APIs', icon: Plug },
+  { id: 'knowledge', label: 'Knowledge', icon: FileText },
+  { id: 'data', label: 'Data', icon: BarChart3 },
   { id: 'database', label: 'Database', icon: Database },
-  { id: 'code', label: 'Code', icon: Code2 },
+  { id: 'development', label: 'Code', icon: Code2 },
+  { id: 'commerce', label: 'Commerce', icon: Box },
+  { id: 'communication', label: 'Comms', icon: Wifi },
+  { id: 'productivity', label: 'Productivity', icon: FolderOpen },
 ];
 
 export const PERMISSION_META = {

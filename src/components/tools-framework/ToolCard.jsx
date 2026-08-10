@@ -1,7 +1,10 @@
 import { Globe, FileText, BarChart3, Plug, Database, Code2, Power, Play } from 'lucide-react';
 import { PERMISSION_META, PLAN_BADGE } from './toolsData';
 
-const CATEGORY_ICON = { web: Globe, files: FileText, data: BarChart3, api: Plug, database: Database, code: Code2, custom: Plug };
+const CATEGORY_ICON = {
+  research: Globe, automation: Globe, api: Plug, knowledge: FileText, data: BarChart3,
+  database: Database, development: Code2, commerce: Plug, communication: Plug, productivity: FileText,
+};
 
 export default function ToolCard({ tool, onOpen, onRun }) {
   const Icon = CATEGORY_ICON[tool.category] || Plug;

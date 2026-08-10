@@ -218,5 +218,65 @@ registerBrowserProvider('simulated', createSimulatedBrowserTool);
 export function createBrowserTool(provider: string, config: BrowserAgentConfig): BrowserTool {
   const factory = registry.get(provider) ?? registry.get('simulated');
   if (!factory) throw new Error('No browser provider registered');
-  return factory(config);
+  return guardBrowserTool(factory(config), config);
+}
+
+
+/* ------------------------------------------------------------------ providers */
+
+/**
+ * Wraps any provider so the two platform invariants hold even if a vendor
+ * adapter forgets them: every navigation/read/form-fill is allowlisted, and
+ * checkout can only ever be prepared (never paid) and never above the spend cap.
+ */
+export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig): BrowserTool {
+  const denied = (url: string) => !isDomainAllowed(url, config.allowedDomains);
+  return {
+    ...tool,
+    provider: tool.provider,
+    steps: () => tool.steps(),
+    async navigate(url) {
+      if (denied(url)) return { ok: false, url, blocked: 'domain not in allowlist' };
+      return tool.navigate(url);
+    },
+    async read(url) {
+      if (denied(url)) throw new Error(`Domain ${domainOf(url)} is not on this agent's allowlist`);
+      return tool.read(url);
+    },
+    async fillForm(url, fields) {
+      if (denied(url) || !config.allowedTools.includes('browser')) return { ok: false };
+      return tool.fillForm(url, fields);
+    },
+    async prepareCheckout(offer) {
+      if (denied(offer.url)) throw new Error('Seller domain is not on this agent\'s allowlist');
+      const draft = await tool.prepareCheckout(offer);
+      const cap = config.spendCap ?? null;
+      if (cap != null && draft.total > cap) {
+        throw new Error(`Prepared total ${draft.currency} ${draft.total} exceeds the spend cap of ${cap}`);
+      }
+      return { ...draft, paymentAuthorised: false as const };
+    },
+  };
+}
+
+/** Adapters for real automation vendors. Each stays unregistered until the
+ * corresponding credentials exist, so nothing silently falls back to a vendor. */
+function unavailable(name: string, hint: string): BrowserProviderFactory {
+  return () => {
+    throw new Error(`Browser provider "${name}" is not configured. ${hint}`);
+  };
+}
+
+registerBrowserProvider('playwright', unavailable('playwright', 'Connect a Playwright worker endpoint to enable it.'));
+registerBrowserProvider('browserbase', unavailable('browserbase', 'Add a Browserbase API key to enable it.'));
+registerBrowserProvider('computer_use', unavailable('computer_use', 'Enable a computer-use model provider to use it.'));
+
+/**
+ * Chooses the automation provider for a run: an explicit request wins, then the
+ * environment default, then the always-available simulated provider.
+ */
+export function resolveBrowserProvider(preferred?: string | null): string {
+  const configured = process.env['BROWSER_AGENT_PROVIDER'] ?? null;
+  const candidate = preferred || configured || 'simulated';
+  return registry.has(candidate) ? candidate : 'simulated';
 }

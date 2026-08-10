@@ -168,7 +168,7 @@ export async function prepareRun(args: {
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
   assertWithinLimit(ent, 'tasks_per_month');
 
-  const tools = await resolveGrantedTools(args.sb, agent);
+  const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
   const provider = normaliseProvider(agent.model_provider);
   const model = resolveModel(provider, agent.model);
   const messages = await buildContext(args.sb, agent, input);
