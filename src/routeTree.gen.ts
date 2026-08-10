@@ -112,6 +112,7 @@ import { Route as ShellAppAgentsNewRouteImport } from './routes/_shell/_app/agen
 import { Route as ShellAppCreatorsIdRouteImport } from './routes/_shell/_app/creators.$id'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/agents'
+import { Route as ApiPublicV1TasksRouteImport } from './routes/api/public/v1/tasks'
 import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
 import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
 import { Route as ApiPublicV1AgentsIdRouteImport } from './routes/api/public/v1/agents.$id'
@@ -644,6 +645,11 @@ const ApiPublicV1AgentsRoute = ApiPublicV1AgentsRouteImport.update({
   path: '/api/public/v1/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicV1TasksRoute = ApiPublicV1TasksRouteImport.update({
+  id: '/api/public/v1/tasks',
+  path: '/api/public/v1/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellAppAgentsIdIndexRoute = ShellAppAgentsIdIndexRouteImport.update({
   id: '/agents/$id/',
   path: '/agents/$id/',
@@ -766,6 +772,7 @@ export interface FileRoutesByFullPath {
   '/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
+  '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
   '/admin/': typeof ShellAppAdminIndexRoute
   '/agents/': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
@@ -873,6 +880,7 @@ export interface FileRoutesByTo {
   '/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
+  '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
   '/admin': typeof ShellAppAdminIndexRoute
   '/agents': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
@@ -983,6 +991,7 @@ export interface FileRoutesById {
   '/_shell/_app/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
+  '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
   '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
   '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
@@ -1092,6 +1101,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
+    | '/api/public/v1/tasks'
     | '/admin/'
     | '/agents/'
     | '/agents/$id/playground'
@@ -1199,6 +1209,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
+    | '/api/public/v1/tasks'
     | '/admin'
     | '/agents'
     | '/agents/$id/playground'
@@ -1308,6 +1319,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/creators/$id'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
+    | '/api/public/v1/tasks'
     | '/_shell/_app/admin/'
     | '/_shell/_app/agents/'
     | '/_shell/_app/agents/$id/playground'
@@ -1347,6 +1359,7 @@ export interface RootRouteChildren {
   ApiAgentsRunRoute: typeof ApiAgentsRunRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
+  ApiPublicV1TasksRoute: typeof ApiPublicV1TasksRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2072,6 +2085,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicV1AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/v1/tasks': {
+      id: '/api/public/v1/tasks'
+      path: '/api/public/v1/tasks'
+      fullPath: '/api/public/v1/tasks'
+      preLoaderRoute: typeof ApiPublicV1TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/_app/agents/$id/': {
       id: '/_shell/_app/agents/$id/'
       path: '/agents/$id'
@@ -2325,6 +2345,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentsRunRoute: ApiAgentsRunRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
+  ApiPublicV1TasksRoute: ApiPublicV1TasksRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
