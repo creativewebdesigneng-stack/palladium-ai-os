@@ -117,7 +117,7 @@ const meta = (title, description) => `  head: () => ({
 `;
 
 const write = (file, body) => {
-  fs.mkdirSync('src/routes', { recursive: true });
+  fs.mkdirSync(`src/routes/${file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : ''}`, { recursive: true });
   fs.writeFileSync(`src/routes/${file}`, body);
 };
 
