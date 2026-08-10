@@ -77,6 +77,7 @@ import { Route as ShellAppMissionControlRouteImport } from './routes/_shell/_app
 import { Route as ShellAppModelsRouteImport } from './routes/_shell/_app/models'
 import { Route as ShellAppNewsResearchRouteImport } from './routes/_shell/_app/news-research'
 import { Route as ShellAppNotificationsRouteImport } from './routes/_shell/_app/notifications'
+import { Route as ShellAppOrganisationRouteImport } from './routes/_shell/_app/organisation'
 import { Route as ShellAppProjectsRouteImport } from './routes/_shell/_app/projects'
 import { Route as ShellAppPromptsRouteImport } from './routes/_shell/_app/prompts'
 import { Route as ShellAppSearchRouteImport } from './routes/_shell/_app/search'
@@ -456,6 +457,11 @@ const ShellAppNotificationsRoute = ShellAppNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppOrganisationRoute = ShellAppOrganisationRouteImport.update({
+  id: '/organisation',
+  path: '/organisation',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppProjectsRoute = ShellAppProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -696,6 +702,7 @@ export interface FileRoutesByFullPath {
   '/models': typeof ShellAppModelsRoute
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
+  '/organisation': typeof ShellAppOrganisationRoute
   '/projects': typeof ShellAppProjectsRoute
   '/prompts': typeof ShellAppPromptsRoute
   '/search': typeof ShellAppSearchRoute
@@ -797,6 +804,7 @@ export interface FileRoutesByTo {
   '/models': typeof ShellAppModelsRoute
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
+  '/organisation': typeof ShellAppOrganisationRoute
   '/projects': typeof ShellAppProjectsRoute
   '/prompts': typeof ShellAppPromptsRoute
   '/search': typeof ShellAppSearchRoute
@@ -901,6 +909,7 @@ export interface FileRoutesById {
   '/_shell/_app/models': typeof ShellAppModelsRoute
   '/_shell/_app/news-research': typeof ShellAppNewsResearchRoute
   '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
+  '/_shell/_app/organisation': typeof ShellAppOrganisationRoute
   '/_shell/_app/projects': typeof ShellAppProjectsRoute
   '/_shell/_app/prompts': typeof ShellAppPromptsRoute
   '/_shell/_app/search': typeof ShellAppSearchRoute
@@ -1004,6 +1013,7 @@ export interface FileRouteTypes {
     | '/models'
     | '/news-research'
     | '/notifications'
+    | '/organisation'
     | '/projects'
     | '/prompts'
     | '/search'
@@ -1105,6 +1115,7 @@ export interface FileRouteTypes {
     | '/models'
     | '/news-research'
     | '/notifications'
+    | '/organisation'
     | '/projects'
     | '/prompts'
     | '/search'
@@ -1208,6 +1219,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/models'
     | '/_shell/_app/news-research'
     | '/_shell/_app/notifications'
+    | '/_shell/_app/organisation'
     | '/_shell/_app/projects'
     | '/_shell/_app/prompts'
     | '/_shell/_app/search'
@@ -1751,6 +1763,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppNotificationsRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/organisation': {
+      id: '/_shell/_app/organisation'
+      path: '/organisation'
+      fullPath: '/organisation'
+      preLoaderRoute: typeof ShellAppOrganisationRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/projects': {
       id: '/_shell/_app/projects'
       path: '/projects'
@@ -2026,6 +2045,7 @@ interface ShellAppRouteChildren {
   ShellAppModelsRoute: typeof ShellAppModelsRoute
   ShellAppNewsResearchRoute: typeof ShellAppNewsResearchRoute
   ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
+  ShellAppOrganisationRoute: typeof ShellAppOrganisationRoute
   ShellAppProjectsRoute: typeof ShellAppProjectsRoute
   ShellAppPromptsRoute: typeof ShellAppPromptsRoute
   ShellAppSearchRoute: typeof ShellAppSearchRoute
@@ -2102,6 +2122,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppModelsRoute: ShellAppModelsRoute,
   ShellAppNewsResearchRoute: ShellAppNewsResearchRoute,
   ShellAppNotificationsRoute: ShellAppNotificationsRoute,
+  ShellAppOrganisationRoute: ShellAppOrganisationRoute,
   ShellAppProjectsRoute: ShellAppProjectsRoute,
   ShellAppPromptsRoute: ShellAppPromptsRoute,
   ShellAppSearchRoute: ShellAppSearchRoute,
