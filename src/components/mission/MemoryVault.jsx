@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Brain, Plus, Trash2, Pencil, Loader2, X } from 'lucide-react';
 import { MEMORY_CATEGORIES } from '@/lib/mission/catalog';
 
-export default function MemoryVault({ memories = [], loading, saving, onSave, onDelete }) {
+export default function MemoryVault({ memories = [], loading, saving, onSave, onDelete, onClearCategory }) {
   const [draft, setDraft] = useState(null);
 
   const start = (category, existing) => setDraft({
@@ -60,6 +60,15 @@ export default function MemoryVault({ memories = [], loading, saving, onSave, on
               <div className="flex items-center gap-2">
                 <p className="text-xs font-semibold text-white">{cat.label}</p>
                 <button onClick={() => start(cat.id)} aria-label={`Add ${cat.label} preference`} className="ml-auto rounded-md border border-white/10 p-1 text-zinc-400 transition hover:text-white"><Plus className="h-3 w-3" /></button>
+                {items.length > 0 && (
+                  <button
+                    onClick={() => onClearCategory?.(cat.id)}
+                    aria-label={`Delete all ${cat.label}`}
+                    className="rounded-md border border-white/10 p-1 text-zinc-500 transition hover:text-rose-300"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
               </div>
               {loading ? (
                 <div className="mt-2 h-12 animate-pulse rounded-lg bg-white/5" />
