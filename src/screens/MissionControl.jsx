@@ -213,12 +213,12 @@ export default function MissionControl() {
       <div className="mt-4 space-y-4">
         {tab === 'overview' && (
           <>
-            <MissionMetrics metrics={data?.metrics} loading={isLoading} />
+            <MissionMetrics metrics={data?.metrics} loading={isLoading && session !== 'no'} />
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />
               </div>
-              <ActivityStream activities={data?.activities ?? []} loading={isLoading} />
+              <ActivityStream activities={data?.activities ?? []} loading={isLoading && session !== 'no'} />
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Globe2 className="h-4 w-4 text-cyan-400" />Browser agent</h2>
@@ -235,7 +235,7 @@ export default function MissionControl() {
         {tab === 'personal' && (
           <PersonalAISection
             agents={agents}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })}
             onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })}
             onDelete={(agent) => removeAgent.mutate(agent.id)}
@@ -249,7 +249,7 @@ export default function MissionControl() {
             approvals={approvals}
             purchases={data?.purchases ?? []}
             results={data?.shoppingResults ?? []}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             busyId={busyId}
             onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision }); }}
             onChooseAlternative={(a, alt) => alternative.mutate({ approvalId: a.id, resultId: alt.id })}
@@ -259,7 +259,7 @@ export default function MissionControl() {
         )}
 
         {tab === 'shopping' && (
-          <ShoppingBoard shoppingResults={data?.shoppingResults ?? []} purchases={data?.purchases ?? []} loading={isLoading} />
+          <ShoppingBoard shoppingResults={data?.shoppingResults ?? []} purchases={data?.purchases ?? []} loading={isLoading && session !== 'no'} />
         )}
 
         {tab === 'tasks' && <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />}
@@ -267,7 +267,7 @@ export default function MissionControl() {
         {tab === 'memory' && (
           <MemoryVault
             memories={data?.memories ?? []}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             saving={memoryMutation.isPending}
             onSave={(m) => memoryMutation.mutate(m)}
             onDelete={(m) => memoryDelete.mutate(m.id)}
