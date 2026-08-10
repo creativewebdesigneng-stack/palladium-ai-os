@@ -72,6 +72,129 @@ export type Database = {
           },
         ]
       }
+      agent_memories: {
+        Row: {
+          agent_id: string | null
+          category: string
+          content: string
+          created_at: string
+          document_id: string | null
+          embedding: string | null
+          embedding_model: string | null
+          expires_at: string | null
+          file_url: string | null
+          id: string
+          importance: string
+          last_used_at: string | null
+          memory_type: string
+          metadata: Json
+          org_id: string | null
+          pinned: boolean
+          scope: string
+          source: string | null
+          task_id: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          vector_external_id: string | null
+          vector_provider: string
+          vector_status: string
+          workflow_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          category?: string
+          content: string
+          created_at?: string
+          document_id?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          expires_at?: string | null
+          file_url?: string | null
+          id?: string
+          importance?: string
+          last_used_at?: string | null
+          memory_type?: string
+          metadata?: Json
+          org_id?: string | null
+          pinned?: boolean
+          scope?: string
+          source?: string | null
+          task_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          vector_external_id?: string | null
+          vector_provider?: string
+          vector_status?: string
+          workflow_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          category?: string
+          content?: string
+          created_at?: string
+          document_id?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          expires_at?: string | null
+          file_url?: string | null
+          id?: string
+          importance?: string
+          last_used_at?: string | null
+          memory_type?: string
+          metadata?: Json
+          org_id?: string | null
+          pinned?: boolean
+          scope?: string
+          source?: string | null
+          task_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          vector_external_id?: string | null
+          vector_provider?: string
+          vector_status?: string
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memories_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "memory_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_tasks: {
         Row: {
           agent_id: string | null
@@ -642,6 +765,79 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "marketplace_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memory_chunks: {
+        Row: {
+          agent_id: string | null
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: string
+          embedding: string | null
+          embedding_model: string | null
+          id: string
+          metadata: Json
+          org_id: string | null
+          token_estimate: number | null
+          user_id: string
+          vector_external_id: string | null
+          vector_provider: string
+        }
+        Insert: {
+          agent_id?: string | null
+          chunk_index?: number
+          content: string
+          created_at?: string
+          document_id: string
+          embedding?: string | null
+          embedding_model?: string | null
+          id?: string
+          metadata?: Json
+          org_id?: string | null
+          token_estimate?: number | null
+          user_id: string
+          vector_external_id?: string | null
+          vector_provider?: string
+        }
+        Update: {
+          agent_id?: string | null
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: string
+          embedding?: string | null
+          embedding_model?: string | null
+          id?: string
+          metadata?: Json
+          org_id?: string | null
+          token_estimate?: number | null
+          user_id?: string
+          vector_external_id?: string | null
+          vector_provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memory_chunks_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "memory_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_chunks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -2201,6 +2397,43 @@ export type Database = {
           _user: string
         }
         Returns: string
+      }
+      search_agent_memories: {
+        Args: {
+          _agent?: string
+          _embedding: string
+          _match_count?: number
+          _min_similarity?: number
+          _types?: string[]
+        }
+        Returns: {
+          agent_id: string
+          category: string
+          content: string
+          id: string
+          importance: string
+          memory_type: string
+          pinned: boolean
+          scope: string
+          similarity: number
+          source: string
+          title: string
+        }[]
+      }
+      search_memory_chunks: {
+        Args: {
+          _agent?: string
+          _embedding: string
+          _match_count?: number
+          _min_similarity?: number
+        }
+        Returns: {
+          chunk_index: number
+          content: string
+          document_id: string
+          id: string
+          similarity: number
+        }[]
       }
       team_org: { Args: { _team: string }; Returns: string }
       workflow_is_visible: { Args: { _wf: string }; Returns: boolean }
