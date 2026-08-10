@@ -12,6 +12,7 @@ const MAIN = [
   ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
 
+  ['Organisations', '/organisation', Building2],
   ['AI Workforce', '/workforce', Users],
   ['Agents', '/agents', Bot],
   ['Tasks', '/tasks', ListChecks],
