@@ -4,8 +4,9 @@ import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch,
 import { useServerFn } from '@tanstack/react-start';
 import { SectionHead } from './wfShared';
 import { listWorkforces, runWorkflow, getWorkflowRun } from '@/lib/runtime/workforce.functions';
-
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+
 
 const STATUS_ICON = {
   succeeded: { Icon: CheckCircle2, cls: 'text-emerald-400' },
