@@ -96,12 +96,19 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
   const messages: ChatMessage[] = [];
 
   if (agent.memory_enabled !== false) {
-    const [{ data: memories }, { data: history }] = await Promise.all([
-      sb
-        .from('personal_memories')
-        .select('category,key,value')
-        .order('updated_at', { ascending: false })
-        .limit(30),
+    // Memory is injected before execution: short-term context, long-term facts,
+    // organisation knowledge and document extracts relevant to this input.
+    const [memory, historyRes] = await Promise.all([
+      retrieveRelevantMemory({
+        sb: sb as never,
+        userId: agent.user_id,
+        agentId: agent.id,
+        orgId: agent.org_id_fk ?? agent.org_id ?? null,
+        query: input,
+      }).catch((error) => {
+        console.error('[runtime] memory retrieval failed', error);
+        return null;
+      }),
       sb
         .from('agent_tasks')
         .select('input,output_text,status')
@@ -111,15 +118,10 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
         .limit(3),
     ]);
 
-    if (memories?.length) {
-      system.push(
-        `Known facts and preferences about the operator:\n${memories
-          .map((m: any) => `- [${m.category}] ${m.key}: ${m.value ?? ''}`)
-          .join('\n')}`,
-      );
-    }
+    const memoryPrompt = memory ? renderMemoryPrompt(memory) : '';
+    if (memoryPrompt) system.push(memoryPrompt);
 
-    for (const past of [...(history ?? [])].reverse()) {
+    for (const past of [...(historyRes.data ?? [])].reverse()) {
       if (!past.input) continue;
       messages.push({ role: 'user', content: String(past.input).slice(0, 1500) });
       messages.push({ role: 'assistant', content: String(past.output_text ?? '').slice(0, 1500) });
