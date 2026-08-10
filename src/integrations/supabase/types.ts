@@ -1142,6 +1142,7 @@ export type Database = {
           price_pence: number
           sort_order: number
           stripe_price_id: string | null
+          stripe_price_id_yearly: string | null
           updated_at: string
         }
         Insert: {
@@ -1157,6 +1158,7 @@ export type Database = {
           price_pence?: number
           sort_order?: number
           stripe_price_id?: string | null
+          stripe_price_id_yearly?: string | null
           updated_at?: string
         }
         Update: {
@@ -1172,6 +1174,7 @@ export type Database = {
           price_pence?: number
           sort_order?: number
           stripe_price_id?: string | null
+          stripe_price_id_yearly?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1425,6 +1428,7 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          environment: string
           id: string
           metadata: Json
           org_id: string | null
@@ -1432,6 +1436,8 @@ export type Database = {
           seats: number
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
           stripe_subscription_id: string | null
           trial_ends_at: string | null
           updated_at: string
@@ -1442,6 +1448,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          environment?: string
           id?: string
           metadata?: Json
           org_id?: string | null
@@ -1449,6 +1456,8 @@ export type Database = {
           seats?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
@@ -1459,6 +1468,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          environment?: string
           id?: string
           metadata?: Json
           org_id?: string | null
@@ -1466,6 +1476,8 @@ export type Database = {
           seats?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
@@ -2131,6 +2143,10 @@ export type Database = {
         Args: { _org?: string; _user: string }
         Returns: string
       }
+      has_active_subscription: {
+        Args: { _env?: string; _user: string }
+        Returns: boolean
+      }
       has_org_role: {
         Args: {
           _org: string
@@ -2147,6 +2163,17 @@ export type Database = {
       }
       is_org_member: { Args: { _org: string }; Returns: boolean }
       org_admin: { Args: { _org: string }; Returns: boolean }
+      record_usage: {
+        Args: {
+          _metadata?: Json
+          _metric: string
+          _org?: string
+          _quantity: number
+          _unit?: string
+          _user: string
+        }
+        Returns: string
+      }
       team_org: { Args: { _team: string }; Returns: string }
       workflow_is_visible: { Args: { _wf: string }; Returns: boolean }
       workforce_is_visible: { Args: { _wf: string }; Returns: boolean }
