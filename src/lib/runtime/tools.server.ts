@@ -6,6 +6,7 @@
  * in `tool_permissions`. The frontend is never trusted for any of this.
  */
 import type { ToolDef } from './model-gateway.server';
+import { searchMemory, storeMemory } from '@/lib/memory/memory.server';
 
 export type ToolContext = {
   userId: string;
@@ -125,12 +126,28 @@ const REGISTRY: Record<string, ToolImpl> = {
     },
     run: async (input, ctx) => {
       const query = str(input['query']);
-      let q = ctx.sb.from('personal_memories').select('category,key,value,updated_at').limit(20);
-      if (str(input['category'])) q = q.eq('category', str(input['category']));
-      if (query) q = q.or(`key.ilike.%${query.replace(/[%,]/g, '')}%,value.ilike.%${query.replace(/[%,]/g, '')}%`);
-      const { data, error } = await q;
-      if (error) return { error: 'Memory is unavailable right now.' };
-      return { memories: data ?? [] };
+      if (!query) return { error: 'A query is required.' };
+      try {
+        const results = await searchMemory({
+          sb: ctx.sb as never,
+          userId: ctx.userId,
+          query,
+          agentId: ctx.agentId,
+          limit: 8,
+        });
+        const category = str(input['category']);
+        const filtered = category ? results.filter((r) => r.category === category) : results;
+        return {
+          memories: filtered.map((r) => ({
+            title: r.title ?? null,
+            content: r.content,
+            type: r.memory_type ?? r.kind,
+            relevance: Number(r.similarity.toFixed(3)),
+          })),
+        };
+      } catch {
+        return { error: 'Memory is unavailable right now.' };
+      }
     },
   },
 
@@ -150,18 +167,29 @@ const REGISTRY: Record<string, ToolImpl> = {
     },
     run: async (input, ctx) => {
       const key = str(input['key']).slice(0, 200);
+      const value = str(input['value']).slice(0, 4000);
       if (!key) return { error: 'A key is required.' };
-      const { error } = await ctx.sb.from('personal_memories').insert({
-        user_id: ctx.userId,
-        org_id: ctx.orgId,
-        agent_id: ctx.agentId,
-        category: str(input['category'], 'general'),
-        key,
-        value: str(input['value']).slice(0, 4000),
-        scope: 'personal',
-        metadata: { source: 'agent_runtime', task_id: ctx.taskId },
-      });
-      return error ? { error: 'Could not save that memory.' } : { saved: true, key };
+      try {
+        await storeMemory({
+          sb: ctx.sb as never,
+          userId: ctx.userId,
+          input: {
+            content: value || key,
+            title: key,
+            memory_type: 'long_term',
+            category: str(input['category'], 'general'),
+            scope: 'private',
+            source: 'agent_runtime',
+            agent_id: ctx.agentId,
+            task_id: ctx.taskId,
+            org_id: ctx.orgId,
+            importance: 'high',
+          },
+        });
+        return { saved: true, key };
+      } catch {
+        return { error: 'Could not save that memory.' };
+      }
     },
   },
 
