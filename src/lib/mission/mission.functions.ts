@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import {
   aiBriefing,
+  emitWebhook,
   fallbackBriefing,
   prepareCheckoutDraft,
   routeRequest,
@@ -14,16 +15,6 @@ const DEFAULT_DOMAINS = [
   'amazon.co.uk', 'johnlewis.com', 'argos.co.uk', 'currys.co.uk', 'ikea.com',
   'booking.com', 'trainline.com', 'tesco.com', 'sainsburys.co.uk',
 ];
-
-/** Emits a signed developer webhook. Best effort — never blocks the user flow. */
-async function emitWebhook(userId: string, event: string, payload: Record<string, unknown>) {
-  try {
-    const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
-    await dispatchWebhookEvent({ userId, event, payload });
-  } catch (error) {
-    console.error('[mission] webhook dispatch failed', error);
-  }
-}
 
 async function log(sb: Sb, userId: string, action: string, extra: Record<string, unknown> = {}) {
   await sb.from('mission_audit_logs').insert({
