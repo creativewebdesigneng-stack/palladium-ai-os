@@ -321,6 +321,20 @@ export async function completeRun(args: {
   ]);
 
   const { data } = await args.sb.from('agent_tasks').select('*').eq('id', run.taskId).maybeSingle();
+
+  // Notify developer webhook subscribers (signed, best effort).
+  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  const payload = {
+    agent_id: run.agent.id,
+    agent_name: run.agent.name,
+    task_id: run.taskId,
+    output: result.text,
+    tokens: { input: result.usage.input, output: result.usage.output },
+    duration_ms: duration,
+  };
+  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'agent.completed', payload });
+  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'task.completed', payload });
+
   return data;
 }
 
