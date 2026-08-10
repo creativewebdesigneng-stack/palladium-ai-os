@@ -118,6 +118,7 @@ import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/
 import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
 import { Route as ApiPublicV1AgentsIdRouteImport } from './routes/api/public/v1/agents.$id'
 import { Route as ApiPublicV1AgentsIdRunRouteImport } from './routes/api/public/v1/agents.$id.run'
+import { Route as ApiPublicV1WorkflowsIdRunRouteImport } from './routes/api/public/v1/workflows.$id.run'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -677,6 +678,12 @@ const ApiPublicV1AgentsIdRunRoute = ApiPublicV1AgentsIdRunRouteImport.update({
   path: '/run',
   getParentRoute: () => ApiPublicV1AgentsIdRoute,
 } as any)
+const ApiPublicV1WorkflowsIdRunRoute =
+  ApiPublicV1WorkflowsIdRunRouteImport.update({
+    id: '/$id/run',
+    path: '/$id/run',
+    getParentRoute: () => ApiPublicV1WorkflowsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -779,13 +786,14 @@ export interface FileRoutesByFullPath {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
-  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRoute
+  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/admin/': typeof ShellAppAdminIndexRoute
   '/agents/': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id/': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
+  '/api/public/v1/workflows/$id/run': typeof ApiPublicV1WorkflowsIdRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -888,13 +896,14 @@ export interface FileRoutesByTo {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
-  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRoute
+  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/admin': typeof ShellAppAdminIndexRoute
   '/agents': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
+  '/api/public/v1/workflows/$id/run': typeof ApiPublicV1WorkflowsIdRunRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1000,13 +1009,14 @@ export interface FileRoutesById {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
-  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRoute
+  '/api/public/v1/workflows': typeof ApiPublicV1WorkflowsRouteWithChildren
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
   '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
   '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/_shell/_app/agents/$id/': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
+  '/api/public/v1/workflows/$id/run': typeof ApiPublicV1WorkflowsIdRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1118,6 +1128,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents/$id'
     | '/agents/$id/'
     | '/api/public/v1/agents/$id/run'
+    | '/api/public/v1/workflows/$id/run'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1227,6 +1238,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents/$id'
     | '/agents/$id'
     | '/api/public/v1/agents/$id/run'
+    | '/api/public/v1/workflows/$id/run'
   id:
     | '__root__'
     | '/'
@@ -1338,6 +1350,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/agents/$id'
     | '/_shell/_app/agents/$id/'
     | '/api/public/v1/agents/$id/run'
+    | '/api/public/v1/workflows/$id/run'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1372,7 +1385,7 @@ export interface RootRouteChildren {
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
   ApiPublicV1TasksRoute: typeof ApiPublicV1TasksRoute
-  ApiPublicV1WorkflowsRoute: typeof ApiPublicV1WorkflowsRoute
+  ApiPublicV1WorkflowsRoute: typeof ApiPublicV1WorkflowsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -2140,6 +2153,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicV1AgentsIdRunRouteImport
       parentRoute: typeof ApiPublicV1AgentsIdRoute
     }
+    '/api/public/v1/workflows/$id/run': {
+      id: '/api/public/v1/workflows/$id/run'
+      path: '/$id/run'
+      fullPath: '/api/public/v1/workflows/$id/run'
+      preLoaderRoute: typeof ApiPublicV1WorkflowsIdRunRouteImport
+      parentRoute: typeof ApiPublicV1WorkflowsRoute
+    }
   }
 }
 
@@ -2333,6 +2353,17 @@ const ApiPublicV1AgentsRouteChildren: ApiPublicV1AgentsRouteChildren = {
 const ApiPublicV1AgentsRouteWithChildren =
   ApiPublicV1AgentsRoute._addFileChildren(ApiPublicV1AgentsRouteChildren)
 
+interface ApiPublicV1WorkflowsRouteChildren {
+  ApiPublicV1WorkflowsIdRunRoute: typeof ApiPublicV1WorkflowsIdRunRoute
+}
+
+const ApiPublicV1WorkflowsRouteChildren: ApiPublicV1WorkflowsRouteChildren = {
+  ApiPublicV1WorkflowsIdRunRoute: ApiPublicV1WorkflowsIdRunRoute,
+}
+
+const ApiPublicV1WorkflowsRouteWithChildren =
+  ApiPublicV1WorkflowsRoute._addFileChildren(ApiPublicV1WorkflowsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
@@ -2366,7 +2397,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
   ApiPublicV1TasksRoute: ApiPublicV1TasksRoute,
-  ApiPublicV1WorkflowsRoute: ApiPublicV1WorkflowsRoute,
+  ApiPublicV1WorkflowsRoute: ApiPublicV1WorkflowsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
