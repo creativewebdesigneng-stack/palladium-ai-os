@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch, Layers, Users } from 'lucide-react';
 import { useServerFn } from '@tanstack/react-start';
 import { SectionHead } from './wfShared';
-import { listWorkforces } from '@/lib/runtime/workforce.functions';
-import { runWorkflow, getWorkflowRun } from '@/lib/runtime/workforce.functions';
+import { listWorkforces, runWorkflow, getWorkflowRun } from '@/lib/runtime/workforce.functions';
+
 import { useToast } from '@/components/ui/use-toast';
 
 const STATUS_ICON = {
