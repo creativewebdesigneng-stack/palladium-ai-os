@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
+import { supabase } from '@/integrations/supabase/client';
+
 import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
@@ -46,11 +48,24 @@ export default function MissionControl() {
   const deleteMemoryFn = useServerFn(deleteMemory);
   const taskStatusFn = useServerFn(updateTaskStatus);
 
+  // Mission Control's server functions require a real backend session bearer
+  // token, so only query once a session exists on the client.
+  const [session, setSession] = useState('unknown');
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
+    return () => { alive = false; sub?.subscription?.unsubscribe(); };
+  }, []);
+
   const { data, isLoading } = useQuery({
     queryKey: ['mission-overview'],
     queryFn: () => overviewFn({ data: {} }),
+    enabled: session === 'yes',
+    retry: false,
     refetchInterval: 30000,
   });
+
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['mission-overview'] });
   const fail = (e) => toast({ title: 'Something went wrong', description: e?.message ?? 'Please try again.', variant: 'destructive' });
@@ -164,13 +179,21 @@ export default function MissionControl() {
         }
       />
 
+      {session === 'no' && (
+        <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">
+          <p className="flex items-center gap-2 text-xs font-semibold text-amber-100"><ShieldAlert className="h-4 w-4" />Sign in to activate Mission Control</p>
+          <p className="mt-1 text-[11px] text-amber-200/80">Your agents, tasks, approvals and memory are private to your account, so Mission Control needs a signed-in session before it can load or run anything.</p>
+        </div>
+      )}
+
       <BriefingConsole
         briefing={data?.briefing}
-        loading={isLoading}
+        loading={isLoading && session !== 'no'}
         agents={agents}
         submitting={dispatch.isPending}
         onSubmit={(vars) => dispatch.mutate(vars)}
       />
+
 
       <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
         {TABS.map(([id, label, Icon]) => (
@@ -190,12 +213,12 @@ export default function MissionControl() {
       <div className="mt-4 space-y-4">
         {tab === 'overview' && (
           <>
-            <MissionMetrics metrics={data?.metrics} loading={isLoading} />
+            <MissionMetrics metrics={data?.metrics} loading={isLoading && session !== 'no'} />
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />
               </div>
-              <ActivityStream activities={data?.activities ?? []} loading={isLoading} />
+              <ActivityStream activities={data?.activities ?? []} loading={isLoading && session !== 'no'} />
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Globe2 className="h-4 w-4 text-cyan-400" />Browser agent</h2>
@@ -212,7 +235,7 @@ export default function MissionControl() {
         {tab === 'personal' && (
           <PersonalAISection
             agents={agents}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })}
             onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })}
             onDelete={(agent) => removeAgent.mutate(agent.id)}
@@ -226,7 +249,7 @@ export default function MissionControl() {
             approvals={approvals}
             purchases={data?.purchases ?? []}
             results={data?.shoppingResults ?? []}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             busyId={busyId}
             onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision }); }}
             onChooseAlternative={(a, alt) => alternative.mutate({ approvalId: a.id, resultId: alt.id })}
@@ -236,7 +259,7 @@ export default function MissionControl() {
         )}
 
         {tab === 'shopping' && (
-          <ShoppingBoard shoppingResults={data?.shoppingResults ?? []} purchases={data?.purchases ?? []} loading={isLoading} />
+          <ShoppingBoard shoppingResults={data?.shoppingResults ?? []} purchases={data?.purchases ?? []} loading={isLoading && session !== 'no'} />
         )}
 
         {tab === 'tasks' && <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />}
@@ -244,7 +267,7 @@ export default function MissionControl() {
         {tab === 'memory' && (
           <MemoryVault
             memories={data?.memories ?? []}
-            loading={isLoading}
+            loading={isLoading && session !== 'no'}
             saving={memoryMutation.isPending}
             onSave={(m) => memoryMutation.mutate(m)}
             onDelete={(m) => memoryDelete.mutate(m.id)}
