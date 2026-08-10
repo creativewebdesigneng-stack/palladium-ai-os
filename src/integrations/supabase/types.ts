@@ -195,6 +195,94 @@ export type Database = {
           },
         ]
       }
+      agent_messages: {
+        Row: {
+          content: string
+          created_at: string
+          from_agent_id: string | null
+          from_step_run_id: string | null
+          id: string
+          kind: string
+          metadata: Json
+          org_id: string | null
+          run_id: string
+          to_agent_id: string | null
+          to_step_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          from_agent_id?: string | null
+          from_step_run_id?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          org_id?: string | null
+          run_id: string
+          to_agent_id?: string | null
+          to_step_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          from_agent_id?: string | null
+          from_step_run_id?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          org_id?: string | null
+          run_id?: string
+          to_agent_id?: string | null
+          to_step_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_from_agent_id_fkey"
+            columns: ["from_agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_from_step_run_id_fkey"
+            columns: ["from_step_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_step_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_to_agent_id_fkey"
+            columns: ["to_agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_to_step_id_fkey"
+            columns: ["to_step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_tasks: {
         Row: {
           agent_id: string | null
@@ -2243,43 +2331,67 @@ export type Database = {
       }
       workflow_runs: {
         Row: {
+          attempt: number
           completed_at: string | null
+          cost_pence: number
           created_at: string
           error: string | null
           id: string
+          input: string | null
           org_id: string | null
+          output: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["exec_status"]
           step_results: Json
+          tokens_in: number
+          tokens_out: number
+          trigger: string
           updated_at: string
           user_id: string
           workflow_id: string
+          workforce_id: string | null
         }
         Insert: {
+          attempt?: number
           completed_at?: string | null
+          cost_pence?: number
           created_at?: string
           error?: string | null
           id?: string
+          input?: string | null
           org_id?: string | null
+          output?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           step_results?: Json
+          tokens_in?: number
+          tokens_out?: number
+          trigger?: string
           updated_at?: string
           user_id: string
           workflow_id: string
+          workforce_id?: string | null
         }
         Update: {
+          attempt?: number
           completed_at?: string | null
+          cost_pence?: number
           created_at?: string
           error?: string | null
           id?: string
+          input?: string | null
           org_id?: string | null
+          output?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           step_results?: Json
+          tokens_in?: number
+          tokens_out?: number
+          trigger?: string
           updated_at?: string
           user_id?: string
           workflow_id?: string
+          workforce_id?: string | null
         }
         Relationships: [
           {
@@ -2296,44 +2408,196 @@ export type Database = {
             referencedRelation: "workflows"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "workflow_runs_workforce_id_fkey"
+            columns: ["workforce_id"]
+            isOneToOne: false
+            referencedRelation: "workforces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_step_runs: {
+        Row: {
+          agent_id: string | null
+          attempt: number
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          input: string | null
+          kind: string
+          name: string | null
+          org_id: string | null
+          output: string | null
+          position: number
+          run_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["exec_status"]
+          step_id: string | null
+          task_id: string | null
+          tokens_in: number
+          tokens_out: number
+          updated_at: string
+          user_id: string
+          workflow_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: string | null
+          kind?: string
+          name?: string | null
+          org_id?: string | null
+          output?: string | null
+          position?: number
+          run_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["exec_status"]
+          step_id?: string | null
+          task_id?: string | null
+          tokens_in?: number
+          tokens_out?: number
+          updated_at?: string
+          user_id: string
+          workflow_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: string | null
+          kind?: string
+          name?: string | null
+          org_id?: string | null
+          output?: string | null
+          position?: number
+          run_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["exec_status"]
+          step_id?: string | null
+          task_id?: string | null
+          tokens_in?: number
+          tokens_out?: number
+          updated_at?: string
+          user_id?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_step_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_step_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_step_runs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_step_runs_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_step_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_step_runs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
         ]
       }
       workflow_steps: {
         Row: {
           agent_id: string | null
+          condition: Json
           config: Json
+          continue_on_error: boolean
           created_at: string
+          depends_on: string[]
           id: string
+          input_template: string | null
           kind: string
+          max_retries: number
+          mode: string
           name: string | null
           position: number
           requires_approval: boolean
+          retry_delay_ms: number
+          timeout_ms: number
           tool: string | null
           updated_at: string
           workflow_id: string
         }
         Insert: {
           agent_id?: string | null
+          condition?: Json
           config?: Json
+          continue_on_error?: boolean
           created_at?: string
+          depends_on?: string[]
           id?: string
+          input_template?: string | null
           kind?: string
+          max_retries?: number
+          mode?: string
           name?: string | null
           position?: number
           requires_approval?: boolean
+          retry_delay_ms?: number
+          timeout_ms?: number
           tool?: string | null
           updated_at?: string
           workflow_id: string
         }
         Update: {
           agent_id?: string | null
+          condition?: Json
           config?: Json
+          continue_on_error?: boolean
           created_at?: string
+          depends_on?: string[]
           id?: string
+          input_template?: string | null
           kind?: string
+          max_retries?: number
+          mode?: string
           name?: string | null
           position?: number
           requires_approval?: boolean
+          retry_delay_ms?: number
+          timeout_ms?: number
           tool?: string | null
           updated_at?: string
           workflow_id?: string
@@ -2368,6 +2632,7 @@ export type Database = {
           trigger_type: string
           updated_at: string
           user_id: string
+          workforce_id: string | null
         }
         Insert: {
           created_at?: string
@@ -2381,6 +2646,7 @@ export type Database = {
           trigger_type?: string
           updated_at?: string
           user_id: string
+          workforce_id?: string | null
         }
         Update: {
           created_at?: string
@@ -2394,6 +2660,7 @@ export type Database = {
           trigger_type?: string
           updated_at?: string
           user_id?: string
+          workforce_id?: string | null
         }
         Relationships: [
           {
@@ -2401,6 +2668,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflows_workforce_id_fkey"
+            columns: ["workforce_id"]
+            isOneToOne: false
+            referencedRelation: "workforces"
             referencedColumns: ["id"]
           },
         ]
@@ -2448,6 +2722,7 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
+          description: string | null
           id: string
           name: string
           org_id: string | null
@@ -2459,6 +2734,7 @@ export type Database = {
         Insert: {
           created_at?: string
           department?: string | null
+          description?: string | null
           id?: string
           name: string
           org_id?: string | null
@@ -2470,6 +2746,7 @@ export type Database = {
         Update: {
           created_at?: string
           department?: string | null
+          description?: string | null
           id?: string
           name?: string
           org_id?: string | null
@@ -2570,6 +2847,7 @@ export type Database = {
       }
       team_org: { Args: { _team: string }; Returns: string }
       workflow_is_visible: { Args: { _wf: string }; Returns: boolean }
+      workflow_run_is_visible: { Args: { _run: string }; Returns: boolean }
       workforce_is_visible: { Args: { _wf: string }; Returns: boolean }
     }
     Enums: {
