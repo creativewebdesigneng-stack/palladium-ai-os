@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type React from "react";
 import Screen from "@/screens/Files";
 
 export const Route = createFileRoute("/_shell/_app/files")({
@@ -12,5 +13,5 @@ export const Route = createFileRoute("/_shell/_app/files")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: Screen as unknown as () => React.ReactElement,
 });
