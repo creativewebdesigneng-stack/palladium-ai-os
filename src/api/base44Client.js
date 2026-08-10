@@ -11,14 +11,40 @@
  * - `base44.functions.invoke` -> server functions (not yet wired: resolves null)
  */
 import { supabase } from "@/integrations/supabase/client";
+import { runAgentTask, cancelAgentTask, getAgentRuntime, reapStuckRuns } from "@/lib/runtime/runtime.functions";
+
+/** Legacy entity names -> real tables in the Cloud database. */
+const TABLE_ALIASES = {
+  Agent: "personal_agents",
+  PersonalAgent: "personal_agents",
+  Task: "agent_tasks",
+  AgentTask: "agent_tasks",
+  PersonalTask: "personal_tasks",
+  Approval: "approval_requests",
+  ApprovalRequest: "approval_requests",
+  Memory: "personal_memories",
+  PersonalMemory: "personal_memories",
+  Activity: "agent_activities",
+  AgentActivity: "agent_activities",
+  ToolExecution: "tool_executions",
+  AuditLog: "mission_audit_logs",
+  Organisation: "organisations",
+  Organization: "organisations",
+};
+
+/** Legacy timestamp column names used by the screens. */
+const COLUMN_ALIASES = { created_date: "created_at", updated_date: "updated_at" };
+const column = (name) => COLUMN_ALIASES[name] ?? name;
 
 const toTable = (entity) =>
+  TABLE_ALIASES[entity] ??
   entity
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toLowerCase()
     .replace(/y$/, "ie")
     .concat("s")
     .replace(/ss$/, "s");
+
 
 const mapUser = (user, profile) =>
   user
