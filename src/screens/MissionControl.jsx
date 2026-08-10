@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
+import { supabase } from '@/integrations/supabase/client';
+
 import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
