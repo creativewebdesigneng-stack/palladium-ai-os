@@ -103,14 +103,16 @@ function renderInput(template: string | null, ctx: { input: string; upstream: St
 /** Evaluates a step's `condition` against its declared upstream outputs. */
 function conditionMet(condition: Record<string, any> | null, upstream: StepOutcome[]) {
   if (!condition || !Object.keys(condition).length) return true;
-  const op = String(condition.op ?? condition.when ?? 'always');
+  const op = String(condition['op'] ?? condition['when'] ?? 'always');
   if (op === 'always') return true;
 
-  const source = condition.step
-    ? upstream.find((o) => o.step_id === condition.step || o.name.toLowerCase() === String(condition.step).toLowerCase())
+  const ref = condition['step'] ? String(condition['step']) : null;
+  const source = ref
+    ? upstream.find((o) => o.step_id === ref || o.name.toLowerCase() === ref.toLowerCase())
     : upstream[upstream.length - 1];
   const text = (source?.output ?? '').toLowerCase();
-  const value = String(condition.value ?? '').toLowerCase();
+  const value = String(condition['value'] ?? '').toLowerCase();
+
 
   switch (op) {
     case 'contains':
