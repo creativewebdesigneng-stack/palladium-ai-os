@@ -31,13 +31,14 @@ export function normalizeMemory(m, agents = []) {
     importance: m.importance || 'medium',
     pinned: !!m.pinned,
     agent_id: m.agent_id || '',
-    agent_name: agent ? agent.name : (m.scope === 'shared' ? 'Organisation' : m.scope === 'user' ? 'User memory' : 'Agent'),
+    agent_name: agent ? agent.name : ((m.scope === 'shared' || m.scope === 'organisation') ? 'Organisation' : m.scope === 'user' ? 'User memory' : 'Agent'),
     user_id: m.user_id || '',
     file_url: m.file_url || '',
     vector_status: m.vector_status || 'disabled',
     vector_provider: m.vector_provider || 'none',
-    created: m.created_date,
-    lastUsed: m.last_used_date || m.updated_date,
+    similarity: typeof m.similarity === 'number' ? m.similarity : null,
+    created: m.created_at || m.created_date,
+    lastUsed: m.last_used_at || m.last_used_date || m.updated_at || m.updated_date,
     _backend: true,
   };
 }

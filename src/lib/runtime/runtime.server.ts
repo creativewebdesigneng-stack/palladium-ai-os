@@ -10,6 +10,7 @@
  * time-boxed and retried, and every failure path closes the task row.
  */
 import { writeAudit } from '@/lib/platform/audit.server';
+import { renderMemoryPrompt, retrieveRelevantMemory, storeMemory } from '@/lib/memory/memory.server';
 import { assertWithinLimit, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import {
   normaliseProvider,
@@ -96,12 +97,19 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
   const messages: ChatMessage[] = [];
 
   if (agent.memory_enabled !== false) {
-    const [{ data: memories }, { data: history }] = await Promise.all([
-      sb
-        .from('personal_memories')
-        .select('category,key,value')
-        .order('updated_at', { ascending: false })
-        .limit(30),
+    // Memory is injected before execution: short-term context, long-term facts,
+    // organisation knowledge and document extracts relevant to this input.
+    const [memory, historyRes] = await Promise.all([
+      retrieveRelevantMemory({
+        sb: sb as never,
+        userId: agent.user_id,
+        agentId: agent.id,
+        orgId: agent.org_id_fk ?? agent.org_id ?? null,
+        query: input,
+      }).catch((error) => {
+        console.error('[runtime] memory retrieval failed', error);
+        return null;
+      }),
       sb
         .from('agent_tasks')
         .select('input,output_text,status')
@@ -111,15 +119,10 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
         .limit(3),
     ]);
 
-    if (memories?.length) {
-      system.push(
-        `Known facts and preferences about the operator:\n${memories
-          .map((m: any) => `- [${m.category}] ${m.key}: ${m.value ?? ''}`)
-          .join('\n')}`,
-      );
-    }
+    const memoryPrompt = memory ? renderMemoryPrompt(memory) : '';
+    if (memoryPrompt) system.push(memoryPrompt);
 
-    for (const past of [...(history ?? [])].reverse()) {
+    for (const past of [...(historyRes.data ?? [])].reverse()) {
       if (!past.input) continue;
       messages.push({ role: 'user', content: String(past.input).slice(0, 1500) });
       messages.push({ role: 'assistant', content: String(past.output_text ?? '').slice(0, 1500) });
@@ -239,19 +242,39 @@ export async function completeRun(args: {
 
   await db.from('personal_agents').update({ last_run_at: new Date().toISOString() }).eq('id', run.agent.id);
 
-  // Save memory: a compact trace of what was asked and delivered.
+  // Save memory: short-term run context (expires) plus the legacy key/value trace.
   if (run.agent.memory_enabled !== false && result.text) {
-    await args.sb.from('personal_memories').insert({
-      user_id: args.userId,
-      org_id: run.orgId,
-      agent_id: run.agent.id,
-      category: 'run_history',
-      key: `run:${new Date().toISOString().slice(0, 19)}`,
-      value: `Task: ${run.messages[run.messages.length - 1]?.content?.slice(0, 300)}\nOutcome: ${result.text.slice(0, 600)}`,
-      scope: 'personal',
-      metadata: { task_id: run.taskId, agent: run.agent.name },
-    });
+    const request = String(run.messages[run.messages.length - 1]?.content ?? '').slice(0, 300);
+    await Promise.all([
+      storeMemory({
+        sb: args.sb as never,
+        userId: args.userId,
+        input: {
+          content: `Task: ${request}\nOutcome: ${result.text.slice(0, 1500)}`,
+          memory_type: 'short_term',
+          category: 'task',
+          scope: 'agent',
+          title: `${run.agent.name} run`,
+          source: 'agent_runtime',
+          agent_id: run.agent.id,
+          task_id: run.taskId,
+          org_id: run.orgId,
+          metadata: { provider: run.provider, model: run.model },
+        },
+      }).catch((error: unknown) => console.error('[runtime] short-term memory write failed', error)),
+      args.sb.from('personal_memories').insert({
+        user_id: args.userId,
+        org_id: run.orgId,
+        agent_id: run.agent.id,
+        category: 'run_history',
+        key: `run:${new Date().toISOString().slice(0, 19)}`,
+        value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
+        scope: 'personal',
+        metadata: { task_id: run.taskId, agent: run.agent.name },
+      }),
+    ]);
   }
+
 
   await Promise.all([
     recordUsage({
