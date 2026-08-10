@@ -16,12 +16,43 @@ import BillingRightSidebar from '@/components/billing/BillingRightSidebar';
 import SubscriptionHistory from '@/components/billing/SubscriptionHistory';
 import UsageDashboard from '@/components/billing/UsageDashboard';
 import { Panel } from '@/components/billing/shared';
+import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
+import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
+import { priceIdFor, getStripeEnvironment } from '@/lib/stripe';
+import { createPortalSession } from '@/utils/payments.functions';
 
 const TABS = ['Overview', 'Plans', 'Usage', 'Invoices', 'History', 'Compare', 'Enterprise'];
 
 export default function Billing() {
   const [tab, setTab] = useState('Overview');
   const [query, setQuery] = useState('');
+  const [cycle, setCycle] = useState('monthly');
+  const [checkoutPriceId, setCheckoutPriceId] = useState(null);
+  const [portalError, setPortalError] = useState(null);
+
+  const choosePlan = (planId) => {
+    if (planId === 'free') { setTab('Plans'); return; }
+    if (planId === 'enterprise' || planId === 'business') {
+      // Both are self-serve plans in the catalog; enterprise enquiries use the section below.
+    }
+    const priceId = priceIdFor(planId, cycle);
+    if (!priceId) { setTab('Enterprise'); return; }
+    setCheckoutPriceId(priceId);
+    setTab('Plans');
+  };
+
+  const openPortal = async () => {
+    setPortalError(null);
+    try {
+      const result = await createPortalSession({
+        data: { returnUrl: `${window.location.origin}/billing`, environment: getStripeEnvironment() },
+      });
+      if ('error' in result) throw new Error(result.error);
+      window.open(result.url, '_blank');
+    } catch (e) {
+      setPortalError(e?.message || 'Could not open the billing portal.');
+    }
+  };
 
   const headerActions = (
     <div className="flex items-center gap-2">
@@ -35,6 +66,7 @@ export default function Billing() {
       </button>
     </div>
   );
+
 
   return (
     <>
