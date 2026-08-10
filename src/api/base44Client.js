@@ -11,7 +11,12 @@
  * - `base44.functions.invoke` -> server functions (not yet wired: resolves null)
  */
 import { supabase } from "@/integrations/supabase/client";
-import { runAgentTask, cancelAgentTask, getAgentRuntime, reapStuckRuns } from "@/lib/runtime/runtime.functions";
+import {
+  runAgentTask,
+  cancelAgentTask,
+  getAgentRuntime,
+  reapStuckRuns,
+} from "@/lib/runtime/runtime.functions";
 
 /** Legacy entity names -> real tables in the Cloud database. */
 const TABLE_ALIASES = {
@@ -44,7 +49,6 @@ const toTable = (entity) =>
     .replace(/y$/, "ie")
     .concat("s")
     .replace(/ss$/, "s");
-
 
 const mapUser = (user, profile) =>
   user
@@ -93,7 +97,8 @@ const auth = {
       email,
       password,
       options: {
-        emailRedirectTo: typeof window === "undefined" ? undefined : `${window.location.origin}/dashboard`,
+        emailRedirectTo:
+          typeof window === "undefined" ? undefined : `${window.location.origin}/dashboard`,
         data: full_name ? { full_name } : undefined,
       },
     });
@@ -122,7 +127,8 @@ const auth = {
   },
   async resetPasswordRequest(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: typeof window === "undefined" ? undefined : `${window.location.origin}/reset-password`,
+      redirectTo:
+        typeof window === "undefined" ? undefined : `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
     return true;
@@ -234,7 +240,8 @@ const integrations = {
 
 /** Server-side runtime operations exposed to the screens. */
 const RUNTIME_FUNCTIONS = {
-  runAgentTask: (payload) => runAgentTask({ data: { agent_id: payload?.agent_id, input: payload?.input ?? "" } }),
+  runAgentTask: (payload) =>
+    runAgentTask({ data: { agent_id: payload?.agent_id, input: payload?.input ?? "" } }),
   cancelAgentTask: (payload) => cancelAgentTask({ data: { task_id: payload?.task_id } }),
   getAgentRuntime: (payload) => getAgentRuntime({ data: { agent_id: payload?.agent_id } }),
   reapStuckRuns: () => reapStuckRuns(),

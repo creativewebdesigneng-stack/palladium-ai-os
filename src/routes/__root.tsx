@@ -20,7 +20,9 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="pglass max-w-md rounded-2xl px-8 py-10 text-center">
-        <h1 className="bg-gradient-to-br from-violet-400 to-cyan-300 bg-clip-text text-7xl font-bold text-transparent">404</h1>
+        <h1 className="bg-gradient-to-br from-violet-400 to-cyan-300 bg-clip-text text-7xl font-bold text-transparent">
+          404
+        </h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Signal lost</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           This module isn't part of your operating system yet.

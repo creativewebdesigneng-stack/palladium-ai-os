@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
-import { getStripe, getStripeEnvironment } from '@/lib/stripe';
-import { createCheckoutSession } from '@/utils/payments.functions';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from "react";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { getStripe, getStripeEnvironment } from "@/lib/stripe";
+import { createCheckoutSession } from "@/utils/payments.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   priceId: string;
@@ -42,11 +42,11 @@ export default function PalladiumCheckout({ priceId, orgId, returnUrl }: Props) 
           environment: getStripeEnvironment(),
         },
       });
-      if ('error' in result) throw new Error(result.error);
-      if (!result.clientSecret) throw new Error('Checkout did not return a client secret');
+      if ("error" in result) throw new Error(result.error);
+      if (!result.clientSecret) throw new Error("Checkout did not return a client secret");
       return result.clientSecret;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Could not start checkout';
+      const message = e instanceof Error ? e.message : "Could not start checkout";
       setError(message);
       throw e;
     }
@@ -59,8 +59,11 @@ export default function PalladiumCheckout({ priceId, orgId, returnUrl }: Props) 
   if (!authed) {
     return (
       <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[.07] p-4 text-sm text-amber-200">
-        Sign in to continue to secure checkout.{' '}
-        <a href={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="font-semibold underline">
+        Sign in to continue to secure checkout.{" "}
+        <a
+          href={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+          className="font-semibold underline"
+        >
           Sign in
         </a>
       </div>
@@ -69,12 +72,17 @@ export default function PalladiumCheckout({ priceId, orgId, returnUrl }: Props) 
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-rose-400/20 bg-rose-500/[.08] p-4 text-sm text-rose-200">{error}</div>
+      <div className="rounded-2xl border border-rose-400/20 bg-rose-500/[.08] p-4 text-sm text-rose-200">
+        {error}
+      </div>
     );
   }
 
   return (
-    <div id="checkout" className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.02] p-2">
+    <div
+      id="checkout"
+      className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.02] p-2"
+    >
       <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>
         <EmbeddedCheckout />
       </EmbeddedCheckoutProvider>

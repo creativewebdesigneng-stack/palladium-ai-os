@@ -9,9 +9,17 @@
  * Runs are never left stuck: stale runs are reaped, every model call is
  * time-boxed and retried, and every failure path closes the task row.
  */
-import { writeAudit } from '@/lib/platform/audit.server';
-import { renderMemoryPrompt, retrieveRelevantMemory, storeMemory } from '@/lib/memory/memory.server';
-import { assertWithinLimit, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
+import { writeAudit } from "@/lib/platform/audit.server";
+import {
+  renderMemoryPrompt,
+  retrieveRelevantMemory,
+  storeMemory,
+} from "@/lib/memory/memory.server";
+import {
+  assertWithinLimit,
+  getEntitlements,
+  recordUsage,
+} from "@/lib/platform/entitlements.server";
 import {
   normaliseProvider,
   ProviderError,
@@ -20,8 +28,8 @@ import {
   streamChat,
   type ChatMessage,
   type ChatResult,
-} from './model-gateway.server';
-import { executeTool, resolveGrantedTools, type ToolGrant } from './tools.server';
+} from "./model-gateway.server";
+import { executeTool, resolveGrantedTools, type ToolGrant } from "./tools.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -65,19 +73,33 @@ const RUN_BUDGET_MS = 120_000;
 
 async function reapStale(userId: string) {
   try {
-    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
-    await supabaseAdmin.rpc('reap_stale_agent_tasks', { _user: userId } as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.rpc("reap_stale_agent_tasks", { _user: userId } as never);
   } catch (error) {
-    console.error('[runtime] reap failed', error);
+    console.error("[runtime] reap failed", error);
   }
 }
 
 /** Loads the agent through the caller's own client, so RLS is the permission check. */
 async function loadAgent(sb: Sb, agentId: string): Promise<Agent> {
-  const { data, error } = await sb.from('personal_agents').select('*').eq('id', agentId).maybeSingle();
-  if (error) throw new RuntimeError('Could not load that agent.', 'AGENT_LOAD_FAILED', 500);
-  if (!data) throw new RuntimeError('Agent not found or you do not have access to it.', 'AGENT_FORBIDDEN', 403);
-  if (data.status === 'archived') throw new RuntimeError('This agent is archived. Restore it before running tasks.', 'AGENT_ARCHIVED', 409);
+  const { data, error } = await sb
+    .from("personal_agents")
+    .select("*")
+    .eq("id", agentId)
+    .maybeSingle();
+  if (error) throw new RuntimeError("Could not load that agent.", "AGENT_LOAD_FAILED", 500);
+  if (!data)
+    throw new RuntimeError(
+      "Agent not found or you do not have access to it.",
+      "AGENT_FORBIDDEN",
+      403,
+    );
+  if (data.status === "archived")
+    throw new RuntimeError(
+      "This agent is archived. Restore it before running tasks.",
+      "AGENT_ARCHIVED",
+      409,
+    );
   return data as Agent;
 }
 
@@ -91,7 +113,7 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
   if (agent.instructions) system.push(`Standing instructions:\n${agent.instructions}`);
   if (agent.system_prompt) system.push(agent.system_prompt);
   system.push(
-    'Operating rules: be concise and decisive, use markdown, cite sources when you used the web, and never claim to have completed a real-world action unless a tool confirmed it. If an action costs money or affects the outside world, raise an approval request instead of pretending to act.',
+    "Operating rules: be concise and decisive, use markdown, cite sources when you used the web, and never claim to have completed a real-world action unless a tool confirmed it. If an action costs money or affects the outside world, raise an approval request instead of pretending to act.",
   );
 
   const messages: ChatMessage[] = [];
@@ -107,30 +129,30 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
         orgId: agent.org_id_fk ?? agent.org_id ?? null,
         query: input,
       }).catch((error) => {
-        console.error('[runtime] memory retrieval failed', error);
+        console.error("[runtime] memory retrieval failed", error);
         return null;
       }),
       sb
-        .from('agent_tasks')
-        .select('input,output_text,status')
-        .eq('agent_id', agent.id)
-        .eq('status', 'succeeded')
-        .order('created_at', { ascending: false })
+        .from("agent_tasks")
+        .select("input,output_text,status")
+        .eq("agent_id", agent.id)
+        .eq("status", "succeeded")
+        .order("created_at", { ascending: false })
         .limit(3),
     ]);
 
-    const memoryPrompt = memory ? renderMemoryPrompt(memory) : '';
+    const memoryPrompt = memory ? renderMemoryPrompt(memory) : "";
     if (memoryPrompt) system.push(memoryPrompt);
 
     for (const past of [...(historyRes.data ?? [])].reverse()) {
       if (!past.input) continue;
-      messages.push({ role: 'user', content: String(past.input).slice(0, 1500) });
-      messages.push({ role: 'assistant', content: String(past.output_text ?? '').slice(0, 1500) });
+      messages.push({ role: "user", content: String(past.input).slice(0, 1500) });
+      messages.push({ role: "assistant", content: String(past.output_text ?? "").slice(0, 1500) });
     }
   }
 
-  messages.unshift({ role: 'system', content: system.join('\n\n') });
-  messages.push({ role: 'user', content: input });
+  messages.unshift({ role: "system", content: system.join("\n\n") });
+  messages.push({ role: "user", content: input });
   return messages;
 }
 
@@ -156,8 +178,12 @@ export async function prepareRun(args: {
   input: string;
 }): Promise<PreparedRun> {
   const input = args.input?.trim();
-  if (!input) throw new RuntimeError('Give the agent something to do.', 'EMPTY_INPUT');
-  if (input.length > 12_000) throw new RuntimeError('That task is too long — keep it under 12,000 characters.', 'INPUT_TOO_LONG');
+  if (!input) throw new RuntimeError("Give the agent something to do.", "EMPTY_INPUT");
+  if (input.length > 12_000)
+    throw new RuntimeError(
+      "That task is too long — keep it under 12,000 characters.",
+      "INPUT_TOO_LONG",
+    );
 
   await reapStale(args.userId);
 
@@ -166,7 +192,7 @@ export async function prepareRun(args: {
 
   // Subscription + monthly execution limit, resolved from the database.
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
-  assertWithinLimit(ent, 'tasks_per_month');
+  assertWithinLimit(ent, "tasks_per_month");
 
   const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
   const provider = normaliseProvider(agent.model_provider);
@@ -174,7 +200,7 @@ export async function prepareRun(args: {
   const messages = await buildContext(args.sb, agent, input);
 
   const { data: task, error } = await args.sb
-    .from('agent_tasks')
+    .from("agent_tasks")
     .insert({
       user_id: args.userId,
       org_id: orgId,
@@ -183,36 +209,46 @@ export async function prepareRun(args: {
       title: input.slice(0, 120),
       provider,
       model,
-      status: 'running',
+      status: "running",
       started_at: new Date().toISOString(),
     })
-    .select('*')
+    .select("*")
     .maybeSingle();
 
-  if (error || !task) throw new RuntimeError('Could not queue that run.', 'TASK_CREATE_FAILED', 500);
+  if (error || !task)
+    throw new RuntimeError("Could not queue that run.", "TASK_CREATE_FAILED", 500);
 
-  await args.sb.from('agent_activities').insert({
+  await args.sb.from("agent_activities").insert({
     user_id: args.userId,
     org_id: orgId,
     agent_id: agent.id,
-    kind: 'run_started',
+    kind: "run_started",
     message: `${agent.name} started: ${input.slice(0, 120)}`,
     metadata: { task_id: task.id, provider, model },
   });
 
-  return { agent, orgId, taskId: task.id as string, messages, tools, provider, model, startedAt: Date.now() };
+  return {
+    agent,
+    orgId,
+    taskId: task.id as string,
+    messages,
+    tools,
+    provider,
+    model,
+    startedAt: Date.now(),
+  };
 }
 
 /* ------------------------------------------------------------ finalise a task */
 
 async function admin() {
-  const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin as unknown as Sb;
 }
 
 async function isCancelled(sb: Sb, taskId: string) {
-  const { data } = await sb.from('agent_tasks').select('status').eq('id', taskId).maybeSingle();
-  return data?.status === 'cancelled';
+  const { data } = await sb.from("agent_tasks").select("status").eq("id", taskId).maybeSingle();
+  return data?.status === "cancelled";
 }
 
 export async function completeRun(args: {
@@ -228,9 +264,9 @@ export async function completeRun(args: {
 
   const output = { text: result.text, tool_calls: args.toolCallCount };
   await db
-    .from('agent_tasks')
+    .from("agent_tasks")
     .update({
-      status: 'succeeded',
+      status: "succeeded",
       output,
       output_text: result.text,
       tokens_in: result.usage.input,
@@ -238,49 +274,53 @@ export async function completeRun(args: {
       duration_ms: duration,
       completed_at: new Date().toISOString(),
     })
-    .eq('id', run.taskId);
+    .eq("id", run.taskId);
 
-  await db.from('personal_agents').update({ last_run_at: new Date().toISOString() }).eq('id', run.agent.id);
+  await db
+    .from("personal_agents")
+    .update({ last_run_at: new Date().toISOString() })
+    .eq("id", run.agent.id);
 
   // Save memory: short-term run context (expires) plus the legacy key/value trace.
   if (run.agent.memory_enabled !== false && result.text) {
-    const request = String(run.messages[run.messages.length - 1]?.content ?? '').slice(0, 300);
+    const request = String(run.messages[run.messages.length - 1]?.content ?? "").slice(0, 300);
     await Promise.all([
       storeMemory({
         sb: args.sb as never,
         userId: args.userId,
         input: {
           content: `Task: ${request}\nOutcome: ${result.text.slice(0, 1500)}`,
-          memory_type: 'short_term',
-          category: 'task',
-          scope: 'agent',
+          memory_type: "short_term",
+          category: "task",
+          scope: "agent",
           title: `${run.agent.name} run`,
-          source: 'agent_runtime',
+          source: "agent_runtime",
           agent_id: run.agent.id,
           task_id: run.taskId,
           org_id: run.orgId,
           metadata: { provider: run.provider, model: run.model },
         },
-      }).catch((error: unknown) => console.error('[runtime] short-term memory write failed', error)),
-      args.sb.from('personal_memories').insert({
+      }).catch((error: unknown) =>
+        console.error("[runtime] short-term memory write failed", error),
+      ),
+      args.sb.from("personal_memories").insert({
         user_id: args.userId,
         org_id: run.orgId,
         agent_id: run.agent.id,
-        category: 'run_history',
+        category: "run_history",
         key: `run:${new Date().toISOString().slice(0, 19)}`,
         value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
-        scope: 'personal',
+        scope: "personal",
         metadata: { task_id: run.taskId, agent: run.agent.name },
       }),
     ]);
   }
 
-
   await Promise.all([
     recordUsage({
       userId: args.userId,
       orgId: run.orgId,
-      metric: 'agent_task',
+      metric: "agent_task",
       quantity: 1,
       agentId: run.agent.id,
       metadata: {
@@ -295,35 +335,35 @@ export async function completeRun(args: {
     recordUsage({
       userId: args.userId,
       orgId: run.orgId,
-      metric: 'tokens',
+      metric: "tokens",
       quantity: result.usage.input + result.usage.output,
-      unit: 'token',
+      unit: "token",
       agentId: run.agent.id,
       metadata: { task_id: run.taskId, provider: run.provider, model: run.model },
     }),
-    args.sb.from('agent_activities').insert({
+    args.sb.from("agent_activities").insert({
       user_id: args.userId,
       org_id: run.orgId,
       agent_id: run.agent.id,
-      kind: 'run_completed',
+      kind: "run_completed",
       message: `${run.agent.name} completed a task in ${(duration / 1000).toFixed(1)}s`,
       metadata: { task_id: run.taskId, tokens: result.usage.input + result.usage.output },
     }),
     writeAudit({
       userId: args.userId,
       orgId: run.orgId,
-      action: 'agent.run',
-      targetType: 'agent_task',
+      action: "agent.run",
+      targetType: "agent_task",
       targetId: run.taskId,
       agentId: run.agent.id,
       metadata: { provider: run.provider, model: run.model, duration_ms: duration },
     }),
   ]);
 
-  const { data } = await args.sb.from('agent_tasks').select('*').eq('id', run.taskId).maybeSingle();
+  const { data } = await args.sb.from("agent_tasks").select("*").eq("id", run.taskId).maybeSingle();
 
   // Notify developer webhook subscribers (signed, best effort).
-  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
   const payload = {
     agent_id: run.agent.id,
     agent_name: run.agent.name,
@@ -332,37 +372,47 @@ export async function completeRun(args: {
     tokens: { input: result.usage.input, output: result.usage.output },
     duration_ms: duration,
   };
-  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'agent.completed', payload });
-  await dispatchWebhookEvent({ userId: args.userId, orgId: run.orgId, event: 'task.completed', payload });
+  await dispatchWebhookEvent({
+    userId: args.userId,
+    orgId: run.orgId,
+    event: "agent.completed",
+    payload,
+  });
+  await dispatchWebhookEvent({
+    userId: args.userId,
+    orgId: run.orgId,
+    event: "task.completed",
+    payload,
+  });
 
   return data;
 }
 
 export async function failRun(args: {
   userId: string;
-  run: Pick<PreparedRun, 'taskId' | 'agent' | 'orgId' | 'startedAt'>;
+  run: Pick<PreparedRun, "taskId" | "agent" | "orgId" | "startedAt">;
   error: unknown;
 }) {
   const message =
     args.error instanceof ProviderError || args.error instanceof RuntimeError
       ? args.error.message
-      : 'The run failed unexpectedly. Please try again.';
+      : "The run failed unexpectedly. Please try again.";
   const db = await admin();
   await db
-    .from('agent_tasks')
+    .from("agent_tasks")
     .update({
-      status: 'failed',
+      status: "failed",
       error: message.slice(0, 1000),
       duration_ms: Date.now() - args.run.startedAt,
       completed_at: new Date().toISOString(),
     })
-    .eq('id', args.run.taskId);
+    .eq("id", args.run.taskId);
 
-  await db.from('agent_activities').insert({
+  await db.from("agent_activities").insert({
     user_id: args.userId,
     org_id: args.run.orgId,
     agent_id: args.run.agent.id,
-    kind: 'run_failed',
+    kind: "run_failed",
     message: `${args.run.agent.name} failed: ${message.slice(0, 160)}`,
     metadata: { task_id: args.run.taskId },
   });
@@ -370,23 +420,23 @@ export async function failRun(args: {
   await writeAudit({
     userId: args.userId,
     orgId: args.run.orgId,
-    action: 'agent.run',
-    status: 'failed',
-    targetType: 'agent_task',
+    action: "agent.run",
+    status: "failed",
+    targetType: "agent_task",
     targetId: args.run.taskId,
     agentId: args.run.agent.id,
     metadata: { error: message },
   });
 
-  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
   await dispatchWebhookEvent({
     userId: args.userId,
     orgId: args.run.orgId,
-    event: 'agent.failed',
+    event: "agent.failed",
     payload: { agent_id: args.run.agent.id, task_id: args.run.taskId, error: message },
   });
 
-  console.error('[runtime] run failed', args.run.taskId, args.error);
+  console.error("[runtime] run failed", args.run.taskId, args.error);
   return message;
 }
 
@@ -402,14 +452,14 @@ type ToolLoopDeps = {
 };
 
 export type RunEvent =
-  | { type: 'status'; status: string; task_id: string }
-  | { type: 'delta'; text: string }
-  | { type: 'tool'; name: string; ok: boolean }
-  | { type: 'error'; message: string }
-  | { type: 'complete'; task: unknown };
+  | { type: "status"; status: string; task_id: string }
+  | { type: "delta"; text: string }
+  | { type: "tool"; name: string; ok: boolean }
+  | { type: "error"; message: string }
+  | { type: "complete"; task: unknown };
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
-  messages.push({ role: 'assistant', content: result.text, tool_calls: result.toolCalls });
+  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
   for (const call of result.toolCalls) {
     const exec = await executeTool(
       call.name,
@@ -424,9 +474,9 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
       },
       deps.grants,
     );
-    await deps.onEvent?.({ type: 'tool', name: call.name, ok: exec.ok });
+    await deps.onEvent?.({ type: "tool", name: call.name, ok: exec.ok });
     messages.push({
-      role: 'tool',
+      role: "tool",
       tool_call_id: call.id,
       name: call.name,
       content: JSON.stringify(exec.output).slice(0, 8000),
@@ -445,7 +495,7 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (await isCancelled(args.sb, args.run.taskId)) {
-        throw new RuntimeError('Run cancelled by the operator.', 'CANCELLED', 499);
+        throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
       const result = await runChat({
         provider: args.run.provider,
@@ -470,19 +520,33 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
       }
       toolCallCount += result.toolCalls.length;
       await runToolCalls(
-        { sb: args.sb, userId: args.userId, run: args.run, grants: args.run.tools.grants, signal: controller.signal },
+        {
+          sb: args.sb,
+          userId: args.userId,
+          run: args.run,
+          grants: args.run.tools.grants,
+          signal: controller.signal,
+        },
         result,
         messages,
       );
     }
-    throw new RuntimeError('The agent used too many tool rounds without answering.', 'TOOL_LOOP_EXHAUSTED', 500);
+    throw new RuntimeError(
+      "The agent used too many tool rounds without answering.",
+      "TOOL_LOOP_EXHAUSTED",
+      500,
+    );
   } finally {
     clearTimeout(budget);
   }
 }
 
 /** Streaming execution: yields runtime events for a live console. */
-export async function* streamRun(args: { sb: Sb; userId: string; run: PreparedRun }): AsyncGenerator<RunEvent> {
+export async function* streamRun(args: {
+  sb: Sb;
+  userId: string;
+  run: PreparedRun;
+}): AsyncGenerator<RunEvent> {
   const controller = new AbortController();
   const budget = setTimeout(() => controller.abort(), RUN_BUDGET_MS);
   const messages = [...args.run.messages];
@@ -490,12 +554,12 @@ export async function* streamRun(args: { sb: Sb; userId: string; run: PreparedRu
   const usage = { input: 0, output: 0 };
   let toolCallCount = 0;
 
-  yield { type: 'status', status: 'running', task_id: args.run.taskId };
+  yield { type: "status", status: "running", task_id: args.run.taskId };
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (await isCancelled(args.sb, args.run.taskId)) {
-        throw new RuntimeError('Run cancelled by the operator.', 'CANCELLED', 499);
+        throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
 
       let final: ChatResult | null = null;
@@ -508,10 +572,10 @@ export async function* streamRun(args: { sb: Sb; userId: string; run: PreparedRu
         maxTokens: args.run.agent.max_tokens,
         signal: controller.signal,
       })) {
-        if (event.type === 'text') yield { type: 'delta', text: event.delta };
-        if (event.type === 'done') final = event.result;
+        if (event.type === "text") yield { type: "delta", text: event.delta };
+        if (event.type === "done") final = event.result;
       }
-      if (!final) throw new RuntimeError('The model returned no response.', 'EMPTY_RESPONSE', 502);
+      if (!final) throw new RuntimeError("The model returned no response.", "EMPTY_RESPONSE", 502);
       usage.input += final.usage.input;
       usage.output += final.usage.output;
 
@@ -523,7 +587,7 @@ export async function* streamRun(args: { sb: Sb; userId: string; run: PreparedRu
           result: { ...final, usage },
           toolCallCount,
         });
-        yield { type: 'complete', task };
+        yield { type: "complete", task };
         return;
       }
 
@@ -542,10 +606,14 @@ export async function* streamRun(args: { sb: Sb; userId: string; run: PreparedRu
       );
       while (pending.length) yield pending.shift()!;
     }
-    throw new RuntimeError('The agent used too many tool rounds without answering.', 'TOOL_LOOP_EXHAUSTED', 500);
+    throw new RuntimeError(
+      "The agent used too many tool rounds without answering.",
+      "TOOL_LOOP_EXHAUSTED",
+      500,
+    );
   } catch (error) {
     const message = await failRun({ userId: args.userId, run: args.run, error });
-    yield { type: 'error', message };
+    yield { type: "error", message };
   } finally {
     clearTimeout(budget);
   }

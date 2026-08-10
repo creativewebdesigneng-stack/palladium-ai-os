@@ -5,10 +5,17 @@ import { notAuthenticated, supabaseForUser } from "../supabase";
 export default defineTool({
   name: "list_agents",
   title: "List AI agents",
-  description: "List the signed-in user's PalladiumAI personal agents with their category, autonomy level and status.",
+  description:
+    "List the signed-in user's PalladiumAI personal agents with their category, autonomy level and status.",
   inputSchema: {
     status: z.enum(["active", "paused", "archived"]).optional().describe("Filter by agent status."),
-    limit: z.number().int().min(1).max(100).default(25).describe("Maximum number of agents to return."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(25)
+      .describe("Maximum number of agents to return."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ status, limit }, ctx) => {

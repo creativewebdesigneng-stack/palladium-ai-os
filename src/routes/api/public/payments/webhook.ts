@@ -6,8 +6,8 @@ let _supabase: any = null;
 function getSupabase(): any {
   if (!_supabase) {
     _supabase = createClient(
-      process.env['SUPABASE_URL']!,
-      process.env['SUPABASE_SERVICE_ROLE_KEY']!,
+      process.env["SUPABASE_URL"]!,
+      process.env["SUPABASE_SERVICE_ROLE_KEY"]!,
     );
   }
   return _supabase;
@@ -36,7 +36,9 @@ const PLAN_BY_PRICE: Record<string, string> = {
 };
 
 function resolvePriceKey(item: any): string | null {
-  return item?.price?.lookup_key || item?.price?.metadata?.lovable_external_id || item?.price?.id || null;
+  return (
+    item?.price?.lookup_key || item?.price?.metadata?.lovable_external_id || item?.price?.id || null
+  );
 }
 
 function iso(seconds: number | null | undefined): string | null {
@@ -53,7 +55,8 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
   const item = subscription.items?.data?.[0];
   const priceKey = resolvePriceKey(item);
   const planCode = (priceKey && PLAN_BY_PRICE[priceKey]) || "pro";
-  const productId = typeof item?.price?.product === "string" ? item.price.product : item?.price?.product?.id;
+  const productId =
+    typeof item?.price?.product === "string" ? item.price.product : item?.price?.product?.id;
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
   const periodEnd = item?.current_period_end ?? subscription.current_period_end;
 
@@ -63,7 +66,8 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
     plan_code: planCode,
     status: STATUS_MAP[subscription.status] ?? "incomplete",
     seats: item?.quantity ?? 1,
-    stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id,
+    stripe_customer_id:
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id,
     stripe_subscription_id: subscription.id,
     stripe_price_id: priceKey,
     stripe_product_id: productId ?? null,
@@ -104,15 +108,17 @@ async function recordUsage(invoice: any, env: StripeEnv) {
     .maybeSingle();
   if (!sub?.user_id) return;
 
-  const { error } = await getSupabase().from("usage_records").insert({
-    user_id: sub.user_id,
-    org_id: sub.org_id ?? null,
-    metric: "billing.invoice_paid",
-    quantity: (invoice.amount_paid ?? 0) / 100,
-    unit: invoice.currency ?? "gbp",
-    period_start: new Date().toISOString().slice(0, 8) + "01",
-    metadata: { invoice_id: invoice.id, environment: env },
-  });
+  const { error } = await getSupabase()
+    .from("usage_records")
+    .insert({
+      user_id: sub.user_id,
+      org_id: sub.org_id ?? null,
+      metric: "billing.invoice_paid",
+      quantity: (invoice.amount_paid ?? 0) / 100,
+      unit: invoice.currency ?? "gbp",
+      period_start: new Date().toISOString().slice(0, 8) + "01",
+      metadata: { invoice_id: invoice.id, environment: env },
+    });
   if (error) console.error("Failed to record usage:", error.message);
 }
 

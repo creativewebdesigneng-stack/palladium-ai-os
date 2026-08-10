@@ -8,7 +8,6 @@ import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
-import { DEV_ADMIN_EMAIL, DEV_ADMIN_PASSWORD, activateDevAdmin } from "@/lib/access";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -24,12 +23,6 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      // Development-only admin shortcut (frontend mock). Remove before production.
-      if (email === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
-        activateDevAdmin();
-        window.location.href = returnTo && returnTo !== "/" ? returnTo : "/dashboard";
-        return;
-      }
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {

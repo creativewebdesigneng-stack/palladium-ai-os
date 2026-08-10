@@ -65,7 +65,9 @@ export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link(
 
 export interface NavLinkProps extends Omit<LinkProps, "className" | "style" | "children"> {
   className?: string | ((props: { isActive: boolean; isPending: boolean }) => string);
-  style?: React.CSSProperties | ((props: { isActive: boolean; isPending: boolean }) => React.CSSProperties);
+  style?:
+    | React.CSSProperties
+    | ((props: { isActive: boolean; isPending: boolean }) => React.CSSProperties);
   children?: ReactNode | ((props: { isActive: boolean; isPending: boolean }) => ReactNode);
   end?: boolean;
 }
@@ -116,11 +118,16 @@ export function useLocation() {
   );
 }
 
-export function useParams<T extends Record<string, string | undefined> = Record<string, string | undefined>>() {
+export function useParams<
+  T extends Record<string, string | undefined> = Record<string, string | undefined>,
+>() {
   return (useTanstackParams as unknown as (opts: { strict: false }) => T)({ strict: false });
 }
 
-export function useSearchParams(): [URLSearchParams, (next: URLSearchParams | Record<string, string>) => void] {
+export function useSearchParams(): [
+  URLSearchParams,
+  (next: URLSearchParams | Record<string, string>) => void,
+] {
   const { search, pathname } = useLocation();
   const go = useGo();
   const params = useMemo(() => new URLSearchParams(search), [search]);
