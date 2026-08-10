@@ -15,6 +15,16 @@ const DEFAULT_DOMAINS = [
   'booking.com', 'trainline.com', 'tesco.com', 'sainsburys.co.uk',
 ];
 
+/** Emits a signed developer webhook. Best effort — never blocks the user flow. */
+async function emitWebhook(userId: string, event: string, payload: Record<string, unknown>) {
+  try {
+    const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+    await dispatchWebhookEvent({ userId, event, payload });
+  } catch (error) {
+    console.error('[mission] webhook dispatch failed', error);
+  }
+}
+
 async function log(sb: Sb, userId: string, action: string, extra: Record<string, unknown> = {}) {
   await sb.from('mission_audit_logs').insert({
     user_id: userId,
@@ -395,6 +405,7 @@ export const submitPersonalTask = createServerFn({ method: 'POST' })
         await sb.from('shopping_tasks').update({ status: 'awaiting_approval' }).eq('id', shoppingTask.id).eq('user_id', userId);
         await sb.from('personal_tasks').update({ status: 'awaiting_approval', result: { results: results.length, recommended: draft.product, total: draft.total } }).eq('id', task.id).eq('user_id', userId);
         await activity(sb, userId, `Agent waiting for approval: ${draft.product}`, 'awaiting_approval', { agent_id: agent?.id ?? null, task_id: task.id });
+        await emitWebhook(userId, 'approval.required', { task_id: task.id, title: `Purchase: ${draft.product}`, action_type: 'purchase', estimated_cost: draft.total, currency: draft.currency });
         await log(sb, userId, 'purchase_prepared', { agent_id: agent?.id ?? null, target_type: 'purchase_request', target_id: approvalRes.data?.id ?? null, metadata: { total: draft.total } });
       }
 
@@ -416,6 +427,7 @@ export const submitPersonalTask = createServerFn({ method: 'POST' })
         risk_level: decision.involvesMoney ? 'medium' : 'low',
         status: 'pending',
       });
+      await emitWebhook(userId, 'approval.required', { task_id: task.id, title: decision.title, action_type: decision.category === 'travel' ? 'booking' : 'external_action', estimated_cost: budget, currency });
       await sb.from('personal_tasks').update({ status: 'awaiting_approval' }).eq('id', task.id).eq('user_id', userId);
       await activity(sb, userId, `Agent prepared an action awaiting approval: ${decision.title}`, 'awaiting_approval', { agent_id: agent?.id ?? null, task_id: task.id });
       return { taskId: task.id, decision };
@@ -590,6 +602,18 @@ export const confirmPurchase = createServerFn({ method: 'POST' })
 
     await log(sb, userId, 'external_action_executed', { target_type: 'purchase_request', target_id: purchase.id, metadata: { total: purchase.total, seller: purchase.seller } });
     await activity(sb, userId, `Checkout ready for ${purchase.product} — you complete payment`, 'action_completed', { task_id: approvalRes.data.task_id });
+
+    await emitWebhook(userId, 'purchase.completed', {
+      purchase_id: purchase.id,
+      product: purchase.product,
+      seller: purchase.seller,
+      total: purchase.total,
+      currency: purchase.currency,
+      checkout_url: purchase.checkout_url,
+    });
+    if (approvalRes.data.task_id) {
+      await emitWebhook(userId, 'task.completed', { task_id: approvalRes.data.task_id, source: 'purchase' });
+    }
 
     return { checkoutUrl: purchase.checkout_url, total: purchase.total, currency: purchase.currency };
   });
