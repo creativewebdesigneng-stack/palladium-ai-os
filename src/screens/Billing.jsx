@@ -70,9 +70,14 @@ export default function Billing() {
 
   return (
     <>
+      <PaymentTestModeBanner />
       <PageHeader eyebrow="Workspace" title="Billing & Subscription" description="Manage your PalladiumAI plan, usage and payments." action={headerActions} />
 
       <div className="mb-5"><BillingOverviewCards /></div>
+
+      {portalError && (
+        <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-200">{portalError}</div>
+      )}
 
       <div className="mb-5 flex flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-white/[.025] p-1.5">
         {TABS.map((t) => (
@@ -87,7 +92,7 @@ export default function Billing() {
         <div className="min-w-0 space-y-6">
           {tab === 'Overview' && (
             <>
-              <CurrentPlan onUpgrade={() => setTab('Plans')} onChange={() => setTab('Plans')} />
+              <CurrentPlan onUpgrade={() => setTab('Plans')} onChange={() => setTab('Plans')} onManage={openPortal} />
               <UsageDashboard />
               <UpgradeRecommendation onUpgrade={() => setTab('Plans')} />
               <Panel icon={Gauge} title="Usage" grad="from-violet-500 to-indigo-500"><UsageMetrics /></Panel>
@@ -98,11 +103,27 @@ export default function Billing() {
           )}
           {tab === 'Plans' && (
             <>
-              <CurrentPlan onUpgrade={() => setTab('Compare')} onChange={() => setTab('Compare')} />
-              <Panel icon={Wallet} title="Choose a plan" grad="from-violet-500 to-indigo-500"><PlansGrid onSelect={() => setTab('Compare')} /></Panel>
+              <CurrentPlan onUpgrade={() => setTab('Compare')} onChange={() => setTab('Compare')} onManage={openPortal} />
+              <div className="flex items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[.025] p-1.5 w-fit">
+                {['monthly', 'yearly'].map((c) => (
+                  <button key={c} onClick={() => { setCycle(c); setCheckoutPriceId(null); }}
+                    className={`rounded-xl px-3.5 py-1.5 text-xs font-medium capitalize transition ${cycle === c ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
+                    {c} billing
+                  </button>
+                ))}
+              </div>
+              {checkoutPriceId ? (
+                <Panel icon={CreditCard} title="Complete your upgrade" grad="from-violet-500 to-indigo-500">
+                  <PalladiumCheckout priceId={checkoutPriceId} returnUrl={`${window.location.origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`} />
+                  <button onClick={() => setCheckoutPriceId(null)} className="mt-3 rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5">Cancel</button>
+                </Panel>
+              ) : (
+                <Panel icon={Wallet} title="Choose a plan" grad="from-violet-500 to-indigo-500"><PlansGrid onSelect={choosePlan} /></Panel>
+              )}
               <EnterpriseSection />
             </>
           )}
+
           {tab === 'Usage' && (
             <>
               <UsageDashboard />
