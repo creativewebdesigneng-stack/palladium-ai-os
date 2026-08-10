@@ -160,7 +160,7 @@ function entity(name) {
     table,
     list: (sort, limit) => {
       let q = query().select("*");
-      if (sort) q = q.order(sort.replace(/^-/, ""), { ascending: !sort.startsWith("-") });
+      if (sort) q = q.order(column(sort.replace(/^-/, "")), { ascending: !sort.startsWith("-") });
       if (limit) q = q.limit(limit);
       return rows(q);
     },
@@ -170,7 +170,7 @@ function entity(name) {
         if (value === undefined || value === null) continue;
         q = Array.isArray(value) ? q.in(key, value) : q.eq(key, value);
       }
-      if (sort) q = q.order(sort.replace(/^-/, ""), { ascending: !sort.startsWith("-") });
+      if (sort) q = q.order(column(sort.replace(/^-/, "")), { ascending: !sort.startsWith("-") });
       if (limit) q = q.limit(limit);
       return rows(q);
     },
@@ -193,6 +193,18 @@ function entity(name) {
       const { error } = await query().delete().eq("id", id);
       if (error) throw error;
       return true;
+    },
+    /** Live row updates for this table; returns an unsubscribe function. */
+    subscribe(handler, filter) {
+      const channel = supabase
+        .channel(`${table}-${Math.random().toString(36).slice(2)}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
+          (payload) => handler(payload.new ?? payload.old, payload.eventType ?? payload.event),
+        )
+        .subscribe();
+      return () => supabase.removeChannel(channel);
     },
   };
 }
@@ -220,10 +232,26 @@ const integrations = {
   },
 };
 
+/** Server-side runtime operations exposed to the screens. */
+const RUNTIME_FUNCTIONS = {
+  runAgentTask: (payload) => runAgentTask({ data: { agent_id: payload?.agent_id, input: payload?.input ?? "" } }),
+  cancelAgentTask: (payload) => cancelAgentTask({ data: { task_id: payload?.task_id } }),
+  getAgentRuntime: (payload) => getAgentRuntime({ data: { agent_id: payload?.agent_id } }),
+  reapStuckRuns: () => reapStuckRuns(),
+};
+
 const functions = {
   async invoke(name, payload) {
-    console.info(`[functions] ${name} not implemented yet`, payload);
-    return { data: null, error: null };
+    const fn = RUNTIME_FUNCTIONS[name];
+    if (!fn) {
+      console.warn(`[functions] ${name} is not available`);
+      return { data: null, error: new Error(`Unknown function: ${name}`) };
+    }
+    try {
+      return { data: await fn(payload), error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
   },
 };
 
