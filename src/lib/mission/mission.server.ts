@@ -84,7 +84,8 @@ export async function runShoppingResearch(params: {
   };
   const tool = createBrowserTool(params.provider ?? 'simulated', config);
   const found = await tool.search(params.requirement, { budget: params.budget, currency: params.currency });
-  const inBudget = params.budget ? found.filter((o) => o.price <= params.budget) : found;
+  const cap = params.budget;
+  const inBudget = cap ? found.filter((o) => o.price <= cap) : found;
   const ranked = await tool.compare(inBudget.length ? inBudget : found);
   const steps = tool.steps();
   await tool.close();
