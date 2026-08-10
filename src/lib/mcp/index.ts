@@ -1,5 +1,4 @@
 import { auth, defineMcp } from "@lovable.dev/mcp-js";
-import type { AnyToolDefinition } from "@lovable.dev/mcp-js";
 import listAgents from "./tools/list-agents";
 import createAgent from "./tools/create-agent";
 import listTasks from "./tools/list-tasks";
@@ -32,5 +31,5 @@ export default defineMcp({
     decideApproval,
     listMemories,
     remember,
-  ] as unknown as AnyToolDefinition[],
+  ] as unknown as Parameters<typeof defineMcp>[0]["tools"],
 });
