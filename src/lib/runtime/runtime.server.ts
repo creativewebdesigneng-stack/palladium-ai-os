@@ -242,19 +242,39 @@ export async function completeRun(args: {
 
   await db.from('personal_agents').update({ last_run_at: new Date().toISOString() }).eq('id', run.agent.id);
 
-  // Save memory: a compact trace of what was asked and delivered.
+  // Save memory: short-term run context (expires) plus the legacy key/value trace.
   if (run.agent.memory_enabled !== false && result.text) {
-    await args.sb.from('personal_memories').insert({
-      user_id: args.userId,
-      org_id: run.orgId,
-      agent_id: run.agent.id,
-      category: 'run_history',
-      key: `run:${new Date().toISOString().slice(0, 19)}`,
-      value: `Task: ${run.messages[run.messages.length - 1]?.content?.slice(0, 300)}\nOutcome: ${result.text.slice(0, 600)}`,
-      scope: 'personal',
-      metadata: { task_id: run.taskId, agent: run.agent.name },
-    });
+    const request = String(run.messages[run.messages.length - 1]?.content ?? '').slice(0, 300);
+    await Promise.all([
+      storeMemory({
+        sb: args.sb as never,
+        userId: args.userId,
+        input: {
+          content: `Task: ${request}\nOutcome: ${result.text.slice(0, 1500)}`,
+          memory_type: 'short_term',
+          category: 'task',
+          scope: 'agent',
+          title: `${run.agent.name} run`,
+          source: 'agent_runtime',
+          agent_id: run.agent.id,
+          task_id: run.taskId,
+          org_id: run.orgId,
+          metadata: { provider: run.provider, model: run.model },
+        },
+      }).catch((error) => console.error('[runtime] short-term memory write failed', error)),
+      args.sb.from('personal_memories').insert({
+        user_id: args.userId,
+        org_id: run.orgId,
+        agent_id: run.agent.id,
+        category: 'run_history',
+        key: `run:${new Date().toISOString().slice(0, 19)}`,
+        value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
+        scope: 'personal',
+        metadata: { task_id: run.taskId, agent: run.agent.name },
+      }),
+    ]);
   }
+
 
   await Promise.all([
     recordUsage({
