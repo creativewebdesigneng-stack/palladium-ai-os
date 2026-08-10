@@ -621,3 +621,31 @@ export const deleteMemory = createServerFn({ method: 'POST' })
     if (res.error) throw new Error(res.error.message);
     return { ok: true };
   });
+
+export const clearMemoryCategory = createServerFn({ method: 'POST' })
+  .inputValidator((input: { category: string }) => {
+    if (!input?.category) throw new Error('A category is required');
+    return input;
+  })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const res = await sb.from('personal_memories').delete().eq('user_id', context.userId).eq('category', data.category);
+    if (res.error) throw new Error(res.error.message);
+    await log(sb, context.userId, 'memory_category_cleared', { metadata: { category: data.category } });
+    return { ok: true };
+  });
+
+/* ------------------------------------------------------------- notifications */
+
+export const markNotifications = createServerFn({ method: 'POST' })
+  .inputValidator((input: { id?: string; all?: boolean }) => input ?? {})
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let q = sb.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', context.userId).is('read_at', null);
+    if (!data.all && data.id) q = q.eq('id', data.id);
+    const res = await q;
+    if (res.error) throw new Error(res.error.message);
+    return { ok: true };
+  });
