@@ -10,49 +10,153 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppRouteImport } from './routes/app'
+import { Route as R403RouteImport } from './routes/403'
+import { Route as R500RouteImport } from './routes/500'
+import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as AiAgentsRouteImport } from './routes/ai-agents'
+import { Route as BusinessRouteImport } from './routes/business'
+import { Route as DevelopersRouteImport } from './routes/developers'
+import { Route as EmailVerificationRouteImport } from './routes/email-verification'
+import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as PaymentRouteImport } from './routes/payment'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RegisterRouteImport } from './routes/register'
-import { Route as VerifyEmailRouteImport } from './routes/verify-email'
-import { Route as AppIndexRouteImport } from './routes/app.index'
-import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
-import { Route as AppBillingRouteImport } from './routes/app.billing'
-import { Route as AppBusinessRouteImport } from './routes/app.business'
-import { Route as AppCalendarRouteImport } from './routes/app.calendar'
-import { Route as AppCreativeStudioRouteImport } from './routes/app.creative-studio'
-import { Route as AppDevelopmentRouteImport } from './routes/app.development'
-import { Route as AppFinanceRouteImport } from './routes/app.finance'
-import { Route as AppHealthRouteImport } from './routes/app.health'
-import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
-import { Route as AppMarketingRouteImport } from './routes/app.marketing'
-import { Route as AppMarketplaceRouteImport } from './routes/app.marketplace'
-import { Route as AppMemoryRouteImport } from './routes/app.memory'
-import { Route as AppMissionControlRouteImport } from './routes/app.mission-control'
-import { Route as AppNotificationsRouteImport } from './routes/app.notifications'
-import { Route as AppProfileRouteImport } from './routes/app.profile'
-import { Route as AppSalesRouteImport } from './routes/app.sales'
-import { Route as AppSettingsRouteImport } from './routes/app.settings'
-import { Route as AppShoppingRouteImport } from './routes/app.shopping'
-import { Route as AppTravelRouteImport } from './routes/app.travel'
-import { Route as AppWorkforceRouteImport } from './routes/app.workforce'
-import { Route as AppDepartmentsIndexRouteImport } from './routes/app.departments.index'
-import { Route as AppDepartmentsSlugRouteImport } from './routes/app.departments.$slug'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as ToolsRouteImport } from './routes/tools'
+import { Route as TwoFactorRouteImport } from './routes/two-factor'
+import { Route as ShellAppRouteImport } from './routes/_shell/_app'
+import { Route as LegalIndexRouteImport } from './routes/legal.index'
+import { Route as LegalSlugRouteImport } from './routes/legal.$slug'
+import { Route as ShellAppAgentBuilderRouteImport } from './routes/_shell/_app/agent-builder'
+import { Route as ShellAppAgentMarketplaceRouteImport } from './routes/_shell/_app/agent-marketplace'
+import { Route as ShellAppAiBuilderRouteImport } from './routes/_shell/_app/ai-builder'
+import { Route as ShellAppAiMarketplaceRouteImport } from './routes/_shell/_app/ai-marketplace'
+import { Route as ShellAppAiModelHubRouteImport } from './routes/_shell/_app/ai-model-hub'
+import { Route as ShellAppAiToolsRouteImport } from './routes/_shell/_app/ai-tools'
+import { Route as ShellAppAnalyticsRouteImport } from './routes/_shell/_app/analytics'
+import { Route as ShellAppAutomationRouteImport } from './routes/_shell/_app/automation'
+import { Route as ShellAppAutomationsRouteImport } from './routes/_shell/_app/automations'
+import { Route as ShellAppBillingRouteImport } from './routes/_shell/_app/billing'
+import { Route as ShellAppBrowserPreviewRouteImport } from './routes/_shell/_app/browser-preview'
+import { Route as ShellAppBuilderRouteImport } from './routes/_shell/_app/builder'
+import { Route as ShellAppBusinessAutomationRouteImport } from './routes/_shell/_app/business-automation'
+import { Route as ShellAppBusinessIntelligenceRouteImport } from './routes/_shell/_app/business-intelligence'
+import { Route as ShellAppChatRouteImport } from './routes/_shell/_app/chat'
+import { Route as ShellAppCodeExplorerRouteImport } from './routes/_shell/_app/code-explorer'
+import { Route as ShellAppComputerControlRouteImport } from './routes/_shell/_app/computer-control'
+import { Route as ShellAppCreatorHubRouteImport } from './routes/_shell/_app/creator-hub'
+import { Route as ShellAppCrmRouteImport } from './routes/_shell/_app/crm'
+import { Route as ShellAppDashboardRouteImport } from './routes/_shell/_app/dashboard'
+import { Route as ShellAppDeploymentsRouteImport } from './routes/_shell/_app/deployments'
+import { Route as ShellAppDeveloperRouteImport } from './routes/_shell/_app/developer'
+import { Route as ShellAppDeveloperPortalRouteImport } from './routes/_shell/_app/developer-portal'
+import { Route as ShellAppDeveloperWorkspaceRouteImport } from './routes/_shell/_app/developer-workspace'
+import { Route as ShellAppDiscoveryRouteImport } from './routes/_shell/_app/discovery'
+import { Route as ShellAppDocsRouteImport } from './routes/_shell/_app/docs'
+import { Route as ShellAppDocumentsRouteImport } from './routes/_shell/_app/documents'
+import { Route as ShellAppFilesRouteImport } from './routes/_shell/_app/files'
+import { Route as ShellAppFilesAnalysisRouteImport } from './routes/_shell/_app/files-analysis'
+import { Route as ShellAppFinanceRouteImport } from './routes/_shell/_app/finance'
+import { Route as ShellAppIntegrationsRouteImport } from './routes/_shell/_app/integrations'
+import { Route as ShellAppKnowledgeRouteImport } from './routes/_shell/_app/knowledge'
+import { Route as ShellAppMarketingRouteImport } from './routes/_shell/_app/marketing'
+import { Route as ShellAppMarketplaceRouteImport } from './routes/_shell/_app/marketplace'
+import { Route as ShellAppMcpHubRouteImport } from './routes/_shell/_app/mcp-hub'
+import { Route as ShellAppMemoryRouteImport } from './routes/_shell/_app/memory'
+import { Route as ShellAppModelsRouteImport } from './routes/_shell/_app/models'
+import { Route as ShellAppNewsResearchRouteImport } from './routes/_shell/_app/news-research'
+import { Route as ShellAppNotificationsRouteImport } from './routes/_shell/_app/notifications'
+import { Route as ShellAppProjectsRouteImport } from './routes/_shell/_app/projects'
+import { Route as ShellAppPromptsRouteImport } from './routes/_shell/_app/prompts'
+import { Route as ShellAppSearchRouteImport } from './routes/_shell/_app/search'
+import { Route as ShellAppSecurityRouteImport } from './routes/_shell/_app/security'
+import { Route as ShellAppSettingsRouteImport } from './routes/_shell/_app/settings'
+import { Route as ShellAppSkillsRouteImport } from './routes/_shell/_app/skills'
+import { Route as ShellAppSupportRouteImport } from './routes/_shell/_app/support'
+import { Route as ShellAppTasksRouteImport } from './routes/_shell/_app/tasks'
+import { Route as ShellAppTeamRouteImport } from './routes/_shell/_app/team'
+import { Route as ShellAppTemplatesRouteImport } from './routes/_shell/_app/templates'
+import { Route as ShellAppTerminalRouteImport } from './routes/_shell/_app/terminal'
+import { Route as ShellAppToolMarketplaceRouteImport } from './routes/_shell/_app/tool-marketplace'
+import { Route as ShellAppToolsFrameworkRouteImport } from './routes/_shell/_app/tools-framework'
+import { Route as ShellAppVersionControlRouteImport } from './routes/_shell/_app/version-control'
+import { Route as ShellAppWebRouteImport } from './routes/_shell/_app/web'
+import { Route as ShellAppWorkflowsRouteImport } from './routes/_shell/_app/workflows'
+import { Route as ShellAppWorkforceRouteImport } from './routes/_shell/_app/workforce'
+import { Route as ShellAppAdminIndexRouteImport } from './routes/_shell/_app/admin.index'
+import { Route as ShellAppAdminAuditLogsRouteImport } from './routes/_shell/_app/admin.audit-logs'
+import { Route as ShellAppAdminIntegrationsRouteImport } from './routes/_shell/_app/admin.integrations'
+import { Route as ShellAppAdminMarketplaceRouteImport } from './routes/_shell/_app/admin.marketplace'
+import { Route as ShellAppAdminMonitoringRouteImport } from './routes/_shell/_app/admin.monitoring'
+import { Route as ShellAppAdminOrganisationsRouteImport } from './routes/_shell/_app/admin.organisations'
+import { Route as ShellAppAdminPlatformAnalyticsRouteImport } from './routes/_shell/_app/admin.platform-analytics'
+import { Route as ShellAppAdminSecurityRouteImport } from './routes/_shell/_app/admin.security'
+import { Route as ShellAppAdminSubscriptionsRouteImport } from './routes/_shell/_app/admin.subscriptions'
+import { Route as ShellAppAdminSystemSettingsRouteImport } from './routes/_shell/_app/admin.system-settings'
+import { Route as ShellAppAdminUsersRouteImport } from './routes/_shell/_app/admin.users'
+import { Route as ShellAppAgentsIndexRouteImport } from './routes/_shell/_app/agents.index'
+import { Route as ShellAppAgentsNewRouteImport } from './routes/_shell/_app/agents.new'
+import { Route as ShellAppCreatorsIdRouteImport } from './routes/_shell/_app/creators.$id'
+import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
+import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRoute = AppRouteImport.update({
-  id: '/app',
-  path: '/app',
+const R403Route = R403RouteImport.update({
+  id: '/403',
+  path: '/403',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const R500Route = R500RouteImport.update({
+  id: '/500',
+  path: '/500',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiAgentsRoute = AiAgentsRouteImport.update({
+  id: '/ai-agents',
+  path: '/ai-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessRoute = BusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevelopersRoute = DevelopersRouteImport.update({
+  id: '/developers',
+  path: '/developers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailVerificationRoute = EmailVerificationRouteImport.update({
+  id: '/email-verification',
+  path: '/email-verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeaturesRoute = FeaturesRouteImport.update({
+  id: '/features',
+  path: '/features',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -65,334 +169,1028 @@ const OnboardingRoute = OnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentRoute = PaymentRouteImport.update({
+  id: '/payment',
+  path: '/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VerifyEmailRoute = VerifyEmailRouteImport.update({
-  id: '/verify-email',
-  path: '/verify-email',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppRoute,
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+const ToolsRoute = ToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwoFactorRoute = TwoFactorRouteImport.update({
+  id: '/two-factor',
+  path: '/two-factor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAppRoute = ShellAppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => ShellRoute,
+} as any)
+const LegalIndexRoute = LegalIndexRouteImport.update({
+  id: '/legal/',
+  path: '/legal/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalSlugRoute = LegalSlugRouteImport.update({
+  id: '/legal/$slug',
+  path: '/legal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAppAgentBuilderRoute = ShellAppAgentBuilderRouteImport.update({
+  id: '/agent-builder',
+  path: '/agent-builder',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAgentMarketplaceRoute =
+  ShellAppAgentMarketplaceRouteImport.update({
+    id: '/agent-marketplace',
+    path: '/agent-marketplace',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAiBuilderRoute = ShellAppAiBuilderRouteImport.update({
+  id: '/ai-builder',
+  path: '/ai-builder',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAiMarketplaceRoute = ShellAppAiMarketplaceRouteImport.update({
+  id: '/ai-marketplace',
+  path: '/ai-marketplace',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAiModelHubRoute = ShellAppAiModelHubRouteImport.update({
+  id: '/ai-model-hub',
+  path: '/ai-model-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAiToolsRoute = ShellAppAiToolsRouteImport.update({
+  id: '/ai-tools',
+  path: '/ai-tools',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAnalyticsRoute = ShellAppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppBillingRoute = AppBillingRouteImport.update({
+const ShellAppAutomationRoute = ShellAppAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAutomationsRoute = ShellAppAutomationsRouteImport.update({
+  id: '/automations',
+  path: '/automations',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppBillingRoute = ShellAppBillingRouteImport.update({
   id: '/billing',
   path: '/billing',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppBusinessRoute = AppBusinessRouteImport.update({
-  id: '/business',
-  path: '/business',
-  getParentRoute: () => AppRoute,
+const ShellAppBrowserPreviewRoute = ShellAppBrowserPreviewRouteImport.update({
+  id: '/browser-preview',
+  path: '/browser-preview',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppCalendarRoute = AppCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
-  getParentRoute: () => AppRoute,
+const ShellAppBuilderRoute = ShellAppBuilderRouteImport.update({
+  id: '/builder',
+  path: '/builder',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppCreativeStudioRoute = AppCreativeStudioRouteImport.update({
-  id: '/creative-studio',
-  path: '/creative-studio',
-  getParentRoute: () => AppRoute,
+const ShellAppBusinessAutomationRoute =
+  ShellAppBusinessAutomationRouteImport.update({
+    id: '/business-automation',
+    path: '/business-automation',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppBusinessIntelligenceRoute =
+  ShellAppBusinessIntelligenceRouteImport.update({
+    id: '/business-intelligence',
+    path: '/business-intelligence',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppChatRoute = ShellAppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppDevelopmentRoute = AppDevelopmentRouteImport.update({
-  id: '/development',
-  path: '/development',
-  getParentRoute: () => AppRoute,
+const ShellAppCodeExplorerRoute = ShellAppCodeExplorerRouteImport.update({
+  id: '/code-explorer',
+  path: '/code-explorer',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppFinanceRoute = AppFinanceRouteImport.update({
+const ShellAppComputerControlRoute = ShellAppComputerControlRouteImport.update({
+  id: '/computer-control',
+  path: '/computer-control',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppCreatorHubRoute = ShellAppCreatorHubRouteImport.update({
+  id: '/creator-hub',
+  path: '/creator-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppCrmRoute = ShellAppCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDashboardRoute = ShellAppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDeploymentsRoute = ShellAppDeploymentsRouteImport.update({
+  id: '/deployments',
+  path: '/deployments',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDeveloperRoute = ShellAppDeveloperRouteImport.update({
+  id: '/developer',
+  path: '/developer',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDeveloperPortalRoute = ShellAppDeveloperPortalRouteImport.update({
+  id: '/developer-portal',
+  path: '/developer-portal',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDeveloperWorkspaceRoute =
+  ShellAppDeveloperWorkspaceRouteImport.update({
+    id: '/developer-workspace',
+    path: '/developer-workspace',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppDiscoveryRoute = ShellAppDiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDocsRoute = ShellAppDocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppDocumentsRoute = ShellAppDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppFilesRoute = ShellAppFilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppFilesAnalysisRoute = ShellAppFilesAnalysisRouteImport.update({
+  id: '/files-analysis',
+  path: '/files-analysis',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppFinanceRoute = ShellAppFinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppHealthRoute = AppHealthRouteImport.update({
-  id: '/health',
-  path: '/health',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
+const ShellAppIntegrationsRoute = ShellAppIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppMarketingRoute = AppMarketingRouteImport.update({
+const ShellAppKnowledgeRoute = ShellAppKnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppMarketingRoute = ShellAppMarketingRouteImport.update({
   id: '/marketing',
   path: '/marketing',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
+const ShellAppMarketplaceRoute = ShellAppMarketplaceRouteImport.update({
   id: '/marketplace',
   path: '/marketplace',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppMemoryRoute = AppMemoryRouteImport.update({
+const ShellAppMcpHubRoute = ShellAppMcpHubRouteImport.update({
+  id: '/mcp-hub',
+  path: '/mcp-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppMemoryRoute = ShellAppMemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppMissionControlRoute = AppMissionControlRouteImport.update({
-  id: '/mission-control',
-  path: '/mission-control',
-  getParentRoute: () => AppRoute,
+const ShellAppModelsRoute = ShellAppModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppNotificationsRoute = AppNotificationsRouteImport.update({
+const ShellAppNewsResearchRoute = ShellAppNewsResearchRouteImport.update({
+  id: '/news-research',
+  path: '/news-research',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppNotificationsRoute = ShellAppNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppProfileRoute = AppProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AppRoute,
+const ShellAppProjectsRoute = ShellAppProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppSalesRoute = AppSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
-  getParentRoute: () => AppRoute,
+const ShellAppPromptsRoute = ShellAppPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
+const ShellAppSearchRoute = ShellAppSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppSecurityRoute = ShellAppSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppSettingsRoute = ShellAppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppShoppingRoute = AppShoppingRouteImport.update({
-  id: '/shopping',
-  path: '/shopping',
-  getParentRoute: () => AppRoute,
+const ShellAppSkillsRoute = ShellAppSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppTravelRoute = AppTravelRouteImport.update({
-  id: '/travel',
-  path: '/travel',
-  getParentRoute: () => AppRoute,
+const ShellAppSupportRoute = ShellAppSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppWorkforceRoute = AppWorkforceRouteImport.update({
+const ShellAppTasksRoute = ShellAppTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppTeamRoute = ShellAppTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppTemplatesRoute = ShellAppTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppTerminalRoute = ShellAppTerminalRouteImport.update({
+  id: '/terminal',
+  path: '/terminal',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppToolMarketplaceRoute = ShellAppToolMarketplaceRouteImport.update({
+  id: '/tool-marketplace',
+  path: '/tool-marketplace',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppToolsFrameworkRoute = ShellAppToolsFrameworkRouteImport.update({
+  id: '/tools-framework',
+  path: '/tools-framework',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppVersionControlRoute = ShellAppVersionControlRouteImport.update({
+  id: '/version-control',
+  path: '/version-control',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppWebRoute = ShellAppWebRouteImport.update({
+  id: '/web',
+  path: '/web',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppWorkflowsRoute = ShellAppWorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppWorkforceRoute = ShellAppWorkforceRouteImport.update({
   id: '/workforce',
   path: '/workforce',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
-  id: '/departments/',
-  path: '/departments/',
-  getParentRoute: () => AppRoute,
+const ShellAppAdminIndexRoute = ShellAppAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => ShellAppRoute,
 } as any)
-const AppDepartmentsSlugRoute = AppDepartmentsSlugRouteImport.update({
-  id: '/departments/$slug',
-  path: '/departments/$slug',
-  getParentRoute: () => AppRoute,
+const ShellAppAdminAuditLogsRoute = ShellAppAdminAuditLogsRouteImport.update({
+  id: '/admin/audit-logs',
+  path: '/admin/audit-logs',
+  getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppAdminIntegrationsRoute =
+  ShellAppAdminIntegrationsRouteImport.update({
+    id: '/admin/integrations',
+    path: '/admin/integrations',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminMarketplaceRoute =
+  ShellAppAdminMarketplaceRouteImport.update({
+    id: '/admin/marketplace',
+    path: '/admin/marketplace',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminMonitoringRoute = ShellAppAdminMonitoringRouteImport.update({
+  id: '/admin/monitoring',
+  path: '/admin/monitoring',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAdminOrganisationsRoute =
+  ShellAppAdminOrganisationsRouteImport.update({
+    id: '/admin/organisations',
+    path: '/admin/organisations',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminPlatformAnalyticsRoute =
+  ShellAppAdminPlatformAnalyticsRouteImport.update({
+    id: '/admin/platform-analytics',
+    path: '/admin/platform-analytics',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminSecurityRoute = ShellAppAdminSecurityRouteImport.update({
+  id: '/admin/security',
+  path: '/admin/security',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAdminSubscriptionsRoute =
+  ShellAppAdminSubscriptionsRouteImport.update({
+    id: '/admin/subscriptions',
+    path: '/admin/subscriptions',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminSystemSettingsRoute =
+  ShellAppAdminSystemSettingsRouteImport.update({
+    id: '/admin/system-settings',
+    path: '/admin/system-settings',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
+const ShellAppAdminUsersRoute = ShellAppAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAgentsIndexRoute = ShellAppAgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAgentsNewRoute = ShellAppAgentsNewRouteImport.update({
+  id: '/agents/new',
+  path: '/agents/new',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppCreatorsIdRoute = ShellAppCreatorsIdRouteImport.update({
+  id: '/creators/$id',
+  path: '/creators/$id',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAgentsIdIndexRoute = ShellAppAgentsIdIndexRouteImport.update({
+  id: '/agents/$id/',
+  path: '/agents/$id/',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAgentsIdPlaygroundRoute =
+  ShellAppAgentsIdPlaygroundRouteImport.update({
+    id: '/agents/$id/playground',
+    path: '/agents/$id/playground',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/app': typeof AppRouteWithChildren
+  '/403': typeof R403Route
+  '/500': typeof R500Route
+  '/ai-agents': typeof AiAgentsRoute
+  '/business': typeof BusinessRoute
+  '/developers': typeof DevelopersRoute
+  '/email-verification': typeof EmailVerificationRoute
+  '/features': typeof FeaturesRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/payment': typeof PaymentRoute
+  '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
-  '/verify-email': typeof VerifyEmailRoute
-  '/app/analytics': typeof AppAnalyticsRoute
-  '/app/billing': typeof AppBillingRoute
-  '/app/business': typeof AppBusinessRoute
-  '/app/calendar': typeof AppCalendarRoute
-  '/app/creative-studio': typeof AppCreativeStudioRoute
-  '/app/development': typeof AppDevelopmentRoute
-  '/app/finance': typeof AppFinanceRoute
-  '/app/health': typeof AppHealthRoute
-  '/app/integrations': typeof AppIntegrationsRoute
-  '/app/marketing': typeof AppMarketingRoute
-  '/app/marketplace': typeof AppMarketplaceRoute
-  '/app/memory': typeof AppMemoryRoute
-  '/app/mission-control': typeof AppMissionControlRoute
-  '/app/notifications': typeof AppNotificationsRoute
-  '/app/profile': typeof AppProfileRoute
-  '/app/sales': typeof AppSalesRoute
-  '/app/settings': typeof AppSettingsRoute
-  '/app/shopping': typeof AppShoppingRoute
-  '/app/travel': typeof AppTravelRoute
-  '/app/workforce': typeof AppWorkforceRoute
-  '/app/': typeof AppIndexRoute
-  '/app/departments/$slug': typeof AppDepartmentsSlugRoute
-  '/app/departments/': typeof AppDepartmentsIndexRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/resources': typeof ResourcesRoute
+  '/tools': typeof ToolsRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal/': typeof LegalIndexRoute
+  '/agent-builder': typeof ShellAppAgentBuilderRoute
+  '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
+  '/ai-builder': typeof ShellAppAiBuilderRoute
+  '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
+  '/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/ai-tools': typeof ShellAppAiToolsRoute
+  '/analytics': typeof ShellAppAnalyticsRoute
+  '/automation': typeof ShellAppAutomationRoute
+  '/automations': typeof ShellAppAutomationsRoute
+  '/billing': typeof ShellAppBillingRoute
+  '/browser-preview': typeof ShellAppBrowserPreviewRoute
+  '/builder': typeof ShellAppBuilderRoute
+  '/business-automation': typeof ShellAppBusinessAutomationRoute
+  '/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
+  '/chat': typeof ShellAppChatRoute
+  '/code-explorer': typeof ShellAppCodeExplorerRoute
+  '/computer-control': typeof ShellAppComputerControlRoute
+  '/creator-hub': typeof ShellAppCreatorHubRoute
+  '/crm': typeof ShellAppCrmRoute
+  '/dashboard': typeof ShellAppDashboardRoute
+  '/deployments': typeof ShellAppDeploymentsRoute
+  '/developer': typeof ShellAppDeveloperRoute
+  '/developer-portal': typeof ShellAppDeveloperPortalRoute
+  '/developer-workspace': typeof ShellAppDeveloperWorkspaceRoute
+  '/discovery': typeof ShellAppDiscoveryRoute
+  '/docs': typeof ShellAppDocsRoute
+  '/documents': typeof ShellAppDocumentsRoute
+  '/files': typeof ShellAppFilesRoute
+  '/files-analysis': typeof ShellAppFilesAnalysisRoute
+  '/finance': typeof ShellAppFinanceRoute
+  '/integrations': typeof ShellAppIntegrationsRoute
+  '/knowledge': typeof ShellAppKnowledgeRoute
+  '/marketing': typeof ShellAppMarketingRoute
+  '/marketplace': typeof ShellAppMarketplaceRoute
+  '/mcp-hub': typeof ShellAppMcpHubRoute
+  '/memory': typeof ShellAppMemoryRoute
+  '/models': typeof ShellAppModelsRoute
+  '/news-research': typeof ShellAppNewsResearchRoute
+  '/notifications': typeof ShellAppNotificationsRoute
+  '/projects': typeof ShellAppProjectsRoute
+  '/prompts': typeof ShellAppPromptsRoute
+  '/search': typeof ShellAppSearchRoute
+  '/security': typeof ShellAppSecurityRoute
+  '/settings': typeof ShellAppSettingsRoute
+  '/skills': typeof ShellAppSkillsRoute
+  '/support': typeof ShellAppSupportRoute
+  '/tasks': typeof ShellAppTasksRoute
+  '/team': typeof ShellAppTeamRoute
+  '/templates': typeof ShellAppTemplatesRoute
+  '/terminal': typeof ShellAppTerminalRoute
+  '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
+  '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/version-control': typeof ShellAppVersionControlRoute
+  '/web': typeof ShellAppWebRoute
+  '/workflows': typeof ShellAppWorkflowsRoute
+  '/workforce': typeof ShellAppWorkforceRoute
+  '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
+  '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
+  '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
+  '/admin/monitoring': typeof ShellAppAdminMonitoringRoute
+  '/admin/organisations': typeof ShellAppAdminOrganisationsRoute
+  '/admin/platform-analytics': typeof ShellAppAdminPlatformAnalyticsRoute
+  '/admin/security': typeof ShellAppAdminSecurityRoute
+  '/admin/subscriptions': typeof ShellAppAdminSubscriptionsRoute
+  '/admin/system-settings': typeof ShellAppAdminSystemSettingsRoute
+  '/admin/users': typeof ShellAppAdminUsersRoute
+  '/agents/new': typeof ShellAppAgentsNewRoute
+  '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/admin/': typeof ShellAppAdminIndexRoute
+  '/agents/': typeof ShellAppAgentsIndexRoute
+  '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/agents/$id/': typeof ShellAppAgentsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/403': typeof R403Route
+  '/500': typeof R500Route
+  '/ai-agents': typeof AiAgentsRoute
+  '/business': typeof BusinessRoute
+  '/developers': typeof DevelopersRoute
+  '/email-verification': typeof EmailVerificationRoute
+  '/features': typeof FeaturesRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/payment': typeof PaymentRoute
+  '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
-  '/verify-email': typeof VerifyEmailRoute
-  '/app/analytics': typeof AppAnalyticsRoute
-  '/app/billing': typeof AppBillingRoute
-  '/app/business': typeof AppBusinessRoute
-  '/app/calendar': typeof AppCalendarRoute
-  '/app/creative-studio': typeof AppCreativeStudioRoute
-  '/app/development': typeof AppDevelopmentRoute
-  '/app/finance': typeof AppFinanceRoute
-  '/app/health': typeof AppHealthRoute
-  '/app/integrations': typeof AppIntegrationsRoute
-  '/app/marketing': typeof AppMarketingRoute
-  '/app/marketplace': typeof AppMarketplaceRoute
-  '/app/memory': typeof AppMemoryRoute
-  '/app/mission-control': typeof AppMissionControlRoute
-  '/app/notifications': typeof AppNotificationsRoute
-  '/app/profile': typeof AppProfileRoute
-  '/app/sales': typeof AppSalesRoute
-  '/app/settings': typeof AppSettingsRoute
-  '/app/shopping': typeof AppShoppingRoute
-  '/app/travel': typeof AppTravelRoute
-  '/app/workforce': typeof AppWorkforceRoute
-  '/app': typeof AppIndexRoute
-  '/app/departments/$slug': typeof AppDepartmentsSlugRoute
-  '/app/departments': typeof AppDepartmentsIndexRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/resources': typeof ResourcesRoute
+  '/tools': typeof ToolsRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal': typeof LegalIndexRoute
+  '/agent-builder': typeof ShellAppAgentBuilderRoute
+  '/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
+  '/ai-builder': typeof ShellAppAiBuilderRoute
+  '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
+  '/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/ai-tools': typeof ShellAppAiToolsRoute
+  '/analytics': typeof ShellAppAnalyticsRoute
+  '/automation': typeof ShellAppAutomationRoute
+  '/automations': typeof ShellAppAutomationsRoute
+  '/billing': typeof ShellAppBillingRoute
+  '/browser-preview': typeof ShellAppBrowserPreviewRoute
+  '/builder': typeof ShellAppBuilderRoute
+  '/business-automation': typeof ShellAppBusinessAutomationRoute
+  '/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
+  '/chat': typeof ShellAppChatRoute
+  '/code-explorer': typeof ShellAppCodeExplorerRoute
+  '/computer-control': typeof ShellAppComputerControlRoute
+  '/creator-hub': typeof ShellAppCreatorHubRoute
+  '/crm': typeof ShellAppCrmRoute
+  '/dashboard': typeof ShellAppDashboardRoute
+  '/deployments': typeof ShellAppDeploymentsRoute
+  '/developer': typeof ShellAppDeveloperRoute
+  '/developer-portal': typeof ShellAppDeveloperPortalRoute
+  '/developer-workspace': typeof ShellAppDeveloperWorkspaceRoute
+  '/discovery': typeof ShellAppDiscoveryRoute
+  '/docs': typeof ShellAppDocsRoute
+  '/documents': typeof ShellAppDocumentsRoute
+  '/files': typeof ShellAppFilesRoute
+  '/files-analysis': typeof ShellAppFilesAnalysisRoute
+  '/finance': typeof ShellAppFinanceRoute
+  '/integrations': typeof ShellAppIntegrationsRoute
+  '/knowledge': typeof ShellAppKnowledgeRoute
+  '/marketing': typeof ShellAppMarketingRoute
+  '/marketplace': typeof ShellAppMarketplaceRoute
+  '/mcp-hub': typeof ShellAppMcpHubRoute
+  '/memory': typeof ShellAppMemoryRoute
+  '/models': typeof ShellAppModelsRoute
+  '/news-research': typeof ShellAppNewsResearchRoute
+  '/notifications': typeof ShellAppNotificationsRoute
+  '/projects': typeof ShellAppProjectsRoute
+  '/prompts': typeof ShellAppPromptsRoute
+  '/search': typeof ShellAppSearchRoute
+  '/security': typeof ShellAppSecurityRoute
+  '/settings': typeof ShellAppSettingsRoute
+  '/skills': typeof ShellAppSkillsRoute
+  '/support': typeof ShellAppSupportRoute
+  '/tasks': typeof ShellAppTasksRoute
+  '/team': typeof ShellAppTeamRoute
+  '/templates': typeof ShellAppTemplatesRoute
+  '/terminal': typeof ShellAppTerminalRoute
+  '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
+  '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/version-control': typeof ShellAppVersionControlRoute
+  '/web': typeof ShellAppWebRoute
+  '/workflows': typeof ShellAppWorkflowsRoute
+  '/workforce': typeof ShellAppWorkforceRoute
+  '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
+  '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
+  '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
+  '/admin/monitoring': typeof ShellAppAdminMonitoringRoute
+  '/admin/organisations': typeof ShellAppAdminOrganisationsRoute
+  '/admin/platform-analytics': typeof ShellAppAdminPlatformAnalyticsRoute
+  '/admin/security': typeof ShellAppAdminSecurityRoute
+  '/admin/subscriptions': typeof ShellAppAdminSubscriptionsRoute
+  '/admin/system-settings': typeof ShellAppAdminSystemSettingsRoute
+  '/admin/users': typeof ShellAppAdminUsersRoute
+  '/agents/new': typeof ShellAppAgentsNewRoute
+  '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/admin': typeof ShellAppAdminIndexRoute
+  '/agents': typeof ShellAppAgentsIndexRoute
+  '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/agents/$id': typeof ShellAppAgentsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/app': typeof AppRouteWithChildren
+  '/403': typeof R403Route
+  '/500': typeof R500Route
+  '/_shell': typeof ShellRouteWithChildren
+  '/ai-agents': typeof AiAgentsRoute
+  '/business': typeof BusinessRoute
+  '/developers': typeof DevelopersRoute
+  '/email-verification': typeof EmailVerificationRoute
+  '/features': typeof FeaturesRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/payment': typeof PaymentRoute
+  '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
-  '/verify-email': typeof VerifyEmailRoute
-  '/app/analytics': typeof AppAnalyticsRoute
-  '/app/billing': typeof AppBillingRoute
-  '/app/business': typeof AppBusinessRoute
-  '/app/calendar': typeof AppCalendarRoute
-  '/app/creative-studio': typeof AppCreativeStudioRoute
-  '/app/development': typeof AppDevelopmentRoute
-  '/app/finance': typeof AppFinanceRoute
-  '/app/health': typeof AppHealthRoute
-  '/app/integrations': typeof AppIntegrationsRoute
-  '/app/marketing': typeof AppMarketingRoute
-  '/app/marketplace': typeof AppMarketplaceRoute
-  '/app/memory': typeof AppMemoryRoute
-  '/app/mission-control': typeof AppMissionControlRoute
-  '/app/notifications': typeof AppNotificationsRoute
-  '/app/profile': typeof AppProfileRoute
-  '/app/sales': typeof AppSalesRoute
-  '/app/settings': typeof AppSettingsRoute
-  '/app/shopping': typeof AppShoppingRoute
-  '/app/travel': typeof AppTravelRoute
-  '/app/workforce': typeof AppWorkforceRoute
-  '/app/': typeof AppIndexRoute
-  '/app/departments/$slug': typeof AppDepartmentsSlugRoute
-  '/app/departments/': typeof AppDepartmentsIndexRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/resources': typeof ResourcesRoute
+  '/tools': typeof ToolsRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/_shell/_app': typeof ShellAppRouteWithChildren
+  '/legal/$slug': typeof LegalSlugRoute
+  '/legal/': typeof LegalIndexRoute
+  '/_shell/_app/agent-builder': typeof ShellAppAgentBuilderRoute
+  '/_shell/_app/agent-marketplace': typeof ShellAppAgentMarketplaceRoute
+  '/_shell/_app/ai-builder': typeof ShellAppAiBuilderRoute
+  '/_shell/_app/ai-marketplace': typeof ShellAppAiMarketplaceRoute
+  '/_shell/_app/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/_shell/_app/ai-tools': typeof ShellAppAiToolsRoute
+  '/_shell/_app/analytics': typeof ShellAppAnalyticsRoute
+  '/_shell/_app/automation': typeof ShellAppAutomationRoute
+  '/_shell/_app/automations': typeof ShellAppAutomationsRoute
+  '/_shell/_app/billing': typeof ShellAppBillingRoute
+  '/_shell/_app/browser-preview': typeof ShellAppBrowserPreviewRoute
+  '/_shell/_app/builder': typeof ShellAppBuilderRoute
+  '/_shell/_app/business-automation': typeof ShellAppBusinessAutomationRoute
+  '/_shell/_app/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
+  '/_shell/_app/chat': typeof ShellAppChatRoute
+  '/_shell/_app/code-explorer': typeof ShellAppCodeExplorerRoute
+  '/_shell/_app/computer-control': typeof ShellAppComputerControlRoute
+  '/_shell/_app/creator-hub': typeof ShellAppCreatorHubRoute
+  '/_shell/_app/crm': typeof ShellAppCrmRoute
+  '/_shell/_app/dashboard': typeof ShellAppDashboardRoute
+  '/_shell/_app/deployments': typeof ShellAppDeploymentsRoute
+  '/_shell/_app/developer': typeof ShellAppDeveloperRoute
+  '/_shell/_app/developer-portal': typeof ShellAppDeveloperPortalRoute
+  '/_shell/_app/developer-workspace': typeof ShellAppDeveloperWorkspaceRoute
+  '/_shell/_app/discovery': typeof ShellAppDiscoveryRoute
+  '/_shell/_app/docs': typeof ShellAppDocsRoute
+  '/_shell/_app/documents': typeof ShellAppDocumentsRoute
+  '/_shell/_app/files': typeof ShellAppFilesRoute
+  '/_shell/_app/files-analysis': typeof ShellAppFilesAnalysisRoute
+  '/_shell/_app/finance': typeof ShellAppFinanceRoute
+  '/_shell/_app/integrations': typeof ShellAppIntegrationsRoute
+  '/_shell/_app/knowledge': typeof ShellAppKnowledgeRoute
+  '/_shell/_app/marketing': typeof ShellAppMarketingRoute
+  '/_shell/_app/marketplace': typeof ShellAppMarketplaceRoute
+  '/_shell/_app/mcp-hub': typeof ShellAppMcpHubRoute
+  '/_shell/_app/memory': typeof ShellAppMemoryRoute
+  '/_shell/_app/models': typeof ShellAppModelsRoute
+  '/_shell/_app/news-research': typeof ShellAppNewsResearchRoute
+  '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
+  '/_shell/_app/projects': typeof ShellAppProjectsRoute
+  '/_shell/_app/prompts': typeof ShellAppPromptsRoute
+  '/_shell/_app/search': typeof ShellAppSearchRoute
+  '/_shell/_app/security': typeof ShellAppSecurityRoute
+  '/_shell/_app/settings': typeof ShellAppSettingsRoute
+  '/_shell/_app/skills': typeof ShellAppSkillsRoute
+  '/_shell/_app/support': typeof ShellAppSupportRoute
+  '/_shell/_app/tasks': typeof ShellAppTasksRoute
+  '/_shell/_app/team': typeof ShellAppTeamRoute
+  '/_shell/_app/templates': typeof ShellAppTemplatesRoute
+  '/_shell/_app/terminal': typeof ShellAppTerminalRoute
+  '/_shell/_app/tool-marketplace': typeof ShellAppToolMarketplaceRoute
+  '/_shell/_app/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/_shell/_app/version-control': typeof ShellAppVersionControlRoute
+  '/_shell/_app/web': typeof ShellAppWebRoute
+  '/_shell/_app/workflows': typeof ShellAppWorkflowsRoute
+  '/_shell/_app/workforce': typeof ShellAppWorkforceRoute
+  '/_shell/_app/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
+  '/_shell/_app/admin/integrations': typeof ShellAppAdminIntegrationsRoute
+  '/_shell/_app/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
+  '/_shell/_app/admin/monitoring': typeof ShellAppAdminMonitoringRoute
+  '/_shell/_app/admin/organisations': typeof ShellAppAdminOrganisationsRoute
+  '/_shell/_app/admin/platform-analytics': typeof ShellAppAdminPlatformAnalyticsRoute
+  '/_shell/_app/admin/security': typeof ShellAppAdminSecurityRoute
+  '/_shell/_app/admin/subscriptions': typeof ShellAppAdminSubscriptionsRoute
+  '/_shell/_app/admin/system-settings': typeof ShellAppAdminSystemSettingsRoute
+  '/_shell/_app/admin/users': typeof ShellAppAdminUsersRoute
+  '/_shell/_app/agents/new': typeof ShellAppAgentsNewRoute
+  '/_shell/_app/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
+  '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
+  '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/_shell/_app/agents/$id/': typeof ShellAppAgentsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/app'
+    | '/403'
+    | '/500'
+    | '/ai-agents'
+    | '/business'
+    | '/developers'
+    | '/email-verification'
+    | '/features'
     | '/forgot-password'
+    | '/help'
     | '/login'
     | '/onboarding'
+    | '/payment'
+    | '/pricing'
     | '/register'
-    | '/verify-email'
-    | '/app/analytics'
-    | '/app/billing'
-    | '/app/business'
-    | '/app/calendar'
-    | '/app/creative-studio'
-    | '/app/development'
-    | '/app/finance'
-    | '/app/health'
-    | '/app/integrations'
-    | '/app/marketing'
-    | '/app/marketplace'
-    | '/app/memory'
-    | '/app/mission-control'
-    | '/app/notifications'
-    | '/app/profile'
-    | '/app/sales'
-    | '/app/settings'
-    | '/app/shopping'
-    | '/app/travel'
-    | '/app/workforce'
-    | '/app/'
-    | '/app/departments/$slug'
-    | '/app/departments/'
+    | '/reset-password'
+    | '/resources'
+    | '/tools'
+    | '/two-factor'
+    | '/legal/$slug'
+    | '/legal/'
+    | '/agent-builder'
+    | '/agent-marketplace'
+    | '/ai-builder'
+    | '/ai-marketplace'
+    | '/ai-model-hub'
+    | '/ai-tools'
+    | '/analytics'
+    | '/automation'
+    | '/automations'
+    | '/billing'
+    | '/browser-preview'
+    | '/builder'
+    | '/business-automation'
+    | '/business-intelligence'
+    | '/chat'
+    | '/code-explorer'
+    | '/computer-control'
+    | '/creator-hub'
+    | '/crm'
+    | '/dashboard'
+    | '/deployments'
+    | '/developer'
+    | '/developer-portal'
+    | '/developer-workspace'
+    | '/discovery'
+    | '/docs'
+    | '/documents'
+    | '/files'
+    | '/files-analysis'
+    | '/finance'
+    | '/integrations'
+    | '/knowledge'
+    | '/marketing'
+    | '/marketplace'
+    | '/mcp-hub'
+    | '/memory'
+    | '/models'
+    | '/news-research'
+    | '/notifications'
+    | '/projects'
+    | '/prompts'
+    | '/search'
+    | '/security'
+    | '/settings'
+    | '/skills'
+    | '/support'
+    | '/tasks'
+    | '/team'
+    | '/templates'
+    | '/terminal'
+    | '/tool-marketplace'
+    | '/tools-framework'
+    | '/version-control'
+    | '/web'
+    | '/workflows'
+    | '/workforce'
+    | '/admin/audit-logs'
+    | '/admin/integrations'
+    | '/admin/marketplace'
+    | '/admin/monitoring'
+    | '/admin/organisations'
+    | '/admin/platform-analytics'
+    | '/admin/security'
+    | '/admin/subscriptions'
+    | '/admin/system-settings'
+    | '/admin/users'
+    | '/agents/new'
+    | '/creators/$id'
+    | '/admin/'
+    | '/agents/'
+    | '/agents/$id/playground'
+    | '/agents/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/403'
+    | '/500'
+    | '/ai-agents'
+    | '/business'
+    | '/developers'
+    | '/email-verification'
+    | '/features'
     | '/forgot-password'
+    | '/help'
     | '/login'
     | '/onboarding'
+    | '/payment'
+    | '/pricing'
     | '/register'
-    | '/verify-email'
-    | '/app/analytics'
-    | '/app/billing'
-    | '/app/business'
-    | '/app/calendar'
-    | '/app/creative-studio'
-    | '/app/development'
-    | '/app/finance'
-    | '/app/health'
-    | '/app/integrations'
-    | '/app/marketing'
-    | '/app/marketplace'
-    | '/app/memory'
-    | '/app/mission-control'
-    | '/app/notifications'
-    | '/app/profile'
-    | '/app/sales'
-    | '/app/settings'
-    | '/app/shopping'
-    | '/app/travel'
-    | '/app/workforce'
-    | '/app'
-    | '/app/departments/$slug'
-    | '/app/departments'
+    | '/reset-password'
+    | '/resources'
+    | '/tools'
+    | '/two-factor'
+    | '/legal/$slug'
+    | '/legal'
+    | '/agent-builder'
+    | '/agent-marketplace'
+    | '/ai-builder'
+    | '/ai-marketplace'
+    | '/ai-model-hub'
+    | '/ai-tools'
+    | '/analytics'
+    | '/automation'
+    | '/automations'
+    | '/billing'
+    | '/browser-preview'
+    | '/builder'
+    | '/business-automation'
+    | '/business-intelligence'
+    | '/chat'
+    | '/code-explorer'
+    | '/computer-control'
+    | '/creator-hub'
+    | '/crm'
+    | '/dashboard'
+    | '/deployments'
+    | '/developer'
+    | '/developer-portal'
+    | '/developer-workspace'
+    | '/discovery'
+    | '/docs'
+    | '/documents'
+    | '/files'
+    | '/files-analysis'
+    | '/finance'
+    | '/integrations'
+    | '/knowledge'
+    | '/marketing'
+    | '/marketplace'
+    | '/mcp-hub'
+    | '/memory'
+    | '/models'
+    | '/news-research'
+    | '/notifications'
+    | '/projects'
+    | '/prompts'
+    | '/search'
+    | '/security'
+    | '/settings'
+    | '/skills'
+    | '/support'
+    | '/tasks'
+    | '/team'
+    | '/templates'
+    | '/terminal'
+    | '/tool-marketplace'
+    | '/tools-framework'
+    | '/version-control'
+    | '/web'
+    | '/workflows'
+    | '/workforce'
+    | '/admin/audit-logs'
+    | '/admin/integrations'
+    | '/admin/marketplace'
+    | '/admin/monitoring'
+    | '/admin/organisations'
+    | '/admin/platform-analytics'
+    | '/admin/security'
+    | '/admin/subscriptions'
+    | '/admin/system-settings'
+    | '/admin/users'
+    | '/agents/new'
+    | '/creators/$id'
+    | '/admin'
+    | '/agents'
+    | '/agents/$id/playground'
+    | '/agents/$id'
   id:
     | '__root__'
     | '/'
-    | '/app'
+    | '/403'
+    | '/500'
+    | '/_shell'
+    | '/ai-agents'
+    | '/business'
+    | '/developers'
+    | '/email-verification'
+    | '/features'
     | '/forgot-password'
+    | '/help'
     | '/login'
     | '/onboarding'
+    | '/payment'
+    | '/pricing'
     | '/register'
-    | '/verify-email'
-    | '/app/analytics'
-    | '/app/billing'
-    | '/app/business'
-    | '/app/calendar'
-    | '/app/creative-studio'
-    | '/app/development'
-    | '/app/finance'
-    | '/app/health'
-    | '/app/integrations'
-    | '/app/marketing'
-    | '/app/marketplace'
-    | '/app/memory'
-    | '/app/mission-control'
-    | '/app/notifications'
-    | '/app/profile'
-    | '/app/sales'
-    | '/app/settings'
-    | '/app/shopping'
-    | '/app/travel'
-    | '/app/workforce'
-    | '/app/'
-    | '/app/departments/$slug'
-    | '/app/departments/'
+    | '/reset-password'
+    | '/resources'
+    | '/tools'
+    | '/two-factor'
+    | '/_shell/_app'
+    | '/legal/$slug'
+    | '/legal/'
+    | '/_shell/_app/agent-builder'
+    | '/_shell/_app/agent-marketplace'
+    | '/_shell/_app/ai-builder'
+    | '/_shell/_app/ai-marketplace'
+    | '/_shell/_app/ai-model-hub'
+    | '/_shell/_app/ai-tools'
+    | '/_shell/_app/analytics'
+    | '/_shell/_app/automation'
+    | '/_shell/_app/automations'
+    | '/_shell/_app/billing'
+    | '/_shell/_app/browser-preview'
+    | '/_shell/_app/builder'
+    | '/_shell/_app/business-automation'
+    | '/_shell/_app/business-intelligence'
+    | '/_shell/_app/chat'
+    | '/_shell/_app/code-explorer'
+    | '/_shell/_app/computer-control'
+    | '/_shell/_app/creator-hub'
+    | '/_shell/_app/crm'
+    | '/_shell/_app/dashboard'
+    | '/_shell/_app/deployments'
+    | '/_shell/_app/developer'
+    | '/_shell/_app/developer-portal'
+    | '/_shell/_app/developer-workspace'
+    | '/_shell/_app/discovery'
+    | '/_shell/_app/docs'
+    | '/_shell/_app/documents'
+    | '/_shell/_app/files'
+    | '/_shell/_app/files-analysis'
+    | '/_shell/_app/finance'
+    | '/_shell/_app/integrations'
+    | '/_shell/_app/knowledge'
+    | '/_shell/_app/marketing'
+    | '/_shell/_app/marketplace'
+    | '/_shell/_app/mcp-hub'
+    | '/_shell/_app/memory'
+    | '/_shell/_app/models'
+    | '/_shell/_app/news-research'
+    | '/_shell/_app/notifications'
+    | '/_shell/_app/projects'
+    | '/_shell/_app/prompts'
+    | '/_shell/_app/search'
+    | '/_shell/_app/security'
+    | '/_shell/_app/settings'
+    | '/_shell/_app/skills'
+    | '/_shell/_app/support'
+    | '/_shell/_app/tasks'
+    | '/_shell/_app/team'
+    | '/_shell/_app/templates'
+    | '/_shell/_app/terminal'
+    | '/_shell/_app/tool-marketplace'
+    | '/_shell/_app/tools-framework'
+    | '/_shell/_app/version-control'
+    | '/_shell/_app/web'
+    | '/_shell/_app/workflows'
+    | '/_shell/_app/workforce'
+    | '/_shell/_app/admin/audit-logs'
+    | '/_shell/_app/admin/integrations'
+    | '/_shell/_app/admin/marketplace'
+    | '/_shell/_app/admin/monitoring'
+    | '/_shell/_app/admin/organisations'
+    | '/_shell/_app/admin/platform-analytics'
+    | '/_shell/_app/admin/security'
+    | '/_shell/_app/admin/subscriptions'
+    | '/_shell/_app/admin/system-settings'
+    | '/_shell/_app/admin/users'
+    | '/_shell/_app/agents/new'
+    | '/_shell/_app/creators/$id'
+    | '/_shell/_app/admin/'
+    | '/_shell/_app/agents/'
+    | '/_shell/_app/agents/$id/playground'
+    | '/_shell/_app/agents/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AppRoute: typeof AppRouteWithChildren
+  R403Route: typeof R403Route
+  R500Route: typeof R500Route
+  ShellRoute: typeof ShellRouteWithChildren
+  AiAgentsRoute: typeof AiAgentsRoute
+  BusinessRoute: typeof BusinessRoute
+  DevelopersRoute: typeof DevelopersRoute
+  EmailVerificationRoute: typeof EmailVerificationRoute
+  FeaturesRoute: typeof FeaturesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  PaymentRoute: typeof PaymentRoute
+  PricingRoute: typeof PricingRoute
   RegisterRoute: typeof RegisterRoute
-  VerifyEmailRoute: typeof VerifyEmailRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  ResourcesRoute: typeof ResourcesRoute
+  ToolsRoute: typeof ToolsRoute
+  TwoFactorRoute: typeof TwoFactorRoute
+  LegalSlugRoute: typeof LegalSlugRoute
+  LegalIndexRoute: typeof LegalIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -404,11 +1202,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app': {
-      id: '/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppRouteImport
+    '/403': {
+      id: '/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof R403RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/500': {
+      id: '/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof R500RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-agents': {
+      id: '/ai-agents'
+      path: '/ai-agents'
+      fullPath: '/ai-agents'
+      preLoaderRoute: typeof AiAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business': {
+      id: '/business'
+      path: '/business'
+      fullPath: '/business'
+      preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/developers': {
+      id: '/developers'
+      path: '/developers'
+      fullPath: '/developers'
+      preLoaderRoute: typeof DevelopersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email-verification': {
+      id: '/email-verification'
+      path: '/email-verification'
+      fullPath: '/email-verification'
+      preLoaderRoute: typeof EmailVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/features': {
+      id: '/features'
+      path: '/features'
+      fullPath: '/features'
+      preLoaderRoute: typeof FeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -416,6 +1263,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -432,6 +1286,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment': {
+      id: '/payment'
+      path: '/payment'
+      fullPath: '/payment'
+      preLoaderRoute: typeof PaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -439,250 +1307,750 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verify-email': {
-      id: '/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof VerifyEmailRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/': {
-      id: '/app/'
-      path: '/'
-      fullPath: '/app/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/app/analytics': {
-      id: '/app/analytics'
+    '/tools': {
+      id: '/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof ToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/two-factor': {
+      id: '/two-factor'
+      path: '/two-factor'
+      fullPath: '/two-factor'
+      preLoaderRoute: typeof TwoFactorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell/_app': {
+      id: '/_shell/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellAppRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/legal/': {
+      id: '/legal/'
+      path: '/legal'
+      fullPath: '/legal/'
+      preLoaderRoute: typeof LegalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/$slug': {
+      id: '/legal/$slug'
+      path: '/legal/$slug'
+      fullPath: '/legal/$slug'
+      preLoaderRoute: typeof LegalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell/_app/agent-builder': {
+      id: '/_shell/_app/agent-builder'
+      path: '/agent-builder'
+      fullPath: '/agent-builder'
+      preLoaderRoute: typeof ShellAppAgentBuilderRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/agent-marketplace': {
+      id: '/_shell/_app/agent-marketplace'
+      path: '/agent-marketplace'
+      fullPath: '/agent-marketplace'
+      preLoaderRoute: typeof ShellAppAgentMarketplaceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/ai-builder': {
+      id: '/_shell/_app/ai-builder'
+      path: '/ai-builder'
+      fullPath: '/ai-builder'
+      preLoaderRoute: typeof ShellAppAiBuilderRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/ai-marketplace': {
+      id: '/_shell/_app/ai-marketplace'
+      path: '/ai-marketplace'
+      fullPath: '/ai-marketplace'
+      preLoaderRoute: typeof ShellAppAiMarketplaceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/ai-model-hub': {
+      id: '/_shell/_app/ai-model-hub'
+      path: '/ai-model-hub'
+      fullPath: '/ai-model-hub'
+      preLoaderRoute: typeof ShellAppAiModelHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/ai-tools': {
+      id: '/_shell/_app/ai-tools'
+      path: '/ai-tools'
+      fullPath: '/ai-tools'
+      preLoaderRoute: typeof ShellAppAiToolsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/analytics': {
+      id: '/_shell/_app/analytics'
       path: '/analytics'
-      fullPath: '/app/analytics'
-      preLoaderRoute: typeof AppAnalyticsRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/analytics'
+      preLoaderRoute: typeof ShellAppAnalyticsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/billing': {
-      id: '/app/billing'
+    '/_shell/_app/automation': {
+      id: '/_shell/_app/automation'
+      path: '/automation'
+      fullPath: '/automation'
+      preLoaderRoute: typeof ShellAppAutomationRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/automations': {
+      id: '/_shell/_app/automations'
+      path: '/automations'
+      fullPath: '/automations'
+      preLoaderRoute: typeof ShellAppAutomationsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/billing': {
+      id: '/_shell/_app/billing'
       path: '/billing'
-      fullPath: '/app/billing'
-      preLoaderRoute: typeof AppBillingRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/billing'
+      preLoaderRoute: typeof ShellAppBillingRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/business': {
-      id: '/app/business'
-      path: '/business'
-      fullPath: '/app/business'
-      preLoaderRoute: typeof AppBusinessRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/browser-preview': {
+      id: '/_shell/_app/browser-preview'
+      path: '/browser-preview'
+      fullPath: '/browser-preview'
+      preLoaderRoute: typeof ShellAppBrowserPreviewRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/calendar': {
-      id: '/app/calendar'
-      path: '/calendar'
-      fullPath: '/app/calendar'
-      preLoaderRoute: typeof AppCalendarRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/builder': {
+      id: '/_shell/_app/builder'
+      path: '/builder'
+      fullPath: '/builder'
+      preLoaderRoute: typeof ShellAppBuilderRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/creative-studio': {
-      id: '/app/creative-studio'
-      path: '/creative-studio'
-      fullPath: '/app/creative-studio'
-      preLoaderRoute: typeof AppCreativeStudioRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/business-automation': {
+      id: '/_shell/_app/business-automation'
+      path: '/business-automation'
+      fullPath: '/business-automation'
+      preLoaderRoute: typeof ShellAppBusinessAutomationRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/development': {
-      id: '/app/development'
-      path: '/development'
-      fullPath: '/app/development'
-      preLoaderRoute: typeof AppDevelopmentRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/business-intelligence': {
+      id: '/_shell/_app/business-intelligence'
+      path: '/business-intelligence'
+      fullPath: '/business-intelligence'
+      preLoaderRoute: typeof ShellAppBusinessIntelligenceRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/finance': {
-      id: '/app/finance'
+    '/_shell/_app/chat': {
+      id: '/_shell/_app/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ShellAppChatRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/code-explorer': {
+      id: '/_shell/_app/code-explorer'
+      path: '/code-explorer'
+      fullPath: '/code-explorer'
+      preLoaderRoute: typeof ShellAppCodeExplorerRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/computer-control': {
+      id: '/_shell/_app/computer-control'
+      path: '/computer-control'
+      fullPath: '/computer-control'
+      preLoaderRoute: typeof ShellAppComputerControlRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/creator-hub': {
+      id: '/_shell/_app/creator-hub'
+      path: '/creator-hub'
+      fullPath: '/creator-hub'
+      preLoaderRoute: typeof ShellAppCreatorHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/crm': {
+      id: '/_shell/_app/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof ShellAppCrmRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/dashboard': {
+      id: '/_shell/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof ShellAppDashboardRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/deployments': {
+      id: '/_shell/_app/deployments'
+      path: '/deployments'
+      fullPath: '/deployments'
+      preLoaderRoute: typeof ShellAppDeploymentsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/developer': {
+      id: '/_shell/_app/developer'
+      path: '/developer'
+      fullPath: '/developer'
+      preLoaderRoute: typeof ShellAppDeveloperRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/developer-portal': {
+      id: '/_shell/_app/developer-portal'
+      path: '/developer-portal'
+      fullPath: '/developer-portal'
+      preLoaderRoute: typeof ShellAppDeveloperPortalRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/developer-workspace': {
+      id: '/_shell/_app/developer-workspace'
+      path: '/developer-workspace'
+      fullPath: '/developer-workspace'
+      preLoaderRoute: typeof ShellAppDeveloperWorkspaceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/discovery': {
+      id: '/_shell/_app/discovery'
+      path: '/discovery'
+      fullPath: '/discovery'
+      preLoaderRoute: typeof ShellAppDiscoveryRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/docs': {
+      id: '/_shell/_app/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof ShellAppDocsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/documents': {
+      id: '/_shell/_app/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof ShellAppDocumentsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/files': {
+      id: '/_shell/_app/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof ShellAppFilesRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/files-analysis': {
+      id: '/_shell/_app/files-analysis'
+      path: '/files-analysis'
+      fullPath: '/files-analysis'
+      preLoaderRoute: typeof ShellAppFilesAnalysisRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/finance': {
+      id: '/_shell/_app/finance'
       path: '/finance'
-      fullPath: '/app/finance'
-      preLoaderRoute: typeof AppFinanceRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/finance'
+      preLoaderRoute: typeof ShellAppFinanceRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/health': {
-      id: '/app/health'
-      path: '/health'
-      fullPath: '/app/health'
-      preLoaderRoute: typeof AppHealthRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/integrations': {
-      id: '/app/integrations'
+    '/_shell/_app/integrations': {
+      id: '/_shell/_app/integrations'
       path: '/integrations'
-      fullPath: '/app/integrations'
-      preLoaderRoute: typeof AppIntegrationsRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/integrations'
+      preLoaderRoute: typeof ShellAppIntegrationsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/marketing': {
-      id: '/app/marketing'
+    '/_shell/_app/knowledge': {
+      id: '/_shell/_app/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof ShellAppKnowledgeRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/marketing': {
+      id: '/_shell/_app/marketing'
       path: '/marketing'
-      fullPath: '/app/marketing'
-      preLoaderRoute: typeof AppMarketingRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/marketing'
+      preLoaderRoute: typeof ShellAppMarketingRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/marketplace': {
-      id: '/app/marketplace'
+    '/_shell/_app/marketplace': {
+      id: '/_shell/_app/marketplace'
       path: '/marketplace'
-      fullPath: '/app/marketplace'
-      preLoaderRoute: typeof AppMarketplaceRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof ShellAppMarketplaceRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/memory': {
-      id: '/app/memory'
+    '/_shell/_app/mcp-hub': {
+      id: '/_shell/_app/mcp-hub'
+      path: '/mcp-hub'
+      fullPath: '/mcp-hub'
+      preLoaderRoute: typeof ShellAppMcpHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/memory': {
+      id: '/_shell/_app/memory'
       path: '/memory'
-      fullPath: '/app/memory'
-      preLoaderRoute: typeof AppMemoryRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/memory'
+      preLoaderRoute: typeof ShellAppMemoryRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/mission-control': {
-      id: '/app/mission-control'
-      path: '/mission-control'
-      fullPath: '/app/mission-control'
-      preLoaderRoute: typeof AppMissionControlRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/models': {
+      id: '/_shell/_app/models'
+      path: '/models'
+      fullPath: '/models'
+      preLoaderRoute: typeof ShellAppModelsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/notifications': {
-      id: '/app/notifications'
+    '/_shell/_app/news-research': {
+      id: '/_shell/_app/news-research'
+      path: '/news-research'
+      fullPath: '/news-research'
+      preLoaderRoute: typeof ShellAppNewsResearchRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/notifications': {
+      id: '/_shell/_app/notifications'
       path: '/notifications'
-      fullPath: '/app/notifications'
-      preLoaderRoute: typeof AppNotificationsRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/notifications'
+      preLoaderRoute: typeof ShellAppNotificationsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/profile': {
-      id: '/app/profile'
-      path: '/profile'
-      fullPath: '/app/profile'
-      preLoaderRoute: typeof AppProfileRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/projects': {
+      id: '/_shell/_app/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ShellAppProjectsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/sales': {
-      id: '/app/sales'
-      path: '/sales'
-      fullPath: '/app/sales'
-      preLoaderRoute: typeof AppSalesRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/prompts': {
+      id: '/_shell/_app/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof ShellAppPromptsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/settings': {
-      id: '/app/settings'
+    '/_shell/_app/search': {
+      id: '/_shell/_app/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof ShellAppSearchRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/security': {
+      id: '/_shell/_app/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof ShellAppSecurityRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/settings': {
+      id: '/_shell/_app/settings'
       path: '/settings'
-      fullPath: '/app/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/settings'
+      preLoaderRoute: typeof ShellAppSettingsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/shopping': {
-      id: '/app/shopping'
-      path: '/shopping'
-      fullPath: '/app/shopping'
-      preLoaderRoute: typeof AppShoppingRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/skills': {
+      id: '/_shell/_app/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof ShellAppSkillsRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/travel': {
-      id: '/app/travel'
-      path: '/travel'
-      fullPath: '/app/travel'
-      preLoaderRoute: typeof AppTravelRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/support': {
+      id: '/_shell/_app/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof ShellAppSupportRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/workforce': {
-      id: '/app/workforce'
+    '/_shell/_app/tasks': {
+      id: '/_shell/_app/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof ShellAppTasksRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/team': {
+      id: '/_shell/_app/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof ShellAppTeamRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/templates': {
+      id: '/_shell/_app/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof ShellAppTemplatesRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/terminal': {
+      id: '/_shell/_app/terminal'
+      path: '/terminal'
+      fullPath: '/terminal'
+      preLoaderRoute: typeof ShellAppTerminalRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/tool-marketplace': {
+      id: '/_shell/_app/tool-marketplace'
+      path: '/tool-marketplace'
+      fullPath: '/tool-marketplace'
+      preLoaderRoute: typeof ShellAppToolMarketplaceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/tools-framework': {
+      id: '/_shell/_app/tools-framework'
+      path: '/tools-framework'
+      fullPath: '/tools-framework'
+      preLoaderRoute: typeof ShellAppToolsFrameworkRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/version-control': {
+      id: '/_shell/_app/version-control'
+      path: '/version-control'
+      fullPath: '/version-control'
+      preLoaderRoute: typeof ShellAppVersionControlRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/web': {
+      id: '/_shell/_app/web'
+      path: '/web'
+      fullPath: '/web'
+      preLoaderRoute: typeof ShellAppWebRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/workflows': {
+      id: '/_shell/_app/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof ShellAppWorkflowsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/workforce': {
+      id: '/_shell/_app/workforce'
       path: '/workforce'
-      fullPath: '/app/workforce'
-      preLoaderRoute: typeof AppWorkforceRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/workforce'
+      preLoaderRoute: typeof ShellAppWorkforceRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/departments/': {
-      id: '/app/departments/'
-      path: '/departments'
-      fullPath: '/app/departments/'
-      preLoaderRoute: typeof AppDepartmentsIndexRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/admin/': {
+      id: '/_shell/_app/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof ShellAppAdminIndexRouteImport
+      parentRoute: typeof ShellAppRoute
     }
-    '/app/departments/$slug': {
-      id: '/app/departments/$slug'
-      path: '/departments/$slug'
-      fullPath: '/app/departments/$slug'
-      preLoaderRoute: typeof AppDepartmentsSlugRouteImport
-      parentRoute: typeof AppRoute
+    '/_shell/_app/admin/audit-logs': {
+      id: '/_shell/_app/admin/audit-logs'
+      path: '/admin/audit-logs'
+      fullPath: '/admin/audit-logs'
+      preLoaderRoute: typeof ShellAppAdminAuditLogsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/integrations': {
+      id: '/_shell/_app/admin/integrations'
+      path: '/admin/integrations'
+      fullPath: '/admin/integrations'
+      preLoaderRoute: typeof ShellAppAdminIntegrationsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/marketplace': {
+      id: '/_shell/_app/admin/marketplace'
+      path: '/admin/marketplace'
+      fullPath: '/admin/marketplace'
+      preLoaderRoute: typeof ShellAppAdminMarketplaceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/monitoring': {
+      id: '/_shell/_app/admin/monitoring'
+      path: '/admin/monitoring'
+      fullPath: '/admin/monitoring'
+      preLoaderRoute: typeof ShellAppAdminMonitoringRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/organisations': {
+      id: '/_shell/_app/admin/organisations'
+      path: '/admin/organisations'
+      fullPath: '/admin/organisations'
+      preLoaderRoute: typeof ShellAppAdminOrganisationsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/platform-analytics': {
+      id: '/_shell/_app/admin/platform-analytics'
+      path: '/admin/platform-analytics'
+      fullPath: '/admin/platform-analytics'
+      preLoaderRoute: typeof ShellAppAdminPlatformAnalyticsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/security': {
+      id: '/_shell/_app/admin/security'
+      path: '/admin/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof ShellAppAdminSecurityRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/subscriptions': {
+      id: '/_shell/_app/admin/subscriptions'
+      path: '/admin/subscriptions'
+      fullPath: '/admin/subscriptions'
+      preLoaderRoute: typeof ShellAppAdminSubscriptionsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/system-settings': {
+      id: '/_shell/_app/admin/system-settings'
+      path: '/admin/system-settings'
+      fullPath: '/admin/system-settings'
+      preLoaderRoute: typeof ShellAppAdminSystemSettingsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/users': {
+      id: '/_shell/_app/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof ShellAppAdminUsersRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/agents/': {
+      id: '/_shell/_app/agents/'
+      path: '/agents'
+      fullPath: '/agents/'
+      preLoaderRoute: typeof ShellAppAgentsIndexRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/agents/new': {
+      id: '/_shell/_app/agents/new'
+      path: '/agents/new'
+      fullPath: '/agents/new'
+      preLoaderRoute: typeof ShellAppAgentsNewRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/creators/$id': {
+      id: '/_shell/_app/creators/$id'
+      path: '/creators/$id'
+      fullPath: '/creators/$id'
+      preLoaderRoute: typeof ShellAppCreatorsIdRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/agents/$id/': {
+      id: '/_shell/_app/agents/$id/'
+      path: '/agents/$id'
+      fullPath: '/agents/$id/'
+      preLoaderRoute: typeof ShellAppAgentsIdIndexRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/agents/$id/playground': {
+      id: '/_shell/_app/agents/$id/playground'
+      path: '/agents/$id/playground'
+      fullPath: '/agents/$id/playground'
+      preLoaderRoute: typeof ShellAppAgentsIdPlaygroundRouteImport
+      parentRoute: typeof ShellAppRoute
     }
   }
 }
 
-interface AppRouteChildren {
-  AppAnalyticsRoute: typeof AppAnalyticsRoute
-  AppBillingRoute: typeof AppBillingRoute
-  AppBusinessRoute: typeof AppBusinessRoute
-  AppCalendarRoute: typeof AppCalendarRoute
-  AppCreativeStudioRoute: typeof AppCreativeStudioRoute
-  AppDevelopmentRoute: typeof AppDevelopmentRoute
-  AppFinanceRoute: typeof AppFinanceRoute
-  AppHealthRoute: typeof AppHealthRoute
-  AppIntegrationsRoute: typeof AppIntegrationsRoute
-  AppMarketingRoute: typeof AppMarketingRoute
-  AppMarketplaceRoute: typeof AppMarketplaceRoute
-  AppMemoryRoute: typeof AppMemoryRoute
-  AppMissionControlRoute: typeof AppMissionControlRoute
-  AppNotificationsRoute: typeof AppNotificationsRoute
-  AppProfileRoute: typeof AppProfileRoute
-  AppSalesRoute: typeof AppSalesRoute
-  AppSettingsRoute: typeof AppSettingsRoute
-  AppShoppingRoute: typeof AppShoppingRoute
-  AppTravelRoute: typeof AppTravelRoute
-  AppWorkforceRoute: typeof AppWorkforceRoute
-  AppIndexRoute: typeof AppIndexRoute
-  AppDepartmentsSlugRoute: typeof AppDepartmentsSlugRoute
-  AppDepartmentsIndexRoute: typeof AppDepartmentsIndexRoute
+interface ShellAppRouteChildren {
+  ShellAppAgentBuilderRoute: typeof ShellAppAgentBuilderRoute
+  ShellAppAgentMarketplaceRoute: typeof ShellAppAgentMarketplaceRoute
+  ShellAppAiBuilderRoute: typeof ShellAppAiBuilderRoute
+  ShellAppAiMarketplaceRoute: typeof ShellAppAiMarketplaceRoute
+  ShellAppAiModelHubRoute: typeof ShellAppAiModelHubRoute
+  ShellAppAiToolsRoute: typeof ShellAppAiToolsRoute
+  ShellAppAnalyticsRoute: typeof ShellAppAnalyticsRoute
+  ShellAppAutomationRoute: typeof ShellAppAutomationRoute
+  ShellAppAutomationsRoute: typeof ShellAppAutomationsRoute
+  ShellAppBillingRoute: typeof ShellAppBillingRoute
+  ShellAppBrowserPreviewRoute: typeof ShellAppBrowserPreviewRoute
+  ShellAppBuilderRoute: typeof ShellAppBuilderRoute
+  ShellAppBusinessAutomationRoute: typeof ShellAppBusinessAutomationRoute
+  ShellAppBusinessIntelligenceRoute: typeof ShellAppBusinessIntelligenceRoute
+  ShellAppChatRoute: typeof ShellAppChatRoute
+  ShellAppCodeExplorerRoute: typeof ShellAppCodeExplorerRoute
+  ShellAppComputerControlRoute: typeof ShellAppComputerControlRoute
+  ShellAppCreatorHubRoute: typeof ShellAppCreatorHubRoute
+  ShellAppCrmRoute: typeof ShellAppCrmRoute
+  ShellAppDashboardRoute: typeof ShellAppDashboardRoute
+  ShellAppDeploymentsRoute: typeof ShellAppDeploymentsRoute
+  ShellAppDeveloperRoute: typeof ShellAppDeveloperRoute
+  ShellAppDeveloperPortalRoute: typeof ShellAppDeveloperPortalRoute
+  ShellAppDeveloperWorkspaceRoute: typeof ShellAppDeveloperWorkspaceRoute
+  ShellAppDiscoveryRoute: typeof ShellAppDiscoveryRoute
+  ShellAppDocsRoute: typeof ShellAppDocsRoute
+  ShellAppDocumentsRoute: typeof ShellAppDocumentsRoute
+  ShellAppFilesRoute: typeof ShellAppFilesRoute
+  ShellAppFilesAnalysisRoute: typeof ShellAppFilesAnalysisRoute
+  ShellAppFinanceRoute: typeof ShellAppFinanceRoute
+  ShellAppIntegrationsRoute: typeof ShellAppIntegrationsRoute
+  ShellAppKnowledgeRoute: typeof ShellAppKnowledgeRoute
+  ShellAppMarketingRoute: typeof ShellAppMarketingRoute
+  ShellAppMarketplaceRoute: typeof ShellAppMarketplaceRoute
+  ShellAppMcpHubRoute: typeof ShellAppMcpHubRoute
+  ShellAppMemoryRoute: typeof ShellAppMemoryRoute
+  ShellAppModelsRoute: typeof ShellAppModelsRoute
+  ShellAppNewsResearchRoute: typeof ShellAppNewsResearchRoute
+  ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
+  ShellAppProjectsRoute: typeof ShellAppProjectsRoute
+  ShellAppPromptsRoute: typeof ShellAppPromptsRoute
+  ShellAppSearchRoute: typeof ShellAppSearchRoute
+  ShellAppSecurityRoute: typeof ShellAppSecurityRoute
+  ShellAppSettingsRoute: typeof ShellAppSettingsRoute
+  ShellAppSkillsRoute: typeof ShellAppSkillsRoute
+  ShellAppSupportRoute: typeof ShellAppSupportRoute
+  ShellAppTasksRoute: typeof ShellAppTasksRoute
+  ShellAppTeamRoute: typeof ShellAppTeamRoute
+  ShellAppTemplatesRoute: typeof ShellAppTemplatesRoute
+  ShellAppTerminalRoute: typeof ShellAppTerminalRoute
+  ShellAppToolMarketplaceRoute: typeof ShellAppToolMarketplaceRoute
+  ShellAppToolsFrameworkRoute: typeof ShellAppToolsFrameworkRoute
+  ShellAppVersionControlRoute: typeof ShellAppVersionControlRoute
+  ShellAppWebRoute: typeof ShellAppWebRoute
+  ShellAppWorkflowsRoute: typeof ShellAppWorkflowsRoute
+  ShellAppWorkforceRoute: typeof ShellAppWorkforceRoute
+  ShellAppAdminAuditLogsRoute: typeof ShellAppAdminAuditLogsRoute
+  ShellAppAdminIntegrationsRoute: typeof ShellAppAdminIntegrationsRoute
+  ShellAppAdminMarketplaceRoute: typeof ShellAppAdminMarketplaceRoute
+  ShellAppAdminMonitoringRoute: typeof ShellAppAdminMonitoringRoute
+  ShellAppAdminOrganisationsRoute: typeof ShellAppAdminOrganisationsRoute
+  ShellAppAdminPlatformAnalyticsRoute: typeof ShellAppAdminPlatformAnalyticsRoute
+  ShellAppAdminSecurityRoute: typeof ShellAppAdminSecurityRoute
+  ShellAppAdminSubscriptionsRoute: typeof ShellAppAdminSubscriptionsRoute
+  ShellAppAdminSystemSettingsRoute: typeof ShellAppAdminSystemSettingsRoute
+  ShellAppAdminUsersRoute: typeof ShellAppAdminUsersRoute
+  ShellAppAgentsNewRoute: typeof ShellAppAgentsNewRoute
+  ShellAppCreatorsIdRoute: typeof ShellAppCreatorsIdRoute
+  ShellAppAdminIndexRoute: typeof ShellAppAdminIndexRoute
+  ShellAppAgentsIndexRoute: typeof ShellAppAgentsIndexRoute
+  ShellAppAgentsIdPlaygroundRoute: typeof ShellAppAgentsIdPlaygroundRoute
+  ShellAppAgentsIdIndexRoute: typeof ShellAppAgentsIdIndexRoute
 }
 
-const AppRouteChildren: AppRouteChildren = {
-  AppAnalyticsRoute: AppAnalyticsRoute,
-  AppBillingRoute: AppBillingRoute,
-  AppBusinessRoute: AppBusinessRoute,
-  AppCalendarRoute: AppCalendarRoute,
-  AppCreativeStudioRoute: AppCreativeStudioRoute,
-  AppDevelopmentRoute: AppDevelopmentRoute,
-  AppFinanceRoute: AppFinanceRoute,
-  AppHealthRoute: AppHealthRoute,
-  AppIntegrationsRoute: AppIntegrationsRoute,
-  AppMarketingRoute: AppMarketingRoute,
-  AppMarketplaceRoute: AppMarketplaceRoute,
-  AppMemoryRoute: AppMemoryRoute,
-  AppMissionControlRoute: AppMissionControlRoute,
-  AppNotificationsRoute: AppNotificationsRoute,
-  AppProfileRoute: AppProfileRoute,
-  AppSalesRoute: AppSalesRoute,
-  AppSettingsRoute: AppSettingsRoute,
-  AppShoppingRoute: AppShoppingRoute,
-  AppTravelRoute: AppTravelRoute,
-  AppWorkforceRoute: AppWorkforceRoute,
-  AppIndexRoute: AppIndexRoute,
-  AppDepartmentsSlugRoute: AppDepartmentsSlugRoute,
-  AppDepartmentsIndexRoute: AppDepartmentsIndexRoute,
+const ShellAppRouteChildren: ShellAppRouteChildren = {
+  ShellAppAgentBuilderRoute: ShellAppAgentBuilderRoute,
+  ShellAppAgentMarketplaceRoute: ShellAppAgentMarketplaceRoute,
+  ShellAppAiBuilderRoute: ShellAppAiBuilderRoute,
+  ShellAppAiMarketplaceRoute: ShellAppAiMarketplaceRoute,
+  ShellAppAiModelHubRoute: ShellAppAiModelHubRoute,
+  ShellAppAiToolsRoute: ShellAppAiToolsRoute,
+  ShellAppAnalyticsRoute: ShellAppAnalyticsRoute,
+  ShellAppAutomationRoute: ShellAppAutomationRoute,
+  ShellAppAutomationsRoute: ShellAppAutomationsRoute,
+  ShellAppBillingRoute: ShellAppBillingRoute,
+  ShellAppBrowserPreviewRoute: ShellAppBrowserPreviewRoute,
+  ShellAppBuilderRoute: ShellAppBuilderRoute,
+  ShellAppBusinessAutomationRoute: ShellAppBusinessAutomationRoute,
+  ShellAppBusinessIntelligenceRoute: ShellAppBusinessIntelligenceRoute,
+  ShellAppChatRoute: ShellAppChatRoute,
+  ShellAppCodeExplorerRoute: ShellAppCodeExplorerRoute,
+  ShellAppComputerControlRoute: ShellAppComputerControlRoute,
+  ShellAppCreatorHubRoute: ShellAppCreatorHubRoute,
+  ShellAppCrmRoute: ShellAppCrmRoute,
+  ShellAppDashboardRoute: ShellAppDashboardRoute,
+  ShellAppDeploymentsRoute: ShellAppDeploymentsRoute,
+  ShellAppDeveloperRoute: ShellAppDeveloperRoute,
+  ShellAppDeveloperPortalRoute: ShellAppDeveloperPortalRoute,
+  ShellAppDeveloperWorkspaceRoute: ShellAppDeveloperWorkspaceRoute,
+  ShellAppDiscoveryRoute: ShellAppDiscoveryRoute,
+  ShellAppDocsRoute: ShellAppDocsRoute,
+  ShellAppDocumentsRoute: ShellAppDocumentsRoute,
+  ShellAppFilesRoute: ShellAppFilesRoute,
+  ShellAppFilesAnalysisRoute: ShellAppFilesAnalysisRoute,
+  ShellAppFinanceRoute: ShellAppFinanceRoute,
+  ShellAppIntegrationsRoute: ShellAppIntegrationsRoute,
+  ShellAppKnowledgeRoute: ShellAppKnowledgeRoute,
+  ShellAppMarketingRoute: ShellAppMarketingRoute,
+  ShellAppMarketplaceRoute: ShellAppMarketplaceRoute,
+  ShellAppMcpHubRoute: ShellAppMcpHubRoute,
+  ShellAppMemoryRoute: ShellAppMemoryRoute,
+  ShellAppModelsRoute: ShellAppModelsRoute,
+  ShellAppNewsResearchRoute: ShellAppNewsResearchRoute,
+  ShellAppNotificationsRoute: ShellAppNotificationsRoute,
+  ShellAppProjectsRoute: ShellAppProjectsRoute,
+  ShellAppPromptsRoute: ShellAppPromptsRoute,
+  ShellAppSearchRoute: ShellAppSearchRoute,
+  ShellAppSecurityRoute: ShellAppSecurityRoute,
+  ShellAppSettingsRoute: ShellAppSettingsRoute,
+  ShellAppSkillsRoute: ShellAppSkillsRoute,
+  ShellAppSupportRoute: ShellAppSupportRoute,
+  ShellAppTasksRoute: ShellAppTasksRoute,
+  ShellAppTeamRoute: ShellAppTeamRoute,
+  ShellAppTemplatesRoute: ShellAppTemplatesRoute,
+  ShellAppTerminalRoute: ShellAppTerminalRoute,
+  ShellAppToolMarketplaceRoute: ShellAppToolMarketplaceRoute,
+  ShellAppToolsFrameworkRoute: ShellAppToolsFrameworkRoute,
+  ShellAppVersionControlRoute: ShellAppVersionControlRoute,
+  ShellAppWebRoute: ShellAppWebRoute,
+  ShellAppWorkflowsRoute: ShellAppWorkflowsRoute,
+  ShellAppWorkforceRoute: ShellAppWorkforceRoute,
+  ShellAppAdminAuditLogsRoute: ShellAppAdminAuditLogsRoute,
+  ShellAppAdminIntegrationsRoute: ShellAppAdminIntegrationsRoute,
+  ShellAppAdminMarketplaceRoute: ShellAppAdminMarketplaceRoute,
+  ShellAppAdminMonitoringRoute: ShellAppAdminMonitoringRoute,
+  ShellAppAdminOrganisationsRoute: ShellAppAdminOrganisationsRoute,
+  ShellAppAdminPlatformAnalyticsRoute: ShellAppAdminPlatformAnalyticsRoute,
+  ShellAppAdminSecurityRoute: ShellAppAdminSecurityRoute,
+  ShellAppAdminSubscriptionsRoute: ShellAppAdminSubscriptionsRoute,
+  ShellAppAdminSystemSettingsRoute: ShellAppAdminSystemSettingsRoute,
+  ShellAppAdminUsersRoute: ShellAppAdminUsersRoute,
+  ShellAppAgentsNewRoute: ShellAppAgentsNewRoute,
+  ShellAppCreatorsIdRoute: ShellAppCreatorsIdRoute,
+  ShellAppAdminIndexRoute: ShellAppAdminIndexRoute,
+  ShellAppAgentsIndexRoute: ShellAppAgentsIndexRoute,
+  ShellAppAgentsIdPlaygroundRoute: ShellAppAgentsIdPlaygroundRoute,
+  ShellAppAgentsIdIndexRoute: ShellAppAgentsIdIndexRoute,
 }
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+const ShellAppRouteWithChildren = ShellAppRoute._addFileChildren(
+  ShellAppRouteChildren,
+)
+
+interface ShellRouteChildren {
+  ShellAppRoute: typeof ShellAppRouteWithChildren
+}
+
+const ShellRouteChildren: ShellRouteChildren = {
+  ShellAppRoute: ShellAppRouteWithChildren,
+}
+
+const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AppRoute: AppRouteWithChildren,
+  R403Route: R403Route,
+  R500Route: R500Route,
+  ShellRoute: ShellRouteWithChildren,
+  AiAgentsRoute: AiAgentsRoute,
+  BusinessRoute: BusinessRoute,
+  DevelopersRoute: DevelopersRoute,
+  EmailVerificationRoute: EmailVerificationRoute,
+  FeaturesRoute: FeaturesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  PaymentRoute: PaymentRoute,
+  PricingRoute: PricingRoute,
   RegisterRoute: RegisterRoute,
-  VerifyEmailRoute: VerifyEmailRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  ResourcesRoute: ResourcesRoute,
+  ToolsRoute: ToolsRoute,
+  TwoFactorRoute: TwoFactorRoute,
+  LegalSlugRoute: LegalSlugRoute,
+  LegalIndexRoute: LegalIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

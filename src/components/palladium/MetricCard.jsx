@@ -1,0 +1,4 @@
+import { ArrowUpRight } from 'lucide-react';
+export default function MetricCard({ label, value, detail, icon: Icon }) {
+  return <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[.055] to-white/[.02] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-violet-400/30"><div className="flex items-center justify-between"><span className="text-xs text-zinc-500">{label}</span>{Icon&&<Icon className="h-4 w-4 text-violet-400" />}</div><p className="mt-3 text-2xl font-semibold tracking-tight text-white">{value}</p><p className="mt-1 flex items-center text-[11px] text-emerald-400"><ArrowUpRight className="mr-1 h-3 w-3" />{detail}</p></div>;
+}
