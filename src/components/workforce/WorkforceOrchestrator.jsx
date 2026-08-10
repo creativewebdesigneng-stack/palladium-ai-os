@@ -4,8 +4,9 @@ import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch,
 import { useServerFn } from '@tanstack/react-start';
 import { SectionHead } from './wfShared';
 import { listWorkforces, runWorkflow, getWorkflowRun } from '@/lib/runtime/workforce.functions';
-
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+
 
 const STATUS_ICON = {
   succeeded: { Icon: CheckCircle2, cls: 'text-emerald-400' },
@@ -56,10 +57,22 @@ export default function WorkforceOrchestrator() {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    load()
-      .then((res) => setWorkforces(res?.workforces ?? []))
-      .catch(() => setWorkforces([]));
+    let cancelled = false;
+    // Only query once a Supabase session exists — the server functions are
+    // bearer-authenticated and 401 without one.
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled || !data?.session) return;
+      try {
+        const res = await load();
+        if (!cancelled) setWorkforces(res?.workforces ?? []);
+      } catch {
+        if (!cancelled) setWorkforces([]);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [load]);
+
 
   const workflows = useMemo(
     () => workforces.flatMap((w) => (w.workflows ?? []).map((f) => ({ ...f, workforce: w.name }))),
