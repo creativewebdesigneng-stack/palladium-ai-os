@@ -95,6 +95,7 @@ import { Route as ShellAppVersionControlRouteImport } from './routes/_shell/_app
 import { Route as ShellAppWebRouteImport } from './routes/_shell/_app/web'
 import { Route as ShellAppWorkflowsRouteImport } from './routes/_shell/_app/workflows'
 import { Route as ShellAppWorkforceRouteImport } from './routes/_shell/_app/workforce'
+import { Route as ApiAgentsRunRouteImport } from './routes/api/agents/run'
 import { Route as ShellAppAdminIndexRouteImport } from './routes/_shell/_app/admin.index'
 import { Route as ShellAppAdminAuditLogsRouteImport } from './routes/_shell/_app/admin.audit-logs'
 import { Route as ShellAppAdminIntegrationsRouteImport } from './routes/_shell/_app/admin.integrations'
@@ -548,6 +549,11 @@ const ShellAppWorkforceRoute = ShellAppWorkforceRouteImport.update({
   path: '/workforce',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ApiAgentsRunRoute = ApiAgentsRunRouteImport.update({
+  id: '/api/agents/run',
+  path: '/api/agents/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellAppAdminIndexRoute = ShellAppAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -727,6 +733,7 @@ export interface FileRoutesByFullPath {
   '/web': typeof ShellAppWebRoute
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
+  '/api/agents/run': typeof ApiAgentsRunRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -830,6 +837,7 @@ export interface FileRoutesByTo {
   '/web': typeof ShellAppWebRoute
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
+  '/api/agents/run': typeof ApiAgentsRunRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -936,6 +944,7 @@ export interface FileRoutesById {
   '/_shell/_app/web': typeof ShellAppWebRoute
   '/_shell/_app/workflows': typeof ShellAppWorkflowsRoute
   '/_shell/_app/workforce': typeof ShellAppWorkforceRoute
+  '/api/agents/run': typeof ApiAgentsRunRoute
   '/_shell/_app/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/_shell/_app/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/_shell/_app/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1041,6 +1050,7 @@ export interface FileRouteTypes {
     | '/web'
     | '/workflows'
     | '/workforce'
+    | '/api/agents/run'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1144,6 +1154,7 @@ export interface FileRouteTypes {
     | '/web'
     | '/workflows'
     | '/workforce'
+    | '/api/agents/run'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1249,6 +1260,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/web'
     | '/_shell/_app/workflows'
     | '/_shell/_app/workforce'
+    | '/api/agents/run'
     | '/_shell/_app/admin/audit-logs'
     | '/_shell/_app/admin/integrations'
     | '/_shell/_app/admin/marketplace'
@@ -1296,6 +1308,7 @@ export interface RootRouteChildren {
   LegalIndexRoute: typeof LegalIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiAgentsRunRoute: typeof ApiAgentsRunRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
@@ -1903,6 +1916,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppWorkforceRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/api/agents/run': {
+      id: '/api/agents/run'
+      path: '/api/agents/run'
+      fullPath: '/api/agents/run'
+      preLoaderRoute: typeof ApiAgentsRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/_app/admin/': {
       id: '/_shell/_app/admin/'
       path: '/admin'
@@ -2222,6 +2242,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalIndexRoute: LegalIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiAgentsRunRoute: ApiAgentsRunRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport

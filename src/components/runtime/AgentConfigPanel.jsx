@@ -5,20 +5,19 @@ function Row({ k, v }) {
 }
 
 // Right-hand sidebar summarising the agent's model, tools and memory settings
-// pulled live from the backend Agent record.
+// pulled live from the backend agent record.
 export default function AgentConfigPanel({ agent }) {
-  const c = agent.config || {};
-  const tools = agent.tools || [];
-  const mem = c.memory || {};
+  const tools = agent.allowed_tools || agent.tools || [];
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Cpu className="h-3.5 w-3.5 text-violet-400" />Model</p>
         <dl className="mt-3 space-y-1.5 text-xs">
-          <Row k="Provider" v={agent.provider || 'openai'} />
+          <Row k="Provider" v={agent.model_provider || 'lovable'} />
           <Row k="Model" v={agent.model || '—'} />
           <Row k="Temperature" v={agent.temperature ?? 0.7} />
           <Row k="Max tokens" v={agent.max_tokens ?? 4096} />
+          <Row k="Autonomy" v={agent.autonomy || 'assist'} />
         </dl>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
@@ -32,12 +31,14 @@ export default function AgentConfigPanel({ agent }) {
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Brain className="h-3.5 w-3.5 text-violet-400" />Memory</p>
         <div className="mt-3 space-y-1 text-[11px] text-zinc-400">
-          {Object.keys(mem).length ? Object.entries(mem).map(([k, v]) => (
-            <div key={k} className="flex justify-between">
-              <span className="capitalize">{k}</span>
-              <span className={v ? 'text-emerald-400' : 'text-zinc-600'}>{v ? 'On' : 'Off'}</span>
-            </div>
-          )) : <p className="text-zinc-600">Default</p>}
+          <div className="flex justify-between">
+            <span>Long-term memory</span>
+            <span className={agent.memory_enabled === false ? 'text-zinc-600' : 'text-emerald-400'}>{agent.memory_enabled === false ? 'Off' : 'On'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Approval required</span>
+            <span className={agent.requires_approval ? 'text-amber-300' : 'text-zinc-600'}>{agent.requires_approval ? 'Yes' : 'No'}</span>
+          </div>
         </div>
       </div>
     </div>
