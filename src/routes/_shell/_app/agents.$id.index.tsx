@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/AgentDetail";
 
-export const Route = createFileRoute("/_shell/_app/agents/$id")({
+export const Route = createFileRoute("/_shell/_app/agents/$id/")({
   head: () => ({
     meta: [
       { title: "Agent detail — PalladiumAI" },
