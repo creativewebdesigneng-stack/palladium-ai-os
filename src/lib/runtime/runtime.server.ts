@@ -378,6 +378,14 @@ export async function failRun(args: {
     metadata: { error: message },
   });
 
+  const { dispatchWebhookEvent } = await import('@/lib/devapi/webhooks.server');
+  await dispatchWebhookEvent({
+    userId: args.userId,
+    orgId: args.run.orgId,
+    event: 'agent.failed',
+    payload: { agent_id: args.run.agent.id, task_id: args.run.taskId, error: message },
+  });
+
   console.error('[runtime] run failed', args.run.taskId, args.error);
   return message;
 }
