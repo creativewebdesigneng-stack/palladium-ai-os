@@ -1,0 +1,1 @@
+ALTER TABLE public.webhooks ADD COLUMN IF NOT EXISTS signing_secret text;

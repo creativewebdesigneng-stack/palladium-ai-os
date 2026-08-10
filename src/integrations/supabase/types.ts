@@ -2192,6 +2192,7 @@ export type Database = {
           org_id: string | null
           secret_hash: string | null
           secret_prefix: string | null
+          signing_secret: string | null
           updated_at: string
           url: string
           user_id: string
@@ -2208,6 +2209,7 @@ export type Database = {
           org_id?: string | null
           secret_hash?: string | null
           secret_prefix?: string | null
+          signing_secret?: string | null
           updated_at?: string
           url: string
           user_id: string
@@ -2224,6 +2226,7 @@ export type Database = {
           org_id?: string | null
           secret_hash?: string | null
           secret_prefix?: string | null
+          signing_secret?: string | null
           updated_at?: string
           url?: string
           user_id?: string
