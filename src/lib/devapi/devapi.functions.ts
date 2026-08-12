@@ -180,7 +180,8 @@ function shapeHook(row: any) {
     events: row.events ?? [],
     status: row.is_active ? "active" : "paused",
     description: row.name ?? "",
-    secret: `${row.secret_prefix ?? "whsec_"}${"•".repeat(12)}`,
+    secret: row.secret_prefix ? `${row.secret_prefix}${"•".repeat(12)}` : null,
+    secret_set: Boolean(row.secret_prefix),
     deliveries_count: Number(row.delivery_count ?? 0),
     failure_count: Number(row.failure_count ?? 0),
     last_delivery_at: row.last_delivery_at,
@@ -383,4 +384,57 @@ export const getApiUsageFn = createServerFn({ method: "POST" })
         error: r.error ?? null,
       })),
     };
+  });
+
+/** Issues a new signing secret for a webhook. Returned once, then hashed only. */
+export const rotateWebhookSecretFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { webhook_id: string }) => ({
+    webhook_id: String(input?.webhook_id ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    // RLS proves ownership before any secret material is minted.
+    const { data: hook } = await sb
+      .from("webhooks")
+      .select("id")
+      .eq("id", data.webhook_id)
+      .maybeSingle();
+    if (!hook) throw new Error("That webhook no longer exists.");
+
+    const secret = await generateWebhookSecret();
+    const { error } = await sb
+      .from("webhooks")
+      .update({
+        secret_hash: secret.hash,
+        secret_prefix: secret.prefix,
+        signing_secret: secret.raw,
+      })
+      .eq("id", data.webhook_id);
+    if (error) throw new Error(error.message);
+    return { secret: secret.raw };
+  });
+
+/**
+ * Revokes a webhook's signing secret. Deliveries are paused immediately because
+ * an unsigned payload must never leave the platform.
+ */
+export const revokeWebhookSecretFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { webhook_id: string }) => ({
+    webhook_id: String(input?.webhook_id ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { error } = await sb
+      .from("webhooks")
+      .update({
+        secret_hash: null,
+        secret_prefix: null,
+        signing_secret: null,
+        is_active: false,
+      })
+      .eq("id", data.webhook_id);
+    if (error) throw new Error(error.message);
+    return { revoked: true };
   });
