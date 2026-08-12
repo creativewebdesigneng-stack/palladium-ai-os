@@ -29,7 +29,8 @@ import {
 const TABS = [
   ['overview', 'Overview', Gauge],
   ['personal', 'Personal AI', User],
-  ['approvals', 'Approval centre', ShieldAlert],
+  ['professional', 'Professional AI', Briefcase],
+
   ['shopping', 'Shopping', ShoppingBag],
   ['tasks', 'Tasks', ListChecks],
   ['signals', 'Notifications & usage', Bell],
