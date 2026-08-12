@@ -36,7 +36,8 @@ export async function dispatchWebhookEvent(args: DispatchArgs): Promise<{ delive
     if (!hooks?.length) return { delivered: 0 };
 
     let delivered = 0;
-    for (const hook of hooks) {
+    // A hook whose secret was revoked cannot receive a signed payload, so it is skipped.
+    for (const hook of hooks.filter((h: any) => h.signing_secret)) {
       const ok = await deliver(admin, hook, args);
       if (ok) delivered += 1;
     }
@@ -56,9 +57,7 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
     data: args.payload,
   };
   const body = JSON.stringify(envelope);
-  const signature = hook.signing_secret
-    ? await hmacSha256Hex(hook.signing_secret, `${timestamp}.${body}`)
-    : null;
+  const signature = await hmacSha256Hex(hook.signing_secret, `${timestamp}.${body}`);
 
   const startedAt = Date.now();
   let status: number | null = null;
@@ -74,7 +73,7 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
         "user-agent": "PalladiumAI-Webhooks/1.0",
         "x-palladium-event": String(args.event),
         "x-palladium-timestamp": String(timestamp),
-        ...(signature ? { "x-palladium-signature": `v1=${signature}` } : {}),
+        "x-palladium-signature": `v1=${signature}`,
       },
       body,
       signal: controller.signal,
