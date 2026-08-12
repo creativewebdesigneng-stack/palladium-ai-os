@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { KeyRound, Plus, RotateCw, X, Copy, Check, Loader2 } from 'lucide-react';
 import { listApiKeys, createApiKey, rotateApiKey, revokeApiKey } from './api';
-import { KEY_STATUS_STYLE } from './devPortalData';
+import { KEY_STATUS_STYLE, SCOPES, KEY_EXPIRY_OPTIONS } from './devPortalData';
 
 const ENV_STYLE = { live: 'text-emerald-400 bg-emerald-400/10', test: 'text-sky-400 bg-sky-400/10' };
 
@@ -9,7 +9,7 @@ export default function ApiKeysPanel({ onToast }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', environment: 'live', scopes: ['agents:read', 'agents:run', 'tasks:read'] });
+  const [form, setForm] = useState({ name: '', environment: 'live', scopes: ['agents:read', 'agents:run', 'tasks:read'], expiresInDays: null });
   const [newKey, setNewKey] = useState(null);
   const [copied, setCopied] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -30,10 +30,10 @@ export default function ApiKeysPanel({ onToast }) {
     if (!form.name.trim()) return;
     try {
       setBusy(true);
-      const data = await createApiKey(form.name.trim(), form.environment, form.scopes);
+      const data = await createApiKey(form.name.trim(), form.environment, form.scopes, form.expiresInDays);
       setNewKey(data);
       onToast?.('Key created — copy it now, it won\'t be shown again');
-      setForm({ name: '', environment: 'live', scopes: ['agents:read', 'agents:run', 'tasks:read'] });
+      setForm({ name: '', environment: 'live', scopes: ['agents:read', 'agents:run', 'tasks:read'], expiresInDays: null });
       setCreating(false);
       load();
     } catch (e) { onToast?.(e.message || 'Failed to create key'); }
@@ -87,9 +87,17 @@ export default function ApiKeysPanel({ onToast }) {
             ))}
           </div>
           <div>
+            <p className="mb-1 text-[11px] text-zinc-400">Expiry</p>
+            <div className="flex flex-wrap gap-2">
+              {KEY_EXPIRY_OPTIONS.map((o) => (
+                <button key={o.label} onClick={() => setForm({ ...form, expiresInDays: o.days })} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${form.expiresInDays === o.days ? 'bg-violet-600 text-white' : 'border border-white/10 text-zinc-300'}`}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
             <p className="mb-1 text-[11px] text-zinc-400">Scopes</p>
             <div className="flex flex-wrap gap-1.5">
-              {['agents:read','agents:write','agents:run','tasks:read','tasks:write','workflows:read','workflows:run','webhooks:manage','keys:manage'].map((s) => (
+              {SCOPES.map((s) => (
                 <button key={s} onClick={() => toggleScope(s)} className={`rounded-full px-2 py-1 text-[10px] font-mono ${form.scopes.includes(s) ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/30' : 'border border-white/10 text-zinc-400'}`}>{s}</button>
               ))}
             </div>
@@ -125,6 +133,7 @@ export default function ApiKeysPanel({ onToast }) {
               <div className="mt-2 flex items-center gap-4 text-[10px] text-zinc-500">
                 <span>Created {new Date(k.created_date).toLocaleDateString()}</span>
                 <span>Last used {k.last_used_date ? new Date(k.last_used_date).toLocaleString() : 'never'}</span>
+                <span>{k.expires_at ? `Expires ${new Date(k.expires_at).toLocaleDateString()}` : 'No expiry'}</span>
                 <div className="ml-auto flex gap-1.5">
                   <button onClick={() => rotate(k.id)} disabled={k.status === 'revoked' || busy} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5 disabled:opacity-40"><RotateCw className="h-3 w-3" />Rotate</button>
                   <button onClick={() => revoke(k.id)} disabled={k.status === 'revoked' || busy} className="flex items-center gap-1 rounded-lg border border-rose-400/20 px-2 py-1 text-[10px] text-rose-300 hover:bg-rose-500/15 disabled:opacity-40"><X className="h-3 w-3" />Revoke</button>
