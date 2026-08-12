@@ -54,9 +54,8 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
     const limits = apiLimitsFor(planCode);
     const { data } = await sb
       .from("api_keys")
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
+
       .order("created_at", { ascending: false });
     return {
       keys: (data ?? []).map(shapeKey),
