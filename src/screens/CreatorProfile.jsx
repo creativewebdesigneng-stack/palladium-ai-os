@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, BadgeCheck, Globe, Download, Bot } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import AgentCard from '@/components/marketplace-agents/AgentCard';
 import AgentDetailDrawer from '@/components/marketplace-agents/AgentDetailDrawer';
-import { getCreatorStats } from '@/components/marketplace-agents/api';
+import { getCreatorStats, getCreatorProfile, listAgentsByCreator, installMarketplaceAgent } from '@/components/marketplace-agents/api';
 import { normalizeAgent } from '@/components/marketplace-agents/marketplaceData';
 
 // Public creator profile: avatar, verified badge, bio, website, aggregate
@@ -21,12 +20,12 @@ export default function CreatorProfile() {
   useEffect(() => {
     (async () => {
       try {
-        const [profiles, its, st] = await Promise.all([
-          base44.entities.Creator.filter({ user_id: id }, '-created_date', 1),
-          base44.entities.MarketplaceItem.filter({ creator_id: id, status: 'published' }, '-created_date', 60),
+        const [profile, its, st] = await Promise.all([
+          getCreatorProfile(id),
+          listAgentsByCreator(id),
           getCreatorStats(id),
         ]);
-        setCreator(profiles[0] || { name: 'Creator', bio: '' });
+        setCreator(profile ? { ...profile, name: profile.display_name } : { name: 'Creator', bio: '' });
         setItems(its.map(normalizeAgent));
         setStats(st);
       } catch {}
@@ -35,7 +34,7 @@ export default function CreatorProfile() {
   }, [id]);
 
   const install = (agent) => {
-    base44.functions.invoke('installMarketplaceAgent', { item_id: agent.id }).catch(() => {});
+    installMarketplaceAgent({ item_id: agent.id }).catch(() => {});
     setActive(null);
   };
 

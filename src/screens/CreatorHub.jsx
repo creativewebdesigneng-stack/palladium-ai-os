@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Rocket, BarChart3, LayoutList, UserCircle } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import CreatorOnboarding from '@/components/marketplace-agents/CreatorOnboarding';
 import ListingsManager from '@/components/marketplace-agents/ListingsManager';
 import CreatorAnalytics from '@/components/marketplace-agents/CreatorAnalytics';
 import EditListing from '@/components/marketplace-agents/EditListing';
-import { submitMarketplaceAgent, removeMarketplaceAgent } from '@/components/marketplace-agents/api';
+import { submitMarketplaceAgent, removeMarketplaceAgent, getCreatorProfile, listOwnListings } from '@/components/marketplace-agents/api';
 
 // Creator Hub — the creator's home base. Onboards a user into a Creator, then
 // exposes three tabs: Listings (manage + edit + submit + remove), Analytics
@@ -25,14 +24,12 @@ export default function CreatorHub() {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const profiles = await base44.entities.Creator.filter({ user_id: user.id }, '-created_date', 1);
-      const p = profiles[0] || null;
+      const p = await getCreatorProfile();
       setProfile(p);
-      if (p) {
-        const its = await base44.entities.MarketplaceItem.filter({ creator_id: user.id }, '-created_date', 100);
-        setItems(its);
-      }
-    } catch {}
+      if (p) setItems(await listOwnListings());
+    } catch {
+      setProfile(null);
+    }
     setLoading(false);
   }, [user]);
 

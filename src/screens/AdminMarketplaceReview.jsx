@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { base44 } from '@/api/base44Client';
+import { listPendingListings } from '@/components/marketplace-agents/api';
 import ReviewQueue from '@/components/marketplace-agents/ReviewQueue';
 
 // Admin marketplace moderation: review submitted agents (pending_review) and
@@ -13,9 +13,10 @@ export default function AdminMarketplaceReview() {
 
   const load = useCallback(async () => {
     try {
-      const its = await base44.entities.MarketplaceItem.filter({ status: tab }, '-created_date', 100);
-      setItems(its);
-    } catch {}
+      setItems(await listPendingListings(tab));
+    } catch {
+      setItems([]);
+    }
     setLoading(false);
   }, [tab]);
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { createAgent } from '@/lib/agents/agents.functions';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Brain, Wrench, Shield, User, MessageSquare, MemoryStick } from 'lucide-react';
@@ -63,18 +63,18 @@ export default function AgentWizard() {
     if (!d.name.trim()) { toast({ title: 'Agent name is required', variant: 'destructive' }); return; }
     setCreating(true);
     try {
-      const me = await base44.auth.me();
-      const org = (me && (me.data?.organisation_id || me.organisation_id)) || '';
-      const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'GPT-5';
-      await base44.entities.Agent.create({
-        organisation_id: org,
-        name: d.name.trim(),
-        description: d.desc,
-        role: d.dept,
-        model: modelName,
-        status: 'draft',
-        tools: d.tools,
-        config: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
+      const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'gpt-4o-mini';
+      await createAgent({
+        data: {
+          name: d.name.trim(),
+          description: d.desc,
+          category: d.dept,
+          model: modelName,
+          instructions: d.rules || d.behaviour || '',
+          allowed_tools: d.tools,
+          status: 'draft',
+          preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
+        },
       });
       toast({ title: 'Agent created', description: `${d.name} is now in your workforce.` });
       navigate('/agents');

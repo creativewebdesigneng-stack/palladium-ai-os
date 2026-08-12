@@ -6,10 +6,10 @@ import { Link } from 'react-router-dom';
 import AgentCard from '@/components/marketplace-agents/AgentCard';
 import AgentDetailDrawer from '@/components/marketplace-agents/AgentDetailDrawer';
 import CreatorPanel from '@/components/marketplace-agents/CreatorPanel';
-import { base44 } from '@/api/base44Client';
+import { listPublishedAgents, installMarketplaceAgent, saveMarketplaceAgent } from '@/components/marketplace-agents/api';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
-import { CATEGORIES, FILTERS, AGENTS, normalizeAgent } from '@/components/marketplace-agents/marketplaceData';
+import { CATEGORIES, FILTERS, normalizeAgent } from '@/components/marketplace-agents/marketplaceData';
 
 export default function AgentMarketplace() {
   const { gate } = useUpgrade();
@@ -19,16 +19,17 @@ export default function AgentMarketplace() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState('discover');
   const [active, setActive] = useState(null);
-  const [agents, setAgents] = useState(AGENTS);
+  const [agents, setAgents] = useState([]);
 
-  // Load published agents from the backend; fall back to the built-in catalog
-  // when no records exist yet so browsing always works.
+  // Published listings come from the marketplace API — real records only.
   useEffect(() => {
     (async () => {
       try {
-        const items = await base44.entities.MarketplaceItem.filter({ type: 'agent', status: 'published' }, '-created_date', 60);
-        if (items && items.length) setAgents(items.map(normalizeAgent));
-      } catch {}
+        const items = await listPublishedAgents(undefined, 60);
+        setAgents((items || []).map(normalizeAgent));
+      } catch {
+        setAgents([]);
+      }
     })();
   }, []);
 
@@ -53,7 +54,12 @@ export default function AgentMarketplace() {
   // (marketplaceAccess). The upgrade modal opens automatically when gated.
   const handleInstall = async (agent) => {
     if (!gate('marketplaceAccess')) return;
-    if (agent._backend) { try { await base44.functions.invoke('installMarketplaceAgent', { item_id: agent.id }); } catch {} }
+    try {
+      await installMarketplaceAgent({ item_id: agent.id });
+    } catch (e) {
+      toast({ title: 'Install failed', description: e.message, variant: 'destructive' });
+      return;
+    }
     setAgents((list) => list.map((a) => a.id === agent.id ? { ...a, usage: { ...a.usage, installs: (a.usage?.installs || 0) + 1 } } : a));
     setActive(null);
     toast({ title: `${agent.name} installed`, description: 'Added to your agent library.' });
@@ -65,7 +71,7 @@ export default function AgentMarketplace() {
     try {
       const cat = CATEGORIES.find((c) => c.label === form.category);
       const price = form.pricing === 'Free' ? 0 : (parseInt(form.pricing.replace(/[^0-9]/g, ''), 10) || 0);
-      await base44.functions.invoke('saveMarketplaceAgent', {
+      await saveMarketplaceAgent({
         title: form.name, description: form.description,
         category: cat ? cat.id : (form.category || '').toLowerCase(),
         price, version: '1.0.0', features: form.capabilities, revenue_share: 30,
