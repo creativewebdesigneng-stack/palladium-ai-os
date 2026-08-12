@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { type StripeEnv, createStripeClient, getStripeErrorMessage } from "@/lib/stripe.server";
+import {
+  type BillingInterval,
+  normalizeInterval,
+  normalizePlanCode,
+  priceKeyForPlan,
+} from "@/lib/billing/catalog";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CheckoutSessionResult = { clientSecret: string } | { error: string };
 type PortalSessionResult = { url: string } | { error: string };
@@ -41,54 +49,170 @@ async function resolveOrCreateCustomer(
 export const createCheckoutSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (data: { priceId: string; orgId?: string; returnUrl: string; environment: StripeEnv }) => {
-      if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
-      return data;
+    (data: {
+      planCode: string;
+      interval?: BillingInterval;
+      orgId?: string;
+      returnUrl: string;
+      environment: StripeEnv;
+    }) => {
+      const planCode = normalizePlanCode(data.planCode);
+      if (!planCode) throw new Error("Unknown plan");
+      if (planCode === "explorer") throw new Error("The Explorer plan is free — no checkout required");
+      if (data.orgId && !UUID_RE.test(data.orgId)) throw new Error("Invalid organisation");
+      if (!/^https?:\/\//.test(data.returnUrl)) throw new Error("Invalid return URL");
+      return { ...data, planCode, interval: normalizeInterval(data.interval) };
     },
   )
   .handler(async ({ data, context }): Promise<CheckoutSessionResult> => {
     try {
       const { supabase, userId } = context;
+
+      // Organisation-scoped checkout requires membership; never trust the client.
+      if (data.orgId) {
+        const { data: member } = await supabase
+          .from("organisation_members")
+          .select("role")
+          .eq("org_id", data.orgId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!member || !["owner", "admin"].includes(member.role as string)) {
+          return { error: "You do not have permission to buy a plan for this organisation." };
+        }
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const stripe = createStripeClient(data.environment);
+      // The approved price is resolved server-side from the internal plan code.
+      const priceKey = priceKeyForPlan(data.planCode, data.interval);
+      if (!priceKey) return { error: "That plan cannot be purchased." };
 
-      const prices = await stripe.prices.list({ lookup_keys: [data.priceId] });
+      const stripe = createStripeClient(data.environment);
+      const prices = await stripe.prices.list({ lookup_keys: [priceKey], active: true });
       const stripePrice = prices.data[0];
-      if (!stripePrice) throw new Error("Price not found");
-      const isRecurring = stripePrice.type === "recurring";
+      if (!stripePrice) throw new Error("Price not configured for this plan");
 
       const customerId = await resolveOrCreateCustomer(stripe, {
         ...(user?.email ? { email: user.email } : {}),
         userId,
       });
 
-      let productDescription: string | undefined;
-      if (!isRecurring) {
-        const productId =
-          typeof stripePrice.product === "string" ? stripePrice.product : stripePrice.product.id;
-        const product = await stripe.products.retrieve(productId);
-        productDescription = product.name;
-      }
-
-      const metadata: Record<string, string> = { userId };
+      const metadata: Record<string, string> = { userId, planCode: data.planCode };
       if (data.orgId) metadata["orgId"] = data.orgId;
 
       const session = await stripe.checkout.sessions.create({
         line_items: [{ price: stripePrice.id, quantity: 1 }],
-        mode: isRecurring ? "subscription" : "payment",
+        mode: "subscription",
         ui_mode: "embedded_page",
         return_url: data.returnUrl,
         customer: customerId,
-        ...(!isRecurring && { payment_intent_data: { description: productDescription } }),
         metadata,
-        ...(isRecurring && { subscription_data: { metadata } }),
+        subscription_data: { metadata },
         managed_payments: { enabled: true },
       } as any);
 
       return { clientSecret: session.client_secret ?? "" };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
+type SubscriptionRow = {
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+  plan_code: string | null;
+  status: string;
+};
+
+async function loadOwnSubscription(
+  supabase: any,
+  userId: string,
+  environment: StripeEnv,
+): Promise<SubscriptionRow | null> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("stripe_subscription_id, stripe_customer_id, plan_code, status")
+    .eq("user_id", userId)
+    .eq("environment", environment)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as SubscriptionRow | null) ?? null;
+}
+
+type MutationResult = { ok: true } | { error: string };
+
+/** Cancel at period end — access continues until current_period_end. */
+export const cancelSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { environment: StripeEnv }) => data)
+  .handler(async ({ data, context }): Promise<MutationResult> => {
+    const sub = await loadOwnSubscription(context.supabase, context.userId, data.environment);
+    if (!sub?.stripe_subscription_id) return { error: "No active subscription to cancel." };
+    try {
+      const stripe = createStripeClient(data.environment);
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: true,
+      });
+      return { ok: true };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
+/** Undo a pending cancellation. */
+export const resumeSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { environment: StripeEnv }) => data)
+  .handler(async ({ data, context }): Promise<MutationResult> => {
+    const sub = await loadOwnSubscription(context.supabase, context.userId, data.environment);
+    if (!sub?.stripe_subscription_id) return { error: "No subscription to resume." };
+    try {
+      const stripe = createStripeClient(data.environment);
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: false,
+      });
+      return { ok: true };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
+/** Upgrade or downgrade an existing subscription between approved plans. */
+export const changeSubscriptionPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { planCode: string; interval?: BillingInterval; environment: StripeEnv }) => {
+    const planCode = normalizePlanCode(data.planCode);
+    if (!planCode || planCode === "explorer") throw new Error("Unknown plan");
+    return { ...data, planCode, interval: normalizeInterval(data.interval) };
+  })
+  .handler(async ({ data, context }): Promise<MutationResult> => {
+    const sub = await loadOwnSubscription(context.supabase, context.userId, data.environment);
+    if (!sub?.stripe_subscription_id) {
+      return { error: "No active subscription — start a checkout instead." };
+    }
+    const priceKey = priceKeyForPlan(data.planCode, data.interval);
+    if (!priceKey) return { error: "That plan cannot be purchased." };
+    try {
+      const stripe = createStripeClient(data.environment);
+      const prices = await stripe.prices.list({ lookup_keys: [priceKey], active: true });
+      const price = prices.data[0];
+      if (!price) return { error: "Price not configured for this plan" };
+
+      const current = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+      const itemId = current.items.data[0]?.id;
+      if (!itemId) return { error: "Subscription has no billable item" };
+
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        items: [{ id: itemId, price: price.id, quantity: 1 }],
+        cancel_at_period_end: false,
+        proration_behavior: "create_prorations",
+        metadata: { ...(current.metadata ?? {}), userId: context.userId, planCode: data.planCode },
+      });
+      // Subscription state in the database is only updated by verified webhooks.
+      return { ok: true };
     } catch (error) {
       return { error: getStripeErrorMessage(error) };
     }
