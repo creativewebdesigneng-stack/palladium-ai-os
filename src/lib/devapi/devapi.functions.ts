@@ -25,18 +25,23 @@ async function resolvePlan(sb: Sb, userId: string) {
   return (data?.[0]?.plan_code as string) ?? "explorer";
 }
 
+const KEY_COLUMNS =
+  "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at,expires_at";
+
 function shapeKey(row: any) {
+  const expired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
   return {
     id: row.id,
     name: row.name,
     environment: row.environment ?? "live",
-    status: row.revoked_at ? "revoked" : "active",
+    status: row.revoked_at ? "revoked" : expired ? "expired" : "active",
     prefix: row.key_prefix,
     masked: maskKey(row.key_prefix ?? "pk_live", row.last_four ?? null),
     scopes: row.scopes ?? [],
     requests_count: Number(row.request_count ?? 0),
     created_date: row.created_at,
     last_used_date: row.last_used_at,
+    expires_at: row.expires_at ?? null,
   };
 }
 
@@ -49,9 +54,8 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
     const limits = apiLimitsFor(planCode);
     const { data } = await sb
       .from("api_keys")
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
+
       .order("created_at", { ascending: false });
     return {
       keys: (data ?? []).map(shapeKey),
@@ -63,13 +67,28 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
 /** Creates a key. The raw secret is returned once and never persisted. */
 export const createApiKeyFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { name: string; environment?: string; scopes?: string[] }) => {
-    const name = String(input?.name ?? "").trim();
-    if (!name) throw new Error("Give the key a name.");
-    const environment = input?.environment === "test" ? "test" : "live";
-    const scopes = (input?.scopes ?? []).filter((s) => SCOPES.has(s));
-    return { name: name.slice(0, 80), environment: environment as "live" | "test", scopes };
-  })
+  .inputValidator(
+    (input: {
+      name: string;
+      environment?: string;
+      scopes?: string[];
+      expires_in_days?: number | null;
+    }) => {
+      const name = String(input?.name ?? "").trim();
+      if (!name) throw new Error("Give the key a name.");
+      const environment = input?.environment === "test" ? "test" : "live";
+      const scopes = (input?.scopes ?? []).filter((s) => SCOPES.has(s));
+      const days = Number(input?.expires_in_days ?? 0);
+      const expiresInDays = Number.isFinite(days) && days > 0 ? Math.min(days, 730) : null;
+      return {
+        name: name.slice(0, 80),
+        environment: environment as "live" | "test",
+        scopes,
+        expiresInDays,
+      };
+    },
+  )
+
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const planCode = await resolvePlan(sb, context.userId);
@@ -96,10 +115,11 @@ export const createApiKeyFn = createServerFn({ method: "POST" })
         last_four: generated.lastFour,
         key_hash: generated.hash,
         scopes: data.scopes.length ? data.scopes : ["agents:read", "tasks:read"],
+        expires_at: data.expiresInDays
+          ? new Date(Date.now() + data.expiresInDays * 86_400_000).toISOString()
+          : null,
       })
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     // The only time the raw key exists outside the caller's own machine.
@@ -133,9 +153,7 @@ export const rotateApiKeyFn = createServerFn({ method: "POST" })
         revoked_at: null,
       })
       .eq("id", data.key_id)
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     return { key: generated.raw, record: shapeKey(row) };
@@ -162,7 +180,8 @@ function shapeHook(row: any) {
     events: row.events ?? [],
     status: row.is_active ? "active" : "paused",
     description: row.name ?? "",
-    secret: `${row.secret_prefix ?? "whsec_"}${"•".repeat(12)}`,
+    secret: row.secret_prefix ? `${row.secret_prefix}${"•".repeat(12)}` : null,
+    secret_set: Boolean(row.secret_prefix),
     deliveries_count: Number(row.delivery_count ?? 0),
     failure_count: Number(row.failure_count ?? 0),
     last_delivery_at: row.last_delivery_at,
@@ -365,4 +384,57 @@ export const getApiUsageFn = createServerFn({ method: "POST" })
         error: r.error ?? null,
       })),
     };
+  });
+
+/** Issues a new signing secret for a webhook. Returned once, then hashed only. */
+export const rotateWebhookSecretFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { webhook_id: string }) => ({
+    webhook_id: String(input?.webhook_id ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    // RLS proves ownership before any secret material is minted.
+    const { data: hook } = await sb
+      .from("webhooks")
+      .select("id")
+      .eq("id", data.webhook_id)
+      .maybeSingle();
+    if (!hook) throw new Error("That webhook no longer exists.");
+
+    const secret = await generateWebhookSecret();
+    const { error } = await sb
+      .from("webhooks")
+      .update({
+        secret_hash: secret.hash,
+        secret_prefix: secret.prefix,
+        signing_secret: secret.raw,
+      })
+      .eq("id", data.webhook_id);
+    if (error) throw new Error(error.message);
+    return { secret: secret.raw };
+  });
+
+/**
+ * Revokes a webhook's signing secret. Deliveries are paused immediately because
+ * an unsigned payload must never leave the platform.
+ */
+export const revokeWebhookSecretFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { webhook_id: string }) => ({
+    webhook_id: String(input?.webhook_id ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { error } = await sb
+      .from("webhooks")
+      .update({
+        secret_hash: null,
+        secret_prefix: null,
+        signing_secret: null,
+        is_active: false,
+      })
+      .eq("id", data.webhook_id);
+    if (error) throw new Error(error.message);
+    return { revoked: true };
   });
