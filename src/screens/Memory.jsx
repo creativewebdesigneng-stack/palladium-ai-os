@@ -11,7 +11,7 @@ import EditMemoryModal from '@/components/memory/EditMemoryModal';
 import VectorIndexModal from '@/components/memory/VectorIndexModal';
 import { MEMORY_SETTINGS } from '@/components/memory/memoryData';
 import { normalizeMemory } from '@/components/memory/normalizeMemory';
-import { base44 } from '@/api/base44Client';
+import { listAgents } from '@/lib/agents/agents.functions';
 import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useSession, useActiveOrg } from '@/hooks/use-workspace';
@@ -83,7 +83,7 @@ export default function Memory() {
     if (session !== 'yes') return;
     (async () => {
       try {
-        setAgents(await base44.entities.Agent.filter({}, '-created_date', 200));
+        setAgents((await listAgents({ data: { limit: 200, withTasks: false } })).agents);
       } catch {
         setAgents([]);
       }

@@ -1,16 +1,37 @@
-import { base44 } from "@/api/base44Client";
+// Marketplace client API — thin wrappers around the typed RPC layer.
+// Every call is authenticated server-side; no mock data and no Base44.
+import {
+  listMarketplaceAgents,
+  listMyListings,
+  listCreatorListings,
+  saveMarketplaceAgent as saveFn,
+  submitMarketplaceAgent as submitFn,
+  removeMarketplaceAgent as removeFn,
+  reviewMarketplaceAgent as reviewFn,
+  listReviewQueue,
+  installMarketplaceAgent as installFn,
+  rateMarketplaceAgent as rateFn,
+  getCreatorStats as statsFn,
+} from "@/lib/marketplace/marketplace.functions";
+import {
+  getCreatorProfile as getProfileFn,
+  saveCreatorProfile as saveProfileFn,
+} from "@/lib/marketplace/creators.functions";
 
-// Thin wrapper around base44.functions.invoke for the marketplace backend
-// functions. base44.functions.invoke returns an axios response; the JSON body
-// lives in `res.data` (fall back to `res` for older SDK behaviour).
-async function invoke(name, payload) {
-  const res = await base44.functions.invoke(name, payload);
-  return res.data ?? res;
-}
+export const listPublishedAgents = (category, limit) =>
+  listMarketplaceAgents({ data: { category, limit } });
+export const listOwnListings = () => listMyListings({ data: {} });
+export const listAgentsByCreator = (creatorId) =>
+  listCreatorListings({ data: { creator_id: creatorId } });
 
-export const saveMarketplaceAgent = (payload) => invoke("saveMarketplaceAgent", payload);
-export const submitMarketplaceAgent = (payload) => invoke("submitMarketplaceAgent", payload);
-export const reviewMarketplaceAgent = (payload) => invoke("reviewMarketplaceAgent", payload);
-export const removeMarketplaceAgent = (payload) => invoke("removeMarketplaceAgent", payload);
-export const rateMarketplaceAgent = (payload) => invoke("rateMarketplaceAgent", payload);
-export const getCreatorStats = (userId) => invoke("getCreatorStats", { user_id: userId });
+export const saveMarketplaceAgent = (payload) => saveFn({ data: payload });
+export const submitMarketplaceAgent = (payload) => submitFn({ data: payload });
+export const removeMarketplaceAgent = (payload) => removeFn({ data: payload });
+export const reviewMarketplaceAgent = (payload) => reviewFn({ data: payload });
+export const listPendingListings = (status) => listReviewQueue({ data: { status } });
+export const installMarketplaceAgent = (payload) => installFn({ data: payload });
+export const rateMarketplaceAgent = (payload) => rateFn({ data: payload });
+export const getCreatorStats = (userId) => statsFn({ data: { creator_id: userId ?? null } });
+
+export const getCreatorProfile = (userId) => getProfileFn({ data: { user_id: userId ?? null } });
+export const saveCreatorProfile = (payload) => saveProfileFn({ data: payload });

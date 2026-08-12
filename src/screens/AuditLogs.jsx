@@ -4,16 +4,16 @@ import PageHeader from '@/components/palladium/PageHeader';
 import AuditToolbar from '@/components/audit-logs/AuditToolbar';
 import AuditTable from '@/components/audit-logs/AuditTable';
 import AuditDetail from '@/components/audit-logs/AuditDetail';
-import { AUDIT_EVENTS } from '@/components/audit-logs/auditData';
 import { useToast } from '@/components/ui/use-toast';
-import { base44 } from '@/api/base44Client';
+import { listAuditLogs } from '@/lib/platform/audit.functions';
+import { useActiveOrg } from '@/hooks/use-workspace';
 
-// Enterprise audit log viewer. Reads live AuditLog records via the
-// getAuditLogs backend function (org-scoped, admin-only). Falls back to the
-// illustrative mock dataset while the org has no recorded events so the page
-// is never empty during onboarding.
+// Enterprise audit log viewer. Reads real audit records through the
+// authenticated RPC layer: organisation owners and admins see the whole
+// organisation, everyone else sees their own events.
 export default function AuditLogs() {
   const { toast } = useToast();
+  const { orgId } = useActiveOrg();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({ user: 'All', org: 'All', action: 'All', resource: 'All', result: 'All', date: '' });
   const [selected, setSelected] = useState(null);
@@ -26,9 +26,7 @@ export default function AuditLogs() {
     (async () => {
       try {
         setLoading(true);
-        const res = await base44.functions.invoke('getAuditLogs', { limit: 200 });
-        const data = res.data ?? res;
-        if (data && data.error) throw new Error(data.error);
+        const data = await listAuditLogs({ data: { orgId: orgId ?? null, limit: 200 } });
         if (alive) setLive(Array.isArray(data.logs) ? data.logs : []);
       } catch (e) {
         if (alive) setError(e.message || 'Unable to load live audit data');
@@ -37,7 +35,7 @@ export default function AuditLogs() {
       }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [orgId]);
 
   const normalize = (e) => ({
     id: e.id,
@@ -53,7 +51,7 @@ export default function AuditLogs() {
     meta: e.metadata || {},
   });
 
-  const baseRows = useMemo(() => (live.length ? live.map(normalize) : AUDIT_EVENTS), [live]);
+  const baseRows = useMemo(() => live.map(normalize), [live]);
 
   const rows = useMemo(() => baseRows.filter(e => {
     if (query) {

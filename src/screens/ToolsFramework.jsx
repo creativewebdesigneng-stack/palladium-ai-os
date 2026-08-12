@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Blocks, Globe, ScrollText, Plug } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { listIntegrations, connectIntegration as connectIntegrationFn, disconnectIntegration as disconnectIntegrationFn } from '@/lib/integrations/integrations.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -68,8 +68,8 @@ export default function ToolsFramework() {
       setFramework(data);
       setAgentId((prev) => prev || data.agents?.[0]?.id || '');
       try {
-        const integRes = await base44.functions.invoke('manageIntegration', { action: 'list' });
-        setIntegrations(integRes.data?.integrations || []);
+        const integRes = await listIntegrations({ data: {} });
+        setIntegrations(integRes.integrations || []);
       } catch { /* integrations are optional */ }
     } catch (e) {
       toast({ title: 'Failed to load framework', description: e.message, variant: 'destructive' });
@@ -123,14 +123,14 @@ export default function ToolsFramework() {
 
   const connectIntegration = async (def) => {
     try {
-      await base44.functions.invoke('manageIntegration', { action: 'connect', key: def.key });
+      await connectIntegrationFn({ data: { provider: def.key, name: def.name } });
       toast({ title: `${def.name} connected`, description: 'Add API credentials in settings to enable live sync.' });
       load();
     } catch (e) { toast({ title: 'Connection failed', description: e.message, variant: 'destructive' }); }
   };
   const disconnectIntegration = async (def) => {
     try {
-      await base44.functions.invoke('manageIntegration', { action: 'disconnect', key: def.key });
+      await disconnectIntegrationFn({ data: { provider: def.key } });
       toast({ title: `${def.name} disconnected` });
       load();
     } catch (e) { toast({ title: 'Disconnect failed', description: e.message, variant: 'destructive' }); }

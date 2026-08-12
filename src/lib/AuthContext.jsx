@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import { auth } from '@/lib/auth/client';
 import { supabase } from '@/integrations/supabase/client';
 import { getMyEntitlements } from '@/lib/platform/platform.functions';
 
@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkUserAuth = useCallback(async () => {
     try {
-      const me = await base44.auth.me();
+      const me = await auth.me();
       if (!me) {
         setUser(null);
         setEntitlements(null);
@@ -69,12 +69,12 @@ export const AuthProvider = ({ children }) => {
   }, [checkUserAuth]);
 
   const login = useCallback(async (email, password) => {
-    await base44.auth.loginViaEmailPassword(email, password);
+    await auth.loginViaEmailPassword(email, password);
     return checkUserAuth();
   }, [checkUserAuth]);
 
   const logout = useCallback(async () => {
-    await base44.auth.logout();
+    await auth.logout();
     setUser(null);
     setEntitlements(null);
     setIsAuthenticated(false);

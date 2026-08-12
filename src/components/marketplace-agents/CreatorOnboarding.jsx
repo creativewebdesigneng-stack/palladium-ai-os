@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Rocket, Loader2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { saveCreatorProfile } from './api';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -13,7 +13,7 @@ export default function CreatorOnboarding({ existing, onCreated }) {
   const { toast } = useToast();
   const [form, setForm] = useState(
     existing
-      ? { name: existing.name || '', handle: existing.handle || '', bio: existing.bio || '', website: existing.website || '', avatar_url: existing.avatar_url || '' }
+      ? { name: existing.display_name || '', handle: existing.handle || '', bio: existing.bio || '', website: existing.website || '', avatar_url: existing.avatar_url || '' }
       : { name: user?.full_name || '', handle: '', bio: '', website: '', avatar_url: '' }
   );
   const [busy, setBusy] = useState(false);
@@ -24,13 +24,14 @@ export default function CreatorOnboarding({ existing, onCreated }) {
     if (!form.name.trim() || busy) return;
     setBusy(true);
     try {
-      if (existing) {
-        await base44.entities.Creator.update(existing.id, form);
-        toast({ title: 'Profile updated' });
-      } else {
-        await base44.entities.Creator.create({ user_id: user.id, ...form, verified: false });
-        toast({ title: 'Welcome to PalladiumAI Creators' });
-      }
+      await saveCreatorProfile({
+        display_name: form.name,
+        handle: form.handle || undefined,
+        bio: form.bio || undefined,
+        website: form.website || '',
+        avatar_url: form.avatar_url || '',
+      });
+      toast({ title: existing ? 'Profile updated' : 'Welcome to PalladiumAI Creators' });
       onCreated?.();
     } catch (e) {
       toast({ title: 'Failed', description: e.message, variant: 'destructive' });

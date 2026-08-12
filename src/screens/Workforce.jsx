@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Plus, UserPlus, ClipboardPlus, Filter, Bot, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -16,105 +16,101 @@ import { mapAgentToWf } from '@/components/workforce/normalize';
 import NeuralNetworkBackground from '@/components/visual/NeuralNetworkBackground';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
-import { base44 } from '@/api/base44Client';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { listAgents } from '@/lib/agents/agents.functions';
+import { getUsageSummary } from '@/lib/platform/platform.functions';
+import {
+  listDepartments,
+  saveDepartment,
+  listAgentMessages,
+} from '@/lib/workforce/departments.functions';
 
-const EMPTY_COMMS = { from_agent_id: '', to_agent_id: '', message_type: 'handoff', content: '', create_task: true };
+// Derives the command-centre metrics from the caller's own agents and task
+// ledger. Nothing is mocked: every number comes from RLS-scoped rows.
+function buildOverview(agents, tasks, usage) {
+  const count = (s) => tasks.filter((t) => t.status === s).length;
+  const running = count('running');
+  const pending = count('pending') + count('queued');
+  const completed = count('succeeded') + count('completed');
+  const failed = count('failed');
+  return {
+    totalAgents: agents.length,
+    activeAgents: agents.filter((a) => a.status === 'active').length,
+    runningTasks: running,
+    pendingTasks: pending,
+    completedTasks: completed,
+    failedTasks: failed,
+    totalTasks: tasks.length,
+    performance: completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0,
+    usage: usage || {},
+  };
+}
 
 export default function Workforce() {
   const { gate } = useUpgrade();
   const { toast } = useToast();
+  const { session, activeOrgId } = useWorkspace();
   const [statusFilter, setStatusFilter] = useState('All');
   const [active, setActive] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState(null);
   const [agents, setAgents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [teams, setTeams] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [noOrg, setNoOrg] = useState(false);
+  const [usage, setUsage] = useState(null);
 
   const [deptOpen, setDeptOpen] = useState(false);
   const [editTeam, setEditTeam] = useState(null);
-  const [sending, setSending] = useState(false);
-  const [comms, setComms] = useState(EMPTY_COMMS);
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      setOverview(await base44.functions.invoke('getWorkforceOverview', {}));
-    } catch {
-      setOverview(null);
-    }
-    try {
-      const [ag, tk, tm, msg] = await Promise.all([
-        base44.entities.Agent.filter({}, '-created_date', 200),
-        base44.entities.Task.filter({}, '-created_date', 500),
-        base44.entities.AgentTeam.filter({}, '-created_date', 200),
-        base44.entities.AgentMessage.filter({}, '-created_date', 100),
+      const [ag, dept, msg] = await Promise.all([
+        listAgents({ data: { limit: 200, withTasks: true } }),
+        listDepartments({ data: { orgId: activeOrgId ?? null } }),
+        listAgentMessages({ data: { limit: 100 } }),
       ]);
-      setAgents(ag || []);
-      setTasks(tk || []);
-      setTeams(tm || []);
-      setMessages(msg || []);
-      setNoOrg(false);
-    } catch {
-      setNoOrg(true);
+      setAgents(ag.agents || []);
+      setTasks(ag.tasks || []);
+      setTeams(dept.departments || []);
+      setMessages(msg.messages || []);
+    } catch (e) {
+      toast({ title: 'Could not load your workforce', description: e.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+    try {
+      const summary = await getUsageSummary({ data: { orgId: activeOrgId ?? null } });
+      setUsage(summary?.usage ?? summary ?? null);
+    } catch {
+      setUsage(null);
+    }
+  }, [activeOrgId, toast]);
 
   useEffect(() => {
-    (async () => {
-      // Ensure a workforce record exists for the org; ignore "no organisation"
-      // so the page still renders its empty state instead of erroring.
-      try { await base44.functions.invoke('createWorkforce', {}); } catch { /* no org yet */ }
-      await loadAll();
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (session !== 'yes') return;
+    loadAll();
+  }, [session, loadAll]);
 
-  const reloadOverview = async () => {
-    try { setOverview(await base44.functions.invoke('getWorkforceOverview', {})); } catch { /* ignore */ }
-  };
-
-  const wfAgents = agents.map((a) => mapAgentToWf(a, tasks));
+  const overview = useMemo(() => buildOverview(agents, tasks, usage), [agents, tasks, usage]);
+  const wfAgents = useMemo(() => agents.map((a) => mapAgentToWf(a, tasks)), [agents, tasks]);
   const filtered = statusFilter === 'All' ? wfAgents : wfAgents.filter((a) => a.status === statusFilter);
 
   const handleSaveDepartment = async (form) => {
     if (!gate('createAgents')) return;
+    if (!activeOrgId) {
+      toast({ title: 'Create an organisation first', description: 'Departments are scoped to an organisation.', variant: 'destructive' });
+      return;
+    }
     try {
-      await base44.functions.invoke('createAgentTeam', { ...form, team_id: editTeam ? editTeam.id : '' });
+      await saveDepartment({ data: { ...form, orgId: activeOrgId, id: editTeam ? editTeam.id : undefined } });
       toast({ title: editTeam ? 'Department updated' : 'Department created', description: form.name });
       setDeptOpen(false);
       setEditTeam(null);
-      setTeams(await base44.entities.AgentTeam.filter({}, '-created_date', 200));
-      await reloadOverview();
+      await loadAll();
     } catch (e) {
       toast({ title: 'Could not save department', description: e.message, variant: 'destructive' });
-    }
-  };
-
-  const handleSend = async () => {
-    if (!gate('runTasks')) return;
-    setSending(true);
-    try {
-      await base44.functions.invoke('sendAgentMessage', comms);
-      toast({
-        title: 'Message sent',
-        description: comms.message_type === 'handoff' && comms.create_task !== false
-          ? 'Recipient received a pending task.'
-          : 'Delivered to the recipient.',
-      });
-      setComms(EMPTY_COMMS);
-      setMessages(await base44.entities.AgentMessage.filter({}, '-created_date', 100));
-      setTasks(await base44.entities.Task.filter({}, '-created_date', 500));
-      await reloadOverview();
-    } catch (e) {
-      toast({ title: 'Could not send', description: e.message, variant: 'destructive' });
-    } finally {
-      setSending(false);
     }
   };
 
@@ -125,21 +121,6 @@ export default function Workforce() {
       <button onClick={() => gate('createAgents')} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />Create Agent</button>
     </div>
   );
-
-  if (noOrg) {
-    return (
-      <>
-        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-40"><NeuralNetworkBackground intensity="low" /></div>
-        <PageHeader eyebrow="AI" title="AI Workforce" description="Manage your digital workforce." />
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-16 text-center">
-          <Building2 className="mx-auto h-9 w-9 text-zinc-600" />
-          <p className="mt-3 text-sm font-medium text-white">Create an organisation to start building your workforce</p>
-          <p className="mt-1 text-xs text-zinc-500">AI employees, departments and agent handoffs are all scoped to your organisation.</p>
-          <Link to="/team" className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white">Set up your organisation</Link>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -174,9 +155,18 @@ export default function Workforce() {
 
       <WorkforceOrchestrator />
 
-      <DepartmentGrid teams={teams} agents={agents} onCreate={() => { setEditTeam(null); setDeptOpen(true); }} onEdit={(t) => { setEditTeam(t); setDeptOpen(true); }} />
+      {activeOrgId ? (
+        <DepartmentGrid teams={teams} agents={agents} onCreate={() => { setEditTeam(null); setDeptOpen(true); }} onEdit={(t) => { setEditTeam(t); setDeptOpen(true); }} />
+      ) : (
+        <div className="mb-8 rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-12 text-center">
+          <Building2 className="mx-auto h-8 w-8 text-zinc-600" />
+          <p className="mt-3 text-sm font-medium text-white">Departments need an organisation</p>
+          <p className="mt-1 text-xs text-zinc-500">Set one up to group your agents into departments with shared goals and permissions.</p>
+          <Link to="/team" className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white">Set up your organisation</Link>
+        </div>
+      )}
 
-      <AgentCommsFeed messages={messages} agents={agents} onSend={handleSend} sending={sending} form={comms} setForm={setComms} />
+      <AgentCommsFeed messages={messages} agents={agents} />
 
       <AnimatePresence>
         {active && <AgentProfileDrawer agent={active} onClose={() => setActive(null)} />}

@@ -6,7 +6,7 @@ import AgentCard from '@/components/agents/AgentCard';
 import { CATEGORIES, STATUS_STYLE, AVATAR_COLORS } from '@/components/agents/agentsData';
 import AnimatedBrain from '@/components/visual/AnimatedBrain';
 import { useUpgrade } from '@/lib/upgradeContext';
-import { base44 } from '@/api/base44Client';
+import { listAgents, setAgentStatus, duplicateAgent, deleteAgent } from '@/lib/agents/agents.functions';
 
 const STATUS_MAP = { active: 'Running', paused: 'Paused', draft: 'Idle', archived: 'Stopped' };
 const TOOL_NAMES = {
@@ -31,8 +31,8 @@ function relTime(iso) {
   return `${Math.round(h / 24)}d ago`;
 }
 function mapAgent(r) {
-  const cfg = r.config || {};
-  const tools = Array.isArray(r.tools) ? r.tools : [];
+  const cfg = r.preferences || {};
+  const tools = Array.isArray(r.allowed_tools) ? r.allowed_tools : [];
   return {
     id: r.id,
     name: r.name || 'Untitled Agent',
@@ -40,16 +40,16 @@ function mapAgent(r) {
     grad: cfg.grad || hashGrad(r.id || r.name || ''),
     desc: r.description || 'No description set.',
     status: STATUS_MAP[r.status] || 'Idle',
-    model: r.model || 'GPT-5',
+    model: r.model || 'gpt-4o-mini',
     modelGrad: 'from-emerald-400 to-teal-500',
     caps: tools.map((t) => TOOL_NAMES[t] || t),
     memory: cfg.memory !== false,
-    lastRun: relTime(r.updated_date || r.created_date),
-    category: cfg.category || r.role || 'Operations',
+    lastRun: relTime(r.last_run_at || r.updated_at || r.created_at),
+    category: cfg.category || r.category || 'Operations',
     featured: !!cfg.featured,
     recent: !!cfg.recent,
     score: typeof cfg.score === 'number' ? cfg.score : 0,
-    dept: r.role || 'Operations',
+    dept: r.category || 'Operations',
     task: cfg.task || '',
     _raw: r,
   };
@@ -78,7 +78,7 @@ export default function Agents() {
   useEffect(() => {
     (async () => {
       try {
-        const recs = await base44.entities.Agent.list('-created_date', 50);
+        const { agents: recs } = await listAgents({ data: { limit: 50, withTasks: false } });
         setAgents((recs || []).map(mapAgent));
       } catch (e) {
         // keep empty list on error
@@ -95,29 +95,18 @@ export default function Agents() {
   const avgScore = agents.length ? Math.round(agents.reduce((s, a) => s + (a.score || 0), 0) / agents.length) : 0;
 
   const remove = async (a) => {
-    try { await base44.entities.Agent.delete(a.id); } catch (e) {}
+    try { await deleteAgent({ data: { id: a.id } }); } catch { /* row already gone */ }
     setAgents((list) => list.filter((x) => x.id !== a.id));
   };
   const run = async (a) => {
-    try { await base44.entities.Agent.update(a.id, { status: 'active' }); } catch (e) {}
+    try { await setAgentStatus({ data: { id: a.id, status: 'active' } }); } catch { /* keep optimistic state */ }
     setAgents((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'Running', lastRun: 'now' } : x)));
   };
   const duplicate = async (a) => {
     try {
-      const me = await base44.auth.me();
-      const org = (me && (me.data?.organisation_id || me.organisation_id)) || '';
-      const copy = await base44.entities.Agent.create({
-        organisation_id: org,
-        name: `${a.name} Copy`,
-        description: a.desc,
-        role: a.dept,
-        model: a.model,
-        status: 'draft',
-        tools: a._raw?.tools || [],
-        config: a._raw?.config || {},
-      });
-      setAgents((list) => [mapAgent(copy), ...list]);
-    } catch (e) {}
+      const copy = await duplicateAgent({ data: { id: a.id } });
+      if (copy) setAgents((list) => [mapAgent(copy), ...list]);
+    } catch { /* surfaced by the empty state */ }
   };
   const edit = (a) => navigate('/agents/new');
 

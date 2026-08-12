@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
 import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { priceIdFor } from '@/lib/stripe';
 import PalladiumCheckout from '@/components/payments/PalladiumCheckout';

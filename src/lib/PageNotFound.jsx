@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Home, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { auth } from '@/lib/auth/client';
 
 export default function PageNotFound() {
   const location = useLocation();
@@ -13,7 +13,7 @@ export default function PageNotFound() {
     queryKey: ['user'],
     queryFn: async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await auth.me();
         return { user, isAuthenticated: true };
       } catch (error) {
         return { user: null, isAuthenticated: false };

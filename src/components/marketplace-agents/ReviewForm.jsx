@@ -25,8 +25,11 @@ export default function ReviewForm({ agent }) {
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      const res = await rateMarketplaceAgent({ item_id: agent.id, rating, text });
-      setReviews((res.item && res.item.reviews) || []);
+      await rateMarketplaceAgent({ item_id: agent.id, rating, comment: text });
+      setReviews((list) => [
+        { user_name: user?.full_name || 'You', rating, text, date: new Date().toISOString() },
+        ...list.filter((r) => r.user_name !== (user?.full_name || 'You')),
+      ]);
       setText('');
       setRating(5);
       toast({ title: 'Review posted' });

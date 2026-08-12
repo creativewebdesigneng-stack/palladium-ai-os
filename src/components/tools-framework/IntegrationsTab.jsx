@@ -4,7 +4,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import { INTEGRATIONS, PLAN_BADGE } from './toolsData';
 
 export default function IntegrationsTab({ connections, loading, isAdmin, onConnect, onDisconnect }) {
-  const statusOf = (key) => connections.find((c) => c.key === key);
+  const statusOf = (key) => connections.find((c) => c.provider === key);
   return (
     <>
       <PageHeader eyebrow="Framework" title="Integrations" description="Connect the external systems your agents and tools reach into."
