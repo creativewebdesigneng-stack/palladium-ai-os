@@ -653,6 +653,14 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
           estimated_cost: draft.total,
           currency: draft.currency,
         });
+        await notify({
+          userId,
+          type: "purchase.approval_required",
+          title: `Approval needed to buy ${draft.product}`,
+          body: `Estimated total ${draft.currency} ${draft.total}. No money moves until you approve.`,
+          link: "/mission-control",
+          metadata: { task_id: task.id, purchase_request_id: approvalRes.data?.id ?? null },
+        });
         await log(sb, userId, "purchase_prepared", {
           agent_id: agent?.id ?? null,
           target_type: "purchase_request",
@@ -685,6 +693,14 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         action_type: decision.category === "travel" ? "booking" : "external_action",
         estimated_cost: budget,
         currency,
+      });
+      await notify({
+        userId,
+        type: "approval.required",
+        title: `Approval needed: ${decision.title}`,
+        body: decision.reason,
+        link: "/mission-control",
+        metadata: { task_id: task.id, category: decision.category },
       });
       await sb
         .from("personal_tasks")
