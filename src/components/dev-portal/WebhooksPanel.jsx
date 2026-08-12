@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Webhook, Plus, X, Copy, Loader2, Send } from 'lucide-react';
-import { listWebhooks, createWebhook, updateWebhook, deleteWebhook, testWebhook } from './api';
+import { Webhook, Plus, X, Copy, Loader2, Send, RotateCw, ShieldOff } from 'lucide-react';
+import { listWebhooks, createWebhook, updateWebhook, deleteWebhook, testWebhook, rotateWebhookSecret, revokeWebhookSecret } from './api';
 import { WEBHOOK_EVENTS } from './devPortalData';
 
 export default function WebhooksPanel({ onToast }) {
   const [hooks, setHooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ url: '', events: ['agent.run.completed'], description: '' });
+  const [form, setForm] = useState({ url: '', events: ['agent.completed'], description: '' });
   const [newSecret, setNewSecret] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +28,7 @@ export default function WebhooksPanel({ onToast }) {
       const data = await createWebhook(form.url.trim(), form.events, form.description);
       setNewSecret(data);
       onToast?.('Webhook created');
-      setForm({ url: '', events: ['agent.run.completed'], description: '' });
+      setForm({ url: '', events: ['agent.completed'], description: '' });
       setCreating(false);
       load();
     } catch (e) { onToast?.(e.message || 'Failed to create webhook'); }
@@ -40,6 +40,16 @@ export default function WebhooksPanel({ onToast }) {
     catch (e) { onToast?.(e.message); }
   };
   const remove = async (id) => { try { await deleteWebhook(id); onToast?.('Webhook deleted'); load(); } catch (e) { onToast?.(e.message); } };
+  const rotateSecret = async (id) => {
+    try { setBusy(true); const d = await rotateWebhookSecret(id); setNewSecret(d); onToast?.('Secret rotated — copy the new value'); load(); }
+    catch (e) { onToast?.(e.message); }
+    finally { setBusy(false); }
+  };
+  const revokeSecret = async (id) => {
+    try { setBusy(true); await revokeWebhookSecret(id); onToast?.('Secret revoked — deliveries paused'); load(); }
+    catch (e) { onToast?.(e.message); }
+    finally { setBusy(false); }
+  };
   const test = async (id) => { try { const d = await testWebhook(id); onToast?.(`Test sent — status ${d.last_response_status || 'n/a'}`); load(); } catch (e) { onToast?.(e.message); } };
 
   return (
@@ -49,7 +59,7 @@ export default function WebhooksPanel({ onToast }) {
         <h2 className="text-lg font-semibold text-white">Webhooks</h2>
         <button onClick={() => setCreating((c) => !c)} className="ml-auto flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-xs font-medium text-white"><Plus className="h-3.5 w-3.5" />Create webhook</button>
       </div>
-      <p className="text-xs text-zinc-500">Receive real-time events for agent runs, tasks, workflows and deployments. Each delivery is HMAC-signed with your secret.</p>
+      <p className="text-xs text-zinc-500">Receive real-time events for agent runs, tasks, workflows, approvals and purchases. Every delivery is HMAC-SHA256 signed; revoking a secret pauses the endpoint because unsigned payloads are never sent.</p>
 
       {newSecret && (
         <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
@@ -105,13 +115,15 @@ export default function WebhooksPanel({ onToast }) {
                 {(h.events || []).map((ev) => <span key={ev} className="rounded-full bg-white/5 px-2 py-px text-[9px] font-mono text-zinc-400">{ev}</span>)}
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
-                <div><p className="text-zinc-500">Secret</p><p className="font-mono text-zinc-300">{h.secret}</p></div>
+                <div><p className="text-zinc-500">Secret</p><p className="font-mono text-zinc-300">{h.secret || 'revoked'}</p></div>
                 <div><p className="text-zinc-500">Deliveries</p><p className="font-mono text-zinc-300">{h.deliveries_count || 0}</p></div>
                 <div><p className="text-zinc-500">Last status</p><p className="font-mono text-zinc-300">{h.last_response_status || '—'}</p></div>
               </div>
               <div className="mt-2 flex gap-1.5">
                 <button onClick={() => toggle(h)} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5">{h.status === 'active' ? 'Pause' : 'Resume'}</button>
                 <button onClick={() => test(h.id)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5"><Send className="h-3 w-3" />Send test</button>
+                <button onClick={() => rotateSecret(h.id)} disabled={busy} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5 disabled:opacity-40"><RotateCw className="h-3 w-3" />Rotate secret</button>
+                <button onClick={() => revokeSecret(h.id)} disabled={busy || !h.secret_set} className="flex items-center gap-1 rounded-lg border border-rose-400/20 px-2 py-1 text-[10px] text-rose-300 hover:bg-rose-500/15 disabled:opacity-40"><ShieldOff className="h-3 w-3" />Revoke secret</button>
               </div>
             </div>
           ))}
