@@ -12,6 +12,13 @@
  * own Supabase client, so a user can never touch another organisation's memory.
  */
 import { embedOne, embedTexts, EmbeddingError } from "./embeddings.server";
+import {
+  capturePermitted,
+  expiryFor,
+  loadMemoryPreferences,
+  sanitizeForCapture,
+  type MemoryPreferences,
+} from "./preferences.server";
 import { getVectorStore, resolveVectorProvider, type VectorFilter } from "./vector-store.server";
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
@@ -37,6 +44,12 @@ export type StoreMemoryInput = {
   metadata?: Record<string, unknown>;
   /** Short-term memory decays; defaults to 12 hours when not given. */
   ttl_minutes?: number | null;
+  /**
+   * True when an agent (not the user) decided to remember this. Automatic
+   * writes are subject to the user's memory preferences and sensitive-content
+   * redaction; explicit user-authored memories are not.
+   */
+  automatic?: boolean;
 };
 
 const SHORT_TERM_TTL_MINUTES = 12 * 60;
@@ -65,13 +78,38 @@ function assertScope(input: StoreMemoryInput) {
 
 /* ------------------------------------------------------------------ storeMemory */
 
-export async function storeMemory(args: { sb: Sb; userId: string; input: StoreMemoryInput }) {
-  const content = clean(args.input.content, 20_000);
+export async function storeMemory(args: {
+  sb: Sb;
+  userId: string;
+  input: StoreMemoryInput;
+  prefs?: MemoryPreferences;
+}) {
+  let content = clean(args.input.content, 20_000);
   if (!content) throw new MemoryError("Memory content cannot be empty.");
   const scope = assertScope(args.input);
   const memoryType = args.input.memory_type ?? "long_term";
-  const ttl =
-    args.input.ttl_minutes ?? (memoryType === "short_term" ? SHORT_TERM_TTL_MINUTES : null);
+
+  // Automatic capture obeys the user's privacy choices; anything they typed
+  // themselves is stored verbatim.
+  let prefs = args.prefs ?? null;
+  let redacted: string[] = [];
+  if (args.input.automatic) {
+    prefs = prefs ?? (await loadMemoryPreferences(args.sb, args.userId));
+    const permitted = capturePermitted(memoryType, prefs);
+    if (!permitted.ok) return null;
+    const sanitised = sanitizeForCapture(content, prefs);
+    if (!sanitised.content) return null;
+    content = sanitised.content;
+    redacted = sanitised.redacted;
+  }
+
+  const expiresAt = prefs
+    ? expiryFor(memoryType, prefs, args.input.ttl_minutes ?? null)
+    : args.input.ttl_minutes
+      ? new Date(Date.now() + args.input.ttl_minutes * 60_000).toISOString()
+      : memoryType === "short_term"
+        ? new Date(Date.now() + SHORT_TERM_TTL_MINUTES * 60_000).toISOString()
+        : null;
 
   const { data, error } = await args.sb
     .from("agent_memories")
@@ -91,10 +129,12 @@ export async function storeMemory(args: { sb: Sb; userId: string; input: StoreMe
       importance: args.input.importance ?? "medium",
       pinned: Boolean(args.input.pinned),
       file_url: clean(args.input.file_url, 2000),
-      metadata: args.input.metadata ?? {},
+      metadata: redacted.length
+        ? { ...(args.input.metadata ?? {}), redacted }
+        : (args.input.metadata ?? {}),
       vector_provider: resolveVectorProvider(),
       vector_status: "pending",
-      expires_at: ttl ? new Date(Date.now() + ttl * 60_000).toISOString() : null,
+      expires_at: expiresAt,
     })
     .select("*")
     .maybeSingle();
