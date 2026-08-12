@@ -88,6 +88,10 @@ export default function MissionControl() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_tasks' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_tasks' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_runs' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_requests' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'usage_records' }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

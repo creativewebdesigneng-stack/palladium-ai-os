@@ -108,7 +108,7 @@ export default function Notifications() {
   const overview = useMemo(() => ([
     { label: 'Unread', value: items.filter((n) => !n.read).length, detail: 'across all categories', grad: 'from-violet-500 to-indigo-500', icon: 'Bell' },
     { label: 'Important', value: items.filter((n) => n.tags.includes('important')).length, detail: 'needs attention', grad: 'from-rose-500 to-red-500', icon: 'Star' },
-    { label: 'Mentions', value: items.filter((n) => n.tags.includes('mentions')).length, detail: '@you', grad: 'from-emerald-500 to-teal-500', icon: 'AtSign' },
+    { label: 'Approvals', value: items.filter((n) => n.category === 'security').length, detail: 'awaiting you', grad: 'from-emerald-500 to-teal-500', icon: 'AtSign' },
     { label: 'Failures', value: items.filter((n) => n.tags.includes('failures')).length, detail: 'workflows + agents', grad: 'from-amber-500 to-orange-500', icon: 'XCircle' },
   ]), [items]);
 
