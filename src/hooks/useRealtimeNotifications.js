@@ -69,7 +69,6 @@ export default function useRealtimeNotifications() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   useEffect(() => {
@@ -130,7 +129,6 @@ export default function useRealtimeNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, prefs?.browser_push, prefs?.browser_push_details]);
 
   return { unread, refreshUnread };
