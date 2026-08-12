@@ -1,6 +1,6 @@
 # PalladiumAI — Production Readiness
 
-Last audited: 2026-08-10
+Last audited: 2026-08-12
 
 This document records the outcome of the full security and production audit.
 The threat model assumed throughout: **the attacker fully controls the browser
