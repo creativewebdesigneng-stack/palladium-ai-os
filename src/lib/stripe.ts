@@ -26,17 +26,5 @@ export function getStripeEnvironment(): StripeEnv {
   return paymentsEnvironment();
 }
 
-// Plan code -> price ids (human-readable lookup keys created in the payments catalog).
-export const PLAN_PRICES: Record<string, { monthly: string; yearly: string }> = {
-  pro: { monthly: "pro_monthly", yearly: "pro_yearly" },
-  business: { monthly: "business_monthly", yearly: "business_yearly" },
-  enterprise: { monthly: "enterprise_monthly", yearly: "enterprise_yearly" },
-};
-
-export function priceIdFor(
-  planCode: string,
-  cycle: "monthly" | "yearly" = "monthly",
-): string | null {
-  const entry = PLAN_PRICES[planCode?.toLowerCase?.()];
-  return entry ? entry[cycle] : null;
-}
+// Prices are resolved server-side from internal plan codes
+// (see src/lib/billing/catalog.ts). The client never handles Stripe price ids.
