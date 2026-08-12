@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Upload, Loader2, FileText } from 'lucide-react';
 import { MEMORY_SCOPES, CATEGORIES } from './memoryData';
+import { READABLE_HINT } from '@/lib/memory/documentText';
 
 const CATS = CATEGORIES.knowledge;
 const EMPTY = { category: 'document', scope: 'shared', agent_id: '', title: '', content: '', importance: 'high', file: null };
@@ -11,8 +12,10 @@ export default function UploadKnowledgeModal({ open, onClose, onSubmit, agents, 
   if (!open) return null;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const canSubmit = Boolean(form.file) || form.content.trim().length > 20;
+
   const submit = () => {
-    if (!form.file) return;
+    if (!canSubmit) return;
     onSubmit(form);
   };
 
@@ -34,6 +37,7 @@ export default function UploadKnowledgeModal({ open, onClose, onSubmit, agents, 
               </span>
               <input type="file" className="hidden" onChange={(e) => set('file', e.target.files?.[0] || null)} />
             </label>
+            <p className="mt-1.5 text-[10px] text-zinc-500">{READABLE_HINT} Files are kept in private storage.</p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -67,7 +71,7 @@ export default function UploadKnowledgeModal({ open, onClose, onSubmit, agents, 
 
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} disabled={uploading} className="rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50">Cancel</button>
-          <button onClick={submit} disabled={uploading || !form.file} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-50">
+          <button onClick={submit} disabled={uploading || !canSubmit} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-50">
             {uploading ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading…</> : <><Upload className="h-4 w-4" />Upload</>}
           </button>
         </div>

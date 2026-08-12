@@ -272,3 +272,124 @@ export const pruneMemory = createServerFn({ method: "POST" })
       surface(error);
     }
   });
+
+/* ------------------------------------------------------------- privacy controls */
+
+/** The caller's memory preferences (safe defaults when never configured). */
+export const getMemoryPreferences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { loadMemoryPreferences } = await import("./preferences.server");
+    try {
+      return {
+        preferences: await loadMemoryPreferences(context.supabase as unknown as Sb, context.userId),
+      };
+    } catch (error) {
+      surface(error);
+    }
+  });
+
+export const updateMemoryPreferences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: Record<string, unknown>) => input ?? {})
+  .handler(async ({ data, context }) => {
+    const { saveMemoryPreferences } = await import("./preferences.server");
+    try {
+      return {
+        preferences: await saveMemoryPreferences(
+          context.supabase as unknown as Sb,
+          context.userId,
+          data as never,
+        ),
+      };
+    } catch (error) {
+      surface(error);
+    }
+  });
+
+/* --------------------------------------------------------------- document access */
+
+/**
+ * Short-lived signed URL for a private knowledge file. Documents live in a
+ * private bucket, so this is the only way to read one — and only the owner of
+ * the document row can mint a link.
+ */
+export const getDocumentUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { document_id: string }) => ({
+    document_id: String(input?.document_id ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb & { storage: any };
+    const { data: doc } = await sb
+      .from("memory_documents")
+      .select("id,user_id,storage_path,title")
+      .eq("id", data.document_id)
+      .maybeSingle();
+    if (!doc || doc.user_id !== context.userId)
+      surface(new MemoryError("Document not found, or you do not have access to it."));
+    if (!doc.storage_path)
+      surface(new MemoryError("This document was pasted as text, so there is no file to open."));
+
+    const { data: signed, error } = await sb.storage
+      .from("knowledge")
+      .createSignedUrl(doc.storage_path, 120);
+    if (error || !signed?.signedUrl) surface(new MemoryError("Could not open that document."));
+    return { url: signed.signedUrl, expiresInSeconds: 120, title: doc.title };
+  });
+
+/** Chunk preview for a document, so users can see exactly what was indexed. */
+export const getDocumentChunks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { document_id: string; limit?: number }) => ({
+    document_id: String(input?.document_id ?? ""),
+    limit: Math.min(Math.max(Number(input?.limit ?? 20), 1), 100),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: chunks, error } = await sb
+      .from("memory_chunks")
+      .select("id,chunk_index,content,token_estimate,embedding_model")
+      .eq("document_id", data.document_id)
+      .order("chunk_index", { ascending: true })
+      .limit(data.limit);
+    if (error) surface(new MemoryError(error.message));
+    return { chunks: chunks ?? [] };
+  });
+
+/* ------------------------------------------------------------------ bulk delete */
+
+/**
+ * Deletes many memories at once, or every memory of a layer. RLS keeps this
+ * scoped to the caller, and vectors are removed alongside each row.
+ */
+export const removeMemories = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { ids?: string[]; memory_type?: string; all?: boolean }) => ({
+    ids: Array.isArray(input?.ids) ? input.ids.map(String).slice(0, 500) : [],
+    memory_type: asString(input?.memory_type) || null,
+    all: Boolean(input?.all),
+  }))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let ids = data.ids;
+    if (!ids.length && (data.all || data.memory_type)) {
+      let query = sb.from("agent_memories").select("id").limit(1000);
+      if (data.memory_type && data.memory_type !== "all")
+        query = query.eq("memory_type", data.memory_type);
+      const { data: rows } = await query;
+      ids = (rows ?? []).map((r: { id: string }) => r.id);
+    }
+    if (!ids.length) return { deleted: 0 };
+
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        await deleteMemory({ sb, userId: context.userId, id });
+        deleted += 1;
+      } catch (error) {
+        console.error("[memory.api] bulk delete skipped", error);
+      }
+    }
+    return { deleted };
+  });

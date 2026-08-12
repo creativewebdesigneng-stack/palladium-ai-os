@@ -187,13 +187,14 @@ const REGISTRY: Record<string, ToolImpl> = {
       const value = str(input["value"]).slice(0, 4000);
       if (!key) return { error: "A key is required." };
       try {
-        await storeMemory({
+        const saved = await storeMemory({
           sb: ctx.sb as never,
           userId: ctx.userId,
           input: {
             content: value || key,
             title: key,
             memory_type: "long_term",
+            automatic: true,
             category: str(input["category"], "general"),
             scope: "private",
             source: "agent_runtime",
@@ -203,6 +204,12 @@ const REGISTRY: Record<string, ToolImpl> = {
             importance: "high",
           },
         });
+        if (!saved)
+          return {
+            saved: false,
+            reason:
+              "The operator's memory settings do not allow this to be remembered automatically.",
+          };
         return { saved: true, key };
       } catch {
         return { error: "Could not save that memory." };

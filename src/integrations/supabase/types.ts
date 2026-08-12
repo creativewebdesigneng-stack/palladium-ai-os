@@ -1121,6 +1121,48 @@ export type Database = {
           },
         ]
       }
+      memory_preferences: {
+        Row: {
+          auto_capture: boolean
+          capture_sensitive: boolean
+          created_at: string
+          document_memory_enabled: boolean
+          long_term_enabled: boolean
+          organisation_sharing_enabled: boolean
+          retention_days: number | null
+          short_term_enabled: boolean
+          short_term_ttl_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_capture?: boolean
+          capture_sensitive?: boolean
+          created_at?: string
+          document_memory_enabled?: boolean
+          long_term_enabled?: boolean
+          organisation_sharing_enabled?: boolean
+          retention_days?: number | null
+          short_term_enabled?: boolean
+          short_term_ttl_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_capture?: boolean
+          capture_sensitive?: boolean
+          created_at?: string
+          document_memory_enabled?: boolean
+          long_term_enabled?: boolean
+          organisation_sharing_enabled?: boolean
+          retention_days?: number | null
+          short_term_enabled?: boolean
+          short_term_ttl_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mission_audit_logs: {
         Row: {
           action: string
