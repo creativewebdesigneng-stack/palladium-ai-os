@@ -74,7 +74,7 @@ export default function Payment() {
               <>
                 <p className="text-sm font-medium text-white">Payment details</p>
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Secure checkout is handled by our payment provider — no card details touch PalladiumAI servers.</p>
-                {checkoutOpen && priceId ? (
+                {checkoutOpen && !isFreePlan ? (
                   <div className="mt-5">
                     <PalladiumCheckout
                       planCode={plan.id}
@@ -85,10 +85,10 @@ export default function Payment() {
                 ) : (
                   <button
                     onClick={() => setCheckoutOpen(true)}
-                    disabled={!priceId}
+                    disabled={isFreePlan}
                     className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
                   >
-                    <Lock className="h-4 w-4" /> {priceId ? `Pay £${price.toLocaleString()}${period}` : 'Plan unavailable'}
+                    <Lock className="h-4 w-4" /> {`Pay £${price.toLocaleString()}${period}`}
                   </button>
                 )}
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600"><ShieldCheck className="h-3.5 w-3.5" />Encrypted checkout · Cancel anytime{user?.email ? ` · ${user.email}` : ''}</p>
