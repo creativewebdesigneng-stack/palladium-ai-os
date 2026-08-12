@@ -25,18 +25,23 @@ async function resolvePlan(sb: Sb, userId: string) {
   return (data?.[0]?.plan_code as string) ?? "explorer";
 }
 
+const KEY_COLUMNS =
+  "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at,expires_at";
+
 function shapeKey(row: any) {
+  const expired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
   return {
     id: row.id,
     name: row.name,
     environment: row.environment ?? "live",
-    status: row.revoked_at ? "revoked" : "active",
+    status: row.revoked_at ? "revoked" : expired ? "expired" : "active",
     prefix: row.key_prefix,
     masked: maskKey(row.key_prefix ?? "pk_live", row.last_four ?? null),
     scopes: row.scopes ?? [],
     requests_count: Number(row.request_count ?? 0),
     created_date: row.created_at,
     last_used_date: row.last_used_at,
+    expires_at: row.expires_at ?? null,
   };
 }
 
