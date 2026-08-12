@@ -1,26 +1,36 @@
-import { useAuth } from '@/lib/AuthContext';
-import { getPlanKey, planDisplay } from '@/lib/permissions';
-import { SUBSCRIPTION_HISTORY } from './billingData';
+import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { listBillingEvents } from '@/lib/billing/billing.functions';
 
-// Lightweight subscription history panel for the billing Overview tab. Shows
-// the user's active plan plus prior events. Replace SUBSCRIPTION_HISTORY with
-// backend billing events when available.
 export default function SubscriptionHistory() {
-  const { user } = useAuth();
-  const display = planDisplay(getPlanKey(user));
-  const rows = [
-    { date: new Date().toISOString().slice(0, 10), event: `Active on ${display.name}${display.subtitle ? ` ${display.subtitle}` : ''} plan`, plan: display.name },
-    ...SUBSCRIPTION_HISTORY,
-  ];
+  const { session, activeOrgId } = useWorkspace();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (session !== 'yes') return;
+    let cancelled = false;
+    listBillingEvents({ data: { orgId: activeOrgId } })
+      .then((res) => { if (!cancelled) setRows(res.events.filter((e) => e.kind === 'subscription')); })
+      .catch((e) => { console.error('[billing]', e); if (!cancelled) setError('Could not load subscription history.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [session, activeOrgId]);
+
+  if (loading) return <div className="flex items-center gap-2 py-3 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…</div>;
+  if (error) return <p className="py-3 text-xs text-rose-300">{error}</p>;
+  if (rows.length === 0) return <p className="py-3 text-xs text-zinc-500">No subscription changes recorded yet.</p>;
+
   return (
     <div className="divide-y divide-white/5">
-      {rows.map((r, i) => (
-        <div key={i} className="flex items-center justify-between py-2.5 text-sm">
+      {rows.map((r) => (
+        <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
           <div>
-            <p className="text-zinc-200">{r.event}</p>
-            <p className="text-[11px] text-zinc-500">{r.date}</p>
+            <p className="text-zinc-200">{r.title}</p>
+            <p className="text-[11px] text-zinc-500">{new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
-          <span className="text-xs text-zinc-400">{r.plan}</span>
         </div>
       ))}
     </div>

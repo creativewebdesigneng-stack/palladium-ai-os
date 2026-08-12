@@ -1,6 +1,13 @@
 import { motion } from 'framer-motion';
 import { BadgeDollarSign, Headset, KeyRound, ShieldCheck, SlidersHorizontal, Server, FileSignature, Mail } from 'lucide-react';
-import { ENTERPRISE_FEATURES } from './billingData';
+const ENTERPRISE_FEATURES = [
+  { icon: 'Headset', title: 'Dedicated Support', desc: 'A named account team and 24/7 priority response.' },
+  { icon: 'KeyRound', title: 'SSO', desc: 'SAML / OIDC single sign-on with SCIM provisioning.' },
+  { icon: 'ShieldCheck', title: 'Advanced Security', desc: 'Penetration testing, audit exports and data residency.' },
+  { icon: 'SlidersHorizontal', title: 'Custom Limits', desc: 'Negotiated ceilings on agents, workflows and storage.' },
+  { icon: 'Server', title: 'Private Infrastructure', desc: 'Dedicated, isolated compute for your AI workloads.' },
+  { icon: 'FileSignature', title: 'SLA', desc: '99.99% uptime guarantee with contractual credits.' },
+];
 
 const ICONS = { BadgeDollarSign, Headset, KeyRound, ShieldCheck, SlidersHorizontal, Server, FileSignature };
 
