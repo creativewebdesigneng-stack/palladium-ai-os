@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Save, Play, Rocket, Send } from 'lucide-react';
+import { Save, Play, Rocket, Send, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ConfigLeft from '@/components/agent-builder/ConfigLeft';
 import LivePreview from '@/components/agent-builder/LivePreview';
 import VersionDeployment from '@/components/agent-builder/VersionDeployment';
 import AnimatedBrain from '@/components/visual/AnimatedBrain';
+import { useToast } from '@/components/ui/use-toast';
+import { createAgent } from '@/lib/agents/agents.functions';
 
 const DEFAULT_CONFIG = {
   name: 'Research Agent',
@@ -22,10 +24,36 @@ const DEFAULT_CONFIG = {
 };
 
 export default function AgentBuilder() {
+  const { toast } = useToast();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [deployment, setDeployment] = useState('Testing');
+  const [saving, setSaving] = useState(false);
 
   const update = (fn) => setConfig((c) => fn(c));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await createAgent({
+        data: {
+          name: config.name,
+          description: config.description,
+          category: config.role || 'custom',
+          model: config.model,
+          model_provider: config.provider,
+          instructions: [config.instructions, config.goals, config.rules].filter(Boolean).join('\n\n'),
+          allowed_tools: config.tools || [],
+          status: deployment === 'Published' ? 'active' : 'draft',
+        },
+      });
+      toast({ title: 'Agent saved', description: `${config.name} is ready in your workforce.` });
+    } catch (e) {
+      console.error('[agent-builder]', e);
+      toast({ title: 'Could not save this agent', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <>
@@ -33,10 +61,10 @@ export default function AgentBuilder() {
       <PageHeader eyebrow="Builder" title="Agent Builder" description="Design, test and deploy AI agents in a visual environment."
         action={
           <div className="flex flex-wrap gap-2">
-            <button className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"><Save className="h-4 w-4" />Save</button>
+            <button disabled={saving} onClick={handleSave} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>
             <button className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"><Play className="h-4 w-4" />Test</button>
             <button className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"><Send className="h-4 w-4" />Publish</button>
-            <button className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30 hover:opacity-90"><Rocket className="h-4 w-4" />Deploy</button>
+            <button disabled={saving} onClick={handleSave} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30 hover:opacity-90 disabled:opacity-50"><Rocket className="h-4 w-4" />Deploy</button>
           </div>
         } />
 

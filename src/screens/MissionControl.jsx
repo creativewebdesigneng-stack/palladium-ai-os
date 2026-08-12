@@ -17,6 +17,7 @@ import ShoppingBoard from '@/components/mission/ShoppingBoard';
 import TaskBoard from '@/components/mission/TaskBoard';
 import SignalsPanel from '@/components/mission/SignalsPanel';
 import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
+import { friendlyMessage } from '@/lib/errors';
 import {
   getMissionOverview, savePersonalAgent, deletePersonalAgent, submitPersonalTask,
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
@@ -63,7 +64,7 @@ export default function MissionControl() {
     return () => { alive = false; sub?.subscription?.unsubscribe(); };
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['mission-overview'],
     queryFn: () => overviewFn({ data: {} }),
     enabled: session === 'yes',
@@ -87,7 +88,10 @@ export default function MissionControl() {
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
-  const fail = (e) => toast({ title: 'Something went wrong', description: e?.message ?? 'Please try again.', variant: 'destructive' });
+  const fail = (e) => {
+    console.error('[mission-control]', e);
+    toast({ title: 'Something went wrong', description: friendlyMessage(e), variant: 'destructive' });
+  };
 
   const dispatch = useMutation({
     mutationFn: (vars) => submitTaskFn({ data: { request: vars.request, agentId: vars.agentId ?? null } }),
@@ -209,6 +213,16 @@ export default function MissionControl() {
           </div>
         }
       />
+
+      {session === 'yes' && error && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-rose-400/25 bg-rose-500/[.06] p-4">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-semibold text-rose-100"><ShieldAlert className="h-4 w-4" />Mission Control could not load</p>
+            <p className="mt-1 text-[11px] text-rose-200/80">{friendlyMessage(error)}</p>
+          </div>
+          <button onClick={() => refetch()} className="ml-auto rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-white/10">Try again</button>
+        </div>
+      )}
 
       {session === 'no' && (
         <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">

@@ -1,42 +1,23 @@
 import { useState, useMemo } from 'react';
 import { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2, Search } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { SaveBar } from '@/components/settings/shared';
-import ProfileSection, { initialProfile } from '@/components/settings/ProfileSection';
-import AccountSection, { initialAccount } from '@/components/settings/AccountSection';
-import AppearanceSection, { initialAppearance } from '@/components/settings/AppearanceSection';
-import AIPreferencesSection, { initialAIPreferences } from '@/components/settings/AIPreferencesSection';
-import NotificationsSection, { initialNotifications } from '@/components/settings/NotificationsSection';
-import PrivacySection, { initialPrivacy } from '@/components/settings/PrivacySection';
-import SecuritySection, { initialSecurity } from '@/components/settings/SecuritySection';
+import ProfileSection from '@/components/settings/ProfileSection';
+import AccountSection from '@/components/settings/AccountSection';
+import AppearanceSection from '@/components/settings/AppearanceSection';
+import AIPreferencesSection from '@/components/settings/AIPreferencesSection';
+import NotificationsSection from '@/components/settings/NotificationsSection';
+import PrivacySection from '@/components/settings/PrivacySection';
+import SecuritySection from '@/components/settings/SecuritySection';
 import ConnectedAccountsSection from '@/components/settings/ConnectedAccountsSection';
 import APIKeysSection from '@/components/settings/APIKeysSection';
-import DeveloperSection, { initialDeveloper } from '@/components/settings/DeveloperSection';
+import DeveloperSection from '@/components/settings/DeveloperSection';
 import { SECTIONS } from '@/components/settings/settingsData';
 
 const ICONS = { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2 };
 
-const INITIAL = {
-  profile: initialProfile,
-  account: initialAccount,
-  appearance: initialAppearance,
-  ai: initialAIPreferences,
-  notifications: initialNotifications,
-  privacy: initialPrivacy,
-  security: initialSecurity,
-  developer: initialDeveloper,
-};
-
 export default function Settings() {
   const [active, setActive] = useState('profile');
-  const [draft, setDraft] = useState(INITIAL);
   const [query, setQuery] = useState('');
-  const [saved, setSaved] = useState(true);
-
-  const update = (section, key, val) => {
-    setDraft((d) => ({ ...d, [section]: { ...d[section], [key]: val } }));
-    setSaved(false);
-  };
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -46,21 +27,19 @@ export default function Settings() {
 
   const renderSection = () => {
     switch (active) {
-      case 'profile': return <ProfileSection data={draft.profile} update={(k, v) => update('profile', k, v)} />;
-      case 'account': return <AccountSection data={draft.account} update={(k, v) => update('account', k, v)} />;
-      case 'appearance': return <AppearanceSection data={draft.appearance} update={(k, v) => update('appearance', k, v)} />;
-      case 'ai': return <AIPreferencesSection data={draft.ai} update={(k, v) => update('ai', k, v)} />;
-      case 'notifications': return <NotificationsSection data={draft.notifications} update={(k, v) => update('notifications', k, v)} />;
-      case 'privacy': return <PrivacySection data={draft.privacy} update={(k, v) => update('privacy', k, v)} />;
-      case 'security': return <SecuritySection data={draft.security} update={(k, v) => update('security', k, v)} />;
+      case 'profile': return <ProfileSection />;
+      case 'account': return <AccountSection />;
+      case 'appearance': return <AppearanceSection />;
+      case 'ai': return <AIPreferencesSection />;
+      case 'notifications': return <NotificationsSection />;
+      case 'privacy': return <PrivacySection />;
+      case 'security': return <SecuritySection />;
       case 'connected': return <ConnectedAccountsSection />;
       case 'apikeys': return <APIKeysSection />;
-      case 'developer': return <DeveloperSection data={draft.developer} update={(k, v) => update('developer', k, v)} />;
+      case 'developer': return <DeveloperSection />;
       default: return null;
     }
   };
-
-  const handleSave = () => { setSaved(true); };
 
   return (
     <>
@@ -91,10 +70,9 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Active section + save bar */}
+        {/* Active section */}
         <div className="min-w-0 space-y-4">
           {renderSection()}
-          <SaveBar onSave={handleSave} dirty={!saved} />
         </div>
       </div>
     </>
