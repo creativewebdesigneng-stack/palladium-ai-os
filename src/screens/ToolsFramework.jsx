@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Blocks, Globe, ScrollText, Plug } from 'lucide-react';
-import { listIntegrations, connectIntegration as connectIntegrationFn, disconnectIntegration as disconnectIntegrationFn } from '@/lib/integrations/integrations.functions';
+import { listIntegrations, startIntegrationOAuth, disconnectIntegration as disconnectIntegrationFn } from '@/lib/integrations/integrations.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -123,9 +123,8 @@ export default function ToolsFramework() {
 
   const connectIntegration = async (def) => {
     try {
-      await connectIntegrationFn({ data: { provider: def.key, name: def.name } });
-      toast({ title: `${def.name} connected`, description: 'Add API credentials in settings to enable live sync.' });
-      load();
+      const { authorizeUrl } = await startIntegrationOAuth({ data: { provider: def.key, origin: window.location.origin } });
+      window.location.href = authorizeUrl;
     } catch (e) { toast({ title: 'Connection failed', description: e.message, variant: 'destructive' }); }
   };
   const disconnectIntegration = async (def) => {

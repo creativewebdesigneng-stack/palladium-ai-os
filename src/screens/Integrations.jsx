@@ -15,6 +15,7 @@ import APIUsageCharts from '@/components/integrations/APIUsageCharts';
 import RecentActivity from '@/components/integrations/RecentActivity';
 import IntegrationsRightSidebar from '@/components/integrations/IntegrationsRightSidebar';
 import IntegrationsEmptyState from '@/components/integrations/IntegrationsEmptyState';
+import LiveConnections from '@/components/integrations/LiveConnections';
 import IntegrationDetailDrawer from '@/components/integrations/IntegrationDetailDrawer';
 import { AgentAccess, WorkflowAccess, PermissionsMatrix } from '@/components/integrations/AccessPanels';
 import {
@@ -102,6 +103,7 @@ export default function Integrations() {
           {/* OVERVIEW */}
           {activeTab === 'Overview' && (
             <>
+              <LiveConnections />
               <RecommendedIntegrations onOpen={setSelected} />
               <ConnectedIntegrations onOpen={setSelected} />
               <APIUsageCharts />
