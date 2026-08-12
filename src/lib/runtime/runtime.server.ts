@@ -16,6 +16,7 @@ import {
   storeMemory,
 } from "@/lib/memory/memory.server";
 import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
+import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
   assertWithinLimit,
   getEntitlements,
@@ -639,10 +640,27 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
       deps.run.taskId,
       awaitingApproval ? "waiting_for_approval" : "running",
     );
+    if (awaitingApproval) await notifyInputRequired(deps.userId, deps.run);
   }
   return { awaitingApproval };
 }
 
+
+/** Tells the operator a run has paused and is waiting on them. */
+async function notifyInputRequired(
+  userId: string,
+  run: Pick<PreparedRun, "taskId" | "agent" | "orgId">,
+) {
+  await notify({
+    userId,
+    orgId: run.orgId,
+    type: "agent.input_required",
+    title: `${run.agent.name} is waiting for you`,
+    body: "The run paused on an action that needs your approval before it can continue.",
+    link: "/mission-control",
+    metadata: { task_id: run.taskId, agent_id: run.agent.id },
+  });
+}
 
 /** Non-streaming execution: model turns + tool rounds until a final answer. */
 export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRun }) {
