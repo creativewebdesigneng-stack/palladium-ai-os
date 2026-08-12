@@ -199,6 +199,7 @@ export async function prepareRun(args: {
   const model = resolveModel(provider, agent.model);
   const messages = await buildContext(args.sb, agent, input);
 
+  const now = new Date().toISOString();
   const { data: task, error } = await args.sb
     .from("agent_tasks")
     .insert({
@@ -209,8 +210,9 @@ export async function prepareRun(args: {
       title: input.slice(0, 120),
       provider,
       model,
-      status: "running",
-      started_at: new Date().toISOString(),
+      status: "queued",
+      started_at: now,
+      heartbeat_at: now,
     })
     .select("*")
     .maybeSingle();
@@ -226,6 +228,9 @@ export async function prepareRun(args: {
     message: `${agent.name} started: ${input.slice(0, 120)}`,
     metadata: { task_id: task.id, provider, model },
   });
+
+  // queued -> running only once every gate has passed and the row exists.
+  await setRunState(args.sb, task.id as string, "running");
 
   return {
     agent,
@@ -246,10 +251,80 @@ async function admin() {
   return supabaseAdmin as unknown as Sb;
 }
 
-async function isCancelled(sb: Sb, taskId: string) {
-  const { data } = await sb.from("agent_tasks").select("status").eq("id", taskId).maybeSingle();
-  return data?.status === "cancelled";
+/**
+ * Canonical task states. `completed` is the spec name for a successful run;
+ * `succeeded` is the historical label still stored and read across the app, so
+ * both are treated as terminal success everywhere.
+ */
+export const TASK_STATES = [
+  "pending",
+  "queued",
+  "running",
+  "waiting_for_tool",
+  "waiting_for_approval",
+  "succeeded",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export type TaskState = (typeof TASK_STATES)[number];
+
+export const ACTIVE_TASK_STATES: TaskState[] = [
+  "pending",
+  "queued",
+  "running",
+  "waiting_for_tool",
+];
+
+export function isTerminalState(status: string): boolean {
+  return ["succeeded", "completed", "failed", "cancelled"].includes(status);
 }
+
+export function isSuccessState(status: string): boolean {
+  return status === "succeeded" || status === "completed";
+}
+
+/**
+ * Moves a live run between non-terminal states and refreshes its heartbeat, so
+ * the reaper can tell a working run from an abandoned one.
+ */
+export async function setRunState(
+  sb: Sb,
+  taskId: string,
+  status: Extract<TaskState, "running" | "waiting_for_tool" | "waiting_for_approval">,
+) {
+  try {
+    await sb
+      .from("agent_tasks")
+      .update({ status, heartbeat_at: new Date().toISOString() })
+      .eq("id", taskId);
+  } catch (error) {
+    console.error("[runtime] state update failed", status, error);
+  }
+}
+
+async function heartbeat(sb: Sb, taskId: string) {
+  try {
+    await sb
+      .from("agent_tasks")
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq("id", taskId);
+  } catch (error) {
+    console.error("[runtime] heartbeat failed", error);
+  }
+}
+
+/** Cancellation is authoritative from the database, never from the caller. */
+async function isCancelled(sb: Sb, taskId: string) {
+  const { data } = await sb
+    .from("agent_tasks")
+    .select("status,cancel_requested")
+    .eq("id", taskId)
+    .maybeSingle();
+  return data?.status === "cancelled" || data?.cancel_requested === true;
+}
+
 
 export async function completeRun(args: {
   sb: Sb;
