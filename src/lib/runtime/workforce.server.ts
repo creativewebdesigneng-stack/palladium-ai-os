@@ -22,6 +22,7 @@ import {
   recordUsage,
 } from "@/lib/platform/entitlements.server";
 import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
