@@ -76,6 +76,8 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       notifications,
       usage,
       agentRuns,
+      workforces,
+      workforceRuns,
     ] = await Promise.all([
       sb.from("personal_agents").select("*").order("created_at", { ascending: false }),
       sb.from("personal_tasks").select("*").order("created_at", { ascending: false }).limit(80),
@@ -93,38 +95,109 @@ export const getMissionOverview = createServerFn({ method: "POST" })
         .limit(500),
       sb
         .from("agent_tasks")
-        .select("status, tokens_in, tokens_out, cost_pence, created_at")
+        .select("id, title, status, provider, model, tokens_in, tokens_out, cost_pence, created_at")
         .order("created_at", { ascending: false })
         .limit(200),
+      sb.from("workforces").select("*").order("created_at", { ascending: false }).limit(40),
+      sb
+        .from("workflow_runs")
+        .select("id, workflow_id, workforce_id, status, input, output, started_at, completed_at")
+        .order("created_at", { ascending: false })
+        .limit(30),
     ]);
 
     const agentRows = agents.data ?? [];
     const taskRows = tasks.data ?? [];
     const approvalRows = approvals.data ?? [];
+    const activityRows = activities.data ?? [];
+    const shoppingRows = shoppingResults.data ?? [];
+    const workforceRows = workforces.data ?? [];
+    const workforceRunRows = workforceRuns.data ?? [];
 
     const pendingApprovals = approvalRows.filter((a: any) => a.status === "pending");
     const running = taskRows.filter((t: any) => t.status === "running" || t.status === "queued");
     const completed = taskRows.filter((t: any) => t.status === "completed");
     const upcoming = taskRows.filter((t: any) => t.status === "pending");
+    const personalAgents = agentRows.filter((a: any) => (a.scope ?? "personal") === "personal");
+    const professionalAgents = agentRows.filter((a: any) => a.scope === "professional");
 
     const counts = {
       tasks: taskRows.filter((t: any) => t.status !== "completed" && t.status !== "cancelled")
         .length,
       approvals: pendingApprovals.length,
-      shopping: (shoppingResults.data ?? []).length,
+      shopping: shoppingRows.length,
       running: running.length,
       agents: agentRows.filter((a: any) => a.status === "active").length,
     };
 
-    const briefingFallback = fallbackBriefing(counts);
-    const briefing = await aiBriefing(
-      `Data: ${counts.tasks} open tasks, ${counts.approvals} pending approvals, ${counts.shopping} shopping results found, ${counts.running} running agent tasks, ${counts.agents} active agents.`,
-      briefingFallback,
-    );
-
     const notificationRows = notifications.data ?? [];
     const usageRows = usage.data ?? [];
     const runRows = agentRuns.data ?? [];
+
+    // The briefing is grounded in real rows only. Anything absent is stated as
+    // "none" so the model has nothing to invent.
+    const line = (label: string, items: string[]) =>
+      `${label}: ${items.length ? items.join("; ") : "none"}`;
+    const when = (iso?: string | null) =>
+      iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "UTC" }) : "no date";
+
+    const briefingFacts = [
+      line(
+        "Open tasks",
+        upcoming
+          .slice(0, 6)
+          .map((t: any) => `${t.title ?? t.request} (${t.category}, due ${when(t.due_at)})`),
+      ),
+      line(
+        "Running now",
+        running.slice(0, 5).map((t: any) => `${t.title ?? t.request} (${t.status})`),
+      ),
+      line(
+        "Pending approvals",
+        pendingApprovals
+          .slice(0, 5)
+          .map(
+            (a: any) =>
+              `${a.title} (${a.action_type}, risk ${a.risk_level}${
+                a.estimated_cost ? `, ${a.currency} ${a.estimated_cost}` : ""
+              })`,
+          ),
+      ),
+      line(
+        "Upcoming calendar and reminders",
+        taskRows
+          .filter((t: any) => t.due_at && t.status !== "completed" && t.status !== "cancelled")
+          .slice(0, 6)
+          .map((t: any) => `${t.title ?? t.request} at ${when(t.due_at)}`),
+      ),
+      line(
+        "Shopping findings",
+        shoppingRows
+          .slice(0, 5)
+          .map(
+            (r: any) =>
+              `${r.product}${r.price ? ` at ${r.currency} ${r.price}` : ""}${r.seller ? ` from ${r.seller}` : ""}`,
+          ),
+      ),
+      line(
+        "Recent agent activity",
+        activityRows.slice(0, 6).map((a: any) => `${a.kind}: ${a.message}`),
+      ),
+      line(
+        "Unread notifications",
+        notificationRows.filter((n: any) => !n.read_at).slice(0, 5).map((n: any) => n.title),
+      ),
+      line(
+        "Workforces",
+        workforceRows
+          .slice(0, 5)
+          .map((w: any) => `${w.name} (${w.status}${w.department ? `, ${w.department}` : ""})`),
+      ),
+      `Counts: ${counts.agents} active agents, ${counts.tasks} open tasks, ${counts.approvals} pending approvals, ${counts.running} running tasks, ${completed.length} completed, ${taskRows.filter((t: any) => t.status === "failed").length} failed.`,
+    ].join("\n");
+
+    const briefingFallback = fallbackBriefing(counts);
+    const briefing = await aiBriefing(briefingFacts, briefingFallback);
 
     const usageByMetric: Record<string, number> = {};
     for (const r of usageRows as any[]) {
@@ -139,18 +212,25 @@ export const getMissionOverview = createServerFn({ method: "POST" })
     return {
       briefing,
       agents: agentRows,
+      personalAgents,
+      professionalAgents,
       tasks: taskRows,
       approvals: approvalRows,
-      activities: activities.data ?? [],
+      activities: activityRows,
       purchases: purchases.data ?? [],
       memories: memories.data ?? [],
-      shoppingResults: shoppingResults.data ?? [],
+      shoppingResults: shoppingRows,
       audit: audit.data ?? [],
       notifications: notificationRows,
+      workforces: workforceRows,
+      workforceRuns: workforceRunRows,
+      agentRuns: runRows,
       usage: {
         byMetric: usageByMetric,
         agentRuns: runRows.length,
-        succeededRuns: runRows.filter((r: any) => r.status === "succeeded").length,
+        succeededRuns: runRows.filter(
+          (r: any) => r.status === "succeeded" || r.status === "completed",
+        ).length,
         failedRuns: runRows.filter((r: any) => r.status === "failed").length,
         tokensIn,
         tokensOut,
@@ -167,9 +247,17 @@ export const getMissionOverview = createServerFn({ method: "POST" })
         professionalTasks: taskRows.filter((t: any) => t.scope === "professional").length,
         failedTasks: taskRows.filter((t: any) => t.status === "failed").length,
         unreadNotifications: notificationRows.filter((n: any) => !n.read_at).length,
+        personalAgents: personalAgents.length,
+        professionalAgents: professionalAgents.length,
+        workforces: workforceRows.length,
+        activeWorkforces: workforceRows.filter((w: any) => w.status === "active").length,
+        runningWorkforceRuns: workforceRunRows.filter(
+          (r: any) => r.status === "running" || r.status === "queued",
+        ).length,
       },
     };
   });
+
 
 /* -------------------------------------------------------------------- agents */
 

@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 
-import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2, Bell } from 'lucide-react';
+import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2, Bell, Briefcase } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
 import BriefingConsole from '@/components/mission/BriefingConsole';
 import MissionMetrics from '@/components/mission/MissionMetrics';
 import ActivityStream from '@/components/mission/ActivityStream';
+import ProfessionalPanel from '@/components/mission/ProfessionalPanel';
+
 import ApprovalCentre from '@/components/mission/ApprovalCentre';
 import PersonalAISection from '@/components/mission/PersonalAISection';
 import AgentBuilder from '@/components/mission/AgentBuilder';
@@ -27,7 +29,9 @@ import {
 const TABS = [
   ['overview', 'Overview', Gauge],
   ['personal', 'Personal AI', User],
+  ['professional', 'Professional AI', Briefcase],
   ['approvals', 'Approval centre', ShieldAlert],
+
   ['shopping', 'Shopping', ShoppingBag],
   ['tasks', 'Tasks', ListChecks],
   ['signals', 'Notifications & usage', Bell],
@@ -279,7 +283,8 @@ export default function MissionControl() {
 
         {tab === 'personal' && (
           <PersonalAISection
-            agents={agents}
+            agents={data?.personalAgents ?? agents}
+
             loading={isLoading && session !== 'no'}
             onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })}
             onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })}
@@ -288,6 +293,18 @@ export default function MissionControl() {
             onTemplate={openTemplate}
           />
         )}
+
+        {tab === 'professional' && (
+          <ProfessionalPanel
+            agents={data?.professionalAgents ?? []}
+            workforces={data?.workforces ?? []}
+            runs={data?.workforceRuns ?? []}
+            agentRuns={data?.agentRuns ?? []}
+            loading={isLoading && session !== 'no'}
+          />
+        )}
+
+
 
         {tab === 'approvals' && (
           <ApprovalCentre

@@ -199,10 +199,15 @@ export async function aiBriefing(context: string, fallback: string): Promise<str
           {
             role: "system",
             content:
-              "You write a two-sentence daily briefing for an AI operating system. British English, calm and factual. Never give medical or financial advice. Do not invent numbers beyond the data given.",
+              "You write a short daily briefing (3-5 sentences) for an AI operating system. " +
+              "British English, calm and factual. Use ONLY the facts supplied: never invent tasks, " +
+              "prices, dates, names or numbers, and say a section is clear when its facts say 'none'. " +
+              "Lead with anything awaiting approval, then what is running, then what is upcoming. " +
+              "Never give medical or financial advice.",
           },
-          { role: "user", content: context },
+          { role: "user", content: `Facts for today:\n${context}` },
         ],
+
       }),
     });
     if (!res.ok) return fallback;
