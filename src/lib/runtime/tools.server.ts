@@ -194,6 +194,7 @@ const REGISTRY: Record<string, ToolImpl> = {
             content: value || key,
             title: key,
             memory_type: "long_term",
+            automatic: true,
             category: str(input["category"], "general"),
             scope: "private",
             source: "agent_runtime",

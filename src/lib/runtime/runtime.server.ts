@@ -377,6 +377,7 @@ export async function completeRun(args: {
           task_id: run.taskId,
           org_id: run.orgId,
           metadata: { provider: run.provider, model: run.model },
+          automatic: true,
         },
       }).catch((error: unknown) =>
         console.error("[runtime] short-term memory write failed", error),
