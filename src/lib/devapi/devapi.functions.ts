@@ -67,13 +67,28 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
 /** Creates a key. The raw secret is returned once and never persisted. */
 export const createApiKeyFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { name: string; environment?: string; scopes?: string[] }) => {
-    const name = String(input?.name ?? "").trim();
-    if (!name) throw new Error("Give the key a name.");
-    const environment = input?.environment === "test" ? "test" : "live";
-    const scopes = (input?.scopes ?? []).filter((s) => SCOPES.has(s));
-    return { name: name.slice(0, 80), environment: environment as "live" | "test", scopes };
-  })
+  .inputValidator(
+    (input: {
+      name: string;
+      environment?: string;
+      scopes?: string[];
+      expires_in_days?: number | null;
+    }) => {
+      const name = String(input?.name ?? "").trim();
+      if (!name) throw new Error("Give the key a name.");
+      const environment = input?.environment === "test" ? "test" : "live";
+      const scopes = (input?.scopes ?? []).filter((s) => SCOPES.has(s));
+      const days = Number(input?.expires_in_days ?? 0);
+      const expiresInDays = Number.isFinite(days) && days > 0 ? Math.min(days, 730) : null;
+      return {
+        name: name.slice(0, 80),
+        environment: environment as "live" | "test",
+        scopes,
+        expiresInDays,
+      };
+    },
+  )
+
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const planCode = await resolvePlan(sb, context.userId);
