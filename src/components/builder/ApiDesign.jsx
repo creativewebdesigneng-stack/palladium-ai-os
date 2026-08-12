@@ -19,7 +19,8 @@ export default function ApiDesign() {
             </div>
             <div className="divide-y divide-white/5">
               {g.endpoints.map(([method, path]) => (
-                <div key={path} className="flex items-center gap-2 px-3 py-1.5">
+                <div key={`${method} ${path}`} className="flex items-center gap-2 px-3 py-1.5">
+
                   <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${METHOD_STYLE[method]}`}>{method}</span>
                   <span className="truncate font-mono text-[11px] text-zinc-300">{path}</span>
                 </div>
