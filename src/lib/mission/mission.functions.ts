@@ -8,6 +8,7 @@ import {
   routeRequest,
   runShoppingResearch,
 } from "./mission.server";
+import { assertWithinLimits } from "@/lib/shopping/limits.server";
 
 type Sb = { from: (t: string) => any; rpc?: unknown };
 
@@ -185,7 +186,10 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       ),
       line(
         "Unread notifications",
-        notificationRows.filter((n: any) => !n.read_at).slice(0, 5).map((n: any) => n.title),
+        notificationRows
+          .filter((n: any) => !n.read_at)
+          .slice(0, 5)
+          .map((n: any) => n.title),
       ),
       line(
         "Workforces",
@@ -257,7 +261,6 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       },
     };
   });
-
 
 /* -------------------------------------------------------------------- agents */
 
@@ -546,6 +549,41 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
           allowedTools,
         });
 
+        // An agent may not even prepare a purchase that breaches a spend limit.
+        try {
+          await assertWithinLimits(sb, userId, agent?.id ?? null, Number(draft.total));
+        } catch (error) {
+          const reason = (error as Error).message;
+          await sb
+            .from("personal_tasks")
+            .update({ status: "failed", result: { blocked: reason } })
+            .eq("id", task.id)
+            .eq("user_id", userId);
+          await sb
+            .from("shopping_tasks")
+            .update({ status: "failed", notes: reason })
+            .eq("id", shoppingTask.id)
+            .eq("user_id", userId);
+          await activity(sb, userId, `Purchase blocked by your spend limits: ${reason}`, "failed", {
+            agent_id: agent?.id ?? null,
+            task_id: task.id,
+          });
+          await log(sb, userId, "purchase_blocked_by_limit", {
+            agent_id: agent?.id ?? null,
+            target_type: "shopping_task",
+            target_id: shoppingTask.id,
+            status: "blocked",
+            metadata: { total: draft.total, reason },
+          });
+          return {
+            taskId: task.id,
+            decision,
+            shoppingTaskId: shoppingTask.id,
+            results,
+            blocked: reason,
+          };
+        }
+
         const approvalRes = await sb
           .from("approval_requests")
           .insert({
@@ -726,7 +764,28 @@ export const decideApproval = createServerFn({ method: "POST" })
     if (!approval) throw new Error("Approval request not found");
     if (approval.status !== "pending") throw new Error("This request has already been decided");
 
+    // Approving money movement re-checks the spend limits at decision time: the
+    // ceilings are authoritative here, not at the moment the agent prepared it.
+    if (data.decision === "approve" && approval.estimated_cost != null) {
+      try {
+        await assertWithinLimits(sb, userId, approval.agent_id, Number(approval.estimated_cost));
+      } catch (error) {
+        await log(sb, userId, "purchase_blocked_by_limit", {
+          agent_id: approval.agent_id,
+          target_type: "approval_request",
+          target_id: approval.id,
+          status: "blocked",
+          metadata: {
+            estimated_cost: approval.estimated_cost,
+            reason: (error as Error).message,
+          },
+        });
+        throw error;
+      }
+    }
+
     const status = data.decision === "approve" ? "approved" : "rejected";
+
     await sb
       .from("approval_requests")
       .update({
@@ -916,6 +975,20 @@ export const confirmPurchase = createServerFn({ method: "POST" })
       .maybeSingle();
     if (approvalRes.data?.status !== "approved")
       throw new Error("This purchase has not been approved by you yet");
+
+    // Final gate before the user is handed to the retailer's own checkout.
+    try {
+      await assertWithinLimits(sb, userId, approvalRes.data.agent_id, Number(purchase.total ?? 0));
+    } catch (error) {
+      await log(sb, userId, "checkout_blocked_by_limit", {
+        agent_id: approvalRes.data.agent_id,
+        target_type: "purchase_request",
+        target_id: purchase.id,
+        status: "blocked",
+        metadata: { total: purchase.total, reason: (error as Error).message },
+      });
+      throw error;
+    }
 
     await sb
       .from("purchase_requests")

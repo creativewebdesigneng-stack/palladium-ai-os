@@ -1618,6 +1618,81 @@ export type Database = {
         }
         Relationships: []
       }
+      product_watches: {
+        Row: {
+          agent_id: string | null
+          best_price: number | null
+          created_at: string
+          currency: string
+          id: string
+          in_stock: boolean | null
+          last_checked_at: string | null
+          last_price: number | null
+          notes: string | null
+          product: string
+          seller: string | null
+          shopping_result_id: string | null
+          status: string
+          target_price: number | null
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          best_price?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          in_stock?: boolean | null
+          last_checked_at?: string | null
+          last_price?: number | null
+          notes?: string | null
+          product: string
+          seller?: string | null
+          shopping_result_id?: string | null
+          status?: string
+          target_price?: number | null
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          best_price?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          in_stock?: boolean | null
+          last_checked_at?: string | null
+          last_price?: number | null
+          notes?: string | null
+          product?: string
+          seller?: string | null
+          shopping_result_id?: string | null
+          status?: string
+          target_price?: number | null
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_watches_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_watches_shopping_result_id_fkey"
+            columns: ["shopping_result_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1663,6 +1738,7 @@ export type Database = {
           id: string
           item_price: number
           product: string
+          quantity: number
           seller: string | null
           shopping_result_id: string | null
           shopping_task_id: string | null
@@ -1683,6 +1759,7 @@ export type Database = {
           id?: string
           item_price?: number
           product: string
+          quantity?: number
           seller?: string | null
           shopping_result_id?: string | null
           shopping_task_id?: string | null
@@ -1703,6 +1780,7 @@ export type Database = {
           id?: string
           item_price?: number
           product?: string
+          quantity?: number
           seller?: string | null
           shopping_result_id?: string | null
           shopping_task_id?: string | null
@@ -1732,6 +1810,123 @@ export type Database = {
             columns: ["shopping_task_id"]
             isOneToOne: false
             referencedRelation: "shopping_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_list_items: {
+        Row: {
+          budget: number | null
+          created_at: string
+          id: string
+          list_id: string
+          name: string
+          notes: string | null
+          position: number
+          quantity: number
+          shopping_result_id: string | null
+          shopping_task_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget?: number | null
+          created_at?: string
+          id?: string
+          list_id: string
+          name: string
+          notes?: string | null
+          position?: number
+          quantity?: number
+          shopping_result_id?: string | null
+          shopping_task_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget?: number | null
+          created_at?: string
+          id?: string
+          list_id?: string
+          name?: string
+          notes?: string | null
+          position?: number
+          quantity?: number
+          shopping_result_id?: string | null
+          shopping_task_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_list_items_shopping_result_id_fkey"
+            columns: ["shopping_result_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_list_items_shopping_task_id_fkey"
+            columns: ["shopping_task_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_lists: {
+        Row: {
+          agent_id: string | null
+          budget: number | null
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          budget?: number | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          budget?: number | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_lists_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
             referencedColumns: ["id"]
           },
         ]
@@ -1857,6 +2052,50 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "personal_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spend_limits: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          monthly_cap: number | null
+          per_transaction_limit: number | null
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          monthly_cap?: number | null
+          per_transaction_limit?: number | null
+          scope?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          monthly_cap?: number | null
+          per_transaction_limit?: number | null
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spend_limits_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
             referencedColumns: ["id"]
           },
         ]
