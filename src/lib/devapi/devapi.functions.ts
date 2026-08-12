@@ -115,10 +115,11 @@ export const createApiKeyFn = createServerFn({ method: "POST" })
         last_four: generated.lastFour,
         key_hash: generated.hash,
         scopes: data.scopes.length ? data.scopes : ["agents:read", "tasks:read"],
+        expires_at: data.expiresInDays
+          ? new Date(Date.now() + data.expiresInDays * 86_400_000).toISOString()
+          : null,
       })
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     // The only time the raw key exists outside the caller's own machine.
@@ -152,9 +153,7 @@ export const rotateApiKeyFn = createServerFn({ method: "POST" })
         revoked_at: null,
       })
       .eq("id", data.key_id)
-      .select(
-        "id,name,environment,key_prefix,last_four,scopes,request_count,created_at,last_used_at,revoked_at",
-      )
+      .select(KEY_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     return { key: generated.raw, record: shapeKey(row) };
