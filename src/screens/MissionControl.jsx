@@ -9,6 +9,8 @@ import { toast } from '@/components/ui/use-toast';
 import BriefingConsole from '@/components/mission/BriefingConsole';
 import MissionMetrics from '@/components/mission/MissionMetrics';
 import ActivityStream from '@/components/mission/ActivityStream';
+import ProfessionalPanel from '@/components/mission/ProfessionalPanel';
+
 import ApprovalCentre from '@/components/mission/ApprovalCentre';
 import PersonalAISection from '@/components/mission/PersonalAISection';
 import AgentBuilder from '@/components/mission/AgentBuilder';
