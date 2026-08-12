@@ -127,12 +127,6 @@ export default function Login() {
           )}
         </Button>
       </form>
-      <div className="mt-5 rounded-lg border border-amber-400/20 bg-amber-400/5 p-3 text-center">
-        <p className="text-[11px] font-medium text-amber-300">Development admin</p>
-        <p className="mt-1 text-[11px] text-zinc-500">
-          Use <span className="text-zinc-300">admin@palladiumai.local</span> / <span className="text-zinc-300">password4321</span> to bypass billing. Remove before production.
-        </p>
-      </div>
     </AuthLayout>
   );
 }

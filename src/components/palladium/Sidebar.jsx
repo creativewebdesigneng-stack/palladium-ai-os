@@ -1,8 +1,9 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
   Home, FolderKanban, Users, Bot, ListChecks, Workflow, Files, BookOpen, Rocket,
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
-  ShieldCheck, CreditCard, Building2, ScrollText, Activity, Cpu, Lock, ChevronRight, Radar,
+  ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
+  Brain, Hammer, Banknote, Contact, Megaphone, LineChart,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -11,26 +12,39 @@ const MAIN = [
   ['Home', '/dashboard', Home],
   ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
-
   ['Organisations', '/organisation', Building2],
+];
+
+const WORKFORCE = [
   ['AI Workforce', '/workforce', Users],
   ['Agents', '/agents', Bot],
+  ['Agent Builder', '/agent-builder', Hammer],
   ['Tasks', '/tasks', ListChecks],
   ['Workflows', '/workflows', Workflow],
-  ['Files', '/files', Files],
+  ['Memory', '/memory', Brain],
   ['Knowledge', '/knowledge', BookOpen],
-  ['Integrations', '/integrations', Plug],
+  ['Files', '/files', Files],
   ['Tools Framework', '/tools-framework', Blocks],
+  ['Integrations', '/integrations', Plug],
   ['Marketplace', '/marketplace', Store],
   ['Creator Hub', '/creator-hub', Rocket],
   ['AI Web', '/web', Globe],
   ['AI Tools', '/ai-tools', Wrench],
-  ['Developer', '/developer-workspace', Code2],
+];
+
+const BUSINESS = [
   ['Analytics', '/analytics', BarChart3],
+  ['Business Intelligence', '/business-intelligence', LineChart],
+  ['Finance', '/finance', Banknote],
+  ['CRM', '/crm', Contact],
+  ['Marketing', '/marketing', Megaphone],
 ];
 
 const BOTTOM = [
+  ['Developer', '/developer-workspace', Code2],
+  ['Billing', '/billing', CreditCard],
   ['Notifications', '/notifications', Bell],
+  ['Support', '/support', LifeBuoy],
   ['Help', '/help', LifeBuoy],
   ['Settings', '/settings', Settings],
 ];
@@ -72,8 +86,13 @@ function Item({ label, path, Icon, collapsed, closeMobile, end }) {
 }
 
 export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
-  const { user } = useAuth();
+  const { user, entitlements } = useAuth();
   const isAdmin = user?.role === 'admin';
+
+  const taskLimit = Number(entitlements?.limits?.tasks_per_month ?? 0);
+  const tasksUsed = Number(entitlements?.usage?.tasksThisMonth ?? 0);
+  const unlimited = taskLimit < 0;
+  const pct = unlimited || taskLimit === 0 ? 0 : Math.min(100, Math.round((tasksUsed / taskLimit) * 100));
 
   return (
     <aside
@@ -89,6 +108,20 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
         <ul className="space-y-1">
           {MAIN.map(([label, path, Icon]) => (
             <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} end={path === '/dashboard'} /></li>
+          ))}
+        </ul>
+
+        {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">AI Workforce</p>}
+        <ul className="space-y-1">
+          {WORKFORCE.map(([label, path, Icon]) => (
+            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
+          ))}
+        </ul>
+
+        {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Business</p>}
+        <ul className="space-y-1">
+          {BUSINESS.map(([label, path, Icon]) => (
+            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
           ))}
         </ul>
 
@@ -111,18 +144,30 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
         )}
       </nav>
 
-      {/* Upgrade card */}
-      <div className="m-3 rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs text-zinc-400">
+      {/* Plan + usage card (live entitlement data) */}
+      <Link
+        to="/billing"
+        onClick={closeMobile}
+        className="m-3 block rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs text-zinc-400 transition hover:border-violet-400/30 hover:bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+        aria-label="Plan and usage — open billing"
+      >
         {collapsed ? (
-          <div className="flex justify-center"><Activity className="h-4 w-4 text-violet-400" /></div>
+          <div className="flex justify-center"><CreditCard className="h-4 w-4 text-violet-400" /></div>
         ) : (
           <>
-            <p className="font-medium text-white">Pro workspace</p>
-            <p className="mt-1">68% of monthly AI credits</p>
-            <div className="mt-2 h-1 rounded-full bg-white/10"><div className="h-1 w-2/3 rounded-full bg-violet-500" /></div>
+            <p className="font-medium text-white">{entitlements?.planName ?? 'Explorer'} workspace</p>
+            <p className="mt-1">
+              {unlimited
+                ? `${tasksUsed.toLocaleString()} tasks this month · unlimited`
+                : `${tasksUsed.toLocaleString()} / ${taskLimit.toLocaleString()} monthly tasks`}
+            </p>
+            <div className="mt-2 h-1 rounded-full bg-white/10">
+              <div className="h-1 rounded-full bg-violet-500 transition-all" style={{ width: `${unlimited ? 8 : pct}%` }} />
+            </div>
           </>
         )}
-      </div>
+      </Link>
+
     </aside>
   );
 }
