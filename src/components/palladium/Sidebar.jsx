@@ -49,13 +49,6 @@ const BOTTOM = [
   ['Settings', '/settings', Settings],
 ];
 
-
-const BOTTOM = [
-  ['Notifications', '/notifications', Bell],
-  ['Help', '/help', LifeBuoy],
-  ['Settings', '/settings', Settings],
-];
-
 const ADMIN = [
   ['Admin Dashboard', '/admin', ShieldCheck],
   ['Users', '/admin/users', Users],
