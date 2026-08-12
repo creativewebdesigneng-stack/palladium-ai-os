@@ -2,7 +2,7 @@ import { Menu, PanelLeftClose, PanelLeftOpen, Search, SunMoon, Bell, LifeBuoy, H
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
-export default function Topbar({ collapsed, toggleSidebar, openMobile, openCommand, openAssistant }) {
+export default function Topbar({ collapsed, toggleSidebar, openMobile, openCommand, openAssistant, unread = 0 }) {
   const toggleTheme = () => document.documentElement.classList.toggle('palladium-dim');
   const { user } = useAuth();
   const initials = (user?.full_name || user?.email || 'U').slice(0, 2).toUpperCase();
@@ -37,9 +37,13 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
         <button onClick={toggleTheme} aria-label="Toggle dim theme" className="rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
           <SunMoon className="h-5 w-5" />
         </button>
-        <Link to="/notifications" aria-label="Notifications" className="relative rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
+        <Link to="/notifications" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
           <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-violet-400 ring-2 ring-[#0c0d13]" />
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-violet-500 px-1 text-[9px] font-semibold text-white ring-2 ring-[#0c0d13]">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
         </Link>
         <Link to="/settings" aria-label="Profile" className="ml-1 flex items-center gap-2 rounded-full p-1 pr-2 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-semibold text-white">{initials}</span>
