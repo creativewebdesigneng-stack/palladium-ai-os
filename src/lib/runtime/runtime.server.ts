@@ -674,7 +674,11 @@ export async function* streamRun(args: {
   run: PreparedRun;
 }): AsyncGenerator<RunEvent> {
   const controller = new AbortController();
-  const budget = setTimeout(() => controller.abort(), RUN_BUDGET_MS);
+  let timedOut = false;
+  const budget = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, RUN_BUDGET_MS);
   const messages = [...args.run.messages];
   const pending: RunEvent[] = [];
   const usage = { input: 0, output: 0 };
@@ -684,22 +688,31 @@ export async function* streamRun(args: {
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+      if (timedOut)
+        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
+      await heartbeat(args.sb, args.run.taskId);
 
       let final: ChatResult | null = null;
-      for await (const event of streamChat({
-        provider: args.run.provider,
-        model: args.run.model,
-        messages,
-        tools: round < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
-        temperature: args.run.agent.temperature,
-        maxTokens: args.run.agent.max_tokens,
-        signal: controller.signal,
-      })) {
-        if (event.type === "text") yield { type: "delta", text: event.delta };
-        if (event.type === "done") final = event.result;
+      try {
+        for await (const event of streamChat({
+          provider: args.run.provider,
+          model: args.run.model,
+          messages,
+          tools: round < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
+          temperature: args.run.agent.temperature,
+          maxTokens: args.run.agent.max_tokens,
+          signal: controller.signal,
+        })) {
+          if (event.type === "text") yield { type: "delta", text: event.delta };
+          if (event.type === "done") final = event.result;
+        }
+      } catch (error) {
+        if (timedOut)
+          throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+        throw error;
       }
       if (!final) throw new RuntimeError("The model returned no response.", "EMPTY_RESPONSE", 502);
       usage.input += final.usage.input;
@@ -718,7 +731,8 @@ export async function* streamRun(args: {
       }
 
       toolCallCount += final.toolCalls.length;
-      await runToolCalls(
+      yield { type: "status", status: "waiting_for_tool", task_id: args.run.taskId };
+      const { awaitingApproval } = await runToolCalls(
         {
           sb: args.sb,
           userId: args.userId,
@@ -731,7 +745,13 @@ export async function* streamRun(args: {
         messages,
       );
       while (pending.length) yield pending.shift()!;
+      yield {
+        type: "status",
+        status: awaitingApproval ? "waiting_for_approval" : "running",
+        task_id: args.run.taskId,
+      };
     }
+
     throw new RuntimeError(
       "The agent used too many tool rounds without answering.",
       "TOOL_LOOP_EXHAUSTED",
