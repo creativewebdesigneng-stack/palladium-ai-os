@@ -30,6 +30,7 @@ const TABS = [
   ['overview', 'Overview', Gauge],
   ['personal', 'Personal AI', User],
   ['professional', 'Professional AI', Briefcase],
+  ['approvals', 'Approval centre', ShieldAlert],
 
   ['shopping', 'Shopping', ShoppingBag],
   ['tasks', 'Tasks', ListChecks],
