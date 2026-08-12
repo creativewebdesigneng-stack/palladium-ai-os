@@ -160,7 +160,7 @@ export const listNotifications = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const { data: rows, error } = await sb
       .from("notifications")
-      .select("id,title,body,kind,link,metadata,read_at,created_at")
+      .select("id,title,body,kind,severity,link,metadata,read_at,created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(data.limit ?? 100);
