@@ -15,6 +15,7 @@ import {
   retrieveRelevantMemory,
   storeMemory,
 } from "@/lib/memory/memory.server";
+import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
 import {
   assertWithinLimit,
   getEntitlements,
@@ -362,6 +363,10 @@ export async function completeRun(args: {
   // Save memory: short-term run context (expires) plus the legacy key/value trace.
   if (run.agent.memory_enabled !== false && result.text) {
     const request = String(run.messages[run.messages.length - 1]?.content ?? "").slice(0, 300);
+    const memoryPrefs = await loadMemoryPreferences(args.sb as never, args.userId).catch(
+      () => null,
+    );
+    const mayCapture = memoryPrefs ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled : true;
     await Promise.all([
       storeMemory({
         sb: args.sb as never,
@@ -382,7 +387,8 @@ export async function completeRun(args: {
       }).catch((error: unknown) =>
         console.error("[runtime] short-term memory write failed", error),
       ),
-      args.sb.from("personal_memories").insert({
+      mayCapture &&
+        args.sb.from("personal_memories").insert({
         user_id: args.userId,
         org_id: run.orgId,
         agent_id: run.agent.id,
