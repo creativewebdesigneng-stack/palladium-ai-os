@@ -230,6 +230,26 @@ export async function prepareRun(args: {
     metadata: { task_id: task.id, provider, model },
   });
 
+  await notify({
+    userId: args.userId,
+    orgId,
+    type: "agent.started",
+    title: `${agent.name} started a run`,
+    body: input.slice(0, 200),
+    link: `/agents/${agent.id}`,
+    metadata: { task_id: task.id, agent_id: agent.id },
+  });
+
+  // Warn before the monthly allowance runs out rather than after.
+  await notifyUsageThreshold({
+    userId: args.userId,
+    orgId,
+    metric: "tasks_per_month",
+    used: ent.usage.tasksThisMonth + 1,
+    limit: ent.limits.tasks_per_month,
+    planName: ent.planName,
+  });
+
   // queued -> running only once every gate has passed and the row exists.
   await setRunState(args.sb, task.id as string, "running");
 
@@ -472,6 +492,16 @@ export async function completeRun(args: {
     payload,
   });
 
+  await notify({
+    userId: args.userId,
+    orgId: run.orgId,
+    type: "agent.completed",
+    title: `${run.agent.name} completed a run`,
+    body: `Finished in ${(duration / 1000).toFixed(1)}s using ${result.usage.input + result.usage.output} tokens.`,
+    link: `/agents/${run.agent.id}`,
+    metadata: { task_id: run.taskId, agent_id: run.agent.id },
+  });
+
   return data;
 }
 
@@ -531,6 +561,18 @@ export async function failRun(args: {
     event: "agent.failed",
     payload: { agent_id: args.run.agent.id, task_id: args.run.taskId, error: message },
   });
+
+  if (!cancelled) {
+    await notify({
+      userId: args.userId,
+      orgId: args.run.orgId,
+      type: "agent.failed",
+      title: `${args.run.agent.name} failed`,
+      body: message,
+      link: `/agents/${args.run.agent.id}`,
+      metadata: { task_id: args.run.taskId, agent_id: args.run.agent.id, timed_out: timedOut },
+    });
+  }
 
   console.error("[runtime] run failed", args.run.taskId, args.error);
   return message;
