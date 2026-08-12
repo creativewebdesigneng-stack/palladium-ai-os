@@ -1,49 +1,84 @@
-import { Receipt, Clock, TrendingUp, HelpCircle } from 'lucide-react';
-import { PAYMENT_HISTORY } from './billingData';
+import { useEffect, useState } from 'react';
+import { Receipt, Clock, TrendingUp, HelpCircle, Loader2 } from 'lucide-react';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { getBillingOverview, listBillingEvents } from '@/lib/billing/billing.functions';
+import { friendlyMessage } from '@/lib/errors';
 import { StatusBadge, Panel } from './shared';
 
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function BillingRightSidebar() {
-  const recent = PAYMENT_HISTORY.slice(0, 4);
+  const { session, activeOrgId } = useWorkspace();
+  const [overview, setOverview] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (session !== 'yes') return;
+    let cancelled = false;
+    Promise.all([
+      getBillingOverview({ data: { orgId: activeOrgId } }),
+      listBillingEvents({ data: { orgId: activeOrgId } }),
+    ])
+      .then(([o, e]) => { if (!cancelled) { setOverview(o); setEvents(e.events ?? []); } })
+      .catch((e) => { console.error('[billing]', e); if (!cancelled) setError(friendlyMessage(e, 'Could not load billing details.')); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [session, activeOrgId]);
+
+  if (loading) return <div className="flex items-center gap-2 p-3 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…</div>;
+  if (error) return <p className="p-3 text-xs text-rose-300">{error}</p>;
+
+  const sub = overview?.subscription ?? null;
+  const paymentEvents = events.filter((e) => e.amount != null).slice(0, 4);
+  const spend = events.filter((e) => e.amount != null).slice(0, 7).reverse();
+  const maxSpend = Math.max(1, ...spend.map((s) => s.amount || 0));
+  const avg = spend.length ? spend.reduce((a, s) => a + (s.amount || 0), 0) / spend.length : 0;
+
   return (
     <div className="space-y-4">
       <Panel icon={Clock} title="Next renewal" grad="from-violet-500 to-indigo-500">
-        <p className="text-sm text-white">7 Sep 2026</p>
-        <p className="text-[11px] text-zinc-500">Auto-renews on Visa •••• 4242</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/5">Pause</button>
-          <button className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/5">Switch to annual</button>
-        </div>
+        <p className="text-sm text-white">{sub?.current_period_end ? fmtDate(sub.current_period_end) : 'No active subscription'}</p>
+        <p className="text-[11px] text-zinc-500">{sub?.cancel_at_period_end ? 'Cancels at period end' : sub ? 'Auto-renews' : 'Choose a plan to start billing'}</p>
       </Panel>
 
       <Panel icon={Receipt} title="Recent payments" grad="from-sky-500 to-cyan-500">
-        <div className="space-y-2">
-          {recent.map((p) => (
-            <div key={p.id} className="flex items-center justify-between text-[11px]">
-              <div>
-                <p className="text-zinc-300">{p.id}</p>
-                <p className="text-zinc-600">{new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+        {paymentEvents.length === 0 ? <p className="text-[11px] text-zinc-600">No payments recorded yet.</p> : (
+          <div className="space-y-2">
+            {paymentEvents.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-[11px]">
+                <div>
+                  <p className="truncate text-zinc-300">{p.title}</p>
+                  <p className="text-zinc-600">{new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-white">£{Number(p.amount).toFixed(2)}</span>
+                  <StatusBadge status={p.status} />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-white">£{p.amount.toFixed(2)}</span>
-                <StatusBadge status={p.status} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Panel>
 
       <Panel icon={TrendingUp} title="Spend trend" grad="from-emerald-500 to-teal-500">
-        <div className="flex h-20 items-end gap-1.5">
-          {[48, 48, 64, 64, 79, 79, 79].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-emerald-600/30 to-emerald-400" style={{ height: h + 'px' }} />
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] text-zinc-500">Last 7 invoices · avg £350.00</p>
+        {spend.length === 0 ? <p className="text-[11px] text-zinc-600">No spend history yet.</p> : (
+          <>
+            <div className="flex h-20 items-end gap-1.5">
+              {spend.map((s, i) => <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-emerald-600/30 to-emerald-400" style={{ height: `${Math.max(4, (s.amount / maxSpend) * 80)}px` }} />)}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500">Last {spend.length} charges · avg £{avg.toFixed(2)}</p>
+          </>
+        )}
       </Panel>
 
       <Panel icon={HelpCircle} title="Billing support" grad="from-amber-500 to-orange-500">
         <p className="text-[11px] text-zinc-400">Need help with invoices, tax or refunds? Reach out to our billing team.</p>
-        <button className="mt-3 w-full rounded-lg border border-white/10 px-3 py-2 text-[11px] text-zinc-300 hover:bg-white/5">Contact billing</button>
+        <a href="mailto:billing@palladiumai.com" className="mt-3 block w-full rounded-lg border border-white/10 px-3 py-2 text-center text-[11px] text-zinc-300 hover:bg-white/5">Contact billing</a>
       </Panel>
     </div>
   );

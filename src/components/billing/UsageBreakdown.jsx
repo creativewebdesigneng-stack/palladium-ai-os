@@ -1,6 +1,5 @@
 import { Bot, FolderKanban, Users, Plug } from 'lucide-react';
-import { USAGE_BREAKDOWN } from './billingData';
-import { MiniBar, Panel } from './shared';
+import { Panel } from './shared';
 
 const SECTIONS = [
   { key: 'byAgent', title: 'Usage By Agent', icon: Bot, grad: 'from-violet-500 to-indigo-500' },
@@ -14,7 +13,9 @@ export default function UsageBreakdown() {
     <div className="grid gap-4 md:grid-cols-2">
       {SECTIONS.map((s) => (
         <Panel key={s.key} icon={s.icon} title={s.title} grad={s.grad}>
-          <MiniBar items={USAGE_BREAKDOWN[s.key]} />
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[.02] p-4 text-center">
+            <p className="text-[11px] text-zinc-500">Detailed attribution isn't tracked yet.</p>
+          </div>
         </Panel>
       ))}
     </div>
