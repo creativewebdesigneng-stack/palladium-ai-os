@@ -207,7 +207,6 @@ export async function aiBriefing(context: string, fallback: string): Promise<str
           },
           { role: "user", content: `Facts for today:\n${context}` },
         ],
-
       }),
     });
     if (!res.ok) return fallback;

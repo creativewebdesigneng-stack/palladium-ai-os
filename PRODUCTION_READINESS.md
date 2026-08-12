@@ -1,6 +1,6 @@
 # PalladiumAI — Production Readiness
 
-Last audited: 2026-08-10
+Last audited: 2026-08-12
 
 This document records the outcome of the full security and production audit.
 The threat model assumed throughout: **the attacker fully controls the browser
@@ -55,7 +55,38 @@ Each row was traced end to end (database policy → server function → route).
 - `Payment.jsx` no longer activates plans locally; free tier is the server default.
 - `UsageDashboard` shows real consumption; the "reset demo usage" control is gone.
 
-## 3. Known remaining warnings (accepted)
+## 3. Second hardening pass (2026-08-12)
+
+**Database**
+
+- `marketplace_reviews` no longer readable by anonymous visitors: the
+  `USING (true)` public policy was replaced with an `authenticated`-only policy
+  and `SELECT` was revoked from `anon`, so reviewer identities (`user_id`) are
+  never exposed to the public internet. All review reads and writes already run
+  through `requireSupabaseAuth` server functions.
+- Full policy sweep re-run across all 53 public tables: RLS is enabled
+  everywhere; SELECT/INSERT/UPDATE/DELETE coverage was checked table by table.
+  Ledger tables (`subscriptions`, `usage_records`, `api_request_logs`,
+  `webhook_deliveries`, `tool_executions`, `billing_webhook_events`,
+  `mission_audit_logs`, `workflow_runs`, `workflow_step_runs`, `agent_messages`,
+  `marketplace_purchases`, `plans`, `tools`, `user_roles`) intentionally expose
+  **no** user write policies — they are written only by trusted server code.
+- Storage: the `knowledge` bucket is private, with INSERT/SELECT/UPDATE/DELETE
+  policies scoped to `storage.foldername(name)[1] = auth.uid()`. No public
+  object URLs exist.
+
+**Tests** — Vitest suites now cover the highest-risk backend logic (58 tests):
+
+| Suite | Covers |
+| --- | --- |
+| `src/lib/billing/__tests__/billing.test.ts` | Stripe webhook signature verification (valid, forged, wrong secret, tampered body, stale replay, missing header) and the plan ↔ price mapping, including rejection of client-supplied Stripe price ids |
+| `src/lib/platform/__tests__/entitlements.test.ts` | Plan resolved from `subscriptions` only, another user's subscription ignored, forged `orgId` rejected, allowance exhaustion, unlimited metrics |
+| `src/lib/devapi/__tests__/api-auth.test.ts` | Valid / unknown / revoked / expired keys, missing key, scope enforcement, hash-only storage, plan execution gate, per-minute quota from real logs, no cross-user quota bleed, org-scoped plan resolution |
+| `src/lib/shopping/__tests__/limits.test.ts` | Per-transaction, per-agent and account monthly ceilings; only committed purchases counted; tightest ceiling wins |
+| `src/lib/runtime/__tests__/runtime.test.ts` | Task lifecycle, cancellation, timeouts, provider failure messages never leaking provider internals, usage recording |
+| `src/lib/runtime/__tests__/tools.test.ts` | Tool grants, unknown slugs, plan minimums, disabled permissions, domain allowlists |
+
+## 4. Known remaining warnings (accepted)
 
 - **`SECURITY DEFINER` functions callable by signed-in users** — these are the
   RLS predicate helpers (`has_role`, `is_org_member`, `has_org_role`,
@@ -63,52 +94,69 @@ Each row was traced end to end (database policy → server function → route).
   `workflow_is_visible`, `workflow_run_is_visible`, `workforce_is_visible`).
   They must be callable by `authenticated` because policies invoke them, and
   each one resolves against `auth.uid()` internally. Intentional.
+- **`creator_profiles` public read** — publisher display name, handle, bio,
+  website and avatar for marketplace listing pages. No email or contact data.
+- **`billing_webhook_events` has RLS with no policy** — deliberate: the
+  idempotency ledger is service-role only.
 - **React Fast Refresh warnings (11)** — shadcn/ui primitives export variants
   alongside components. Cosmetic, dev-only.
 
-## 4. Simulated vs real subsystems
+## 5. Real vs simulated subsystems
 
 | Subsystem | State |
 | --- | --- |
 | Auth, organisations, roles | Real |
-| Subscriptions, checkout, webhooks | Real (Stripe) |
-| Agent runtime, streaming, tasks | Real (OpenAI / Anthropic gateway) |
-| Memory, embeddings, semantic search | Real (pgvector) |
-| Tools, permissions, approvals | Real |
+| Subscriptions, checkout, webhooks, lifecycle (upgrade / downgrade / cancel / resume) | Real (Stripe, sandbox credentials configured) |
+| Agent runtime, streaming, tasks, cancellation, usage | Real (OpenAI / Anthropic via the AI gateway) |
+| Memory, embeddings, semantic search, document ingestion | Real (pgvector + private storage bucket) |
+| Tools, permissions, approvals, spend limits | Real |
 | Developer API, keys, webhooks, rate limits | Real |
-| Workforce orchestration | Real |
-| **Browser agent** | Falls back to a clearly labelled `simulated` provider when no external browser provider is configured. It performs no network access. Register a real provider to enable live browsing. |
+| Workforce orchestration (sequential, parallel, conditional, retries) | Real |
+| Notifications | Real (Supabase Realtime) |
+| **Browser agent** | **Simulated** unless an external browser provider is configured. The built-in provider performs no network access and returns clearly labelled placeholder results. Live shopping research is therefore **not** production-ready until a provider is registered. |
+| **Live Stripe payments** | **Not enabled.** Only sandbox credentials exist (`STRIPE_SANDBOX_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET`). Live checkout requires go-live onboarding. |
 
-## 5. Required environment configuration
+Everything in the "Real" rows was exercised against the live database or unit
+tests. The two rows above must not be described as production-ready.
 
-Server-side only (never exposed to the browser):
+## 6. Required configuration
 
-- `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SANDBOX_API_KEY` (live key for production), `PAYMENTS_SANDBOX_WEBHOOK_SECRET`
-- `LOVABLE_API_KEY` (AI gateway)
-- Model provider keys for any non-gateway provider you enable
-- Browser-agent provider credentials, if you enable live browsing
-
+**Supabase / Cloud backend** — provisioned. Server-side only:
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 Browser-visible: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`,
-`VITE_SUPABASE_PROJECT_ID`.
+`VITE_SUPABASE_PROJECT_ID`. The `knowledge` storage bucket and all RLS policies
+are already in place.
 
-## 6. Verification commands
+**Stripe** — sandbox works today. For live payments: complete go-live
+onboarding, then `STRIPE_LIVE_API_KEY` and `PAYMENTS_LIVE_WEBHOOK_SECRET` are
+required. Prices must exist under the lookup keys in
+`src/lib/billing/catalog.ts` (`pro_monthly`, `pro_yearly`, `business_monthly`,
+`business_yearly`, `enterprise_monthly`, `enterprise_yearly`); the frontend can
+never supply a price id.
+
+**AI providers** — `LOVABLE_API_KEY` (gateway) is configured. Direct
+`OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are optional and only needed to bypass
+the gateway.
+
+**Browser provider** — required for live browsing/shopping research. Without it
+the shopping agent stays in simulated mode.
+
+## 7. Verification commands
 
 ```
-bunx tsgo --noEmit    # clean
 bun run lint          # 0 errors, 11 accepted warnings
 bun run build:dev     # succeeds
+bun run backend:check # tsgo --noEmit + vitest: 58 tests, 6 files, all passing
 ```
 
-There is no test runner configured in this project yet; adding one for
-`entitlements.server.ts`, `api-auth.server.ts` and the webhook signature check
-is the highest-value next step.
+## 8. Before public launch
 
-## 7. Before going live
+1. Complete Stripe go-live, swap in live credentials, and re-verify checkout,
+   renewal, failed payment, upgrade, downgrade, cancellation and webhook replay
+   against live mode.
+2. Register a real browser-agent provider, or hide the shopping research
+   surfaces until one exists.
+3. Confirm email confirmation is enabled and anonymous sign-ups stay disabled.
+4. Set per-organisation spend ceilings (`spend_limits`) as onboarding defaults.
+5. Re-run the security scan after any new table, policy or storage bucket.
 
-1. Swap Stripe sandbox credentials for live keys and re-point the webhook.
-2. Confirm email confirmation is enabled and anonymous sign-ups stay disabled.
-3. Create the storage bucket(s) for document memory with owner-scoped policies
-   (none exist yet — uploads currently go through database-backed memory only).
-4. Set a spend cap per organisation in `tool_permissions` for commerce tools.
-5. Re-run the security scan after any new table or policy.

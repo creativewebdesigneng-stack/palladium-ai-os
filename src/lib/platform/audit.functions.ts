@@ -38,7 +38,9 @@ export const listAuditLogs = createServerFn({ method: "POST" })
 
     const base = sb
       .from("mission_audit_logs")
-      .select("id,user_id,agent_id,action,target_type,target_id,status,metadata,ip_address,created_at")
+      .select(
+        "id,user_id,agent_id,action,target_type,target_id,status,metadata,ip_address,created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(limit);
 

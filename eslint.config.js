@@ -59,6 +59,9 @@ export default tseslint.config(
       "src/lib/**/*.server.ts",
       "src/lib/**/*.functions.ts",
       "src/utils/payments.functions.ts",
+      // Test doubles stand in for Supabase query builders, whose fluent shape
+      // cannot be expressed with the generated types.
+      "src/lib/**/__tests__/**/*.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
