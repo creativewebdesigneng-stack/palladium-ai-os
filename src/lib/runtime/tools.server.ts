@@ -921,7 +921,7 @@ export async function executeTool(
       allowedDomains: grant.allowedDomains,
       spendCap: grant.spendCap ?? ctx.spendCap ?? null,
     });
-    await log("succeeded", { output: output as never });
+    await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Tool execution failed.";
