@@ -58,7 +58,8 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     }) => {
       const planCode = normalizePlanCode(data.planCode);
       if (!planCode) throw new Error("Unknown plan");
-      if (planCode === "explorer") throw new Error("The Explorer plan is free — no checkout required");
+      if (planCode === "explorer")
+        throw new Error("The Explorer plan is free — no checkout required");
       if (data.orgId && !UUID_RE.test(data.orgId)) throw new Error("Invalid organisation");
       if (!/^https?:\/\//.test(data.returnUrl)) throw new Error("Invalid return URL");
       return { ...data, planCode, interval: normalizeInterval(data.interval) };
@@ -183,11 +184,13 @@ export const resumeSubscription = createServerFn({ method: "POST" })
 /** Upgrade or downgrade an existing subscription between approved plans. */
 export const changeSubscriptionPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { planCode: string; interval?: BillingInterval; environment: StripeEnv }) => {
-    const planCode = normalizePlanCode(data.planCode);
-    if (!planCode || planCode === "explorer") throw new Error("Unknown plan");
-    return { ...data, planCode, interval: normalizeInterval(data.interval) };
-  })
+  .inputValidator(
+    (data: { planCode: string; interval?: BillingInterval; environment: StripeEnv }) => {
+      const planCode = normalizePlanCode(data.planCode);
+      if (!planCode || planCode === "explorer") throw new Error("Unknown plan");
+      return { ...data, planCode, interval: normalizeInterval(data.interval) };
+    },
+  )
   .handler(async ({ data, context }): Promise<MutationResult> => {
     const sub = await loadOwnSubscription(context.supabase, context.userId, data.environment);
     if (!sub?.stripe_subscription_id) {
