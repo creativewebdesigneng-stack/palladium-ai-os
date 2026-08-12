@@ -101,3 +101,12 @@ export function useSettingsSlice(initial) {
   const update = (key, val) => setState((s) => ({ ...s, [key]: val }));
   return [state, update, setState];
 }
+export function NotConfigured({ icon: Icon, title, desc }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-8 text-center">
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-white/5"><Icon className="h-5 w-5 text-zinc-500" /></span>
+      <h4 className="mt-3 text-sm font-semibold text-white">{title}</h4>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-zinc-500">{desc}</p>
+    </div>
+  );
+}
