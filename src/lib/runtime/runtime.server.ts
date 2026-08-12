@@ -473,20 +473,29 @@ export async function failRun(args: {
   run: Pick<PreparedRun, "taskId" | "agent" | "orgId" | "startedAt">;
   error: unknown;
 }) {
-  const message =
-    args.error instanceof ProviderError || args.error instanceof RuntimeError
-      ? args.error.message
-      : "The run failed unexpectedly. Please try again.";
+  const cancelled = args.error instanceof RuntimeError && args.error.code === "CANCELLED";
+  const timedOut =
+    (args.error instanceof Error && args.error.name === "AbortError") ||
+    (args.error instanceof RuntimeError && args.error.code === "RUN_TIMEOUT");
+  const message = cancelled
+    ? "Run cancelled by the operator."
+    : timedOut
+      ? "The run exceeded its time budget and was terminated."
+      : args.error instanceof ProviderError || args.error instanceof RuntimeError
+        ? args.error.message
+        : "The run failed unexpectedly. Please try again.";
   const db = await admin();
   await db
     .from("agent_tasks")
     .update({
-      status: "failed",
+      status: cancelled ? "cancelled" : "failed",
       error: message.slice(0, 1000),
       duration_ms: Date.now() - args.run.startedAt,
+      heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
     .eq("id", args.run.taskId);
+
 
   await db.from("agent_activities").insert({
     user_id: args.userId,
