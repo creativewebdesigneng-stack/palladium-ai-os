@@ -6,14 +6,14 @@ import { highlight } from '@/components/dev/highlight';
 const LANGS = Object.keys(SDKS);
 
 export default function SDKsPanel() {
-  const [lang, setLang] = useState('JavaScript');
+  const [lang, setLang] = useState('cURL');
   const [copied, setCopied] = useState(false);
   const sdk = SDKS[lang];
   const copy = (txt) => { navigator.clipboard?.writeText(txt); setCopied(true); setTimeout(() => setCopied(false), 1200); };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><Package className="h-5 w-5 text-violet-400" /><h2 className="text-lg font-semibold text-white">SDKs</h2></div>
+      <div className="flex items-center gap-2"><Package className="h-5 w-5 text-violet-400" /><h2 className="text-lg font-semibold text-white">Code examples</h2></div>
       <div className="flex gap-1 rounded-2xl border border-white/10 bg-white/[.03] p-1">
         {LANGS.map((l) => (
           <button key={l} onClick={() => setLang(l)} className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-medium ${lang === l ? 'bg-violet-500/20 text-white' : 'text-zinc-400 hover:text-white'}`}>{l}</button>
@@ -29,7 +29,7 @@ export default function SDKsPanel() {
         </div>
         <p className="mb-2 text-[11px] font-semibold text-white">Quickstart</p>
         <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/50 p-4">
-          <pre className="font-mono text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: highlight(sdk.code, lang === 'Python' ? 'py' : lang === 'REST' ? 'js' : 'ts') }} />
+          <pre className="font-mono text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: highlight(sdk.code, sdk.lang) }} />
         </div>
       </div>
     </div>
