@@ -9,14 +9,19 @@ import AddMemoryModal from '@/components/memory/AddMemoryModal';
 import UploadKnowledgeModal from '@/components/memory/UploadKnowledgeModal';
 import EditMemoryModal from '@/components/memory/EditMemoryModal';
 import VectorIndexModal from '@/components/memory/VectorIndexModal';
-import { MEMORY_SETTINGS } from '@/components/memory/memoryData';
+import DocumentVault from '@/components/memory/DocumentVault';
 import { normalizeMemory } from '@/components/memory/normalizeMemory';
 import { listAgents } from '@/lib/agents/agents.functions';
 import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useSession, useActiveOrg } from '@/hooks/use-workspace';
+import { uploadKnowledgeDocument } from '@/lib/memory/uploadKnowledge';
 import {
   createMemory,
+  getMemoryPreferences,
+  updateMemoryPreferences,
+  removeMemories,
+  removeKnowledgeDocument,
   editMemory,
   ingestKnowledgeDocument,
   listMemories,
@@ -25,17 +30,6 @@ import {
   removeMemory,
   searchMemories,
 } from '@/lib/memory/memory.functions';
-
-const TEXT_TYPES = /^(text\/|application\/json$|application\/xml$)/;
-
-/** Reads a document client-side so the server only ever receives plain text. */
-async function readDocumentText(file) {
-  if (!file) return '';
-  if (TEXT_TYPES.test(file.type) || /\.(txt|md|markdown|csv|json|ya?ml|log)$/i.test(file.name)) {
-    return (await file.text()).slice(0, 400000);
-  }
-  return '';
-}
 
 export default function Memory() {
   const { toast } = useToast();
@@ -46,7 +40,9 @@ export default function Memory() {
   const [raw, setRaw] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [settings, setSettings] = useState(MEMORY_SETTINGS);
+  const [prefs, setPrefs] = useState(null);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [type, setType] = useState('all');
@@ -86,6 +82,11 @@ export default function Memory() {
         setAgents((await listAgents({ data: { limit: 200, withTasks: false } })).agents);
       } catch {
         setAgents([]);
+      }
+      try {
+        setPrefs((await getMemoryPreferences()).preferences);
+      } catch {
+        setPrefs(null);
       }
       pruneMemory().catch(() => {});
       await reload();
@@ -181,29 +182,64 @@ export default function Memory() {
     if (!gate('createAgents')) return;
     setUploading(true);
     try {
-      const text = (form.content || '') || (await readDocumentText(form.file));
-      if (!text.trim()) {
-        throw new Error('Add a text summary — this file type cannot be read in the browser yet.');
-      }
-      const res = await ingestKnowledgeDocument({
-        data: {
-          title: form.title || form.file?.name || 'Untitled document',
-          text,
-          agent_id: form.agent_id || null,
-          org_id: form.scope === 'private' ? null : orgId,
-          scope: form.scope,
-          mime_type: form.file?.type || null,
-          size_bytes: form.file?.size || null,
-          source: form.file?.name || 'upload',
-        },
+      const res = await uploadKnowledgeDocument({
+        file: form.file,
+        title: form.title,
+        summary: form.content,
+        agentId: form.agent_id,
+        orgId,
+        scope: form.scope,
+        category: form.category,
       });
-      toast({ title: 'Knowledge ingested', description: `${res.chunks} chunks indexed for retrieval.` });
+      toast({
+        title: 'Knowledge ingested',
+        description: `${res.chunks} chunks indexed${res.storedFile ? ' — the file is stored privately.' : '.'}`,
+      });
       setUploadOpen(false);
       await reload();
     } catch (e) {
       fail('Upload failed')(e);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const savePrefs = async (patch) => {
+    setSavingPrefs(true);
+    try {
+      const res = await updateMemoryPreferences({ data: patch });
+      setPrefs(res.preferences);
+      toast({ title: 'Memory settings updated' });
+    } catch (e) {
+      fail('Could not update memory settings')(e);
+      throw e;
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
+  const handleDeleteDocument = async (doc) => {
+    try {
+      await removeKnowledgeDocument({ data: { document_id: doc.id } });
+      toast({ title: 'Document deleted', description: 'The file, its chunks and vectors were removed.' });
+      await reload();
+    } catch (e) {
+      fail('Could not delete document')(e);
+    }
+  };
+
+  const handleClearLayer = async () => {
+    const label = type === 'all' ? 'every memory' : `all ${type.replace('_', ' ')} memories`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    setClearing(true);
+    try {
+      const res = await removeMemories({ data: { memory_type: type, all: type === 'all' } });
+      toast({ title: `Deleted ${res.deleted} ${res.deleted === 1 ? 'memory' : 'memories'}` });
+      await reload();
+    } catch (e) {
+      fail('Could not clear memories')(e);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -295,12 +331,31 @@ export default function Memory() {
         </>
       )}
 
-      <div className="mt-8"><VectorPanel /></div>
+      {session === 'yes' && entries.length > 0 && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={handleClearLayer}
+            disabled={clearing}
+            className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-1.5 text-[11px] font-medium text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-50"
+          >
+            {clearing ? 'Deleting…' : type === 'all' ? 'Delete all memories' : `Delete all ${type.replace('_', ' ')} memories`}
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 xl:grid-cols-2">
-        <MemorySettings settings={settings} onChange={setSettings} />
-        <MemoryGraph />
+        <DocumentVault documents={documents} onDelete={handleDeleteDocument} onError={fail('Could not open document')} />
+        <MemorySettings
+          preferences={prefs}
+          onSave={savePrefs}
+          saving={savingPrefs}
+          disabled={session !== 'yes'}
+        />
       </div>
+
+      <div className="mt-8"><VectorPanel /></div>
+
+      <div className="mt-8"><MemoryGraph /></div>
 
       <AddMemoryModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} agents={agents} />
       <UploadKnowledgeModal open={uploadOpen} onClose={() => setUploadOpen(false)} onSubmit={handleUpload} agents={agents} uploading={uploading} />
