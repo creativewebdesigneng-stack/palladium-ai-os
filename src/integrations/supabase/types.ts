@@ -286,11 +286,13 @@ export type Database = {
       agent_tasks: {
         Row: {
           agent_id: string | null
+          cancel_requested: boolean
           completed_at: string | null
           cost_pence: number
           created_at: string
           duration_ms: number | null
           error: string | null
+          heartbeat_at: string | null
           id: string
           input: string
           model: string | null
@@ -304,16 +306,19 @@ export type Database = {
           title: string | null
           tokens_in: number
           tokens_out: number
+          tool_calls: number
           updated_at: string
           user_id: string
         }
         Insert: {
           agent_id?: string | null
+          cancel_requested?: boolean
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
           duration_ms?: number | null
           error?: string | null
+          heartbeat_at?: string | null
           id?: string
           input: string
           model?: string | null
@@ -327,16 +332,19 @@ export type Database = {
           title?: string | null
           tokens_in?: number
           tokens_out?: number
+          tool_calls?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           agent_id?: string | null
+          cancel_requested?: boolean
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
           duration_ms?: number | null
           error?: string | null
+          heartbeat_at?: string | null
           id?: string
           input?: string
           model?: string | null
@@ -350,6 +358,7 @@ export type Database = {
           title?: string | null
           tokens_in?: number
           tokens_out?: number
+          tool_calls?: number
           updated_at?: string
           user_id?: string
         }
@@ -2933,6 +2942,9 @@ export type Database = {
         | "succeeded"
         | "failed"
         | "cancelled"
+        | "waiting_for_tool"
+        | "waiting_for_approval"
+        | "completed"
       listing_status:
         | "draft"
         | "pending_review"
@@ -3094,6 +3106,9 @@ export const Constants = {
         "succeeded",
         "failed",
         "cancelled",
+        "waiting_for_tool",
+        "waiting_for_approval",
+        "completed",
       ],
       listing_status: [
         "draft",

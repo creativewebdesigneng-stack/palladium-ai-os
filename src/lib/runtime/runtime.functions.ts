@@ -52,15 +52,23 @@ export const cancelAgentTask = createServerFn({ method: "POST" })
       .from("agent_tasks")
       .update({
         status: "cancelled",
+        cancel_requested: true,
         completed_at: new Date().toISOString(),
         error: "Cancelled by the operator.",
       })
       .eq("id", data.task_id)
-      .in("status", ["pending", "queued", "running"])
+      .in("status", [
+        "pending",
+        "queued",
+        "running",
+        "waiting_for_tool",
+        "waiting_for_approval",
+      ])
       .select("*")
       .maybeSingle();
     return { task: task ?? null };
   });
+
 
 /** Agent + recent runs + the tools this workspace can grant. */
 export const getAgentRuntime = createServerFn({ method: "POST" })
