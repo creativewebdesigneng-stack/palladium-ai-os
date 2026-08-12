@@ -294,6 +294,18 @@ export default function MissionControl() {
           />
         )}
 
+        {tab === 'professional' && (
+          <ProfessionalPanel
+            agents={data?.professionalAgents ?? []}
+            workforces={data?.workforces ?? []}
+            runs={data?.workforceRuns ?? []}
+            agentRuns={data?.agentRuns ?? []}
+            loading={isLoading && session !== 'no'}
+          />
+        )}
+
+
+
         {tab === 'approvals' && (
           <ApprovalCentre
             approvals={approvals}
