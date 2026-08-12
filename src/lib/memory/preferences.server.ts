@@ -75,7 +75,8 @@ export async function saveMemoryPreferences(
   }
   if (patch.retention_days !== undefined) {
     const days = patch.retention_days == null ? null : Number(patch.retention_days);
-    row["retention_days"] = days == null || !Number.isFinite(days) || days <= 0 ? null : Math.min(days, 3650);
+    row["retention_days"] =
+      days == null || !Number.isFinite(days) || days <= 0 ? null : Math.min(days, 3650);
   }
 
   const { data, error } = await sb

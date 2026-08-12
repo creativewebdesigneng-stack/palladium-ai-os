@@ -12,22 +12,22 @@ const TEXT_EXT = /\.(txt|md|markdown|csv|tsv|json|ya?ml|log|html?|xml)$/i;
 
 /** Extracts readable text from a file, or returns '' when the type is unsupported. */
 export async function extractDocumentText(file) {
-  if (!file) return '';
+  if (!file) return "";
 
   if (TEXT_TYPES.test(file.type) || TEXT_EXT.test(file.name)) {
     return (await file.text()).slice(0, 400000);
   }
 
-  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+  if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
     return await readPdf(file);
   }
 
-  return '';
+  return "";
 }
 
 async function readPdf(file) {
-  const pdfjs = await import('pdfjs-dist');
-  const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  const pdfjs = await import("pdfjs-dist");
+  const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
 
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -36,10 +36,15 @@ async function readPdf(file) {
   for (let i = 1; i <= limit; i += 1) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    pages.push(content.items.map((item) => item.str || '').join(' '));
+    pages.push(content.items.map((item) => item.str || "").join(" "));
   }
-  return pages.join('\n\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 400000);
+  return pages
+    .join("\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim()
+    .slice(0, 400000);
 }
 
 /** Human-readable list of what the browser can read, for the upload modal. */
-export const READABLE_HINT = 'PDF, TXT, Markdown, CSV, JSON, YAML and HTML can be read automatically. For anything else, add a written summary.';
+export const READABLE_HINT =
+  "PDF, TXT, Markdown, CSV, JSON, YAML and HTML can be read automatically. For anything else, add a written summary.";

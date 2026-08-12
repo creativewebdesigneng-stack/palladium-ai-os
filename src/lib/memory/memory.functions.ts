@@ -281,7 +281,9 @@ export const getMemoryPreferences = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { loadMemoryPreferences } = await import("./preferences.server");
     try {
-      return { preferences: await loadMemoryPreferences(context.supabase as unknown as Sb, context.userId) };
+      return {
+        preferences: await loadMemoryPreferences(context.supabase as unknown as Sb, context.userId),
+      };
     } catch (error) {
       surface(error);
     }
