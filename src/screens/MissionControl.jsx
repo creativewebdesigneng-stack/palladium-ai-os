@@ -283,7 +283,8 @@ export default function MissionControl() {
 
         {tab === 'personal' && (
           <PersonalAISection
-            agents={agents}
+            agents={data?.personalAgents ?? agents}
+
             loading={isLoading && session !== 'no'}
             onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })}
             onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })}
