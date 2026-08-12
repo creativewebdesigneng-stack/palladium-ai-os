@@ -74,6 +74,17 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
     .from("subscriptions")
     .upsert(row, { onConflict: "stripe_subscription_id" });
   if (error) console.error("Failed to upsert subscription:", error.message);
+
+  const { notify } = await import("@/lib/notifications/notify.server");
+  await notify({
+    userId,
+    orgId: (subscription.metadata?.orgId as string | undefined) ?? null,
+    type: "subscription.changed",
+    title: `Your subscription is now ${String(row["status"]).replace(/_/g, " ")}`,
+    body: `Plan: ${planCode}${row["cancel_at_period_end"] ? " — cancels at the end of the period." : "."}`,
+    link: "/billing",
+    metadata: { plan_code: planCode, status: row["status"] },
+  });
 }
 
 async function markCanceled(subscription: any, env: StripeEnv) {
@@ -90,6 +101,25 @@ async function markCanceled(subscription: any, env: StripeEnv) {
     .eq("stripe_subscription_id", subscription.id)
     .eq("environment", env);
   if (error) console.error("Failed to cancel subscription:", error.message);
+
+  const { data: cancelled } = await getSupabase()
+    .from("subscriptions")
+    .select("user_id, org_id, plan_code")
+    .eq("stripe_subscription_id", subscription.id)
+    .eq("environment", env)
+    .maybeSingle();
+  if (cancelled?.user_id) {
+    const { notify } = await import("@/lib/notifications/notify.server");
+    await notify({
+      userId: cancelled.user_id,
+      orgId: cancelled.org_id ?? null,
+      type: "subscription.changed",
+      title: "Your subscription has been cancelled",
+      body: `The ${cancelled.plan_code ?? "current"} plan will not renew.`,
+      link: "/billing",
+      metadata: { status: "canceled" },
+    });
+  }
 }
 
 async function recordUsage(invoice: any, env: StripeEnv) {
@@ -130,6 +160,25 @@ async function markPaymentFailed(invoice: any, env: StripeEnv) {
     .eq("stripe_subscription_id", subscriptionId)
     .eq("environment", env);
   if (error) console.error("Failed to mark subscription past_due:", error.message);
+
+  const { data: sub } = await getSupabase()
+    .from("subscriptions")
+    .select("user_id, org_id")
+    .eq("stripe_subscription_id", subscriptionId)
+    .eq("environment", env)
+    .maybeSingle();
+  if (sub?.user_id) {
+    const { notify } = await import("@/lib/notifications/notify.server");
+    await notify({
+      userId: sub.user_id,
+      orgId: sub.org_id ?? null,
+      type: "payment.failed",
+      title: "A payment could not be collected",
+      body: "Your latest invoice failed, so the subscription is marked past due. Update your payment method to keep access.",
+      link: "/billing",
+      metadata: { invoice_id: invoice.id ?? null },
+    });
+  }
 }
 
 /**
