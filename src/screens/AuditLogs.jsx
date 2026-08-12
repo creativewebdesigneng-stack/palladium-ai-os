@@ -13,7 +13,7 @@ import { useActiveOrg } from '@/hooks/use-workspace';
 // organisation, everyone else sees their own events.
 export default function AuditLogs() {
   const { toast } = useToast();
-  const orgId = useActiveOrg();
+  const { orgId } = useActiveOrg();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({ user: 'All', org: 'All', action: 'All', resource: 'All', result: 'All', date: '' });
   const [selected, setSelected] = useState(null);
