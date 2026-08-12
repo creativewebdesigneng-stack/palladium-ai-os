@@ -18,8 +18,10 @@ import UsageDashboard from '@/components/billing/UsageDashboard';
 import { Panel } from '@/components/billing/shared';
 import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
 import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
-import { priceIdFor, getStripeEnvironment } from '@/lib/stripe';
+import { getStripeEnvironment } from '@/lib/stripe';
+import { normalizePlanCode } from '@/lib/billing/catalog';
 import { createPortalSession } from '@/utils/payments.functions';
+import SubscriptionActions from '@/components/billing/SubscriptionActions';
 
 const TABS = ['Overview', 'Plans', 'Usage', 'Invoices', 'History', 'Compare', 'Enterprise'];
 
@@ -27,17 +29,14 @@ export default function Billing() {
   const [tab, setTab] = useState('Overview');
   const [query, setQuery] = useState('');
   const [cycle, setCycle] = useState('monthly');
-  const [checkoutPriceId, setCheckoutPriceId] = useState(null);
+  const [checkoutPlan, setCheckoutPlan] = useState(null);
   const [portalError, setPortalError] = useState(null);
 
+  // Plan codes only — the backend maps them to approved Stripe prices.
   const choosePlan = (planId) => {
-    if (planId === 'free') { setTab('Plans'); return; }
-    if (planId === 'enterprise' || planId === 'business') {
-      // Both are self-serve plans in the catalog; enterprise enquiries use the section below.
-    }
-    const priceId = priceIdFor(planId, cycle);
-    if (!priceId) { setTab('Enterprise'); return; }
-    setCheckoutPriceId(priceId);
+    const code = normalizePlanCode(planId);
+    if (!code || code === 'explorer') { setTab('Plans'); return; }
+    setCheckoutPlan(code);
     setTab('Plans');
   };
 
@@ -93,10 +92,11 @@ export default function Billing() {
           {tab === 'Overview' && (
             <>
               <CurrentPlan onUpgrade={() => setTab('Plans')} onChange={() => setTab('Plans')} onManage={openPortal} />
+              <SubscriptionActions onChangePlan={() => setTab('Plans')} />
               <UsageDashboard />
               <UpgradeRecommendation onUpgrade={() => setTab('Plans')} />
               <Panel icon={Gauge} title="Usage" grad="from-violet-500 to-indigo-500"><UsageMetrics /></Panel>
-              <Panel icon={CreditCard} title="Payment method" grad="from-sky-500 to-cyan-500"><PaymentMethod /></Panel>
+              <Panel icon={CreditCard} title="Payment method" grad="from-sky-500 to-cyan-500"><PaymentMethod onAdd={openPortal} /></Panel>
               <Panel icon={BarChart3} title="Usage breakdown" grad="from-emerald-500 to-teal-500"><UsageBreakdown /></Panel>
               <Panel icon={History} title="Subscription history" grad="from-violet-500 to-indigo-500"><SubscriptionHistory /></Panel>
             </>
@@ -106,16 +106,16 @@ export default function Billing() {
               <CurrentPlan onUpgrade={() => setTab('Compare')} onChange={() => setTab('Compare')} onManage={openPortal} />
               <div className="flex items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[.025] p-1.5 w-fit">
                 {['monthly', 'yearly'].map((c) => (
-                  <button key={c} onClick={() => { setCycle(c); setCheckoutPriceId(null); }}
+                  <button key={c} onClick={() => { setCycle(c); setCheckoutPlan(null); }}
                     className={`rounded-xl px-3.5 py-1.5 text-xs font-medium capitalize transition ${cycle === c ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
                     {c} billing
                   </button>
                 ))}
               </div>
-              {checkoutPriceId ? (
+              {checkoutPlan ? (
                 <Panel icon={CreditCard} title="Complete your upgrade" grad="from-violet-500 to-indigo-500">
-                  <PalladiumCheckout priceId={checkoutPriceId} returnUrl={`${window.location.origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`} />
-                  <button onClick={() => setCheckoutPriceId(null)} className="mt-3 rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5">Cancel</button>
+                  <PalladiumCheckout planCode={checkoutPlan} interval={cycle} returnUrl={`${window.location.origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`} />
+                  <button onClick={() => setCheckoutPlan(null)} className="mt-3 rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5">Cancel</button>
                 </Panel>
               ) : (
                 <Panel icon={Wallet} title="Choose a plan" grad="from-violet-500 to-indigo-500"><PlansGrid onSelect={choosePlan} /></Panel>

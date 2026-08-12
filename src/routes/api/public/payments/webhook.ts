@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { type StripeEnv, verifyWebhook } from "@/lib/stripe.server";
+import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
+import { planForPriceKey } from "@/lib/billing/catalog";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -25,16 +26,6 @@ const STATUS_MAP: Record<string, string> = {
   paused: "paused",
 };
 
-// Human readable price lookup keys -> plan codes in public.plans.
-const PLAN_BY_PRICE: Record<string, string> = {
-  pro_monthly: "pro",
-  pro_yearly: "pro",
-  business_monthly: "business",
-  business_yearly: "business",
-  enterprise_monthly: "enterprise",
-  enterprise_yearly: "enterprise",
-};
-
 function resolvePriceKey(item: any): string | null {
   return (
     item?.price?.lookup_key || item?.price?.metadata?.lovable_external_id || item?.price?.id || null
@@ -54,7 +45,7 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
 
   const item = subscription.items?.data?.[0];
   const priceKey = resolvePriceKey(item);
-  const planCode = (priceKey && PLAN_BY_PRICE[priceKey]) || "pro";
+  const planCode = planForPriceKey(priceKey) ?? "builder";
   const productId =
     typeof item?.price?.product === "string" ? item.price.product : item?.price?.product?.id;
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
@@ -88,7 +79,14 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
 async function markCanceled(subscription: any, env: StripeEnv) {
   const { error } = await getSupabase()
     .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
+    .update({
+      status: "canceled",
+      cancel_at_period_end: false,
+      current_period_end: iso(
+        subscription.items?.data?.[0]?.current_period_end ?? subscription.current_period_end,
+      ),
+      updated_at: new Date().toISOString(),
+    })
     .eq("stripe_subscription_id", subscription.id)
     .eq("environment", env);
   if (error) console.error("Failed to cancel subscription:", error.message);
@@ -122,8 +120,60 @@ async function recordUsage(invoice: any, env: StripeEnv) {
   if (error) console.error("Failed to record usage:", error.message);
 }
 
+async function markPaymentFailed(invoice: any, env: StripeEnv) {
+  const subscriptionId =
+    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  if (!subscriptionId) return;
+  const { error } = await getSupabase()
+    .from("subscriptions")
+    .update({ status: "past_due", updated_at: new Date().toISOString() })
+    .eq("stripe_subscription_id", subscriptionId)
+    .eq("environment", env);
+  if (error) console.error("Failed to mark subscription past_due:", error.message);
+}
+
+/**
+ * Checkout completion is a safety net: `customer.subscription.created` normally
+ * carries the state, but if it is delayed or dropped we resolve the subscription
+ * from Stripe directly (never from client input) and upsert it.
+ */
+async function handleCheckoutCompleted(session: any, env: StripeEnv) {
+  if (session.payment_status === "unpaid") return;
+  const subscriptionId =
+    typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+  if (!subscriptionId) return;
+
+  const stripe = createStripeClient(env);
+  const subscription: any = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ["items.data.price"],
+  });
+  if (!subscription.metadata?.userId && session.metadata?.userId) {
+    subscription.metadata = { ...(subscription.metadata ?? {}), ...session.metadata };
+  }
+  await upsertSubscription(subscription, env);
+}
+
+/** Returns true when this event has not been processed before. */
+async function claimEvent(event: any, env: StripeEnv): Promise<boolean> {
+  if (!event?.id) return true;
+  const { error } = await getSupabase()
+    .from("billing_webhook_events")
+    .insert({ event_id: event.id, type: event.type, environment: env });
+  if (!error) return true;
+  // 23505 = unique violation -> already handled, ack without reprocessing.
+  if ((error as any).code === "23505") return false;
+  console.error("Failed to record webhook event:", error.message);
+  return true;
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
-  const event = await verifyWebhook(req, env);
+  const event: any = await verifyWebhook(req, env);
+
+  const fresh = await claimEvent(event, env);
+  if (!fresh) {
+    console.log("Duplicate payments event ignored:", event.id);
+    return;
+  }
 
   switch (event.type) {
     case "customer.subscription.created":
@@ -133,12 +183,15 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     case "customer.subscription.deleted":
       await markCanceled(event.data.object, env);
       break;
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded":
+      await handleCheckoutCompleted(event.data.object, env);
+      break;
     case "invoice.paid":
       await recordUsage(event.data.object, env);
       break;
-    case "checkout.session.completed":
-    case "checkout.session.async_payment_succeeded":
-      // Subscription state arrives through customer.subscription.* events.
+    case "invoice.payment_failed":
+      await markPaymentFailed(event.data.object, env);
       break;
     default:
       console.log("Unhandled payments event:", event.type);
