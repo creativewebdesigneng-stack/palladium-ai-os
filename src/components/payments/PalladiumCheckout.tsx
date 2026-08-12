@@ -5,12 +5,19 @@ import { createCheckoutSession } from "@/utils/payments.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
-  priceId: string;
+  /** Internal plan code (explorer | builder | business | enterprise, or legacy free/pro). */
+  planCode: string;
+  interval?: "monthly" | "yearly";
   orgId?: string;
   returnUrl?: string;
 }
 
-export default function PalladiumCheckout({ priceId, orgId, returnUrl }: Props) {
+export default function PalladiumCheckout({
+  planCode,
+  interval = "monthly",
+  orgId,
+  returnUrl,
+}: Props) {
   // Checkout requires a signed-in session — the server function is auth-gated,
   // so mounting it without a bearer token throws "No authorization header".
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -34,7 +41,8 @@ export default function PalladiumCheckout({ priceId, orgId, returnUrl }: Props) 
     try {
       const result = await createCheckoutSession({
         data: {
-          priceId,
+          planCode,
+          interval,
           ...(orgId ? { orgId } : {}),
           returnUrl:
             returnUrl ||

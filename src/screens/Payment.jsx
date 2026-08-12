@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
 import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
 import { useAuth } from '@/lib/AuthContext';
-import { priceIdFor } from '@/lib/stripe';
 import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
 import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
 
@@ -21,7 +20,6 @@ export default function Payment() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const { checkUserAuth, user, isAuthenticated } = useAuth();
-  const priceId = priceIdFor(plan.id, billing);
 
   // Every account is on the free Explorer tier by default — it is the plan the
   // server falls back to when no active subscription row exists, so no client
@@ -79,7 +77,8 @@ export default function Payment() {
                 {checkoutOpen && priceId ? (
                   <div className="mt-5">
                     <PalladiumCheckout
-                      priceId={priceId}
+                      planCode={plan.id}
+                      interval={billing}
                       returnUrl={`${window.location.origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`}
                     />
                   </div>
