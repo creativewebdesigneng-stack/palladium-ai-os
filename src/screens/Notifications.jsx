@@ -8,7 +8,7 @@ import NotificationsOverviewCards from '@/components/notifications/Notifications
 import NotificationsCategoryNav from '@/components/notifications/NotificationsCategoryNav';
 import NotificationsFilters from '@/components/notifications/NotificationsFilters';
 import NotificationsList from '@/components/notifications/NotificationsList';
-import NotificationSettings, { initialSettings } from '@/components/notifications/NotificationSettings';
+import NotificationPreferencesPanel from '@/components/notifications/NotificationPreferencesPanel';
 import { CATEGORIES, metaForKind, tagsForKind, priorityForKind } from '@/components/notifications/notificationsData';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -37,10 +37,10 @@ function toItem(n) {
     desc: n.body || '',
     time: timeAgo(n.created_at),
     createdAt: n.created_at,
-    priority: priorityForKind(n.kind),
+    priority: priorityForKind(n.kind, n.severity),
     read: !!n.read_at,
     related: n.link ? { type: meta.category, label: n.link, path: n.link } : null,
-    tags: tagsForKind(n.kind),
+    tags: tagsForKind(n.kind, n.severity),
   };
 }
 
@@ -54,7 +54,6 @@ export default function Notifications() {
   const [active, setActive] = useState('all');
   const [activeFilters, setActiveFilters] = useState([]);
   const [query, setQuery] = useState('');
-  const [settings, setSettings] = useState(initialSettings);
 
   const [session, setSession] = useState('unknown');
   useEffect(() => {
@@ -109,7 +108,7 @@ export default function Notifications() {
   const overview = useMemo(() => ([
     { label: 'Unread', value: items.filter((n) => !n.read).length, detail: 'across all categories', grad: 'from-violet-500 to-indigo-500', icon: 'Bell' },
     { label: 'Important', value: items.filter((n) => n.tags.includes('important')).length, detail: 'needs attention', grad: 'from-rose-500 to-red-500', icon: 'Star' },
-    { label: 'Mentions', value: items.filter((n) => n.tags.includes('mentions')).length, detail: '@you', grad: 'from-emerald-500 to-teal-500', icon: 'AtSign' },
+    { label: 'Approvals', value: items.filter((n) => n.category === 'security').length, detail: 'awaiting you', grad: 'from-emerald-500 to-teal-500', icon: 'AtSign' },
     { label: 'Failures', value: items.filter((n) => n.tags.includes('failures')).length, detail: 'workflows + agents', grad: 'from-amber-500 to-orange-500', icon: 'XCircle' },
   ]), [items]);
 
@@ -125,8 +124,6 @@ export default function Notifications() {
     if (q) list = list.filter((n) => n.title.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q));
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [items, active, activeFilters, query]);
-
-  const updateSetting = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
 
   return (
     <>
@@ -178,7 +175,7 @@ export default function Notifications() {
           )}
         </div>
         <div className="hidden xl:block">
-          <div className="sticky top-6"><NotificationSettings settings={settings} update={updateSetting} /></div>
+          <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto pr-1"><NotificationPreferencesPanel compact /></div>
         </div>
       </div>
     </>

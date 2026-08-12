@@ -16,6 +16,7 @@ import {
   storeMemory,
 } from "@/lib/memory/memory.server";
 import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
+import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
   assertWithinLimit,
   getEntitlements,
@@ -230,6 +231,26 @@ export async function prepareRun(args: {
     metadata: { task_id: task.id, provider, model },
   });
 
+  await notify({
+    userId: args.userId,
+    orgId,
+    type: "agent.started",
+    title: `${agent.name} started a run`,
+    body: input.slice(0, 200),
+    link: `/agents/${agent.id}`,
+    metadata: { task_id: task.id, agent_id: agent.id },
+  });
+
+  // Warn before the monthly allowance runs out rather than after.
+  await notifyUsageThreshold({
+    userId: args.userId,
+    orgId,
+    metric: "tasks_per_month",
+    used: ent.usage.tasksThisMonth + 1,
+    limit: ent.limits.tasks_per_month,
+    planName: ent.planName,
+  });
+
   // queued -> running only once every gate has passed and the row exists.
   await setRunState(args.sb, task.id as string, "running");
 
@@ -271,12 +292,7 @@ export const TASK_STATES = [
 
 export type TaskState = (typeof TASK_STATES)[number];
 
-export const ACTIVE_TASK_STATES: TaskState[] = [
-  "pending",
-  "queued",
-  "running",
-  "waiting_for_tool",
-];
+export const ACTIVE_TASK_STATES: TaskState[] = ["pending", "queued", "running", "waiting_for_tool"];
 
 export function isTerminalState(status: string): boolean {
   return ["succeeded", "completed", "failed", "cancelled"].includes(status);
@@ -326,7 +342,6 @@ async function isCancelled(sb: Sb, taskId: string) {
   return data?.status === "cancelled" || data?.cancel_requested === true;
 }
 
-
 export async function completeRun(args: {
   sb: Sb;
   userId: string;
@@ -354,7 +369,6 @@ export async function completeRun(args: {
     })
     .eq("id", run.taskId);
 
-
   await db
     .from("personal_agents")
     .update({ last_run_at: new Date().toISOString() })
@@ -366,7 +380,9 @@ export async function completeRun(args: {
     const memoryPrefs = await loadMemoryPreferences(args.sb as never, args.userId).catch(
       () => null,
     );
-    const mayCapture = memoryPrefs ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled : true;
+    const mayCapture = memoryPrefs
+      ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled
+      : true;
     await Promise.all([
       storeMemory({
         sb: args.sb as never,
@@ -389,15 +405,15 @@ export async function completeRun(args: {
       ),
       mayCapture &&
         args.sb.from("personal_memories").insert({
-        user_id: args.userId,
-        org_id: run.orgId,
-        agent_id: run.agent.id,
-        category: "run_history",
-        key: `run:${new Date().toISOString().slice(0, 19)}`,
-        value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
-        scope: "personal",
-        metadata: { task_id: run.taskId, agent: run.agent.name },
-      }),
+          user_id: args.userId,
+          org_id: run.orgId,
+          agent_id: run.agent.id,
+          category: "run_history",
+          key: `run:${new Date().toISOString().slice(0, 19)}`,
+          value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
+          scope: "personal",
+          metadata: { task_id: run.taskId, agent: run.agent.name },
+        }),
     ]);
   }
 
@@ -419,7 +435,6 @@ export async function completeRun(args: {
       },
     }),
     recordUsage({
-
       userId: args.userId,
       orgId: run.orgId,
       metric: "tokens",
@@ -472,6 +487,16 @@ export async function completeRun(args: {
     payload,
   });
 
+  await notify({
+    userId: args.userId,
+    orgId: run.orgId,
+    type: "agent.completed",
+    title: `${run.agent.name} completed a run`,
+    body: `Finished in ${(duration / 1000).toFixed(1)}s using ${result.usage.input + result.usage.output} tokens.`,
+    link: `/agents/${run.agent.id}`,
+    metadata: { task_id: run.taskId, agent_id: run.agent.id },
+  });
+
   return data;
 }
 
@@ -503,7 +528,6 @@ export async function failRun(args: {
     })
     .eq("id", args.run.taskId);
 
-
   await db.from("agent_activities").insert({
     user_id: args.userId,
     org_id: args.run.orgId,
@@ -531,6 +555,18 @@ export async function failRun(args: {
     event: "agent.failed",
     payload: { agent_id: args.run.agent.id, task_id: args.run.taskId, error: message },
   });
+
+  if (!cancelled) {
+    await notify({
+      userId: args.userId,
+      orgId: args.run.orgId,
+      type: "agent.failed",
+      title: `${args.run.agent.name} failed`,
+      body: message,
+      link: `/agents/${args.run.agent.id}`,
+      metadata: { task_id: args.run.taskId, agent_id: args.run.agent.id, timed_out: timedOut },
+    });
+  }
 
   console.error("[runtime] run failed", args.run.taskId, args.error);
   return message;
@@ -597,10 +633,26 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
       deps.run.taskId,
       awaitingApproval ? "waiting_for_approval" : "running",
     );
+    if (awaitingApproval) await notifyInputRequired(deps.userId, deps.run);
   }
   return { awaitingApproval };
 }
 
+/** Tells the operator a run has paused and is waiting on them. */
+async function notifyInputRequired(
+  userId: string,
+  run: Pick<PreparedRun, "taskId" | "agent" | "orgId">,
+) {
+  await notify({
+    userId,
+    orgId: run.orgId,
+    type: "agent.input_required",
+    title: `${run.agent.name} is waiting for you`,
+    body: "The run paused on an action that needs your approval before it can continue.",
+    link: "/mission-control",
+    metadata: { task_id: run.taskId, agent_id: run.agent.id },
+  });
+}
 
 /** Non-streaming execution: model turns + tool rounds until a final answer. */
 export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRun }) {
@@ -616,8 +668,7 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-      if (timedOut)
-        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
@@ -695,8 +746,7 @@ export async function* streamRun(args: {
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-      if (timedOut)
-        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }

@@ -1306,6 +1306,39 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          browser_push: boolean
+          browser_push_details: boolean
+          created_at: string
+          in_app: boolean
+          min_severity: string
+          muted_types: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          browser_push?: boolean
+          browser_push_details?: boolean
+          created_at?: string
+          in_app?: boolean
+          min_severity?: string
+          muted_types?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          browser_push?: boolean
+          browser_push_details?: boolean
+          created_at?: string
+          in_app?: boolean
+          min_severity?: string
+          muted_types?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -1316,6 +1349,7 @@ export type Database = {
           metadata: Json
           org_id: string | null
           read_at: string | null
+          severity: string
           title: string
           user_id: string
         }
@@ -1328,6 +1362,7 @@ export type Database = {
           metadata?: Json
           org_id?: string | null
           read_at?: string | null
+          severity?: string
           title: string
           user_id: string
         }
@@ -1340,6 +1375,7 @@ export type Database = {
           metadata?: Json
           org_id?: string | null
           read_at?: string | null
+          severity?: string
           title?: string
           user_id?: string
         }

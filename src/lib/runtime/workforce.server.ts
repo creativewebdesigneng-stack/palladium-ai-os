@@ -22,6 +22,7 @@ import {
   recordUsage,
 } from "@/lib/platform/entitlements.server";
 import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -486,6 +487,20 @@ export async function executeWorkflow(args: {
       },
     }).catch(() => undefined);
 
+    await notify({
+      userId: args.userId,
+      orgId,
+      type: failure ? "workflow.failed" : "workflow.completed",
+      title: failure
+        ? `Workflow "${workflow.name}" failed`
+        : `Workflow "${workflow.name}" completed`,
+      body: failure
+        ? `Stopped on step "${failure.name}": ${String(failure.error).slice(0, 200)}`
+        : `${completed.length} step${completed.length === 1 ? "" : "s"} finished successfully.`,
+      link: "/workforce",
+      metadata: { run_id: runId, workflow_id: workflow.id },
+    });
+
     const { data: finished } = await args.sb
       .from("workflow_runs")
       .select("*")
@@ -503,6 +518,14 @@ export async function executeWorkflow(args: {
         completed_at: new Date().toISOString(),
       })
       .eq("id", runId);
+    await notify({
+      userId: args.userId,
+      type: "workflow.failed",
+      title: "A workflow run failed",
+      body: message.slice(0, 200),
+      link: "/workforce",
+      metadata: { run_id: runId },
+    });
     throw error instanceof WorkforceError ? error : new WorkforceError(message);
   }
 }

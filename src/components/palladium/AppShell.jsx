@@ -8,12 +8,14 @@ import SpaceBackground from '@/components/visual/SpaceBackground';
 import PageTransition from '@/components/visual/PageTransition';
 import { UpgradeProvider } from '@/lib/upgradeContext';
 import UpgradeModal from '@/components/UpgradeModal';
+import useRealtimeNotifications from '@/hooks/useRealtimeNotifications';
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [command, setCommand] = useState(false);
   const [assistantPanel, setAssistantPanel] = useState(false);
+  const { unread } = useRealtimeNotifications();
 
   useEffect(() => {
     const handler = (e) => {
@@ -37,6 +39,7 @@ export default function AppShell() {
           openMobile={() => setMobileOpen(true)}
           openCommand={() => setCommand(true)}
           openAssistant={() => setAssistantPanel(true)}
+          unread={unread}
         />
         <main className="relative mx-auto max-w-[1600px] p-4 lg:p-6">
           <PageTransition><Outlet /></PageTransition>

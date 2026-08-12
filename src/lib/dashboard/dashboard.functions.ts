@@ -35,33 +35,23 @@ export const getDashboardSummary = createServerFn({ method: "POST" })
     const orgId = data.orgId ?? null;
 
     const now = new Date();
-    const startToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const startToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
     const startYesterday = new Date(startToday.getTime() - 86400000);
     const sevenDaysAgo = new Date(startToday.getTime() - 6 * 86400000);
 
     const [agentsRes, tasksRes, usageRes, notificationsRes, entitlements] = await Promise.all([
-      scope(
-        sb.from("personal_agents").select("id,name,status,model,created_at"),
-        orgId,
-        userId,
-      )
+      scope(sb.from("personal_agents").select("id,name,status,model,created_at"), orgId, userId)
         .order("created_at", { ascending: false })
         .limit(200),
-      scope(
-        sb.from("agent_tasks").select("id,title,status,input,created_at"),
-        orgId,
-        userId,
-      )
+      scope(sb.from("agent_tasks").select("id,title,status,input,created_at"), orgId, userId)
         .order("created_at", { ascending: false })
         .limit(200),
       scope(sb.from("usage_records").select("metric,quantity,occurred_at"), orgId, userId)
         .gte("occurred_at", sevenDaysAgo.toISOString())
         .limit(2000),
-      scope(
-        sb.from("notifications").select("id,title,kind,read_at,created_at"),
-        orgId,
-        userId,
-      )
+      scope(sb.from("notifications").select("id,title,kind,read_at,created_at"), orgId, userId)
         .order("created_at", { ascending: false })
         .limit(20),
       getEntitlements(sb as never, userId, orgId),
@@ -101,13 +91,18 @@ export const getDashboardSummary = createServerFn({ method: "POST" })
     const queuedTasks = tasks.filter((t: any) => t.status === "pending").length;
     const activeAgents = agents.filter((a: any) => a.status === "active").length;
     const connectedModels = new Set(
-      agents.filter((a: any) => a.status === "active").map((a: any) => a.model).filter(Boolean),
+      agents
+        .filter((a: any) => a.status === "active")
+        .map((a: any) => a.model)
+        .filter(Boolean),
     ).size;
 
     const activity = [
-      ...agents
-        .slice(0, 5)
-        .map((a: any) => ({ id: `agent-${a.id}`, message: `Agent "${a.name}" is ${a.status}`, created_at: a.created_at })),
+      ...agents.slice(0, 5).map((a: any) => ({
+        id: `agent-${a.id}`,
+        message: `Agent "${a.name}" is ${a.status}`,
+        created_at: a.created_at,
+      })),
       ...tasks.slice(0, 5).map((t: any) => ({
         id: `task-${t.id}`,
         message: `Task "${t.title || String(t.input ?? "").slice(0, 60) || "Untitled"}" ${t.status}`,
@@ -129,7 +124,9 @@ export const getDashboardSummary = createServerFn({ method: "POST" })
       },
       usageSeries,
       activity,
-      recentAgents: agents.slice(0, 5).map((a: any) => ({ id: a.id, name: a.name, status: a.status })),
+      recentAgents: agents
+        .slice(0, 5)
+        .map((a: any) => ({ id: a.id, name: a.name, status: a.status })),
       recentTasks: tasks.slice(0, 5).map((t: any) => ({
         id: t.id,
         title: t.title || (t.input ? String(t.input).slice(0, 60) : "Untitled task"),
@@ -160,7 +157,7 @@ export const listNotifications = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const { data: rows, error } = await sb
       .from("notifications")
-      .select("id,title,body,kind,link,metadata,read_at,created_at")
+      .select("id,title,body,kind,severity,link,metadata,read_at,created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(data.limit ?? 100);
@@ -221,14 +218,18 @@ export const getAnalyticsSummary = createServerFn({ method: "POST" })
     const prevWindowStart = new Date(windowStart.getTime() - days * 86400000);
 
     const [agentsRes, teamsRes, tasksRes, prevTasksRes, workflowRunsRes] = await Promise.all([
-      scope(sb.from("personal_agents").select("id,name,team_id,model,status"), orgId, userId).limit(500),
+      scope(sb.from("personal_agents").select("id,name,team_id,model,status"), orgId, userId).limit(
+        500,
+      ),
       orgId
         ? sb.from("teams").select("id,name,team_members(id)").eq("org_id", orgId)
         : Promise.resolve({ data: [], error: null }),
       scope(
         sb
           .from("agent_tasks")
-          .select("id,agent_id,status,model,tokens_in,tokens_out,cost_pence,duration_ms,created_at"),
+          .select(
+            "id,agent_id,status,model,tokens_in,tokens_out,cost_pence,duration_ms,created_at",
+          ),
         orgId,
         userId,
       )
@@ -264,15 +265,43 @@ export const getAnalyticsSummary = createServerFn({ method: "POST" })
       workflowRuns.filter((r: any) => r.status === "failed").length;
 
     const pctDelta = (curr: number, prev: number) =>
-      prev === 0 ? (curr > 0 ? "+100%" : "0%") : `${curr >= prev ? "+" : ""}${(((curr - prev) / prev) * 100).toFixed(1)}%`;
+      prev === 0
+        ? curr > 0
+          ? "+100%"
+          : "0%"
+        : `${curr >= prev ? "+" : ""}${(((curr - prev) / prev) * 100).toFixed(1)}%`;
 
     const metrics = [
       { id: "agents", label: "Agents", value: String(agents.length), delta: "", up: true },
-      { id: "tasks", label: "Tasks", value: String(tasks.length), delta: pctDelta(tasks.length, prevTasks.length), up: tasks.length >= prevTasks.length },
-      { id: "workflows", label: "Workflow runs", value: String(workflowRuns.length), delta: "", up: true },
-      { id: "ai-requests", label: "AI Requests", value: String(tasks.length), delta: pctDelta(tasks.length, prevTasks.length), up: tasks.length >= prevTasks.length },
+      {
+        id: "tasks",
+        label: "Tasks",
+        value: String(tasks.length),
+        delta: pctDelta(tasks.length, prevTasks.length),
+        up: tasks.length >= prevTasks.length,
+      },
+      {
+        id: "workflows",
+        label: "Workflow runs",
+        value: String(workflowRuns.length),
+        delta: "",
+        up: true,
+      },
+      {
+        id: "ai-requests",
+        label: "AI Requests",
+        value: String(tasks.length),
+        delta: pctDelta(tasks.length, prevTasks.length),
+        up: tasks.length >= prevTasks.length,
+      },
       { id: "errors", label: "Errors", value: String(errors), delta: "", up: errors === 0 },
-      { id: "costs", label: "Costs", value: `£${(totalCostPence / 100).toFixed(2)}`, delta: pctDelta(totalCostPence, prevCostPence), up: totalCostPence <= prevCostPence },
+      {
+        id: "costs",
+        label: "Costs",
+        value: `£${(totalCostPence / 100).toFixed(2)}`,
+        delta: pctDelta(totalCostPence, prevCostPence),
+        up: totalCostPence <= prevCostPence,
+      },
     ];
 
     // Activity series bucketed by day (daily -> hourly buckets collapsed to a
@@ -288,7 +317,11 @@ export const getAnalyticsSummary = createServerFn({ method: "POST" })
     }
     const activity = Object.keys(buckets)
       .sort()
-      .map((k) => ({ k, requests: buckets[k]?.requests ?? 0, users: buckets[k]?.activeAgents.size ?? 0 }));
+      .map((k) => ({
+        k,
+        requests: buckets[k]?.requests ?? 0,
+        users: buckets[k]?.activeAgents.size ?? 0,
+      }));
 
     // Per-agent aggregates.
     const byAgent = new Map<string, { tasks: number; completed: number; cost: number }>();
@@ -312,7 +345,9 @@ export const getAnalyticsSummary = createServerFn({ method: "POST" })
       .slice(0, 8);
 
     // Per-team aggregates (via each agent's team_id).
-    const agentTeam = new Map<string, string | null>(agents.map((a: any) => [a.id, a.team_id] as [string, string | null]));
+    const agentTeam = new Map<string, string | null>(
+      agents.map((a: any) => [a.id, a.team_id] as [string, string | null]),
+    );
     const byTeam = new Map<string, { tasks: number; cost: number }>();
     for (const t of tasks) {
       const teamId = t.agent_id ? agentTeam.get(t.agent_id) : null;
@@ -336,11 +371,25 @@ export const getAnalyticsSummary = createServerFn({ method: "POST" })
     // Per-model aggregates.
     const byModel = new Map<
       string,
-      { requests: number; tokensIn: number; tokensOut: number; cost: number; duration: number; durationCount: number }
+      {
+        requests: number;
+        tokensIn: number;
+        tokensOut: number;
+        cost: number;
+        duration: number;
+        durationCount: number;
+      }
     >();
     for (const t of tasks) {
       const key = t.model || "Unknown";
-      const row = byModel.get(key) ?? { requests: 0, tokensIn: 0, tokensOut: 0, cost: 0, duration: 0, durationCount: 0 };
+      const row = byModel.get(key) ?? {
+        requests: 0,
+        tokensIn: 0,
+        tokensOut: 0,
+        cost: 0,
+        duration: 0,
+        durationCount: 0,
+      };
       row.requests += 1;
       row.tokensIn += Number(t.tokens_in ?? 0);
       row.tokensOut += Number(t.tokens_out ?? 0);
