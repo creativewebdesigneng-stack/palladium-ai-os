@@ -407,10 +407,12 @@ export async function completeRun(args: {
         model: run.model,
         tokens_in: result.usage.input,
         tokens_out: result.usage.output,
+        tool_calls: args.toolCallCount,
         duration_ms: duration,
       },
     }),
     recordUsage({
+
       userId: args.userId,
       orgId: run.orgId,
       metric: "tokens",
