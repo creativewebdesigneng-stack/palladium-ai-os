@@ -603,6 +603,12 @@ export async function ingestDocument(args: {
 
 /** Deletes a document, its chunks and any vectors held by an external store. */
 export async function deleteDocument(args: { sb: Sb; userId: string; documentId: string }) {
+  const { data: doc } = await args.sb
+    .from("memory_documents")
+    .select("id,storage_path")
+    .eq("id", args.documentId)
+    .maybeSingle();
+
   const { data: chunks } = await args.sb
     .from("memory_chunks")
     .select("id,org_id,agent_id,vector_provider")
@@ -622,6 +628,16 @@ export async function deleteDocument(args: { sb: Sb; userId: string; documentId:
   }
   const { error } = await args.sb.from("memory_documents").delete().eq("id", args.documentId);
   if (error) throw new MemoryError(error.message);
+
+  // The uploaded file goes with the document; nothing is left in the private bucket.
+  if (doc?.storage_path) {
+    try {
+      const storage = (args.sb as unknown as { storage?: any }).storage;
+      await storage?.from("knowledge").remove([doc.storage_path]);
+    } catch (storageError) {
+      console.error("[memory] document file delete failed", storageError);
+    }
+  }
   return { deleted: true, id: args.documentId };
 }
 
