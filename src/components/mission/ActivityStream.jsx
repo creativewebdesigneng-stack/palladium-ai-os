@@ -1,19 +1,32 @@
 import { motion } from 'framer-motion';
-import { Radio, Search, PackageSearch, CheckCircle2, ShieldAlert, ThumbsUp, ThumbsDown, XCircle, Bot } from 'lucide-react';
+import {
+  Radio, Search, PackageSearch, CheckCircle2, ShieldAlert, ThumbsUp, ThumbsDown, XCircle, Bot,
+  Cog, Wrench, ArrowLeftRight, Play,
+} from 'lucide-react';
 
 const KIND = {
-  task_started: { icon: Bot, cls: 'text-violet-300', ring: 'ring-violet-400/25' },
+  task_started: { icon: Play, cls: 'text-violet-300', ring: 'ring-violet-400/25' },
+  run_started: { icon: Play, cls: 'text-violet-300', ring: 'ring-violet-400/25' },
+  working: { icon: Cog, cls: 'text-violet-300', ring: 'ring-violet-400/25' },
   searching: { icon: Search, cls: 'text-cyan-300', ring: 'ring-cyan-400/25' },
   results_found: { icon: PackageSearch, cls: 'text-sky-300', ring: 'ring-sky-400/25' },
+  preparing_action: { icon: Wrench, cls: 'text-amber-300', ring: 'ring-amber-400/25' },
+  tool_call: { icon: Wrench, cls: 'text-cyan-300', ring: 'ring-cyan-400/25' },
+  handoff: { icon: ArrowLeftRight, cls: 'text-indigo-300', ring: 'ring-indigo-400/25' },
   completed: { icon: CheckCircle2, cls: 'text-emerald-300', ring: 'ring-emerald-400/25' },
+  run_completed: { icon: CheckCircle2, cls: 'text-emerald-300', ring: 'ring-emerald-400/25' },
   awaiting_approval: { icon: ShieldAlert, cls: 'text-amber-300', ring: 'ring-amber-400/25' },
+  approval_required: { icon: ShieldAlert, cls: 'text-amber-300', ring: 'ring-amber-400/25' },
   approved: { icon: ThumbsUp, cls: 'text-emerald-300', ring: 'ring-emerald-400/25' },
   rejected: { icon: ThumbsDown, cls: 'text-rose-300', ring: 'ring-rose-400/25' },
   action_completed: { icon: CheckCircle2, cls: 'text-emerald-300', ring: 'ring-emerald-400/25' },
   failed: { icon: XCircle, cls: 'text-rose-300', ring: 'ring-rose-400/25' },
+  run_failed: { icon: XCircle, cls: 'text-rose-300', ring: 'ring-rose-400/25' },
+  cancelled: { icon: XCircle, cls: 'text-zinc-400', ring: 'ring-white/10' },
   agent_created: { icon: Bot, cls: 'text-violet-300', ring: 'ring-violet-400/25' },
   info: { icon: Radio, cls: 'text-zinc-400', ring: 'ring-white/10' },
 };
+
 
 const time = (iso) => {
   if (!iso) return '';
