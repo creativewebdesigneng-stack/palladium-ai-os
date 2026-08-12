@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { History, AlertCircle } from 'lucide-react';
-import { getWorkspace, listAuditLogs } from '@/lib/platform/platform.functions';
+import { getWorkspace } from '@/lib/platform/platform.functions';
 import { listAuditLogs as listAuditLogsFn } from '@/lib/platform/audit.functions';
 import { SectionHead, EmptyState } from './shared';
 
