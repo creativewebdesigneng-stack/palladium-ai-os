@@ -64,9 +64,8 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const provider = findProvider(data.provider);
     if (!provider) throw new Error("Unknown integration provider.");
 
-    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } = await import(
-      "./oauth.server"
-    );
+    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } =
+      await import("./oauth.server");
     if (!providerConfigured(provider)) {
       throw new Error(
         `${provider.name} is not available yet: the workspace owner needs to add its OAuth client credentials.`,

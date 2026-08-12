@@ -11,12 +11,7 @@
  */
 
 export type IntegrationCategory =
-  | "productivity"
-  | "communication"
-  | "crm"
-  | "project_management"
-  | "calendar"
-  | "email";
+  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email";
 
 export type IntegrationProvider = {
   id: string;
@@ -59,7 +54,10 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     clientIdEnv: "GOOGLE_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "GOOGLE_INTEGRATION_CLIENT_SECRET",
     authorizeParams: { access_type: "offline", prompt: "consent", include_granted_scopes: "true" },
-    identity: { url: "https://openidconnect.googleapis.com/v1/userinfo", labelKeys: ["email", "name"] },
+    identity: {
+      url: "https://openidconnect.googleapis.com/v1/userinfo",
+      labelKeys: ["email", "name"],
+    },
     docsUrl: "https://developers.google.com/identity/protocols/oauth2",
   },
   {
@@ -82,7 +80,10 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     clientIdEnv: "MICROSOFT_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "MICROSOFT_INTEGRATION_CLIENT_SECRET",
     authorizeParams: { response_mode: "query", prompt: "consent" },
-    identity: { url: "https://graph.microsoft.com/v1.0/me", labelKeys: ["userPrincipalName", "displayName"] },
+    identity: {
+      url: "https://graph.microsoft.com/v1.0/me",
+      labelKeys: ["userPrincipalName", "displayName"],
+    },
     docsUrl: "https://learn.microsoft.com/entra/identity-platform/v2-oauth2-auth-code-flow",
   },
   {
@@ -137,7 +138,8 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     tokenUrl: "https://login.salesforce.com/services/oauth2/token",
     clientIdEnv: "SALESFORCE_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "SALESFORCE_INTEGRATION_CLIENT_SECRET",
-    docsUrl: "https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm",
+    docsUrl:
+      "https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm",
   },
   {
     id: "notion",

@@ -28,7 +28,8 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
         const { findProvider } = await import("@/lib/integrations/providers");
 
         const verified = verifyState(state);
-        if (!verified) return new Response("Invalid or expired authorization state.", { status: 400 });
+        if (!verified)
+          return new Response("Invalid or expired authorization state.", { status: 400 });
 
         const provider = findProvider(verified.provider);
         const origin = verified.origin || url.origin;
@@ -96,7 +97,9 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
 
           return done(origin, { integration_connected: provider.id });
         } catch (error) {
-          return fail(error instanceof Error ? error.message : "Could not complete the connection.");
+          return fail(
+            error instanceof Error ? error.message : "Could not complete the connection.",
+          );
         }
       },
     },

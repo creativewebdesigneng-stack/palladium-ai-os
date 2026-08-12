@@ -8,7 +8,14 @@
  *  - The OAuth `state` value is HMAC-signed and short-lived, so a callback
  *    cannot be replayed or pointed at another user's account.
  */
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual, createHash } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+  createHash,
+} from "node:crypto";
 import { findProvider, type IntegrationProvider } from "./providers";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -45,14 +52,20 @@ export function providerConfigured(provider: IntegrationProvider): boolean {
 }
 
 const b64url = (v: Buffer | string) =>
-  Buffer.from(v as never).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  Buffer.from(v as never)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
 function sign(payload: string): string {
   return b64url(createHmac("sha256", stateSecret()).update(payload).digest());
 }
 
 export function createState(input: { userId: string; provider: string; origin: string }): string {
-  const payload = b64url(JSON.stringify({ ...input, ts: Date.now(), n: randomBytes(8).toString("hex") }));
+  const payload = b64url(
+    JSON.stringify({ ...input, ts: Date.now(), n: randomBytes(8).toString("hex") }),
+  );
   return `${payload}.${sign(payload)}`;
 }
 
@@ -72,7 +85,11 @@ export function verifyState(
     const parsed = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
     if (typeof parsed?.ts !== "number" || Date.now() - parsed.ts > STATE_TTL_MS) return null;
     if (typeof parsed.userId !== "string" || typeof parsed.provider !== "string") return null;
-    return { userId: parsed.userId, provider: parsed.provider, origin: String(parsed.origin ?? "") };
+    return {
+      userId: parsed.userId,
+      provider: parsed.provider,
+      origin: String(parsed.origin ?? ""),
+    };
   } catch {
     return null;
   }
@@ -122,13 +139,18 @@ function parseTokenPayload(payload: Record<string, any>): TokenSet {
   // Slack nests the user grant; everything else is flat.
   const flat = payload["authed_user"]?.access_token ? payload["authed_user"] : payload;
   const accessToken = flat["access_token"];
-  if (!accessToken) throw new Error(payload["error_description"] ?? payload["error"] ?? "No access token returned.");
+  if (!accessToken)
+    throw new Error(
+      payload["error_description"] ?? payload["error"] ?? "No access token returned.",
+    );
   const expiresIn = Number(flat["expires_in"] ?? payload["expires_in"] ?? 0);
   return {
     accessToken,
     refreshToken: flat["refresh_token"] ?? payload["refresh_token"] ?? null,
     tokenType: flat["token_type"] ?? "Bearer",
-    scopes: String(flat["scope"] ?? payload["scope"] ?? "").split(/[\s,]+/).filter(Boolean),
+    scopes: String(flat["scope"] ?? payload["scope"] ?? "")
+      .split(/[\s,]+/)
+      .filter(Boolean),
     expiresAt: expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
   };
 }
@@ -146,7 +168,12 @@ async function postForm(url: string, body: URLSearchParams): Promise<Record<stri
   } catch {
     throw new Error(`Provider returned an unreadable token response (${response.status}).`);
   }
-  if (!response.ok) throw new Error(payload["error_description"] ?? payload["error"] ?? `Token exchange failed (${response.status}).`);
+  if (!response.ok)
+    throw new Error(
+      payload["error_description"] ??
+        payload["error"] ??
+        `Token exchange failed (${response.status}).`,
+    );
   return payload;
 }
 

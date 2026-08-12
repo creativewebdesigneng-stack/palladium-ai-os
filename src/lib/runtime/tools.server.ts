@@ -841,7 +841,8 @@ export async function resolveGrantedTools(
   return { defs: [...grants.keys()].map((slug) => REGISTRY[slug]!.def), grants };
 }
 
-const SENSITIVE_KEY = /(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i;
+const SENSITIVE_KEY =
+  /(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i;
 
 /**
  * Execution records keep metadata, not payloads: enough to audit what a tool was
@@ -899,7 +900,6 @@ export async function executeTool(
       ...extra,
     });
   };
-
 
   if (!tool || !grant) {
     await log("failed", { error: "Tool not enabled for this agent." });
