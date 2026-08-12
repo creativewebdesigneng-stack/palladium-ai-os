@@ -6,7 +6,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: createF
 
 import { executeTool, resolveGrantedTools } from "../tools.server";
 
-const AGENT = { id: "agent-1", allowed_tools: ["web_search", "browser_task"] };
+const AGENT = { id: "agent-1", allowed_tools: ["web_search", "browser"] };
 
 function sb(seed: Record<string, any[]> = {}) {
   return createFakeSupabase({
@@ -35,15 +35,15 @@ describe("tool grants", () => {
 
   it("withholds a tool whose minimum plan is above the caller's plan", async () => {
     const db = sb({
-      tools: [{ slug: "browser_task", is_active: true, min_plan: "business", requires_approval: true }],
+      tools: [{ slug: "browser", is_active: true, min_plan: "business", requires_approval: true }],
     });
     const explorer = await resolveGrantedTools(db, AGENT, "explorer");
-    expect(explorer.grants.has("browser_task")).toBe(false);
+    expect(explorer.grants.has("browser")).toBe(false);
 
     const business = await resolveGrantedTools(sb({
-      tools: [{ slug: "browser_task", is_active: true, min_plan: "business", requires_approval: true }],
+      tools: [{ slug: "browser", is_active: true, min_plan: "business", requires_approval: true }],
     }), AGENT, "business");
-    expect(business.grants.has("browser_task")).toBe(true);
+    expect(business.grants.has("browser")).toBe(true);
   });
 
   it("respects a disabled account-wide permission row", async () => {
@@ -55,9 +55,9 @@ describe("tool grants", () => {
   });
 
   it("marks sensitive tools as requiring human approval", async () => {
-    const { grants } = await resolveGrantedTools(sb(), { id: "a", allowed_tools: ["shopping_purchase"] }, "enterprise");
-    if (grants.has("shopping_purchase")) {
-      expect(grants.get("shopping_purchase")!.requiresApproval).toBe(true);
+    const { grants } = await resolveGrantedTools(sb(), { id: "a", allowed_tools: ["prepare_purchase"] }, "enterprise");
+    if (grants.has("prepare_purchase")) {
+      expect(grants.get("prepare_purchase")!.requiresApproval).toBe(true);
     }
   });
 });
@@ -84,12 +84,12 @@ describe("tool execution guards", () => {
     const db = sb();
     const grants = new Map([
       [
-        "browser_task",
-        { slug: "browser_task", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null },
+        "browser",
+        { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null },
       ],
     ]);
     const result = await executeTool(
-      "browser_task",
+      "browser",
       { url: "https://evil.test/checkout" },
       ctx(db),
       grants as any,
