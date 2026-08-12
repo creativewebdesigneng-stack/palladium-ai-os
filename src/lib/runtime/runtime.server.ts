@@ -598,25 +598,40 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
 /** Non-streaming execution: model turns + tool rounds until a final answer. */
 export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRun }) {
   const controller = new AbortController();
-  const budget = setTimeout(() => controller.abort(), RUN_BUDGET_MS);
+  let timedOut = false;
+  const budget = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, RUN_BUDGET_MS);
   const messages = [...args.run.messages];
   let toolCallCount = 0;
   const usage = { input: 0, output: 0 };
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+      if (timedOut)
+        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
-      const result = await runChat({
-        provider: args.run.provider,
-        model: args.run.model,
-        messages,
-        tools: round < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
-        temperature: args.run.agent.temperature,
-        maxTokens: args.run.agent.max_tokens,
-        signal: controller.signal,
-      });
+      await heartbeat(args.sb, args.run.taskId);
+      let result: ChatResult;
+      try {
+        result = await runChat({
+          provider: args.run.provider,
+          model: args.run.model,
+          messages,
+          tools: round < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
+          temperature: args.run.agent.temperature,
+          maxTokens: args.run.agent.max_tokens,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (timedOut)
+          throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+        throw error;
+      }
+
       usage.input += result.usage.input;
       usage.output += result.usage.output;
 
