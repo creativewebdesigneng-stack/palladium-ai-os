@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backend:check": "tsgo --noEmit && vitest run"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

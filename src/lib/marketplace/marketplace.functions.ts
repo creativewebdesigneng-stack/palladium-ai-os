@@ -42,9 +42,7 @@ const listingInput = z.object({
 export const listMarketplaceAgents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({ category: z.string().optional(), limit: z.number().optional() })
-      .parse(input ?? {}),
+    z.object({ category: z.string().optional(), limit: z.number().optional() }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -262,9 +260,9 @@ export const installMarketplaceAgent = createServerFn({ method: "POST" })
         description: listing.description,
         purpose: listing.summary,
         instructions: listing.usage_requirements || null,
-        model_provider: config['provider'] ?? "openai",
-        model: config['model'] || "gpt-4o-mini",
-        allowed_tools: Array.isArray(config['tools']) ? config['tools'] : [],
+        model_provider: config["provider"] ?? "openai",
+        model: config["model"] || "gpt-4o-mini",
+        allowed_tools: Array.isArray(config["tools"]) ? config["tools"] : [],
         status: "active",
       })
       .select("id,name")
@@ -353,7 +351,9 @@ export const getCreatorStats = createServerFn({ method: "POST" })
         title: r.title as string,
         downloads: Number(r.install_count ?? 0),
         rating: Number(r.rating_avg ?? 0),
-        earnings: Math.round((Number(r.price_pence ?? 0) / 100) * Number(r.install_count ?? 0) * share),
+        earnings: Math.round(
+          (Number(r.price_pence ?? 0) / 100) * Number(r.install_count ?? 0) * share,
+        ),
       };
     });
 

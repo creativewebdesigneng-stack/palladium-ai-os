@@ -7,12 +7,33 @@
  */
 export type Row = Record<string, any>;
 
-type Filter = { op: "eq" | "in"; column: string; value: any };
+type Filter = {
+  op: "eq" | "in" | "is" | "gte" | "lte" | "ilike";
+  column: string;
+  value: any;
+};
 
 function matches(row: Row, filters: Filter[]) {
-  return filters.every((f) =>
-    f.op === "eq" ? row[f.column] === f.value : (f.value as any[]).includes(row[f.column]),
-  );
+  return filters.every((f) => {
+    const cell = row[f.column];
+    switch (f.op) {
+      case "eq":
+        return cell === f.value;
+      case "in":
+        return (f.value as any[]).includes(cell);
+      case "is":
+        return f.value === null ? cell === null || cell === undefined : cell === f.value;
+      case "gte":
+        return cell != null && cell >= f.value;
+      case "lte":
+        return cell != null && cell <= f.value;
+      case "ilike": {
+        const pattern = String(f.value).toLowerCase().split("%").filter(Boolean);
+        const cellText = String(cell ?? "").toLowerCase();
+        return pattern.every((part) => cellText.includes(part));
+      }
+    }
+  });
 }
 
 export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
@@ -26,8 +47,11 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
     let mode: "select" | "insert" | "update" | "delete" = "select";
     let payload: Row = {};
 
+    let counting = false;
+
     const api: any = {
-      select() {
+      select(_columns?: string, options?: { count?: string; head?: boolean }) {
+        if (options?.count) counting = true;
         return api;
       },
       insert(values: Row) {
@@ -52,6 +76,22 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
         filters.push({ op: "in", column, value });
         return api;
       },
+      is(column: string, value: any) {
+        filters.push({ op: "is", column, value });
+        return api;
+      },
+      gte(column: string, value: any) {
+        filters.push({ op: "gte", column, value });
+        return api;
+      },
+      lte(column: string, value: any) {
+        filters.push({ op: "lte", column, value });
+        return api;
+      },
+      ilike(column: string, value: string) {
+        filters.push({ op: "ilike", column, value });
+        return api;
+      },
       order() {
         return api;
       },
@@ -61,9 +101,13 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
       run() {
         const rows = table(name);
         if (mode === "insert") {
-          const created = { id: `${name}-${rows.length + 1}`, ...payload };
-          rows.push(created);
-          return { data: [created], error: null };
+          const values = Array.isArray(payload) ? payload : [payload];
+          const created = values.map((v: Row, i: number) => ({
+            id: `${name}-${rows.length + i + 1}`,
+            ...v,
+          }));
+          rows.push(...created);
+          return { data: created, error: null };
         }
         if (mode === "update") {
           const hit = rows.filter((r) => matches(r, filters));
@@ -76,8 +120,11 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
           tables[name] = keep;
           return { data: removed, error: null };
         }
-        return { data: rows.filter((r) => matches(r, filters)), error: null };
+        const found = rows.filter((r) => matches(r, filters));
+        if (counting) return { data: null, count: found.length, error: null };
+        return { data: found, error: null };
       },
+
       maybeSingle() {
         const { data, error } = api.run();
         return Promise.resolve({ data: data[0] ?? null, error });

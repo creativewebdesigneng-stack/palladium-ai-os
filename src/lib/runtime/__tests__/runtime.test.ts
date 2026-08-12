@@ -170,7 +170,10 @@ describe("agent permissions", () => {
 describe("subscription and usage limits", () => {
   it("blocks the run when the monthly task allowance is spent", async () => {
     entitlements.getEntitlements.mockResolvedValue(
-      plan({ limits: { agents: 3, tasks_per_month: 5, seats: 1, storage_mb: 100 }, usage: { agents: 1, tasksThisMonth: 5, seats: 1 } }),
+      plan({
+        limits: { agents: 3, tasks_per_month: 5, seats: 1, storage_mb: 100 },
+        usage: { agents: 1, tasksThisMonth: 5, seats: 1 },
+      }),
     );
     const sb = db();
     await expect(
@@ -182,7 +185,14 @@ describe("subscription and usage limits", () => {
   it("allows unlimited plans through", () => {
     expect(() =>
       assertWithinLimit(
-        plan({ limits: { agents: UNLIMITED, tasks_per_month: UNLIMITED, seats: UNLIMITED, storage_mb: UNLIMITED } }) as any,
+        plan({
+          limits: {
+            agents: UNLIMITED,
+            tasks_per_month: UNLIMITED,
+            seats: UNLIMITED,
+            storage_mb: UNLIMITED,
+          },
+        }) as any,
         "tasks_per_month",
       ),
     ).not.toThrow();
@@ -222,7 +232,11 @@ describe("run lifecycle", () => {
     gateway.runChat.mockRejectedValue(new ProviderError("Upstream model unavailable.", 503, true));
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
     await expect(executeRun({ sb, userId: USER, run })).rejects.toBeInstanceOf(ProviderError);
-    const message = await failRun({ userId: USER, run, error: new ProviderError("Upstream model unavailable.", 503, true) });
+    const message = await failRun({
+      userId: USER,
+      run,
+      error: new ProviderError("Upstream model unavailable.", 503, true),
+    });
     expect(message).toContain("Upstream");
     const row = sb.tables["agent_tasks"][0];
     expect(row.status).toBe("failed");

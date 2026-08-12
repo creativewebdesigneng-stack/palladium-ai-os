@@ -40,22 +40,34 @@ describe("tool grants", () => {
     const explorer = await resolveGrantedTools(db, AGENT, "explorer");
     expect(explorer.grants.has("browser")).toBe(false);
 
-    const business = await resolveGrantedTools(sb({
-      tools: [{ slug: "browser", is_active: true, min_plan: "business", requires_approval: true }],
-    }), AGENT, "business");
+    const business = await resolveGrantedTools(
+      sb({
+        tools: [
+          { slug: "browser", is_active: true, min_plan: "business", requires_approval: true },
+        ],
+      }),
+      AGENT,
+      "business",
+    );
     expect(business.grants.has("browser")).toBe(true);
   });
 
   it("respects a disabled account-wide permission row", async () => {
     const db = sb({
-      tool_permissions: [{ tool: "web_search", enabled: false, agent_id: null, allowed_domains: [] }],
+      tool_permissions: [
+        { tool: "web_search", enabled: false, agent_id: null, allowed_domains: [] },
+      ],
     });
     const { grants } = await resolveGrantedTools(db, AGENT, "business");
     expect(grants.has("web_search")).toBe(false);
   });
 
   it("marks sensitive tools as requiring human approval", async () => {
-    const { grants } = await resolveGrantedTools(sb(), { id: "a", allowed_tools: ["prepare_purchase"] }, "enterprise");
+    const { grants } = await resolveGrantedTools(
+      sb(),
+      { id: "a", allowed_tools: ["prepare_purchase"] },
+      "enterprise",
+    );
     if (grants.has("prepare_purchase")) {
       expect(grants.get("prepare_purchase")!.requiresApproval).toBe(true);
     }
@@ -63,14 +75,15 @@ describe("tool grants", () => {
 });
 
 describe("tool execution guards", () => {
-  const ctx = (db: any) => ({
-    sb: db,
-    userId: "user-1",
-    orgId: null,
-    agentId: "agent-1",
-    taskId: "task-1",
-    spendCap: null,
-  }) as any;
+  const ctx = (db: any) =>
+    ({
+      sb: db,
+      userId: "user-1",
+      orgId: null,
+      agentId: "agent-1",
+      taskId: "task-1",
+      spendCap: null,
+    }) as any;
 
   it("refuses a tool that was never granted, and logs the attempt", async () => {
     const db = sb();
@@ -85,7 +98,12 @@ describe("tool execution guards", () => {
     const grants = new Map([
       [
         "browser",
-        { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null },
+        {
+          slug: "browser",
+          requiresApproval: false,
+          allowedDomains: ["example.com"],
+          spendCap: null,
+        },
       ],
     ]);
     const result = await executeTool(

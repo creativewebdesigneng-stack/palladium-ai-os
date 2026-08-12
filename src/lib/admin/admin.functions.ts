@@ -33,7 +33,10 @@ export const getAdminOverview = createServerFn({ method: "POST" })
     const [users, orgs, activeSubs, agents, tasks24h, errors24h] = await Promise.all([
       admin.from("profiles").select("id", { count: "exact", head: true }),
       admin.from("organisations").select("id", { count: "exact", head: true }),
-      admin.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
+      admin
+        .from("subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
       admin.from("personal_agents").select("id", { count: "exact", head: true }),
       admin
         .from("agent_tasks")
@@ -62,7 +65,10 @@ export const listAllUsers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ q: z.string().trim().optional(), limit: z.number().int().min(1).max(500).optional() })
+      .object({
+        q: z.string().trim().optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+      })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
@@ -90,7 +96,9 @@ export const listAllUsers = createServerFn({ method: "POST" })
         ? admin.from("user_roles").select("user_id,role").in("user_id", ids)
         : Promise.resolve({ data: [] }),
     ]);
-    const subByUser = new Map<string, any>((subs ?? []).map((s: any) => [s.user_id, s] as [string, any]));
+    const subByUser = new Map<string, any>(
+      (subs ?? []).map((s: any) => [s.user_id, s] as [string, any]),
+    );
     const rolesByUser = new Map<string, string[]>();
     for (const r of roles ?? []) {
       const list = rolesByUser.get(r.user_id) ?? [];
@@ -118,7 +126,10 @@ export const listAllOrganisations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ q: z.string().trim().optional(), limit: z.number().int().min(1).max(500).optional() })
+      .object({
+        q: z.string().trim().optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+      })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
@@ -149,13 +160,21 @@ export const listAllOrganisations = createServerFn({ method: "POST" })
         ? admin
             .from("profiles")
             .select("id,email,full_name")
-            .in("id", (rows ?? []).map((r: any) => r.owner_id))
+            .in(
+              "id",
+              (rows ?? []).map((r: any) => r.owner_id),
+            )
         : Promise.resolve({ data: [] }),
     ]);
-    const subByOrg = new Map<string, any>((subs ?? []).map((s: any) => [s.org_id, s] as [string, any]));
+    const subByOrg = new Map<string, any>(
+      (subs ?? []).map((s: any) => [s.org_id, s] as [string, any]),
+    );
     const memberCounts = new Map<string, number>();
-    for (const m of members ?? []) memberCounts.set(m.org_id, (memberCounts.get(m.org_id) ?? 0) + 1);
-    const ownerById = new Map<string, any>((owners ?? []).map((o: any) => [o.id, o] as [string, any]));
+    for (const m of members ?? [])
+      memberCounts.set(m.org_id, (memberCounts.get(m.org_id) ?? 0) + 1);
+    const ownerById = new Map<string, any>(
+      (owners ?? []).map((o: any) => [o.id, o] as [string, any]),
+    );
 
     return {
       forbidden: false as const,
@@ -186,7 +205,9 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
     const [{ data: subs, error }, { data: plans }] = await Promise.all([
       admin
         .from("subscriptions")
-        .select("id,org_id,user_id,plan_code,status,seats,current_period_end,cancel_at_period_end,created_at")
+        .select(
+          "id,org_id,user_id,plan_code,status,seats,current_period_end,cancel_at_period_end,created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(300),
       admin.from("plans").select("code,name,price_pence,currency,billing_interval,is_active"),
@@ -196,14 +217,20 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
     const orgIds = [...new Set((subs ?? []).map((s: any) => s.org_id).filter(Boolean))];
     const userIds = [...new Set((subs ?? []).map((s: any) => s.user_id).filter(Boolean))];
     const [{ data: orgs }, { data: profiles }] = await Promise.all([
-      orgIds.length ? admin.from("organisations").select("id,name").in("id", orgIds) : Promise.resolve({ data: [] }),
+      orgIds.length
+        ? admin.from("organisations").select("id,name").in("id", orgIds)
+        : Promise.resolve({ data: [] }),
       userIds.length
         ? admin.from("profiles").select("id,email,full_name").in("id", userIds)
         : Promise.resolve({ data: [] }),
     ]);
     const orgById = new Map<string, any>((orgs ?? []).map((o: any) => [o.id, o] as [string, any]));
-    const profileById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p] as [string, any]));
-    const planByCode = new Map<string, any>((plans ?? []).map((p: any) => [p.code, p] as [string, any]));
+    const profileById = new Map<string, any>(
+      (profiles ?? []).map((p: any) => [p.id, p] as [string, any]),
+    );
+    const planByCode = new Map<string, any>(
+      (plans ?? []).map((p: any) => [p.code, p] as [string, any]),
+    );
 
     return {
       forbidden: false as const,
@@ -211,8 +238,10 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
       subscriptions: (subs ?? []).map((s: any) => {
         const plan = planByCode.get(s.plan_code);
         const customer = s.org_id
-          ? orgById.get(s.org_id)?.name ?? "Unknown organisation"
-          : profileById.get(s.user_id)?.full_name ?? profileById.get(s.user_id)?.email ?? "Unknown user";
+          ? (orgById.get(s.org_id)?.name ?? "Unknown organisation")
+          : (profileById.get(s.user_id)?.full_name ??
+            profileById.get(s.user_id)?.email ??
+            "Unknown user");
         return {
           id: s.id,
           customer,
@@ -234,7 +263,9 @@ const RANGE_DAYS: Record<string, number> = { Daily: 1, Weekly: 7, Monthly: 30, Y
 export const getPlatformAnalytics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ range: z.enum(["Daily", "Weekly", "Monthly", "Yearly"]).optional() }).parse(input ?? {}),
+    z
+      .object({ range: z.enum(["Daily", "Weekly", "Monthly", "Yearly"]).optional() })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -247,7 +278,11 @@ export const getPlatformAnalytics = createServerFn({ method: "POST" })
     const admin = supabaseAdmin as unknown as Sb;
 
     const [{ data: tasks }, { data: logs }, { count: newUsers }] = await Promise.all([
-      admin.from("agent_tasks").select("created_at,status,cost_pence").gte("created_at", since).limit(5000),
+      admin
+        .from("agent_tasks")
+        .select("created_at,status,cost_pence")
+        .gte("created_at", since)
+        .limit(5000),
       admin
         .from("api_request_logs")
         .select("created_at,status_code")
@@ -276,7 +311,12 @@ export const getPlatformAnalytics = createServerFn({ method: "POST" })
 
     const series = [...byDay.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, requests: v.requests, errors: v.errors, revenue: Math.round(v.revenuePence / 100) }));
+      .map(([date, v]) => ({
+        date,
+        requests: v.requests,
+        errors: v.errors,
+        revenue: Math.round(v.revenuePence / 100),
+      }));
 
     return {
       forbidden: false as const,
@@ -300,30 +340,31 @@ export const getSecurityOverview = createServerFn({ method: "POST" })
     const admin = supabaseAdmin as unknown as Sb;
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
 
-    const [{ data: denied }, { data: failedAuth }, { data: keys }, { data: errorReqs }] = await Promise.all([
-      admin
-        .from("mission_audit_logs")
-        .select("id,user_id,action,ip_address,created_at,status")
-        .eq("status", "denied")
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      admin
-        .from("mission_audit_logs")
-        .select("id,user_id,ip_address,created_at")
-        .eq("action", "auth_failed")
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      admin.from("api_keys").select("id,name,last_used_at,revoked_at,expires_at").limit(500),
-      admin
-        .from("api_request_logs")
-        .select("id,ip,path,status_code,created_at")
-        .gte("status_code", 400)
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(100),
-    ]);
+    const [{ data: denied }, { data: failedAuth }, { data: keys }, { data: errorReqs }] =
+      await Promise.all([
+        admin
+          .from("mission_audit_logs")
+          .select("id,user_id,action,ip_address,created_at,status")
+          .eq("status", "denied")
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        admin
+          .from("mission_audit_logs")
+          .select("id,user_id,ip_address,created_at")
+          .eq("action", "auth_failed")
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        admin.from("api_keys").select("id,name,last_used_at,revoked_at,expires_at").limit(500),
+        admin
+          .from("api_request_logs")
+          .select("id,ip,path,status_code,created_at")
+          .gte("status_code", 400)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ]);
 
     const activeKeys = (keys ?? []).filter((k: any) => !k.revoked_at).length;
     const revokedKeys = (keys ?? []).filter((k: any) => !!k.revoked_at).length;
@@ -357,14 +398,20 @@ export const listSystemHealth = createServerFn({ method: "POST" })
     const since = new Date(Date.now() - 3600 * 1000).toISOString();
 
     const [{ data: recentLogs }, { data: recentTasks }] = await Promise.all([
-      admin.from("api_request_logs").select("status_code,duration_ms").gte("created_at", since).limit(2000),
+      admin
+        .from("api_request_logs")
+        .select("status_code,duration_ms")
+        .gte("created_at", since)
+        .limit(2000),
       admin.from("agent_tasks").select("status,duration_ms").gte("created_at", since).limit(2000),
     ]);
 
     const total = recentLogs?.length ?? 0;
     const errors = (recentLogs ?? []).filter((r: any) => r.status_code >= 500).length;
     const avgLatency = total
-      ? Math.round((recentLogs ?? []).reduce((s: number, r: any) => s + (r.duration_ms ?? 0), 0) / total)
+      ? Math.round(
+          (recentLogs ?? []).reduce((s: number, r: any) => s + (r.duration_ms ?? 0), 0) / total,
+        )
       : null;
     const taskTotal = recentTasks?.length ?? 0;
     const taskFailures = (recentTasks ?? []).filter((t: any) => t.status === "failed").length;
@@ -373,8 +420,14 @@ export const listSystemHealth = createServerFn({ method: "POST" })
     return {
       forbidden: false as const,
       window: "last 60 minutes",
-      api: { total_requests: total, server_errors: errors, avg_latency_ms: avgLatency, error_rate: errorRate },
+      api: {
+        total_requests: total,
+        server_errors: errors,
+        avg_latency_ms: avgLatency,
+        error_rate: errorRate,
+      },
       agents: { total_runs: taskTotal, failed_runs: taskFailures },
-      overall: total === 0 && taskTotal === 0 ? "no_data" : errorRate > 0.1 ? "degraded" : "operational",
+      overall:
+        total === 0 && taskTotal === 0 ? "no_data" : errorRate > 0.1 ? "degraded" : "operational",
     };
   });

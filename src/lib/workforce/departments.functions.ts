@@ -89,7 +89,9 @@ export const saveDepartment = createServerFn({ method: "POST" })
 export const listAgentMessages = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ limit: z.number().int().min(1).max(200).optional().default(100) }).parse(input ?? {}),
+    z
+      .object({ limit: z.number().int().min(1).max(200).optional().default(100) })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
