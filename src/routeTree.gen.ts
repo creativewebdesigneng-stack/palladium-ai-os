@@ -110,6 +110,7 @@ import { Route as ShellAppAdminUsersRouteImport } from './routes/_shell/_app/adm
 import { Route as ShellAppAgentsIndexRouteImport } from './routes/_shell/_app/agents.index'
 import { Route as ShellAppAgentsNewRouteImport } from './routes/_shell/_app/agents.new'
 import { Route as ShellAppCreatorsIdRouteImport } from './routes/_shell/_app/creators.$id'
+import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/agents'
 import { Route as ApiPublicV1MarketplaceRouteImport } from './routes/api/public/v1/marketplace'
@@ -639,6 +640,12 @@ const ShellAppCreatorsIdRoute = ShellAppCreatorsIdRouteImport.update({
   path: '/creators/$id',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ApiPublicIntegrationsCallbackRoute =
+  ApiPublicIntegrationsCallbackRouteImport.update({
+    id: '/api/public/integrations/callback',
+    path: '/api/public/integrations/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -801,6 +808,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof ShellAppAdminUsersRoute
   '/agents/new': typeof ShellAppAgentsNewRoute
   '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -914,6 +922,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof ShellAppAdminUsersRoute
   '/agents/new': typeof ShellAppAgentsNewRoute
   '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -1030,6 +1039,7 @@ export interface FileRoutesById {
   '/_shell/_app/admin/users': typeof ShellAppAdminUsersRoute
   '/_shell/_app/agents/new': typeof ShellAppAgentsNewRoute
   '/_shell/_app/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -1145,6 +1155,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/new'
     | '/creators/$id'
+    | '/api/public/integrations/callback'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1258,6 +1269,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/new'
     | '/creators/$id'
+    | '/api/public/integrations/callback'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1373,6 +1385,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/admin/users'
     | '/_shell/_app/agents/new'
     | '/_shell/_app/creators/$id'
+    | '/api/public/integrations/callback'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1418,6 +1431,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiAgentsRunRoute: typeof ApiAgentsRunRoute
+  ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
   ApiPublicV1MarketplaceRoute: typeof ApiPublicV1MarketplaceRoute
@@ -2136,6 +2150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppCreatorsIdRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/api/public/integrations/callback': {
+      id: '/api/public/integrations/callback'
+      path: '/api/public/integrations/callback'
+      fullPath: '/api/public/integrations/callback'
+      preLoaderRoute: typeof ApiPublicIntegrationsCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -2454,6 +2475,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiAgentsRunRoute: ApiAgentsRunRoute,
+  ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
   ApiPublicV1MarketplaceRoute: ApiPublicV1MarketplaceRoute,

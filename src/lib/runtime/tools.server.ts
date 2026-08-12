@@ -841,6 +841,38 @@ export async function resolveGrantedTools(
   return { defs: [...grants.keys()].map((slug) => REGISTRY[slug]!.def), grants };
 }
 
+const SENSITIVE_KEY =
+  /(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i;
+
+/**
+ * Execution records keep metadata, not payloads: enough to audit what a tool was
+ * asked to do, without persisting credentials or long free text that the model
+ * may have pulled from private context.
+ */
+function inputMetadata(input: Record<string, unknown>): Record<string, unknown> {
+  const meta: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (SENSITIVE_KEY.test(key)) {
+      meta[key] = "[redacted]";
+    } else if (typeof value === "string") {
+      meta[key] = value.length > 200 ? `${value.slice(0, 200)}…(${value.length} chars)` : value;
+    } else if (Array.isArray(value)) {
+      meta[key] = { type: "array", length: value.length };
+    } else if (value && typeof value === "object") {
+      meta[key] = { type: "object", keys: Object.keys(value as object).slice(0, 12) };
+    } else {
+      meta[key] = value;
+    }
+  }
+  return meta;
+}
+
+function outputMetadata(output: unknown): unknown {
+  const text = JSON.stringify(output ?? null);
+  if (text && text.length > 4000) return { truncated: true, bytes: text.length };
+  return output;
+}
+
 /** Executes one tool call. Never throws — failures come back as tool output so
  * the model can recover instead of the whole run dying. Every attempt is logged. */
 export async function executeTool(
@@ -862,7 +894,7 @@ export async function executeTool(
       agent_id: ctx.agentId,
       agent_task_id: ctx.taskId || null,
       tool: name,
-      input,
+      input: inputMetadata(input),
       status,
       duration_ms: Date.now() - started,
       ...extra,
@@ -889,7 +921,7 @@ export async function executeTool(
       allowedDomains: grant.allowedDomains,
       spendCap: grant.spendCap ?? ctx.spendCap ?? null,
     });
-    await log("succeeded", { output: output as never });
+    await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Tool execution failed.";

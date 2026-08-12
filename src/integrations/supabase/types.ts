@@ -735,12 +735,67 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_credentials: {
+        Row: {
+          access_token_ciphertext: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          integration_id: string
+          provider: string
+          refresh_token_ciphertext: string | null
+          scopes: string[]
+          token_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_id: string
+          provider: string
+          refresh_token_ciphertext?: string | null
+          scopes?: string[]
+          token_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          integration_id?: string
+          provider?: string
+          refresh_token_ciphertext?: string | null
+          scopes?: string[]
+          token_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_credentials_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
+          account_label: string | null
           config: Json
           connected_at: string | null
           created_at: string
+          expires_at: string | null
+          granted_scopes: string[]
           id: string
+          integration_type: string
+          last_error: string | null
           last_sync_at: string | null
           name: string | null
           org_id: string | null
@@ -752,10 +807,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_label?: string | null
           config?: Json
           connected_at?: string | null
           created_at?: string
+          expires_at?: string | null
+          granted_scopes?: string[]
           id?: string
+          integration_type?: string
+          last_error?: string | null
           last_sync_at?: string | null
           name?: string | null
           org_id?: string | null
@@ -767,10 +827,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_label?: string | null
           config?: Json
           connected_at?: string | null
           created_at?: string
+          expires_at?: string | null
+          granted_scopes?: string[]
           id?: string
+          integration_type?: string
+          last_error?: string | null
           last_sync_at?: string | null
           name?: string | null
           org_id?: string | null
