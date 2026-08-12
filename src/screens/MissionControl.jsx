@@ -15,7 +15,7 @@ import ApprovalCentre from '@/components/mission/ApprovalCentre';
 import PersonalAISection from '@/components/mission/PersonalAISection';
 import AgentBuilder from '@/components/mission/AgentBuilder';
 import MemoryVault from '@/components/mission/MemoryVault';
-import ShoppingBoard from '@/components/mission/ShoppingBoard';
+import ShoppingWorkspace from '@/components/mission/ShoppingWorkspace';
 import TaskBoard from '@/components/mission/TaskBoard';
 import SignalsPanel from '@/components/mission/SignalsPanel';
 import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
@@ -321,7 +321,7 @@ export default function MissionControl() {
         )}
 
         {tab === 'shopping' && (
-          <ShoppingBoard shoppingResults={data?.shoppingResults ?? []} purchases={data?.purchases ?? []} loading={isLoading && session !== 'no'} />
+          <ShoppingWorkspace agents={(data?.agents ?? []).filter((a) => a.category === 'shopping' || a.scope === 'personal')} />
         )}
 
         {tab === 'tasks' && <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />}
