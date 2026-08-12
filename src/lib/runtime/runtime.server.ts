@@ -346,10 +346,13 @@ export async function completeRun(args: {
       output_text: result.text,
       tokens_in: result.usage.input,
       tokens_out: result.usage.output,
+      tool_calls: args.toolCallCount,
       duration_ms: duration,
+      heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
     .eq("id", run.taskId);
+
 
   await db
     .from("personal_agents")
