@@ -549,29 +549,51 @@ export type RunEvent =
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
   messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
-  for (const call of result.toolCalls) {
-    const exec = await executeTool(
-      call.name,
-      call.arguments,
-      {
-        userId: deps.userId,
-        orgId: deps.run.orgId,
-        agentId: deps.run.agent.id,
-        taskId: deps.run.taskId,
-        sb: deps.sb,
-        signal: deps.signal,
-      },
-      deps.grants,
+  // The run is visibly parked on tool work rather than silently "running".
+  await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
+  let awaitingApproval = false;
+  try {
+    for (const call of result.toolCalls) {
+      const exec = await executeTool(
+        call.name,
+        call.arguments,
+        {
+          userId: deps.userId,
+          orgId: deps.run.orgId,
+          agentId: deps.run.agent.id,
+          taskId: deps.run.taskId,
+          sb: deps.sb,
+          signal: deps.signal,
+        },
+        deps.grants,
+      );
+      await deps.onEvent?.({ type: "tool", name: call.name, ok: exec.ok });
+      const output = exec.output as Record<string, unknown> | null;
+      if (
+        output &&
+        (output["approval_request_id"] ||
+          output["status"] === "awaiting_approval" ||
+          output["requires_approval"] === true)
+      ) {
+        awaitingApproval = true;
+      }
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        name: call.name,
+        content: JSON.stringify(exec.output).slice(0, 8000),
+      });
+    }
+  } finally {
+    await setRunState(
+      deps.sb,
+      deps.run.taskId,
+      awaitingApproval ? "waiting_for_approval" : "running",
     );
-    await deps.onEvent?.({ type: "tool", name: call.name, ok: exec.ok });
-    messages.push({
-      role: "tool",
-      tool_call_id: call.id,
-      name: call.name,
-      content: JSON.stringify(exec.output).slice(0, 8000),
-    });
   }
+  return { awaitingApproval };
 }
+
 
 /** Non-streaming execution: model turns + tool rounds until a final answer. */
 export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRun }) {
