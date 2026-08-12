@@ -72,3 +72,16 @@ export function nameInitials(name) {
 }
 
 export { motion };
+
+export function Sparkline({ data = [], grad = 'from-violet-500 to-indigo-500', className = 'h-6' }) {
+  if (!data.length) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const points = data.map((v, i) => `${(i / (data.length - 1 || 1)) * 100},${100 - ((v - min) / range) * 100}`).join(' ');
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`w-full ${className}`}>
+      <polyline points={points} fill="none" strokeWidth="4" className={`stroke-current text-violet-400`} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
