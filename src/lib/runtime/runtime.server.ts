@@ -292,12 +292,7 @@ export const TASK_STATES = [
 
 export type TaskState = (typeof TASK_STATES)[number];
 
-export const ACTIVE_TASK_STATES: TaskState[] = [
-  "pending",
-  "queued",
-  "running",
-  "waiting_for_tool",
-];
+export const ACTIVE_TASK_STATES: TaskState[] = ["pending", "queued", "running", "waiting_for_tool"];
 
 export function isTerminalState(status: string): boolean {
   return ["succeeded", "completed", "failed", "cancelled"].includes(status);
@@ -347,7 +342,6 @@ async function isCancelled(sb: Sb, taskId: string) {
   return data?.status === "cancelled" || data?.cancel_requested === true;
 }
 
-
 export async function completeRun(args: {
   sb: Sb;
   userId: string;
@@ -375,7 +369,6 @@ export async function completeRun(args: {
     })
     .eq("id", run.taskId);
 
-
   await db
     .from("personal_agents")
     .update({ last_run_at: new Date().toISOString() })
@@ -387,7 +380,9 @@ export async function completeRun(args: {
     const memoryPrefs = await loadMemoryPreferences(args.sb as never, args.userId).catch(
       () => null,
     );
-    const mayCapture = memoryPrefs ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled : true;
+    const mayCapture = memoryPrefs
+      ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled
+      : true;
     await Promise.all([
       storeMemory({
         sb: args.sb as never,
@@ -410,15 +405,15 @@ export async function completeRun(args: {
       ),
       mayCapture &&
         args.sb.from("personal_memories").insert({
-        user_id: args.userId,
-        org_id: run.orgId,
-        agent_id: run.agent.id,
-        category: "run_history",
-        key: `run:${new Date().toISOString().slice(0, 19)}`,
-        value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
-        scope: "personal",
-        metadata: { task_id: run.taskId, agent: run.agent.name },
-      }),
+          user_id: args.userId,
+          org_id: run.orgId,
+          agent_id: run.agent.id,
+          category: "run_history",
+          key: `run:${new Date().toISOString().slice(0, 19)}`,
+          value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
+          scope: "personal",
+          metadata: { task_id: run.taskId, agent: run.agent.name },
+        }),
     ]);
   }
 
@@ -440,7 +435,6 @@ export async function completeRun(args: {
       },
     }),
     recordUsage({
-
       userId: args.userId,
       orgId: run.orgId,
       metric: "tokens",
@@ -533,7 +527,6 @@ export async function failRun(args: {
       completed_at: new Date().toISOString(),
     })
     .eq("id", args.run.taskId);
-
 
   await db.from("agent_activities").insert({
     user_id: args.userId,
@@ -645,7 +638,6 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   return { awaitingApproval };
 }
 
-
 /** Tells the operator a run has paused and is waiting on them. */
 async function notifyInputRequired(
   userId: string,
@@ -676,8 +668,7 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-      if (timedOut)
-        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
@@ -755,8 +746,7 @@ export async function* streamRun(args: {
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-      if (timedOut)
-        throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
