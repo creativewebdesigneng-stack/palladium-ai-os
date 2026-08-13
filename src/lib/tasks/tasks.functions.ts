@@ -337,7 +337,9 @@ export const importWorkflow = createServerFn({ method: "POST" })
     const triggerTypes = ["manual", "schedule", "webhook", "event"];
     const triggerType = String(def.trigger_type ?? def.trigger ?? "manual").toLowerCase();
     if (!triggerTypes.includes(triggerType))
-      throw new Error(`Unsupported trigger "${triggerType}". Use manual, schedule, webhook or event.`);
+      throw new Error(
+        `Unsupported trigger "${triggerType}". Use manual, schedule, webhook or event.`,
+      );
     const schedule = def.schedule ? String(def.schedule).slice(0, 200) : null;
 
     const kinds = [
@@ -356,7 +358,8 @@ export const importWorkflow = createServerFn({ method: "POST" })
     if (rawSteps.length > 100) throw new Error("Workflows are limited to 100 steps.");
     const steps = rawSteps.map((s: any, i: number) => {
       const kind = String(s?.kind ?? "action").toLowerCase();
-      if (!kinds.includes(kind)) throw new Error(`Step ${i + 1} has an unsupported kind "${kind}".`);
+      if (!kinds.includes(kind))
+        throw new Error(`Step ${i + 1} has an unsupported kind "${kind}".`);
       const mode = String(s?.mode ?? "sequential").toLowerCase();
       if (!["sequential", "parallel"].includes(mode))
         throw new Error(`Step ${i + 1} mode must be sequential or parallel.`);
