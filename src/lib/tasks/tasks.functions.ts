@@ -394,7 +394,7 @@ export const importWorkflow = createServerFn({ method: "POST" })
 
     const { error: stepError } = await sb
       .from("workflow_steps")
-      .insert(data.steps.map((s) => ({ ...s, workflow_id: workflow.id })));
+      .insert(data.steps.map((s: any) => ({ ...s, workflow_id: workflow.id })));
     if (stepError) {
       await sb.from("workflows").delete().eq("id", workflow.id).eq("user_id", context.userId);
       throw new Error(stepError.message);
