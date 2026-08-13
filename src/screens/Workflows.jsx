@@ -12,7 +12,10 @@ import DataPulse from '@/components/visual/DataPulse';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { listWorkflows } from '@/lib/tasks/tasks.functions';
+import { listWorkflows, importWorkflow } from '@/lib/tasks/tasks.functions';
+import ImportWorkflowModal from '@/components/workflows/ImportWorkflowModal';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function Workflows() {
   const { gate } = useUpgrade();
