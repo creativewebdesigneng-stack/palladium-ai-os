@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plug, BookOpen, Store, Code2, Brain, Briefcase, MessageSquare, HardDrive, Database, Workflow, Boxes, Search } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import IntegrationsOverviewCards from '@/components/integrations/IntegrationsOverviewCards';
@@ -24,7 +25,6 @@ import {
 } from '@/components/integrations/integrationsData';
 import { SectionHead } from '@/components/integrations/shared';
 import { motion } from 'framer-motion';
-import { toast } from '@/components/ui/use-toast';
 
 const HEADER_ACTIONS = [
   { label: 'Connect Integration', icon: Plug, primary: true },
@@ -34,6 +34,7 @@ const HEADER_ACTIONS = [
 ];
 
 export default function Integrations() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('Overview');
   const [activeCat, setActiveCat] = useState(null);
@@ -45,7 +46,9 @@ export default function Integrations() {
       {HEADER_ACTIONS.map(a => (
         <button key={a.label} onClick={() => {
             if (a.label === 'Connect Integration') setShowEmpty(true);
-            else toast({ title: a.label, description: `${a.label} will be available once the backend is connected.` });
+            else if (a.label === 'Browse Marketplace') setActiveTab('Marketplace');
+            else if (a.label === 'Create Custom Integration') setActiveTab('Custom APIs');
+            else navigate('/developer-portal');
           }}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium ${a.primary ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}>
           <a.icon className="h-4 w-4" />{a.label}

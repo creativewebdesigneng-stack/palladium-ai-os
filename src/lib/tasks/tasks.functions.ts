@@ -320,3 +320,88 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/**
+ * Imports a workflow definition (JSON) exported from PalladiumAI or written by
+ * hand. Validated in full before anything is written; the workflow and its
+ * steps are always created for the calling user.
+ */
+export const importWorkflow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { definition?: unknown }) => {
+    const def = (input?.definition ?? {}) as any;
+    const name = String(def.name ?? "").trim();
+    if (!name) throw new Error("The workflow definition needs a name.");
+    if (name.length > 120) throw new Error("Workflow names must be 120 characters or fewer.");
+    const description = String(def.description ?? "").slice(0, 1000);
+    const triggerTypes = ["manual", "schedule", "webhook", "event"];
+    const triggerType = String(def.trigger_type ?? def.trigger ?? "manual").toLowerCase();
+    if (!triggerTypes.includes(triggerType))
+      throw new Error(
+        `Unsupported trigger "${triggerType}". Use manual, schedule, webhook or event.`,
+      );
+    const schedule = def.schedule ? String(def.schedule).slice(0, 200) : null;
+
+    const kinds = [
+      "agent",
+      "condition",
+      "action",
+      "api",
+      "database",
+      "notification",
+      "approval",
+      "delay",
+      "loop",
+    ];
+    const rawSteps = Array.isArray(def.steps) ? def.steps : [];
+    if (rawSteps.length === 0) throw new Error("The workflow definition needs at least one step.");
+    if (rawSteps.length > 100) throw new Error("Workflows are limited to 100 steps.");
+    const steps = rawSteps.map((s: any, i: number) => {
+      const kind = String(s?.kind ?? "action").toLowerCase();
+      if (!kinds.includes(kind))
+        throw new Error(`Step ${i + 1} has an unsupported kind "${kind}".`);
+      const mode = String(s?.mode ?? "sequential").toLowerCase();
+      if (!["sequential", "parallel"].includes(mode))
+        throw new Error(`Step ${i + 1} mode must be sequential or parallel.`);
+      return {
+        kind,
+        mode,
+        name: s?.name ? String(s.name).slice(0, 120) : `Step ${i + 1}`,
+        position: Number.isFinite(Number(s?.position)) ? Number(s.position) : i,
+        input_template: s?.input_template ? String(s.input_template).slice(0, 4000) : null,
+        tool: s?.tool ? String(s.tool).slice(0, 120) : null,
+        requires_approval: Boolean(s?.requires_approval),
+        continue_on_error: Boolean(s?.continue_on_error),
+        max_retries: Math.min(Math.max(Number(s?.max_retries ?? 0), 0), 5),
+      };
+    });
+
+    return { name, description, triggerType, schedule, steps };
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: workflow, error } = await sb
+      .from("workflows")
+      .insert({
+        user_id: context.userId,
+        name: data.name,
+        description: data.description || null,
+        trigger_type: data.triggerType,
+        schedule: data.schedule,
+        status: "draft",
+      })
+      .select("*")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!workflow) throw new Error("The workflow could not be created.");
+
+    const { error: stepError } = await sb
+      .from("workflow_steps")
+      .insert(data.steps.map((s: any) => ({ ...s, workflow_id: workflow.id })));
+    if (stepError) {
+      await sb.from("workflows").delete().eq("id", workflow.id).eq("user_id", context.userId);
+      throw new Error(stepError.message);
+    }
+
+    return { id: workflow.id, name: workflow.name, steps: data.steps.length };
+  });
