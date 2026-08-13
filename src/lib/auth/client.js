@@ -7,6 +7,15 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Accepts an email or a bare username. Usernames (no `@`) map to a
+ * deterministic synthetic address so they can be used as auth credentials.
+ */
+export function toAuthEmail(identifier) {
+  const value = String(identifier ?? "").trim();
+  return value.includes("@") ? value : `${value.toLowerCase()}@palladiumai.local`;
+}
+
 const mapUser = (user, profile) =>
   user
     ? {
@@ -46,7 +55,10 @@ export const auth = {
     return data?.session ?? null;
   },
   async loginViaEmailPassword(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: toAuthEmail(email),
+      password,
+    });
     if (error) throw error;
     return data;
   },

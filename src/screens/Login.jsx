@@ -30,7 +30,7 @@ export default function Login() {
       await auth.loginViaEmailPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      setError(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
@@ -83,15 +83,15 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email or username</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="email"
-              type="email"
-              autoComplete="email"
+              type="text"
+              autoComplete="username"
               autoFocus
-              placeholder="you@example.com"
+              placeholder="you@example.com or username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"
