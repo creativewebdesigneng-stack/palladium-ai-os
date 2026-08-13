@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Upload, FolderPlus, Archive } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PageHeader from '@/components/palladium/PageHeader';
-import { toast } from '@/components/ui/use-toast';
 import ProjectsOverviewCards from '@/components/projects/ProjectsOverviewCards';
 import ProjectsToolbar from '@/components/projects/ProjectsToolbar';
 import ProjectsFolderGrid from '@/components/projects/ProjectsFolderGrid';
