@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { auth } from '@/lib/auth/client';
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   // Post-login destination (e.g. the MCP OAuth consent page sends users here
   // with returnTo so the grant flow can resume). Same-origin paths only.
-  const returnTo = safeReturnTo();
+  // Computed after mount so SSR never touches `window`.
+  const [returnTo, setReturnTo] = useState("/");
+  useEffect(() => {
+    setReturnTo(safeReturnTo());
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
