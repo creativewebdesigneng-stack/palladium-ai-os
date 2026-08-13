@@ -329,7 +329,7 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
 export const importWorkflow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { definition?: unknown }) => {
-    const def = (input?.definition ?? {}) as Record<string, any>;
+    const def = (input?.definition ?? {}) as any;
     const name = String(def.name ?? "").trim();
     if (!name) throw new Error("The workflow definition needs a name.");
     if (name.length > 120) throw new Error("Workflow names must be 120 characters or fewer.");
