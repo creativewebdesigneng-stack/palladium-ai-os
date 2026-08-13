@@ -21,8 +21,10 @@ export default function Workflows() {
   const { gate } = useUpgrade();
   const { toast } = useToast();
   const { session } = useWorkspace();
+  const navigate = useNavigate();
   const [status, setStatus] = useState('All');
   const [open, setOpen] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,6 +50,12 @@ export default function Workflows() {
     load();
   }, [session, load]);
 
+  const handleImport = useCallback(async (definition) => {
+    const res = await importWorkflow({ data: { definition } });
+    toast({ title: 'Workflow imported', description: `${res.name} · ${res.steps} step${res.steps === 1 ? '' : 's'} · saved as a draft.` });
+    await load();
+  }, [toast, load]);
+
   const counts = useMemo(() => {
     const c = { All: workflows.length };
     STATUSES.forEach((s) => { c[s] = workflows.filter((w) => w.status === s).length; });
@@ -62,10 +70,13 @@ export default function Workflows() {
       <div aria-hidden className="mb-4"><DataPulse active duration={2.2} /></div>
 
       <WorkflowsToolbar
-        onCreate={() => { if (gate('createWorkflows')) toast({ title: 'Build your workflow', description: 'Design it in the Automation Studio, then it will appear here.' }); }}
+        onCreate={() => { if (gate('createWorkflows')) navigate('/automation'); }}
         onTemplates={() => document.getElementById('wf-templates')?.scrollIntoView({ behavior: 'smooth' })}
-        onImport={() => { if (gate('createWorkflows')) toast({ title: 'Import coming soon', description: 'Bring workflows in from the Automation Studio.' }); }}
+        onImport={() => { if (gate('createWorkflows')) setImportOpen(true); }}
       />
+
+      <ImportWorkflowModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
+
 
       <WorkflowsStatusTabs status={status} onStatus={setStatus} counts={counts} />
 
