@@ -16,13 +16,16 @@ export default function UpgradeModal() {
   const currentKey = getPlanKey(user);
   const current = planDisplay(currentKey);
   const pro = FREEMIUM_PLANS.find(p => p.id === 'pro');
-  const benefits = [
-    FEATURE_LABELS[activeFeature] || 'This feature',
-    'Create & deploy custom AI agents',
-    'Run AI workforce tasks',
-    'Basic workflow builder & agent templates',
-    'Agent memory, analytics & integrations',
-  ];
+  const benefits = Array.from(
+    new Set([
+      FEATURE_LABELS[activeFeature] || 'This feature',
+      'Create & deploy custom AI agents',
+      'Run AI workforce tasks',
+      'Basic workflow builder & agent templates',
+      'Agent memory, analytics & integrations',
+    ]),
+  );
+
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
