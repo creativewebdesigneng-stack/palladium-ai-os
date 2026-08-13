@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Upload, FolderPlus, Archive } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PageHeader from '@/components/palladium/PageHeader';
@@ -28,6 +29,7 @@ const HEAD_ACTIONS = [
 ];
 
 export default function Projects() {
+  const navigate = useNavigate();
   const [view, setView] = useState('grid');
   const [query, setQuery] = useState('');
   const [showEmpty, setShowEmpty] = useState(false);
@@ -47,7 +49,9 @@ export default function Projects() {
           key={a.label}
           onClick={() => {
             if (a.label === 'New Project') setShowEmpty(true);
-            else toast({ title: a.label, description: `${a.label} will be available once the backend is connected.` });
+            else if (a.label === 'Import Project') navigate('/version-control');
+            else if (a.label === 'Create Folder') document.getElementById('projects-folders')?.scrollIntoView({ behavior: 'smooth' });
+            else navigate('/deployments');
           }}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium ${a.primary ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}
         >
@@ -74,7 +78,7 @@ export default function Projects() {
 
       <div className="mb-6"><ProjectsToolbar view={view} setView={setView} query={query} setQuery={setQuery} /></div>
 
-      <div className="mb-8"><ProjectsFolderGrid /></div>
+      <div id="projects-folders" className="mb-8"><ProjectsFolderGrid /></div>
 
       <div className="mb-8"><ProjectsTemplates /></div>
 
