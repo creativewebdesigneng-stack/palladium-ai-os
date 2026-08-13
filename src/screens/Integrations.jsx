@@ -25,7 +25,6 @@ import {
 } from '@/components/integrations/integrationsData';
 import { SectionHead } from '@/components/integrations/shared';
 import { motion } from 'framer-motion';
-import { toast } from '@/components/ui/use-toast';
 
 const HEADER_ACTIONS = [
   { label: 'Connect Integration', icon: Plug, primary: true },
@@ -48,7 +47,7 @@ export default function Integrations() {
         <button key={a.label} onClick={() => {
             if (a.label === 'Connect Integration') setShowEmpty(true);
             else if (a.label === 'Browse Marketplace') setActiveTab('Marketplace');
-            else if (a.label === 'Create Custom Integration') setActiveTab('Custom API');
+            else if (a.label === 'Create Custom Integration') setActiveTab('Custom APIs');
             else navigate('/developer-portal');
           }}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium ${a.primary ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}>
