@@ -24,6 +24,10 @@ import {
 import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
 import { notify } from "@/lib/notifications/notify.server";
 import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
+import {
+  pauseForWorkflowApproval,
+  type WorkflowApprovalPause,
+} from "./workflow-approval.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -75,6 +79,13 @@ export class WorkforceError extends Error {
     readonly code = "WORKFORCE_ERROR",
   ) {
     super(message);
+  }
+}
+
+class WorkflowPausedError extends Error {
+  constructor(readonly pause: WorkflowApprovalPause) {
+    super("Workflow is waiting for approval.");
+    this.name = "WorkflowPausedError";
   }
 }
 
@@ -247,6 +258,21 @@ async function runBuiltInStep(
   base: StepOutcome,
 ): Promise<StepOutcome> {
   const { step, db } = args;
+
+  if (step.kind === "approval") {
+    const pause = await pauseForWorkflowApproval({
+      db,
+      userId: args.userId,
+      orgId: args.orgId,
+      workflowId: step.workflow_id,
+      workflowName: args.workflowName,
+      runId: args.runId,
+      step,
+      completed: args.completed ?? [],
+    });
+    throw new WorkflowPausedError(pause);
+  }
+
   const startedAt = Date.now();
   const { data: stepRun } = await db
     .from("workflow_step_runs")
@@ -328,6 +354,7 @@ async function runBuiltInStep(
         .eq("id", stepRunId);
     return outcome;
   } catch (error) {
+    if (error instanceof WorkflowPausedError) throw error;
     const message = error instanceof Error ? error.message : "Step failed.";
     if (stepRunId)
       await db
@@ -356,10 +383,12 @@ export async function runStep(args: {
   userId: string;
   orgId: string | null;
   runId: string;
+  workflowName: string;
   step: StepRow;
   input: string;
   objective: string;
   upstream: StepOutcome[];
+  completed?: StepOutcome[];
   signal?: AbortSignal;
 }): Promise<StepOutcome> {
   const { step, db } = args;
@@ -575,72 +604,89 @@ export async function executeWorkflowRun(args: {
   try {
     for (const wave of waves) {
       if (failure) break;
-      const pendingWave = wave.filter((step) => !completedIds.has(step.id));
-      if (!pendingWave.length) continue;
-      if (workflowController.signal.aborted) throw workflowController.signal.reason;
-      if (await workflowIsCancelled(args.db, runId)) {
-        throw new WorkforceError("Workflow run cancelled by the operator.", "CANCELLED");
-      }
-      if (Date.now() > deadline)
-        throw new WorkforceError("The workforce run exceeded its time budget.", "RUN_TIMEOUT");
 
-      const results = await Promise.all(
-        pendingWave.map(async (step) => {
-          const upstream = upstreamFor(step, completed);
-          if (!conditionMet(step.condition, upstream)) {
-            const skipped: StepOutcome = {
-              step_id: step.id,
-              step_run_id: null,
-              name: step.name || `Step ${step.position + 1}`,
-              agent_id: step.agent_id,
-              status: "skipped",
-              output: "",
-              error: "Condition not met.",
-              attempts: 0,
-              duration_ms: 0,
-              tokens_in: 0,
-              tokens_out: 0,
-            };
-            await args.db.from("workflow_step_runs").insert({
-              run_id: runId,
-              workflow_id: step.workflow_id,
-              step_id: step.id,
-              agent_id: step.agent_id,
-              org_id: orgId,
-              user_id: args.userId,
-              name: skipped.name,
-              kind: step.kind,
-              position: step.position,
-              status: "cancelled",
-              error: "Condition not met.",
-              completed_at: new Date().toISOString(),
+      // Approval is a safety barrier. If a parallel wave contains an approval,
+      // execute that gate alone first. On resume, the completed approval is
+      // skipped and the remaining siblings may execute normally.
+      while (true) {
+        const pendingWave = wave.filter((step) => !completedIds.has(step.id));
+        if (!pendingWave.length) break;
+        if (workflowController.signal.aborted) throw workflowController.signal.reason;
+        if (await workflowIsCancelled(args.db, runId)) {
+          throw new WorkforceError("Workflow run cancelled by the operator.", "CANCELLED");
+        }
+        if (Date.now() > deadline)
+          throw new WorkforceError("The workforce run exceeded its time budget.", "RUN_TIMEOUT");
+
+        const approval = pendingWave.find((step) => step.kind === "approval");
+        const executionWave = approval ? [approval] : pendingWave;
+        const results = await Promise.all(
+          executionWave.map(async (step) => {
+            const upstream = upstreamFor(step, completed);
+            if (!conditionMet(step.condition, upstream)) {
+              const skipped: StepOutcome = {
+                step_id: step.id,
+                step_run_id: null,
+                name: step.name || `Step ${step.position + 1}`,
+                agent_id: step.agent_id,
+                status: "skipped",
+                output: "",
+                error: "Condition not met.",
+                attempts: 0,
+                duration_ms: 0,
+                tokens_in: 0,
+                tokens_out: 0,
+              };
+              await args.db.from("workflow_step_runs").insert({
+                run_id: runId,
+                workflow_id: step.workflow_id,
+                step_id: step.id,
+                agent_id: step.agent_id,
+                org_id: orgId,
+                user_id: args.userId,
+                name: skipped.name,
+                kind: step.kind,
+                position: step.position,
+                status: "cancelled",
+                error: "Condition not met.",
+                completed_at: new Date().toISOString(),
+              });
+              return skipped;
+            }
+
+            return runStep({
+              sb: args.sb,
+              db: args.db,
+              userId: args.userId,
+              orgId,
+              runId,
+              workflowName: workflow.name,
+              step,
+              objective: args.objective,
+              input: renderInput(step.input_template, { input: args.objective, upstream }),
+              upstream,
+              completed,
+              signal: workflowController.signal,
             });
-            return skipped;
-          }
+          }),
+        );
 
-          return runStep({
-            sb: args.sb,
-            db: args.db,
-            userId: args.userId,
-            orgId,
-            runId,
-            step,
-            objective: args.objective,
-            input: renderInput(step.input_template, { input: args.objective, upstream }),
-            upstream,
-            signal: workflowController.signal,
-          });
-        }),
-      );
-
-      results.forEach((result) => {
-        completed.push(result);
-        completedIds.add(result.step_id);
-      });
-      const blocking = results.find(
-        (result, index) => result.status === "failed" && !pendingWave[index]!.continue_on_error,
-      );
-      if (blocking) failure = blocking;
+        results.forEach((result) => {
+          completed.push(result);
+          completedIds.add(result.step_id);
+        });
+        const blocking = results.find(
+          (result, index) => result.status === "failed" && !executionWave[index]!.continue_on_error,
+        );
+        if (blocking) {
+          failure = blocking;
+          break;
+        }
+        if (!approval) break;
+        // A conditional approval may be skipped. In that case continue with
+        // the remaining siblings in the same wave. A real approval throws the
+        // pause sentinel above and exits before reaching this point.
+      }
     }
 
     const tokensIn = completed.reduce((sum, outcome) => sum + outcome.tokens_in, 0);
@@ -720,6 +766,21 @@ export async function executeWorkflowRun(args: {
       .maybeSingle();
     return { run: finished ?? { id: runId, status }, steps: completed, output: finalOutput };
   } catch (error) {
+    if (error instanceof WorkflowPausedError) {
+      const { data: pausedRun } = await args.sb
+        .from("workflow_runs")
+        .select("*")
+        .eq("id", runId)
+        .maybeSingle();
+      return {
+        run: pausedRun ?? { id: runId, status: "waiting_for_approval" },
+        steps: completed,
+        output: "",
+        paused: true,
+        approval: error.pause,
+      };
+    }
+
     const message = error instanceof Error ? error.message : "The workforce run failed.";
     const cancelled =
       (error instanceof RuntimeError && error.code === "CANCELLED") ||
