@@ -121,9 +121,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                       animate={{ opacity: 1, y: 0 }}
                       className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : 'bg-white/[.04] text-zinc-200'}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : m.error ? 'bg-rose-500/10 text-rose-200 ring-1 ring-rose-400/20' : 'bg-white/[.04] text-zinc-200'}`}>
                         {m.text}
                         {m.action && <p className="mt-1.5 flex items-center gap-1 text-[11px] text-violet-300"><Sparkles className="h-3 w-3" /> Navigating…</p>}
+
                       </div>
                     </motion.div>
                   ))}
