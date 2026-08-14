@@ -1,3 +1,4 @@
+import { assistantChat } from '@/lib/ai/assistant.functions';
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -187,6 +188,97 @@ export function ContactSupport() {
 
 export function AIAssistant() {
   const [messages, setMessages] = useState([
+    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI — answers come from live AI, not a script." },
+  ]);
+  const [input, setInput] = useState('');
+  const [pending, setPending] = useState(false);
+
+  const send = async (text) => {
+    const content = (text ?? input).trim();
+    if (!content || pending) return;
+    const history = messages
+      .filter((m) => !m.error)
+      .slice(-6)
+      .map((m) => ({ role: m.role, content: m.text }));
+    setMessages((m) => [...m, { role: 'user', text: content }]);
+    setInput('');
+    setPending(true);
+    try {
+      const res = await assistantChat({ data: { message: content, history } });
+      setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
+    } catch (e) {
+      console.error('[help-assistant]', e);
+      const raw = e?.message || '';
+      const text = /unauthor|sign in|401/i.test(raw)
+        ? 'Sign in to ask the AI support assistant.'
+        : raw || 'AI service temporarily unavailable.';
+      setMessages((m) => [...m, { role: 'assistant', error: true, text }]);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl px-6">
+      <div className="space-y-2">
+        {FAQ.map((item, i) => {
+          const isOpen = open === i;
+          return (
+            <div key={i} className="overflow-hidden rounded-xl border border-white/10 bg-white/[.025]">
+              <button
+                onClick={() => setOpen(isOpen ? null : i)}
+                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+              >
+                <span className="text-sm font-medium text-white">{item.q}</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-400 transition ${isOpen ? 'rotate-180 text-violet-300' : ''}`} />
+              </button>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <p className="px-5 pb-4 text-sm leading-relaxed text-zinc-400">{item.a}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ContactSupport() {
+  const channels = [
+    { icon: Mail, label: 'Email Support', desc: 'Average reply in under 4 hours', action: 'support@palladium.ai', tone: 'text-violet-300' },
+    { icon: MessageSquare, label: 'Live Chat', desc: 'Mon–Fri, 9am–6pm GMT', action: 'Start a chat', tone: 'text-cyan-300' },
+    { icon: Phone, label: 'Priority Line', desc: 'Business & Enterprise plans', action: '+44 20 0000 0000', tone: 'text-emerald-300' },
+  ];
+  return (
+    <div className="mx-auto grid max-w-5xl gap-4 px-6 md:grid-cols-3">
+      {channels.map((c) => {
+        const Icon = c.icon;
+        return (
+          <div key={c.label} className="rounded-2xl border border-white/10 bg-white/[.025] p-6 text-center transition hover:border-white/20 hover:bg-white/[.04]">
+            <span className={`mx-auto grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[.04] ${c.tone}`}>
+              <Icon className="h-5 w-5" />
+            </span>
+            <h3 className="mt-4 text-sm font-semibold text-white">{c.label}</h3>
+            <p className="mt-1 text-xs text-zinc-500">{c.desc}</p>
+            <p className={`mt-3 text-sm ${c.tone}`}>{c.action}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function AIAssistant() {
+  const [messages, setMessages] = useState([
     { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI or pick a suggestion below." },
   ]);
   const [input, setInput] = useState('');
@@ -213,7 +305,7 @@ export function AIAssistant() {
           </span>
           <div>
             <p className="text-sm font-semibold text-white">AI Support Assistant</p>
-            <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online · instant answers</p>
+            <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live AI · signed-in operators</p>
           </div>
         </div>
         <div className="h-72 space-y-3 overflow-y-auto px-5 py-4">
@@ -225,12 +317,13 @@ export function AIAssistant() {
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : 'bg-white/[.04] text-zinc-200'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : m.error ? 'bg-rose-500/10 text-rose-200 ring-1 ring-rose-400/20' : 'bg-white/[.04] text-zinc-200'}`}>
                   {m.text}
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
+          {pending && <p className="px-1 text-[11px] text-zinc-500">Thinking…</p>}
         </div>
         <div className="border-t border-white/10 px-5 pb-3 pt-3">
           <div className="mb-3 flex flex-wrap gap-2">
@@ -247,6 +340,7 @@ export function AIAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
+              disabled={pending}
               placeholder="Describe your issue…"
               className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400/40 focus:outline-none"
             />
