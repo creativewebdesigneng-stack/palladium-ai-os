@@ -355,7 +355,7 @@ export default function Memory() {
 
       <div className="mt-8"><VectorPanel /></div>
 
-      <div className="mt-8"><MemoryGraph /></div>
+      <div className="mt-8"><MemoryGraph entries={entries} /></div>
 
       <AddMemoryModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} agents={agents} />
       <UploadKnowledgeModal open={uploadOpen} onClose={() => setUploadOpen(false)} onSubmit={handleUpload} agents={agents} uploading={uploading} />

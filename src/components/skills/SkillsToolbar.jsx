@@ -22,7 +22,9 @@ export default function SkillsToolbar({ category, onCategory, query, onQuery, on
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
             <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search tools…" className="w-52 rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-400/40" />
           </div>
-          <button onClick={onNew} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-3.5 w-3.5" />Create Tool</button>
+          {onNew && (
+            <button onClick={onNew} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-xs font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-3.5 w-3.5" />Create Tool</button>
+          )}
         </div>
       </div>
     </div>

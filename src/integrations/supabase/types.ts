@@ -756,6 +756,162 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_activities: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          kind: string
+          occurred_at: string
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          occurred_at?: string
+          summary: string
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          occurred_at?: string
+          summary?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          last_contacted_at: string | null
+          name: string
+          notes: string | null
+          org_id: string | null
+          phone: string | null
+          source: string | null
+          stage: string
+          tags: string[]
+          title: string | null
+          updated_at: string
+          user_id: string
+          value_gbp: number
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          name: string
+          notes?: string | null
+          org_id?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          value_gbp?: number
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          name?: string
+          notes?: string | null
+          org_id?: string | null
+          phone?: string | null
+          source?: string | null
+          stage?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          value_gbp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contacts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          direction: string
+          id: string
+          occurred_on: string
+          org_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          direction?: string
+          id?: string
+          occurred_on?: string
+          org_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          direction?: string
+          id?: string
+          occurred_on?: string
+          org_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_credentials: {
         Row: {
           access_token_ciphertext: string
@@ -870,6 +1026,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "integrations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          budget: number
+          channel: string
+          clicks: number
+          conversions: number
+          created_at: string
+          ended_at: string | null
+          id: string
+          impressions: number
+          name: string
+          org_id: string | null
+          spend: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget?: number
+          channel?: string
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          impressions?: number
+          name: string
+          org_id?: string | null
+          spend?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget?: number
+          channel?: string
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          impressions?: number
+          name?: string
+          org_id?: string | null
+          spend?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
@@ -2339,6 +2557,106 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          author_role: string
+          body: string
+          created_at: string
+          id: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          author_role?: string
+          body: string
+          created_at?: string
+          id?: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          author_role?: string
+          body?: string
+          created_at?: string
+          id?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assignee: string | null
+          body: string | null
+          channel: string
+          created_at: string
+          first_response_at: string | null
+          id: string
+          org_id: string | null
+          priority: string
+          requester_email: string | null
+          requester_name: string | null
+          resolved_at: string | null
+          satisfaction: number | null
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assignee?: string | null
+          body?: string | null
+          channel?: string
+          created_at?: string
+          first_response_at?: string | null
+          id?: string
+          org_id?: string | null
+          priority?: string
+          requester_email?: string | null
+          requester_name?: string | null
+          resolved_at?: string | null
+          satisfaction?: number | null
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assignee?: string | null
+          body?: string | null
+          channel?: string
+          created_at?: string
+          first_response_at?: string | null
+          id?: string
+          org_id?: string | null
+          priority?: string
+          requester_email?: string | null
+          requester_name?: string | null
+          resolved_at?: string | null
+          satisfaction?: number | null
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
           },
         ]
       }
