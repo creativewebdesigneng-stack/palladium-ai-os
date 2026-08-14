@@ -1,43 +1,95 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2 } from 'lucide-react';
-import { TEST_SEED } from './builderData';
+import { Send, Sparkles, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2, AlertTriangle } from 'lucide-react';
+import { streamAgentRun } from '@/lib/runtime/run-client';
 
-export default function LivePreview({ config }) {
+/**
+ * Real agent test console. Runs the saved agent through the production runtime —
+ * there is no simulated response path. Until the draft is saved there is nothing
+ * to execute, so the console says so rather than inventing an answer.
+ */
+export default function LivePreview({ config, agentId }) {
   const [tab, setTab] = useState('preview');
-  const [messages, setMessages] = useState(TEST_SEED);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
-  const [activity, setActivity] = useState([
-    { t: '11:02', text: 'Agent initialised · Claude Sonnet 4.6', kind: 'init' },
-    { t: '11:02', text: 'Loaded 3 knowledge sources', kind: 'load' },
-    { t: '11:03', text: 'Permissions: read · write · execute', kind: 'perm' },
-  ]);
+  const [activity, setActivity] = useState([]);
   const scrollRef = useRef(null);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, running]);
 
-  const send = () => {
+  const log = (text, kind) => {
+    const d = new Date();
+    const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    setActivity((a) => [...a, { t, text, kind }]);
+  };
+
+  const send = async () => {
     const text = input.trim();
     if (!text || running) return;
+    if (!agentId) {
+      setMessages((m) => [...m, { role: 'user', text }, {
+        role: 'agent', error: true,
+        text: 'Save this agent first — the test console runs the real agent through the production runtime and cannot execute an unsaved draft.',
+      }]);
+      setInput('');
+      return;
+    }
+
     setInput('');
     setRunning(true);
-    setMessages((m) => [...m, { role: 'user', text }]);
-    // Simulated agent run — replace with backend function invocation.
-    setTimeout(() => {
-      const toolName = config.tools.length ? toolLabel(config.tools[0]) : 'Reasoning';
-      setMessages((m) => [...m, {
-        role: 'agent', text: `Based on ${config.name || 'your agent'}’s context, here’s a response to “${text}”. I analysed the request, used ${toolName}, and drafted an answer aligned with your ${config.role || 'role'}.`,
-        steps: [
-          { type: 'thinking', text: `Interpret request → plan using ${config.tools.length} tools → draft response.` },
-          { type: 'tool', name: toolName, detail: config.tools.length ? `${toolName} · input: "${text.slice(0, 40)}"` : 'internal reasoning' },
-          { type: 'result', text: '1 result · confidence 92%' },
-        ],
-      }]);
-      setActivity((a) => [...a, { t: now(), text: `Tool used: ${toolName}`, kind: 'tool' }, { t: now(), text: 'Response generated', kind: 'done' }]);
+    setMessages((m) => [...m, { role: 'user', text }, { role: 'agent', text: '', steps: [] }]);
+    log('Run started', 'init');
+
+    const appendDelta = (delta) => setMessages((m) => {
+      const next = [...m];
+      const last = next[next.length - 1];
+      if (last?.role === 'agent') next[next.length - 1] = { ...last, text: (last.text || '') + delta };
+      return next;
+    });
+    const addStep = (step) => setMessages((m) => {
+      const next = [...m];
+      const last = next[next.length - 1];
+      if (last?.role === 'agent') next[next.length - 1] = { ...last, steps: [...(last.steps || []), step] };
+      return next;
+    });
+    const setLast = (patch) => setMessages((m) => {
+      const next = [...m];
+      const last = next[next.length - 1];
+      if (last?.role === 'agent') next[next.length - 1] = { ...last, ...patch };
+      return next;
+    });
+
+    try {
+      const task = await streamAgentRun({
+        agentId,
+        input: text,
+        onEvent: (event) => {
+          if (event.type === 'delta' && event.delta) appendDelta(event.delta);
+          else if (event.type === 'tool') {
+            addStep({ type: 'tool', name: event.tool || 'Tool', detail: event.detail || event.status || 'executed' });
+            log(`Tool used: ${event.tool || 'tool'}`, 'tool');
+          } else if (event.type === 'status' && event.status) {
+            log(`Status: ${event.status}`, 'perm');
+          } else if (event.type === 'error' && event.error) {
+            setLast({ error: true, text: event.error });
+          }
+        },
+      });
+      const output = task?.output_text || '';
+      if (task?.error) setLast({ error: true, text: task.error });
+      else if (output) setLast({ text: output });
+      else setLast((prev) => prev);
+      log('Run finished', 'done');
+    } catch (e) {
+      console.error('[agent-builder:test]', e);
+      setLast({ error: true, text: e?.message || 'AI service temporarily unavailable.' });
+      log('Run failed', 'error');
+    } finally {
       setRunning(false);
-    }, 1400);
+    }
   };
+
 
   return (
     <div className="flex h-full min-h-0 flex-col">
