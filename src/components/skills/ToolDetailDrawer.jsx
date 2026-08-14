@@ -43,28 +43,40 @@ export default function ToolDetailDrawer({ tool, onClose, onToggle }) {
         {/* details */}
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           <Section title="Permissions">
-            <div className="flex flex-wrap gap-1.5">
-              {tool.permissions.map((p) => <span key={p} className="rounded-lg bg-violet-500/10 px-2 py-1 text-[11px] text-violet-200 ring-1 ring-violet-400/20">{p}</span>)}
-            </div>
+            {permissions.length === 0 ? (
+              <p className="text-[11px] text-zinc-500">No permission grants recorded for this tool.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {permissions.map((p) => <span key={p} className="rounded-lg bg-violet-500/10 px-2 py-1 text-[11px] text-violet-200 ring-1 ring-violet-400/20">{p}</span>)}
+              </div>
+            )}
           </Section>
 
           <Section title="Agents using it">
-            <div className="space-y-2">
-              {tool.agentNames.map((n) => (
-                <div key={n} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-500/20 text-[11px] text-violet-200">{n[0]}</span>
-                  <p className="text-xs text-zinc-200">{n}</p>
-                </div>
-              ))}
-            </div>
+            {agentNames.length === 0 ? (
+              <p className="text-[11px] text-zinc-500">No agents have this tool assigned yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {agentNames.map((n) => (
+                  <div key={n} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-500/20 text-[11px] text-violet-200">{n[0]}</span>
+                    <p className="text-xs text-zinc-200">{n}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section>
 
-          <Section title="Schema">
+          <Section title="Configuration">
             <div className="space-y-2">
-              <Field label="Input" value={tool.input} mono />
-              <Field label="Output" value={tool.output} mono />
-              <Field label="API Endpoint" value={tool.endpoint} mono />
-              <Field label="Authentication" value={tool.auth} />
+              <Field label="Slug" value={tool.slug ?? '—'} mono />
+              <Field label="Authentication" value={tool.authMethod ?? 'None'} />
+              <Field label="Approval required" value={tool.requiresApproval ? 'Yes' : 'No'} />
+              <Field
+                label="Allowed domains"
+                value={(tool.allowedDomains ?? []).length ? tool.allowedDomains.join(', ') : 'None configured'}
+                mono
+              />
             </div>
           </Section>
         </div>
