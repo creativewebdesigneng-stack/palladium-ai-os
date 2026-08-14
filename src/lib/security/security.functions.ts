@@ -185,7 +185,9 @@ export const getSecurityCentre = createServerFn({ method: "POST" })
       : [];
     const aal = String(claims?.["aal"] ?? "aal1");
     const mfaEnabled = aal === "aal2";
-    const emailVerified = Boolean(claims?.["email_verified"] ?? claims?.["user_metadata"]?.["email_verified"]);
+    const emailVerified = Boolean(
+      claims?.["email_verified"] ?? claims?.["user_metadata"]?.["email_verified"],
+    );
 
     const account = {
       email: (claims?.["email"] as string) ?? "",
@@ -194,9 +196,12 @@ export const getSecurityCentre = createServerFn({ method: "POST" })
       aal,
       mfaEnabled,
       emailVerified,
-      sessionExpiresAt: claims?.["exp"] ? new Date(Number(claims["exp"]) * 1000).toISOString() : null,
+      sessionExpiresAt: claims?.["exp"]
+        ? new Date(Number(claims["exp"]) * 1000).toISOString()
+        : null,
       issuedAt: claims?.["iat"] ? new Date(Number(claims["iat"]) * 1000).toISOString() : null,
-      ip: request?.headers?.get("cf-connecting-ip") ?? request?.headers?.get("x-forwarded-for") ?? "",
+      ip:
+        request?.headers?.get("cf-connecting-ip") ?? request?.headers?.get("x-forwarded-for") ?? "",
       userAgent: request?.headers?.get("user-agent") ?? "",
     };
 
@@ -211,7 +216,9 @@ export const getSecurityCentre = createServerFn({ method: "POST" })
         key: "mfa",
         label: "Multi-factor auth",
         value: mfaEnabled ? 100 : 40,
-        note: mfaEnabled ? "Second factor verified on this session" : "No second factor on this session",
+        note: mfaEnabled
+          ? "Second factor verified on this session"
+          : "No second factor on this session",
       },
       {
         key: "email",
@@ -320,14 +327,54 @@ export const getSecurityCentre = createServerFn({ method: "POST" })
       });
 
     const metrics = [
-      { key: "score", label: "Security Score", value: String(total), detail: total >= 85 ? "Good" : total >= 70 ? "Fair" : "Needs work" },
-      { key: "mfa", label: "Session Assurance", value: aal.toUpperCase(), detail: mfaEnabled ? "Two factors" : "Single factor" },
-      { key: "keys", label: "API Keys", value: String(keys.length), detail: riskyKeys ? `${riskyKeys} expiring` : "All healthy" },
-      { key: "integrations", label: "Integrations", value: String(integrations.length), detail: reauthIntegrations ? `${reauthIntegrations} need re-auth` : "All reviewed" },
-      { key: "webhooks", label: "Webhooks", value: String(webhooks.length), detail: `${webhooks.reduce((n, w) => n + w.deliveries, 0)} deliveries` },
-      { key: "alerts", label: "Security Alerts", value: String(alerts.length), detail: `${alerts.filter((a) => a.severity === "critical").length} critical` },
-      { key: "audit", label: "Audit Events", value: String(auditCountRes.count ?? auditLogs.length), detail: "last 30 days" },
-      { key: "denied", label: "Denied Actions", value: String(failedEvents), detail: "recent trail" },
+      {
+        key: "score",
+        label: "Security Score",
+        value: String(total),
+        detail: total >= 85 ? "Good" : total >= 70 ? "Fair" : "Needs work",
+      },
+      {
+        key: "mfa",
+        label: "Session Assurance",
+        value: aal.toUpperCase(),
+        detail: mfaEnabled ? "Two factors" : "Single factor",
+      },
+      {
+        key: "keys",
+        label: "API Keys",
+        value: String(keys.length),
+        detail: riskyKeys ? `${riskyKeys} expiring` : "All healthy",
+      },
+      {
+        key: "integrations",
+        label: "Integrations",
+        value: String(integrations.length),
+        detail: reauthIntegrations ? `${reauthIntegrations} need re-auth` : "All reviewed",
+      },
+      {
+        key: "webhooks",
+        label: "Webhooks",
+        value: String(webhooks.length),
+        detail: `${webhooks.reduce((n, w) => n + w.deliveries, 0)} deliveries`,
+      },
+      {
+        key: "alerts",
+        label: "Security Alerts",
+        value: String(alerts.length),
+        detail: `${alerts.filter((a) => a.severity === "critical").length} critical`,
+      },
+      {
+        key: "audit",
+        label: "Audit Events",
+        value: String(auditCountRes.count ?? auditLogs.length),
+        detail: "last 30 days",
+      },
+      {
+        key: "denied",
+        label: "Denied Actions",
+        value: String(failedEvents),
+        detail: "recent trail",
+      },
     ];
 
     return {
