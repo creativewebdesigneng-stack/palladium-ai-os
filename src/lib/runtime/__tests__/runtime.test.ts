@@ -22,6 +22,12 @@ const entitlements = vi.hoisted(() => ({
   recordUsage: vi.fn(async () => {}),
 }));
 
+const notifications = vi.hoisted(() => ({
+  notify: vi.fn(async () => true),
+  notifyUsageThreshold: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/notifications/notify.server", () => notifications);
+
 vi.mock("@/lib/platform/entitlements.server", async () => {
   const actual = await vi.importActual<any>("@/lib/platform/entitlements.server");
   return {
@@ -58,6 +64,8 @@ import {
   prepareRun,
   RuntimeError,
 } from "../runtime.server";
+import { runStep } from "../workforce.server";
+import { normaliseWorkflowStepConfig } from "../workforce.functions";
 import { assertWithinLimit, EntitlementError, UNLIMITED } from "@/lib/platform/entitlements.server";
 
 const USER = "user-1";
@@ -308,5 +316,96 @@ describe("run lifecycle", () => {
     });
     expect(message).toBe("The run failed unexpectedly. Please try again.");
     expect(message).not.toContain("sk-live");
+  });
+});
+
+describe("workflow built-in nodes", () => {
+  it("preserves bounded JSON-safe workflow config for persisted steps", () => {
+    expect(
+      normaliseWorkflowStepConfig("notification", {
+        title: "Done",
+        future_node_option: { mode: "brief" },
+      }),
+    ).toEqual({
+      title: "Done",
+      future_node_option: { mode: "brief" },
+    });
+    expect(() => normaliseWorkflowStepConfig("delay", { duration_ms: 300_001 })).toThrow(
+      "duration_ms",
+    );
+  });
+
+  function step(kind: string, config: Record<string, unknown> = {}) {
+    return {
+      id: `step-${kind}`,
+      workflow_id: "workflow-1",
+      position: 0,
+      name: kind,
+      kind,
+      agent_id: null,
+      mode: "sequential",
+      depends_on: [],
+      condition: {},
+      input_template: null,
+      max_retries: 1,
+      retry_delay_ms: 0,
+      timeout_ms: 5_000,
+      continue_on_error: false,
+      requires_approval: false,
+      config,
+    };
+  }
+  async function builtIn(kind: string, config: Record<string, unknown> = {}, signal?: AbortSignal) {
+    const sb = db();
+    const args = {
+      sb,
+      db: sb,
+      userId: USER,
+      orgId: null,
+      runId: "run-1",
+      step: step(kind, config),
+      input: "go",
+      objective: "go",
+      upstream: [],
+    };
+    return runStep(signal ? { ...args, signal } : args);
+  }
+
+  it("runs a delay without an agent and records its step ledger", async () => {
+    const outcome = await builtIn("delay", { duration_ms: 0 });
+    expect(outcome).toMatchObject({
+      status: "succeeded",
+      output: "Delayed for 0 ms.",
+      tokens_in: 0,
+      tokens_out: 0,
+    });
+  });
+
+  it("stops a delay when its workflow is cancelled", async () => {
+    const controller = new AbortController();
+    const running = builtIn("delay", { duration_ms: 300_000 }, controller.signal);
+    controller.abort(new RuntimeError("cancelled", "CANCELLED", 499));
+    await expect(running).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+
+  it("delivers a notification without an agent through the real notification path", async () => {
+    const outcome = await builtIn("notification", {
+      title: "Workflow update",
+      body: "Finished",
+      type: "workflow.completed",
+      link: "/workforce",
+    });
+    expect(outcome.status).toBe("succeeded");
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER, type: "workflow.completed" }),
+    );
+  });
+
+  it("fails unsupported non-agent nodes clearly", async () => {
+    const outcome = await builtIn("loop");
+    expect(outcome).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Unsupported workflow step kind"),
+    });
   });
 });

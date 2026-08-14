@@ -23,6 +23,7 @@ import {
 } from "@/lib/platform/entitlements.server";
 import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
 import { notify } from "@/lib/notifications/notify.server";
+import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -42,6 +43,7 @@ type StepRow = {
   timeout_ms: number;
   continue_on_error: boolean;
   requires_approval: boolean;
+  config: Record<string, unknown> | null;
 };
 
 export type StepOutcome = {
@@ -77,6 +79,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)))
 const MAX_STEPS = 25;
 const RUN_BUDGET_MS = 10 * 60 * 1000;
 const CANCELLATION_POLL_MS = 1_000;
+const MAX_DELAY_MS = 300_000;
 
 async function workflowIsCancelled(db: Sb, runId: string): Promise<boolean> {
   const { data } = await db
@@ -85,6 +88,47 @@ async function workflowIsCancelled(db: Sb, runId: string): Promise<boolean> {
     .eq("id", runId)
     .maybeSingle();
   return data?.status === "cancelled" || data?.cancel_requested === true;
+}
+
+function delayFor(config: Record<string, unknown> | null): number {
+  const value = config?.["duration_ms"];
+  if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > MAX_DELAY_MS)
+    throw new WorkforceError(
+      `Delay duration_ms must be an integer between 0 and ${MAX_DELAY_MS}.`,
+      "INVALID_DELAY",
+    );
+  return Number(value);
+}
+
+function safeLink(value: unknown): string | null {
+  const link = typeof value === "string" ? value.trim() : "";
+  return link && link.startsWith("/") && !link.startsWith("//") && !/[\\\r\n]/.test(link)
+    ? link.slice(0, 500)
+    : null;
+}
+
+function abortableDelay(durationMs: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted)
+    return Promise.reject(
+      signal.reason ??
+        new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+    );
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, durationMs);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      reject(
+        signal?.reason ??
+          new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+      );
+    };
+    function done() {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }
 
 /* ------------------------------------------------------------ templating */
@@ -189,7 +233,115 @@ function upstreamFor(step: StepRow, completed: StepOutcome[]): StepOutcome[] {
 
 /* ------------------------------------------------------------ one step */
 
-async function runStep(args: {
+async function runBuiltInStep(
+  args: Parameters<typeof runStep>[0],
+  base: StepOutcome,
+): Promise<StepOutcome> {
+  const { step, db } = args;
+  const startedAt = Date.now();
+  const { data: stepRun } = await db
+    .from("workflow_step_runs")
+    .insert({
+      run_id: args.runId,
+      workflow_id: step.workflow_id,
+      step_id: step.id,
+      agent_id: null,
+      org_id: args.orgId,
+      user_id: args.userId,
+      name: base.name,
+      kind: step.kind,
+      position: step.position,
+      attempt: 1,
+      status: "running",
+      input: args.input.slice(0, 8000),
+      started_at: new Date().toISOString(),
+    })
+    .select("id")
+    .maybeSingle();
+  const stepRunId = (stepRun?.id as string | undefined) ?? null;
+
+  try {
+    let output: string;
+    if (step.kind === "delay") {
+      const durationMs = delayFor(step.config);
+      await abortableDelay(durationMs, args.signal);
+      output = `Delayed for ${durationMs} ms.`;
+    } else if (step.kind === "notification") {
+      const config = step.config ?? {};
+      const requestedType =
+        typeof config["type"] === "string" ? config["type"] : "workflow.completed";
+      const type = NOTIFICATION_TYPE_MAP[requestedType] ? requestedType : "workflow.completed";
+      const severity = ["info", "success", "warning", "critical"].includes(
+        String(config["severity"]),
+      )
+        ? (config["severity"] as NotificationSeverity)
+        : undefined;
+      const title = String(config["title"] ?? base.name)
+        .trim()
+        .slice(0, 200);
+      if (!title)
+        throw new WorkforceError("Notification title is required.", "INVALID_NOTIFICATION");
+      const body = typeof config["body"] === "string" ? config["body"].trim().slice(0, 500) : null;
+      const delivered = await notify({
+        userId: args.userId,
+        orgId: args.orgId,
+        type,
+        title,
+        body,
+        ...(severity ? { severity } : {}),
+        link: safeLink(config["link"]),
+        metadata: { workflow_id: step.workflow_id, run_id: args.runId, step_id: step.id },
+      });
+      output = delivered
+        ? "Notification delivered."
+        : "Notification was suppressed by recipient preferences.";
+    } else {
+      throw new WorkforceError(`Unsupported workflow step kind: ${step.kind}.`, "UNSUPPORTED_STEP");
+    }
+
+    const outcome = {
+      ...base,
+      step_run_id: stepRunId,
+      status: "succeeded" as const,
+      output,
+      attempts: 1,
+      duration_ms: Date.now() - startedAt,
+    };
+    if (stepRunId)
+      await db
+        .from("workflow_step_runs")
+        .update({
+          status: "succeeded",
+          output,
+          duration_ms: outcome.duration_ms,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", stepRunId);
+    return outcome;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Step failed.";
+    if (stepRunId)
+      await db
+        .from("workflow_step_runs")
+        .update({
+          status: "failed",
+          error: message.slice(0, 600),
+          duration_ms: Date.now() - startedAt,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", stepRunId);
+    if (error instanceof RuntimeError && error.code === "CANCELLED") throw error;
+    return {
+      ...base,
+      step_run_id: stepRunId,
+      attempts: 1,
+      duration_ms: Date.now() - startedAt,
+      error: message,
+    };
+  }
+}
+
+export async function runStep(args: {
   sb: Sb;
   db: Sb;
   userId: string;
@@ -217,6 +369,7 @@ async function runStep(args: {
     tokens_out: 0,
   };
 
+  if (step.kind !== "agent") return runBuiltInStep(args, base);
   if (!step.agent_id) {
     return { ...base, status: "skipped", error: "No agent is assigned to this step." };
   }

@@ -9,6 +9,36 @@ import { executeWorkflow, requestWorkflowCancellation, WorkforceError } from "./
 
 type Sb = { from: (t: string) => any };
 
+function jsonConfig(value: unknown, depth = 0): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 4) return {};
+  const result: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value).slice(0, 40)) {
+    if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(key)) continue;
+    if (raw == null || typeof raw === "boolean" || typeof raw === "number") result[key] = raw;
+    else if (typeof raw === "string") result[key] = raw.slice(0, 2_000);
+    else if (Array.isArray(raw))
+      result[key] = raw
+        .slice(0, 20)
+        .filter((item) => typeof item === "string")
+        .map(String);
+    else if (typeof raw === "object") result[key] = jsonConfig(raw, depth + 1);
+  }
+  return result;
+}
+
+export function normaliseWorkflowStepConfig(kind: string, value: unknown): Record<string, unknown> {
+  const config = jsonConfig(value);
+  if (kind === "delay") {
+    if (
+      !Number.isInteger(config["duration_ms"]) ||
+      Number(config["duration_ms"]) < 0 ||
+      Number(config["duration_ms"]) > 300_000
+    )
+      throw new Error("Delay duration_ms must be an integer between 0 and 300000.");
+  }
+  return config;
+}
+
 function surface(error: unknown): never {
   if (error instanceof WorkforceError || error instanceof EntitlementError)
     throw new Error(error.message);
@@ -125,6 +155,7 @@ export const saveWorkflow = createServerFn({ method: "POST" })
           position: Number.isFinite(s?.position) ? Number(s.position) : index,
           name: s?.name ? String(s.name) : null,
           kind: String(s?.kind ?? "agent"),
+          config: normaliseWorkflowStepConfig(String(s?.kind ?? "agent"), s?.config),
           agent_id: s?.agent_id ? String(s.agent_id) : null,
           mode: ["sequential", "parallel", "conditional"].includes(s?.mode) ? s.mode : "sequential",
           depends_on: Array.isArray(s?.depends_on) ? s.depends_on.map(String) : [],
