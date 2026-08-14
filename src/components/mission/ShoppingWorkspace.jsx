@@ -5,6 +5,7 @@ import {
   Search, Wallet, Bookmark, ListChecks, RefreshCw, Trash2, Plus, ShieldAlert, Globe2, Bot,
 } from 'lucide-react';
 
+import BrowserProviderBadge from '@/components/browser/BrowserProviderBadge';
 import ShoppingBoard from './ShoppingBoard';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
