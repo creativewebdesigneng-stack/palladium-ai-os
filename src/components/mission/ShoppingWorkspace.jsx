@@ -75,10 +75,9 @@ export default function ShoppingWorkspace({ agents = [] }) {
     onSuccess: (res) => {
       toast({
         title: `${res.results.length} options found`,
-        description:
-          res.provider === 'simulated'
-            ? 'Simulated browsing provider — results are illustrative, not live retailer data.'
-            : `Researched via the ${res.provider} browser provider.`,
+        description: res.simulated
+          ? 'Development simulation — these are NOT real listings, prices or availability. Connect a production browser provider for real research.'
+          : `Researched live via the ${res.provider} browser provider.`,
       });
       setRequirement('');
       refresh();
@@ -116,7 +115,7 @@ export default function ShoppingWorkspace({ agents = [] }) {
     currency: userLimit?.currency ?? 'GBP',
   };
 
-  const provider = data?.sessions?.[0]?.provider ?? 'simulated';
+  const provider = data?.browser?.provider ?? data?.sessions?.[0]?.provider ?? null;
   const domains = data?.sessions?.[0]?.allowed_domains ?? [];
 
   return (

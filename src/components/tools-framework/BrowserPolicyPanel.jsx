@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, ShieldCheck, Globe, Wallet, Save, Bot } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import BrowserProviderBadge, { BrowserProviderNotice } from '@/components/browser/BrowserProviderBadge';
 
 /**
  * Domain allow-list and spend-cap policy for the browser and commerce tools.
@@ -20,9 +21,7 @@ export default function BrowserPolicyPanel({ tools, browser, saving, onSave }) {
         description="Agents may only reach domains you list here, and can never complete a payment without your explicit approval."
         action={
           <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">
-              Provider: {browser?.active || 'simulated'}
-            </span>
+            <BrowserProviderBadge browser={browser} />
             <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300">
               <ShieldCheck className="mr-1 inline h-3 w-3" />Payments always require approval
             </span>
@@ -30,10 +29,7 @@ export default function BrowserPolicyPanel({ tools, browser, saving, onSave }) {
         }
       />
 
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-xs text-zinc-400">
-        Automation providers available to this workspace: {(browser?.providers || []).join(', ') || 'simulated'}. Providers
-        stay inactive until credentials are configured, so nothing silently switches vendor.
-      </div>
+      <BrowserProviderNotice browser={browser} />
 
       <div className="grid gap-3 lg:grid-cols-2">
         {scoped.map((tool) => <PolicyCard key={tool.slug} tool={tool} saving={saving} onSave={onSave} />)}
