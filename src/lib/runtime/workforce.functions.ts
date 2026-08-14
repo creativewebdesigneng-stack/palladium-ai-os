@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
+import { decideWorkflowApproval } from "./workflow-approval-decision.server";
 import { executeWorkflow, requestWorkflowCancellation, WorkforceError } from "./workforce.server";
 
 type Sb = { from: (t: string) => any };
@@ -239,6 +240,39 @@ export const cancelWorkflowRun = createServerFn({ method: "POST" })
         sb: context.supabase as unknown as Sb,
         userId: context.userId,
         runId: data.run_id,
+      });
+    } catch (error) {
+      surface(error);
+    }
+  });
+
+/** Owner-only decision for a workflow approval. Approved runs resume on the
+ * same durable workflow_runs row; rejected runs obey continue_on_error. */
+export const decideWorkflowApprovalRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    approval_request_id: string;
+    decision: "approved" | "rejected";
+    note?: string | null;
+  }) => {
+    const approval_request_id = String(input?.approval_request_id ?? "").trim();
+    if (!approval_request_id) throw new Error("An approval request is required.");
+    if (input?.decision !== "approved" && input?.decision !== "rejected")
+      throw new Error("Decision must be approved or rejected.");
+    return {
+      approval_request_id,
+      decision: input.decision,
+      note: input.note ? String(input.note).trim().slice(0, 500) : null,
+    };
+  })
+  .handler(async ({ data, context }) => {
+    try {
+      return await decideWorkflowApproval({
+        sb: context.supabase as unknown as Sb,
+        userId: context.userId,
+        approvalRequestId: data.approval_request_id,
+        decision: data.decision,
+        note: data.note,
       });
     } catch (error) {
       surface(error);
