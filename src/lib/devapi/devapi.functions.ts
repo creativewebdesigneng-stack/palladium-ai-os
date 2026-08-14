@@ -9,6 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { apiLimitsFor, API_SCOPES, WEBHOOK_EVENT_TYPES } from "./plans";
 import { generateApiKey, generateWebhookSecret, maskKey } from "./keys.server";
+import { validateWebhookUrl } from "./webhook-url";
 
 type Sb = { from: (t: string) => any };
 
@@ -225,10 +226,7 @@ export const listWebhooksFn = createServerFn({ method: "POST" })
 export const createWebhookFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { url: string; events?: string[]; description?: string }) => {
-    const url = String(input?.url ?? "").trim();
-    if (!/^https:\/\/.+/i.test(url) && !/^http:\/\/localhost/i.test(url)) {
-      throw new Error("Webhook URLs must use HTTPS.");
-    }
+    const url = validateWebhookUrl(String(input?.url ?? ""));
     const events = (input?.events ?? []).filter((e) => EVENTS.has(e));
     if (!events.length) throw new Error("Select at least one supported event.");
     return {
@@ -275,7 +273,7 @@ export const updateWebhookFn = createServerFn({ method: "POST" })
       webhook_id: String(input?.webhook_id ?? ""),
       status: input?.status === "paused" || input?.status === "active" ? input.status : undefined,
       events: input?.events?.filter((e) => EVENTS.has(e)),
-      url: input?.url ? String(input.url).slice(0, 500) : undefined,
+      url: input?.url ? validateWebhookUrl(String(input.url)) : undefined,
     }),
   )
   .handler(async ({ data, context }) => {

@@ -3,6 +3,7 @@
  * developers can verify signature handling before going live.
  */
 import { hmacSha256Hex } from "./keys.server";
+import { validateWebhookUrl } from "./webhook-url";
 
 export async function sendTestDelivery(webhookId: string, userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -32,9 +33,10 @@ export async function sendTestDelivery(webhookId: string, userId: string) {
   let status: number | null = null;
   let error: string | null = null;
   try {
+    const targetUrl = validateWebhookUrl(hook.url);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(hook.url, {
+    const res = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",

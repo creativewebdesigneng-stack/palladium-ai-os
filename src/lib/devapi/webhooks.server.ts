@@ -6,6 +6,7 @@
  * reject replays. Deliveries are recorded for the developer portal.
  */
 import { hmacSha256Hex } from "./keys.server";
+import { validateWebhookUrl } from "./webhook-url";
 import type { WebhookEvent } from "./plans";
 
 const TIMEOUT_MS = 8000;
@@ -64,9 +65,10 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
   let error: string | null = null;
 
   try {
+    const targetUrl = validateWebhookUrl(hook.url);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const res = await fetch(hook.url, {
+    const res = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",

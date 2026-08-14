@@ -191,6 +191,17 @@ export function isDomainAllowed(url: string, allowed: string[]): boolean {
   });
 }
 
+/**
+ * Enforce the agent allow-list at the PalladiumAI boundary as well as in the
+ * remote browser worker. The worker is a defence-in-depth layer, never the
+ * only thing preventing an LLM-controlled URL from being opened.
+ */
+function assertAllowedUrl(url: string, allowedDomains: string[]): void {
+  if (!isDomainAllowed(url, allowedDomains)) {
+    throw new Error("Browser action blocked: the URL is not in this agent's domain allow-list.");
+  }
+}
+
 /* ------------------------------------------- development simulation provider */
 
 const SIM_SELLERS: Array<{ name: string; domain: string; delivery: string; deliveryCost: number }> =
@@ -275,8 +286,7 @@ export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserT
       const currency = opts?.currency ?? "GBP";
       const budget = opts?.budget ?? null;
       const base = budget && budget > 0 ? budget : 120 + (hash(query) % 240);
-      const allowed = SIM_SELLERS.filter((s) => isDomainAllowed(s.domain, config.allowedDomains));
-      const sellers = allowed.length ? allowed : SIM_SELLERS.slice(0, 3);
+      const sellers = SIM_SELLERS.filter((s) => isDomainAllowed(s.domain, config.allowedDomains));
       const label = query.replace(/^(find|get|buy|i need|a|an|the)\s+/gi, "").trim() || "product";
       return sellers.slice(0, 4).map((seller, i) => {
         const seed = hash(`${query}-${seller.name}`);
@@ -315,6 +325,15 @@ export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserT
       return { ok: true, simulated: true };
     },
     async extract(url, selector) {
+      if (!isDomainAllowed(url, config.allowedDomains)) {
+        record("extract", url, "blocked by allowlist");
+        return {
+          url,
+          text: `${SIMULATED_PREFIX} Browser action blocked: the URL is not in this agent's domain allow-list.`,
+          items: [],
+          simulated: true,
+        };
+      }
       record("extract", url, selector ? `simulated extract of ${selector}` : "simulated extract");
       return {
         url,
@@ -354,10 +373,17 @@ export function createSimulatedBrowserTool(config: BrowserAgentConfig): BrowserT
     },
     async fillForm(url, fields) {
       if (!config.allowedTools.includes("browser")) return { ok: false };
+      if (!isDomainAllowed(url, config.allowedDomains)) {
+        record("fill_form", url, "blocked by allowlist");
+        return { ok: false };
+      }
       record("fill_form", url, Object.keys(fields).join(", "));
       return { ok: true };
     },
     async prepareCheckout(offer) {
+      if (!isDomainAllowed(offer.url, config.allowedDomains)) {
+        throw new Error("Browser action blocked: the offer URL is not in this agent's domain allow-list.");
+      }
       record("prepare_checkout", offer.seller, offer.product);
       const itemPrice = offer.price;
       const deliveryCost = offer.deliveryCost;
@@ -500,9 +526,12 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
     steps: () => steps,
 
     async navigate(url) {
+      assertAllowedUrl(url, config.allowedDomains);
       record("navigate", url);
       const data = (await call("navigate", { url })) as { url?: string } | undefined;
-      return { ok: true, url: data?.url ?? url, simulated: false };
+      const resolvedUrl = data?.url ?? url;
+      assertAllowedUrl(resolvedUrl, config.allowedDomains);
+      return { ok: true, url: resolvedUrl, simulated: false };
     },
     async search(query, opts) {
       record("search", query);
@@ -531,6 +560,7 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
       return { ok: true, simulated: false };
     },
     async extract(url, selector) {
+      assertAllowedUrl(url, config.allowedDomains);
       record("extract", url, selector);
       const data = (await call("extract", { url, selector })) as
         | { text?: string; items?: unknown[] }
@@ -551,13 +581,17 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
     },
     async back() {
       const data = (await call("back")) as BrowserPageState | undefined;
-      record("back", data?.url ?? "");
-      return { url: data?.url ?? "", ...(data?.title ? { title: data.title } : {}), simulated: false };
+      const url = data?.url ?? "";
+      if (url) assertAllowedUrl(url, config.allowedDomains);
+      record("back", url);
+      return { url, ...(data?.title ? { title: data.title } : {}), simulated: false };
     },
     async forward() {
       const data = (await call("forward")) as BrowserPageState | undefined;
-      record("forward", data?.url ?? "");
-      return { url: data?.url ?? "", ...(data?.title ? { title: data.title } : {}), simulated: false };
+      const url = data?.url ?? "";
+      if (url) assertAllowedUrl(url, config.allowedDomains);
+      record("forward", url);
+      return { url, ...(data?.title ? { title: data.title } : {}), simulated: false };
     },
     async wait(ms) {
       record("wait", `${ms}ms`);
@@ -577,17 +611,21 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
     },
     async fillForm(url, fields) {
       if (!config.allowedTools.includes("browser")) return { ok: false };
+      assertAllowedUrl(url, config.allowedDomains);
       record("fill_form", url, Object.keys(fields).join(", "));
       await call("fill_form", { url, fields });
       return { ok: true };
     },
     async prepareCheckout(offer) {
+      assertAllowedUrl(offer.url, config.allowedDomains);
       record("prepare_checkout", offer.seller, offer.product);
       const data = (await call("prepare_checkout", { offer })) as Partial<CheckoutDraft> | undefined;
       const itemPrice = Number(data?.itemPrice ?? offer.price);
       const deliveryCost = Number(data?.deliveryCost ?? offer.deliveryCost);
       const tax = Number(data?.tax ?? 0);
       const fees = Number(data?.fees ?? 0);
+      const checkoutUrl = data?.checkoutUrl ?? offer.url;
+      assertAllowedUrl(checkoutUrl, config.allowedDomains);
       return {
         product: offer.product,
         seller: offer.seller,
@@ -597,7 +635,7 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
         fees,
         total: Math.round((itemPrice + deliveryCost + fees) * 100) / 100,
         currency: offer.currency,
-        checkoutUrl: data?.checkoutUrl ?? offer.url,
+        checkoutUrl,
         // A prepared draft is never an authorised payment, whatever a vendor says.
         paymentAuthorised: false,
         simulated: false,
@@ -768,7 +806,11 @@ export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig):
     steps: () => tool.steps(),
     async navigate(url) {
       if (denied(url)) return { ok: false, url, blocked: "domain not in allowlist" };
-      return tool.navigate(url);
+      const result = await tool.navigate(url);
+      if (result.ok && denied(result.url)) {
+        throw new Error("Navigation redirected outside this agent's allowlist");
+      }
+      return result;
     },
     async extract(url, selector) {
       if (denied(url)) throw new Error(`Domain ${domainOf(url)} is not on this agent's allowlist`);
@@ -776,7 +818,21 @@ export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig):
     },
     async read(url) {
       if (denied(url)) throw new Error(`Domain ${domainOf(url)} is not on this agent's allowlist`);
-      return tool.read(url);
+      const result = await tool.read(url);
+      if (denied(result.url)) throw new Error("Read redirected outside this agent's allowlist");
+      return result;
+    },
+    async back() {
+      const result = await tool.back();
+      if (result.url && denied(result.url))
+        throw new Error("Browser history navigated outside this agent's allowlist");
+      return result;
+    },
+    async forward() {
+      const result = await tool.forward();
+      if (result.url && denied(result.url))
+        throw new Error("Browser history navigated outside this agent's allowlist");
+      return result;
     },
     async fillForm(url, fields) {
       if (denied(url) || !config.allowedTools.includes("browser")) return { ok: false };
@@ -785,6 +841,9 @@ export function guardBrowserTool(tool: BrowserTool, config: BrowserAgentConfig):
     async prepareCheckout(offer) {
       if (denied(offer.url)) throw new Error("Seller domain is not on this agent's allowlist");
       const draft = await tool.prepareCheckout(offer);
+      if (denied(draft.checkoutUrl)) {
+        throw new Error("Checkout domain is not on this agent's allowlist");
+      }
       const cap = config.spendCap ?? null;
       if (cap != null && draft.total > cap) {
         throw new Error(

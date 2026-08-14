@@ -13,6 +13,8 @@ export default tseslint.config(
       "dist",
       ".output",
       ".vinxi",
+      ".bun-tmp",
+      "node_modules.pre-bun-repair",
       "src/routes/mcp.ts",
       "src/routes/\\[.mcp\\]/**",
       "src/routes/\\[.well-known\\]/**",

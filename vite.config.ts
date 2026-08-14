@@ -15,7 +15,15 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [mcpPlugin()],
+    plugins:
+      process.platform === "win32"
+        ? [
+            // @lovable.dev/mcp-js currently compares a slash-normalised Vite
+            // root with Windows-native route paths and rejects the generated
+            // route directory. The generated MCP routes are committed; keep
+            // generation enabled everywhere except this local Windows path.
+          ]
+        : [mcpPlugin()],
     resolve: {
       alias: [
         {
