@@ -15,8 +15,9 @@ import { Empty, Loading, Failed } from '@/components/business/live';
 import { useToast } from '@/components/ui/use-toast';
 
 /** Maps a live `tools` row + permission into the shape the tool cards expect. */
-function toCardTool(row) {
+function toCardTool(row, agents) {
   const enabled = row.permission ? row.permission.enabled !== false : false;
+  const assigned = agents.filter((a) => (a.allowed_tools ?? []).includes(row.slug));
   return {
     id: row.id,
     slug: row.slug,
@@ -27,9 +28,11 @@ function toCardTool(row) {
     executable: row.executable,
     requiresApproval: row.permission?.requires_approval ?? true,
     allowedDomains: row.permission?.allowed_domains ?? [],
-    permissions: row.permission?.enabled ? ['Execute'] : [],
+    permissions: enabled ? ['Execute'] : [],
     authMethod: row.auth_method || 'None',
     version: row.version || null,
+    agents: assigned.length,
+    agentNames: assigned.map((a) => a.name).filter(Boolean),
   };
 }
 
