@@ -25,6 +25,7 @@ import {
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
   markNotifications, clearMemoryCategory,
 } from '@/lib/mission/mission.functions';
+import { decideWorkflowApprovalRequest } from '@/lib/runtime/workforce.functions';
 
 const TABS = [
   ['overview', 'Overview', Gauge],
@@ -39,6 +40,17 @@ const TABS = [
   ['audit', 'Audit trail', ScrollText],
 ];
 
+function isWorkflowApproval(approval) {
+  const details = approval?.details;
+  return approval?.action_type === 'workflow_step'
+    && details
+    && typeof details === 'object'
+    && !Array.isArray(details)
+    && typeof details.workflow_run_id === 'string'
+    && typeof details.workflow_id === 'string'
+    && typeof details.workflow_step_id === 'string';
+}
+
 export default function MissionControl() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
@@ -50,6 +62,7 @@ export default function MissionControl() {
   const deleteAgentFn = useServerFn(deletePersonalAgent);
   const submitTaskFn = useServerFn(submitPersonalTask);
   const decideFn = useServerFn(decideApproval);
+  const decideWorkflowFn = useServerFn(decideWorkflowApprovalRequest);
   const altFn = useServerFn(chooseAlternative);
   const confirmFn = useServerFn(confirmPurchase);
   const saveMemoryFn = useServerFn(saveMemory);
@@ -128,13 +141,28 @@ export default function MissionControl() {
   });
 
   const decide = useMutation({
-    mutationFn: (vars) => decideFn({ data: { id: vars.id, decision: vars.decision } }),
+    mutationFn: async (vars) => {
+      if (isWorkflowApproval(vars.approval)) {
+        return decideWorkflowFn({
+          data: {
+            approval_request_id: vars.id,
+            decision: vars.decision === 'approve' ? 'approved' : 'rejected',
+          },
+        });
+      }
+      return decideFn({ data: { id: vars.id, decision: vars.decision } });
+    },
     onSuccess: (res, vars) => {
+      const workflowApproval = isWorkflowApproval(vars.approval);
       toast({
         title: vars.decision === 'approve' ? 'Approved' : 'Rejected',
-        description: vars.decision === 'approve' && res?.purchase
-          ? 'Confirm the cost breakdown to continue to secure checkout.'
-          : 'The agent has been told your decision.',
+        description: workflowApproval
+          ? (vars.decision === 'approve'
+              ? 'The workflow has resumed from the approval step.'
+              : 'The workflow recorded your rejection and applied its error policy.')
+          : vars.decision === 'approve' && res?.purchase
+            ? 'Confirm the cost breakdown to continue to secure checkout.'
+            : 'The agent has been told your decision.',
       });
       refresh();
     },
@@ -317,7 +345,7 @@ export default function MissionControl() {
             results={data?.shoppingResults ?? []}
             loading={isLoading && session !== 'no'}
             busyId={busyId}
-            onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision }); }}
+            onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision, approval: a }); }}
             onChooseAlternative={(a, alt) => alternative.mutate({ approvalId: a.id, resultId: alt.id })}
             onConfirmPurchase={(p) => { setBusyId(p.id); checkout.mutate(p.id); }}
             onAskAgent={(a) => toast({ title: 'Ask the agent', description: `Send a follow-up about “${a.title}” from the console — the agent keeps this request open.` })}
