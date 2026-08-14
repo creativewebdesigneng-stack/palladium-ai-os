@@ -115,7 +115,6 @@ export default function ShoppingWorkspace({ agents = [] }) {
     currency: userLimit?.currency ?? 'GBP',
   };
 
-  const provider = data?.browser?.provider ?? data?.sessions?.[0]?.provider ?? null;
   const domains = data?.sessions?.[0]?.allowed_domains ?? [];
 
   return (
@@ -149,12 +148,14 @@ export default function ShoppingWorkspace({ agents = [] }) {
             {search.isPending ? 'Searching…' : 'Search & compare'}
           </button>
         </form>
-        <p className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+          <BrowserProviderBadge browser={data?.browser} compact />
           <Globe2 className="h-3 w-3 text-cyan-400" />
-          Browser provider: <span className="text-zinc-300">{provider}</span>
-          {provider === 'simulated' && <span className="text-amber-300/90">— simulated results, not live retailer browsing</span>}
           {domains.slice(0, 6).map((d) => <span key={d} className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-zinc-500">{d}</span>)}
-        </p>
+        </div>
+        {data?.browser?.state !== 'production_connected' && (
+          <p className="mt-2 text-[10px] text-amber-300/90">{data?.browser?.detail}</p>
+        )}
       </Card>
 
       <Card
