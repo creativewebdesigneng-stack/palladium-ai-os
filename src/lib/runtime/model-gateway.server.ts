@@ -66,8 +66,14 @@ export function normaliseProvider(value?: string | null): Provider {
   if (v === "anthropic" || v === "claude") return "anthropic";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
+  // No explicit choice: prefer a directly configured vendor key over the gateway.
+  if (!v) {
+    if (process.env["OPENAI_API_KEY"]) return "openai";
+    if (process.env["ANTHROPIC_API_KEY"]) return "anthropic";
+  }
   return "lovable";
 }
+
 
 export function resolveModel(provider: Provider, model?: string | null): string {
   const m = (model ?? "").trim();
