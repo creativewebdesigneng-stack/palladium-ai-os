@@ -279,22 +279,36 @@ export function ContactSupport() {
 
 export function AIAssistant() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI or pick a suggestion below." },
+    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI — answers come from live AI, not a script." },
   ]);
   const [input, setInput] = useState('');
+  const [pending, setPending] = useState(false);
 
-  const send = (text) => {
+  const send = async (text) => {
     const content = (text ?? input).trim();
-    if (!content) return;
+    if (!content || pending) return;
+    const history = messages
+      .filter((m) => !m.error)
+      .slice(-6)
+      .map((m) => ({ role: m.role, content: m.text }));
     setMessages((m) => [...m, { role: 'user', text: content }]);
     setInput('');
-    setTimeout(() => {
-      setMessages((m) => [...m, {
-        role: 'assistant',
-        text: "Here's what I found: you can create a new agent from the AI Agents page, choose a model, add a system prompt and tools, then test it in the playground before deploying. Would you like me to link the full guide?",
-      }]);
-    }, 600);
+    setPending(true);
+    try {
+      const res = await assistantChat({ data: { message: content, history } });
+      setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
+    } catch (e) {
+      console.error('[help-assistant]', e);
+      const raw = e?.message || '';
+      const text = /unauthor|sign in|401/i.test(raw)
+        ? 'Sign in to ask the AI support assistant.'
+        : raw || 'AI service temporarily unavailable.';
+      setMessages((m) => [...m, { role: 'assistant', error: true, text }]);
+    } finally {
+      setPending(false);
+    }
   };
+
 
   return (
     <div className="mx-auto max-w-3xl px-6">
