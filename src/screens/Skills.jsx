@@ -1,61 +1,159 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import SkillsToolbar from '@/components/skills/SkillsToolbar';
 import ToolCard from '@/components/skills/ToolCard';
 import ToolDetailDrawer from '@/components/skills/ToolDetailDrawer';
-import ToolBuilder from '@/components/skills/ToolBuilder';
-import { TOOLS, CATEGORIES } from '@/components/skills/skillsData';
+import { CATEGORIES } from '@/components/skills/skillsData';
+import { getToolFramework, saveToolPermission } from '@/lib/tools/tools.functions';
+import { friendlyMessage } from '@/lib/errors';
+import { useSessionReady } from '@/lib/useSessionReady';
+import { Empty, Loading, Failed } from '@/components/business/live';
+import { useToast } from '@/components/ui/use-toast';
+
+/** Maps a live `tools` row + permission into the shape the tool cards expect. */
+function toCardTool(row, agents) {
+  const enabled = row.permission ? row.permission.enabled !== false : false;
+  const assigned = agents.filter((a) => (a.allowed_tools ?? []).includes(row.slug));
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description || 'No description recorded.',
+    category: row.category || 'General',
+    status: enabled ? 'Enabled' : 'Disabled',
+    executable: row.executable,
+    requiresApproval: row.permission?.requires_approval ?? true,
+    allowedDomains: row.permission?.allowed_domains ?? [],
+    permissions: enabled ? ['Execute'] : [],
+    authMethod: row.auth_method || 'None',
+    version: row.version || null,
+    agents: assigned.length,
+    agentNames: assigned.map((a) => a.name).filter(Boolean),
+  };
+}
 
 export default function Skills() {
-  const [tools, setTools] = useState(TOOLS);
+  const session = useSessionReady();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const frameworkFn = useServerFn(getToolFramework);
+  const savePermissionFn = useServerFn(saveToolPermission);
+
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(null);
-  const [builderOpen, setBuilderOpen] = useState(false);
+
+  const framework = useQuery({
+    queryKey: ['tool-framework'],
+    queryFn: () => frameworkFn({ data: {} }),
+    enabled: session === 'yes',
+    retry: false,
+  });
+
+  const tools = useMemo(
+    () => (framework.data?.tools ?? []).map((t) => toCardTool(t, framework.data?.agents ?? [])),
+    [framework.data],
+  );
+
+  const toggleMutation = useMutation({
+    mutationFn: (tool) =>
+      savePermissionFn({
+        data: { tool: tool.slug, enabled: tool.status !== 'Enabled' },
+      }),
+    onSuccess: (_res, tool) => {
+      toast({
+        title: tool.status === 'Enabled' ? 'Tool disabled' : 'Tool enabled',
+        description: `${tool.name} permission saved to your workspace.`,
+      });
+      qc.invalidateQueries({ queryKey: ['tool-framework'] });
+    },
+    onError: (err) =>
+      toast({ variant: 'destructive', title: 'Could not save', description: friendlyMessage(err) }),
+  });
 
   const filtered = useMemo(() => {
     let list = tools;
     if (category !== 'All') list = list.filter((t) => t.category === category);
-    if (query) { const q = query.toLowerCase(); list = list.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)); }
+    if (query) {
+      const q = query.toLowerCase();
+      list = list.filter(
+        (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+      );
+    }
     return list;
   }, [tools, category, query]);
 
-  const toggle = (t) => setTools((ts) => ts.map((x) => x.id === t.id ? { ...x, status: x.status === 'Enabled' ? 'Disabled' : 'Enabled' } : x));
-  const create = (t) => setTools((ts) => [t, ...ts]);
-
-  const stats = useMemo(() => {
-    const enabled = tools.filter((t) => t.status === 'Enabled').length;
-    const cats = CATEGORIES.length;
-    return { total: tools.length, enabled, cats };
-  }, [tools]);
+  const stats = useMemo(
+    () => ({
+      total: tools.length,
+      enabled: tools.filter((t) => t.status === 'Enabled').length,
+      executable: tools.filter((t) => t.executable).length,
+    }),
+    [tools],
+  );
 
   return (
     <>
-      <PageHeader eyebrow="Capabilities" title="Skills & Tools" description="Manage the capabilities your AI agents can use." action={
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.total} tools</span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.enabled} enabled</span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.cats} categories</span>
-        </div>
-      } />
+      <PageHeader
+        eyebrow="Capabilities"
+        title="Skills & Tools"
+        description="The live tool registry your agents can call. Permissions are stored and enforced server-side."
+        action={
+          framework.isSuccess ? (
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.total} tools</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.enabled} enabled</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{stats.executable} executable</span>
+            </div>
+          ) : null
+        }
+      />
 
-      <SkillsToolbar category={category} onCategory={setCategory} query={query} onQuery={setQuery} onNew={() => setBuilderOpen(true)} />
+      {session === 'no' && <Failed message="Sign in to manage your tool registry." />}
+      {session === 'yes' && framework.isLoading && <Loading label="Loading your tool registry…" />}
+      {framework.isError && (
+        <Failed message={friendlyMessage(framework.error)} onRetry={() => framework.refetch()} />
+      )}
 
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No tools match your filters.</div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((t) => <ToolCard key={t.id} tool={t} onOpen={setOpen} />)}
-        </div>
+      {framework.isSuccess && (
+        <>
+          <SkillsToolbar
+            category={category}
+            onCategory={setCategory}
+            query={query}
+            onQuery={setQuery}
+          />
+
+          {tools.length === 0 ? (
+            <Empty
+              icon={Wrench}
+              title="No tools yet"
+              desc="Your workspace tool registry is empty. Tools become available as integrations are connected."
+            />
+          ) : filtered.length === 0 ? (
+            <Empty title="No matches" desc="No tools match your filters." />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((t) => (
+                <ToolCard key={t.id} tool={t} onOpen={setOpen} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <AnimatePresence>
-        {open && <ToolDetailDrawer tool={open} onClose={() => setOpen(null)} onToggle={toggle} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        <ToolBuilder open={builderOpen} onClose={() => setBuilderOpen(false)} onCreate={create} />
+        {open && (
+          <ToolDetailDrawer
+            tool={open}
+            onClose={() => setOpen(null)}
+            onToggle={(t) => toggleMutation.mutate(t)}
+          />
+        )}
       </AnimatePresence>
     </>
   );

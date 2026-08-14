@@ -1,106 +1,144 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { supabase } from '@/integrations/supabase/client';
-import { ShieldAlert } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PageHeader from '@/components/palladium/PageHeader';
-import AnalyticsFilters from '@/components/analytics/AnalyticsFilters';
-import AnalyticsMetricCards from '@/components/analytics/AnalyticsMetricCards';
-import ActivityChart from '@/components/analytics/ActivityChart';
-import AgentAnalytics from '@/components/analytics/AgentAnalytics';
-import TeamAnalytics from '@/components/analytics/TeamAnalytics';
-import ModelAnalytics from '@/components/analytics/ModelAnalytics';
 import { friendlyMessage } from '@/lib/errors';
-import { getAnalyticsSummary } from '@/lib/dashboard/dashboard.functions';
+import { useSessionReady } from '@/lib/useSessionReady';
+import { getAnalytics } from '@/lib/analytics/analytics.functions';
+import {
+  Stat, Tabs, Empty, Loading, Failed, Table,
+  formatNumber, formatPercent,
+} from '@/components/business/live';
 
-const buildCsv = (data) => {
-  const rows = [
-    ['Section', 'Item', 'Metric', 'Value'],
-    ...(data.metrics ?? []).map((m) => ['Metric', m.label, 'value', m.value]),
-    ...(data.agentAnalytics ?? []).map((a) => ['Agent', a.agent, 'tasks', a.tasks]),
-    ...(data.teamAnalytics ?? []).map((t) => ['Team', t.team, 'tasks', t.tasks]),
-    ...(data.modelAnalytics ?? []).map((m) => ['Model', m.model, 'requests', m.requests]),
-  ];
-  return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-};
+const RANGES = [
+  { id: '7d', label: 'Last 7 days' },
+  { id: '30d', label: 'Last 30 days' },
+  { id: '90d', label: 'Last 90 days' },
+];
 
 export default function Analytics() {
-  const [filters, setFilters] = useState({ date: 'Last 7 days', user: 'All users', team: 'All teams', agent: 'All agents', project: 'All projects', model: 'All models' });
-  const [range, setRange] = useState('weekly');
-  const [toast, setToast] = useState(null);
+  const session = useSessionReady();
+  const [range, setRange] = useState('30d');
+  const analyticsFn = useServerFn(getAnalytics);
 
-  const summaryFn = useServerFn(getAnalyticsSummary);
-  const [session, setSession] = useState('unknown');
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
-    return () => { alive = false; sub?.subscription?.unsubscribe(); };
-  }, []);
-
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['analytics-summary', range],
-    queryFn: () => summaryFn({ data: { range } }),
+  const analytics = useQuery({
+    queryKey: ['analytics', range],
+    queryFn: () => analyticsFn({ data: { range } }),
     enabled: session === 'yes',
     retry: false,
   });
 
-  const exportCsv = () => {
-    if (!data) return;
-    const csv = buildCsv(data);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'palladium-analytics.csv'; a.click();
-    URL.revokeObjectURL(url);
-    setToast('Exported palladium-analytics.csv'); setTimeout(() => setToast(null), 1600);
-  };
+  const totals = analytics.data?.totals;
+  const series = analytics.data?.series ?? [];
+  const models = analytics.data?.models ?? [];
+  const agents = analytics.data?.agents ?? [];
+  const hasActivity = (totals?.tasks ?? 0) > 0;
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Analytics" description="Track agents, tasks, costs, and AI usage across your workspace." />
+      <PageHeader
+        eyebrow="Workspace"
+        title="Analytics"
+        description="Computed live from your agent runs, workflow executions and metered usage. Empty means no events recorded yet."
+        action={<Tabs tabs={RANGES} active={range} onChange={setRange} />}
+      />
 
-      {session === 'no' && (
-        <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">
-          <p className="flex items-center gap-2 text-xs font-semibold text-amber-100"><ShieldAlert className="h-4 w-4" />Sign in to see your analytics</p>
-        </div>
-      )}
+      {session === 'no' && <Failed message="Sign in to view your analytics." />}
+      {session === 'yes' && analytics.isLoading && <Loading label="Aggregating your events…" />}
+      {analytics.isError && <Failed message={friendlyMessage(analytics.error)} onRetry={() => analytics.refetch()} />}
 
-      {session === 'yes' && error && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-rose-400/25 bg-rose-500/[.06] p-4">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-xs font-semibold text-rose-100"><ShieldAlert className="h-4 w-4" />Analytics could not load</p>
-            <p className="mt-1 text-[11px] text-rose-200/80">{friendlyMessage(error)}</p>
-          </div>
-          <button onClick={() => refetch()} className="ml-auto rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-white/10">Try again</button>
-        </div>
-      )}
-
-      <AnalyticsFilters filters={filters} setFilters={setFilters} onExport={exportCsv} />
-
-      {session === 'yes' && isLoading ? (
+      {analytics.isSuccess && (
         <>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" />)}</div>
-          <div className="mt-4 h-72 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" />
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" />
-            <div className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <Stat label="Agent runs" value={formatNumber(totals.tasks)} />
+            <Stat label="Completed" value={formatNumber(totals.completed)} tone="text-emerald-300" />
+            <Stat label="Failed" value={formatNumber(totals.failed)} tone="text-rose-300" />
+            <Stat label="Success rate" value={totals.successRate == null ? null : formatPercent(totals.successRate)} />
+            <Stat
+              label="Avg duration"
+              value={totals.avgDurationSeconds == null ? null : `${totals.avgDurationSeconds}s`}
+            />
+            <Stat label="Tokens" value={totals.tokens ? formatNumber(totals.tokens) : null} />
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[.02] p-4">
+            <h3 className="text-sm font-medium text-white">Execution volume</h3>
+            {!hasActivity ? (
+              <Empty
+                icon={BarChart3}
+                title="No data yet"
+                desc="Run an agent or a workflow and the execution timeline appears here."
+              />
+            ) : (
+              <div className="mt-3 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={series}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="day" stroke="#71717a" fontSize={11} />
+                    <YAxis stroke="#71717a" fontSize={11} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: '#0c0d13', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }} />
+                    <Area type="monotone" dataKey="completed" stroke="#34d399" fill="rgba(52,211,153,0.15)" />
+                    <Area type="monotone" dataKey="failed" stroke="#fb7185" fill="rgba(251,113,133,0.12)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+              <h3 className="text-sm font-medium text-white">Model usage</h3>
+              {models.length === 0 ? (
+                <Empty title="No data yet" desc="Model usage appears once agents run." />
+              ) : (
+                <div className="mt-3 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={models}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="model" stroke="#71717a" fontSize={11} />
+                      <YAxis stroke="#71717a" fontSize={11} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: '#0c0d13', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }} />
+                      <Bar dataKey="runs" fill="#a78bfa" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+              <h3 className="mb-3 text-sm font-medium text-white">Agent performance</h3>
+              <Table
+                columns={['Agent', 'Runs', 'Completed', 'Failed', 'Success']}
+                rows={agents}
+                empty={<Empty title="No data yet" desc="Agent performance appears after their first run." />}
+                renderRow={(a) => {
+                  const finished = a.completed + a.failed;
+                  return (
+                    <tr key={a.id} className="border-b border-white/5 last:border-0">
+                      <td className="px-4 py-3 text-white">{a.name}</td>
+                      <td className="px-4 py-3 text-zinc-300">{formatNumber(a.runs)}</td>
+                      <td className="px-4 py-3 text-emerald-300">{formatNumber(a.completed)}</td>
+                      <td className="px-4 py-3 text-rose-300">{formatNumber(a.failed)}</td>
+                      <td className="px-4 py-3 text-zinc-300">
+                        {finished ? formatPercent(Math.round((a.completed / finished) * 100)) : 'No data yet'}
+                      </td>
+                    </tr>
+                  );
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Workflow runs" value={formatNumber(totals.workflowRuns)} />
+            <Stat label="Workflow success" value={totals.workflowSuccessRate == null ? null : formatPercent(totals.workflowSuccessRate)} />
+            <Stat label="Agents" value={formatNumber(totals.agents)} />
+            <Stat label="Model cost" value={totals.modelCost ? `$${Number(totals.modelCost).toFixed(2)}` : null} />
           </div>
         </>
-      ) : (
-        <>
-          <div className="mt-4"><AnalyticsMetricCards metrics={data?.metrics ?? []} /></div>
-          <div className="mt-4"><ActivityChart range={range} setRange={setRange} data={data?.activity ?? []} /></div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <AgentAnalytics data={data?.agentAnalytics ?? []} />
-            <TeamAnalytics data={data?.teamAnalytics ?? []} />
-          </div>
-          <div className="mt-4"><ModelAnalytics data={data?.modelAnalytics ?? []} /></div>
-        </>
       )}
-
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#10121a] px-4 py-2 text-xs text-zinc-200 shadow-2xl">{toast}</div>}
     </>
   );
 }
