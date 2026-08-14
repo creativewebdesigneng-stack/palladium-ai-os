@@ -83,15 +83,18 @@ export const saveWorkforce = createServerFn({ method: "POST" })
       : await sb.from("workforces").insert(row).select("*").maybeSingle();
     if (error || !workforce) throw new Error(error?.message ?? "Could not save that workforce.");
 
+    // Replace membership even when the new list is empty. This prevents stale
+    // agents from remaining attached after an operator removes everyone.
+    await sb.from("workforce_agents").delete().eq("workforce_id", workforce.id);
     if (data.agents.length) {
-      await sb.from("workforce_agents").delete().eq("workforce_id", workforce.id);
-      await sb.from("workforce_agents").insert(
+      const { error: memberError } = await sb.from("workforce_agents").insert(
         data.agents.map((a) => ({
           workforce_id: workforce.id,
           agent_id: a.agent_id,
           role: a.role,
         })),
       );
+      if (memberError) throw new Error(memberError.message);
     }
     return { workforce };
   });
@@ -152,8 +155,10 @@ export const saveWorkflow = createServerFn({ method: "POST" })
       : await sb.from("workflows").insert(row).select("*").maybeSingle();
     if (error || !workflow) throw new Error(error?.message ?? "Could not save that workflow.");
 
+    // Always replace the step set, including when the editor intentionally
+    // saves an empty workflow. This prevents removed steps from reappearing.
+    await sb.from("workflow_steps").delete().eq("workflow_id", workflow.id);
     if (data.steps.length) {
-      await sb.from("workflow_steps").delete().eq("workflow_id", workflow.id);
       const { error: stepError } = await sb
         .from("workflow_steps")
         .insert(data.steps.map((s) => ({ ...s, workflow_id: workflow.id })));
