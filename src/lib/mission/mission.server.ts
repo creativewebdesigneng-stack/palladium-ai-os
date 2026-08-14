@@ -4,7 +4,12 @@
  * Nothing here trusts the client: routing decisions, approval requirements and
  * purchase totals are all derived on the server.
  */
-import { createBrowserTool, isDomainAllowed, type BrowserProductOffer } from "./browser-agent";
+import {
+  createBrowserTool,
+  isDomainAllowed,
+  resolveBrowserProvider,
+  type BrowserProductOffer,
+} from "./browser-agent";
 
 export type RoutingDecision = {
   category: string;
@@ -126,13 +131,19 @@ export async function runShoppingResearch(params: {
   allowedDomains: string[];
   allowedTools: string[];
   provider?: string;
-}): Promise<{ offers: BrowserProductOffer[]; steps: unknown[]; provider: string }> {
+}): Promise<{
+  offers: BrowserProductOffer[];
+  steps: unknown[];
+  provider: string;
+  simulated: boolean;
+}> {
   const config = {
     allowedDomains: params.allowedDomains,
     allowedTools: params.allowedTools,
     spendCap: params.budget,
   };
-  const tool = createBrowserTool(params.provider ?? "simulated", config);
+  // Throws BROWSER_NOT_CONFIGURED_MESSAGE when no provider may run — never silently simulates.
+  const tool = createBrowserTool(resolveBrowserProvider(params.provider ?? null), config);
   const found = await tool.search(params.requirement, {
     budget: params.budget,
     currency: params.currency,
@@ -142,7 +153,7 @@ export async function runShoppingResearch(params: {
   const ranked = await tool.compare(inBudget.length ? inBudget : found);
   const steps = tool.steps();
   await tool.close();
-  return { offers: ranked, steps, provider: tool.provider };
+  return { offers: ranked, steps, provider: tool.provider, simulated: tool.kind === "development" };
 }
 
 export async function prepareCheckoutDraft(params: {
@@ -154,7 +165,7 @@ export async function prepareCheckoutDraft(params: {
   if (!isDomainAllowed(params.offer.url, params.allowedDomains)) {
     throw new Error("Seller domain is not on the allowlist for this agent");
   }
-  const tool = createBrowserTool(params.provider ?? "simulated", {
+  const tool = createBrowserTool(resolveBrowserProvider(params.provider ?? null), {
     allowedDomains: params.allowedDomains,
     allowedTools: params.allowedTools,
   });

@@ -10,7 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { executeTool, resolveGrantedTools, TOOL_MANIFEST } from "@/lib/runtime/tools.server";
-import { listBrowserProviders, resolveBrowserProvider } from "@/lib/mission/browser-agent";
+import { browserProviderStatus } from "@/lib/mission/browser-agent";
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -30,6 +30,8 @@ export const getToolFramework = createServerFn({ method: "POST" })
       getEntitlements(sb as never, userId, null),
     ]);
 
+    const browser = await browserProviderStatus();
+
     const executable = new Set(TOOL_MANIFEST.map((t) => t.slug));
 
     return {
@@ -43,7 +45,7 @@ export const getToolFramework = createServerFn({ method: "POST" })
       permissions: permissions.data ?? [],
       executions: executions.data ?? [],
       agents: agents.data ?? [],
-      browser: { active: resolveBrowserProvider(), providers: listBrowserProviders() },
+      browser,
     };
   });
 

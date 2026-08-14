@@ -268,30 +268,87 @@ const REGISTRY: Record<string, ToolImpl> = {
     def: {
       name: "browser",
       description:
-        "Drive a browser session: navigate and read pages inside the agent allow-list. Cannot pay for anything.",
+        "Drive a browser session inside the agent allow-list: navigate, click, type, scroll, extract, screenshot, go back/forward or wait. Cannot pay for anything. Results are marked as simulated when only the development provider is available.",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["navigate", "read"] },
+          action: {
+            type: "string",
+            enum: [
+              "navigate",
+              "read",
+              "extract",
+              "click",
+              "type",
+              "scroll",
+              "screenshot",
+              "back",
+              "forward",
+              "wait",
+            ],
+          },
           url: { type: "string" },
+          selector: { type: "string" },
+          text: { type: "string" },
+          direction: { type: "string", enum: ["up", "down"] },
+          ms: { type: "number" },
         },
-        required: ["action", "url"],
+        required: ["action"],
       },
     },
     run: async (input, ctx) => {
       const url = str(input["url"]);
       const action = str(input["action"], "read");
-      const tool = createBrowserTool(resolveBrowserProvider(), {
-        allowedDomains: ctx.allowedDomains ?? [],
-        allowedTools: ["browser"],
-        spendCap: ctx.spendCap ?? null,
+      const selector = str(input["selector"]);
+      let tool;
+      try {
+        tool = createBrowserTool(resolveBrowserProvider(), {
+          allowedDomains: ctx.allowedDomains ?? [],
+          allowedTools: ["browser"],
+          spendCap: ctx.spendCap ?? null,
+        });
+      } catch (error) {
+        return { error: (error as Error).message };
+      }
+      const stamp = (result: unknown) => ({
+        provider: tool.provider,
+        simulated: tool.kind === "development",
+        ...(tool.kind === "development"
+          ? { warning: "Development simulation — this did not happen in a real browser." }
+          : {}),
+        result,
       });
       try {
-        if (!isDomainAllowed(url, ctx.allowedDomains ?? [])) {
-          return { error: "That domain is not on this agent’s allow-list." };
+        const needsUrl = action === "navigate" || action === "read" || action === "extract";
+        if (needsUrl && !isDomainAllowed(url, ctx.allowedDomains ?? [])) {
+          return { error: "That domain is not on this agent\u2019s allow-list." };
         }
-        if (action === "navigate") return await tool.navigate(url);
-        return await tool.read(url);
+        switch (action) {
+          case "navigate":
+            return stamp(await tool.navigate(url));
+          case "extract":
+            return stamp(await tool.extract(url, selector || undefined));
+          case "click":
+            return stamp(await tool.click(selector));
+          case "type":
+            return stamp(await tool.type(selector, str(input["text"])));
+          case "scroll":
+            return stamp(
+              await tool.scroll(str(input["direction"], "down") === "up" ? "up" : "down", Number(input["amount"] ?? 1)),
+            );
+          case "screenshot":
+            return stamp(await tool.screenshot());
+          case "back":
+            return stamp(await tool.back());
+          case "forward":
+            return stamp(await tool.forward());
+          case "wait":
+            return stamp(await tool.wait(Math.min(30000, Number(input["ms"] ?? 1000))));
+          default:
+            return stamp(await tool.read(url));
+        }
+      } catch (error) {
+        return { error: (error as Error).message };
       } finally {
         await tool.close();
       }
@@ -529,11 +586,16 @@ const REGISTRY: Record<string, ToolImpl> = {
       const requirement = str(input["requirement"]).slice(0, 300);
       if (!requirement) return { error: "Describe what to shop for." };
       const budget = Number(input["budget"] ?? 0) || ctx.spendCap || null;
-      const tool = createBrowserTool(resolveBrowserProvider(), {
-        allowedDomains: ctx.allowedDomains ?? [],
-        allowedTools: ["browser", "shopping_search"],
-        spendCap: budget,
-      });
+      let tool;
+      try {
+        tool = createBrowserTool(resolveBrowserProvider(), {
+          allowedDomains: ctx.allowedDomains ?? [],
+          allowedTools: ["browser", "shopping_search"],
+          spendCap: budget,
+        });
+      } catch (error) {
+        return { error: (error as Error).message };
+      }
       try {
         const offers = await tool.search(requirement, {
           budget,
@@ -546,8 +608,12 @@ const REGISTRY: Record<string, ToolImpl> = {
           requirement,
           budget,
           provider: tool.provider,
+          simulated: tool.kind === "development",
           offers: (ranked.length ? ranked : offers).slice(0, 6),
-          note: "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
+          note:
+            tool.kind === "development"
+              ? "Development simulation — these are NOT real listings or prices. Do not present them as real products. A purchase always requires explicit approval via prepare_purchase."
+              : "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
         };
       } finally {
         await tool.close();

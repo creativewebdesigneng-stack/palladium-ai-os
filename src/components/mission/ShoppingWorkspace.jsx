@@ -5,6 +5,7 @@ import {
   Search, Wallet, Bookmark, ListChecks, RefreshCw, Trash2, Plus, ShieldAlert, Globe2, Bot,
 } from 'lucide-react';
 
+import BrowserProviderBadge from '@/components/browser/BrowserProviderBadge';
 import ShoppingBoard from './ShoppingBoard';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -75,10 +76,9 @@ export default function ShoppingWorkspace({ agents = [] }) {
     onSuccess: (res) => {
       toast({
         title: `${res.results.length} options found`,
-        description:
-          res.provider === 'simulated'
-            ? 'Simulated browsing provider — results are illustrative, not live retailer data.'
-            : `Researched via the ${res.provider} browser provider.`,
+        description: res.simulated
+          ? 'Development simulation — these are NOT real listings, prices or availability. Connect a production browser provider for real research.'
+          : `Researched live via the ${res.provider} browser provider.`,
       });
       setRequirement('');
       refresh();
@@ -116,7 +116,6 @@ export default function ShoppingWorkspace({ agents = [] }) {
     currency: userLimit?.currency ?? 'GBP',
   };
 
-  const provider = data?.sessions?.[0]?.provider ?? 'simulated';
   const domains = data?.sessions?.[0]?.allowed_domains ?? [];
 
   return (
@@ -150,12 +149,14 @@ export default function ShoppingWorkspace({ agents = [] }) {
             {search.isPending ? 'Searching…' : 'Search & compare'}
           </button>
         </form>
-        <p className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+          <BrowserProviderBadge browser={data?.browser} compact />
           <Globe2 className="h-3 w-3 text-cyan-400" />
-          Browser provider: <span className="text-zinc-300">{provider}</span>
-          {provider === 'simulated' && <span className="text-amber-300/90">— simulated results, not live retailer browsing</span>}
           {domains.slice(0, 6).map((d) => <span key={d} className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-zinc-500">{d}</span>)}
-        </p>
+        </div>
+        {data?.browser?.state !== 'production_connected' && (
+          <p className="mt-2 text-[10px] text-amber-300/90">{data?.browser?.detail}</p>
+        )}
       </Card>
 
       <Card

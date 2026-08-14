@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { prepareCheckoutDraft, runShoppingResearch } from "@/lib/mission/mission.server";
+import { browserProviderStatus } from "@/lib/mission/browser-agent";
 import { assertWithinLimits, checkAgainstLimits, resolveSpendLimits } from "./limits.server";
 
 type Sb = { from: (t: string) => any };
@@ -91,8 +92,10 @@ export const getShoppingWorkspace = createServerFn({ method: "POST" })
       ]);
 
     const limits = await resolveSpendLimits(sb, userId, null);
+    const browser = await browserProviderStatus();
 
     return {
+      browser,
       tasks: tasks.data ?? [],
       results: results.data ?? [],
       purchases: purchases.data ?? [],
@@ -154,7 +157,7 @@ export const runShoppingSearch = createServerFn({ method: "POST" })
       agent_id: agentId,
     });
 
-    const { offers, steps, provider } = await runShoppingResearch({
+    const { offers, steps, provider, simulated } = await runShoppingResearch({
       requirement: data.requirement,
       budget,
       currency,
@@ -184,7 +187,9 @@ export const runShoppingSearch = createServerFn({ method: "POST" })
       rating: o.rating,
       url: o.url,
       specs: o.specs,
-      reason: o.reason,
+      reason: simulated
+        ? `[SIMULATED DEVELOPMENT DATA — not a real listing] ${o.reason}`
+        : o.reason,
       in_stock: o.inStock,
       selected: i === 0,
     }));
@@ -217,7 +222,7 @@ export const runShoppingSearch = createServerFn({ method: "POST" })
       metadata: { requirement: data.requirement.trim(), budget, currency, results: results.length },
     });
 
-    return { taskId: task.id, provider, results, allowedDomains };
+    return { taskId: task.id, provider, simulated, results, allowedDomains };
   });
 
 /** Re-ranks stored offers and returns cheapest / best-rated / fastest views. */
@@ -434,6 +439,8 @@ export const preparePurchase = createServerFn({ method: "POST" })
       purchase: purchaseRes.data ?? null,
       approvalId: approvalRes.data?.id ?? null,
       limits,
+      /** True when the underlying offer came from the development simulation. */
+      simulated: draft.simulated === true,
       /** The platform prepares checkout only; the user authorises payment. */
       paymentAuthorised: false as const,
     };
