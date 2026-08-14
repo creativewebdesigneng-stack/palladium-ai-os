@@ -1,5 +1,5 @@
-// Mock options + default config for the Agent Builder.
-// Replace simulated test run with a backend function when ready.
+// Static option catalogues for the Agent Builder (labels, not data).
+// Agent test runs execute on the real runtime; no seeded transcripts exist here.
 
 export const TOOLS = [
   { id: 'web_search', label: 'Web Search', icon: 'Globe', grad: 'from-sky-500 to-cyan-500', desc: 'Search the live web' },
@@ -63,21 +63,3 @@ export const VERSIONS = [
 ];
 
 export const DEPLOYMENT_STATES = ['Draft', 'Testing', 'Published', 'Paused'];
-
-export const PREVIEW_SEED = [
-  { role: 'user', text: 'Summarise last week’s support tickets and draft a weekly digest.' },
-  { role: 'agent', text: 'I’ll search the help desk for last week’s tickets, summarise by theme, then draft the digest for Slack.', steps: [
-    { type: 'thinking', text: 'Tickets from 31 Jul–6 Aug → group by category → rank by volume.' },
-    { type: 'tool', name: 'Database', detail: 'SELECT * FROM tickets WHERE created > now() - interval \'7 days\'' },
-    { type: 'result', text: '482 tickets · top theme: billing (31%)' },
-  ]},
-];
-
-export const TEST_SEED = [
-  { role: 'user', text: 'What’s the status of the Atlas project?' },
-  { role: 'agent', text: 'Atlas Analytics is on track — 82% of sprint scope complete, with one blocker on the data export module. Estimated ship date is 14 Aug.', steps: [
-    { type: 'thinking', text: 'Query project memory for Atlas → check open tasks → identify blockers.' },
-    { type: 'tool', name: 'Files', detail: 'Read projects/atlas/status.md' },
-    { type: 'result', text: '12 tasks open · 1 blocker · ETA 14 Aug' },
-  ]},
-];

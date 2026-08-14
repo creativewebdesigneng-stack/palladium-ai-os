@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, X, Plus, Bot, FolderKanban, ListChecks, Workflow } from 'lucide-react';
+import { assistantChat } from '@/lib/ai/assistant.functions';
 
-// Mock intent → response + optional navigation
+// Deterministic navigation commands. These are UI routing actions, not AI answers —
+// anything that is not a navigation command is answered by the real AI provider.
 const INTENTS = [
   { test: /project/i, reply: 'Opening your projects…', to: '/projects', icon: FolderKanban },
   { test: /running agent/i, reply: 'Showing running agents…', to: '/agents', icon: Bot },
@@ -29,31 +31,43 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const setOpen = (v) => onOpenChange?.(v);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your PalladiumAI assistant. I can navigate and interact with your workspace. Try “Open my projects” or “Show running agents”." },
+    { role: 'assistant', text: "Hi, I'm your PalladiumAI assistant. Ask me a question, or tell me where to go — try “Open my projects” or “Show running agents”." },
   ]);
   const [pending, setPending] = useState(false);
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open]);
 
-  const send = (text) => {
+  const send = async (text) => {
     const content = (text ?? input).trim();
-    if (!content) return;
+    if (!content || pending) return;
+    const history = messages
+      .filter((m) => m.role === 'user' || (m.role === 'assistant' && !m.action && !m.error))
+      .slice(-8)
+      .map((m) => ({ role: m.role, content: m.text }));
     setMessages((m) => [...m, { role: 'user', text: content }]);
     setInput('');
+
+    const intent = INTENTS.find((i) => i.test.test(content));
+    if (intent) {
+      setMessages((m) => [...m, { role: 'assistant', text: intent.reply, action: intent.to }]);
+      navigate(intent.to);
+      setOpen(false);
+      return;
+    }
+
     setPending(true);
-    setTimeout(() => {
-      const intent = INTENTS.find((i) => i.test.test(content));
-      if (intent) {
-        setMessages((m) => [...m, { role: 'assistant', text: intent.reply, action: intent.to }]);
-        navigate(intent.to);
-        setOpen(false);
-      } else {
-        setMessages((m) => [...m, { role: 'assistant', text: "I can help with that. For now, try asking me to open projects, show agents, tasks or workflows." }]);
-      }
+    try {
+      const res = await assistantChat({ data: { message: content, history } });
+      setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
+    } catch (e) {
+      console.error('[assistant]', e);
+      setMessages((m) => [...m, { role: 'assistant', error: true, text: e?.message || 'AI service temporarily unavailable.' }]);
+    } finally {
       setPending(false);
-    }, 550);
+    }
   };
+
 
   return (
     <>
@@ -107,9 +121,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                       animate={{ opacity: 1, y: 0 }}
                       className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : 'bg-white/[.04] text-zinc-200'}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : m.error ? 'bg-rose-500/10 text-rose-200 ring-1 ring-rose-400/20' : 'bg-white/[.04] text-zinc-200'}`}>
                         {m.text}
                         {m.action && <p className="mt-1.5 flex items-center gap-1 text-[11px] text-violet-300"><Sparkles className="h-3 w-3" /> Navigating…</p>}
+
                       </div>
                     </motion.div>
                   ))}

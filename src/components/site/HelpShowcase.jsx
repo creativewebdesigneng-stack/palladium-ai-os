@@ -1,3 +1,4 @@
+import { assistantChat } from '@/lib/ai/assistant.functions';
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -187,22 +188,36 @@ export function ContactSupport() {
 
 export function AIAssistant() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI or pick a suggestion below." },
+    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI — answers come from live AI, not a script." },
   ]);
   const [input, setInput] = useState('');
+  const [pending, setPending] = useState(false);
 
-  const send = (text) => {
+  const send = async (text) => {
     const content = (text ?? input).trim();
-    if (!content) return;
+    if (!content || pending) return;
+    const history = messages
+      .filter((m) => !m.error)
+      .slice(-6)
+      .map((m) => ({ role: m.role, content: m.text }));
     setMessages((m) => [...m, { role: 'user', text: content }]);
     setInput('');
-    setTimeout(() => {
-      setMessages((m) => [...m, {
-        role: 'assistant',
-        text: "Here's what I found: you can create a new agent from the AI Agents page, choose a model, add a system prompt and tools, then test it in the playground before deploying. Would you like me to link the full guide?",
-      }]);
-    }, 600);
+    setPending(true);
+    try {
+      const res = await assistantChat({ data: { message: content, history } });
+      setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
+    } catch (e) {
+      console.error('[help-assistant]', e);
+      const raw = e?.message || '';
+      const text = /unauthor|sign in|401/i.test(raw)
+        ? 'Sign in to ask the AI support assistant.'
+        : raw || 'AI service temporarily unavailable.';
+      setMessages((m) => [...m, { role: 'assistant', error: true, text }]);
+    } finally {
+      setPending(false);
+    }
   };
+
 
   return (
     <div className="mx-auto max-w-3xl px-6">
@@ -213,7 +228,7 @@ export function AIAssistant() {
           </span>
           <div>
             <p className="text-sm font-semibold text-white">AI Support Assistant</p>
-            <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online · instant answers</p>
+            <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live AI · signed-in operators</p>
           </div>
         </div>
         <div className="h-72 space-y-3 overflow-y-auto px-5 py-4">
@@ -225,12 +240,13 @@ export function AIAssistant() {
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : 'bg-white/[.04] text-zinc-200'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : m.error ? 'bg-rose-500/10 text-rose-200 ring-1 ring-rose-400/20' : 'bg-white/[.04] text-zinc-200'}`}>
                   {m.text}
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
+          {pending && <p className="px-1 text-[11px] text-zinc-500">Thinking…</p>}
         </div>
         <div className="border-t border-white/10 px-5 pb-3 pt-3">
           <div className="mb-3 flex flex-wrap gap-2">
@@ -247,6 +263,7 @@ export function AIAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
+              disabled={pending}
               placeholder="Describe your issue…"
               className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400/40 focus:outline-none"
             />
