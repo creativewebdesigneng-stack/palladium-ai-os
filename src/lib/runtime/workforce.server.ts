@@ -46,6 +46,15 @@ type StepRow = {
   config: Record<string, unknown> | null;
 };
 
+type WorkflowRow = {
+  id: string;
+  name: string;
+  org_id: string | null;
+  user_id: string;
+  workforce_id: string | null;
+  status: string;
+};
+
 export type StepOutcome = {
   step_id: string;
   step_run_id: string | null;
@@ -521,9 +530,230 @@ export async function runStep(args: {
   };
 }
 
+/* ------------------------------------------------------------ resumable core */
+
+/**
+ * Executes (or resumes) a workflow on an existing workflow_runs row.
+ * Previously persisted outcomes are authoritative for this run and are never
+ * replayed. They remain available to dependency resolution and templates.
+ */
+export async function executeWorkflowRun(args: {
+  sb: Sb;
+  db: Sb;
+  userId: string;
+  workflow: WorkflowRow;
+  steps: StepRow[];
+  runId: string;
+  objective: string;
+  completed?: StepOutcome[];
+}) {
+  const { workflow, runId } = args;
+  const orgId = workflow.org_id ?? null;
+  const waves = buildWaves(args.steps);
+  const completed: StepOutcome[] = [...(args.completed ?? [])];
+  const completedIds = new Set(completed.map((outcome) => outcome.step_id));
+  const deadline = Date.now() + RUN_BUDGET_MS;
+  const workflowController = new AbortController();
+  const runBudgetTimer = setTimeout(() => {
+    workflowController.abort(
+      new RuntimeError("The workforce run exceeded its time budget.", "RUN_TIMEOUT", 504),
+    );
+  }, RUN_BUDGET_MS);
+  const cancellationPoll = setInterval(() => {
+    void workflowIsCancelled(args.db, runId)
+      .then((cancelled) => {
+        if (cancelled && !workflowController.signal.aborted) {
+          workflowController.abort(
+            new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, CANCELLATION_POLL_MS);
+  let failure: StepOutcome | null = null;
+
+  try {
+    for (const wave of waves) {
+      if (failure) break;
+      const pendingWave = wave.filter((step) => !completedIds.has(step.id));
+      if (!pendingWave.length) continue;
+      if (workflowController.signal.aborted) throw workflowController.signal.reason;
+      if (await workflowIsCancelled(args.db, runId)) {
+        throw new WorkforceError("Workflow run cancelled by the operator.", "CANCELLED");
+      }
+      if (Date.now() > deadline)
+        throw new WorkforceError("The workforce run exceeded its time budget.", "RUN_TIMEOUT");
+
+      const results = await Promise.all(
+        pendingWave.map(async (step) => {
+          const upstream = upstreamFor(step, completed);
+          if (!conditionMet(step.condition, upstream)) {
+            const skipped: StepOutcome = {
+              step_id: step.id,
+              step_run_id: null,
+              name: step.name || `Step ${step.position + 1}`,
+              agent_id: step.agent_id,
+              status: "skipped",
+              output: "",
+              error: "Condition not met.",
+              attempts: 0,
+              duration_ms: 0,
+              tokens_in: 0,
+              tokens_out: 0,
+            };
+            await args.db.from("workflow_step_runs").insert({
+              run_id: runId,
+              workflow_id: step.workflow_id,
+              step_id: step.id,
+              agent_id: step.agent_id,
+              org_id: orgId,
+              user_id: args.userId,
+              name: skipped.name,
+              kind: step.kind,
+              position: step.position,
+              status: "cancelled",
+              error: "Condition not met.",
+              completed_at: new Date().toISOString(),
+            });
+            return skipped;
+          }
+
+          return runStep({
+            sb: args.sb,
+            db: args.db,
+            userId: args.userId,
+            orgId,
+            runId,
+            step,
+            objective: args.objective,
+            input: renderInput(step.input_template, { input: args.objective, upstream }),
+            upstream,
+            signal: workflowController.signal,
+          });
+        }),
+      );
+
+      results.forEach((result) => {
+        completed.push(result);
+        completedIds.add(result.step_id);
+      });
+      const blocking = results.find(
+        (result, index) => result.status === "failed" && !pendingWave[index]!.continue_on_error,
+      );
+      if (blocking) failure = blocking;
+    }
+
+    const tokensIn = completed.reduce((sum, outcome) => sum + outcome.tokens_in, 0);
+    const tokensOut = completed.reduce((sum, outcome) => sum + outcome.tokens_out, 0);
+    const finalOutput =
+      [...completed].reverse().find((outcome) => outcome.status === "succeeded" && outcome.output)
+        ?.output ?? "";
+    const status = failure ? "failed" : "succeeded";
+
+    await args.db
+      .from("workflow_runs")
+      .update({
+        status,
+        step_results: completed,
+        output: finalOutput.slice(0, 12_000),
+        error: failure ? `${failure.name}: ${failure.error}` : null,
+        tokens_in: tokensIn,
+        tokens_out: tokensOut,
+        waiting_approval_request_id: null,
+        waiting_step_id: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+
+    await recordUsage({
+      userId: args.userId,
+      orgId,
+      metric: "workflow_run",
+      quantity: 1,
+      metadata: {
+        run_id: runId,
+        workflow_id: workflow.id,
+        workforce_id: workflow.workforce_id ?? null,
+        steps: completed.length,
+        tokens: tokensIn + tokensOut,
+        status,
+      },
+    }).catch(() => undefined);
+
+    const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
+    await dispatchWebhookEvent({
+      userId: args.userId,
+      orgId,
+      event: "workflow.completed",
+      payload: {
+        run_id: runId,
+        workflow_id: workflow.id,
+        workflow_name: workflow.name,
+        status,
+        output: finalOutput,
+        steps: completed.map((outcome) => ({
+          name: outcome.name,
+          status: outcome.status,
+          attempts: outcome.attempts,
+        })),
+      },
+    }).catch(() => undefined);
+
+    await notify({
+      userId: args.userId,
+      orgId,
+      type: failure ? "workflow.failed" : "workflow.completed",
+      title: failure
+        ? `Workflow "${workflow.name}" failed`
+        : `Workflow "${workflow.name}" completed`,
+      body: failure
+        ? `Stopped on step "${failure.name}": ${String(failure.error).slice(0, 200)}`
+        : `${completed.length} step${completed.length === 1 ? "" : "s"} finished successfully.`,
+      link: "/workforce",
+      metadata: { run_id: runId, workflow_id: workflow.id },
+    });
+
+    const { data: finished } = await args.sb
+      .from("workflow_runs")
+      .select("*")
+      .eq("id", runId)
+      .maybeSingle();
+    return { run: finished ?? { id: runId, status }, steps: completed, output: finalOutput };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The workforce run failed.";
+    const cancelled =
+      (error instanceof RuntimeError && error.code === "CANCELLED") ||
+      (error instanceof WorkforceError && error.code === "CANCELLED");
+    await args.db
+      .from("workflow_runs")
+      .update({
+        status: cancelled ? "cancelled" : "failed",
+        step_results: completed,
+        error: message.slice(0, 600),
+        waiting_approval_request_id: null,
+        waiting_step_id: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+    await notify({
+      userId: args.userId,
+      orgId,
+      type: "workflow.failed",
+      title: "A workflow run failed",
+      body: message.slice(0, 200),
+      link: "/workforce",
+      metadata: { run_id: runId },
+    });
+    throw error instanceof WorkforceError ? error : new WorkforceError(message);
+  } finally {
+    clearTimeout(runBudgetTimer);
+    clearInterval(cancellationPoll);
+  }
+}
+
 /* ------------------------------------------------------------ orchestrator */
 
-/** Executes a workflow across its workforce and returns the finished run. */
+/** Creates a workflow run, then delegates execution to the resumable core. */
 export async function executeWorkflow(args: {
   sb: Sb;
   userId: string;
@@ -573,190 +803,17 @@ export async function executeWorkflow(args: {
     .maybeSingle();
   if (!run?.id)
     throw new WorkforceError("Could not start that workforce run.", "RUN_CREATE_FAILED");
-  const runId = run.id as string;
 
-  const waves = buildWaves(steps);
-  const completed: StepOutcome[] = [];
-  const deadline = Date.now() + RUN_BUDGET_MS;
-  const workflowController = new AbortController();
-  const runBudgetTimer = setTimeout(() => {
-    workflowController.abort(
-      new RuntimeError("The workforce run exceeded its time budget.", "RUN_TIMEOUT", 504),
-    );
-  }, RUN_BUDGET_MS);
-  const cancellationPoll = setInterval(() => {
-    void workflowIsCancelled(db, runId)
-      .then((cancelled) => {
-        if (cancelled && !workflowController.signal.aborted) {
-          workflowController.abort(
-            new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
-          );
-        }
-      })
-      .catch(() => undefined);
-  }, CANCELLATION_POLL_MS);
-  let failure: StepOutcome | null = null;
-
-  try {
-    for (const wave of waves) {
-      if (failure) break;
-      if (workflowController.signal.aborted) throw workflowController.signal.reason;
-      if (await workflowIsCancelled(db, runId)) {
-        throw new WorkforceError("Workflow run cancelled by the operator.", "CANCELLED");
-      }
-      if (Date.now() > deadline)
-        throw new WorkforceError("The workforce run exceeded its time budget.", "RUN_TIMEOUT");
-
-      const results = await Promise.all(
-        wave.map(async (step) => {
-          const upstream = upstreamFor(step, completed);
-          if (!conditionMet(step.condition, upstream)) {
-            const skipped: StepOutcome = {
-              step_id: step.id,
-              step_run_id: null,
-              name: step.name || `Step ${step.position + 1}`,
-              agent_id: step.agent_id,
-              status: "skipped",
-              output: "",
-              error: "Condition not met.",
-              attempts: 0,
-              duration_ms: 0,
-              tokens_in: 0,
-              tokens_out: 0,
-            };
-            await db.from("workflow_step_runs").insert({
-              run_id: runId,
-              workflow_id: step.workflow_id,
-              step_id: step.id,
-              agent_id: step.agent_id,
-              org_id: orgId,
-              user_id: args.userId,
-              name: skipped.name,
-              kind: step.kind,
-              position: step.position,
-              status: "cancelled",
-              error: "Condition not met.",
-              completed_at: new Date().toISOString(),
-            });
-            return skipped;
-          }
-
-          return runStep({
-            sb: args.sb,
-            db,
-            userId: args.userId,
-            orgId,
-            runId,
-            step,
-            objective,
-            input: renderInput(step.input_template, { input: objective, upstream }),
-            upstream,
-            signal: workflowController.signal,
-          });
-        }),
-      );
-
-      results.forEach((r) => completed.push(r));
-      const blocking = results.find((r, i) => r.status === "failed" && !wave[i]!.continue_on_error);
-      if (blocking) failure = blocking;
-    }
-
-    const tokensIn = completed.reduce((sum, o) => sum + o.tokens_in, 0);
-    const tokensOut = completed.reduce((sum, o) => sum + o.tokens_out, 0);
-    const finalOutput =
-      [...completed].reverse().find((o) => o.status === "succeeded" && o.output)?.output ?? "";
-    const status = failure ? "failed" : "succeeded";
-
-    await db
-      .from("workflow_runs")
-      .update({
-        status,
-        step_results: completed,
-        output: finalOutput.slice(0, 12_000),
-        error: failure ? `${failure.name}: ${failure.error}` : null,
-        tokens_in: tokensIn,
-        tokens_out: tokensOut,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
-
-    await recordUsage({
-      userId: args.userId,
-      orgId,
-      metric: "workflow_run",
-      quantity: 1,
-      metadata: {
-        run_id: runId,
-        workflow_id: workflow.id,
-        workforce_id: workflow.workforce_id ?? null,
-        steps: completed.length,
-        tokens: tokensIn + tokensOut,
-        status,
-      },
-    }).catch(() => undefined);
-
-    const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
-    await dispatchWebhookEvent({
-      userId: args.userId,
-      orgId,
-      event: "workflow.completed",
-      payload: {
-        run_id: runId,
-        workflow_id: workflow.id,
-        workflow_name: workflow.name,
-        status,
-        output: finalOutput,
-        steps: completed.map((o) => ({ name: o.name, status: o.status, attempts: o.attempts })),
-      },
-    }).catch(() => undefined);
-
-    await notify({
-      userId: args.userId,
-      orgId,
-      type: failure ? "workflow.failed" : "workflow.completed",
-      title: failure
-        ? `Workflow "${workflow.name}" failed`
-        : `Workflow "${workflow.name}" completed`,
-      body: failure
-        ? `Stopped on step "${failure.name}": ${String(failure.error).slice(0, 200)}`
-        : `${completed.length} step${completed.length === 1 ? "" : "s"} finished successfully.`,
-      link: "/workforce",
-      metadata: { run_id: runId, workflow_id: workflow.id },
-    });
-
-    const { data: finished } = await args.sb
-      .from("workflow_runs")
-      .select("*")
-      .eq("id", runId)
-      .maybeSingle();
-    return { run: finished ?? { id: runId, status }, steps: completed, output: finalOutput };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "The workforce run failed.";
-    const cancelled =
-      (error instanceof RuntimeError && error.code === "CANCELLED") ||
-      (error instanceof WorkforceError && error.code === "CANCELLED");
-    await db
-      .from("workflow_runs")
-      .update({
-        status: cancelled ? "cancelled" : "failed",
-        step_results: completed,
-        error: message.slice(0, 600),
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", runId);
-    await notify({
-      userId: args.userId,
-      type: "workflow.failed",
-      title: "A workflow run failed",
-      body: message.slice(0, 200),
-      link: "/workforce",
-      metadata: { run_id: runId },
-    });
-    throw error instanceof WorkforceError ? error : new WorkforceError(message);
-  } finally {
-    clearTimeout(runBudgetTimer);
-    clearInterval(cancellationPoll);
-  }
+  return executeWorkflowRun({
+    sb: args.sb,
+    db,
+    userId: args.userId,
+    workflow: workflow as WorkflowRow,
+    steps,
+    runId: run.id as string,
+    objective,
+    completed: [],
+  });
 }
 
 /** Requests cancellation without directly closing the run ledger. The active
@@ -780,7 +837,7 @@ export async function requestWorkflowCancellation(args: { sb: Sb; userId: string
     .from("workflow_runs")
     .update({ cancel_requested: true })
     .eq("id", args.runId)
-    .in("status", ["pending", "queued", "running"])
+    .in("status", ["pending", "queued", "running", "waiting_for_approval"])
     .select("id,status,cancel_requested")
     .maybeSingle();
   if (error) throw new WorkforceError(error.message, "CANCEL_FAILED");
