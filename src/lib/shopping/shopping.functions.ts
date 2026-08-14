@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { prepareCheckoutDraft, runShoppingResearch } from "@/lib/mission/mission.server";
+import { browserProviderStatus } from "@/lib/mission/browser-agent";
 import { assertWithinLimits, checkAgainstLimits, resolveSpendLimits } from "./limits.server";
 
 type Sb = { from: (t: string) => any };
