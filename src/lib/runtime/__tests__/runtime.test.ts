@@ -64,7 +64,8 @@ import {
   prepareRun,
   RuntimeError,
 } from "../runtime.server";
-import { runStep } from "../workforce.server";
+import { executeWorkflowRun, runStep } from "../workforce.server";
+import { decideWorkflowApproval } from "../workflow-approval-decision.server";
 import { normaliseWorkflowStepConfig } from "../workforce.functions";
 import { assertWithinLimit, EntitlementError, UNLIMITED } from "@/lib/platform/entitlements.server";
 
@@ -363,10 +364,12 @@ describe("workflow built-in nodes", () => {
       userId: USER,
       orgId: null,
       runId: "run-1",
+      workflowName: "Workflow",
       step: step(kind, config),
       input: "go",
       objective: "go",
       upstream: [],
+      completed: [],
     };
     return runStep(signal ? { ...args, signal } : args);
   }
@@ -407,5 +410,194 @@ describe("workflow built-in nodes", () => {
       status: "failed",
       error: expect.stringContaining("Unsupported workflow step kind"),
     });
+  });
+});
+
+describe("workflow approval gates", () => {
+  function workflowStep(id: string, position: number, kind: string, overrides: Record<string, unknown> = {}) {
+    return {
+      id,
+      workflow_id: "workflow-1",
+      position,
+      name: id,
+      kind,
+      agent_id: null,
+      mode: "sequential",
+      depends_on: [],
+      condition: {},
+      input_template: null,
+      max_retries: 1,
+      retry_delay_ms: 0,
+      timeout_ms: 5_000,
+      continue_on_error: false,
+      requires_approval: kind === "approval",
+      config: kind === "delay" ? { duration_ms: 0 } : {},
+      ...overrides,
+    };
+  }
+
+  function workflowDb(extra: Record<string, any[]> = {}) {
+    const sb = createFakeSupabase({
+      personal_agents: [AGENT],
+      agent_tasks: [],
+      agent_activities: [],
+      personal_memories: [],
+      tool_permissions: [],
+      tools: [],
+      tool_executions: [],
+      workflow_runs: [
+        {
+          id: "run-1",
+          workflow_id: "workflow-1",
+          workforce_id: null,
+          org_id: null,
+          user_id: USER,
+          status: "running",
+          cancel_requested: false,
+          input: "objective",
+          step_results: [],
+          tokens_in: 0,
+          tokens_out: 0,
+        },
+      ],
+      workflow_step_runs: [],
+      approval_requests: [],
+      agent_messages: [],
+      workflows: [
+        {
+          id: "workflow-1",
+          name: "Approval workflow",
+          org_id: null,
+          user_id: USER,
+          workforce_id: null,
+          status: "active",
+        },
+      ],
+      workflow_steps: [],
+      ...extra,
+    });
+    adminDb = sb;
+    return sb as any;
+  }
+
+  it("pauses on an approval node and persists the durable gate", async () => {
+    const approval = workflowStep("approval-1", 0, "approval", {
+      config: { title: "Review change", summary: "Confirm before continuing.", risk_level: "medium" },
+    });
+    const downstream = workflowStep("delay-1", 1, "delay");
+    const sb = workflowDb({ workflow_steps: [approval, downstream] });
+
+    const result = await executeWorkflowRun({
+      sb,
+      db: sb,
+      userId: USER,
+      workflow: sb.tables.workflows[0],
+      steps: sb.tables.workflow_steps,
+      runId: "run-1",
+      objective: "objective",
+      completed: [],
+    });
+
+    expect(result.paused).toBe(true);
+    expect(sb.tables.approval_requests).toHaveLength(1);
+    expect(sb.tables.approval_requests[0]).toMatchObject({
+      user_id: USER,
+      action_type: "workflow_step",
+      status: "pending",
+      details: expect.objectContaining({
+        workflow_run_id: "run-1",
+        workflow_id: "workflow-1",
+        workflow_step_id: "approval-1",
+      }),
+    });
+    expect(sb.tables.workflow_runs[0]).toMatchObject({
+      status: "waiting_for_approval",
+      waiting_step_id: "approval-1",
+    });
+    expect(sb.tables.workflow_step_runs).toHaveLength(1);
+    expect(sb.tables.workflow_step_runs[0].status).toBe("waiting_for_approval");
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-1")).toBe(false);
+  });
+
+  it("resumes the same run without replaying completed upstream work", async () => {
+    const upstream = workflowStep("delay-before", 0, "delay");
+    const approval = workflowStep("approval-1", 1, "approval");
+    const downstream = workflowStep("delay-after", 2, "delay");
+    const completedUpstream = {
+      step_id: "delay-before",
+      step_run_id: "step-run-before",
+      name: "delay-before",
+      agent_id: null,
+      status: "succeeded" as const,
+      output: "Delayed for 0 ms.",
+      error: null,
+      attempts: 1,
+      duration_ms: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+    };
+    const sb = workflowDb({ workflow_steps: [upstream, approval, downstream] });
+    sb.tables.workflow_runs[0].step_results = [completedUpstream];
+
+    const paused = await executeWorkflowRun({
+      sb,
+      db: sb,
+      userId: USER,
+      workflow: sb.tables.workflows[0],
+      steps: sb.tables.workflow_steps,
+      runId: "run-1",
+      objective: "objective",
+      completed: [completedUpstream],
+    });
+    expect(paused.paused).toBe(true);
+    const request = sb.tables.approval_requests[0];
+    const beforeCount = sb.tables.workflow_step_runs.filter((row: any) => row.step_id === "delay-before").length;
+
+    const resumed = await decideWorkflowApproval({
+      sb,
+      userId: USER,
+      approvalRequestId: request.id,
+      decision: "approved",
+    });
+
+    expect(resumed.run.status).toBe("succeeded");
+    expect(sb.tables.workflow_runs).toHaveLength(1);
+    expect(sb.tables.workflow_step_runs.filter((row: any) => row.step_id === "delay-before")).toHaveLength(beforeCount);
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after" && row.status === "succeeded")).toBe(true);
+    expect(sb.tables.workflow_runs[0].step_results.map((row: any) => row.step_id)).toEqual([
+      "delay-before",
+      "approval-1",
+      "delay-after",
+    ]);
+  });
+
+  it("does not resume a workflow that was cancelled while waiting", async () => {
+    const approval = workflowStep("approval-1", 0, "approval");
+    const sb = workflowDb({ workflow_steps: [approval] });
+    const paused = await executeWorkflowRun({
+      sb,
+      db: sb,
+      userId: USER,
+      workflow: sb.tables.workflows[0],
+      steps: sb.tables.workflow_steps,
+      runId: "run-1",
+      objective: "objective",
+      completed: [],
+    });
+    expect(paused.paused).toBe(true);
+    const request = sb.tables.approval_requests[0];
+    sb.tables.workflow_runs[0].cancel_requested = true;
+    sb.tables.workflow_runs[0].status = "cancelled";
+
+    await expect(
+      decideWorkflowApproval({
+        sb,
+        userId: USER,
+        approvalRequestId: request.id,
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_WAITING" });
+    expect(sb.tables.workflow_runs[0].status).toBe("cancelled");
+    expect(sb.tables.workflow_step_runs).toHaveLength(1);
   });
 });
