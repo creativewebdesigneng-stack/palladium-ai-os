@@ -79,7 +79,6 @@ export default function LivePreview({ config, agentId }) {
       const output = task?.output_text || '';
       if (task?.error) setLast({ error: true, text: task.error });
       else if (output) setLast({ text: output });
-      else setLast((prev) => prev);
       log('Run finished', 'done');
     } catch (e) {
       console.error('[agent-builder:test]', e);
@@ -116,6 +115,12 @@ export default function LivePreview({ config, agentId }) {
       ) : (
         <>
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+            {messages.length === 0 && !running && (
+              <div className="grid place-items-center py-10 text-center">
+                <Bot className="h-6 w-6 text-zinc-600" />
+                <p className="mt-2 text-xs text-zinc-400">{agentId ? 'Send a task to run this agent for real.' : 'Save this agent to run a real test.'}</p>
+              </div>
+            )}
             {messages.map((m, i) => <Message key={i} m={m} />)}
             {running && (
               <div className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /> Agent is thinking…</div>
@@ -126,7 +131,7 @@ export default function LivePreview({ config, agentId }) {
               <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} disabled={running} placeholder={tab === 'test' ? 'Send a task to your agent…' : 'Message preview…'} className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 outline-none disabled:opacity-50" />
               <button onClick={send} disabled={running || !input.trim()} className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"><Send className="h-3.5 w-3.5" /> Run</button>
             </div>
-            <p className="mt-1.5 px-1 text-[9px] text-zinc-600">{tab === 'test' ? 'Test mode · responses are simulated (backend-ready).' : 'Live preview of agent behaviour.'}</p>
+            <p className="mt-1.5 px-1 text-[9px] text-zinc-600">{agentId ? 'Runs execute on the production runtime — real model, real tools, real usage.' : 'Save this agent to enable real runs. No simulated responses are ever shown.'}</p>
           </div>
         </>
       )}
@@ -152,7 +157,10 @@ function Message({ m }) {
             {m.steps.map((s, i) => <Step key={i} s={s} />)}
           </div>
         )}
-        <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-zinc-200">{m.text}</div>
+        <div className={`flex items-start gap-2 rounded-2xl rounded-tl-sm border px-3 py-2 text-xs ${m.error ? 'border-rose-400/25 bg-rose-500/10 text-rose-200' : 'border-white/10 bg-white/[.04] text-zinc-200'}`}>
+          {m.error && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+          <span>{m.text || (m.error ? 'AI service temporarily unavailable.' : '…')}</span>
+        </div>
       </div>
     </div>
   );
