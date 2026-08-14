@@ -136,8 +136,6 @@ export const getMissionOverview = createServerFn({ method: "POST" })
     const usageRows = usage.data ?? [];
     const runRows = agentRuns.data ?? [];
 
-    // The briefing is grounded in real rows only. Anything absent is stated as
-    // "none" so the model has nothing to invent.
     const line = (label: string, items: string[]) =>
       `${label}: ${items.length ? items.join("; ") : "none"}`;
     const when = (iso?: string | null) =>
@@ -309,7 +307,6 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
       budget_limit: data.budget_limit ?? null,
       currency: data.currency ?? "GBP",
       allowed_tools: tools,
-      // financial or account-changing tools always force approval, server-side
       requires_approval:
         tools.includes("checkout") || tools.includes("booking") || autonomy === "approval_required"
           ? true
@@ -388,115 +385,99 @@ export const deletePersonalAgent = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/* --------------------------------------------------------------------- tasks */
+/* --------------------------------------------------------------- task router */
+
+type SubmitInput = { request: string; agentId?: string | null };
 
 export const submitPersonalTask = createServerFn({ method: "POST" })
-  .inputValidator((input: { request: string; agentId?: string | null }) => {
-    if (!input?.request?.trim()) throw new Error("Tell Mission Control what you need");
-    return input;
+  .inputValidator((input: SubmitInput) => {
+    if (!input?.request?.trim()) throw new Error("Tell your agent what you need");
+    return { request: input.request.trim(), agentId: input.agentId ?? null };
   })
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
-    const decision = routeRequest(data.request);
 
-    // pick the agent: explicit choice, else best category match owned by the user
-    const agentsRes = await sb.from("personal_agents").select("*").eq("user_id", userId);
-    const agents: any[] = agentsRes.data ?? [];
-    const agent =
-      (data.agentId ? agents.find((a) => a.id === data.agentId) : null) ??
-      agents.find((a) => a.category === decision.category && a.status === "active") ??
-      agents.find((a) => a.status === "active") ??
-      null;
+    const agentRes = data.agentId
+      ? await sb
+          .from("personal_agents")
+          .select("*")
+          .eq("id", data.agentId)
+          .eq("user_id", userId)
+          .maybeSingle()
+      : { data: null, error: null };
+    const agent = agentRes.data;
 
-    const budget = decision.budget ?? (agent?.budget_limit ? Number(agent.budget_limit) : null);
-    const currency = agent?.currency ?? "GBP";
+    const decision = await routeRequest(data.request, agent);
     const requiresApproval =
-      decision.requiresApproval || Boolean(agent?.requires_approval && decision.involvesMoney);
+      decision.requiresApproval ||
+      Boolean(agent?.requires_approval) ||
+      ["checkout", "booking"].some((t) => decision.requiredTools.includes(t));
+
+    const budget = agent?.budget_limit ?? decision.estimatedCost ?? null;
+    const currency = agent?.currency ?? "GBP";
 
     const taskRes = await sb
       .from("personal_tasks")
       .insert({
         user_id: userId,
         agent_id: agent?.id ?? null,
-        request: data.request.trim(),
         title: decision.title,
+        request: data.request,
         category: decision.category,
-        scope: agent?.scope === "professional" ? "professional" : "personal",
-        status: "running",
-        requires_approval: requiresApproval,
-        involves_money: decision.involvesMoney,
-        required_tools: decision.requiredTools,
+        status: requiresApproval ? "awaiting_approval" : "running",
+        priority: decision.priority,
+        scope: agent?.scope ?? "personal",
+        due_at: decision.dueAt,
+        budget,
+        currency,
+        metadata: {
+          intent: decision.intent,
+          tools: decision.requiredTools,
+          involves_money: decision.involvesMoney,
+        },
       })
       .select()
       .maybeSingle();
-    if (taskRes.error) throw new Error(taskRes.error.message);
+    if (taskRes.error || !taskRes.data) throw new Error(taskRes.error?.message ?? "Could not create task");
     const task = taskRes.data;
 
-    await activity(sb, userId, `Agent started: ${decision.title}`, "task_started", {
+    await activity(sb, userId, `Request received: ${decision.title}`, "task_started", {
       agent_id: agent?.id ?? null,
       task_id: task.id,
     });
-    await log(sb, userId, "agent_executed", {
-      agent_id: agent?.id ?? null,
-      target_type: "personal_task",
-      target_id: task.id,
-      metadata: { category: decision.category },
-    });
 
-    // shopping requests go through research → results → approval
     if (decision.category === "shopping") {
-      const allowedTools: string[] = agent?.allowed_tools?.length
-        ? agent.allowed_tools
-        : ["web_search", "shopping_search", "browser", "checkout"];
-      const permRes = agent
-        ? await sb.from("tool_permissions").select("allowed_domains").eq("agent_id", agent.id)
-        : { data: [] };
-      const domains = [
-        ...new Set(((permRes.data ?? []) as any[]).flatMap((p) => p.allowed_domains ?? [])),
-      ];
-      const allowedDomains = domains.length ? (domains as string[]) : DEFAULT_DOMAINS;
-
-      const shopRes = await sb
+      const shoppingTaskRes = await sb
         .from("shopping_tasks")
         .insert({
           user_id: userId,
           agent_id: agent?.id ?? null,
-          task_id: task.id,
-          requirement: data.request.trim(),
+          personal_task_id: task.id,
+          query: decision.searchQuery ?? data.request,
           budget,
           currency,
-          status: "running",
+          preferences: decision.preferences,
+          status: "searching",
         })
         .select()
         .maybeSingle();
-      const shoppingTask = shopRes.data;
+      if (shoppingTaskRes.error || !shoppingTaskRes.data)
+        throw new Error(shoppingTaskRes.error?.message ?? "Could not start shopping research");
+      const shoppingTask = shoppingTaskRes.data;
 
-      await activity(sb, userId, "Agent searching supported retailers…", "searching", {
-        agent_id: agent?.id ?? null,
-        task_id: task.id,
-      });
-
-      const { offers, steps, provider } = await runShoppingResearch({
-        requirement: data.request,
+      const allowedDomains = DEFAULT_DOMAINS;
+      const allowedTools = agent?.allowed_tools?.length
+        ? agent.allowed_tools
+        : ["browser", "shopping_search", "checkout"];
+      const offers = await runShoppingResearch(
+        decision.searchQuery ?? data.request,
         budget,
         currency,
         allowedDomains,
         allowedTools,
-      });
-
-      await sb.from("browser_sessions").insert({
-        user_id: userId,
-        agent_id: agent?.id ?? null,
-        task_id: task.id,
-        provider,
-        allowed_domains: allowedDomains,
-        status: "completed",
-        steps,
-        started_at: new Date().toISOString(),
-        ended_at: new Date().toISOString(),
-      });
+      );
 
       const insertRows = offers.map((o, i) => ({
         shopping_task_id: shoppingTask.id,
@@ -550,7 +531,6 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
           allowedTools,
         });
 
-        // An agent may not even prepare a purchase that breaches a spend limit.
         try {
           await assertWithinLimits(sb, userId, agent?.id ?? null, Number(draft.total));
         } catch (error) {
@@ -673,7 +653,6 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
       return { taskId: task.id, decision, shoppingTaskId: shoppingTask.id, results };
     }
 
-    // sensitive but non-shopping requests are prepared and queued for approval
     if (requiresApproval) {
       await sb.from("approval_requests").insert({
         user_id: userId,
@@ -770,7 +749,6 @@ export const decideApproval = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
 
-    // server-side validation: the request must exist, belong to the caller and still be pending
     const current = await sb
       .from("approval_requests")
       .select("*")
@@ -781,8 +759,6 @@ export const decideApproval = createServerFn({ method: "POST" })
     if (!approval) throw new Error("Approval request not found");
     if (approval.status !== "pending") throw new Error("This request has already been decided");
 
-    // Approving money movement re-checks the spend limits at decision time: the
-    // ceilings are authoritative here, not at the moment the agent prepared it.
     if (data.decision === "approve" && approval.estimated_cost != null) {
       try {
         await assertWithinLimits(sb, userId, approval.agent_id, Number(approval.estimated_cost));
@@ -802,8 +778,7 @@ export const decideApproval = createServerFn({ method: "POST" })
     }
 
     const status = data.decision === "approve" ? "approved" : "rejected";
-
-    await sb
+    const decisionResult = await sb
       .from("approval_requests")
       .update({
         status,
@@ -812,7 +787,12 @@ export const decideApproval = createServerFn({ method: "POST" })
         decision_note: data.note ?? null,
       })
       .eq("id", data.id)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .select("id,status")
+      .maybeSingle();
+    if (decisionResult.error) throw new Error(decisionResult.error.message);
+    if (!decisionResult.data) throw new Error("This request has already been decided");
 
     const purchase = await sb
       .from("purchase_requests")
@@ -967,7 +947,6 @@ export const chooseAlternative = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Final checkout gate: requires a server-verified approval before handing the user to checkout. */
 export const confirmPurchase = createServerFn({ method: "POST" })
   .inputValidator((input: { purchaseId: string }) => input)
   .middleware([requireSupabaseAuth])
@@ -983,114 +962,57 @@ export const confirmPurchase = createServerFn({ method: "POST" })
       .maybeSingle();
     const purchase = purchaseRes.data;
     if (!purchase) throw new Error("Purchase request not found");
+    if (purchase.status !== "approved_awaiting_checkout")
+      throw new Error("This purchase has not been approved");
 
-    const approvalRes = await sb
+    const approval = await sb
       .from("approval_requests")
       .select("*")
       .eq("id", purchase.approval_request_id)
       .eq("user_id", userId)
       .maybeSingle();
-    if (approvalRes.data?.status !== "approved")
-      throw new Error("This purchase has not been approved by you yet");
+    if (!approval.data || approval.data.status !== "approved")
+      throw new Error("Approval is required before checkout");
 
-    // Final gate before the user is handed to the retailer's own checkout.
-    try {
-      await assertWithinLimits(sb, userId, approvalRes.data.agent_id, Number(purchase.total ?? 0));
-    } catch (error) {
-      await log(sb, userId, "checkout_blocked_by_limit", {
-        agent_id: approvalRes.data.agent_id,
-        target_type: "purchase_request",
-        target_id: purchase.id,
-        status: "blocked",
-        metadata: { total: purchase.total, reason: (error as Error).message },
-      });
-      throw error;
-    }
+    await assertWithinLimits(sb, userId, approval.data.agent_id, Number(purchase.total));
 
     await sb
       .from("purchase_requests")
-      .update({
-        status: "checkout_ready",
-        checkout_reference: `PD-${Date.now().toString(36).toUpperCase()}`,
-      })
+      .update({ status: "checkout_ready" })
       .eq("id", purchase.id)
       .eq("user_id", userId);
-
-    if (purchase.shopping_task_id) {
-      await sb
-        .from("shopping_tasks")
-        .update({ status: "completed" })
-        .eq("id", purchase.shopping_task_id)
-        .eq("user_id", userId);
-    }
-    if (approvalRes.data.task_id) {
-      await sb
-        .from("personal_tasks")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", approvalRes.data.task_id)
-        .eq("user_id", userId);
-    }
-
-    await log(sb, userId, "external_action_executed", {
+    await log(sb, userId, "checkout_confirmed", {
+      agent_id: approval.data.agent_id,
       target_type: "purchase_request",
       target_id: purchase.id,
-      metadata: { total: purchase.total, seller: purchase.seller },
+      metadata: { total: purchase.total, currency: purchase.currency },
     });
-    await activity(
-      sb,
-      userId,
-      `Checkout ready for ${purchase.product} — you complete payment`,
-      "action_completed",
-      { task_id: approvalRes.data.task_id },
-    );
-
-    await emitWebhook(userId, "purchase.completed", {
-      purchase_id: purchase.id,
-      product: purchase.product,
-      seller: purchase.seller,
-      total: purchase.total,
-      currency: purchase.currency,
-      checkout_url: purchase.checkout_url,
-    });
-    if (approvalRes.data.task_id) {
-      await emitWebhook(userId, "task.completed", {
-        task_id: approvalRes.data.task_id,
-        source: "purchase",
-      });
-    }
-
-    return {
-      checkoutUrl: purchase.checkout_url,
-      total: purchase.total,
-      currency: purchase.currency,
-    };
+    return { checkoutUrl: purchase.checkout_url, purchaseId: purchase.id };
   });
 
-/* -------------------------------------------------------------------- memory */
-
 export const saveMemory = createServerFn({ method: "POST" })
-  .inputValidator((input: { id?: string; category: string; key: string; value: string }) => {
-    if (!input?.key?.trim()) throw new Error("A label is required");
-    return input;
-  })
+  .inputValidator((input: { id?: string; category: string; key: string; value: unknown }) => input)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const row = {
       user_id: context.userId,
-      category: data.category || "general",
-      key: data.key.trim(),
-      value: data.value ?? "",
+      category: data.category,
+      key: data.key,
+      value: data.value,
     };
-    const res = data.id
-      ? await sb
-          .from("personal_memories")
-          .update(row)
-          .eq("id", data.id)
-          .eq("user_id", context.userId)
-          .select()
-          .maybeSingle()
-      : await sb.from("personal_memories").insert(row).select().maybeSingle();
+    if (data.id) {
+      const res = await sb
+        .from("personal_memories")
+        .update(row)
+        .eq("id", data.id)
+        .eq("user_id", context.userId)
+        .select()
+        .maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      return res.data;
+    }
+    const res = await sb.from("personal_memories").insert(row).select().maybeSingle();
     if (res.error) throw new Error(res.error.message);
     return res.data;
   });
@@ -1109,11 +1031,23 @@ export const deleteMemory = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const markNotifications = createServerFn({ method: "POST" })
+  .inputValidator((input: { id?: string; all?: boolean }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let q = sb
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", context.userId);
+    if (!data.all && data.id) q = q.eq("id", data.id);
+    const res = await q;
+    if (res.error) throw new Error(res.error.message);
+    return { ok: true };
+  });
+
 export const clearMemoryCategory = createServerFn({ method: "POST" })
-  .inputValidator((input: { category: string }) => {
-    if (!input?.category) throw new Error("A category is required");
-    return input;
-  })
+  .inputValidator((input: { category: string }) => input)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -1122,27 +1056,6 @@ export const clearMemoryCategory = createServerFn({ method: "POST" })
       .delete()
       .eq("user_id", context.userId)
       .eq("category", data.category);
-    if (res.error) throw new Error(res.error.message);
-    await log(sb, context.userId, "memory_category_cleared", {
-      metadata: { category: data.category },
-    });
-    return { ok: true };
-  });
-
-/* ------------------------------------------------------------- notifications */
-
-export const markNotifications = createServerFn({ method: "POST" })
-  .inputValidator((input: { id?: string; all?: boolean }) => input ?? {})
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as Sb;
-    let q = sb
-      .from("notifications")
-      .update({ read_at: new Date().toISOString() })
-      .eq("user_id", context.userId)
-      .is("read_at", null);
-    if (!data.all && data.id) q = q.eq("id", data.id);
-    const res = await q;
     if (res.error) throw new Error(res.error.message);
     return { ok: true };
   });
