@@ -55,7 +55,7 @@ export default function Skills() {
   });
 
   const tools = useMemo(
-    () => (framework.data?.tools ?? []).map(toCardTool),
+    () => (framework.data?.tools ?? []).map((t) => toCardTool(t, framework.data?.agents ?? [])),
     [framework.data],
   );
 
