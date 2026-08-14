@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
-import { executeWorkflow, WorkforceError } from "./workforce.server";
+import { executeWorkflow, requestWorkflowCancellation, WorkforceError } from "./workforce.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -188,6 +188,26 @@ export const runWorkflow = createServerFn({ method: "POST" })
         workflowId: data.workflow_id,
         input: data.input,
         trigger: "manual",
+      });
+    } catch (error) {
+      surface(error);
+    }
+  });
+
+/** Requests cancellation of an active workflow run. The runtime will abort any
+ * in-flight agent/model/tool work and mark the run cancelled. */
+export const cancelWorkflowRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { run_id: string }) => {
+    if (!input?.run_id) throw new Error("A workflow run is required.");
+    return { run_id: String(input.run_id) };
+  })
+  .handler(async ({ data, context }) => {
+    try {
+      return await requestWorkflowCancellation({
+        sb: context.supabase as unknown as Sb,
+        userId: context.userId,
+        runId: data.run_id,
       });
     } catch (error) {
       surface(error);

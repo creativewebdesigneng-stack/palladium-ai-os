@@ -655,19 +655,42 @@ async function notifyInputRequired(
 }
 
 /** Non-streaming execution: model turns + tool rounds until a final answer. */
-export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRun }) {
+export async function executeRun(args: {
+  sb: Sb;
+  userId: string;
+  run: PreparedRun;
+  /** An owning workflow can terminate an in-flight model or tool request. */
+  signal?: AbortSignal;
+  /** A tighter owner budget, such as a workflow step timeout. */
+  timeoutMs?: number;
+}) {
   const controller = new AbortController();
-  let timedOut = false;
-  const budget = setTimeout(() => {
-    timedOut = true;
+  let externalFailure: RuntimeError | null = null;
+  const abortFromOwner = () => {
+    const reason = args.signal?.reason;
+    externalFailure =
+      reason instanceof RuntimeError
+        ? reason
+        : new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
     controller.abort();
-  }, RUN_BUDGET_MS);
+  };
+  if (args.signal?.aborted) abortFromOwner();
+  else args.signal?.addEventListener("abort", abortFromOwner, { once: true });
+  let timedOut = false;
+  const budget = setTimeout(
+    () => {
+      timedOut = true;
+      controller.abort();
+    },
+    Math.min(Math.max(args.timeoutMs ?? RUN_BUDGET_MS, 1_000), RUN_BUDGET_MS),
+  );
   const messages = [...args.run.messages];
   let toolCallCount = 0;
   const usage = { input: 0, output: 0 };
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+      if (externalFailure) throw externalFailure;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
@@ -685,10 +708,15 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
           signal: controller.signal,
         });
       } catch (error) {
+        if (externalFailure) throw externalFailure;
         if (timedOut)
           throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
         throw error;
       }
+      // Some providers may resolve despite an aborted transport. Never turn a
+      // late response into a completed task after its owner stopped the run.
+      if (externalFailure) throw externalFailure;
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
 
       usage.input += result.usage.input;
       usage.output += result.usage.output;
@@ -722,6 +750,7 @@ export async function executeRun(args: { sb: Sb; userId: string; run: PreparedRu
     );
   } finally {
     clearTimeout(budget);
+    args.signal?.removeEventListener("abort", abortFromOwner);
   }
 }
 

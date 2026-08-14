@@ -256,6 +256,38 @@ describe("run lifecycle", () => {
     expect(sb.tables["agent_tasks"][0].status).toBe("cancelled");
   });
 
+  it("propagates a workflow owner abort before making a model request", async () => {
+    const sb = db();
+    const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
+    const controller = new AbortController();
+    controller.abort(new RuntimeError("Workflow step timed out.", "RUN_TIMEOUT", 504));
+
+    await expect(
+      executeRun({ sb, userId: USER, run, signal: controller.signal }),
+    ).rejects.toMatchObject({
+      code: "RUN_TIMEOUT",
+    });
+    expect(gateway.runChat).not.toHaveBeenCalled();
+  });
+
+  it("does not complete a task when a provider resolves after workflow cancellation", async () => {
+    const sb = db();
+    const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
+    const controller = new AbortController();
+    let resolveProvider: ((value: ReturnType<typeof textResult>) => void) | undefined;
+    gateway.runChat.mockImplementation(
+      () => new Promise<ReturnType<typeof textResult>>((resolve) => (resolveProvider = resolve)),
+    );
+
+    const execution = executeRun({ sb, userId: USER, run, signal: controller.signal });
+    await vi.waitFor(() => expect(gateway.runChat).toHaveBeenCalledOnce());
+    controller.abort(new RuntimeError("Workflow cancelled.", "CANCELLED", 499));
+    resolveProvider?.(textResult());
+
+    await expect(execution).rejects.toMatchObject({ code: "CANCELLED" });
+    expect(sb.tables["agent_tasks"][0].status).toBe("running");
+  });
+
   it("never leaves a timed-out run in running", async () => {
     const sb = db();
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });

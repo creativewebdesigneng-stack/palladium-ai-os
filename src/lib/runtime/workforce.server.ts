@@ -76,6 +76,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)))
 
 const MAX_STEPS = 25;
 const RUN_BUDGET_MS = 10 * 60 * 1000;
+const CANCELLATION_POLL_MS = 1_000;
+
+async function workflowIsCancelled(db: Sb, runId: string): Promise<boolean> {
+  const { data } = await db
+    .from("workflow_runs")
+    .select("status,cancel_requested")
+    .eq("id", runId)
+    .maybeSingle();
+  return data?.status === "cancelled" || data?.cancel_requested === true;
+}
 
 /* ------------------------------------------------------------ templating */
 
@@ -189,6 +199,7 @@ async function runStep(args: {
   input: string;
   objective: string;
   upstream: StepOutcome[];
+  signal?: AbortSignal;
 }): Promise<StepOutcome> {
   const { step, db } = args;
   const name = step.name || `Step ${step.position + 1}`;
@@ -244,12 +255,48 @@ async function runStep(args: {
         agentId: step.agent_id,
         input: args.input,
       });
-      const task = (await Promise.race([
-        executeRun({ sb: args.sb as never, userId: args.userId, run }),
-        sleep(Math.min(step.timeout_ms ?? 120_000, 300_000)).then(() => {
-          throw new WorkforceError(`${name} timed out.`, "STEP_TIMEOUT");
-        }),
-      ])) as any;
+      // Do not use Promise.race for deadlines: losing promises continue running.
+      // The abort signal reaches model and tool calls so a timed-out/cancelled
+      // workflow cannot spend tokens or execute tools after its ledger closed.
+      const controller = new AbortController();
+      const abortFromWorkflow = () => {
+        controller.abort(
+          args.signal?.reason ??
+            new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+        );
+      };
+      if (args.signal?.aborted) abortFromWorkflow();
+      else args.signal?.addEventListener("abort", abortFromWorkflow, { once: true });
+      const timeoutMs = Math.min(Math.max(step.timeout_ms ?? 120_000, 5_000), 300_000);
+      const deadlineTimer = setTimeout(() => {
+        controller.abort(new RuntimeError(`${name} timed out.`, "RUN_TIMEOUT", 504));
+      }, timeoutMs);
+      const cancellationPoll = setInterval(() => {
+        void workflowIsCancelled(db, args.runId)
+          .then((cancelled) => {
+            if (cancelled && !controller.signal.aborted) {
+              controller.abort(
+                new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+              );
+            }
+          })
+          .catch(() => undefined);
+      }, CANCELLATION_POLL_MS);
+
+      let task: any;
+      try {
+        task = await executeRun({
+          sb: args.sb as never,
+          userId: args.userId,
+          run,
+          signal: controller.signal,
+          timeoutMs,
+        });
+      } finally {
+        clearTimeout(deadlineTimer);
+        clearInterval(cancellationPoll);
+        args.signal?.removeEventListener("abort", abortFromWorkflow);
+      }
 
       const output = String(task?.output_text ?? "");
       const outcome: StepOutcome = {
@@ -306,6 +353,7 @@ async function runStep(args: {
           })
           .eq("id", stepRunId);
       }
+      if (error instanceof RuntimeError && error.code === "CANCELLED") throw error;
       const retryable = !(error instanceof RuntimeError && error.code === "CANCELLED");
       if (!retryable || attempt === attemptsAllowed) break;
       await sleep((step.retry_delay_ms ?? 500) * attempt);
@@ -377,11 +425,32 @@ export async function executeWorkflow(args: {
   const waves = buildWaves(steps);
   const completed: StepOutcome[] = [];
   const deadline = Date.now() + RUN_BUDGET_MS;
+  const workflowController = new AbortController();
+  const runBudgetTimer = setTimeout(() => {
+    workflowController.abort(
+      new RuntimeError("The workforce run exceeded its time budget.", "RUN_TIMEOUT", 504),
+    );
+  }, RUN_BUDGET_MS);
+  const cancellationPoll = setInterval(() => {
+    void workflowIsCancelled(db, runId)
+      .then((cancelled) => {
+        if (cancelled && !workflowController.signal.aborted) {
+          workflowController.abort(
+            new RuntimeError("Workflow run cancelled by the operator.", "CANCELLED", 499),
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, CANCELLATION_POLL_MS);
   let failure: StepOutcome | null = null;
 
   try {
     for (const wave of waves) {
       if (failure) break;
+      if (workflowController.signal.aborted) throw workflowController.signal.reason;
+      if (await workflowIsCancelled(db, runId)) {
+        throw new WorkforceError("Workflow run cancelled by the operator.", "CANCELLED");
+      }
       if (Date.now() > deadline)
         throw new WorkforceError("The workforce run exceeded its time budget.", "RUN_TIMEOUT");
 
@@ -429,6 +498,7 @@ export async function executeWorkflow(args: {
             objective,
             input: renderInput(step.input_template, { input: objective, upstream }),
             upstream,
+            signal: workflowController.signal,
           });
         }),
       );
@@ -509,10 +579,13 @@ export async function executeWorkflow(args: {
     return { run: finished ?? { id: runId, status }, steps: completed, output: finalOutput };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The workforce run failed.";
+    const cancelled =
+      (error instanceof RuntimeError && error.code === "CANCELLED") ||
+      (error instanceof WorkforceError && error.code === "CANCELLED");
     await db
       .from("workflow_runs")
       .update({
-        status: "failed",
+        status: cancelled ? "cancelled" : "failed",
         step_results: completed,
         error: message.slice(0, 600),
         completed_at: new Date().toISOString(),
@@ -527,5 +600,36 @@ export async function executeWorkflow(args: {
       metadata: { run_id: runId },
     });
     throw error instanceof WorkforceError ? error : new WorkforceError(message);
+  } finally {
+    clearTimeout(runBudgetTimer);
+    clearInterval(cancellationPoll);
   }
+}
+
+/** Requests cancellation without directly closing the run ledger. The active
+ * worker observes the flag and aborts its child agent work before finalising. */
+export async function requestWorkflowCancellation(args: { sb: Sb; userId: string; runId: string }) {
+  const { data: visibleRun } = await args.sb
+    .from("workflow_runs")
+    .select("id,user_id,status")
+    .eq("id", args.runId)
+    .maybeSingle();
+  if (!visibleRun)
+    throw new WorkforceError(
+      "Workflow run not found or you do not have access to it.",
+      "NOT_FOUND",
+    );
+  if (visibleRun.user_id !== args.userId)
+    throw new WorkforceError("Only the run owner can cancel this workflow.", "FORBIDDEN");
+
+  const db = await admin();
+  const { data: updated, error } = await db
+    .from("workflow_runs")
+    .update({ cancel_requested: true })
+    .eq("id", args.runId)
+    .in("status", ["pending", "queued", "running"])
+    .select("id,status,cancel_requested")
+    .maybeSingle();
+  if (error) throw new WorkforceError(error.message, "CANCEL_FAILED");
+  return { run: updated ?? visibleRun, requested: Boolean(updated) };
 }
