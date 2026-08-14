@@ -28,13 +28,14 @@ export default function AgentBuilder() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [deployment, setDeployment] = useState('Testing');
   const [saving, setSaving] = useState(false);
+  const [agentId, setAgentId] = useState(null);
 
   const update = (fn) => setConfig((c) => fn(c));
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await createAgent({
+      const saved = await createAgent({
         data: {
           name: config.name,
           description: config.description,
@@ -46,6 +47,7 @@ export default function AgentBuilder() {
           status: deployment === 'Published' ? 'active' : 'draft',
         },
       });
+      setAgentId(saved?.agent?.id ?? saved?.id ?? null);
       toast({ title: 'Agent saved', description: `${config.name} is ready in your workforce.` });
     } catch (e) {
       console.error('[agent-builder]', e);
@@ -73,7 +75,7 @@ export default function AgentBuilder() {
           <ConfigLeft config={config} update={update} />
         </div>
         <div className="h-[calc(100vh-13rem)] min-h-[28rem] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0c12]">
-          <LivePreview config={config} />
+          <LivePreview config={config} agentId={agentId} />
         </div>
       </div>
 
