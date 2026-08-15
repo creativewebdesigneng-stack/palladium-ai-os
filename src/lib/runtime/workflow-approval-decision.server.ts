@@ -178,7 +178,7 @@ export async function decideWorkflowApproval(args: {
       tokens_out: 0,
     })
     .eq("id", details.workflow_step_run_id)
-    .eq("workflow_run_id", run.id)
+    .eq("run_id", run.id)
     .eq("step_id", waitingStep.id);
 
   const completed = Array.isArray(run.step_results) ? (run.step_results as StepOutcome[]) : [];
