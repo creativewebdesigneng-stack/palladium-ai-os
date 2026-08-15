@@ -59,10 +59,21 @@ export type PersonalTaskExecutionResult =
   | { status: "failed"; error: string; runId?: string };
 
 const MAX_TOOL_ROUNDS = 4;
+const PERSONAL_BROWSER_ACTIONS = [
+  "navigate",
+  "read",
+  "extract",
+  "scroll",
+  "screenshot",
+  "back",
+  "forward",
+  "wait",
+] as const;
+const PERSONAL_BROWSER_ACTION_SET = new Set<string>(PERSONAL_BROWSER_ACTIONS);
 
-// These tools are read-only or local computation/storage. No external writes,
-// purchases, messages, calendar proposals, HTTP POSTs, code execution, or
-// browser click/type actions are reachable from the personal-task loop.
+// These tools are read-only or local computation/storage. Browser access is
+// included only through the restricted action set above: click/type remain
+// blocked in this path, as do purchases, messages, HTTP POSTs and code execution.
 const PERSONAL_SAFE_TOOLS = new Set([
   "current_time",
   "calculator",
@@ -74,12 +85,14 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "file_analysis",
   "data_analysis",
   "database_query",
+  "browser",
 ]);
 
 function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
   const lines = [
     `You are ${agent?.name ?? "a PalladiumAI personal agent"}, working inside PalladiumAI Mission Control.`,
     "Carry out the operator's request using the read-only tools available to you when they improve accuracy.",
+    "Browser access is research-only: you may navigate, read, extract, scroll, screenshot, go back/forward or wait, but you may not click controls or type into websites.",
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service in this run.",
     "If the request needs an external write or purchase, explain exactly what remains to be approved and performed; do not pretend it happened.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
@@ -95,6 +108,26 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
   return lines.join("\n");
 }
 
+function restrictBrowserDefinition(def: ToolDef): ToolDef {
+  if (def.name !== "browser") return def;
+  const properties =
+    def.parameters["properties"] && typeof def.parameters["properties"] === "object"
+      ? (def.parameters["properties"] as Record<string, unknown>)
+      : {};
+  return {
+    ...def,
+    description:
+      "Read-only browser research: navigate, read, extract, scroll, screenshot, go back/forward or wait. Click and type are not available in personal-task runs.",
+    parameters: {
+      ...def.parameters,
+      properties: {
+        ...properties,
+        action: { type: "string", enum: [...PERSONAL_BROWSER_ACTIONS] },
+      },
+    },
+  };
+}
+
 function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>): {
   defs: ToolDef[];
   grants: Map<string, ToolGrant>;
@@ -104,7 +137,7 @@ function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>):
     if (PERSONAL_SAFE_TOOLS.has(slug) && !grant.requiresApproval) grants.set(slug, grant);
   }
   return {
-    defs: resolved.defs.filter((def) => grants.has(def.name)),
+    defs: resolved.defs.filter((def) => grants.has(def.name)).map(restrictBrowserDefinition),
     grants,
   };
 }
@@ -184,6 +217,36 @@ async function finishAuditRun(args: {
     .eq("user_id", args.userId);
 }
 
+async function blockedPersonalBrowserCall(args: {
+  sb: Sb;
+  userId: string;
+  orgId: string | null;
+  agentId: string | null;
+  runId: string;
+  action: string;
+}) {
+  const error = `Browser action "${args.action}" is not permitted in a read-only personal-task run.`;
+  await args.sb.from("tool_executions").insert({
+    user_id: args.userId,
+    org_id: args.orgId,
+    agent_id: args.agentId,
+    agent_task_id: args.runId,
+    tool: "browser",
+    input: { action: args.action },
+    status: "failed",
+    duration_ms: 0,
+    error,
+  });
+  return {
+    ok: false,
+    output: {
+      error,
+      requires_approval: true,
+      note: "Clicking or typing on an external site is reserved for an approval-capable action path.",
+    },
+  };
+}
+
 /**
  * Runs the personal task through the live model gateway and the same
  * server-authorised tool registry used by professional agents, restricted to a
@@ -249,18 +312,29 @@ export async function executePersonalTask(args: {
       toolCalls += result.toolCalls.length;
       messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
       for (const call of result.toolCalls) {
-        const execution = await executeTool(
-          call.name,
-          call.arguments,
-          {
-            userId,
-            orgId: task.org_id ?? null,
-            agentId: agent?.id ?? "personal-task",
-            taskId: runId,
-            sb,
-          },
-          tools.grants,
-        );
+        const action = String(call.arguments["action"] ?? "read");
+        const execution =
+          call.name === "browser" && !PERSONAL_BROWSER_ACTION_SET.has(action)
+            ? await blockedPersonalBrowserCall({
+                sb,
+                userId,
+                orgId: task.org_id ?? null,
+                agentId: agent?.id ?? null,
+                runId,
+                action,
+              })
+            : await executeTool(
+                call.name,
+                call.arguments,
+                {
+                  userId,
+                  orgId: task.org_id ?? null,
+                  agentId: agent?.id ?? "personal-task",
+                  taskId: runId,
+                  sb,
+                },
+                tools.grants,
+              );
         messages.push({
           role: "tool",
           tool_call_id: call.id,
