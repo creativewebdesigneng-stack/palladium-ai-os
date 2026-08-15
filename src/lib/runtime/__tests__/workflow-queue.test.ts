@@ -9,6 +9,12 @@ function staleHeartbeat() {
   return new Date(Date.now() - 20 * 60 * 1000).toISOString();
 }
 
+function workflowRun(sb: ReturnType<typeof createFakeSupabase>, index = 0) {
+  const run = sb.tables["workflow_runs"]?.[index];
+  if (!run) throw new Error(`Expected workflow run fixture at index ${index}.`);
+  return run;
+}
+
 describe("durable workflow queue", () => {
   it("requeues a stale running lease while retry budget remains", async () => {
     const sb = createFakeSupabase({
@@ -25,12 +31,12 @@ describe("durable workflow queue", () => {
 
     await requeueAbandonedWorkflowRuns(sb as never);
 
-    const run = sb.tables.workflow_runs[0];
-    expect(run.status).toBe("queued");
-    expect(run.claimed_at).toBeNull();
-    expect(run.worker_attempts).toBe(1);
-    expect(run.worker_error).toContain("lease expired");
-    expect(run.queued_at).toBeTruthy();
+    const run = workflowRun(sb);
+    expect(run["status"]).toBe("queued");
+    expect(run["claimed_at"]).toBeNull();
+    expect(run["worker_attempts"]).toBe(1);
+    expect(run["worker_error"]).toContain("lease expired");
+    expect(run["queued_at"]).toBeTruthy();
   });
 
   it("fails a stale run after the worker retry budget is exhausted", async () => {
@@ -47,10 +53,10 @@ describe("durable workflow queue", () => {
 
     await requeueAbandonedWorkflowRuns(sb as never);
 
-    const run = sb.tables.workflow_runs[0];
-    expect(run.status).toBe("failed");
-    expect(run.worker_error).toContain("expired too many times");
-    expect(run.completed_at).toBeTruthy();
+    const run = workflowRun(sb);
+    expect(run["status"]).toBe("failed");
+    expect(run["worker_error"]).toContain("expired too many times");
+    expect(run["completed_at"]).toBeTruthy();
   });
 
   it("allows only one competing worker to claim the same queued run", async () => {
@@ -75,9 +81,10 @@ describe("durable workflow queue", () => {
       processQueuedWorkflowRuns(1, sb as never),
     ]);
 
+    const run = workflowRun(sb);
     expect(first.claimed + second.claimed).toBe(1);
-    expect(sb.tables.workflow_runs[0].worker_attempts).toBe(1);
-    expect(sb.tables.workflow_runs[0].status).toBe("cancelled");
+    expect(run["worker_attempts"]).toBe(1);
+    expect(run["status"]).toBe("cancelled");
   });
 
   it("fails a claimed run when an assigned agent is outside the queued owner scope", async () => {
@@ -142,9 +149,9 @@ describe("durable workflow queue", () => {
     const result = await processQueuedWorkflowRuns(1, sb as never);
 
     expect(result).toEqual({ claimed: 1, succeeded: 0, failed: 1 });
-    const run = sb.tables.workflow_runs[0];
-    expect(run.status).toBe("failed");
-    expect(run.worker_attempts).toBe(1);
-    expect(run.worker_error).toContain("outside its allowed scope");
+    const run = workflowRun(sb);
+    expect(run["status"]).toBe("failed");
+    expect(run["worker_attempts"]).toBe(1);
+    expect(run["worker_error"]).toContain("outside its allowed scope");
   });
 });
