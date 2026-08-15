@@ -693,24 +693,21 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
       return { taskId: task.id, decision };
     }
 
-    await sb
-      .from("personal_tasks")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        result: {
-          summary: `${decision.category} request handled by ${agent?.name ?? "Mission Control"}`,
-          tools: decision.requiredTools,
-        },
-      })
-      .eq("id", task.id)
-      .eq("user_id", userId);
-    await activity(sb, userId, `Agent completed research: ${decision.title}`, "completed", {
+    const execution = await executePersonalTask({ sb, userId, task, agent });
+    if (execution.status === "failed") {
+      await activity(sb, userId, `Agent could not complete: ${decision.title}`, "failed", {
+        agent_id: agent?.id ?? null,
+        task_id: task.id,
+      });
+      return { taskId: task.id, decision, execution };
+    }
+    await activity(sb, userId, `Agent completed: ${decision.title}`, "completed", {
       agent_id: agent?.id ?? null,
       task_id: task.id,
     });
-    return { taskId: task.id, decision };
+    return { taskId: task.id, decision, execution };
   });
+
 
 export const updateTaskStatus = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; status: string }) => input)
