@@ -1,12 +1,15 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildGitHubInstallUrl,
   createGitHubAppJwt,
   createGitHubInstallationToken,
+  exchangeGitHubUserCode,
   listGitHubCommits,
   listGitHubPath,
   normaliseInstallationId,
   readGitHubFile,
+  resolveVerifiedUserInstallation,
 } from "./github-app.server";
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -23,11 +26,17 @@ describe("GitHub App read-only executor", () => {
   beforeEach(() => {
     process.env["GITHUB_APP_ID"] = "123456";
     process.env["GITHUB_APP_PRIVATE_KEY"] = privateKeyPem;
+    process.env["GITHUB_APP_SLUG"] = "palladium-ai";
+    process.env["GITHUB_APP_CLIENT_ID"] = "Iv1.client";
+    process.env["GITHUB_APP_CLIENT_SECRET"] = "client-secret";
   });
 
   afterEach(() => {
     delete process.env["GITHUB_APP_ID"];
     delete process.env["GITHUB_APP_PRIVATE_KEY"];
+    delete process.env["GITHUB_APP_SLUG"];
+    delete process.env["GITHUB_APP_CLIENT_ID"];
+    delete process.env["GITHUB_APP_CLIENT_SECRET"];
     vi.restoreAllMocks();
   });
 
@@ -42,6 +51,64 @@ describe("GitHub App read-only executor", () => {
       exp: now + 8 * 60,
       iss: "123456",
     });
+  });
+
+  it("builds the official app-install URL with only signed state in the browser", () => {
+    const url = new URL(buildGitHubInstallUrl("signed.state"));
+    expect(url.origin).toBe("https://github.com");
+    expect(url.pathname).toBe("/apps/palladium-ai/installations/new");
+    expect(url.searchParams.get("state")).toBe("signed.state");
+    expect(url.search).not.toContain("client-secret");
+  });
+
+  it("exchanges a callback code server-side without returning client credentials", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({ access_token: "ghu_user_token" }));
+    const token = await exchangeGitHubUserCode(
+      "callback-code",
+      "https://app.example.com/api/public/integrations/github-callback",
+      fetchImpl as unknown as typeof fetch,
+    );
+    expect(token).toBe("ghu_user_token");
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(String(url)).toBe("https://github.com/login/oauth/access_token");
+    expect(String(init.body)).toContain("client_secret=client-secret");
+    expect(token).not.toContain("client-secret");
+  });
+
+  it("binds only an installation accessible to the authorizing GitHub user", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({
+      total_count: 2,
+      installations: [
+        { id: 42, account: { login: "acme" } },
+        { id: 77, account: { login: "other" } },
+      ],
+    }));
+
+    await expect(resolveVerifiedUserInstallation(
+      "ghu_user_token",
+      42,
+      fetchImpl as unknown as typeof fetch,
+    )).resolves.toEqual({ id: 42, accountLogin: "acme" });
+  });
+
+  it("rejects spoofed or ambiguous installation binding instead of guessing", async () => {
+    const spoofFetch = vi.fn().mockResolvedValueOnce(jsonResponse({
+      installations: [{ id: 42, account: { login: "acme" } }],
+    }));
+    await expect(resolveVerifiedUserInstallation(
+      "ghu_user_token",
+      999,
+      spoofFetch as unknown as typeof fetch,
+    )).rejects.toThrow("not accessible to the authorized GitHub user");
+
+    const ambiguousFetch = vi.fn().mockResolvedValueOnce(jsonResponse({
+      installations: [{ id: 42 }, { id: 77 }],
+    }));
+    await expect(resolveVerifiedUserInstallation(
+      "ghu_user_token",
+      null,
+      ambiguousFetch as unknown as typeof fetch,
+    )).rejects.toThrow("Multiple PalladiumAI GitHub installations are available");
   });
 
   it("rejects spoof-shaped installation ids before any GitHub request", () => {
