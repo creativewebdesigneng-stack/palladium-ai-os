@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { exchangeCode, refreshTokens } from "./oauth.server";
 import { findProvider } from "./providers";
 
-const originalClientId = process.env.NOTION_INTEGRATION_CLIENT_ID;
-const originalClientSecret = process.env.NOTION_INTEGRATION_CLIENT_SECRET;
+const originalClientId = process.env["NOTION_INTEGRATION_CLIENT_ID"];
+const originalClientSecret = process.env["NOTION_INTEGRATION_CLIENT_SECRET"];
 
 beforeEach(() => {
-  process.env.NOTION_INTEGRATION_CLIENT_ID = "notion-client";
-  process.env.NOTION_INTEGRATION_CLIENT_SECRET = "notion-secret";
+  process.env["NOTION_INTEGRATION_CLIENT_ID"] = "notion-client";
+  process.env["NOTION_INTEGRATION_CLIENT_SECRET"] = "notion-secret";
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  if (originalClientId === undefined) delete process.env.NOTION_INTEGRATION_CLIENT_ID;
-  else process.env.NOTION_INTEGRATION_CLIENT_ID = originalClientId;
-  if (originalClientSecret === undefined) delete process.env.NOTION_INTEGRATION_CLIENT_SECRET;
-  else process.env.NOTION_INTEGRATION_CLIENT_SECRET = originalClientSecret;
+  if (originalClientId === undefined) delete process.env["NOTION_INTEGRATION_CLIENT_ID"];
+  else process.env["NOTION_INTEGRATION_CLIENT_ID"] = originalClientId;
+  if (originalClientSecret === undefined) delete process.env["NOTION_INTEGRATION_CLIENT_SECRET"];
+  else process.env["NOTION_INTEGRATION_CLIENT_SECRET"] = originalClientSecret;
 });
 
 describe("Notion OAuth", () => {
