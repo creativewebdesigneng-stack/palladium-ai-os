@@ -12,6 +12,8 @@ import {
 } from "./workflow-step-config";
 import { executeWorkflow, requestWorkflowCancellation, WorkforceError } from "./workforce.server";
 
+export { normaliseWorkflowStepConfig };
+
 type Sb = { from: (t: string) => any };
 
 type AgentRef = { agent_id: string; role?: string };
