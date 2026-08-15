@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Menu, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { isSignedIn } from '@/lib/authUiState';
 
 export default function PublicNav() {
   const [open, setOpen] = useState(false);
   const { isAuthenticated, authChecked, user, logout } = useAuth();
-  const signedIn = authChecked && isAuthenticated;
+  const signedIn = isSignedIn({ authChecked, isAuthenticated });
   const initials = (user?.full_name || user?.email || 'U').slice(0, 2).toUpperCase();
   const links = [
     ['Features', '/features'],
