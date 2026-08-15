@@ -1,25 +1,23 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Copy, RotateCcw, Pencil, Trash2, ThumbsUp, ThumbsDown, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { Check, Copy, Sparkles } from 'lucide-react';
 
 function CodeBlock({ children, lang }) {
   const [copied, setCopied] = useState(false);
-  const copy = () => { navigator.clipboard?.writeText(String(children)); setCopied(true); setTimeout(() => setCopied(false), 1200); };
+  const copy = () => {
+    navigator.clipboard?.writeText(String(children));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
 
   if (lang === 'table') {
-    const rows = String(children).trim().split('\n').map(r => r.split('|'));
+    const rows = String(children).trim().split('\n').map((row) => row.split('|'));
     if (!rows.length) return null;
     return (
       <div className="my-3 overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-xs">
-          <thead className="bg-white/5 text-zinc-300">
-            <tr>{rows[0].map((h, i) => <th key={i} className="px-3 py-2 text-left font-medium">{h.trim()}</th>)}</tr>
-          </thead>
-          <tbody className="text-zinc-400">
-            {rows.slice(1).map((r, i) => (
-              <tr key={i} className="border-t border-white/5">{r.map((c, j) => <td key={j} className="px-3 py-2">{c.trim()}</td>)}</tr>
-            ))}
-          </tbody>
+          <thead className="bg-white/5 text-zinc-300"><tr>{rows[0].map((heading, index) => <th key={index} className="px-3 py-2 text-left font-medium">{heading.trim()}</th>)}</tr></thead>
+          <tbody className="text-zinc-400">{rows.slice(1).map((row, index) => <tr key={index} className="border-t border-white/5">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2">{cell.trim()}</td>)}</tr>)}</tbody>
         </table>
       </div>
     );
@@ -38,13 +36,14 @@ function CodeBlock({ children, lang }) {
   );
 }
 
-export default function MessageBubble({ message, onCopy, onRegenerate, onDelete, onEdit, onReact }) {
+export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
-  const [reaction, setReaction] = useState(message.reaction || null);
-
-  const copy = () => { navigator.clipboard?.writeText(message.text); setCopied(true); onCopy?.(message); setTimeout(() => setCopied(false), 1200); };
-  const react = (r) => { setReaction(prev => prev === r ? null : r); onReact?.(message, r); };
+  const copy = () => {
+    navigator.clipboard?.writeText(message.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
 
   return (
     <div className={`group flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -66,7 +65,6 @@ export default function MessageBubble({ message, onCopy, onRegenerate, onDelete,
                     return <CodeBlock lang={lang}>{children}</CodeBlock>;
                   },
                   a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="text-violet-300 underline underline-offset-2">{children}</a>,
-                  img: ({ src, alt }) => <img src={src} alt={alt || ''} className="my-2 rounded-xl border border-white/10" />,
                   ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
                   ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
                   li: ({ children }) => <li className="my-0.5">{children}</li>,
@@ -76,21 +74,14 @@ export default function MessageBubble({ message, onCopy, onRegenerate, onDelete,
                   strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
                 }}
               >{message.text || ' '}</ReactMarkdown>
-              {message.streaming && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-violet-400 align-middle" />}
             </div>
           )}
         </div>
 
-        {!isUser && !message.streaming && (
-          <div className="mt-1.5 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-            <button onClick={copy} className="rounded-md p-1 text-zinc-500 hover:bg-white/5 hover:text-white" aria-label="Copy">{copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}</button>
-            <button onClick={() => onRegenerate?.(message)} className="rounded-md p-1 text-zinc-500 hover:bg-white/5 hover:text-white" aria-label="Regenerate"><RefreshCw className="h-3.5 w-3.5" /></button>
-            <button onClick={() => onEdit?.(message)} className="rounded-md p-1 text-zinc-500 hover:bg-white/5 hover:text-white" aria-label="Edit"><Pencil className="h-3.5 w-3.5" /></button>
-            <button onClick={() => onDelete?.(message)} className="rounded-md p-1 text-zinc-500 hover:bg-white/5 hover:text-rose-400" aria-label="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
-            <span className="mx-1 h-3 w-px bg-white/10" />
-            <button onClick={() => react('up')} className={`rounded-md p-1 hover:bg-white/5 ${reaction === 'up' ? 'text-emerald-400' : 'text-zinc-500 hover:text-white'}`} aria-label="Thumbs up"><ThumbsUp className="h-3.5 w-3.5" /></button>
-            <button onClick={() => react('down')} className={`rounded-md p-1 hover:bg-white/5 ${reaction === 'down' ? 'text-rose-400' : 'text-zinc-500 hover:text-white'}`} aria-label="Thumbs down"><ThumbsDown className="h-3.5 w-3.5" /></button>
-          </div>
+        {!isUser && (
+          <button onClick={copy} className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-zinc-600 opacity-0 transition hover:bg-white/5 hover:text-white group-hover:opacity-100" aria-label="Copy response">
+            {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}{copied ? 'Copied' : 'Copy'}
+          </button>
         )}
       </div>
     </div>
