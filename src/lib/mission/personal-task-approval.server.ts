@@ -32,12 +32,43 @@ function bounded(value: unknown, fallback: string, max: number): string {
   return (text || fallback).slice(0, max);
 }
 
+function browserApprovalCopy(call: PersonalTaskPendingToolCall, agentName?: string | null) {
+  if (call.name !== "browser_interact") return null;
+  const url = typeof call.arguments["url"] === "string" ? call.arguments["url"] : "";
+  let host = "an external site";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "") || host;
+  } catch {
+    /* Invalid URLs are rejected again by the executor after approval. */
+  }
+  const steps = Array.isArray(call.arguments["steps"])
+    ? call.arguments["steps"]
+        .slice(0, 6)
+        .map((step) =>
+          step && typeof step === "object" && !Array.isArray(step)
+            ? String((step as Record<string, unknown>)["action"] ?? "interaction")
+            : "interaction",
+        )
+    : [];
+  const sequence = steps.length ? steps.join(" → ") : "browser interaction";
+  return {
+    title: `${agentName ?? "Your personal agent"} wants to interact with ${host}`,
+    summary: `Approve ${steps.length || 1} browser step${steps.length === 1 ? "" : "s"} (${sequence}) on ${host}. The exact approved payload is locked to this paused run; typed text is not copied into the approval or audit record. Checkout and payment interactions are refused.`,
+    extraDetails: {
+      browser_host: host,
+      browser_step_count: steps.length,
+      browser_actions: steps,
+    },
+  };
+}
+
 /**
  * Persists a personal-task tool approval without executing the tool.
  *
- * The approval request contains association identifiers only. The resumable
- * conversation/tool payload stays on the owner-scoped agent_tasks ledger so a
- * later decision can resume the same run without replaying completed work.
+ * The approval request contains association identifiers only plus bounded,
+ * non-secret display metadata. The exact resumable conversation/tool payload
+ * stays on the owner-scoped agent_tasks ledger so a later decision can resume
+ * the same run without replaying completed work.
  */
 export async function pauseForPersonalTaskApproval(args: {
   sb: Sb;
@@ -50,13 +81,14 @@ export async function pauseForPersonalTaskApproval(args: {
   call: PersonalTaskPendingToolCall;
   resumeState: PersonalTaskApprovalResumeState;
 }): Promise<PersonalTaskApprovalPause> {
+  const browserCopy = browserApprovalCopy(args.call, args.agentName);
   const title = bounded(
-    `${args.agentName ?? "Your personal agent"} wants to use ${args.call.name}`,
+    browserCopy?.title ?? `${args.agentName ?? "Your personal agent"} wants to use ${args.call.name}`,
     "Personal agent action needs approval",
     200,
   );
   const summary = bounded(
-    `Approve this ${args.call.name} action to continue the same personal task run.`,
+    browserCopy?.summary ?? `Approve this ${args.call.name} action to continue the same personal task run.`,
     "Approve this action to continue the personal task.",
     500,
   );
@@ -66,6 +98,7 @@ export async function pauseForPersonalTaskApproval(args: {
     agent_task_id: args.runId,
     tool_call_id: args.call.id,
     tool_name: args.call.name,
+    ...(browserCopy?.extraDetails ?? {}),
   };
 
   const { data: approval, error: approvalError } = await args.sb

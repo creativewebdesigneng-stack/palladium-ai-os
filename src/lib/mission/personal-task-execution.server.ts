@@ -18,6 +18,11 @@ import {
 } from "@/lib/runtime/model-gateway.server";
 import { executeTool, resolveGrantedTools, type ToolGrant } from "@/lib/runtime/tools.server";
 import {
+  executeApprovedPersonalBrowserInteraction,
+  PERSONAL_BROWSER_INTERACT,
+  PERSONAL_BROWSER_INTERACT_DEF,
+} from "./personal-browser-interaction.server";
+import {
   pauseForPersonalTaskApproval,
   type PersonalTaskApprovalResumeState,
   type PersonalTaskPendingToolCall,
@@ -103,7 +108,8 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
   const lines = [
     `You are ${agent?.name ?? "a PalladiumAI personal agent"}, working inside PalladiumAI Mission Control.`,
     "Carry out the operator's request using the tools available to you when they improve accuracy.",
-    "Browser access is research-only: you may navigate, read, extract, scroll, screenshot, go back/forward or wait, but you may not click controls or type into websites.",
+    "The browser tool is read-only. Use browser_interact only when clicking or typing is genuinely necessary; it always pauses for explicit operator approval before anything happens.",
+    "Never use browser_interact for checkout, payment, purchases or entering payment credentials. Those actions require the dedicated purchase flow.",
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
@@ -128,7 +134,7 @@ function restrictBrowserDefinition(def: ToolDef): ToolDef {
   return {
     ...def,
     description:
-      "Read-only browser research: navigate, read, extract, scroll, screenshot, go back/forward or wait. Click and type are not available in personal-task runs.",
+      "Read-only browser research: navigate, read, extract, scroll, screenshot, go back/forward or wait. Use browser_interact for approval-gated click/type sequences.",
     parameters: {
       ...def.parameters,
       properties: {
@@ -147,10 +153,18 @@ function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>):
   for (const [slug, grant] of resolved.grants) {
     if (PERSONAL_SAFE_TOOLS.has(slug)) grants.set(slug, grant);
   }
-  return {
-    defs: resolved.defs.filter((def) => grants.has(def.name)).map(restrictBrowserDefinition),
-    grants,
-  };
+  const defs = resolved.defs.filter((def) => grants.has(def.name)).map(restrictBrowserDefinition);
+  const browserGrant = grants.get("browser");
+  if (browserGrant) {
+    grants.set(PERSONAL_BROWSER_INTERACT, {
+      ...browserGrant,
+      slug: PERSONAL_BROWSER_INTERACT,
+      requiresApproval: true,
+      spendCap: null,
+    });
+    defs.push(PERSONAL_BROWSER_INTERACT_DEF);
+  }
+  return { defs, grants };
 }
 
 function providerFailure(error: unknown): string {
@@ -254,7 +268,7 @@ async function blockedPersonalBrowserCall(args: {
     ok: false,
     output: {
       error,
-      note: "Clicking or typing on an external site is not available in the personal-task tool set.",
+      note: "Use browser_interact for bounded click/type sequences that require explicit approval.",
     },
   };
 }
@@ -537,20 +551,32 @@ export async function resumePersonalTaskApproval(args: {
 
   const messages = [...state.messages];
   if (args.decision === "approved") {
-    const approvedGrants = new Map(tools.grants);
-    approvedGrants.set(state.pendingCall.name, { ...grant, requiresApproval: false });
-    const execution = await executeTool(
-      state.pendingCall.name,
-      state.pendingCall.arguments,
-      {
-        userId: args.userId,
-        orgId: task.org_id ?? null,
-        agentId: agent?.id ?? "personal-task",
-        taskId: String(run.id),
-        sb: args.sb,
-      },
-      approvedGrants,
-    );
+    const execution = state.pendingCall.name === PERSONAL_BROWSER_INTERACT
+      ? await executeApprovedPersonalBrowserInteraction({
+          sb: args.sb,
+          userId: args.userId,
+          orgId: task.org_id ?? null,
+          agentId: agent?.id ?? null,
+          runId: String(run.id),
+          input: state.pendingCall.arguments,
+          allowedDomains: grant.allowedDomains,
+        })
+      : await (async () => {
+          const approvedGrants = new Map(tools.grants);
+          approvedGrants.set(state.pendingCall.name, { ...grant, requiresApproval: false });
+          return executeTool(
+            state.pendingCall.name,
+            state.pendingCall.arguments,
+            {
+              userId: args.userId,
+              orgId: task.org_id ?? null,
+              agentId: agent?.id ?? "personal-task",
+              taskId: String(run.id),
+              sb: args.sb,
+            },
+            approvedGrants,
+          );
+        })();
     messages.push(toolMessage(state.pendingCall, execution.output));
   } else {
     messages.push(
