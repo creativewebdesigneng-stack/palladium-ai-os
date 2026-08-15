@@ -96,7 +96,7 @@ export async function executePersonalTask(args: {
       provider,
       model,
       messages,
-      temperature: agent?.temperature ?? undefined,
+      temperature: agent?.temperature ?? null,
       maxTokens: agent?.max_tokens ?? 1200,
     });
     const summary = result.text.trim();
