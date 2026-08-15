@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
+const read = (path: string) => readFileSync(resolve(process.cwd(), 'src', path), 'utf8');
 
 describe('workspace chat live-only contract', () => {
   it('routes chat messages through the authenticated assistant server function', () => {
