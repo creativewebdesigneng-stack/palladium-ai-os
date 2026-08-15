@@ -25,6 +25,7 @@ import {
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
   markNotifications, clearMemoryCategory,
 } from '@/lib/mission/mission.functions';
+import { decideEmailApproval } from '@/lib/mission/email-approval.functions';
 import { decideWorkflowApprovalRequest } from '@/lib/runtime/workforce.functions';
 
 const TABS = [
@@ -51,6 +52,10 @@ function isWorkflowApproval(approval) {
     && typeof details.workflow_step_id === 'string';
 }
 
+function isEmailApproval(approval) {
+  return approval?.action_type === 'email_send';
+}
+
 export default function MissionControl() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
@@ -62,6 +67,7 @@ export default function MissionControl() {
   const deleteAgentFn = useServerFn(deletePersonalAgent);
   const submitTaskFn = useServerFn(submitPersonalTask);
   const decideFn = useServerFn(decideApproval);
+  const decideEmailFn = useServerFn(decideEmailApproval);
   const decideWorkflowFn = useServerFn(decideWorkflowApprovalRequest);
   const altFn = useServerFn(chooseAlternative);
   const confirmFn = useServerFn(confirmPurchase);
@@ -150,16 +156,22 @@ export default function MissionControl() {
           },
         });
       }
+      if (isEmailApproval(vars.approval)) {
+        return decideEmailFn({ data: { id: vars.id, decision: vars.decision } });
+      }
       return decideFn({ data: { id: vars.id, decision: vars.decision } });
     },
     onSuccess: (res, vars) => {
       const workflowApproval = isWorkflowApproval(vars.approval);
+      const emailApproval = isEmailApproval(vars.approval);
       toast({
         title: vars.decision === 'approve' ? 'Approved' : 'Rejected',
         description: workflowApproval
           ? (vars.decision === 'approve'
               ? 'The workflow has resumed from the approval step.'
               : 'The workflow recorded your rejection and applied its error policy.')
+          : emailApproval && vars.decision === 'approve' && res?.emailDraft
+            ? `The message is now a draft in ${res.emailDraft.provider === 'microsoft' ? 'Outlook' : 'Gmail'}. It has not been sent.`
           : vars.decision === 'approve' && res?.purchase
             ? 'Confirm the cost breakdown to continue to secure checkout.'
             : 'The agent has been told your decision.',
