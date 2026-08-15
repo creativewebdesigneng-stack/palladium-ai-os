@@ -53,7 +53,7 @@ function parseInput(input: Record<string, unknown>): {
   const raw = Array.isArray(input["steps"]) ? input["steps"] : [];
   if (!raw.length || raw.length > 6) throw new Error("Browser interaction must contain between 1 and 6 steps.");
 
-  const steps = raw.map((item, index) => {
+  const steps: BrowserInteractionStep[] = raw.map((item, index): BrowserInteractionStep => {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw new Error(`Browser interaction step ${index + 1} is invalid.`);
     }
