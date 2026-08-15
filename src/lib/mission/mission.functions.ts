@@ -9,6 +9,8 @@ import {
   runShoppingResearch,
 } from "./mission.server";
 import { assertWithinLimits } from "@/lib/shopping/limits.server";
+import { executePersonalTask } from "./personal-task-execution.server";
+
 import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any; rpc?: unknown };
@@ -693,24 +695,21 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
       return { taskId: task.id, decision };
     }
 
-    await sb
-      .from("personal_tasks")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        result: {
-          summary: `${decision.category} request handled by ${agent?.name ?? "Mission Control"}`,
-          tools: decision.requiredTools,
-        },
-      })
-      .eq("id", task.id)
-      .eq("user_id", userId);
-    await activity(sb, userId, `Agent completed research: ${decision.title}`, "completed", {
+    const execution = await executePersonalTask({ sb, userId, task, agent });
+    if (execution.status === "failed") {
+      await activity(sb, userId, `Agent could not complete: ${decision.title}`, "failed", {
+        agent_id: agent?.id ?? null,
+        task_id: task.id,
+      });
+      return { taskId: task.id, decision, execution };
+    }
+    await activity(sb, userId, `Agent completed: ${decision.title}`, "completed", {
       agent_id: agent?.id ?? null,
       task_id: task.id,
     });
-    return { taskId: task.id, decision };
+    return { taskId: task.id, decision, execution };
   });
+
 
 export const updateTaskStatus = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; status: string }) => input)
@@ -831,7 +830,46 @@ export const decideApproval = createServerFn({ method: "POST" })
       metadata: { action_type: approval.action_type, estimated_cost: approval.estimated_cost },
     });
 
-    return { status, purchase: purchase.data ?? null };
+    // An approved non-purchase task must now actually run. Purchases stay parked
+    // at approved_awaiting_checkout — money only moves through checkout.
+    let execution: Awaited<ReturnType<typeof executePersonalTask>> | null = null;
+    if (data.decision === "approve" && approval.task_id && !purchase.data) {
+      const taskRes = await sb
+        .from("personal_tasks")
+        .select("*")
+        .eq("id", approval.task_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      const task = taskRes.data;
+      if (task) {
+        const agentRes = task.agent_id
+          ? await sb
+              .from("personal_agents")
+              .select("*")
+              .eq("id", task.agent_id)
+              .eq("user_id", userId)
+              .maybeSingle()
+          : { data: null };
+        execution = await executePersonalTask({
+          sb,
+          userId,
+          task,
+          agent: agentRes.data ?? null,
+        });
+        await activity(
+          sb,
+          userId,
+          execution.status === "completed"
+            ? `Agent completed the approved action: ${approval.title}`
+            : `Agent could not complete the approved action: ${approval.title}`,
+          execution.status === "completed" ? "completed" : "failed",
+          { agent_id: approval.agent_id, task_id: approval.task_id },
+        );
+      }
+    }
+
+    return { status, purchase: purchase.data ?? null, execution };
+
   });
 
 export const chooseAlternative = createServerFn({ method: "POST" })
