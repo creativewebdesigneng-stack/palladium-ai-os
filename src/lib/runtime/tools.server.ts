@@ -7,6 +7,7 @@
  */
 import type { ToolDef } from "./model-gateway.server";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
+import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
 import {
   createBrowserTool,
   isDomainAllowed,
@@ -321,7 +322,7 @@ const REGISTRY: Record<string, ToolImpl> = {
       try {
         const needsUrl = action === "navigate" || action === "read" || action === "extract";
         if (needsUrl && !isDomainAllowed(url, ctx.allowedDomains ?? [])) {
-          return { error: "That domain is not on this agent\u2019s allow-list." };
+          return { error: "That domain is not on this agent’s allow-list." };
         }
         switch (action) {
           case "navigate":
@@ -365,6 +366,8 @@ const REGISTRY: Record<string, ToolImpl> = {
           url: { type: "string" },
           method: { type: "string", enum: ["GET", "POST"] },
           body: { type: "string" },
+          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
+          query: { type: "string", description: "Optional text filter when listing connected calendar events" },
         },
         required: ["url"],
       },
@@ -386,6 +389,136 @@ const REGISTRY: Record<string, ToolImpl> = {
       });
       const text = (await res.text()).slice(0, 6000);
       return { status: res.status, ok: res.ok, body: text };
+    },
+  },
+
+  connected_service: {
+    def: {
+      name: "connected_service",
+      description:
+        "Read data from an OAuth-connected service using a fixed read-only provider/action whitelist. Never accepts URLs or tokens and never writes to the external service.",
+      parameters: {
+        type: "object",
+        properties: {
+          provider: { type: "string", enum: Object.keys(CONNECTED_SERVICE_ACTIONS) },
+          action: { type: "string" },
+          query: { type: "string" },
+          resource_id: {
+            type: "string",
+            description: "Provider resource id when an action needs one, e.g. Slack channel or Asana project.",
+          },
+          limit: { type: "number" },
+        },
+        required: ["provider", "action"],
+      },
+    },
+    run: async (input, ctx) =>
+      readConnectedService(
+        ctx.userId,
+        {
+          provider: str(input["provider"]),
+          action: str(input["action"]),
+          query: str(input["query"]),
+          resource_id: str(input["resource_id"]),
+          limit: Number(input["limit"] ?? 10),
+        },
+        ctx.signal,
+      ),
+  },
+
+  connected_service_write: {
+    def: {
+      name: "connected_service_write",
+      description:
+        "Prepare a bounded write to HubSpot, Asana, Linear or Notion for explicit operator approval. This tool only queues the exact payload; the provider write happens after approval.",
+      parameters: {
+        type: "object",
+        properties: {
+          provider: { type: "string", enum: ["hubspot", "asana", "linear", "notion"] },
+          action: {
+            type: "string",
+            enum: [
+              "hubspot_contact_update",
+              "hubspot_deal_update",
+              "asana_task_create",
+              "asana_task_update",
+              "linear_issue_create",
+              "linear_issue_update",
+              "notion_page_create",
+            ],
+          },
+          object_id: { type: "string" },
+          properties: { type: "object" },
+          workspace_gid: { type: "string" },
+          project_gid: { type: "string" },
+          task_gid: { type: "string" },
+          name: { type: "string" },
+          notes: { type: "string" },
+          due_on: { type: "string" },
+          completed: { type: "boolean" },
+          team_id: { type: "string" },
+          issue_id: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          priority: { type: "number" },
+          parent_page_id: { type: "string" },
+          content: { type: "string" },
+        },
+        required: ["provider", "action"],
+      },
+    },
+    sensitive: true,
+    run: async (input, ctx) => {
+      const provider = str(input["provider"]).toLowerCase();
+      const action = str(input["action"]).toLowerCase();
+      const allowed: Record<string, string[]> = {
+        hubspot: ["hubspot_contact_update", "hubspot_deal_update"],
+        asana: ["asana_task_create", "asana_task_update"],
+        linear: ["linear_issue_create", "linear_issue_update"],
+        notion: ["notion_page_create"],
+      };
+      if (!allowed[provider]?.includes(action)) return { error: "That provider/action pair is not supported." };
+
+      const details: Record<string, unknown> = { provider };
+      const copy = (key: string, max = 8000) => {
+        const value = input[key];
+        if (typeof value === "string") details[key] = value.slice(0, max);
+        else if (typeof value === "boolean" || typeof value === "number") details[key] = value;
+      };
+      for (const key of [
+        "object_id", "workspace_gid", "project_gid", "task_gid", "name", "due_on",
+        "team_id", "issue_id", "title", "priority", "parent_page_id",
+      ]) copy(key, 400);
+      copy("notes", 8000);
+      copy("description", 8000);
+      copy("content", 8000);
+      if (input["properties"] && typeof input["properties"] === "object" && !Array.isArray(input["properties"])) {
+        details["properties"] = Object.fromEntries(
+          Object.entries(input["properties"] as Record<string, unknown>).slice(0, 20),
+        );
+      }
+      if (typeof input["completed"] === "boolean") details["completed"] = input["completed"];
+
+      const label = action.replace(/_/g, " ");
+      const target = str(input["title"]) || str(input["name"]) || str(input["object_id"]) || str(input["task_gid"]) || str(input["issue_id"]);
+      const { data, error } = await ctx.sb
+        .from("approval_requests")
+        .insert({
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          agent_id: ctx.agentId,
+          task_id: ctx.taskId,
+          action_type: action,
+          title: `${label}${target ? `: ${target.slice(0, 120)}` : ""}`,
+          summary: `Approve this ${provider} write. The exact approved payload is stored with this request and cannot be changed during retry.`,
+          details,
+          risk_level: "medium",
+          status: "pending",
+        })
+        .select("id")
+        .maybeSingle();
+      if (error) return { error: "Could not queue the connected-service write for approval." };
+      return { queued: true, approval_request_id: data?.id, status: "pending", provider, action };
     },
   },
 
@@ -476,32 +609,57 @@ const REGISTRY: Record<string, ToolImpl> = {
     def: {
       name: "calendar",
       description:
-        "List upcoming scheduled items, or propose a new one. Proposals are created as tasks awaiting approval — nothing is written to an external calendar.",
+        "List upcoming scheduled items, or propose a real connected-calendar event. Proposals wait for explicit approval before any external calendar write.",
       parameters: {
         type: "object",
         properties: {
           action: { type: "string", enum: ["list", "propose"] },
           title: { type: "string" },
-          when: { type: "string" },
+          when: { type: "string", description: "ISO start date/time" },
+          end: { type: "string", description: "Optional ISO end date/time; defaults to 30 minutes after start" },
+          location: { type: "string" },
+          description: { type: "string" },
+          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
         },
         required: ["action"],
       },
     },
     run: async (input, ctx) => {
       if (str(input["action"], "list") === "list") {
+        const requested = str(input["provider"], "auto").toLowerCase();
+        const query = str(input["query"]).slice(0, 200);
+        const providers = requested === "google" || requested === "microsoft"
+          ? [requested]
+          : ["google", "microsoft"];
+        for (const provider of providers) {
+          const live = await readConnectedService(
+            ctx.userId,
+            { provider, action: "calendar_upcoming", query, limit: 10 },
+            ctx.signal,
+          );
+          if (!(live && typeof live === "object" && "error" in live)) {
+            return { source: provider, connected: true, ...live as Record<string, unknown> };
+          }
+        }
         const { data } = await ctx.sb
           .from("personal_tasks")
           .select("id,title,due_at,status")
           .not("due_at", "is", null)
           .order("due_at", { ascending: true })
           .limit(10);
-        return { events: data ?? [] };
+        return { source: "palladium", connected: false, events: data ?? [], note: "No connected Google or Microsoft calendar was available." };
       }
       const title = str(input["title"]).slice(0, 200);
       if (!title) return { error: "A title is required to propose a calendar item." };
       const when = str(input["when"]);
-      const due = when && !Number.isNaN(Date.parse(when)) ? new Date(when).toISOString() : null;
-      const { data, error } = await ctx.sb
+      if (!when || Number.isNaN(Date.parse(when))) return { error: "A valid start date/time is required." };
+      const start = new Date(when).toISOString();
+      const requestedEnd = str(input["end"]);
+      const end = requestedEnd && !Number.isNaN(Date.parse(requestedEnd))
+        ? new Date(requestedEnd).toISOString()
+        : new Date(Date.parse(start) + 30 * 60_000).toISOString();
+      if (Date.parse(end) <= Date.parse(start)) return { error: "Calendar end must be after start." };
+      const { data: task, error } = await ctx.sb
         .from("personal_tasks")
         .insert({
           user_id: ctx.userId,
@@ -513,12 +671,39 @@ const REGISTRY: Record<string, ToolImpl> = {
           scope: "personal",
           status: "awaiting_approval",
           requires_approval: true,
-          due_at: due,
+          due_at: start,
         })
         .select("id")
         .maybeSingle();
       if (error) return { error: "Could not create the calendar proposal." };
-      return { proposed: true, task_id: data?.id, status: "awaiting_approval" };
+      const { data: approval, error: approvalError } = await ctx.sb
+        .from("approval_requests")
+        .insert({
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          agent_id: ctx.agentId,
+          task_id: task?.id ?? null,
+          action_type: "calendar_create",
+          title: `Create calendar event: ${title}`,
+          summary: `${title} — ${start} to ${end}`,
+          details: {
+            title,
+            start,
+            end,
+            location: str(input["location"]).slice(0, 200),
+            description: str(input["description"]).slice(0, 4000),
+            provider: str(input["provider"], "auto"),
+          },
+          risk_level: "medium",
+          status: "pending",
+        })
+        .select("id")
+        .maybeSingle();
+      if (approvalError) {
+        if (task?.id) await ctx.sb.from("personal_tasks").update({ status: "failed" }).eq("id", task.id);
+        return { error: "Could not queue the calendar proposal for approval." };
+      }
+      return { proposed: true, task_id: task?.id, approval_request_id: approval?.id, status: "awaiting_approval" };
     },
   },
 
@@ -533,6 +718,7 @@ const REGISTRY: Record<string, ToolImpl> = {
           to: { type: "string" },
           subject: { type: "string" },
           body: { type: "string" },
+          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
         },
         required: ["to", "subject", "body"],
       },
@@ -548,14 +734,15 @@ const REGISTRY: Record<string, ToolImpl> = {
           user_id: ctx.userId,
           org_id: ctx.orgId,
           agent_id: ctx.agentId,
+          task_id: ctx.taskId,
           action_type: "email_send",
-          title: `Send email: ${str(input["subject"]).slice(0, 120)}`,
+          title: `Create email draft: ${str(input["subject"]).slice(0, 120)}`,
           summary: str(input["body"]).slice(0, 1000),
           details: {
             to,
-            subject: str(input["subject"]),
-            body: str(input["body"]),
-            task_id: ctx.taskId,
+            subject: str(input["subject"]).slice(0, 200),
+            body: str(input["body"]).slice(0, 20000),
+            provider: str(input["provider"], "auto"),
           },
           risk_level: "high",
           status: "pending",
@@ -563,6 +750,47 @@ const REGISTRY: Record<string, ToolImpl> = {
         .select("id")
         .maybeSingle();
       if (error) return { error: "Could not queue the email for approval." };
+      return { queued: true, approval_request_id: data?.id, status: "pending" };
+    },
+  },
+
+  slack_post: {
+    def: {
+      name: "slack_post",
+      description:
+        "Prepare a Slack channel message for explicit operator approval. The message is posted only after approval succeeds.",
+      parameters: {
+        type: "object",
+        properties: {
+          channel: { type: "string", description: "Slack channel ID, e.g. C0123456789" },
+          text: { type: "string" },
+        },
+        required: ["channel", "text"],
+      },
+    },
+    sensitive: true,
+    run: async (input, ctx) => {
+      const channel = str(input["channel"]).slice(0, 80);
+      const text = str(input["text"]).slice(0, 4000);
+      if (!/^[A-Z0-9]{2,80}$/i.test(channel)) return { error: "A valid Slack channel ID is required." };
+      if (!text) return { error: "Slack message text is required." };
+      const { data, error } = await ctx.sb
+        .from("approval_requests")
+        .insert({
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          agent_id: ctx.agentId,
+          task_id: ctx.taskId,
+          action_type: "slack_post",
+          title: `Post Slack message to ${channel}`,
+          summary: text.slice(0, 1000),
+          details: { channel, text, provider: "slack" },
+          risk_level: "medium",
+          status: "pending",
+        })
+        .select("id")
+        .maybeSingle();
+      if (error) return { error: "Could not queue the Slack message for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending" };
     },
   },
@@ -979,6 +1207,25 @@ export async function executeTool(
       await log("failed", { error: `Domain ${host} outside allow-list.` });
       return { ok: false, output: { error: `Domain ${host} is outside this agent's allow-list.` } };
     }
+  }
+
+  const SELF_QUEUING_APPROVAL_TOOLS = new Set([
+    "request_approval",
+    "email_send",
+    "slack_post",
+    "prepare_purchase",
+    "connected_service_write",
+  ]);
+  if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
+    await log("failed", { error: "Tool requires explicit approval before execution." });
+    return {
+      ok: false,
+      output: {
+        error: `Tool "${name}" requires explicit operator approval and cannot execute directly.`,
+        requires_approval: true,
+        suggested_tool: "request_approval",
+      },
+    };
   }
 
   try {
