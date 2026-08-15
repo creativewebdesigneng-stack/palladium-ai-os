@@ -1,11 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+type Sb = { from: (t: string) => any };
+
 export const getPlatformAnnouncement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const admin = supabaseAdmin as unknown as Sb;
+    const { data, error } = await admin
       .from("platform_settings")
       .select("value")
       .eq("key", "announcement")
