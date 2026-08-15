@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { buildApprovedActionRequest } from "@/lib/integrations/approved-action.server";
 
 describe("approved external action request builder", () => {
-  it("creates a Gmail draft request and never a send request", () => {
-    const req = buildApprovedActionRequest({ actionType: "email_send", details: { to: "person@example.com", subject: "Hello", body: "Draft body" } }, "google");
-    expect(req.url).toBe("https://gmail.googleapis.com/gmail/v1/users/me/drafts");
-    expect(req.url).not.toContain("/send");
+  it("sends Gmail only through the fixed messages/send endpoint", () => {
+    const req = buildApprovedActionRequest({ actionType: "email_send", details: { to: "person@example.com", subject: "Hello", body: "Approved body" } }, "google");
+    expect(req.url).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+    expect(req.url).not.toContain("/drafts");
     expect(req.body).toContain("raw");
   });
 
