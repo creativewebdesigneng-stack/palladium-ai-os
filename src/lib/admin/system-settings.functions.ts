@@ -29,7 +29,8 @@ export const getAdminSystemSettings = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const admin = supabaseAdmin as unknown as Sb;
+    const { data, error } = await admin
       .from("platform_settings")
       .select("value,updated_at,updated_by")
       .eq("key", "announcement")
@@ -63,7 +64,8 @@ export const updatePlatformAnnouncement = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const admin = supabaseAdmin as unknown as Sb;
+    const { error } = await admin
       .from("platform_settings")
       .upsert({
         key: "announcement",
