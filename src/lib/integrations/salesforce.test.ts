@@ -106,8 +106,9 @@ describe("Salesforce CRM executor", () => {
       fetchImpl,
     });
     const queryUrl = decodeURIComponent(String(calls[1]![0]));
-    expect(queryUrl).not.toContain("OR Name LIKE");
-    expect(queryUrl).toContain("Acme OR Name LIKE");
+    expect(queryUrl).toContain("WHERE Name LIKE '%Acme OR Name LIKE%'");
+    expect(queryUrl).not.toContain("WHERE Name LIKE '%Acme' OR");
+    expect(queryUrl).not.toContain("LIKE '%''");
   });
 
   it("fails closed when tenant API metadata is absent", async () => {
