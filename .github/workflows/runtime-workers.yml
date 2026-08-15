@@ -1,0 +1,57 @@
+name: Runtime Workers
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: palladium-runtime-workers
+  cancel-in-progress: false
+
+jobs:
+  drain-queues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PALLADIUM_BASE_URL: ${{ secrets.PALLADIUM_BASE_URL }}
+      WORKFLOW_RUNNER_CRON_SECRET: ${{ secrets.WORKFLOW_RUNNER_CRON_SECRET }}
+      WEBHOOK_RETRY_CRON_SECRET: ${{ secrets.WEBHOOK_RETRY_CRON_SECRET }}
+    steps:
+      - name: Check scheduler configuration
+        shell: bash
+        run: |
+          if [ -z "$PALLADIUM_BASE_URL" ]; then
+            echo "::warning::PALLADIUM_BASE_URL is not configured; runtime workers will be skipped."
+          fi
+          if [ -z "$WORKFLOW_RUNNER_CRON_SECRET" ]; then
+            echo "::warning::WORKFLOW_RUNNER_CRON_SECRET is not configured; workflow queue drain will be skipped."
+          fi
+          if [ -z "$WEBHOOK_RETRY_CRON_SECRET" ]; then
+            echo "::warning::WEBHOOK_RETRY_CRON_SECRET is not configured; webhook retry drain will be skipped."
+          fi
+
+      - name: Drain workflow queue
+        if: ${{ env.PALLADIUM_BASE_URL != '' && env.WORKFLOW_RUNNER_CRON_SECRET != '' }}
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 90 \
+            -X POST \
+            -H "Authorization: Bearer $WORKFLOW_RUNNER_CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            "${PALLADIUM_BASE_URL%/}/api/internal/workflow-runs?limit=4"
+
+      - name: Drain webhook retry queue
+        if: ${{ env.PALLADIUM_BASE_URL != '' && env.WEBHOOK_RETRY_CRON_SECRET != '' }}
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 90 \
+            -X POST \
+            -H "Authorization: Bearer $WEBHOOK_RETRY_CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            "${PALLADIUM_BASE_URL%/}/api/internal/webhook-retries?limit=50"
