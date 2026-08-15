@@ -147,4 +147,39 @@ describe("central approval enforcement", () => {
     expect(db.tables["approval_requests"]).toHaveLength(1);
     expect(db.tables["approval_requests"][0]).toMatchObject({ action_type: "asana_task_update", status: "pending" });
   });
+
+  it("allows registered github_write to queue an immutable high-risk approval instead of mutating GitHub", async () => {
+    const db = sb({ approval_requests: [] });
+    const grants = new Map([
+      ["github_write", { slug: "github_write", requiresApproval: true, allowedDomains: [], spendCap: null }],
+    ]);
+    const result = await executeTool(
+      "github_write",
+      {
+        action: "github_file_update",
+        repository: "creativewebdesigneng-stack/palladium-ai-os",
+        branch: "feature/github-approved-writes",
+        path: "README.md",
+        content: "updated",
+        message: "docs: update readme",
+        sha: "0123456789abcdef0123456789abcdef01234567",
+      },
+      ctx(db),
+      grants as any,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      queued: true,
+      provider: "github",
+      action: "github_file_update",
+      status: "pending",
+      risk_level: "high",
+    });
+    expect(db.tables["approval_requests"]).toHaveLength(1);
+    expect(db.tables["approval_requests"][0]).toMatchObject({
+      action_type: "github_file_update",
+      risk_level: "high",
+      status: "pending",
+    });
+  });
 });
