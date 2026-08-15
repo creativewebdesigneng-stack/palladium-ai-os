@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
+import PlatformAnnouncement from "@/components/palladium/PlatformAnnouncement";
 import Screen from "@/screens/Dashboard";
+
+function DashboardRoute() {
+  return (
+    <>
+      <PlatformAnnouncement />
+      <Screen />
+    </>
+  );
+}
 
 export const Route = createFileRoute("/_shell/_app/dashboard")({
   head: () => ({
@@ -18,5 +28,5 @@ export const Route = createFileRoute("/_shell/_app/dashboard")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: DashboardRoute,
 });
