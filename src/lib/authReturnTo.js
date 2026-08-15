@@ -40,3 +40,32 @@ export function safeReturnTo(search) {
     return "/";
   }
 }
+
+// --- Post-OAuth redirect handoff -------------------------------------------
+// The Lovable OAuth broker returns to a public same-origin URL (the origin
+// root), so the intended destination cannot travel through redirect_uri. It is
+// parked in sessionStorage before the flow starts and consumed once the
+// Supabase session has hydrated.
+export const POST_AUTH_REDIRECT_KEY = "palladium:post_auth_redirect";
+
+export function storePostAuthRedirect(path) {
+  if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) return false;
+  try {
+    sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function consumePostAuthRedirect() {
+  try {
+    const value = sessionStorage.getItem(POST_AUTH_REDIRECT_KEY);
+    sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+    if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return null;
+    if (value.includes("\\")) return null;
+    return value === "/" ? null : value;
+  } catch {
+    return null;
+  }
+}
