@@ -370,7 +370,9 @@ describe("personal task execution", () => {
     });
 
     expect(toolLayer.executeTool).not.toHaveBeenCalled();
-    const blocked = sb.inserts.find((i) => i.table === "tool_executions" && i.row.tool === "browser");
+    const blocked = sb.inserts.find(
+      (i) => i.table === "tool_executions" && i.row["tool"] === "browser",
+    );
     expect(blocked?.row).toMatchObject({
       user_id: "user-1",
       agent_id: "agent-1",
