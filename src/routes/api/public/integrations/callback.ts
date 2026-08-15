@@ -67,6 +67,7 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
                 scopes: provider.scopes,
                 granted_scopes: tokens.scopes,
                 account_label: label,
+                config: tokens.providerConfig,
                 last_error: null,
                 connected_at: new Date().toISOString(),
                 expires_at: tokens.expiresAt,
