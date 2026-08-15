@@ -86,7 +86,10 @@ const PERSONAL_BROWSER_ACTIONS = [
   "wait",
 ] as const;
 const PERSONAL_BROWSER_ACTION_SET = new Set<string>(PERSONAL_BROWSER_ACTIONS);
-const PERSONAL_SELF_QUEUING_APPROVAL_TOOLS = new Set(["connected_service_write"]);
+const PERSONAL_SELF_QUEUING_APPROVAL_TOOLS = new Set([
+  "connected_service_write",
+  "github_write",
+]);
 
 // Personal tasks may only execute this bounded subset. Most approval-required
 // tools pause the durable run before execution. Self-queuing approval tools are
@@ -101,6 +104,7 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "memory_write",
   "connected_service",
   "connected_service_write",
+  "github_write",
   "file_analysis",
   "data_analysis",
   "database_query",
@@ -113,7 +117,7 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
     "Carry out the operator's request using the tools available to you when they improve accuracy.",
     "The browser tool is read-only. Use browser_interact only when clicking or typing is genuinely necessary; it always pauses for explicit operator approval before anything happens.",
     "Never use browser_interact for checkout, payment, purchases or entering payment credentials. Those actions require the dedicated purchase flow.",
-    "connected_service_write only queues the exact external write for operator approval; a queued result does not mean the external service has been changed.",
+    "connected_service_write and github_write only queue the exact external write for operator approval; a queued result does not mean the external service has been changed.",
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
