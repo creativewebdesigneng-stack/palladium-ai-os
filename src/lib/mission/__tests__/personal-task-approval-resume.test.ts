@@ -151,7 +151,11 @@ describe("personal task approval pause/resume", () => {
         call: expect.objectContaining({ id: "call-1", name: "connected_service" }),
       }),
     );
-    expect(updates.some((u) => u.table === "personal_tasks" && u.status === "awaiting_approval")).toBe(true);
+    expect(
+      updates.some(
+        (u) => u["table"] === "personal_tasks" && u["status"] === "awaiting_approval",
+      ),
+    ).toBe(true);
   });
 
   it("resumes the existing agent_tasks row without creating a second run", async () => {
@@ -272,6 +276,10 @@ describe("personal task approval pause/resume", () => {
       expect.objectContaining({ taskId: "run-1" }),
       expect.any(Map),
     );
-    expect(updates.some((u) => u.table === "agent_tasks" && u.patch.status === "succeeded")).toBe(true);
+    expect(
+      updates.some(
+        (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
+      ),
+    ).toBe(true);
   });
 });
