@@ -8,7 +8,10 @@ import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "../github-write-tool.
 describe("github_write approval-only runtime tool", () => {
   it("exposes only the bounded approval-gated GitHub mutations", () => {
     expect(GITHUB_WRITE_TOOL_DEF.name).toBe("github_write");
-    expect(GITHUB_WRITE_TOOL_DEF.parameters.properties.action.enum).toEqual([
+    const parameters = GITHUB_WRITE_TOOL_DEF.parameters as {
+      properties: { action: { enum: string[] } };
+    };
+    expect(parameters.properties.action.enum).toEqual([
       "github_branch_create",
       "github_file_create",
       "github_file_update",
