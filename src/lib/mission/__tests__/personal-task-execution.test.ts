@@ -268,7 +268,12 @@ describe("personal task execution", () => {
     });
 
     const exposed = gateway.runChat.mock.calls[0]?.[0]?.tools ?? [];
-    expect(exposed.map((d: any) => d.name)).toEqual(["connected_service", "browser", "browser_interact"]);
+    expect(exposed.map((d: any) => d.name)).toEqual([
+      "connected_service",
+      "connected_service_write",
+      "browser",
+      "browser_interact",
+    ]);
     const browserDef = exposed.find((d: any) => d.name === "browser");
     expect(browserDef.parameters.properties.action.enum).toEqual([
       "navigate",
