@@ -32,5 +32,8 @@ jobs:
       - name: Production build and route generation
         run: bun run build
 
-      - name: Typecheck and tests
-        run: bun run backend:check
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Tests
+        run: bun run test
