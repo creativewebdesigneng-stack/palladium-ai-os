@@ -92,13 +92,8 @@ export const auth = {
   },
   async loginWithProvider(provider, returnTo) {
     const origin = typeof window === "undefined" ? "" : window.location.origin;
-    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
-      try {
-        sessionStorage.setItem("palladium:post_auth_redirect", returnTo);
-      } catch {
-        /* ignore storage failures */
-      }
-    }
+    const { storePostAuthRedirect } = await import("@/lib/authReturnTo");
+    storePostAuthRedirect(returnTo);
     const { lovable } = await import("@/integrations/lovable/index");
     const result = await lovable.auth.signInWithOAuth(provider, {
       redirect_uri: origin || undefined,

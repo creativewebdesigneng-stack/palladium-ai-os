@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Toaster as ShadToaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/lib/AuthContext";
 import ScrollToTop from "@/components/ScrollToTop";
+import PostAuthRedirect from "@/components/PostAuthRedirect";
 import { publicRuntimeConfigScript, readPublicRuntimeConfig } from "@/lib/public-config";
 
 function NotFoundComponent() {
@@ -136,6 +137,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ScrollToTop />
+        <PostAuthRedirect />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster />

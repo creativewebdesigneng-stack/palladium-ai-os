@@ -11,7 +11,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Login() {
-  const { authError } = useAuth();
+  const { authError, checkUserAuth } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -38,9 +38,16 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
+    setError("");
     try {
-      auth.loginWithProvider("google", returnTo);
+      const result = await auth.loginWithProvider("google", returnTo);
+      // Popup (web_message) flow: the session is already set, so move the user
+      // on ourselves. Full-page redirect flows never reach this line.
+      if (result && !result.redirected) {
+        await checkUserAuth();
+        window.location.href = returnTo;
+      }
     } catch (err) {
       setError(err?.message || "Google sign-in could not start.");
     }
