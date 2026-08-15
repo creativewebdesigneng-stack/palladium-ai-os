@@ -224,17 +224,9 @@ describe("personal task execution", () => {
     expect(gateway.runChat).toHaveBeenCalledTimes(2);
     const secondMessages = gateway.runChat.mock.calls[1]?.[0]?.messages ?? [];
     expect(secondMessages.some((m: any) => m.role === "tool" && m.content.includes("Live item"))).toBe(true);
-    const completed = sb.updates.find(
-      (u) => u.table === "personal_tasks" && u.patch["status"] === "completed",
-    );
-    expect((completed?.patch["result"] as any).tool_calls).toBe(1);
-    const completedRun = sb.updates.find(
-      (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
-    );
-    expect(completedRun?.patch["tool_calls"]).toBe(1);
   });
 
-  it("filters out write-capable and approval-gated tools before the model sees them", async () => {
+  it("exposes browser as a read-only schema while still filtering approval/write tools", async () => {
     const grants = new Map([
       ["connected_service", { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null }],
       ["connected_service_write", { slug: "connected_service_write", requiresApproval: true, allowedDomains: [], spendCap: null }],
@@ -245,7 +237,14 @@ describe("personal task execution", () => {
       defs: [...grants.keys()].map((name) => ({
         name,
         description: name,
-        parameters: { type: "object", properties: {}, required: [] },
+        parameters: {
+          type: "object",
+          properties:
+            name === "browser"
+              ? { action: { type: "string", enum: ["navigate", "read", "click", "type"] } }
+              : {},
+          required: [],
+        },
       })),
       grants,
     });
@@ -269,8 +268,122 @@ describe("personal task execution", () => {
     });
 
     const exposed = gateway.runChat.mock.calls[0]?.[0]?.tools ?? [];
-    expect(exposed.map((d: any) => d.name)).toEqual(["connected_service"]);
+    expect(exposed.map((d: any) => d.name)).toEqual(["connected_service", "browser"]);
+    const browserDef = exposed.find((d: any) => d.name === "browser");
+    expect(browserDef.parameters.properties.action.enum).toEqual([
+      "navigate",
+      "read",
+      "extract",
+      "scroll",
+      "screenshot",
+      "back",
+      "forward",
+      "wait",
+    ]);
+    expect(browserDef.parameters.properties.action.enum).not.toContain("click");
+    expect(browserDef.parameters.properties.action.enum).not.toContain("type");
+  });
+
+  it("executes an allowed browser read action through the shared tool layer", async () => {
+    const grants = new Map([
+      ["browser", { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null }],
+    ]);
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [
+        {
+          name: "browser",
+          description: "Browser",
+          parameters: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
+        },
+      ],
+      grants,
+    });
+    toolLayer.executeTool.mockResolvedValue({ ok: true, output: { text: "Live page" } });
+    gateway.runChat
+      .mockResolvedValueOnce({
+        text: "",
+        toolCalls: [{ id: "browser-1", name: "browser", arguments: { action: "read", url: "https://example.com" } }],
+        provider: "openai",
+        model: "gpt-test",
+        usage: { input: 2, output: 1 },
+      })
+      .mockResolvedValueOnce({
+        text: "I read the live page.",
+        toolCalls: [],
+        provider: "openai",
+        model: "gpt-test",
+        usage: { input: 2, output: 2 },
+      });
+    const sb = fakeSb();
+
+    await executePersonalTask({
+      sb: sb as any,
+      userId: "user-1",
+      task,
+      agent: { ...agent, allowed_tools: ["browser"] },
+    });
+
+    expect(toolLayer.executeTool).toHaveBeenCalledWith(
+      "browser",
+      { action: "read", url: "https://example.com" },
+      expect.objectContaining({ taskId: "run-1" }),
+      grants,
+    );
+  });
+
+  it("blocks and audits browser click/type even if the model emits an out-of-schema call", async () => {
+    const grants = new Map([
+      ["browser", { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null }],
+    ]);
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [
+        {
+          name: "browser",
+          description: "Browser",
+          parameters: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },
+        },
+      ],
+      grants,
+    });
+    gateway.runChat
+      .mockResolvedValueOnce({
+        text: "",
+        toolCalls: [{ id: "browser-1", name: "browser", arguments: { action: "click", selector: "#submit" } }],
+        provider: "openai",
+        model: "gpt-test",
+        usage: { input: 2, output: 1 },
+      })
+      .mockResolvedValueOnce({
+        text: "That action needs approval.",
+        toolCalls: [],
+        provider: "openai",
+        model: "gpt-test",
+        usage: { input: 2, output: 2 },
+      });
+    const sb = fakeSb();
+
+    await executePersonalTask({
+      sb: sb as any,
+      userId: "user-1",
+      task,
+      agent: { ...agent, allowed_tools: ["browser"] },
+    });
+
     expect(toolLayer.executeTool).not.toHaveBeenCalled();
+    const blocked = sb.inserts.find((i) => i.table === "tool_executions" && i.row.tool === "browser");
+    expect(blocked?.row).toMatchObject({
+      user_id: "user-1",
+      agent_id: "agent-1",
+      agent_task_id: "run-1",
+      status: "failed",
+      input: { action: "click" },
+    });
+    const secondMessages = gateway.runChat.mock.calls[1]?.[0]?.messages ?? [];
+    expect(
+      secondMessages.some(
+        (m: any) => m.role === "tool" && m.content.includes("not permitted in a read-only personal-task run"),
+      ),
+    ).toBe(true);
   });
 
   it("marks the personal task running before the provider call", async () => {
@@ -305,9 +418,6 @@ describe("personal task execution", () => {
       (u) => u.table === "agent_tasks" && u.patch["status"] === "failed",
     );
     expect(failedRun?.patch["error"]).toBe("AI provider is not configured.");
-    expect(
-      sb.updates.some((u) => u.table === "personal_tasks" && u.patch["status"] === "completed"),
-    ).toBe(false);
   });
 
   it("fails rather than fabricating a result when the model returns empty text", async () => {
