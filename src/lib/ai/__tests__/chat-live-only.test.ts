@@ -23,6 +23,6 @@ describe('workspace chat live-only contract', () => {
       expect(source).not.toContain("from './chatData'");
     }
     expect(sidebar).toContain('session-local');
-    expect(emptyState).toContain('configured live provider');
+    expect(emptyState).toContain('instead of a simulated answer');
   });
 });
