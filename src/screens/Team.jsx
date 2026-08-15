@@ -24,12 +24,12 @@ import TeamRightSidebar from '@/components/team/TeamRightSidebar';
 import { EmptyState } from '@/components/team/shared';
 
 const HEADER_ACTIONS = [
-  { label: 'Invite Member', icon: UserPlus, primary: true, tab: 'Invitations' },
+  { label: 'Add Member', icon: UserPlus, primary: true, tab: 'Member Access' },
   { label: 'Create Team', icon: Network, tab: 'Team Structure' },
   { label: 'Organisation Settings', icon: Settings2, tab: 'Organisation' },
 ];
 
-const TABS = ['Overview', 'Members', 'Team Structure', 'Roles & Permissions', 'Invitations', 'AI Agents', 'Collaboration', 'Organisation', 'Audit'];
+const TABS = ['Overview', 'Members', 'Team Structure', 'Roles & Permissions', 'Member Access', 'AI Agents', 'Collaboration', 'Organisation', 'Audit'];
 
 export default function Team() {
   const qc = useQueryClient();
@@ -169,7 +169,7 @@ export default function Team() {
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Team & Organisation" description="Manage your people, teams, departments and permissions." action={headerActions} />
+      <PageHeader eyebrow="Workspace" title="Team & Organisation" description="Manage existing account members, teams, departments and permissions." action={headerActions} />
 
       <div className="mb-5"><TeamOverviewCards members={memberList} teams={teamList} loading={workspace.isLoading || members.isLoading || teams.isLoading} /></div>
 
@@ -202,7 +202,7 @@ export default function Team() {
               onDeleteTeam={(id) => deleteTeamMutation.mutate(id)} full />
           )}
           {activeTab === 'Roles & Permissions' && <RolesPermissions members={memberList} />}
-          {activeTab === 'Invitations' && (
+          {activeTab === 'Member Access' && (
             <InvitationsTable canManage={canManage} onAdd={(vars) => addMemberMutation.mutate(vars)} busy={addMemberMutation.isPending} />
           )}
           {activeTab === 'AI Agents' && <AgentAssignments />}
