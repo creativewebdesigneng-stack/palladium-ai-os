@@ -116,3 +116,35 @@ describe("tool execution guards", () => {
     expect(JSON.stringify(result.output)).toContain("allow-list");
   });
 });
+
+describe("central approval enforcement", () => {
+  const ctx = (db: any) =>
+    ({ sb: db, userId: "user-1", orgId: null, agentId: "agent-1", taskId: "task-1", spendCap: null }) as any;
+
+  it("does not execute an ordinary tool when its resolved grant requires approval", async () => {
+    const db = sb();
+    const grants = new Map([
+      ["current_time", { slug: "current_time", requiresApproval: true, allowedDomains: [], spendCap: null }],
+    ]);
+    const result = await executeTool("current_time", {}, ctx(db), grants as any);
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatchObject({ requires_approval: true, suggested_tool: "request_approval" });
+  });
+
+  it("allows the dedicated connected-service write tool to queue approval instead of executing the provider write", async () => {
+    const db = sb({ approval_requests: [] });
+    const grants = new Map([
+      ["connected_service_write", { slug: "connected_service_write", requiresApproval: true, allowedDomains: [], spendCap: null }],
+    ]);
+    const result = await executeTool(
+      "connected_service_write",
+      { provider: "asana", action: "asana_task_update", task_gid: "123", completed: true },
+      ctx(db),
+      grants as any,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({ queued: true, provider: "asana", action: "asana_task_update" });
+    expect(db.tables["approval_requests"]).toHaveLength(1);
+    expect(db.tables["approval_requests"][0]).toMatchObject({ action_type: "asana_task_update", status: "pending" });
+  });
+});
