@@ -92,17 +92,21 @@ export const auth = {
   },
   async loginWithProvider(provider, returnTo) {
     const origin = typeof window === "undefined" ? "" : window.location.origin;
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: origin
-          ? `${origin}${returnTo && returnTo.startsWith("/") ? returnTo : ""}`
-          : undefined,
-      },
+    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
+      try {
+        sessionStorage.setItem("palladium:post_auth_redirect", returnTo);
+      } catch {
+        /* ignore storage failures */
+      }
+    }
+    const { lovable } = await import("@/integrations/lovable/index");
+    const result = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: origin || undefined,
     });
-    if (error) throw error;
-    return data;
+    if (result?.error) throw result.error;
+    return result;
   },
+
   async resetPasswordRequest(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo:
