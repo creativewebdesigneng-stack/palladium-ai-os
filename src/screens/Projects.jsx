@@ -1,120 +1,73 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, FolderPlus, Archive } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { Bot, Database, GitBranch, Layers3, Workflow } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import ProjectsOverviewCards from '@/components/projects/ProjectsOverviewCards';
-import ProjectsToolbar from '@/components/projects/ProjectsToolbar';
-import ProjectsFolderGrid from '@/components/projects/ProjectsFolderGrid';
-import ProjectsTemplates from '@/components/projects/ProjectsTemplates';
-import ProjectCard from '@/components/projects/ProjectCard';
-import ProjectListRow from '@/components/projects/ProjectListRow';
-import ProjectKanban from '@/components/projects/ProjectKanban';
-import ProjectTimeline from '@/components/projects/ProjectTimeline';
-import ProjectsActivity from '@/components/projects/ProjectsActivity';
-import ProjectsCollaboration from '@/components/projects/ProjectsCollaboration';
-import ProjectsVersionHistory from '@/components/projects/ProjectsVersionHistory';
-import ProjectsDeployments from '@/components/projects/ProjectsDeployments';
-import ProjectsRightSidebar from '@/components/projects/ProjectsRightSidebar';
-import ProjectsEmptyState from '@/components/projects/ProjectsEmptyState';
-import ProjectDetailDrawer from '@/components/projects/ProjectDetailDrawer';
-import { PROJECTS } from '@/components/projects/projectsData';
 
-const HEAD_ACTIONS = [
-  { label: 'New Project', icon: Plus, primary: true },
-  { label: 'Import Project', icon: Upload },
-  { label: 'Create Folder', icon: FolderPlus },
-  { label: 'Archive', icon: Archive },
+const REQUIREMENTS = [
+  'Persist projects, ownership, membership and lifecycle state in the database.',
+  'Link agents, workflows, files and missions to a project with owner-scoped policies.',
+  'Record project activity/version events from real backend actions instead of UI fixtures.',
+  'Connect deployment status only after a deployment provider/webhook integration exists.',
 ];
 
 export default function Projects() {
   const navigate = useNavigate();
-  const [view, setView] = useState('grid');
-  const [query, setQuery] = useState('');
-  const [showEmpty, setShowEmpty] = useState(false);
-  const [selected, setSelected] = useState(null);
-
-  const filtered = PROJECTS.filter(p =>
-    !query ||
-    p.name.toLowerCase().includes(query.toLowerCase()) ||
-    p.description.toLowerCase().includes(query.toLowerCase()) ||
-    p.tags.some(t => t.toLowerCase().includes(query.toLowerCase()))
-  );
-
-  const headerActions = (
-    <div className="flex flex-wrap gap-2">
-      {HEAD_ACTIONS.map(a => (
-        <button
-          key={a.label}
-          onClick={() => {
-            if (a.label === 'New Project') setShowEmpty(true);
-            else if (a.label === 'Import Project') navigate('/version-control');
-            else if (a.label === 'Create Folder') document.getElementById('projects-folders')?.scrollIntoView({ behavior: 'smooth' });
-            else navigate('/deployments');
-          }}
-          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium ${a.primary ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}
-        >
-          <a.icon className="h-4 w-4" />{a.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  if (showEmpty) {
-    return (
-      <>
-        <PageHeader eyebrow="Workspace" title="Projects" description="Manage every AI project, application, automation and workspace from one place." action={headerActions} />
-        <ProjectsEmptyState onStart={() => setShowEmpty(false)} />
-      </>
-    );
-  }
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Projects" description="Manage every AI project, application, automation and workspace from one place." action={headerActions} />
+      <PageHeader
+        eyebrow="Workspace"
+        title="Projects"
+        description="Project tracking is not connected to a persistent backend yet. No simulated projects are shown."
+      />
 
-      <div className="mb-4"><ProjectsOverviewCards /></div>
-
-      <div className="mb-6"><ProjectsToolbar view={view} setView={setView} query={query} setQuery={setQuery} /></div>
-
-      <div id="projects-folders" className="mb-8"><ProjectsFolderGrid /></div>
-
-      <div className="mb-8"><ProjectsTemplates /></div>
-
-      {/* Project views */}
-      <div className="mb-8">
-        {view === 'grid' && (
-          <AnimatePresence mode="popLayout">
-            <motion.div layout className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map(p => <ProjectCard key={p.id} p={p} onOpen={setSelected} />)}
-            </motion.div>
-          </AnimatePresence>
-        )}
-        {view === 'list' && (
-          <div className="space-y-2">
-            {filtered.map(p => <ProjectListRow key={p.id} p={p} onOpen={setSelected} />)}
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/[.08]">
+            <Layers3 className="h-5 w-5 text-violet-300" />
           </div>
-        )}
-        {view === 'kanban' && <ProjectKanban onOpen={setSelected} />}
-        {view === 'timeline' && <ProjectTimeline onOpen={setSelected} />}
-      </div>
+          <h2 className="text-xl font-semibold text-white">Project persistence is not connected</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+            The previous project cards, folders, kanban board, timeline, activity, collaboration, version history and deployment records were presentation-only fixtures. They have been removed so this workspace does not present invented operational state as live data.
+          </p>
 
-      {/* Content + Right Sidebar */}
-      <div className="grid gap-4 xl:grid-cols-[1fr_18rem]">
-        <div className="min-w-0 space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ProjectsActivity />
-            <ProjectsVersionHistory />
+          <div className="mt-6 rounded-xl border border-amber-400/15 bg-amber-400/[.05] p-4">
+            <div className="flex items-start gap-3">
+              <Database className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              <div>
+                <p className="text-sm font-medium text-amber-100">Backend work required before this can be enabled</p>
+                <div className="mt-3 space-y-2">
+                  {REQUIREMENTS.map((item) => (
+                    <div key={item} className="flex gap-2 text-xs leading-5 text-amber-100/70">
+                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-amber-300/70" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <ProjectsDeployments />
-          <ProjectsCollaboration />
-        </div>
-        <div className="hidden xl:block">
-          <div className="sticky top-6"><ProjectsRightSidebar /></div>
-        </div>
-      </div>
+        </section>
 
-      <ProjectDetailDrawer project={selected} onClose={() => setSelected(null)} />
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <h3 className="text-sm font-semibold text-white">Use live workspaces instead</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">These areas are already backed by persisted application data.</p>
+
+          <div className="mt-5 space-y-2.5">
+            <button onClick={() => navigate('/workflows')} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/[.04]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-400/[.08] text-violet-300"><Workflow className="h-4 w-4" /></span>
+              <span><span className="block text-sm font-medium text-white">Workflows</span><span className="text-[11px] text-zinc-500">Build and run persisted automations.</span></span>
+            </button>
+            <button onClick={() => navigate('/agents')} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/[.04]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-400/[.08] text-sky-300"><Bot className="h-4 w-4" /></span>
+              <span><span className="block text-sm font-medium text-white">AI Agents</span><span className="text-[11px] text-zinc-500">Manage real personal agents and runtime state.</span></span>
+            </button>
+            <button onClick={() => navigate('/version-control')} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:bg-white/[.04]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400/[.08] text-emerald-300"><GitBranch className="h-4 w-4" /></span>
+              <span><span className="block text-sm font-medium text-white">Version Control</span><span className="text-[11px] text-zinc-500">Use the existing source-control workspace.</span></span>
+            </button>
+          </div>
+        </section>
+      </div>
     </>
   );
 }
