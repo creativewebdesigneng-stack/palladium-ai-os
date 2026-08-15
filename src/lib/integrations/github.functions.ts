@@ -104,7 +104,12 @@ export const listConnectedGitHubBranches = createServerFn({ method: "POST" })
     const connection = await githubConnection(sb, context.userId);
     const { owner, repo } = splitRepository(data.repository);
     const { listGitHubBranches } = await import("./github-app.server");
-    return listGitHubBranches({ installationId: connection.installationId, owner, repo, perPage: data.perPage });
+    return listGitHubBranches({
+      installationId: connection.installationId,
+      owner,
+      repo,
+      ...(data.perPage === undefined ? {} : { perPage: data.perPage }),
+    });
   });
 
 export const listConnectedGitHubCommits = createServerFn({ method: "POST" })
@@ -119,8 +124,8 @@ export const listConnectedGitHubCommits = createServerFn({ method: "POST" })
       installationId: connection.installationId,
       owner,
       repo,
-      ref: data.ref,
-      perPage: data.perPage,
+      ...(data.ref === undefined ? {} : { ref: data.ref }),
+      ...(data.perPage === undefined ? {} : { perPage: data.perPage }),
     });
   });
 
@@ -136,8 +141,8 @@ export const listConnectedGitHubPath = createServerFn({ method: "POST" })
       installationId: connection.installationId,
       owner,
       repo,
-      path: data.path,
-      ref: data.ref,
+      ...(data.path === undefined ? {} : { path: data.path }),
+      ...(data.ref === undefined ? {} : { ref: data.ref }),
     });
   });
 
@@ -154,6 +159,6 @@ export const readConnectedGitHubFile = createServerFn({ method: "POST" })
       owner,
       repo,
       path: data.path,
-      ref: data.ref,
+      ...(data.ref === undefined ? {} : { ref: data.ref }),
     });
   });
