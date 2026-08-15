@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { auth } from '@/lib/auth/client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,7 @@ import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Register() {
+  const { authError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,9 +22,13 @@ export default function Register() {
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
 
+  const visibleError = error || authError || "";
+  const configurationBlocked = visibleError.includes("Supabase is not configured for this deployment");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    if (configurationBlocked) return;
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -40,6 +46,7 @@ export default function Register() {
 
   const handleVerify = async () => {
     setError("");
+    if (configurationBlocked) return;
     setLoading(true);
     try {
       const result = await auth.verifyOtp({ email, otpCode });
@@ -56,6 +63,7 @@ export default function Register() {
 
   const handleResend = async () => {
     setError("");
+    if (configurationBlocked) return;
     try {
       await auth.resendOtp(email);
       toast({
@@ -68,7 +76,12 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
-    auth.loginWithProvider("google", safeReturnTo());
+    try {
+      if (configurationBlocked) return;
+      auth.loginWithProvider("google", safeReturnTo());
+    } catch (err) {
+      setError(err?.message || "Google sign-up could not start.");
+    }
   };
 
   if (showOtp) {
@@ -78,9 +91,9 @@ export default function Register() {
         title="Verify your email"
         subtitle={`We sent a code to ${email}`}
       >
-        {error && (
+        {visibleError && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
+            {visibleError}
           </div>
         )}
         <div className="flex justify-center mb-6">
@@ -104,7 +117,7 @@ export default function Register() {
         <Button
           className="w-full h-12 font-medium"
           onClick={handleVerify}
-          disabled={loading || otpCode.length < 6}
+          disabled={loading || otpCode.length < 6 || configurationBlocked}
         >
           {loading ? (
             <>
@@ -117,7 +130,7 @@ export default function Register() {
         </Button>
         <p className="text-center text-sm text-muted-foreground mt-4">
           Didn't receive the code?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
+          <button onClick={handleResend} disabled={configurationBlocked} className="text-primary font-medium hover:underline disabled:opacity-50">
             Resend
           </button>
         </p>
@@ -142,10 +155,22 @@ export default function Register() {
         </>
       }
     >
+      {visibleError && (
+        <div className="mb-5 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <p>{visibleError}</p>
+          {configurationBlocked && (
+            <p className="mt-2 text-xs opacity-80">
+              Configure the Supabase project/environment variables in the deployment, then reload this page before creating accounts.
+            </p>
+          )}
+        </div>
+      )}
+
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
         onClick={handleGoogle}
+        disabled={configurationBlocked}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />
         Continue with Google
@@ -159,12 +184,6 @@ export default function Register() {
           <span className="bg-card px-3 text-muted-foreground">or</span>
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -181,6 +200,7 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"
               required
+              disabled={configurationBlocked}
             />
           </div>
         </div>
@@ -197,6 +217,7 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
               className="pl-10 h-12"
               required
+              disabled={configurationBlocked}
             />
           </div>
         </div>
@@ -213,15 +234,18 @@ export default function Register() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="pl-10 h-12"
               required
+              disabled={configurationBlocked}
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading || configurationBlocked}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Creating account...
             </>
+          ) : configurationBlocked ? (
+            "Supabase setup required"
           ) : (
             "Create account"
           )}
