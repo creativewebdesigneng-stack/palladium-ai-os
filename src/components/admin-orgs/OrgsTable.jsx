@@ -1,6 +1,5 @@
 import { Eye, Pencil, Ban, Trash2 } from 'lucide-react';
 
-const PLAN_CLS = { Free: 'text-zinc-300 bg-white/5', Pro: 'text-violet-300 bg-violet-400/10', Team: 'text-sky-300 bg-sky-400/10', Enterprise: 'text-amber-300 bg-amber-400/10' };
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', suspended: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trial: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 
 export default function OrgsTable({ orgs, onView, onAction }) {
@@ -13,9 +12,8 @@ export default function OrgsTable({ orgs, onView, onAction }) {
             <th className="px-3 py-2 font-medium">Owner</th>
             <th className="px-3 py-2 font-medium">Members</th>
             <th className="px-3 py-2 font-medium">Plan</th>
-            <th className="px-3 py-2 font-medium">Projects</th>
+            <th className="px-3 py-2 font-medium">Teams</th>
             <th className="px-3 py-2 font-medium">Agents</th>
-            <th className="px-3 py-2 font-medium">Usage</th>
             <th className="px-3 py-2 font-medium">Created</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 text-right font-medium">Actions</th>
@@ -32,12 +30,11 @@ export default function OrgsTable({ orgs, onView, onAction }) {
               </td>
               <td className="px-3 py-2.5"><p className="text-zinc-200">{o.owner}</p><p className="text-[10px] text-zinc-500">{o.ownerEmail}</p></td>
               <td className="px-3 py-2.5 text-zinc-300">{o.members}</td>
-              <td className="px-3 py-2.5"><span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${PLAN_CLS[o.plan]}`}>{o.plan}</span></td>
-              <td className="px-3 py-2.5 text-zinc-300">{o.projects}</td>
+              <td className="px-3 py-2.5"><span className="rounded-md bg-violet-400/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-200">{o.plan}</span></td>
+              <td className="px-3 py-2.5 text-zinc-300">{o.usage.teams}</td>
               <td className="px-3 py-2.5 text-zinc-300">{o.agents}</td>
-              <td className="px-3 py-2.5 text-zinc-400">{(o.usage.requests/1000).toFixed(1)}k req</td>
               <td className="px-3 py-2.5 text-zinc-400">{o.created}</td>
-              <td className="px-3 py-2.5"><span className={`rounded-full border px-2 py-0.5 text-[10px] ${STATUS_CLS[o.status]}`}>{o.status}</span></td>
+              <td className="px-3 py-2.5"><span className={`rounded-full border px-2 py-0.5 text-[10px] ${STATUS_CLS[o.status] ?? STATUS_CLS.active}`}>{o.status}</span></td>
               <td className="px-3 py-2.5">
                 <div className="flex items-center justify-end gap-1">
                   <IconBtn title="View" onClick={() => onView(o)}><Eye className="h-3.5 w-3.5" /></IconBtn>
@@ -48,7 +45,7 @@ export default function OrgsTable({ orgs, onView, onAction }) {
               </td>
             </tr>
           ))}
-          {orgs.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-zinc-500">No organisations match your filters.</td></tr>}
+          {orgs.length === 0 && <tr><td colSpan={9} className="px-3 py-10 text-center text-zinc-500">No organisations match your filters.</td></tr>}
         </tbody>
       </table>
     </div>
