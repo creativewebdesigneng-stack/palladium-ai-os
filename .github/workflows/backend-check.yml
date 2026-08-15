@@ -35,23 +35,8 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Test diagnostics
-        id: tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          bun run test 2>&1 | tee test.log
-
-      - name: Upload test diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-diagnostics
-          path: test.log
-
-      - name: Fail when tests failed
-        if: steps.tests.outcome == 'failure'
-        run: exit 1
+      - name: Tests
+        run: bun run test
 
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
