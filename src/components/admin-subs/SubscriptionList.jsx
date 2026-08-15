@@ -1,4 +1,4 @@
-import { Search, Eye, CreditCard, Calendar, User, Building2, Activity } from 'lucide-react';
+import { Search, Eye, CreditCard, Calendar, User, Building2, Activity, Info } from 'lucide-react';
 
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', past_due: 'text-amber-300 bg-amber-400/10 border-amber-400/20', canceled: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trialing: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 
@@ -60,7 +60,7 @@ export default function SubscriptionList({ subscriptions, onView, filters, setFi
   );
 }
 
-export function SubscriptionDetail({ sub, onClose, onAction }) {
+export function SubscriptionDetail({ sub, onClose }) {
   if (!sub) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -81,10 +81,11 @@ export function SubscriptionDetail({ sub, onClose, onAction }) {
           <Row icon={Calendar} label="Renews" value={sub.renews} />
           <Row icon={Activity} label="Normalised MRR" value={`£${Number(sub.mrr ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
         </div>
-        <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">
-          <button onClick={() => onAction('upgrade', sub)} className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 py-2.5 text-xs text-emerald-300 hover:bg-emerald-400/20">Upgrade</button>
-          <button onClick={() => onAction('downgrade', sub)} className="rounded-xl border border-amber-400/20 bg-amber-400/10 py-2.5 text-xs text-amber-300 hover:bg-amber-400/20">Downgrade</button>
-          <button onClick={() => onAction('cancel', sub)} className="rounded-xl border border-rose-400/20 bg-rose-400/10 py-2.5 text-xs text-rose-300 hover:bg-rose-400/20">Cancel</button>
+        <div className="border-t border-white/10 p-3">
+          <div className="flex items-start gap-2 rounded-xl border border-sky-400/15 bg-sky-400/[.05] px-3 py-2.5 text-[11px] leading-5 text-sky-100/80">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <p>This view is read-only. Subscription plan changes and cancellations are not connected to an admin billing mutation endpoint yet.</p>
+          </div>
         </div>
       </div>
     </div>
