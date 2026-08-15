@@ -7,7 +7,7 @@ export default function InvitationsTable({ canManage, onAdd, busy }) {
   const [role, setRole] = useState('member');
 
   if (!canManage) {
-    return <EmptyState icon={ShieldAlert} title="Not available" desc="Only owners and admins can invite new members." />;
+    return <EmptyState icon={ShieldAlert} title="Not available" desc="Only owners and admins can add organisation members." />;
   }
 
   const submit = (e) => {
@@ -19,7 +19,7 @@ export default function InvitationsTable({ canManage, onAdd, busy }) {
 
   return (
     <div>
-      <SectionHead icon={MailOpen} title="Invite a Member" grad="from-amber-500 to-orange-500" />
+      <SectionHead icon={UserPlus} title="Add an Existing Member" grad="from-amber-500 to-orange-500" />
       <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
         <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -41,11 +41,11 @@ export default function InvitationsTable({ canManage, onAdd, busy }) {
           </button>
         </form>
         <p className="mt-3 text-[11px] text-zinc-500">
-          The person must already have a PalladiumAI account with this email address — they'll be added to the organisation immediately.
+          The person must already have a PalladiumAI account with this email address. The backend adds that account to the organisation immediately; no invitation email is sent.
         </p>
       </div>
       <div className="mt-4">
-        <EmptyState icon={MailOpen} title="No pending invitation queue yet" desc="Invites are applied immediately once the person has an account; there's no separate pending-invite tracking yet." />
+        <EmptyState icon={MailOpen} title="Invitation workflow not available yet" desc="Pending invitations and emailed join links require a separate invitation backend and are not simulated here." />
       </div>
     </div>
   );
