@@ -16,8 +16,10 @@ beforeEach(() => {
 
 describe("Slack executor", () => {
   it("lists and normalises channels", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push([input, init]);
+      return new Response(
         JSON.stringify({
           ok: true,
           channels: [
@@ -33,8 +35,8 @@ describe("Slack executor", () => {
           response_metadata: { next_cursor: "cursor-2" },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      ),
-    );
+      );
+    };
 
     const result = await listSlackChannels({
       userId: "user-1",
@@ -45,9 +47,9 @@ describe("Slack executor", () => {
       expect.objectContaining({ id: "C12345678", name: "operations", isMember: true }),
     );
     expect(result.nextCursor).toBe("cursor-2");
-    const [url, init] = fetchImpl.mock.calls[0]!;
+    const [url, init] = calls[0]!;
     expect(String(url)).toContain("/conversations.list?");
-    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer slack-token");
+    expect((init?.headers as Record<string, string>)["Authorization"]).toBe("Bearer slack-token");
   });
 
   it("returns bounded channel history", async () => {
