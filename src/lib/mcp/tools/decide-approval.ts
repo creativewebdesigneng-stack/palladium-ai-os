@@ -14,9 +14,9 @@ function isWorkflowApproval(value: unknown): boolean {
 
 export default defineTool({
   name: "decide_approval",
-  title: "Approve or reject a request",
+  title: "Reject a request or direct the user to Approval Centre",
   description:
-    "Record the signed-in user's decision on a pending approval request. Approving may authorise an agent to spend money or act on the user's behalf. Workflow-step approvals must be decided in the PalladiumAI Approval Centre so the paused workflow can resume safely.",
+    "Reject a pending approval request. Approval must be confirmed in PalladiumAI's Approval Centre so spend limits, workflow resume and external-action execution gates cannot be bypassed.",
   inputSchema: {
     approval_id: z.string().uuid().describe("The approval request to decide."),
     decision: z.enum(["approved", "rejected"]).describe("The user's decision."),
@@ -27,32 +27,16 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return notAuthenticated();
     const supabase = supabaseForUser(ctx);
 
-    // Read the request first so workflow gates cannot be decided through this
-    // generic row-update path. Workflow approvals have durable pause/resume
-    // semantics and must go through the authenticated workflow decision API.
     const { data: current, error: readError } = await supabase
       .from("approval_requests")
       .select("id,user_id,status,action_type,details")
       .eq("id", approval_id)
+      .eq("user_id", ctx.getUserId())
       .maybeSingle();
     if (readError) return { content: [{ type: "text", text: readError.message }], isError: true };
-    if (!current || current.user_id !== ctx.getUserId()) {
+    if (!current) {
       return {
-        content: [{ type: "text", text: "No approval request found with that id." }],
-        isError: true,
-      };
-    }
-    if (
-      current.action_type === "workflow_step" ||
-      isWorkflowApproval(current.details)
-    ) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "Workflow-step approvals must be decided in the PalladiumAI Approval Centre so the workflow can resume safely.",
-          },
-        ],
+        content: [{ type: "text", text: "No pending approval request found with that id." }],
         isError: true,
       };
     }
@@ -63,10 +47,27 @@ export default defineTool({
       };
     }
 
+    if (decision === "approved") {
+      const workflow = current.action_type === "workflow_step" || isWorkflowApproval(current.details);
+      return {
+        content: [
+          {
+            type: "text",
+            text: workflow
+              ? "Workflow-step approvals must be confirmed in PalladiumAI's Approval Centre so the paused workflow can resume safely."
+              : "Approvals must be confirmed in PalladiumAI's Approval Centre so spend limits and external-action execution gates cannot be bypassed.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Rejection is safe to expose here because it cannot authorise money movement
+    // or an external side effect. Keep it owner-scoped and first-writer-wins.
     const { data, error } = await supabase
       .from("approval_requests")
       .update({
-        status: decision,
+        status: "rejected",
         decided_at: new Date().toISOString(),
         decided_by: ctx.getUserId(),
         ...(note ? { decision_note: note } : {}),
