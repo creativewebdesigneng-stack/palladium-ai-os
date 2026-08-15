@@ -4,10 +4,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
+type ProjectScope = { id: string; user_id: string; org_id: string | null; name: string; status?: string };
+type ResourceType = "agent" | "workflow";
 
 const scopeSchema = z.object({ orgId: z.string().uuid().nullish() });
 const statusSchema = z.enum(["active", "paused", "completed", "archived"]);
 const prioritySchema = z.enum(["low", "normal", "high", "urgent"]);
+const resourceTypeSchema = z.enum(["agent", "workflow"]);
 
 async function requireOrgMember(sb: Sb, orgId: string, userId: string) {
   const { data, error } = await sb
@@ -28,7 +31,7 @@ async function requireOrgManager(sb: Sb, orgId: string, userId: string) {
   }
 }
 
-async function getProjectForMutation(sb: Sb, id: string, userId: string) {
+async function getProjectForMutation(sb: Sb, id: string, userId: string): Promise<ProjectScope> {
   const { data, error } = await sb
     .from("projects")
     .select("id,user_id,org_id,name,status")
@@ -38,7 +41,7 @@ async function getProjectForMutation(sb: Sb, id: string, userId: string) {
   if (!data) throw new Error("Project not found or access denied.");
   if (data.org_id) await requireOrgManager(sb, data.org_id, userId);
   else if (data.user_id !== userId) throw new Error("Project not found or access denied.");
-  return data;
+  return data as ProjectScope;
 }
 
 async function addActivity(sb: Sb, userId: string, projectId: string, kind: string, message: string) {
@@ -49,6 +52,30 @@ async function addActivity(sb: Sb, userId: string, projectId: string, kind: stri
     message,
   });
   if (error) throw new Error(error.message);
+}
+
+async function resolveScopedResource(
+  sb: Sb,
+  project: ProjectScope,
+  userId: string,
+  resourceType: ResourceType,
+  resourceId: string,
+) {
+  const table = resourceType === "agent" ? "personal_agents" : "workflows";
+  const fields = resourceType === "agent"
+    ? "id,name,status,user_id,org_id,category"
+    : "id,name,status,user_id,org_id,description";
+  const { data, error } = await sb.from(table).select(fields).eq("id", resourceId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`${resourceType === "agent" ? "Agent" : "Workflow"} not found or access denied.`);
+
+  const sameScope = project.org_id
+    ? data.org_id === project.org_id
+    : data.user_id === userId && !data.org_id;
+  if (!sameScope) {
+    throw new Error("That resource belongs to a different workspace and cannot be linked to this project.");
+  }
+  return data;
 }
 
 export const listProjects = createServerFn({ method: "POST" })
@@ -85,14 +112,20 @@ export const getProject = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!project) throw new Error("Project not found or access denied.");
 
-    const { data: activity, error: activityError } = await sb
-      .from("project_activity")
-      .select("id,user_id,kind,message,metadata,created_at")
-      .eq("project_id", data.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
+    const [{ data: activity, error: activityError }, { data: resources, error: resourceError }] = await Promise.all([
+      sb.from("project_activity")
+        .select("id,user_id,kind,message,metadata,created_at")
+        .eq("project_id", data.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      sb.from("project_resources")
+        .select("id,resource_type,resource_id,added_by,created_at")
+        .eq("project_id", data.id)
+        .order("created_at", { ascending: false }),
+    ]);
     if (activityError) throw new Error(activityError.message);
-    return { project, activity: activity ?? [] };
+    if (resourceError) throw new Error(resourceError.message);
+    return { project, activity: activity ?? [], resources: resources ?? [] };
   });
 
 export const createProject = createServerFn({ method: "POST" })
@@ -209,4 +242,146 @@ export const archiveProject = createServerFn({ method: "POST" })
       targetId: data.id,
     });
     return project;
+  });
+
+export const listProjectResources = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: project, error: projectError } = await sb
+      .from("projects")
+      .select("id,user_id,org_id,name")
+      .eq("id", data.projectId)
+      .maybeSingle();
+    if (projectError) throw new Error(projectError.message);
+    if (!project) throw new Error("Project not found or access denied.");
+    if (project.org_id) await requireOrgMember(sb, project.org_id, context.userId);
+    else if (project.user_id !== context.userId) throw new Error("Project not found or access denied.");
+
+    let agentsQuery = sb
+      .from("personal_agents")
+      .select("id,name,status,user_id,org_id,category")
+      .order("name", { ascending: true })
+      .limit(250);
+    let workflowsQuery = sb
+      .from("workflows")
+      .select("id,name,status,user_id,org_id,description")
+      .order("name", { ascending: true })
+      .limit(250);
+    if (project.org_id) {
+      agentsQuery = agentsQuery.eq("org_id", project.org_id);
+      workflowsQuery = workflowsQuery.eq("org_id", project.org_id);
+    } else {
+      agentsQuery = agentsQuery.eq("user_id", context.userId).is("org_id", null);
+      workflowsQuery = workflowsQuery.eq("user_id", context.userId).is("org_id", null);
+    }
+
+    const [linksResult, agentsResult, workflowsResult] = await Promise.all([
+      sb.from("project_resources")
+        .select("id,resource_type,resource_id,added_by,created_at")
+        .eq("project_id", data.projectId)
+        .order("created_at", { ascending: false }),
+      agentsQuery,
+      workflowsQuery,
+    ]);
+    if (linksResult.error) throw new Error(linksResult.error.message);
+    if (agentsResult.error) throw new Error(agentsResult.error.message);
+    if (workflowsResult.error) throw new Error(workflowsResult.error.message);
+
+    return {
+      project,
+      links: linksResult.data ?? [],
+      agents: agentsResult.data ?? [],
+      workflows: workflowsResult.data ?? [],
+    };
+  });
+
+export const addProjectResource = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      projectId: z.string().uuid(),
+      resourceType: resourceTypeSchema,
+      resourceId: z.string().uuid(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const project = await getProjectForMutation(sb, data.projectId, context.userId);
+    const resource = await resolveScopedResource(
+      sb,
+      project,
+      context.userId,
+      data.resourceType,
+      data.resourceId,
+    );
+
+    const { data: existing, error: existingError } = await sb
+      .from("project_resources")
+      .select("id")
+      .eq("project_id", data.projectId)
+      .eq("resource_type", data.resourceType)
+      .eq("resource_id", data.resourceId)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+    if (existing) return existing;
+
+    const { data: link, error } = await sb
+      .from("project_resources")
+      .insert({
+        project_id: data.projectId,
+        resource_type: data.resourceType,
+        resource_id: data.resourceId,
+        added_by: context.userId,
+      })
+      .select("id,resource_type,resource_id,created_at")
+      .single();
+    if (error) throw new Error(error.message);
+
+    const label = data.resourceType === "agent" ? "agent" : "workflow";
+    await addActivity(sb, context.userId, project.id, "resource_linked", `Linked ${label} “${resource.name}”.`);
+    await writeAudit({
+      userId: context.userId,
+      orgId: project.org_id,
+      action: "project_resource_linked",
+      targetType: "project",
+      targetId: project.id,
+      metadata: { resourceType: data.resourceType, resourceId: data.resourceId },
+    });
+    return link;
+  });
+
+export const removeProjectResource = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid(), linkId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const project = await getProjectForMutation(sb, data.projectId, context.userId);
+    const { data: link, error: linkError } = await sb
+      .from("project_resources")
+      .select("id,resource_type,resource_id")
+      .eq("id", data.linkId)
+      .eq("project_id", data.projectId)
+      .maybeSingle();
+    if (linkError) throw new Error(linkError.message);
+    if (!link) throw new Error("Project resource link not found.");
+
+    const { error } = await sb
+      .from("project_resources")
+      .delete()
+      .eq("id", data.linkId)
+      .eq("project_id", data.projectId);
+    if (error) throw new Error(error.message);
+
+    await addActivity(sb, context.userId, project.id, "resource_unlinked", `Removed linked ${link.resource_type}.`);
+    await writeAudit({
+      userId: context.userId,
+      orgId: project.org_id,
+      action: "project_resource_unlinked",
+      targetType: "project",
+      targetId: project.id,
+      metadata: { resourceType: link.resource_type, resourceId: link.resource_id },
+    });
+    return { ok: true };
   });
