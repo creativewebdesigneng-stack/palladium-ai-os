@@ -7,14 +7,12 @@ export const Route = createFileRoute("/resources")({
       { title: "Resources — PalladiumAI" },
       {
         name: "description",
-        content:
-          "Guides, templates, changelog and research to help you get the most out of your AI workforce.",
+        content: "Access live PalladiumAI product resources and see publication-feed availability.",
       },
       { property: "og:title", content: "Resources — PalladiumAI" },
       {
         property: "og:description",
-        content:
-          "Guides, templates, changelog and research to help you get the most out of your AI workforce.",
+        content: "Access live PalladiumAI product resources and see publication-feed availability.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
