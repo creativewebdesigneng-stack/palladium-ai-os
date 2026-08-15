@@ -5,9 +5,9 @@ export const Route = createFileRoute("/_shell/_app/integrations")({
   head: () => ({
     meta: [
       { title: "Integrations — PalladiumAI" },
-      { name: "description", content: "Connect the tools your business already runs on." },
+      { name: "description", content: "Browse the external provider capabilities PalladiumAI is designed to integrate with." },
       { property: "og:title", content: "Integrations — PalladiumAI" },
-      { property: "og:description", content: "Connect the tools your business already runs on." },
+      { property: "og:description", content: "Browse the external provider capabilities PalladiumAI is designed to integrate with." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
