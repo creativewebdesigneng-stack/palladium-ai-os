@@ -2,8 +2,8 @@
  * Microsoft 365 provider executor. Server-only.
  *
  * Access tokens come from the encrypted OAuth credential store. This module
- * exposes read-only calendar access and Outlook draft creation only; it never
- * sends mail.
+ * exposes read-only calendar/OneDrive access and Outlook draft creation only;
+ * it never sends mail or writes files.
  */
 import { getIntegrationAccessToken } from "./oauth.server";
 
@@ -80,9 +80,7 @@ export async function listMicrosoftCalendarEvents(args: {
     args.to && !Number.isNaN(Date.parse(args.to))
       ? new Date(args.to)
       : new Date(fromDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-  if (toDate.getTime() <= fromDate.getTime()) {
-    throw new Microsoft365Error("Calendar end time must be after the start time.");
-  }
+  if (toDate.getTime() <= fromDate.getTime()) throw new Microsoft365Error("Calendar end time must be after the start time.");
 
   const query = new URLSearchParams({
     startDateTime: fromDate.toISOString(),
@@ -96,12 +94,7 @@ export async function listMicrosoftCalendarEvents(args: {
     headers: { Prefer: 'outlook.timezone="UTC"' },
     ...(args.signal ? { signal: args.signal } : {}),
   };
-  const response = await graphFetch(
-    args.userId,
-    `/me/calendarView?${query.toString()}`,
-    init,
-    args.fetchImpl ?? fetch,
-  );
+  const response = await graphFetch(args.userId, `/me/calendarView?${query.toString()}`, init, args.fetchImpl ?? fetch);
   const payload = (await response.json()) as any;
   const items = Array.isArray(payload?.value) ? payload.value : [];
   return items.map((event: any) => ({
@@ -130,7 +123,6 @@ function recipient(address: string) {
   return { emailAddress: { address } };
 }
 
-/** Creates an Outlook draft only. No /send or sendMail endpoint is used. */
 export async function createMicrosoftOutlookDraft(args: {
   userId: string;
   to: string;
@@ -141,13 +133,9 @@ export async function createMicrosoftOutlookDraft(args: {
   fetchImpl?: FetchLike;
 }): Promise<{ draftId: string; webLink: string | null }> {
   const to = cleanHeader(args.to).slice(0, 500);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
-    throw new Microsoft365Error("A valid recipient email address is required.");
-  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new Microsoft365Error("A valid recipient email address is required.");
   const cc = args.cc ? cleanHeader(args.cc).slice(0, 500) : "";
-  if (cc && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cc)) {
-    throw new Microsoft365Error("A valid CC email address is required.");
-  }
+  if (cc && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cc)) throw new Microsoft365Error("A valid CC email address is required.");
 
   const init: RequestInit = {
     method: "POST",
@@ -162,8 +150,72 @@ export async function createMicrosoftOutlookDraft(args: {
   const response = await graphFetch(args.userId, "/me/messages", init, args.fetchImpl ?? fetch);
   const payload = (await response.json()) as any;
   if (!payload?.id) throw new Microsoft365Error("Microsoft did not return an Outlook draft id.");
-  return {
-    draftId: String(payload.id),
-    webLink: payload?.webLink ? String(payload.webLink) : null,
-  };
+  return { draftId: String(payload.id), webLink: payload?.webLink ? String(payload.webLink) : null };
+}
+
+export type OneDriveFile = {
+  id: string;
+  name: string;
+  size: number | null;
+  mimeType: string | null;
+  modifiedTime: string | null;
+  webUrl: string | null;
+};
+
+function oneDriveSearchTerm(value: string): string {
+  return value.replace(/[\r\n'\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/** Read-only search of the connected user's OneDrive. */
+export async function searchMicrosoftOneDriveFiles(args: {
+  userId: string;
+  query: string;
+  limit?: number;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}): Promise<OneDriveFile[]> {
+  const query = oneDriveSearchTerm(args.query);
+  if (!query) throw new Microsoft365Error("A OneDrive search query is required.");
+  const top = Math.min(Math.max(args.limit ?? 10, 1), 50);
+  const path = `/me/drive/root/search(q='${encodeURIComponent(query)}')?$top=${top}&$select=id,name,size,lastModifiedDateTime,webUrl,file,folder`;
+  const response = await graphFetch(
+    args.userId,
+    path,
+    { method: "GET", ...(args.signal ? { signal: args.signal } : {}) },
+    args.fetchImpl ?? fetch,
+  );
+  const payload = (await response.json()) as any;
+  return (Array.isArray(payload?.value) ? payload.value : [])
+    .filter((item: any) => item?.file)
+    .map((item: any) => ({
+      id: String(item?.id ?? ""),
+      name: String(item?.name ?? "Untitled file").slice(0, 500),
+      size: Number.isFinite(Number(item?.size)) ? Number(item.size) : null,
+      mimeType: item?.file?.mimeType ? String(item.file.mimeType).slice(0, 200) : null,
+      modifiedTime: item?.lastModifiedDateTime ? String(item.lastModifiedDateTime) : null,
+      webUrl: item?.webUrl ? String(item.webUrl) : null,
+    }));
+}
+
+/** Reads bounded text-like OneDrive content; binary formats remain download-only. */
+export async function readMicrosoftOneDriveFile(args: {
+  userId: string;
+  fileId: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}): Promise<{ fileId: string; text: string; truncated: boolean; contentType: string }> {
+  const fileId = String(args.fileId ?? "").trim();
+  if (!/^[A-Za-z0-9!._~-]{5,300}$/.test(fileId)) throw new Microsoft365Error("A valid OneDrive file id is required.");
+  const response = await graphFetch(
+    args.userId,
+    `/me/drive/items/${encodeURIComponent(fileId)}/content`,
+    { method: "GET", headers: { Accept: "text/plain,text/csv,application/json,application/xml,*/*" }, ...(args.signal ? { signal: args.signal } : {}) },
+    args.fetchImpl ?? fetch,
+  );
+  const contentType = String(response.headers.get("content-type") ?? "application/octet-stream").toLowerCase();
+  const textual = contentType.startsWith("text/") || contentType.includes("json") || contentType.includes("xml") || contentType.includes("csv");
+  if (!textual) throw new Microsoft365Error("This OneDrive file is binary and cannot be read as agent text.");
+  const raw = await response.text();
+  const max = 100_000;
+  return { fileId, text: raw.slice(0, max), truncated: raw.length > max, contentType: contentType.slice(0, 120) };
 }
