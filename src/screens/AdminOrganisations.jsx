@@ -7,28 +7,75 @@ import OrgFilters from '@/components/admin-orgs/OrgFilters';
 import OrgsTable from '@/components/admin-orgs/OrgsTable';
 import OrgDetail from '@/components/admin-orgs/OrgDetail';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { listAllOrganisations } from '@/lib/admin/admin.functions';
+import { listAdminOrganisationsDetailed } from '@/lib/admin/admin-organisations.functions';
 import { friendlyMessage } from '@/lib/errors';
 
-const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Free';
+function moneyFromPence(value, currency = 'GBP') {
+  if (value == null) return 'Not available';
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(value) / 100);
+  } catch {
+    return `${currency} ${(Number(value) / 100).toFixed(2)}`;
+  }
+}
+
+function statusFor(subscription) {
+  if (!subscription) return 'active';
+  if (subscription.status === 'trialing') return 'trial';
+  if (['canceled', 'unpaid', 'paused'].includes(subscription.status)) return 'suspended';
+  return 'active';
+}
 
 function mapOrg(o) {
+  const subscription = o.subscription ?? null;
   return {
-    id: o.id, name: o.name, owner: o.owner || '—', ownerEmail: '',
-    members: o.memberCount || 0, plan: cap(o.plan), projects: 0, agents: 0,
-    usage: { requests: 0, storage: 0, seats: o.memberCount || 0 },
-    created: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—',
-    status: o.status === 'suspended' ? 'suspended' : 'active',
-    teams: [], membersList: [], agentsList: [],
-    billing: { plan: cap(o.plan), mrr: '—', method: '—', since: '—', seats: o.memberCount || 0 },
-    security: { mfaEnforced: false, sso: false, sessions: 0, risk: 'low', lastIncident: 'None' },
+    id: o.id,
+    name: o.name,
+    owner: o.owner || '—',
+    ownerEmail: o.ownerEmail || '',
+    members: o.members?.length ?? 0,
+    plan: subscription?.planName ?? 'No subscription',
+    projects: null,
+    agents: o.agents?.length ?? 0,
+    usage: {
+      seats: o.members?.length ?? 0,
+      teams: o.teams?.length ?? 0,
+      agents: o.agents?.length ?? 0,
+    },
+    created: o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-GB') : '—',
+    status: statusFor(subscription),
+    teams: (o.teams ?? []).map((team) => team.name),
+    membersList: (o.members ?? []).map((member) => ({
+      n: member.name,
+      e: member.email,
+      r: member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : 'Member',
+      t: member.joinedAt ? `Joined ${new Date(member.joinedAt).toLocaleDateString('en-GB')}` : '',
+    })),
+    agentsList: (o.agents ?? []).map((agent) => agent.name),
+    billing: {
+      plan: subscription?.planName ?? 'No subscription',
+      mrr: subscription?.billingInterval === 'month'
+        ? moneyFromPence(subscription.monthlyPricePence, subscription.currency)
+        : 'Not monthly',
+      method: 'Not exposed by backend',
+      since: subscription?.startedAt
+        ? new Date(subscription.startedAt).toLocaleDateString('en-GB')
+        : 'Not available',
+      seats: subscription?.seats ?? 'Not available',
+      status: subscription?.status ?? 'none',
+      currentPeriodEnd: subscription?.currentPeriodEnd
+        ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB')
+        : null,
+      cancelAtPeriodEnd: Boolean(subscription?.cancelAtPeriodEnd),
+    },
+    security: null,
   };
 }
 
 export default function AdminOrganisations() {
   const { session } = useWorkspace();
-  const listFn = useServerFn(listAllOrganisations);
-  const q = useQuery({ queryKey: ['admin-orgs'], queryFn: () => listFn({ data: {} }), enabled: session === 'yes', retry: false });
+  const listFn = useServerFn(listAdminOrganisationsDetailed);
+  const q = useQuery({ queryKey: ['admin-orgs-detailed'], queryFn: () => listFn({ data: {} }), enabled: session === 'yes', retry: false });
 
   const [filters, setFilters] = useState({ q: '', plan: 'all', status: 'all', date: 'all' });
   const [selected, setSelected] = useState(null);
@@ -40,7 +87,10 @@ export default function AdminOrganisations() {
     let list = orgs;
     if (filters.plan !== 'all') list = list.filter(o => o.plan === filters.plan);
     if (filters.status !== 'all') list = list.filter(o => o.status === filters.status);
-    if (filters.q.trim()) { const s = filters.q.toLowerCase(); list = list.filter(o => o.name.toLowerCase().includes(s) || o.owner.toLowerCase().includes(s)); }
+    if (filters.q.trim()) {
+      const s = filters.q.toLowerCase();
+      list = list.filter(o => o.name.toLowerCase().includes(s) || o.owner.toLowerCase().includes(s) || o.ownerEmail.toLowerCase().includes(s));
+    }
     return list;
   }, [orgs, filters]);
 
@@ -64,8 +114,8 @@ export default function AdminOrganisations() {
 
   return (
     <>
-      <PageHeader eyebrow="Admin" title="Organisation Management" description="Manage all PalladiumAI organisations — access is restricted to administrators." action={headerAction} />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Restricted area. All admin reads are re-verified server-side against your platform role. Edit/suspend actions are not yet wired to a backend endpoint.</p></div>
+      <PageHeader eyebrow="Admin" title="Organisation Management" description="Live organisation membership, teams, agents and subscription context." action={headerAction} />
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/[.06] px-3 py-2 text-[11px] text-sky-100/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Values shown here come from persisted platform rows. Project counts and organisation-wide security posture are not exposed by the current backend and are labelled unavailable instead of estimated.</p></div>
       <div className="mb-4"><OrgFilters filters={filters} setFilters={setFilters} resultCount={filtered.length} /></div>
       {filtered.length ? <OrgsTable orgs={filtered} onView={setSelected} onAction={handleAction} /> : <div className="grid place-items-center rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No organisations match your filters.</div>}
       <OrgDetail org={selected} onClose={() => setSelected(null)} onAction={handleAction} />
