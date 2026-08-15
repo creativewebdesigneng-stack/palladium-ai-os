@@ -24,17 +24,39 @@ import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { executePersonalTask } from "../personal-task-execution.server";
 
 type Update = { table: string; patch: Record<string, unknown>; filters: Record<string, unknown> };
+type Insert = { table: string; row: Record<string, unknown> };
 
-function fakeSb() {
+function fakeSb(options: { auditRunError?: boolean } = {}) {
   const updates: Update[] = [];
+  const inserts: Insert[] = [];
   return {
     updates,
+    inserts,
     from(table: string) {
       const filters: Record<string, unknown> = {};
+      let selected = false;
       const chain: any = {
         update(patch: Record<string, unknown>) {
           updates.push({ table, patch, filters });
           return chain;
+        },
+        insert(row: Record<string, unknown>) {
+          inserts.push({ table, row });
+          return chain;
+        },
+        select() {
+          selected = true;
+          return chain;
+        },
+        maybeSingle() {
+          if (table === "agent_tasks" && selected) {
+            return Promise.resolve(
+              options.auditRunError
+                ? { data: null, error: { message: "audit insert failed" } }
+                : { data: { id: "run-1" }, error: null },
+            );
+          }
+          return Promise.resolve({ data: null, error: null });
         },
         eq(column: string, value: unknown) {
           filters[column] = value;
@@ -49,6 +71,7 @@ function fakeSb() {
 const task = {
   id: "task-1",
   request: "Draft a supplier follow-up plan",
+  title: "Supplier follow-up",
   category: "work",
   required_tools: ["research"],
   agent_id: "agent-1",
@@ -71,6 +94,42 @@ describe("personal task execution", () => {
     toolLayer.resolveGrantedTools.mockResolvedValue({ defs: [], grants: new Map() });
   });
 
+  it("creates an auditable agent run linked to the personal task", async () => {
+    gateway.runChat.mockResolvedValue({
+      text: "Here is the plan.",
+      toolCalls: [],
+      provider: "openai",
+      model: "gpt-test",
+      usage: { input: 20, output: 30 },
+    });
+    const sb = fakeSb();
+
+    const result = await executePersonalTask({ sb: sb as any, userId: "user-1", task, agent });
+
+    expect(result).toMatchObject({ status: "completed", runId: "run-1" });
+    const createdRun = sb.inserts.find((i) => i.table === "agent_tasks");
+    expect(createdRun?.row).toMatchObject({
+      user_id: "user-1",
+      agent_id: "agent-1",
+      task_id: "task-1",
+      title: "Supplier follow-up",
+      input: task.request,
+      status: "running",
+      provider: "openai",
+      model: "gpt-test",
+    });
+    const completedRun = sb.updates.find(
+      (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
+    );
+    expect(completedRun?.patch).toMatchObject({
+      tokens_in: 20,
+      tokens_out: 30,
+      tool_calls: 0,
+      output_text: "Here is the plan.",
+    });
+    expect(completedRun?.filters).toMatchObject({ id: "run-1", user_id: "user-1" });
+  });
+
   it("runs a real model turn and stores the model output as the result", async () => {
     gateway.runChat.mockResolvedValue({
       text: "Here is the plan.",
@@ -88,14 +147,18 @@ describe("personal task execution", () => {
       provider: "openai",
       model: "gpt-test",
       toolCalls: 0,
+      runId: "run-1",
     });
     expect(gateway.runChat).toHaveBeenCalledTimes(1);
-    const completed = sb.updates.find((u) => u.patch["status"] === "completed");
+    const completed = sb.updates.find(
+      (u) => u.table === "personal_tasks" && u.patch["status"] === "completed",
+    );
     expect((completed?.patch["result"] as any).summary).toBe("Here is the plan.");
+    expect((completed?.patch["result"] as any).agent_run_id).toBe("run-1");
     expect(completed?.filters).toMatchObject({ id: "task-1", user_id: "user-1" });
   });
 
-  it("runs an allowed read-only tool and feeds its output back to the model", async () => {
+  it("runs an allowed read-only tool with the agent run as its audit task", async () => {
     const grants = new Map([
       [
         "connected_service",
@@ -151,18 +214,24 @@ describe("personal task execution", () => {
       agent: { ...agent, allowed_tools: ["connected_service"] },
     });
 
-    expect(result).toMatchObject({ status: "completed", toolCalls: 1 });
+    expect(result).toMatchObject({ status: "completed", toolCalls: 1, runId: "run-1" });
     expect(toolLayer.executeTool).toHaveBeenCalledWith(
       "connected_service",
       { provider: "github", action: "notifications" },
-      expect.objectContaining({ userId: "user-1", agentId: "agent-1", taskId: null }),
+      expect.objectContaining({ userId: "user-1", agentId: "agent-1", taskId: "run-1" }),
       grants,
     );
     expect(gateway.runChat).toHaveBeenCalledTimes(2);
     const secondMessages = gateway.runChat.mock.calls[1]?.[0]?.messages ?? [];
     expect(secondMessages.some((m: any) => m.role === "tool" && m.content.includes("Live item"))).toBe(true);
-    const completed = sb.updates.find((u) => u.patch["status"] === "completed");
+    const completed = sb.updates.find(
+      (u) => u.table === "personal_tasks" && u.patch["status"] === "completed",
+    );
     expect((completed?.patch["result"] as any).tool_calls).toBe(1);
+    const completedRun = sb.updates.find(
+      (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
+    );
+    expect(completedRun?.patch["tool_calls"]).toBe(1);
   });
 
   it("filters out write-capable and approval-gated tools before the model sees them", async () => {
@@ -204,7 +273,7 @@ describe("personal task execution", () => {
     expect(toolLayer.executeTool).not.toHaveBeenCalled();
   });
 
-  it("marks the task running before the provider call", async () => {
+  it("marks the personal task running before the provider call", async () => {
     gateway.runChat.mockResolvedValue({
       text: "Done",
       toolCalls: [],
@@ -214,19 +283,31 @@ describe("personal task execution", () => {
     });
     const sb = fakeSb();
     await executePersonalTask({ sb: sb as any, userId: "user-1", task });
-    expect(sb.updates[0]?.patch).toMatchObject({ status: "running" });
+    expect(sb.updates[0]).toMatchObject({ table: "personal_tasks", patch: { status: "running" } });
   });
 
-  it("fails the task clearly when no provider is configured", async () => {
+  it("fails the task and audit run clearly when no provider is configured", async () => {
     gateway.runChat.mockRejectedValue(new ProviderError("no key", 503, false));
     const sb = fakeSb();
 
     const result = await executePersonalTask({ sb: sb as any, userId: "user-1", task });
 
-    expect(result).toEqual({ status: "failed", error: "AI provider is not configured." });
-    const failed = sb.updates.find((u) => u.patch["status"] === "failed");
+    expect(result).toEqual({
+      status: "failed",
+      error: "AI provider is not configured.",
+      runId: "run-1",
+    });
+    const failed = sb.updates.find(
+      (u) => u.table === "personal_tasks" && u.patch["status"] === "failed",
+    );
     expect((failed?.patch["result"] as any).error).toBe("AI provider is not configured.");
-    expect(sb.updates.some((u) => u.patch["status"] === "completed")).toBe(false);
+    const failedRun = sb.updates.find(
+      (u) => u.table === "agent_tasks" && u.patch["status"] === "failed",
+    );
+    expect(failedRun?.patch["error"]).toBe("AI provider is not configured.");
+    expect(
+      sb.updates.some((u) => u.table === "personal_tasks" && u.patch["status"] === "completed"),
+    ).toBe(false);
   });
 
   it("fails rather than fabricating a result when the model returns empty text", async () => {
@@ -242,10 +323,25 @@ describe("personal task execution", () => {
     const result = await executePersonalTask({ sb: sb as any, userId: "user-1", task });
 
     expect(result.status).toBe("failed");
-    expect(sb.updates.some((u) => u.patch["status"] === "completed")).toBe(false);
+    expect(
+      sb.updates.some((u) => u.table === "personal_tasks" && u.patch["status"] === "completed"),
+    ).toBe(false);
+    expect(
+      sb.updates.some((u) => u.table === "agent_tasks" && u.patch["status"] === "failed"),
+    ).toBe(true);
   });
 
-  it("scopes every personal-task write to the owning user", async () => {
+  it("does not run the model when an auditable execution row cannot be created", async () => {
+    const sb = fakeSb({ auditRunError: true });
+
+    const result = await executePersonalTask({ sb: sb as any, userId: "user-1", task, agent });
+
+    expect(result).toEqual({ status: "failed", error: "AI service temporarily unavailable." });
+    expect(gateway.runChat).not.toHaveBeenCalled();
+    expect(toolLayer.executeTool).not.toHaveBeenCalled();
+  });
+
+  it("scopes personal-task and audit-run updates to the owning user", async () => {
     gateway.runChat.mockResolvedValue({
       text: "ok",
       toolCalls: [],
