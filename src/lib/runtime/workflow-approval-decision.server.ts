@@ -13,7 +13,9 @@ type ApprovalDetails = {
 };
 
 function asId(value: unknown): string | null {
-  return typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return id.length > 0 && id.length <= 128 && /^[A-Za-z0-9_-]+$/.test(id) ? id : null;
 }
 
 function detailsOf(value: unknown): ApprovalDetails | null {
@@ -127,7 +129,6 @@ export async function decideWorkflowApproval(args: {
   const now = new Date().toISOString();
   const decisionNote = args.note?.trim().slice(0, 500) || null;
 
-  // First writer wins. This is the primary approve/reject race guard.
   const { data: decided, error: decideError } = await db
     .from("approval_requests")
     .update({
@@ -143,29 +144,20 @@ export async function decideWorkflowApproval(args: {
     .maybeSingle();
   if (decideError) throw new WorkforceError(decideError.message, "DECISION_FAILED");
   if (!decided)
-    throw new WorkforceError("This approval was decided by another request.", "ALREADY_DECIDED");
+    throw new WorkforceError("This approval request has already been decided.", "ALREADY_DECIDED");
 
-  // Claim the waiting workflow exactly once. If cancellation or another resume
-  // won the race after the approval was read, do not execute any downstream work.
   const { data: claimed, error: claimError } = await db
     .from("workflow_runs")
-    .update({
-      status: "running",
-      waiting_approval_request_id: null,
-      waiting_step_id: null,
-      completed_at: null,
-    })
+    .update({ status: "running", waiting_approval_request_id: null, waiting_step_id: null })
     .eq("id", run.id)
     .eq("user_id", args.userId)
     .eq("status", "waiting_for_approval")
     .eq("waiting_approval_request_id", approval.id)
-    .eq("waiting_step_id", details.workflow_step_id)
-    .eq("cancel_requested", false)
     .select("id")
     .maybeSingle();
   if (claimError) throw new WorkforceError(claimError.message, "RESUME_CLAIM_FAILED");
   if (!claimed)
-    throw new WorkforceError("The workflow changed state before it could resume.", "STALE_APPROVAL");
+    throw new WorkforceError("This workflow is no longer waiting for this approval.", "NOT_WAITING");
 
   const outcome = approvalOutcome({
     step: waitingStep,
@@ -173,61 +165,57 @@ export async function decideWorkflowApproval(args: {
     decision: args.decision,
     note: decisionNote,
   });
-  const completed = Array.isArray(run.step_results) ? ([...run.step_results] as StepOutcome[]) : [];
-  if (!completed.some((item) => item?.step_id === outcome.step_id)) completed.push(outcome);
 
   await db
     .from("workflow_step_runs")
     .update({
-      status: args.decision === "approved" ? "succeeded" : "failed",
+      status: outcome.status,
       output: outcome.output,
       error: outcome.error,
       completed_at: now,
+      duration_ms: 0,
+      tokens_in: 0,
+      tokens_out: 0,
     })
     .eq("id", details.workflow_step_run_id)
-    .eq("run_id", run.id)
-    .eq("step_id", details.workflow_step_id);
+    .eq("workflow_run_id", run.id)
+    .eq("step_id", waitingStep.id);
+
+  const completed = Array.isArray(run.step_results) ? (run.step_results as StepOutcome[]) : [];
+  const withDecision = [...completed.filter((item) => item.step_id !== waitingStep.id), outcome];
+  await db.from("workflow_runs").update({ step_results: withDecision }).eq("id", run.id).eq("user_id", args.userId);
 
   if (args.decision === "rejected" && !waitingStep.continue_on_error) {
-    await db
+    const error = outcome.error ?? "Approval was rejected.";
+    const { data: failedRun } = await db
       .from("workflow_runs")
-      .update({
-        status: "failed",
-        step_results: completed,
-        error: `${outcome.name}: ${outcome.error}`.slice(0, 600),
-        completed_at: now,
-      })
+      .update({ status: "failed", error, completed_at: now, step_results: withDecision })
       .eq("id", run.id)
       .eq("user_id", args.userId)
-      .eq("status", "running");
-
+      .eq("status", "running")
+      .select("*")
+      .maybeSingle();
     await notify({
       userId: args.userId,
       orgId: run.org_id ?? null,
       type: "workflow.failed",
-      title: `Workflow "${workflow.name}" stopped`,
-      body: `${outcome.name} was rejected.`,
-      link: "/workforce",
-      metadata: { run_id: run.id, workflow_id: workflow.id, approval_request_id: approval.id },
+      title: `Workflow approval rejected: ${workflow.name}`,
+      body: error,
+      link: "/workflows",
+      metadata: { workflow_id: workflow.id, run_id: run.id },
     });
-    return { run: { ...run, status: "failed", step_results: completed }, steps: completed, resumed: false };
+    return { approval: decided, run: failedRun ?? { ...run, status: "failed", error } };
   }
 
-  await db
-    .from("workflow_runs")
-    .update({ step_results: completed })
-    .eq("id", run.id)
-    .eq("user_id", args.userId)
-    .eq("status", "running");
-
-  return executeWorkflowRun({
+  const result = await executeWorkflowRun({
     sb: args.sb,
     db,
     userId: args.userId,
-    workflow: workflow as any,
-    steps: (rawSteps ?? []) as any,
-    runId: run.id as string,
-    objective: String(run.input ?? ""),
-    completed,
+    workflow,
+    steps: rawSteps ?? [],
+    runId: run.id,
+    objective: typeof run.input === "string" ? run.input : JSON.stringify(run.input ?? ""),
+    completed: withDecision,
   });
+  return { approval: decided, run: result.run, paused: result.paused ?? false };
 }
