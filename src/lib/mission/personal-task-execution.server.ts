@@ -1,10 +1,10 @@
 /**
  * Personal task execution — live model work with the existing read-only tool layer.
  *
- * Personal Mission Control tasks intentionally expose only tools that cannot
- * perform external writes in this path. Write-capable tools continue to use the
- * professional runtime/approval paths until personal-task approval resume has a
- * dedicated audit-safe task association.
+ * Each personal task execution is represented by an `agent_tasks` run. That row
+ * links back to `personal_tasks.task_id`, giving tool executions and memories a
+ * real audit-safe agent-task identity instead of overloading the personal task
+ * primary key or leaving the audit association empty.
  */
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import {
@@ -54,8 +54,9 @@ export type PersonalTaskExecutionResult =
       model: string;
       usage: { input: number; output: number };
       toolCalls: number;
+      runId: string;
     }
-  | { status: "failed"; error: string };
+  | { status: "failed"; error: string; runId?: string };
 
 const MAX_TOOL_ROUNDS = 4;
 
@@ -122,6 +123,67 @@ async function writeFailed(sb: Sb, userId: string, taskId: string, message: stri
     .eq("user_id", userId);
 }
 
+async function createAuditRun(args: {
+  sb: Sb;
+  userId: string;
+  task: PersonalTaskRow;
+  agent: PersonalAgentRow;
+  provider: string;
+  model: string;
+}): Promise<string> {
+  const now = new Date().toISOString();
+  const { data, error } = await args.sb
+    .from("agent_tasks")
+    .insert({
+      user_id: args.userId,
+      org_id: args.task.org_id ?? null,
+      agent_id: args.agent?.id ?? null,
+      task_id: args.task.id,
+      title: args.task.title ?? args.task.request.slice(0, 200),
+      input: args.task.request,
+      status: "running",
+      provider: args.provider,
+      model: args.model,
+      started_at: now,
+      heartbeat_at: now,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error || !data?.id) {
+    throw new ProviderError("Could not create an auditable agent run.", 500, false);
+  }
+  return String(data.id);
+}
+
+async function finishAuditRun(args: {
+  sb: Sb;
+  userId: string;
+  runId: string;
+  startedMs: number;
+  status: "succeeded" | "failed";
+  usage?: { input: number; output: number };
+  toolCalls?: number;
+  outputText?: string | null;
+  error?: string | null;
+}) {
+  await args.sb
+    .from("agent_tasks")
+    .update({
+      status: args.status,
+      completed_at: new Date().toISOString(),
+      duration_ms: Math.max(0, Date.now() - args.startedMs),
+      tokens_in: args.usage?.input ?? 0,
+      tokens_out: args.usage?.output ?? 0,
+      tool_calls: args.toolCalls ?? 0,
+      output_text: args.outputText ?? null,
+      output: args.outputText ? { summary: args.outputText } : null,
+      error: args.error ?? null,
+      heartbeat_at: new Date().toISOString(),
+    })
+    .eq("id", args.runId)
+    .eq("user_id", args.userId);
+}
+
 /**
  * Runs the personal task through the live model gateway and the same
  * server-authorised tool registry used by professional agents, restricted to a
@@ -142,6 +204,10 @@ export async function executePersonalTask(args: {
     { role: "system", content: systemPrompt(task, agent) },
     { role: "user", content: String(task.request ?? "").slice(0, 8000) },
   ];
+  const startedMs = Date.now();
+  let runId: string | undefined;
+  const usage = { input: 0, output: 0 };
+  let toolCalls = 0;
 
   await sb
     .from("personal_tasks")
@@ -150,6 +216,8 @@ export async function executePersonalTask(args: {
     .eq("user_id", userId);
 
   try {
+    runId = await createAuditRun({ sb, userId, task, agent, provider, model });
+
     let tools: { defs: ToolDef[]; grants: Map<string, ToolGrant> } = {
       defs: [],
       grants: new Map(),
@@ -159,8 +227,6 @@ export async function executePersonalTask(args: {
       tools = safeToolSet(await resolveGrantedTools(sb, agent, entitlements.planCode));
     }
 
-    const usage = { input: 0, output: 0 };
-    let toolCalls = 0;
     let final: ChatResult | null = null;
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -190,9 +256,7 @@ export async function executePersonalTask(args: {
             userId,
             orgId: task.org_id ?? null,
             agentId: agent?.id ?? "personal-task",
-            // personal_tasks IDs are not agent_tasks IDs; keep the agent-task
-            // audit FK empty for this read-only loop.
-            taskId: null,
+            taskId: runId,
             sb,
           },
           tools.grants,
@@ -230,10 +294,22 @@ export async function executePersonalTask(args: {
           output_tokens: usage.output,
           tool_calls: toolCalls,
           tools: [...tools.grants.keys()],
+          agent_run_id: runId,
         },
       })
       .eq("id", task.id)
       .eq("user_id", userId);
+
+    await finishAuditRun({
+      sb,
+      userId,
+      runId,
+      startedMs,
+      status: "succeeded",
+      usage,
+      toolCalls,
+      outputText: summary,
+    });
 
     return {
       status: "completed",
@@ -242,11 +318,24 @@ export async function executePersonalTask(args: {
       model: final.model,
       usage,
       toolCalls,
+      runId,
     };
   } catch (error) {
     const message = providerFailure(error);
     console.error("[mission] personal task execution failed", task.id, error);
+    if (runId) {
+      await finishAuditRun({
+        sb,
+        userId,
+        runId,
+        startedMs,
+        status: "failed",
+        usage,
+        toolCalls,
+        error: message,
+      });
+    }
     await writeFailed(sb, userId, task.id, message);
-    return { status: "failed", error: message };
+    return { status: "failed", error: message, ...(runId ? { runId } : {}) };
   }
 }
