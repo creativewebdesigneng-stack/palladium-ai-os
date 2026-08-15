@@ -6,6 +6,10 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertSupportedWorkflowStepKind,
+  normaliseWorkflowStepConfig,
+} from "@/lib/runtime/workflow-step-config";
 
 type Sb = { from: (t: string) => any };
 
@@ -323,8 +327,8 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
 
 /**
  * Imports a workflow definition (JSON) exported from PalladiumAI or written by
- * hand. Validated in full before anything is written; the workflow and its
- * steps are always created for the calling user.
+ * hand. The definition is validated against the actual production runtime
+ * before any database row is created.
  */
 export const importWorkflow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -342,37 +346,31 @@ export const importWorkflow = createServerFn({ method: "POST" })
       );
     const schedule = def.schedule ? String(def.schedule).slice(0, 200) : null;
 
-    const kinds = [
-      "agent",
-      "condition",
-      "action",
-      "api",
-      "database",
-      "notification",
-      "approval",
-      "delay",
-      "loop",
-    ];
     const rawSteps = Array.isArray(def.steps) ? def.steps : [];
     if (rawSteps.length === 0) throw new Error("The workflow definition needs at least one step.");
-    if (rawSteps.length > 100) throw new Error("Workflows are limited to 100 steps.");
+    if (rawSteps.length > 25) throw new Error("Executable workflows are limited to 25 steps.");
     const steps = rawSteps.map((s: any, i: number) => {
-      const kind = String(s?.kind ?? "action").toLowerCase();
-      if (!kinds.includes(kind))
-        throw new Error(`Step ${i + 1} has an unsupported kind "${kind}".`);
+      const kind = assertSupportedWorkflowStepKind(s?.kind ?? "agent", `Step ${i + 1}`);
       const mode = String(s?.mode ?? "sequential").toLowerCase();
-      if (!["sequential", "parallel"].includes(mode))
-        throw new Error(`Step ${i + 1} mode must be sequential or parallel.`);
+      if (!["sequential", "parallel", "conditional"].includes(mode))
+        throw new Error(`Step ${i + 1} mode must be sequential, parallel or conditional.`);
       return {
         kind,
         mode,
         name: s?.name ? String(s.name).slice(0, 120) : `Step ${i + 1}`,
         position: Number.isFinite(Number(s?.position)) ? Number(s.position) : i,
+        config: normaliseWorkflowStepConfig(kind, s?.config),
+        agent_id: kind === "agent" && s?.agent_id ? String(s.agent_id) : null,
+        depends_on: Array.isArray(s?.depends_on) ? s.depends_on.slice(0, 25).map(String) : [],
+        condition: s?.condition && typeof s.condition === "object" && !Array.isArray(s.condition)
+          ? s.condition
+          : {},
         input_template: s?.input_template ? String(s.input_template).slice(0, 4000) : null,
-        tool: s?.tool ? String(s.tool).slice(0, 120) : null,
         requires_approval: Boolean(s?.requires_approval),
         continue_on_error: Boolean(s?.continue_on_error),
-        max_retries: Math.min(Math.max(Number(s?.max_retries ?? 0), 0), 5),
+        max_retries: Math.min(Math.max(Number(s?.max_retries ?? 1), 1), 4),
+        retry_delay_ms: Math.min(Math.max(Number(s?.retry_delay_ms ?? 500), 0), 10_000),
+        timeout_ms: Math.min(Math.max(Number(s?.timeout_ms ?? 120_000), 5_000), 300_000),
       };
     });
 
@@ -380,6 +378,21 @@ export const importWorkflow = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+
+    // Agent references are checked before creating the workflow. personal_agents
+    // is owner-only under RLS, so a foreign agent id cannot be smuggled into an
+    // imported workflow even when it is a valid UUID.
+    const agentIds = [...new Set(data.steps.map((s: any) => s.agent_id).filter(Boolean))] as string[];
+    if (agentIds.length) {
+      const { data: agents, error: agentError } = await sb
+        .from("personal_agents")
+        .select("id")
+        .in("id", agentIds);
+      if (agentError) throw new Error(agentError.message);
+      if ((agents ?? []).length !== agentIds.length)
+        throw new Error("One or more workflow agents are not available to this account.");
+    }
+
     const { data: workflow, error } = await sb
       .from("workflows")
       .insert({
