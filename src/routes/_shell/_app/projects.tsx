@@ -5,9 +5,9 @@ export const Route = createFileRoute("/_shell/_app/projects")({
   head: () => ({
     meta: [
       { title: "Projects — PalladiumAI" },
-      { name: "description", content: "Group work into projects with goals and owners." },
+      { name: "description", content: "Project persistence setup status for PalladiumAI." },
       { property: "og:title", content: "Projects — PalladiumAI" },
-      { property: "og:description", content: "Group work into projects with goals and owners." },
+      { property: "og:description", content: "Project persistence setup status for PalladiumAI." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
