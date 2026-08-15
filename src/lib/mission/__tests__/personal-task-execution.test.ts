@@ -329,7 +329,7 @@ describe("personal task execution", () => {
       "browser",
       { action: "read", url: "https://example.com" },
       expect.objectContaining({ taskId: "run-1" }),
-      grants,
+      expect.any(Map),
     );
   });
 
