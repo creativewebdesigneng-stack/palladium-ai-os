@@ -11,8 +11,15 @@ import {
 describe("connected service read request whitelist", () => {
   it("contains only the intended read-capable providers", () => {
     expect(Object.keys(CONNECTED_SERVICE_ACTIONS).sort()).toEqual(
-      ["asana", "google", "hubspot", "linear", "microsoft", "notion", "slack"].sort(),
+      ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "slack"].sort(),
     );
+    expect(CONNECTED_SERVICE_ACTIONS.github).toEqual([
+      "repositories_list",
+      "branches_list",
+      "commits_list",
+      "path_list",
+      "file_read",
+    ]);
   });
 
   it("rejects an unknown provider/action before building a request", () => {
