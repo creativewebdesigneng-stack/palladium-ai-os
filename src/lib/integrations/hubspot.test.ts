@@ -56,8 +56,10 @@ describe("HubSpot CRM executor", () => {
   });
 
   it("normalises deal values without exposing write capability", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push([input, init]);
+      return new Response(
         JSON.stringify({
           total: 1,
           results: [
@@ -73,8 +75,8 @@ describe("HubSpot CRM executor", () => {
           ],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      ),
-    );
+      );
+    };
 
     const result = await searchHubSpotDeals({
       userId: "user-1",
@@ -82,7 +84,7 @@ describe("HubSpot CRM executor", () => {
       fetchImpl: fetchImpl as typeof fetch,
     });
     expect(result.deals[0]).toMatchObject({ id: "202", name: "Renewal", amount: 12500.5 });
-    const [, init] = fetchImpl.mock.calls[0]!;
+    const [, init] = calls[0]!;
     expect(init?.method).toBe("POST");
   });
 
