@@ -1,69 +1,67 @@
-import { useState } from 'react';
-import { GitFork, GitBranch, GitCommit, FilePen, GitPullRequest, CircleDot, Tag, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { GitBranch, KeyRound, ShieldCheck, Webhook } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import RepositoriesPanel from '@/components/git/RepositoriesPanel';
-import BranchesPanel from '@/components/git/BranchesPanel';
-import CommitsPanel from '@/components/git/CommitsPanel';
-import ChangesPanel from '@/components/git/ChangesPanel';
-import PullRequestsPanel from '@/components/git/PullRequestsPanel';
-import IssuesPanel from '@/components/git/IssuesPanel';
-import TagsPanel from '@/components/git/TagsPanel';
-import AIFeaturesPanel from '@/components/git/AIFeaturesPanel';
 
-const NAV = [
-  { id: 'repos', label: 'Repositories', icon: GitFork },
-  { id: 'branches', label: 'Branches', icon: GitBranch },
-  { id: 'commits', label: 'Commits', icon: GitCommit },
-  { id: 'changes', label: 'Changes', icon: FilePen },
-  { id: 'prs', label: 'Pull Requests', icon: GitPullRequest },
-  { id: 'issues', label: 'Issues', icon: CircleDot },
-  { id: 'tags', label: 'Tags', icon: Tag },
-  { id: 'ai', label: 'AI Features', icon: Sparkles },
+const REQUIRED = [
+  { icon: KeyRound, title: 'Provider authentication', text: 'Connect GitHub, GitLab or another provider with OAuth/App credentials kept server-side.' },
+  { icon: GitBranch, title: 'Repository discovery', text: 'Persist the repositories a user or organisation has explicitly connected and their allowed scopes.' },
+  { icon: Webhook, title: 'Live repository events', text: 'Ingest signed provider webhooks for commits, pull requests, issues, branches and deployment events.' },
+  { icon: ShieldCheck, title: 'Protected write actions', text: 'Require owner-scoped permissions and approval gates before branch, commit, PR or issue mutations.' },
 ];
 
 export default function GitControl() {
-  const [active, setActive] = useState('repos');
-  const [repo, setRepo] = useState('palladium-app');
-  const [toast, setToast] = useState(null);
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1600); };
+  const navigate = useNavigate();
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Git & Version Control" description="Manage repositories, branches, pull requests, issues, and tags with AI-assisted review." />
-      <div className="grid gap-4 lg:grid-cols-[200px_1fr]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-4 rounded-2xl border border-white/10 bg-white/[.03] p-2">
-            <div className="mb-2 border-b border-white/10 px-2 pb-2">
-              <p className="text-[10px] uppercase tracking-wide text-zinc-500">Active repo</p>
-              <p className="truncate font-mono text-[11px] text-white">{repo}</p>
-            </div>
-            <nav className="space-y-0.5">
-              {NAV.map((n) => { const I = n.icon; return (
-                <button key={n.id} onClick={() => setActive(n.id)} className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12px] font-medium ${active === n.id ? 'bg-violet-500/15 text-white ring-1 ring-violet-400/20' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}>
-                  <I className="h-4 w-4 shrink-0" />{n.label}
-                </button>
-              ); })}
-            </nav>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Git & Version Control"
+        description="A source-control provider is not connected yet. PalladiumAI no longer displays simulated repositories, commits, branches, pull requests or issues."
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/[.08]">
+            <GitBranch className="h-5 w-5 text-violet-300" />
           </div>
-        </aside>
-        <div>
-          <div className="mb-4 flex gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/[.03] p-1 lg:hidden">
-            {NAV.map((n) => (
-              <button key={n.id} onClick={() => setActive(n.id)} className={`whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium ${active === n.id ? 'bg-violet-500/20 text-white' : 'text-zinc-400'}`}>{n.label}</button>
+          <h2 className="text-xl font-semibold text-white">Git provider integration required</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+            The previous repository selector and its branches, commits, changes, pull requests, issues, tags and AI-review actions were backed by local fixture data. Those records and buttons have been removed until a real provider connection is available.
+          </p>
+
+          <div className="mt-6 space-y-3">
+            {REQUIRED.map(({ icon: Icon, title, text }) => (
+              <div key={title} className="flex gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[.04] text-zinc-300"><Icon className="h-4 w-4" /></span>
+                <div>
+                  <p className="text-sm font-medium text-white">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">{text}</p>
+                </div>
+              </div>
             ))}
           </div>
-          {active === 'repos' && <RepositoriesPanel active={repo} setActive={setRepo} />}
-          {active === 'branches' && <BranchesPanel onToast={flash} />}
-          {active === 'commits' && <CommitsPanel />}
-          {active === 'changes' && <ChangesPanel onToast={flash} />}
-          {active === 'prs' && <PullRequestsPanel onToast={flash} />}
-          {active === 'issues' && <IssuesPanel />}
-          {active === 'tags' && <TagsPanel onToast={flash} />}
-          {active === 'ai' && <AIFeaturesPanel />}
-        </div>
-      </div>
+        </section>
 
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#10121a] px-4 py-2 text-xs text-zinc-200 shadow-2xl">{toast}</div>}
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <h3 className="text-sm font-semibold text-white">What works today</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">Use PalladiumAI's persisted runtime areas while source control remains unconnected.</p>
+          <div className="mt-5 space-y-2.5">
+            <button onClick={() => navigate('/workflows')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="block text-sm font-medium text-white">Workflow runtime</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Queue and execute real persisted workflow runs.</span>
+            </button>
+            <button onClick={() => navigate('/mcp-hub')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="block text-sm font-medium text-white">MCP Hub</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Inspect the OAuth-protected MCP tools that actually ship with PalladiumAI.</span>
+            </button>
+            <button onClick={() => navigate('/integrations')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="block text-sm font-medium text-white">Integrations</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Manage currently supported provider connections.</span>
+            </button>
+          </div>
+        </section>
+      </div>
     </>
   );
 }
