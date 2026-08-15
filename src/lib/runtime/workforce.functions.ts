@@ -6,45 +6,78 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
 import { decideWorkflowApproval } from "./workflow-approval-decision.server";
+import {
+  assertSupportedWorkflowStepKind,
+  normaliseWorkflowStepConfig,
+} from "./workflow-step-config";
 import { executeWorkflow, requestWorkflowCancellation, WorkforceError } from "./workforce.server";
 
 type Sb = { from: (t: string) => any };
 
-function jsonConfig(value: unknown, depth = 0): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 4) return {};
-  const result: Record<string, unknown> = {};
-  for (const [key, raw] of Object.entries(value).slice(0, 40)) {
-    if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(key)) continue;
-    if (raw == null || typeof raw === "boolean" || typeof raw === "number") result[key] = raw;
-    else if (typeof raw === "string") result[key] = raw.slice(0, 2_000);
-    else if (Array.isArray(raw))
-      result[key] = raw
-        .slice(0, 20)
-        .filter((item) => typeof item === "string")
-        .map(String);
-    else if (typeof raw === "object") result[key] = jsonConfig(raw, depth + 1);
-  }
-  return result;
-}
-
-export function normaliseWorkflowStepConfig(kind: string, value: unknown): Record<string, unknown> {
-  const config = jsonConfig(value);
-  if (kind === "delay") {
-    if (
-      !Number.isInteger(config["duration_ms"]) ||
-      Number(config["duration_ms"]) < 0 ||
-      Number(config["duration_ms"]) > 300_000
-    )
-      throw new Error("Delay duration_ms must be an integer between 0 and 300000.");
-  }
-  return config;
-}
+type AgentRef = { agent_id: string; role?: string };
 
 function surface(error: unknown): never {
   if (error instanceof WorkforceError || error instanceof EntitlementError)
     throw new Error(error.message);
   console.error("[workforce.api]", error);
   throw new Error(error instanceof Error ? error.message : "The workforce engine is unavailable.");
+}
+
+async function requireAccessibleOrg(sb: Sb, orgId: string | null) {
+  if (!orgId) return;
+  const { data, error } = await sb
+    .from("organisations")
+    .select("id")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (error || !data)
+    throw new Error("Organisation not found or you do not have access to it.");
+}
+
+async function requireOwnedWorkforce(sb: Sb, userId: string, workforceId: string) {
+  const { data, error } = await sb
+    .from("workforces")
+    .select("id,user_id,org_id")
+    .eq("id", workforceId)
+    .maybeSingle();
+  if (error || !data || data.user_id !== userId)
+    throw new Error("Workforce not found or you are not its owner.");
+  return data;
+}
+
+async function requireOwnedWorkflow(sb: Sb, userId: string, workflowId: string) {
+  const { data, error } = await sb
+    .from("workflows")
+    .select("id,user_id,org_id,workforce_id")
+    .eq("id", workflowId)
+    .maybeSingle();
+  if (error || !data || data.user_id !== userId)
+    throw new Error("Workflow not found or you are not its owner.");
+  return data;
+}
+
+async function requireAssignableAgents(
+  sb: Sb,
+  userId: string,
+  orgId: string | null,
+  agentIds: string[],
+) {
+  const ids = [...new Set(agentIds.filter(Boolean))];
+  if (!ids.length) return;
+  const { data, error } = await sb
+    .from("personal_agents")
+    .select("id,user_id,org_id")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const byId = new Map(rows.map((row: any) => [String(row.id), row]));
+  for (const id of ids) {
+    const row: any = byId.get(id);
+    const owned = row?.user_id === userId;
+    const sharedInOrg = Boolean(orgId && row?.org_id === orgId);
+    if (!row || (!owned && !sharedInOrg))
+      throw new Error("One or more selected agents are not available to this workforce.");
+  }
 }
 
 /** Workforces with their member agents and the workflows they own. */
@@ -78,7 +111,7 @@ export const saveWorkforce = createServerFn({ method: "POST" })
       department?: string;
       status?: string;
       org_id?: string | null;
-      agents?: { agent_id: string; role?: string }[];
+      agents?: AgentRef[];
     }) => {
       const name = String(input?.name ?? "").trim();
       if (!name) throw new Error("Give the workforce a name.");
@@ -89,7 +122,7 @@ export const saveWorkforce = createServerFn({ method: "POST" })
         purpose: input.purpose ? String(input.purpose) : null,
         department: input.department ? String(input.department) : null,
         status: input.status ? String(input.status) : "active",
-        org_id: input.org_id ?? null,
+        org_id: input.org_id ? String(input.org_id) : null,
         agents: (input.agents ?? []).map((a) => ({
           agent_id: String(a.agent_id),
           role: String(a.role ?? "member"),
@@ -99,6 +132,15 @@ export const saveWorkforce = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    await requireAccessibleOrg(sb, data.org_id);
+    if (data.id) await requireOwnedWorkforce(sb, context.userId, data.id);
+    await requireAssignableAgents(
+      sb,
+      context.userId,
+      data.org_id,
+      data.agents.map((a) => a.agent_id),
+    );
+
     const row = {
       name: data.name,
       description: data.description,
@@ -110,12 +152,18 @@ export const saveWorkforce = createServerFn({ method: "POST" })
     };
 
     const { data: workforce, error } = data.id
-      ? await sb.from("workforces").update(row).eq("id", data.id).select("*").maybeSingle()
+      ? await sb
+          .from("workforces")
+          .update(row)
+          .eq("id", data.id)
+          .eq("user_id", context.userId)
+          .select("*")
+          .maybeSingle()
       : await sb.from("workforces").insert(row).select("*").maybeSingle();
     if (error || !workforce) throw new Error(error?.message ?? "Could not save that workforce.");
 
-    // Replace membership even when the new list is empty. This prevents stale
-    // agents from remaining attached after an operator removes everyone.
+    // Replace membership only after the parent ownership and every requested
+    // agent association have been validated server-side.
     await sb.from("workforce_agents").delete().eq("workforce_id", workforce.id);
     if (data.agents.length) {
       const { error: memberError } = await sb.from("workforce_agents").insert(
@@ -149,30 +197,49 @@ export const saveWorkflow = createServerFn({ method: "POST" })
         id: input.id ? String(input.id) : null,
         name,
         description: input.description ? String(input.description) : null,
-        workforce_id: input.workforce_id ?? null,
-        org_id: input.org_id ?? null,
+        workforce_id: input.workforce_id ? String(input.workforce_id) : null,
+        org_id: input.org_id ? String(input.org_id) : null,
         status: input.status ?? "active",
-        steps: (input.steps ?? []).slice(0, 25).map((s: any, index: number) => ({
-          position: Number.isFinite(s?.position) ? Number(s.position) : index,
-          name: s?.name ? String(s.name) : null,
-          kind: String(s?.kind ?? "agent"),
-          config: normaliseWorkflowStepConfig(String(s?.kind ?? "agent"), s?.config),
-          agent_id: s?.agent_id ? String(s.agent_id) : null,
-          mode: ["sequential", "parallel", "conditional"].includes(s?.mode) ? s.mode : "sequential",
-          depends_on: Array.isArray(s?.depends_on) ? s.depends_on.map(String) : [],
-          condition: s?.condition && typeof s.condition === "object" ? s.condition : {},
-          input_template: s?.input_template ? String(s.input_template) : null,
-          max_retries: Math.min(Math.max(Number(s?.max_retries ?? 1), 1), 4),
-          retry_delay_ms: Math.min(Math.max(Number(s?.retry_delay_ms ?? 500), 0), 10_000),
-          timeout_ms: Math.min(Math.max(Number(s?.timeout_ms ?? 120_000), 5_000), 300_000),
-          continue_on_error: Boolean(s?.continue_on_error),
-          requires_approval: Boolean(s?.requires_approval),
-        })),
+        steps: (input.steps ?? []).slice(0, 25).map((s: any, index: number) => {
+          const kind = assertSupportedWorkflowStepKind(s?.kind ?? "agent", `Step ${index + 1}`);
+          return {
+            position: Number.isFinite(s?.position) ? Number(s.position) : index,
+            name: s?.name ? String(s.name) : null,
+            kind,
+            config: normaliseWorkflowStepConfig(kind, s?.config),
+            agent_id: s?.agent_id ? String(s.agent_id) : null,
+            mode: ["sequential", "parallel", "conditional"].includes(s?.mode)
+              ? s.mode
+              : "sequential",
+            depends_on: Array.isArray(s?.depends_on) ? s.depends_on.map(String) : [],
+            condition: s?.condition && typeof s.condition === "object" ? s.condition : {},
+            input_template: s?.input_template ? String(s.input_template) : null,
+            max_retries: Math.min(Math.max(Number(s?.max_retries ?? 1), 1), 4),
+            retry_delay_ms: Math.min(Math.max(Number(s?.retry_delay_ms ?? 500), 0), 10_000),
+            timeout_ms: Math.min(Math.max(Number(s?.timeout_ms ?? 120_000), 5_000), 300_000),
+            continue_on_error: Boolean(s?.continue_on_error),
+            requires_approval: Boolean(s?.requires_approval),
+          };
+        }),
       };
     },
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    await requireAccessibleOrg(sb, data.org_id);
+    if (data.id) await requireOwnedWorkflow(sb, context.userId, data.id);
+    if (data.workforce_id) {
+      const parent = await requireOwnedWorkforce(sb, context.userId, data.workforce_id);
+      if ((parent.org_id ?? null) !== data.org_id)
+        throw new Error("Workflow and workforce must belong to the same organisation scope.");
+    }
+    await requireAssignableAgents(
+      sb,
+      context.userId,
+      data.org_id,
+      data.steps.map((step) => step.agent_id).filter(Boolean) as string[],
+    );
+
     const row = {
       name: data.name,
       description: data.description,
@@ -183,7 +250,13 @@ export const saveWorkflow = createServerFn({ method: "POST" })
     };
 
     const { data: workflow, error } = data.id
-      ? await sb.from("workflows").update(row).eq("id", data.id).select("*").maybeSingle()
+      ? await sb
+          .from("workflows")
+          .update(row)
+          .eq("id", data.id)
+          .eq("user_id", context.userId)
+          .select("*")
+          .maybeSingle()
       : await sb.from("workflows").insert(row).select("*").maybeSingle();
     if (error || !workflow) throw new Error(error?.message ?? "Could not save that workflow.");
 
