@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getIntegrationAccessToken = vi.fn();
-vi.mock("./oauth.server", () => ({ getIntegrationAccessToken }));
+const oauth = vi.hoisted(() => ({ getIntegrationAccessToken: vi.fn() }));
+vi.mock("./oauth.server", () => oauth);
 
 import {
   createGoogleGmailDraft,
@@ -12,7 +12,7 @@ import {
 describe("Google Workspace executor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getIntegrationAccessToken.mockResolvedValue("access-token");
+    oauth.getIntegrationAccessToken.mockResolvedValue("access-token");
   });
 
   it("lists and normalises primary-calendar events", async () => {
@@ -84,7 +84,7 @@ describe("Google Workspace executor", () => {
   });
 
   it("fails closed when no Google token is available", async () => {
-    getIntegrationAccessToken.mockResolvedValue(null);
+    oauth.getIntegrationAccessToken.mockResolvedValue(null);
     await expect(
       listGoogleCalendarEvents({ userId: "user-1", fetchImpl: vi.fn() as unknown as typeof fetch }),
     ).rejects.toEqual(expect.objectContaining<Partial<GoogleWorkspaceError>>({ status: 401 }));
