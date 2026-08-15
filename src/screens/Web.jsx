@@ -1,92 +1,81 @@
-import { useState } from 'react';
-import { Globe, FileText, ImageIcon, Play, Newspaper, BookmarkPlus, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Globe2, ImageIcon, Newspaper, Search, ShieldCheck, Video } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import SearchBar from '@/components/web/SearchBar';
-import AIAnswer from '@/components/web/AIAnswer';
-import SourceCards from '@/components/web/SourceCards';
-import { WebTab, NewsTab, ImagesTab, VideosTab, SourcesTab } from '@/components/web/ResultsTabs';
-import { SearchHistory, SavedSearches } from '@/components/web/SearchHistory';
 
-const TABS = [
-  { id: 'web', label: 'Web Results', icon: Globe },
-  { id: 'news', label: 'News', icon: Newspaper },
-  { id: 'images', label: 'Images', icon: ImageIcon },
-  { id: 'videos', label: 'Videos', icon: Play },
-  { id: 'sources', label: 'Sources', icon: FileText },
+const REQUIRED = [
+  {
+    icon: Search,
+    title: 'Server-side search API',
+    text: 'Search requests must run through an authenticated backend provider and return real result URLs, snippets and timestamps.',
+  },
+  {
+    icon: Newspaper,
+    title: 'Freshness and source metadata',
+    text: 'News results need publication dates and source attribution so stale or unsupported claims are not presented as current.',
+  },
+  {
+    icon: ImageIcon,
+    title: 'Media result providers',
+    text: 'Image and video tabs should only appear when their results come from real provider APIs with safe external URLs.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Safe fetching and persistence',
+    text: 'Fetched pages need SSRF protections, size/time limits and audited workspace-scoped storage before agents can use them.',
+  },
 ];
 
 export default function Web() {
-  const [query, setQuery] = useState('');
-  const [activeQuery, setActiveQuery] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState('web');
-  const [toast, setToast] = useState(null);
-
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1600); };
-
-  const run = (q) => {
-    const term = (typeof q === 'string' ? q : query).trim();
-    if (!term) return;
-    setQuery(term);
-    setActiveQuery(term);
-    setLoading(true);
-    setTab('web');
-    setTimeout(() => setLoading(false), 900);
-  };
-
-  const pickHistory = (q) => run(q);
-
-  const saveCurrent = () => {
-    if (!activeQuery) return;
-    flash('Search saved');
-  };
+  const navigate = useNavigate();
 
   return (
     <>
       <PageHeader
         eyebrow="Discovery"
         title="PalladiumAI Web"
-        description="AI-powered web discovery — ask anything in natural language and get a synthesised answer with sources, results, news, images and videos."
-        action={activeQuery ? (
-          <button onClick={saveCurrent} className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><BookmarkPlus className="h-4 w-4" />Save search</button>
-        ) : null}
+        description="Live web discovery is not connected yet. Illustrative results, artificial search delays and browser-only saved searches have been removed."
       />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.06] px-3 py-2 text-[11px] text-amber-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Results are illustrative mock data. The interface is backend-ready for a future web search integration.</p></div>
 
-      <SearchBar query={query} setQuery={setQuery} onSearch={run} loading={loading} />
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/[.08]">
+            <Globe2 className="h-5 w-5 text-violet-300" />
+          </div>
+          <h2 className="text-xl font-semibold text-white">Web search provider required</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+            The previous interface rendered illustrative AI answers, web/news/image/video results and search history without a live search backend. PalladiumAI now keeps this surface inactive until every result can be traced to an actual provider response.
+          </p>
 
-      {!activeQuery ? (
-        <div className="mt-10 flex flex-col items-center text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 ring-1 ring-violet-400/20"><Globe className="h-8 w-8 text-violet-400" /></span>
-          <p className="mt-4 text-sm text-zinc-400">Ask a question above to get an AI answer with sources and results.</p>
-        </div>
-      ) : (
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_17rem]">
-          <div className="min-w-0 space-y-5">
-            <AIAnswer loading={loading} />
-            <SourceCards loading={loading} />
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {REQUIRED.map(({ icon: Icon, title, text }) => (
+              <div key={title} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <Icon className="h-4 w-4 text-violet-300" />
+                <p className="mt-3 text-sm font-medium text-white">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="flex flex-wrap gap-1.5 border-b border-white/10 pb-2">
-              {TABS.map(t => { const I = t.icon; return (
-                <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium ${tab === t.id ? 'bg-violet-500/15 text-white ring-1 ring-violet-400/20' : 'text-zinc-400 hover:text-white'}`}><I className="h-3.5 w-3.5" />{t.label}</button>
-              );})}
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <h3 className="text-sm font-semibold text-white">Live capabilities available now</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">Use persisted data sources until external web discovery is connected.</p>
+          <div className="mt-5 space-y-2.5">
+            <button onClick={() => navigate('/knowledge')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><Search className="h-4 w-4 text-violet-300" />Private knowledge search</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Query the real indexed documents and vector-search layer used by agents.</span>
+            </button>
+            <button onClick={() => navigate('/search')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><Newspaper className="h-4 w-4 text-violet-300" />Research setup</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">See what is required before source-backed research and citations can be enabled.</span>
+            </button>
+            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><Video className="h-4 w-4 text-zinc-500" />Image and video discovery</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Disabled until real media-search providers are connected.</span>
             </div>
-
-            {tab === 'web' && <WebTab loading={loading} />}
-            {tab === 'news' && <NewsTab loading={loading} />}
-            {tab === 'images' && <ImagesTab loading={loading} />}
-            {tab === 'videos' && <VideosTab loading={loading} />}
-            {tab === 'sources' && <SourcesTab loading={loading} />}
           </div>
-
-          <div className="space-y-4">
-            <SearchHistory onPick={pickHistory} />
-            <SavedSearches onPick={pickHistory} />
-          </div>
-        </div>
-      )}
-
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#10121a] px-4 py-2 text-xs text-zinc-200 shadow-2xl">{toast}</div>}
+        </section>
+      </div>
     </>
   );
 }
