@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { Browser, Camera, Code2, Network, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { Camera, Code2, Globe2, Network, ShieldCheck, TerminalSquare } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 
 const REQUIRED = [
   {
-    icon: Browser,
+    icon: Globe2,
     title: 'Isolated browser sessions',
     text: 'Create a server-managed browser/session sandbox with explicit URL allowlists, timeouts and per-workspace ownership.',
   },
@@ -39,7 +39,7 @@ export default function BrowserPreview() {
       <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
           <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/[.08]">
-            <Browser className="h-5 w-5 text-violet-300" />
+            <Globe2 className="h-5 w-5 text-violet-300" />
           </div>
           <h2 className="text-xl font-semibold text-white">Browser runtime required</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
