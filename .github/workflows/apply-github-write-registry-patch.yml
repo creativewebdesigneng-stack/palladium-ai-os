@@ -1,0 +1,55 @@
+name: Apply GitHub Write Registry Patch
+
+on:
+  push:
+    branches: [feature/github-approved-writes]
+    paths:
+      - .github/workflows/apply-github-write-registry-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/github-approved-writes
+
+      - name: Apply exact registry patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/lib/runtime/tools.server.ts")
+          text = path.read_text()
+
+          old_import = 'import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";\n'
+          new_import = old_import + 'import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";\n'
+          assert text.count(old_import) == 1, "connected-service import anchor changed"
+          assert "GITHUB_WRITE_TOOL_DEF" not in text, "github_write import already present"
+          text = text.replace(old_import, new_import, 1)
+
+          registry_anchor = '  file_analysis: {\n'
+          github_entry = '''  github_write: {\n    def: GITHUB_WRITE_TOOL_DEF,\n    sensitive: true,\n    run: runGitHubWriteTool,\n  },\n\n'''
+          assert text.count(registry_anchor) == 1, "file_analysis registry anchor changed"
+          assert "  github_write: {" not in text, "github_write registry entry already present"
+          text = text.replace(registry_anchor, github_entry + registry_anchor, 1)
+
+          queue_anchor = '    "connected_service_write",\n  ]);'
+          queue_replacement = '    "connected_service_write",\n    "github_write",\n  ]);'
+          assert text.count(queue_anchor) == 1, "self-queue approval anchor changed"
+          text = text.replace(queue_anchor, queue_replacement, 1)
+
+          path.write_text(text)
+
+      - name: Commit registry patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/runtime/tools.server.ts
+          git diff --cached --check
+          git commit -m "feat(runtime): register approval-gated github write tool"
+          git push origin HEAD:feature/github-approved-writes
