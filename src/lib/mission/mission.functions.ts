@@ -10,6 +10,7 @@ import {
 } from "./mission.server";
 import { assertWithinLimits } from "@/lib/shopping/limits.server";
 import { executePersonalTask } from "./personal-task-execution.server";
+import { decidePersonalTaskToolApproval } from "./personal-task-approval-decision.server";
 
 import { notify } from "@/lib/notifications/notify.server";
 
@@ -753,6 +754,36 @@ export const decideApproval = createServerFn({ method: "POST" })
     const approval = current.data;
     if (!approval) throw new Error("Approval request not found");
     if (approval.status !== "pending") throw new Error("This request has already been decided");
+
+    if (approval.action_type === "personal_task_tool") {
+      const toolDecision = data.decision === "approve" ? "approved" : "rejected";
+      const result = await decidePersonalTaskToolApproval({
+        sb,
+        userId,
+        approvalRequestId: approval.id,
+        decision: toolDecision,
+        note: data.note ?? null,
+      });
+      await activity(
+        sb,
+        userId,
+        `${data.decision === "approve" ? "You approved" : "You rejected"}: ${approval.title}`,
+        data.decision === "approve" ? "approved" : "rejected",
+        { agent_id: approval.agent_id, task_id: approval.task_id },
+      );
+      await log(sb, userId, data.decision === "approve" ? "personal_tool_approved" : "personal_tool_rejected", {
+        agent_id: approval.agent_id,
+        target_type: "approval_request",
+        target_id: approval.id,
+        status: toolDecision,
+        metadata: {
+          action_type: approval.action_type,
+          execution_status: result.execution.status,
+          run_id: "runId" in result.execution ? result.execution.runId : null,
+        },
+      });
+      return { status: result.status, purchase: null, execution: result.execution };
+    }
 
     if (data.decision === "approve" && approval.estimated_cost != null) {
       try {
