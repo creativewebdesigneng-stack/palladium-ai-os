@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "backend:check": "tsgo --noEmit && vitest run"
+    "backend:check": "tsc --noEmit && vitest run"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
