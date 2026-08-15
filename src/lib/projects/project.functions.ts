@@ -158,12 +158,12 @@ export const updateProject = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const existing = await getProjectForMutation(sb, data.id, context.userId);
     const patch: Record<string, unknown> = {};
-    if (data.name !== undefined) patch.name = data.name;
-    if (data.description !== undefined) patch.description = data.description;
-    if (data.status !== undefined) patch.status = data.status;
-    if (data.priority !== undefined) patch.priority = data.priority;
-    if (data.tags !== undefined) patch.tags = data.tags;
-    if (data.dueAt !== undefined) patch.due_at = data.dueAt;
+    if (data.name !== undefined) patch["name"] = data.name;
+    if (data.description !== undefined) patch["description"] = data.description;
+    if (data.status !== undefined) patch["status"] = data.status;
+    if (data.priority !== undefined) patch["priority"] = data.priority;
+    if (data.tags !== undefined) patch["tags"] = data.tags;
+    if (data.dueAt !== undefined) patch["due_at"] = data.dueAt;
     if (Object.keys(patch).length === 0) return existing;
 
     const { data: project, error } = await sb
