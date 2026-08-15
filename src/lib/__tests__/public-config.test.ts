@@ -38,7 +38,8 @@ describe("public runtime config", () => {
     const script = publicRuntimeConfigScript(config);
     expect(script).toBe(publicRuntimeConfigScript(config));
     expect(script).not.toContain("</script>");
-    expect(script).toContain("globalThis.process.env=Object.assign(");
+    expect(script).toContain("globalThis.__PALLADIUM_PUBLIC_CONFIG__=");
+    expect(script).not.toContain("globalThis.process");
   });
 
   it("returns an empty config when nothing is configured", () => {

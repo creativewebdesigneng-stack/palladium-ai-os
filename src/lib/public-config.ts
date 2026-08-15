@@ -9,9 +9,8 @@
  *
  * The SSR shell therefore serialises ONLY the public values (project URL,
  * publishable key, project id) into an inline bootstrap script that runs before
- * the app bundle. The generated Supabase client already falls back to
- * `process.env` reads, so populating `globalThis.process.env` at runtime keeps
- * that file untouched and preserves its auth/session behaviour.
+ * the app bundle. The browser build reads this explicit global directly;
+ * browser bundlers erase `process.env` fallbacks, so those are server-only.
  *
  * Service-role / secret values are never read here and never leave the server.
  */
@@ -80,7 +79,5 @@ export function publicRuntimeConfigScript(config: PublicRuntimeConfig): string {
   const json = JSON.stringify(config).replace(/</g, "\\u003c");
   return [
     `globalThis.__PALLADIUM_PUBLIC_CONFIG__=${json};`,
-    `globalThis.process=globalThis.process||{};`,
-    `globalThis.process.env=Object.assign({},globalThis.process.env,${json});`,
   ].join("");
 }
