@@ -73,6 +73,9 @@ describe("github_write approval-only runtime tool", () => {
     expect(db.tables.approval_requests).toHaveLength(0);
   });
 
+  // This invariant holds even before the tool is wired into the monolithic
+  // runtime registry: the model-facing definition itself has no execution or
+  // credential surface, and the runner only queues the immutable approval.
   it("never exposes a direct-execution function or token through the model schema", () => {
     expect(Object.keys(GITHUB_WRITE_TOOL_DEF)).toEqual(expect.arrayContaining(["name", "description", "parameters"]));
     expect((GITHUB_WRITE_TOOL_DEF as any).run).toBeUndefined();
