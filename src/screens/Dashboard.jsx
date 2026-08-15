@@ -70,7 +70,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="AI Workspace Dashboard" description="Your AI operating system at a glance." action={<button onClick={() => toast({ title: 'Quick start', description: 'Onboarding guide will open here once the backend is connected.' })} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">Quick start</button>} />
+      <PageHeader eyebrow="Workspace" title="AI Workspace Dashboard" description="Your AI operating system at a glance." action={<Link to="/onboarding" className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-200">Quick start</Link>} />
 
       {session === 'no' && (
         <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">
