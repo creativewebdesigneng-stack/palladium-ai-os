@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch, Layers, Users } from 'lucide-react';
+import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch, Layers, Users, Clock3 } from 'lucide-react';
 import { useServerFn } from '@tanstack/react-start';
 import { SectionHead } from './wfShared';
-import { listWorkforces, runWorkflow, getWorkflowRun } from '@/lib/runtime/workforce.functions';
+import { listWorkforces, getWorkflowRun } from '@/lib/runtime/workforce.functions';
+import { queueWorkflow } from '@/lib/runtime/workflow-queue.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-
 
 const STATUS_ICON = {
   succeeded: { Icon: CheckCircle2, cls: 'text-emerald-400' },
   failed: { Icon: XCircle, cls: 'text-rose-400' },
   skipped: { Icon: MinusCircle, cls: 'text-zinc-500' },
 };
+
+const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'waiting_for_approval']);
 
 function StepRow({ step, index }) {
   const { Icon, cls } = STATUS_ICON[step.status] ?? STATUS_ICON.skipped;
@@ -39,27 +41,54 @@ function StepRow({ step, index }) {
   );
 }
 
+function displaySteps(rows = []) {
+  const latest = new Map();
+  for (const row of rows) {
+    const key = row.step_id || row.id;
+    const previous = latest.get(key);
+    if (!previous || Number(row.attempt ?? 1) >= Number(previous.attempt ?? 1)) latest.set(key, row);
+  }
+  return [...latest.values()]
+    .sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0))
+    .map((row) => ({
+      step_id: row.step_id ?? row.id,
+      name: row.name ?? 'Workflow step',
+      status: row.status === 'cancelled' ? 'skipped' : row.status,
+      output: String(row.output ?? ''),
+      error: row.error ? String(row.error) : null,
+      attempts: Number(row.attempt ?? 1),
+      duration_ms: Number(row.duration_ms ?? 0),
+    }));
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Runs a real multi-agent workflow across a workforce and streams back the
- * per-step execution ledger (sequential, parallel and conditional steps).
+ * Durable workflow launcher. The browser only queues the run, then watches the
+ * persisted execution ledger while a protected background worker performs it.
  */
 export default function WorkforceOrchestrator() {
   const { toast } = useToast();
   const load = useServerFn(listWorkforces);
-  const run = useServerFn(runWorkflow);
+  const queue = useServerFn(queueWorkflow);
   const fetchRun = useServerFn(getWorkflowRun);
+  const mounted = useRef(true);
 
   const [workforces, setWorkforces] = useState([]);
   const [workflowId, setWorkflowId] = useState('');
   const [objective, setObjective] = useState('');
   const [busy, setBusy] = useState(false);
+  const [runStatus, setRunStatus] = useState(null);
   const [result, setResult] = useState(null);
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
-    // Only query once a Supabase session exists — the server functions are
-    // bearer-authenticated and 401 without one.
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (cancelled || !data?.session) return;
@@ -73,7 +102,6 @@ export default function WorkforceOrchestrator() {
     return () => { cancelled = true; };
   }, [load]);
 
-
   const workflows = useMemo(
     () => workforces.flatMap((w) => (w.workflows ?? []).map((f) => ({ ...f, workforce: w.name }))),
     [workforces],
@@ -83,26 +111,66 @@ export default function WorkforceOrchestrator() {
     if (!workflowId && workflows.length) setWorkflowId(workflows[0].id);
   }, [workflows, workflowId]);
 
+  const watchRun = useCallback(async (runId) => {
+    for (let poll = 0; poll < 400; poll += 1) {
+      const detail = await fetchRun({ data: { run_id: runId } });
+      const run = detail?.run;
+      if (!run) throw new Error('The queued workflow run could not be loaded.');
+
+      const steps = displaySteps(detail?.stepRuns ?? []);
+      if (mounted.current) {
+        setRunStatus(run.status);
+        setMessages(detail?.messages ?? []);
+        setResult({ run, steps, output: String(run.output ?? '') });
+      }
+      if (TERMINAL.has(run.status)) return { run, steps, messages: detail?.messages ?? [] };
+      await sleep(1500);
+    }
+    throw new Error('The workflow is still processing. Its run remains safely stored in the execution ledger.');
+  }, [fetchRun]);
+
   const execute = useCallback(async () => {
     if (!workflowId || !objective.trim()) return;
     setBusy(true);
+    setRunStatus('queued');
     setResult(null);
     setMessages([]);
     try {
-      const res = await run({ data: { workflow_id: workflowId, input: objective.trim() } });
-      setResult(res);
-      const detail = await fetchRun({ data: { run_id: res?.run?.id } }).catch(() => null);
-      setMessages(detail?.messages ?? []);
+      const queued = await queue({ data: { workflow_id: workflowId, input: objective.trim() } });
+      const runId = queued?.run?.id;
+      if (!runId) throw new Error('The workflow could not be queued.');
       toast({
-        title: res?.run?.status === 'succeeded' ? 'Workforce run complete' : 'Workforce run finished with errors',
-        description: `${res?.steps?.length ?? 0} step(s) executed.`,
+        title: 'Workforce run queued',
+        description: 'The background worker will claim it without keeping this browser request open.',
+      });
+
+      const final = await watchRun(runId);
+      const status = final.run?.status;
+      toast({
+        title: status === 'succeeded'
+          ? 'Workforce run complete'
+          : status === 'waiting_for_approval'
+            ? 'Workflow needs approval'
+            : status === 'cancelled'
+              ? 'Workflow run cancelled'
+              : 'Workforce run finished with errors',
+        description: `${final.steps?.length ?? 0} step(s) recorded in the durable ledger.`,
+        ...(status === 'failed' ? { variant: 'destructive' } : {}),
       });
     } catch (error) {
       toast({ title: 'Run failed', description: error?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
-  }, [workflowId, objective, run, fetchRun, toast]);
+  }, [workflowId, objective, queue, watchRun, toast]);
+
+  const statusText = runStatus === 'queued'
+    ? 'Queued — waiting for the background worker…'
+    : runStatus === 'running'
+      ? 'Background worker is executing the workflow…'
+      : runStatus === 'waiting_for_approval'
+        ? 'Paused safely — approval is required in Mission Control.'
+        : null;
 
   return (
     <section className="mb-8">
@@ -144,8 +212,14 @@ export default function WorkforceOrchestrator() {
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {busy ? 'Orchestrating…' : 'Run workforce'}
+              {busy ? (runStatus === 'queued' ? 'Queued…' : 'Running…') : 'Run workforce'}
             </button>
+
+            {statusText ? (
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-violet-200">
+                <Clock3 className="h-3.5 w-3.5" />{statusText}
+              </p>
+            ) : null}
 
             <div className="mt-4 grid gap-2 text-[11px] text-zinc-500">
               <p className="flex items-center gap-1.5"><Layers className="h-3 w-3" />Steps run in dependency waves — independent steps in parallel.</p>
@@ -163,7 +237,7 @@ export default function WorkforceOrchestrator() {
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-zinc-500">
-                  {busy ? 'Agents are working through the workflow…' : 'Run a workflow to see each agent’s output, retries and handoffs.'}
+                  {busy ? 'Watching the durable workflow queue…' : 'Run a workflow to see each agent’s output, retries and handoffs.'}
                 </p>
               )}
             </AnimatePresence>
