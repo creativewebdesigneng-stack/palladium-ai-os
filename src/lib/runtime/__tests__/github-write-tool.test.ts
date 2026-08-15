@@ -1,22 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { createFakeSupabase } from "./fake-supabase";
 
-vi.mock("@/lib/integrations/github-write-approval.server", () => ({
-  queueGitHubWriteApproval: vi.fn(async () => ({ approvalRequestId: "approval-1" })),
-}));
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: createFakeSupabase() }));
 
-import { queueGitHubWriteApproval } from "@/lib/integrations/github-write-approval.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "../github-write-tool.server";
 
-const ctx = {
-  userId: "user-1",
-  orgId: null,
-  agentId: "agent-1",
-  taskId: "task-1",
-  sb: { from: vi.fn() },
-};
-
-describe("github approval-only runtime tool", () => {
-  it("advertises only the bounded GitHub write actions", () => {
+describe("github_write approval-only runtime tool", () => {
+  it("exposes only the bounded approval-gated GitHub mutations", () => {
     expect(GITHUB_WRITE_TOOL_DEF.name).toBe("github_write");
     expect(GITHUB_WRITE_TOOL_DEF.parameters.properties.action.enum).toEqual([
       "github_branch_create",
@@ -25,49 +15,67 @@ describe("github approval-only runtime tool", () => {
     ]);
   });
 
-  it("queues an immutable write approval instead of executing GitHub", async () => {
+  it("queues an immutable high-risk approval rather than executing GitHub", async () => {
+    const db = createFakeSupabase({ approval_requests: [] }) as any;
     const result = await runGitHubWriteTool(
       {
         action: "github_file_update",
-        repository: "owner/repo",
-        branch: "agent/change",
-        path: "src/app.ts",
-        content: "export const ok = true;\n",
-        message: "Update app",
+        repository: "acme/widgets",
+        branch: "agent/change-copy",
+        path: "src/copy.ts",
+        content: "export const copy = 'approved';\n",
+        message: "Update copy",
         sha: "a".repeat(40),
       },
-      ctx,
+      {
+        sb: db,
+        userId: "user-1",
+        orgId: null,
+        agentId: "agent-1",
+        taskId: "task-1",
+      } as any,
     );
 
     expect(result).toMatchObject({
       queued: true,
-      approval_request_id: "approval-1",
+      status: "pending",
       provider: "github",
       action: "github_file_update",
       risk_level: "high",
+      mutation_executed: false,
     });
-    expect(queueGitHubWriteApproval).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        agentId: "agent-1",
-        taskId: "task-1",
-        action: expect.objectContaining({
-          actionType: "github_file_update",
-          details: expect.objectContaining({
-            repository: "owner/repo",
-            path: "src/app.ts",
-            sha: "a".repeat(40),
-          }),
-        }),
-      }),
-    );
+    expect(db.tables.approval_requests).toHaveLength(1);
+    expect(db.tables.approval_requests[0]).toMatchObject({
+      action_type: "github_file_update",
+      status: "pending",
+      risk_level: "high",
+      details: {
+        repository: "acme/widgets",
+        branch: "agent/change-copy",
+        path: "src/copy.ts",
+        sha: "a".repeat(40),
+      },
+    });
   });
 
-  it("rejects action names outside the GitHub write allow-list", async () => {
+  it("rejects actions outside the explicit GitHub write allow-list", async () => {
+    const db = createFakeSupabase({ approval_requests: [] }) as any;
     const result = await runGitHubWriteTool(
-      { action: "github_repo_delete", repository: "owner/repo", branch: "main" },
-      ctx,
+      {
+        action: "github_repository_delete",
+        repository: "acme/widgets",
+        branch: "main",
+      },
+      { sb: db, userId: "user-1", orgId: null, agentId: "agent-1", taskId: null } as any,
     );
+
     expect(result).toMatchObject({ error: expect.stringContaining("not supported") });
+    expect(db.tables.approval_requests).toHaveLength(0);
+  });
+
+  it("never exposes a direct-execution function through the agent tool contract", () => {
+    expect(Object.keys(GITHUB_WRITE_TOOL_DEF)).toEqual(expect.arrayContaining(["name", "description", "parameters"]));
+    expect((GITHUB_WRITE_TOOL_DEF as any).run).toBeUndefined();
+    expect(JSON.stringify(GITHUB_WRITE_TOOL_DEF)).not.toContain("token");
   });
 });
