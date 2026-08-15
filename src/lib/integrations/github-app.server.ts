@@ -1,12 +1,18 @@
 import { createSign } from "node:crypto";
 
 const GITHUB_API = "https://api.github.com";
+const GITHUB_OAUTH = "https://github.com/login/oauth/access_token";
 const API_VERSION = "2026-03-10";
 const MAX_INSTALLATION_ID = Number.MAX_SAFE_INTEGER;
 const MAX_PAGE_SIZE = 100;
 const MAX_FILE_BYTES = 512_000;
 
 type FetchLike = typeof fetch;
+
+type GitHubUserInstallation = {
+  id: number;
+  accountLogin: string | null;
+};
 
 export type GitHubInstallationToken = {
   token: string;
@@ -45,7 +51,7 @@ export type GitHubPathEntry = {
   htmlUrl: string;
 };
 
-function requiredEnv(name: "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY"): string {
+function requiredEnv(name: "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY" | "GITHUB_APP_SLUG" | "GITHUB_APP_CLIENT_ID" | "GITHUB_APP_CLIENT_SECRET"): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is not configured.`);
   return value;
@@ -53,6 +59,13 @@ function requiredEnv(name: "GITHUB_APP_ID" | "GITHUB_APP_PRIVATE_KEY"): string {
 
 export function githubAppConfigured(): boolean {
   return Boolean(process.env["GITHUB_APP_ID"]?.trim() && process.env["GITHUB_APP_PRIVATE_KEY"]?.trim());
+}
+
+export function githubConnectionConfigured(): boolean {
+  return githubAppConfigured()
+    && Boolean(process.env["GITHUB_APP_SLUG"]?.trim())
+    && Boolean(process.env["GITHUB_APP_CLIENT_ID"]?.trim())
+    && Boolean(process.env["GITHUB_APP_CLIENT_SECRET"]?.trim());
 }
 
 export function normaliseInstallationId(value: unknown): number {
@@ -77,7 +90,6 @@ export function createGitHubAppJwt(now = Math.floor(Date.now() / 1000)): string 
   if (!/^\d+$/.test(appId)) throw new Error("GITHUB_APP_ID must be numeric.");
 
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  // Backdate slightly for clock skew; GitHub allows at most ten minutes.
   const payload = base64url(JSON.stringify({ iat: now - 30, exp: now + 8 * 60, iss: appId }));
   const unsigned = `${header}.${payload}`;
   const signer = createSign("RSA-SHA256");
@@ -104,6 +116,90 @@ async function githubJson<T>(url: string | URL, init: RequestInit, fetchImpl: Fe
     throw new Error(message);
   }
   return payload as T;
+}
+
+/** Build the GitHub App install URL with PalladiumAI's signed state attached. */
+export function buildGitHubInstallUrl(state: string): string {
+  const slug = requiredEnv("GITHUB_APP_SLUG").toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) throw new Error("GITHUB_APP_SLUG is invalid.");
+  if (!state || state.length > 2000) throw new Error("Invalid GitHub installation state.");
+  const url = new URL(`https://github.com/apps/${slug}/installations/new`);
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+/**
+ * Exchange the short-lived callback code for a GitHub App user access token.
+ * This token is used only to bind the installation to the consenting GitHub
+ * user and is never persisted by PalladiumAI.
+ */
+export async function exchangeGitHubUserCode(
+  code: string,
+  redirectUri: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<string> {
+  if (!code.trim() || code.length > 1000) throw new Error("Invalid GitHub authorization code.");
+  const redirect = new URL(redirectUri);
+  if (redirect.protocol !== "https:" && redirect.hostname !== "localhost" && redirect.hostname !== "127.0.0.1") {
+    throw new Error("Invalid GitHub callback URL.");
+  }
+  const body = new URLSearchParams({
+    client_id: requiredEnv("GITHUB_APP_CLIENT_ID"),
+    client_secret: requiredEnv("GITHUB_APP_CLIENT_SECRET"),
+    code,
+    redirect_uri: redirect.toString(),
+  });
+  const payload = await githubJson<any>(GITHUB_OAUTH, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  }, fetchImpl);
+  if (typeof payload?.access_token !== "string" || !payload.access_token) {
+    throw new Error(typeof payload?.error_description === "string" ? payload.error_description : "GitHub did not return a user access token.");
+  }
+  return payload.access_token;
+}
+
+async function listUserInstallations(userAccessToken: string, fetchImpl: FetchLike): Promise<GitHubUserInstallation[]> {
+  const payload = await githubJson<any>(`${GITHUB_API}/user/installations?per_page=100`, {
+    headers: { Authorization: `Bearer ${userAccessToken}` },
+  }, fetchImpl);
+  const rows = Array.isArray(payload?.installations) ? payload.installations : [];
+  return rows.flatMap((installation: any) => {
+    if (!Number.isSafeInteger(installation?.id) || installation.id <= 0) return [];
+    return [{
+      id: installation.id,
+      accountLogin: typeof installation?.account?.login === "string" ? installation.account.login.slice(0, 120) : null,
+    }];
+  });
+}
+
+/**
+ * Proves that a callback installation is accessible to the GitHub user who
+ * just authorized this GitHub App. If GitHub does not send installation_id,
+ * an unambiguous single installation may be selected; multiple candidates are
+ * rejected rather than guessed.
+ */
+export async function resolveVerifiedUserInstallation(
+  userAccessToken: string,
+  suggestedInstallationId: unknown,
+  fetchImpl: FetchLike = fetch,
+): Promise<GitHubUserInstallation> {
+  if (!userAccessToken) throw new Error("GitHub user authorization is missing.");
+  const installations = await listUserInstallations(userAccessToken, fetchImpl);
+  if (!installations.length) throw new Error("No PalladiumAI GitHub App installation is available for this GitHub user.");
+
+  if (suggestedInstallationId !== null && suggestedInstallationId !== undefined && suggestedInstallationId !== "") {
+    const id = normaliseInstallationId(suggestedInstallationId);
+    const match = installations.find((installation) => installation.id === id);
+    if (!match) throw new Error("The GitHub App installation is not accessible to the authorized GitHub user.");
+    return match;
+  }
+
+  if (installations.length !== 1) {
+    throw new Error("Multiple PalladiumAI GitHub installations are available. Reconnect from the specific installation so it can be verified safely.");
+  }
+  return installations[0]!;
 }
 
 /**
