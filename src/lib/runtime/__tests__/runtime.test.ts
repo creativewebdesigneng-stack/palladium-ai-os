@@ -711,5 +711,40 @@ describe("workflow approval gates", () => {
     expect(sb.tables.approval_requests).toHaveLength(0);
     expect(sb.tables.workflow_runs[0].waiting_approval_request_id ?? null).toBeNull();
   });
+
+  it("fails the decision when the approval step ledger cannot be finalised", async () => {
+    const { sb, request } = await pauseAtApproval();
+    const healthy = sb.from.bind(sb);
+    adminDb = {
+      ...sb,
+      from: (name: string) => {
+        const builder = healthy(name);
+        if (name !== "workflow_step_runs") return builder;
+        const failing: any = new Proxy(builder, {
+          get(target, prop) {
+            if (prop === "then")
+              return (resolve: (v: any) => unknown) =>
+                Promise.resolve(resolve({ data: null, error: { message: "ledger write failed" } }));
+            if (prop === "maybeSingle" || prop === "single")
+              return () => Promise.resolve({ data: null, error: { message: "ledger write failed" } });
+            const value = (target as any)[prop];
+            return typeof value === "function" ? (...a: unknown[]) => (value.apply(target, a), failing) : value;
+          },
+        });
+        return failing;
+      },
+    } as any;
+
+    await expect(
+      decideWorkflowApproval({
+        sb,
+        userId: USER,
+        approvalRequestId: request.id,
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "APPROVAL_STEP_LEDGER_FAILED" });
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after")).toBe(false);
+  });
 });
+
 

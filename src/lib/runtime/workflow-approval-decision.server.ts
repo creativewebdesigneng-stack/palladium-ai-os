@@ -166,7 +166,9 @@ export async function decideWorkflowApproval(args: {
     note: decisionNote,
   });
 
-  await db
+  // The step ledger is the audit record for this decision. If it cannot be
+  // finalised we must fail loudly rather than resume on an inconsistent ledger.
+  const { error: stepLedgerError } = await db
     .from("workflow_step_runs")
     .update({
       status: outcome.status,
@@ -180,6 +182,9 @@ export async function decideWorkflowApproval(args: {
     .eq("id", details.workflow_step_run_id)
     .eq("run_id", run.id)
     .eq("step_id", waitingStep.id);
+  if (stepLedgerError)
+    throw new WorkforceError(stepLedgerError.message, "APPROVAL_STEP_LEDGER_FAILED");
+
 
   const completed = Array.isArray(run.step_results) ? (run.step_results as StepOutcome[]) : [];
   const withDecision = [...completed.filter((item) => item.step_id !== waitingStep.id), outcome];
