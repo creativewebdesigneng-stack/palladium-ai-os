@@ -359,6 +359,17 @@ export const ACTION_TYPES = {
   message: "Message waiting to be sent",
   booking: "Booking",
   payment: "Payment",
+  email_send: "Email draft",
+  email_draft: "Email draft",
+  calendar_create: "Calendar event",
+  slack_post: "Slack message",
+  hubspot_contact_update: "HubSpot contact update",
+  hubspot_deal_update: "HubSpot deal update",
+  asana_task_create: "Asana task creation",
+  asana_task_update: "Asana task update",
+  linear_issue_create: "Linear issue creation",
+  linear_issue_update: "Linear issue update",
+  notion_page_create: "Notion page creation",
   other: "Other sensitive action",
 };
 
