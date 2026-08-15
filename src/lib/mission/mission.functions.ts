@@ -430,13 +430,9 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         priority: decision.priority,
         scope: agent?.scope ?? "personal",
         due_at: decision.dueAt,
-        budget,
-        currency,
-        metadata: {
-          intent: decision.intent,
-          tools: decision.requiredTools,
-          involves_money: decision.involvesMoney,
-        },
+        involves_money: decision.involvesMoney,
+        required_tools: decision.requiredTools,
+        requires_approval: requiresApproval,
       })
       .select()
       .maybeSingle();
