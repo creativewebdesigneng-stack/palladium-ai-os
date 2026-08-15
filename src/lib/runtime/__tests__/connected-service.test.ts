@@ -15,6 +15,7 @@ describe("connected service read request whitelist", () => {
     );
     expect(CONNECTED_SERVICE_ACTIONS["github"]).toEqual([
       "repositories_list",
+      "repository_overview",
       "branches_list",
       "commits_list",
       "path_list",
