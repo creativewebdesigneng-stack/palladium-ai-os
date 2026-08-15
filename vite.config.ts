@@ -21,7 +21,7 @@ function runtimeSupabasePublicConfigPlugin(): Plugin {
     name: "palladium-runtime-supabase-public-config",
     enforce: "pre",
     transform(code, id) {
-      const normalizedId = id.replaceAll("\\", "/").split("?", 1)[0];
+      const normalizedId = id.replaceAll("\\", "/").replace(/\?.*$/, "");
       if (!normalizedId.endsWith("/src/integrations/supabase/client.ts")) return null;
 
       const replacements = [
