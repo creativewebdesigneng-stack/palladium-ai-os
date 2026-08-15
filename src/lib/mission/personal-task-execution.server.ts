@@ -86,10 +86,12 @@ const PERSONAL_BROWSER_ACTIONS = [
   "wait",
 ] as const;
 const PERSONAL_BROWSER_ACTION_SET = new Set<string>(PERSONAL_BROWSER_ACTIONS);
+const PERSONAL_SELF_QUEUING_APPROVAL_TOOLS = new Set(["connected_service_write"]);
 
-// Personal tasks may only execute this bounded local/read-oriented subset. A
-// grant that requires approval is still exposed to the model, but it is paused
-// before execution and can only run through resumePersonalTaskApproval().
+// Personal tasks may only execute this bounded subset. Most approval-required
+// tools pause the durable run before execution. Self-queuing approval tools are
+// the exception: their execution only creates the existing approval request and
+// never performs the external write itself.
 const PERSONAL_SAFE_TOOLS = new Set([
   "current_time",
   "calculator",
@@ -98,6 +100,7 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "memory_search",
   "memory_write",
   "connected_service",
+  "connected_service_write",
   "file_analysis",
   "data_analysis",
   "database_query",
@@ -110,6 +113,7 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
     "Carry out the operator's request using the tools available to you when they improve accuracy.",
     "The browser tool is read-only. Use browser_interact only when clicking or typing is genuinely necessary; it always pauses for explicit operator approval before anything happens.",
     "Never use browser_interact for checkout, payment, purchases or entering payment credentials. Those actions require the dedicated purchase flow.",
+    "connected_service_write only queues the exact external write for operator approval; a queued result does not mean the external service has been changed.",
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
@@ -151,7 +155,9 @@ function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>):
 } {
   const grants = new Map<string, ToolGrant>();
   for (const [slug, grant] of resolved.grants) {
-    if (PERSONAL_SAFE_TOOLS.has(slug)) grants.set(slug, grant);
+    if (!PERSONAL_SAFE_TOOLS.has(slug)) continue;
+    if (PERSONAL_SELF_QUEUING_APPROVAL_TOOLS.has(slug) && !grant.requiresApproval) continue;
+    grants.set(slug, grant);
   }
   const defs = resolved.defs.filter((def) => grants.has(def.name)).map(restrictBrowserDefinition);
   const browserGrant = grants.get("browser");
@@ -331,7 +337,11 @@ async function runConversation(args: {
     toolCalls += result.toolCalls.length;
     args.messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
 
-    const approvalCall = result.toolCalls.find((call) => args.tools.grants.get(call.name)?.requiresApproval);
+    const approvalCall = result.toolCalls.find(
+      (call) =>
+        !PERSONAL_SELF_QUEUING_APPROVAL_TOOLS.has(call.name) &&
+        args.tools.grants.get(call.name)?.requiresApproval,
+    );
     if (approvalCall) {
       const skippedCalls = result.toolCalls
         .filter((call) => call.id !== approvalCall.id)
