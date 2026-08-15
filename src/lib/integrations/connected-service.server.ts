@@ -1,13 +1,14 @@
 /**
- * Read-only dispatcher for user-connected OAuth services.
+ * Read-only dispatcher for user-connected services.
  *
  * Security invariants:
- *  - The model never supplies a URL, HTTP method, header or OAuth token.
+ *  - The model never supplies a URL, HTTP method, header, OAuth token or GitHub installation id.
  *  - Every provider/action pair is explicitly allow-listed below.
  *  - Inputs are length/bounds checked before an outbound request is built.
  *  - Only read semantics are exposed. Some providers (Notion/Linear) require
  *    POST for search/GraphQL, but the request body is a fixed read-only query.
- *  - OAuth tokens are resolved server-side and are never returned to the model.
+ *  - OAuth tokens and GitHub App installation tokens are resolved server-side
+ *    and are never returned to the model.
  */
 import { getIntegrationAccessToken } from "./oauth.server";
 import { findProvider } from "./providers";
@@ -17,6 +18,9 @@ export type ConnectedServiceInput = {
   action: string;
   query?: string;
   resource_id?: string;
+  repository?: string;
+  path?: string;
+  ref?: string;
   limit?: number;
 };
 
@@ -41,6 +45,7 @@ export const CONNECTED_SERVICE_ACTIONS: Record<string, readonly string[]> = {
   notion: ["search"],
   asana: ["workspaces_list", "project_tasks"],
   linear: ["issues_search"],
+  github: ["repositories_list", "branches_list", "commits_list", "path_list", "file_read"],
 };
 
 function clean(value: unknown, max: number): string {
@@ -59,7 +64,7 @@ function requireResourceId(input: ConnectedServiceInput): string {
   return id;
 }
 
-/** Pure request builder, exported so the whitelist can be unit-tested. */
+/** Pure request builder for fixed OAuth-provider reads. GitHub App reads use the dedicated server adapter. */
 export function buildConnectedServiceRequest(input: ConnectedServiceInput): RequestSpec {
   const provider = clean(input.provider, 40).toLowerCase();
   const action = clean(input.action, 80).toLowerCase();
@@ -183,6 +188,19 @@ function truncate(value: unknown): unknown {
 
 export async function readConnectedService(userId: string, input: ConnectedServiceInput, signal?: AbortSignal): Promise<unknown> {
   const providerId = clean(input.provider, 40).toLowerCase();
+  const action = clean(input.action, 80).toLowerCase();
+
+  if (providerId === "github") {
+    const { readConnectedGitHubService } = await import("./github-connected-service.server");
+    return readConnectedGitHubService(userId, {
+      action,
+      ...(input.repository === undefined ? {} : { repository: input.repository }),
+      ...(input.path === undefined ? {} : { path: input.path }),
+      ...(input.ref === undefined ? {} : { ref: input.ref }),
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+    });
+  }
+
   const provider = findProvider(providerId);
   if (!provider) return { error: "Unknown integration provider." };
   if (!CONNECTED_SERVICE_ACTIONS[providerId]) return { error: `${provider.name} does not yet expose a read-only agent connector.` };
@@ -204,7 +222,7 @@ export async function readConnectedService(userId: string, input: ConnectedServi
     const text = (await response.text()).slice(0, MAX_RESPONSE_CHARS * 2);
     const payload = safeJson(text);
     if (!response.ok) return { error: `${provider.name} returned ${response.status}.`, status: response.status, details: truncate(payload) };
-    return { provider: providerId, action: clean(input.action, 80).toLowerCase(), read_only: true, data: truncate(payload) };
+    return { provider: providerId, action, read_only: true, data: truncate(payload) };
   } catch (error) {
     if ((error as Error).name === "AbortError" || (error as Error).name === "TimeoutError") return { error: `${provider.name} request timed out.` };
     return { error: `${provider.name} could not be reached.` };
