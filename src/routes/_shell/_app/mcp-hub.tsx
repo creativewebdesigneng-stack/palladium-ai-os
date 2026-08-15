@@ -5,9 +5,9 @@ export const Route = createFileRoute("/_shell/_app/mcp-hub")({
   head: () => ({
     meta: [
       { title: "MCP hub — PalladiumAI" },
-      { name: "description", content: "Connect MCP servers to your workforce." },
+      { name: "description", content: "Inspect the live OAuth-protected MCP server and tools bundled with PalladiumAI." },
       { property: "og:title", content: "MCP hub — PalladiumAI" },
-      { property: "og:description", content: "Connect MCP servers to your workforce." },
+      { property: "og:description", content: "Inspect the live OAuth-protected MCP server and tools bundled with PalladiumAI." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
