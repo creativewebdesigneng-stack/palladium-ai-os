@@ -172,7 +172,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     id: "linear",
     name: "Linear",
     category: "project_management",
-    summary: "OAuth connection is available; provider-specific issue/cycle reads are still being implemented.",
+    summary: "Read-only team listing and bounded issue search for the connected Linear workspace.",
     scopes: ["read"],
     tools: ["http_request"],
     authorizeUrl: "https://linear.app/oauth/authorize",
