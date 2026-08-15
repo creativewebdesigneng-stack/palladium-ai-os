@@ -10,6 +10,10 @@ import {
   resolveBrowserProvider,
   type BrowserProductOffer,
 } from "./browser-agent";
+import {
+  createGoogleGmailDraft,
+  listGoogleCalendarEvents,
+} from "@/lib/integrations/google-workspace.server";
 
 export type RoutingDecision = {
   category: string;
@@ -172,6 +176,49 @@ export async function prepareCheckoutDraft(params: {
   const draft = await tool.prepareCheckout(params.offer);
   await tool.close();
   return draft;
+}
+
+/** Read-only live Google Calendar access for an authenticated operator. */
+export async function listMissionCalendar(params: {
+  userId: string;
+  from?: string | null;
+  to?: string | null;
+  limit?: number;
+  signal?: AbortSignal;
+}) {
+  return {
+    provider: "google",
+    events: await listGoogleCalendarEvents({
+      userId: params.userId,
+      from: params.from,
+      to: params.to,
+      limit: params.limit,
+      signal: params.signal,
+    }),
+  };
+}
+
+/**
+ * Creates a Gmail draft after an explicit approval decision. This helper does
+ * not expose any send operation; the message remains a draft in Gmail.
+ */
+export async function createApprovedMissionEmailDraft(params: {
+  userId: string;
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string | null;
+  signal?: AbortSignal;
+}) {
+  const draft = await createGoogleGmailDraft({
+    userId: params.userId,
+    to: params.to,
+    subject: params.subject,
+    body: params.body,
+    cc: params.cc,
+    signal: params.signal,
+  });
+  return { provider: "google", status: "draft_created", ...draft };
 }
 
 /** Deterministic fallback briefing; the AI version augments this. */
