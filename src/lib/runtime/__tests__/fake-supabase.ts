@@ -8,7 +8,7 @@
 export type Row = Record<string, any>;
 
 type Filter = {
-  op: "eq" | "in" | "is" | "gte" | "lte" | "ilike";
+  op: "eq" | "in" | "is" | "gte" | "lte" | "lt" | "ilike";
   column: string;
   value: any;
 };
@@ -27,6 +27,8 @@ function matches(row: Row, filters: Filter[]) {
         return cell != null && cell >= f.value;
       case "lte":
         return cell != null && cell <= f.value;
+      case "lt":
+        return cell != null && cell < f.value;
       case "ilike": {
         const pattern = String(f.value).toLowerCase().split("%").filter(Boolean);
         const cellText = String(cell ?? "").toLowerCase();
@@ -86,6 +88,10 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
       },
       lte(column: string, value: any) {
         filters.push({ op: "lte", column, value });
+        return api;
+      },
+      lt(column: string, value: any) {
+        filters.push({ op: "lt", column, value });
         return api;
       },
       ilike(column: string, value: string) {
