@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldAlert, Check, X, Pencil, MessageSquare, Truck, Star, Store, Loader2, ExternalLink, Lock } from 'lucide-react';
+import { ShieldAlert, Check, X, Pencil, MessageSquare, Truck, Star, Store, Loader2, ExternalLink, Lock, RotateCcw, AlertTriangle } from 'lucide-react';
 import { ACTION_TYPES, RISK_STYLE, formatMoney } from '@/lib/mission/catalog';
 
 function PurchaseSummary({ purchase }) {
@@ -37,11 +37,11 @@ function PurchaseSummary({ purchase }) {
 
 export default function ApprovalCentre({
   approvals = [], purchases = [], results = [], loading, busyId,
-  onDecide, onChooseAlternative, onConfirmPurchase, onAskAgent,
+  onDecide, onRetry, onChooseAlternative, onConfirmPurchase, onAskAgent,
 }) {
   const [openAlt, setOpenAlt] = useState(null);
   const pending = approvals.filter((a) => a.status === 'pending');
-  const decided = approvals.filter((a) => a.status !== 'pending').slice(0, 6);
+  const decided = approvals.filter((a) => a.status !== 'pending').slice(0, 8);
 
   const purchaseFor = (approvalId) => purchases.find((p) => p.approval_request_id === approvalId);
   const approvedReady = purchases.filter((p) => p.status === 'approved_awaiting_checkout');
@@ -172,14 +172,40 @@ export default function ApprovalCentre({
         {decided.length > 0 && (
           <div className="mt-5 border-t border-white/5 pt-4">
             <p className="text-[10px] uppercase tracking-wider text-zinc-600">Recent decisions</p>
-            <ul className="mt-2 space-y-1.5">
-              {decided.map((d) => (
-                <li key={d.id} className="flex items-center gap-2 text-[11px]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                  <span className="truncate text-zinc-300">{d.title}</span>
-                  <span className="ml-auto text-zinc-600">{d.status}</span>
-                </li>
-              ))}
+            <ul className="mt-2 space-y-2">
+              {decided.map((d) => {
+                const executionFailed = d.status === 'approved' && d.execution_status === 'failed';
+                const executionSucceeded = d.execution_status === 'succeeded';
+                return (
+                  <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className={`h-1.5 w-1.5 rounded-full ${executionFailed ? 'bg-rose-400' : d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      <span className="truncate text-zinc-300">{d.title}</span>
+                      <span className="ml-auto text-zinc-600">
+                        {executionFailed ? 'approved · action failed' : executionSucceeded ? 'approved · completed' : d.status}
+                      </span>
+                    </div>
+                    {executionFailed && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[10px] text-rose-200/80">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span>{d.execution_error ?? 'The provider action failed. Reconnect the integration if its permissions changed, then retry.'}</span>
+                        </p>
+                        {onRetry && (
+                          <button
+                            onClick={() => onRetry(d)}
+                            disabled={busyId === d.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/30 px-2.5 py-1 text-[10px] font-semibold text-rose-200 transition hover:bg-rose-500/10 disabled:opacity-50"
+                          >
+                            {busyId === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                            Retry approved action
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
