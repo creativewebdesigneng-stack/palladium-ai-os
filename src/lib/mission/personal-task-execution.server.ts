@@ -13,6 +13,7 @@ import {
   runChat,
   type ChatMessage,
   type ChatResult,
+  type Provider,
   type ToolDef,
 } from "@/lib/runtime/model-gateway.server";
 import { executeTool, resolveGrantedTools, type ToolGrant } from "@/lib/runtime/tools.server";
@@ -286,7 +287,7 @@ async function runConversation(args: {
   task: PersonalTaskRow;
   agent: PersonalAgentRow;
   runId: string;
-  provider: string;
+  provider: Provider;
   model: string;
   messages: ChatMessage[];
   tools: { defs: ToolDef[]; grants: Map<string, ToolGrant> };
