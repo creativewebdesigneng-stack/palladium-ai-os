@@ -5,9 +5,9 @@ export const Route = createFileRoute("/_shell/_app/developer")({
   head: () => ({
     meta: [
       { title: "Developer Workspace — PalladiumAI" },
-      { name: "description", content: "Code, debug, version and deploy from one focused environment." },
+      { name: "description", content: "Review developer-workspace availability and the production services required to enable it." },
       { property: "og:title", content: "Developer Workspace — PalladiumAI" },
-      { property: "og:description", content: "Code, debug, version and deploy from one focused environment." },
+      { property: "og:description", content: "Review developer-workspace availability and the production services required to enable it." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
