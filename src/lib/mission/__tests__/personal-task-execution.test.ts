@@ -271,6 +271,7 @@ describe("personal task execution", () => {
     expect(exposed.map((d: any) => d.name)).toEqual([
       "connected_service",
       "connected_service_write",
+      "github_write",
       "browser",
       "browser_interact",
     ]);
