@@ -51,33 +51,34 @@ export async function runGitHubWriteTool(
   }
 
   try {
-    const queued = await queueGitHubWriteApproval({
-      sb: ctx.sb,
-      userId: ctx.userId,
-      orgId: ctx.orgId,
-      agentId: ctx.agentId,
-      taskId: ctx.taskId,
-      action: {
-        actionType: action as "github_branch_create" | "github_file_create" | "github_file_update",
-        details: {
-          repository: input["repository"],
-          branch: input["branch"],
-          base_sha: input["base_sha"],
-          path: input["path"],
-          content: input["content"],
-          message: input["message"],
-          sha: input["sha"],
-        },
+    const queued = await queueGitHubWriteApproval(
+      {
+        sb: ctx.sb,
+        userId: ctx.userId,
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        taskId: ctx.taskId,
       },
-    });
+      {
+        action: action as "github_branch_create" | "github_file_create" | "github_file_update",
+        repository: String(input["repository"] ?? ""),
+        branch: String(input["branch"] ?? ""),
+        base_sha: input["base_sha"] === undefined ? undefined : String(input["base_sha"]),
+        path: input["path"] === undefined ? undefined : String(input["path"]),
+        content: input["content"] === undefined ? undefined : String(input["content"]),
+        message: input["message"] === undefined ? undefined : String(input["message"]),
+        sha: input["sha"] === undefined ? undefined : String(input["sha"]),
+      },
+    );
 
     return {
       queued: true,
-      approval_request_id: queued.approvalRequestId,
+      approval_request_id: queued.approval_request_id,
       status: "pending",
       provider: "github",
       action,
       risk_level: "high",
+      mutation_executed: false,
       note: "No GitHub mutation has occurred. Awaiting explicit operator approval.",
     };
   } catch (error) {
