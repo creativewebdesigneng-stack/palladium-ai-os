@@ -30,18 +30,20 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
+  // Browser builds receive VITE_* values at build time. SSR/server execution
+  // can use the unprefixed equivalents from the deployment secret manager.
   const SUPABASE_URL = import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
   const SUPABASE_PUBLISHABLE_KEY =
     import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
-      ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
+      ...(!SUPABASE_URL ? ["VITE_SUPABASE_URL (browser) / SUPABASE_URL (server)"] : []),
+      ...(!SUPABASE_PUBLISHABLE_KEY
+        ? ["VITE_SUPABASE_PUBLISHABLE_KEY (browser) / SUPABASE_PUBLISHABLE_KEY (server)"]
+        : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Supabase is not configured for this deployment. Missing: ${missing.join(", ")}. Connect the Supabase project in Lovable Cloud or add the matching deployment environment variables.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
