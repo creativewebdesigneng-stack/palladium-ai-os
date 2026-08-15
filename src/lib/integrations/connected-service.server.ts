@@ -45,7 +45,7 @@ export const CONNECTED_SERVICE_ACTIONS: Record<string, readonly string[]> = {
   notion: ["search"],
   asana: ["workspaces_list", "project_tasks"],
   linear: ["issues_search"],
-  github: ["repositories_list", "branches_list", "commits_list", "path_list", "file_read"],
+  github: ["repositories_list", "repository_overview", "branches_list", "commits_list", "path_list", "file_read"],
 };
 
 function clean(value: unknown, max: number): string {
@@ -197,7 +197,7 @@ export async function readConnectedService(userId: string, input: ConnectedServi
     // GitHub repository reads usable before clients adopt repository/path/ref.
     const repository = input.repository ?? input.resource_id;
     const path = input.path ?? ((action === "path_list" || action === "file_read") ? input.query : undefined);
-    const ref = input.ref ?? (action === "commits_list" ? input.query : undefined);
+    const ref = input.ref ?? ((action === "commits_list" || action === "repository_overview") ? input.query : undefined);
     return readConnectedGitHubService(userId, {
       action,
       ...(repository === undefined ? {} : { repository }),
