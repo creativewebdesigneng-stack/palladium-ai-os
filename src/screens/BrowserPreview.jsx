@@ -1,68 +1,83 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Browser, Camera, Code2, Network, ShieldCheck, TerminalSquare } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import BrowserChrome from '@/components/browser/BrowserChrome';
-import LivePreview from '@/components/browser/LivePreview';
-import ConsoleView from '@/components/browser/ConsoleView';
-import NetworkView from '@/components/browser/NetworkView';
-import ErrorsView from '@/components/browser/ErrorsView';
-import AIDebugPanel from '@/components/browser/AIDebugPanel';
-import { HISTORY } from '@/components/browser/browserData';
 
-const TABS = [
-  { id: 'preview', label: 'Live Preview' },
-  { id: 'console', label: 'Console' },
-  { id: 'network', label: 'Network' },
-  { id: 'errors', label: 'Errors' },
+const REQUIRED = [
+  {
+    icon: Browser,
+    title: 'Isolated browser sessions',
+    text: 'Create a server-managed browser/session sandbox with explicit URL allowlists, timeouts and per-workspace ownership.',
+  },
+  {
+    icon: Network,
+    title: 'Live page telemetry',
+    text: 'Collect console, network and page-error events from the real browser session instead of rendering fixture requests and logs.',
+  },
+  {
+    icon: Camera,
+    title: 'Persisted screenshots',
+    text: 'Store screenshots through the authenticated Files backend and return the real document id rather than showing a success toast only.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Safe AI debugging',
+    text: 'AI fixes must be generated against an explicitly connected repository and require a reviewed patch before any source mutation.',
+  },
 ];
 
 export default function BrowserPreview() {
-  const [url, setUrl] = useState(HISTORY[1]);
-  const [idx, setIdx] = useState(1);
-  const [device, setDevice] = useState('desktop');
-  const [tab, setTab] = useState('preview');
-  const [toast, setToast] = useState(null);
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1600); };
-
-  const navigate = (u) => {
-    if (u === url) return;
-    setUrl(u);
-    const next = HISTORY.indexOf(u);
-    if (next >= 0) setIdx(next);
-  };
-  const back = () => { if (idx > 0) { const n = idx - 1; setIdx(n); setUrl(HISTORY[n]); } };
-  const forward = () => { if (idx < HISTORY.length - 1) { const n = idx + 1; setIdx(n); setUrl(HISTORY[n]); } };
-  const refresh = () => flash('Page refreshed');
-  const screenshot = () => flash('Screenshot saved to Files');
-  const onAction = (a) => flash(a === 'Open File' ? `Opening ${'src/components/AgentCard.jsx'}:12…` : `${a} — patch generated`);
+  const navigate = useNavigate();
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Browser Preview" description="Preview your app across devices with live console, network, and AI debugging. Simulated data." />
-
-      <BrowserChrome
-        url={url} setUrl={navigate} device={device} setDevice={setDevice}
-        canBack={idx > 0} canForward={idx < HISTORY.length - 1}
-        onBack={back} onForward={forward} onRefresh={refresh} onScreenshot={screenshot} onToast={flash}
+      <PageHeader
+        eyebrow="Workspace"
+        title="Browser Preview"
+        description="Live browser sessions are not connected yet. Simulated navigation, console, network, screenshot and AI-debug actions have been removed."
       />
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-3">
-          <div className="flex gap-1 rounded-2xl border border-white/10 bg-white/[.03] p-1">
-            {TABS.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-medium ${tab === t.id ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'text-zinc-400 hover:text-white'}`}>{t.label}</button>
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/[.08]">
+            <Browser className="h-5 w-5 text-violet-300" />
+          </div>
+          <h2 className="text-xl font-semibold text-white">Browser runtime required</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+            The previous preview used a local sample URL history plus presentation-only console, network and error data. Its screenshot and AI-debug buttons also reported successful actions without storing a screenshot or creating a repository patch. Those controls are disabled until PalladiumAI has a real browser-session backend.
+          </p>
+
+          <div className="mt-6 space-y-3">
+            {REQUIRED.map(({ icon: Icon, title, text }) => (
+              <div key={title} className="flex gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[.04] text-zinc-300"><Icon className="h-4 w-4" /></span>
+                <div>
+                  <p className="text-sm font-medium text-white">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">{text}</p>
+                </div>
+              </div>
             ))}
           </div>
-          <div className="h-[520px]">
-            {tab === 'preview' && <div className="h-full overflow-hidden rounded-2xl border border-white/10 bg-black/60"><LivePreview url={url} device={device} /></div>}
-            {tab === 'console' && <ConsoleView />}
-            {tab === 'network' && <NetworkView />}
-            {tab === 'errors' && <ErrorsView />}
-          </div>
-        </div>
-        <div className="h-[560px] lg:h-[620px]"><AIDebugPanel onAction={onAction} /></div>
-      </div>
+        </section>
 
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#10121a] px-4 py-2 text-xs text-zinc-200 shadow-2xl">{toast}</div>}
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+          <h3 className="text-sm font-semibold text-white">Available foundations</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">These existing live areas will support the browser feature once the runtime is connected.</p>
+          <div className="mt-5 space-y-2.5">
+            <button onClick={() => navigate('/files')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><Camera className="h-4 w-4 text-violet-300" />Files</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Authenticated private storage already exists for future screenshots and captured artifacts.</span>
+            </button>
+            <button onClick={() => navigate('/code-explorer')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><Code2 className="h-4 w-4 text-violet-300" />Code Explorer</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Repository access is intentionally disabled until a real source-control provider is connected.</span>
+            </button>
+            <button onClick={() => navigate('/terminal')} className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left hover:bg-white/[.04]">
+              <span className="flex items-center gap-2 text-sm font-medium text-white"><TerminalSquare className="h-4 w-4 text-violet-300" />Terminal</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">Command execution remains disabled until an isolated audited runner is available.</span>
+            </button>
+          </div>
+        </section>
+      </div>
     </>
   );
 }
