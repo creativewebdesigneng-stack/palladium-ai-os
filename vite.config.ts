@@ -7,6 +7,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import { supabaseEnvPlugin } from "./vite-supabase-env-plugin";
 
 export default defineConfig({
   tanstackStart: {
@@ -22,8 +23,10 @@ export default defineConfig({
             // root with Windows-native route paths and rejects the generated
             // route directory. The generated MCP routes are committed; keep
             // generation enabled everywhere except this local Windows path.
+            supabaseEnvPlugin(),
           ]
-        : [mcpPlugin()],
+        : [supabaseEnvPlugin(), mcpPlugin()],
+
     resolve: {
       alias: [
         {
