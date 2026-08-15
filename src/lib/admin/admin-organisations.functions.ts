@@ -1,10 +1,46 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 
 type Sb = { from: (t: string) => any };
 
 const FORBIDDEN = { forbidden: true as const };
+const updateOrganisationInput = z.object({
+  organisationId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  billingEmail: z.union([z.string().trim().email().max(254), z.literal("")]).optional(),
+});
+
+export const updateAdminOrganisation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => updateOrganisationInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const caller = context.supabase as unknown as Sb;
+    if (!(await isPlatformAdmin(caller as never, context.userId))) return FORBIDDEN;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("organisations")
+      .update({
+        name: data.name,
+        billing_email: data.billingEmail?.trim() || null,
+      })
+      .eq("id", data.organisationId)
+      .select("id,name,billing_email")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Organisation not found.");
+
+    return {
+      forbidden: false as const,
+      organisation: {
+        id: String(row.id),
+        name: String(row.name),
+        billingEmail: row.billing_email ? String(row.billing_email) : null,
+      },
+    };
+  });
 
 export const listAdminOrganisationsDetailed = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

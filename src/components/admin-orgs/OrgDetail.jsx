@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { X, Cpu, Users, FolderKanban, Bot, Ban, Pencil, Info } from 'lucide-react';
+import { X, Cpu, Users, FolderKanban, Bot, Pencil, Info } from 'lucide-react';
 
 const TABS = ['Members', 'Teams', 'Projects', 'Agents', 'Billing', 'Usage', 'Security'];
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', suspended: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trial: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 const ROLE_CLS = { Owner: 'text-amber-300', Admin: 'text-violet-300', Member: 'text-zinc-300' };
 
-export default function OrgDetail({ org, onClose, onAction }) {
+export default function OrgDetail({ org, onClose, onEdit }) {
   const [tab, setTab] = useState('Members');
   if (!org) return null;
 
@@ -50,6 +50,7 @@ export default function OrgDetail({ org, onClose, onAction }) {
           {tab === 'Billing' && (
             <div className="space-y-2 text-[13px]">
               <Row label="Plan" value={org.billing.plan} />
+              <Row label="Billing email" value={org.billingEmail || 'Not set'} />
               <Row label="Monthly price" value={org.billing.mrr} />
               <Row label="Subscription status" value={org.billing.status} />
               <Row label="Seats purchased" value={org.billing.seats} />
@@ -70,9 +71,8 @@ export default function OrgDetail({ org, onClose, onAction }) {
           {tab === 'Security' && <Unavailable text="Organisation-wide MFA, SSO, active-session and risk-posture data are not currently exposed to this admin endpoint. No security status is guessed." />}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-white/10 p-3">
-          <button onClick={() => onAction('edit', org)} className="flex items-center justify-center gap-1 rounded-xl border border-white/10 py-2.5 text-xs text-zinc-300 hover:bg-white/5"><Pencil className="h-3.5 w-3.5" />Edit</button>
-          <button onClick={() => onAction('suspend', org)} className="flex items-center justify-center gap-1 rounded-xl border border-amber-400/20 bg-amber-400/10 py-2.5 text-xs text-amber-300 hover:bg-amber-400/20"><Ban className="h-3.5 w-3.5" />Suspend</button>
+        <div className="border-t border-white/10 p-3">
+          <button onClick={() => onEdit(org)} className="flex w-full items-center justify-center gap-1 rounded-xl border border-white/10 py-2.5 text-xs text-zinc-300 hover:bg-white/5"><Pencil className="h-3.5 w-3.5" />Edit organisation</button>
         </div>
       </div>
     </div>

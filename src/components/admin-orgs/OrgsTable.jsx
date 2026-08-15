@@ -1,8 +1,8 @@
-import { Eye, Pencil, Ban, Trash2 } from 'lucide-react';
+import { Eye, Pencil } from 'lucide-react';
 
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', suspended: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trial: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 
-export default function OrgsTable({ orgs, onView, onAction }) {
+export default function OrgsTable({ orgs, onView, onEdit }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10">
       <table className="w-full text-left text-[12px]">
@@ -38,9 +38,7 @@ export default function OrgsTable({ orgs, onView, onAction }) {
               <td className="px-3 py-2.5">
                 <div className="flex items-center justify-end gap-1">
                   <IconBtn title="View" onClick={() => onView(o)}><Eye className="h-3.5 w-3.5" /></IconBtn>
-                  <IconBtn title="Edit" onClick={() => onAction('edit', o)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
-                  <IconBtn title="Suspend" onClick={() => onAction('suspend', o)} className="text-amber-300"><Ban className="h-3.5 w-3.5" /></IconBtn>
-                  <IconBtn title="Delete" onClick={() => onAction('delete', o)} className="text-rose-300"><Trash2 className="h-3.5 w-3.5" /></IconBtn>
+                  <IconBtn title="Edit organisation" onClick={() => onEdit(o)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
                 </div>
               </td>
             </tr>
@@ -52,6 +50,6 @@ export default function OrgsTable({ orgs, onView, onAction }) {
   );
 }
 
-function IconBtn({ title, onClick, className = '', children }) {
-  return <button title={title} onClick={onClick} className={`grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-zinc-400 hover:bg-white/5 ${className}`}>{children}</button>;
+function IconBtn({ title, onClick, children }) {
+  return <button title={title} onClick={onClick} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-zinc-400 hover:bg-white/5">{children}</button>;
 }
