@@ -37,3 +37,9 @@ jobs:
 
       - name: Tests
         run: bun run test
+
+      - name: Browser worker syntax and policy tests
+        working-directory: browser-worker
+        run: |
+          npm run check
+          npm test
