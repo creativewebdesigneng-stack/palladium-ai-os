@@ -1,5 +1,11 @@
-import { Sparkles, FileText, FolderKanban, Bot, ArrowRight } from 'lucide-react';
-import { SUGGESTED_PROMPTS, RECENT_FILES, PROJECTS, AGENTS } from './chatData';
+import { ArrowRight, Bot, ListChecks, Sparkles, Workflow } from 'lucide-react';
+
+const STARTERS = [
+  { icon: Bot, title: 'Help me plan an AI agent', sub: 'Turn a job to be done into an agent plan.' },
+  { icon: Workflow, title: 'Design a workflow for my task', sub: 'Break a process into safe automation steps.' },
+  { icon: ListChecks, title: 'Help me prioritise my work', sub: 'Create a practical next-action plan.' },
+  { icon: Sparkles, title: 'What can PalladiumAI help me with?', sub: 'Explore the live workspace assistant.' },
+];
 
 export default function ChatEmptyState({ onPrompt }) {
   return (
@@ -10,39 +16,27 @@ export default function ChatEmptyState({ onPrompt }) {
           <Sparkles className="h-9 w-9 text-white" />
         </div>
       </div>
-      <h2 className="mt-6 text-2xl font-semibold tracking-tight text-white">Welcome to PalladiumAI</h2>
-      <p className="mt-2 max-w-md text-sm text-zinc-400">Your AI operating system. Ask anything, build agents, automate work, and ship faster — all from one workspace.</p>
+      <h2 className="mt-6 text-2xl font-semibold tracking-tight text-white">Live workspace assistant</h2>
+      <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-400">
+        Ask a question and PalladiumAI will call the server-configured AI provider. If no provider is configured or the provider fails, you’ll see an error instead of a simulated answer.
+      </p>
 
       <div className="mt-8 grid w-full max-w-3xl gap-3 sm:grid-cols-2">
-        {SUGGESTED_PROMPTS.map((p, i) => {
-          const Icon = p.icon;
-          return (
-            <button key={i} onClick={() => onPrompt?.(p.title)} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.02] p-4 text-left transition hover:-translate-y-0.5 hover:border-violet-400/30">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/15 text-violet-300"><Icon className="h-5 w-5" /></span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white">{p.title}</p>
-                <p className="text-xs text-zinc-500">{p.sub}</p>
-              </div>
-              <ArrowRight className="h-4 w-4 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-violet-300" />
-            </button>
-          );
-        })}
+        {STARTERS.map(({ icon: Icon, title, sub }) => (
+          <button key={title} onClick={() => onPrompt?.(title)} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.02] p-4 text-left transition hover:-translate-y-0.5 hover:border-violet-400/30">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/15 text-violet-300"><Icon className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white">{title}</p>
+              <p className="text-xs text-zinc-500">{sub}</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-violet-300" />
+          </button>
+        ))}
       </div>
 
-      <div className="mt-8 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4 text-left">
-          <p className="mb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-zinc-500"><FileText className="h-3 w-3" />Recent files</p>
-          <div className="space-y-1.5">{RECENT_FILES.slice(0, 3).map(f => <p key={f.id} className="truncate text-xs text-zinc-300">{f.name}</p>)}</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4 text-left">
-          <p className="mb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-zinc-500"><FolderKanban className="h-3 w-3" />Recent projects</p>
-          <div className="space-y-1.5">{PROJECTS.map(p => <p key={p.id} className="truncate text-xs text-zinc-300">{p.name}</p>)}</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4 text-left">
-          <p className="mb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-zinc-500"><Bot className="h-3 w-3" />Suggested agents</p>
-          <div className="space-y-1.5">{AGENTS.map(a => <p key={a.id} className="truncate text-xs text-zinc-300">{a.name}</p>)}</div>
-        </div>
-      </div>
+      <p className="mt-7 max-w-xl text-[11px] leading-5 text-zinc-600">
+        Conversation history on this screen is currently kept only for this browser session. Persistent chat history will not be implied until a real conversation store is connected.
+      </p>
     </div>
   );
 }
