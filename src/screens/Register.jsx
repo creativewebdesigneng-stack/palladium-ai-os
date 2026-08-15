@@ -75,10 +75,14 @@ export default function Register() {
     }
   };
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     try {
       if (configurationBlocked) return;
-      auth.loginWithProvider("google", safeReturnTo());
+      const target = safeReturnTo();
+      const result = await auth.loginWithProvider("google", target);
+      if (result && !result.redirected) {
+        window.location.href = target;
+      }
     } catch (err) {
       setError(err?.message || "Google sign-up could not start.");
     }
