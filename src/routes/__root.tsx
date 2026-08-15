@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Toaster as ShadToaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/lib/AuthContext";
 import ScrollToTop from "@/components/ScrollToTop";
+import { publicRuntimeConfigScript, readPublicRuntimeConfig } from "@/lib/public-config";
 
 function NotFoundComponent() {
   return (
@@ -111,9 +112,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  // Public (publishable) backend config is serialised at request time so the
+  // browser bundle never needs build-time env injection. No secrets here.
+  const bootstrap = publicRuntimeConfigScript(readPublicRuntimeConfig());
   return (
     <html lang="en" className="dark">
       <head>
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: bootstrap }} />
         <HeadContent />
       </head>
       <body>
