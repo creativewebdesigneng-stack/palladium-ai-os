@@ -8,6 +8,7 @@
 import type { ToolDef } from "./model-gateway.server";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
+import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
 import {
   createBrowserTool,
   isDomainAllowed,
@@ -520,6 +521,12 @@ const REGISTRY: Record<string, ToolImpl> = {
       if (error) return { error: "Could not queue the connected-service write for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", provider, action };
     },
+  },
+
+  github_write: {
+    def: GITHUB_WRITE_TOOL_DEF,
+    sensitive: true,
+    run: runGitHubWriteTool,
   },
 
   file_analysis: {
@@ -1215,6 +1222,7 @@ export async function executeTool(
     "slack_post",
     "prepare_purchase",
     "connected_service_write",
+    "github_write",
   ]);
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });

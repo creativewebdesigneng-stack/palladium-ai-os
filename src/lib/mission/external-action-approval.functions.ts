@@ -4,11 +4,22 @@ import {
   executeApprovedAction,
   type ApprovedActionType,
 } from "@/lib/integrations/approved-action.server";
+import {
+  executeApprovedGitHubAction,
+  type ApprovedGitHubActionType,
+} from "@/lib/integrations/github-approved-action.server";
 import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any };
+type ExternalActionType = ApprovedActionType | ApprovedGitHubActionType;
 
-const EXECUTABLE = new Set<ApprovedActionType>([
+const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
+  "github_branch_create",
+  "github_file_create",
+  "github_file_update",
+]);
+
+const EXECUTABLE = new Set<ExternalActionType>([
   "calendar_create",
   "slack_post",
   "hubspot_contact_update",
@@ -18,6 +29,7 @@ const EXECUTABLE = new Set<ApprovedActionType>([
   "linear_issue_create",
   "linear_issue_update",
   "notion_page_create",
+  ...GITHUB_EXECUTABLE,
 ]);
 
 function safeDetails(value: unknown): Record<string, unknown> {
@@ -26,10 +38,27 @@ function safeDetails(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function actionType(value: unknown): ApprovedActionType {
-  const action = String(value ?? "") as ApprovedActionType;
+function actionType(value: unknown): ExternalActionType {
+  const action = String(value ?? "") as ExternalActionType;
   if (!EXECUTABLE.has(action)) throw new Error("This approval has no executable connected-service action");
   return action;
+}
+
+async function executeExternalAction(
+  userId: string,
+  type: ExternalActionType,
+  details: Record<string, unknown>,
+) {
+  if (GITHUB_EXECUTABLE.has(type as ApprovedGitHubActionType)) {
+    return executeApprovedGitHubAction(userId, {
+      actionType: type as ApprovedGitHubActionType,
+      details,
+    });
+  }
+  return executeApprovedAction(userId, {
+    actionType: type as ApprovedActionType,
+    details,
+  });
 }
 
 async function audit(
@@ -136,9 +165,10 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This request has already been decided");
 
-    const execution = await executeApprovedAction(
+    const execution = await executeExternalAction(
       userId,
-      { actionType: type, details: safeDetails(claim.data.details) },
+      type,
+      safeDetails(claim.data.details),
     );
 
     await sb
@@ -234,9 +264,10 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This action is already being retried");
 
-    const execution = await executeApprovedAction(
+    const execution = await executeExternalAction(
       userId,
-      { actionType: type, details: safeDetails(claim.data.details) },
+      type,
+      safeDetails(claim.data.details),
     );
 
     await sb
