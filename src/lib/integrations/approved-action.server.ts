@@ -8,7 +8,7 @@
  * - Provider/action pairs are fixed below.
  * - OAuth credentials are resolved server-side.
  * - Free text and identifiers are bounded before requests are built.
- * - Email approval creates a provider draft; it never sends mail.
+ * - Email drafts remain drafts; email_send performs delivery only after approval is claimed.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getIntegrationAccessToken } from "./oauth.server";
@@ -133,7 +133,7 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
 
   if (action.actionType === "email_send" || action.actionType === "email_draft") {
     if (provider !== "google" && provider !== "microsoft") {
-      throw new Error("Email drafts require Google Workspace or Microsoft 365.");
+      throw new Error("Email actions require Google Workspace or Microsoft 365.");
     }
     const to = cleanHeader(details["to"], 254);
     const subject = cleanHeader(details["subject"], 200);
@@ -152,25 +152,33 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
         "",
         body,
       ].join("\r\n");
+      const raw = base64Url(mime);
       return {
         provider,
         method: "POST",
-        url: "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+        url: action.actionType === "email_send"
+          ? "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+          : "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: { raw: base64Url(mime) } }),
+        body: JSON.stringify(action.actionType === "email_send" ? { raw } : { message: { raw } }),
       };
     }
 
+    const message = {
+      subject,
+      body: { contentType: "Text", content: body },
+      toRecipients: [{ emailAddress: { address: to } }],
+    };
     return {
       provider,
       method: "POST",
-      url: "https://graph.microsoft.com/v1.0/me/messages",
+      url: action.actionType === "email_send"
+        ? "https://graph.microsoft.com/v1.0/me/sendMail"
+        : "https://graph.microsoft.com/v1.0/me/messages",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject,
-        body: { contentType: "Text", content: body },
-        toRecipients: [{ emailAddress: { address: to } }],
-      }),
+      body: JSON.stringify(action.actionType === "email_send"
+        ? { message, saveToSentItems: true }
+        : message),
     };
   }
 
@@ -309,7 +317,7 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     if (typeof details["description"] === "string") input["description"] = str(details["description"], MAX_NOTES);
     if (typeof details["priority"] === "number" && Number.isInteger(details["priority"]) && details["priority"] >= 0 && details["priority"] <= 4) input["priority"] = details["priority"];
     if (!Object.keys(input).length) throw new Error("At least one Linear issue field must change.");
-    const query = `mutation ConnectedIssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { id identifier title url } } }`;
+    const query = `mutation ConnectedIssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { id identifier title url } }`;
     return {
       provider,
       method: "POST",
