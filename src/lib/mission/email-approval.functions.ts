@@ -40,12 +40,6 @@ async function connectedEmailProvider(
   return available[0] ?? null;
 }
 
-/**
- * Decides an email_send approval and, on approval, creates a draft in the
- * operator's connected Google Workspace or Microsoft 365 mailbox.
- *
- * This path never sends mail. The provider executors expose draft creation only.
- */
 export const decideEmailApproval = createServerFn({ method: "POST" })
   .inputValidator(
     (input: { id: string; decision: "approve" | "reject"; note?: string }) => {
@@ -76,12 +70,8 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
 
     const approval = current.data;
     if (!approval) throw new Error("Approval request not found");
-    if (approval.action_type !== "email_send") {
-      throw new Error("This approval is not an email action");
-    }
-    if (approval.status !== "pending") {
-      throw new Error("This request has already been decided");
-    }
+    if (approval.action_type !== "email_send") throw new Error("This approval is not an email action");
+    if (approval.status !== "pending") throw new Error("This request has already been decided");
 
     const details = safeDetails(approval.details);
 
@@ -103,13 +93,8 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
       if (!rejected.data) throw new Error("This request has already been decided");
 
       if (approval.task_id) {
-        await sb
-          .from("personal_tasks")
-          .update({ status: "cancelled" })
-          .eq("id", approval.task_id)
-          .eq("user_id", userId);
+        await sb.from("personal_tasks").update({ status: "cancelled" }).eq("id", approval.task_id).eq("user_id", userId);
       }
-
       await sb.from("mission_audit_logs").insert({
         user_id: userId,
         agent_id: approval.agent_id ?? null,
@@ -122,22 +107,20 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
       return { status: "rejected" as const };
     }
 
-    const to = str(details.to, 500);
-    const subject = str(details.subject, 998);
-    const body = typeof details.body === "string" ? details.body.slice(0, 100_000) : "";
-    const cc = str(details.cc, 500) || null;
+    const to = str(details["to"], 500);
+    const subject = str(details["subject"], 998);
+    const body = typeof details["body"] === "string" ? details["body"].slice(0, 100_000) : "";
+    const cc = str(details["cc"], 500) || null;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
       throw new Error("The approved email does not contain a valid recipient address");
     }
     if (!subject) throw new Error("The approved email does not contain a subject");
 
-    const provider = await connectedEmailProvider(sb, userId, details.provider);
+    const provider = await connectedEmailProvider(sb, userId, details["provider"]);
     if (!provider) {
       throw new Error("Connect Google Workspace or Microsoft 365 before approving this email draft");
     }
 
-    // Claim the pending approval before the external side effect. This is the
-    // first-writer-wins guard that prevents two tabs creating duplicate drafts.
     const approved = await sb
       .from("approval_requests")
       .update({
@@ -155,25 +138,18 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
     if (!approved.data) throw new Error("This request has already been decided");
 
     try {
-      const draft = await createApprovedMissionEmailDraft({
-        userId,
-        provider,
-        to,
-        subject,
-        body,
-        cc,
-      });
+      const draft = await createApprovedMissionEmailDraft({ userId, provider, to, subject, body, cc });
+      const providerResult =
+        draft.provider === "google"
+          ? { message_id: draft.messageId, thread_id: draft.threadId, web_link: null }
+          : { message_id: null, thread_id: null, web_link: draft.webLink };
 
       await sb
         .from("approval_requests")
         .update({
           details: {
             ...details,
-            execution: {
-              provider,
-              status: "draft_created",
-              draft_id: draft.draftId,
-            },
+            execution: { provider, status: "draft_created", draft_id: draft.draftId },
           },
         })
         .eq("id", data.id)
@@ -189,8 +165,7 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
               email_draft: {
                 provider,
                 draft_id: draft.draftId,
-                message_id: draft.messageId ?? null,
-                thread_id: draft.threadId ?? null,
+                ...providerResult,
               },
             },
           })
@@ -233,11 +208,7 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
         .eq("id", data.id)
         .eq("user_id", userId);
       if (approval.task_id) {
-        await sb
-          .from("personal_tasks")
-          .update({ status: "failed", result: { error: message.slice(0, 500) } })
-          .eq("id", approval.task_id)
-          .eq("user_id", userId);
+        await sb.from("personal_tasks").update({ status: "failed", result: { error: message.slice(0, 500) } }).eq("id", approval.task_id).eq("user_id", userId);
       }
       await sb.from("mission_audit_logs").insert({
         user_id: userId,
