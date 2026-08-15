@@ -187,7 +187,7 @@ async function failClaimedRun(db: Sb, runId: string, error: unknown) {
     .eq("status", "running");
 }
 
-async function requeueAbandonedRuns(db: Sb) {
+export async function requeueAbandonedWorkflowRuns(db: Sb) {
   const cutoff = new Date(Date.now() - STALE_AFTER_MS).toISOString();
   const { data: stale } = await db
     .from("workflow_runs")
@@ -223,9 +223,9 @@ async function requeueAbandonedRuns(db: Sb) {
   }
 }
 
-export async function processQueuedWorkflowRuns(limit = 2) {
-  const db = await admin();
-  await requeueAbandonedRuns(db);
+export async function processQueuedWorkflowRuns(limit = 2, dbOverride?: Sb) {
+  const db = dbOverride ?? (await admin());
+  await requeueAbandonedWorkflowRuns(db);
 
   const batch = Math.min(Math.max(Number(limit) || 1, 1), MAX_BATCH);
   const { data: candidates, error } = await db
