@@ -63,11 +63,11 @@ export async function runGitHubWriteTool(
         action: action as "github_branch_create" | "github_file_create" | "github_file_update",
         repository: String(input["repository"] ?? ""),
         branch: String(input["branch"] ?? ""),
-        base_sha: input["base_sha"] === undefined ? undefined : String(input["base_sha"]),
-        path: input["path"] === undefined ? undefined : String(input["path"]),
-        content: input["content"] === undefined ? undefined : String(input["content"]),
-        message: input["message"] === undefined ? undefined : String(input["message"]),
-        sha: input["sha"] === undefined ? undefined : String(input["sha"]),
+        ...(input["base_sha"] === undefined ? {} : { base_sha: String(input["base_sha"]) }),
+        ...(input["path"] === undefined ? {} : { path: String(input["path"]) }),
+        ...(input["content"] === undefined ? {} : { content: String(input["content"]) }),
+        ...(input["message"] === undefined ? {} : { message: String(input["message"]) }),
+        ...(input["sha"] === undefined ? {} : { sha: String(input["sha"]) }),
       },
     );
 
