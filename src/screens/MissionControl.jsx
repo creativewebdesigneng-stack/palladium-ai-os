@@ -26,6 +26,10 @@ import {
   markNotifications, clearMemoryCategory,
 } from '@/lib/mission/mission.functions';
 import { decideEmailApproval } from '@/lib/mission/email-approval.functions';
+import {
+  decideExternalActionApproval,
+  retryExternalApprovedAction,
+} from '@/lib/mission/external-action-approval.functions';
 import { decideWorkflowApprovalRequest } from '@/lib/runtime/workforce.functions';
 
 const TABS = [
@@ -40,6 +44,18 @@ const TABS = [
   ['memory', 'Memory', Brain],
   ['audit', 'Audit trail', ScrollText],
 ];
+
+const EXTERNAL_ACTION_TYPES = new Set([
+  'calendar_create',
+  'slack_post',
+  'hubspot_contact_update',
+  'hubspot_deal_update',
+  'asana_task_create',
+  'asana_task_update',
+  'linear_issue_create',
+  'linear_issue_update',
+  'notion_page_create',
+]);
 
 function isWorkflowApproval(approval) {
   const details = approval?.details;
@@ -56,6 +72,10 @@ function isEmailApproval(approval) {
   return approval?.action_type === 'email_send';
 }
 
+function isExternalActionApproval(approval) {
+  return EXTERNAL_ACTION_TYPES.has(approval?.action_type);
+}
+
 export default function MissionControl() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
@@ -68,6 +88,8 @@ export default function MissionControl() {
   const submitTaskFn = useServerFn(submitPersonalTask);
   const decideFn = useServerFn(decideApproval);
   const decideEmailFn = useServerFn(decideEmailApproval);
+  const decideExternalFn = useServerFn(decideExternalActionApproval);
+  const retryExternalFn = useServerFn(retryExternalApprovedAction);
   const decideWorkflowFn = useServerFn(decideWorkflowApprovalRequest);
   const altFn = useServerFn(chooseAlternative);
   const confirmFn = useServerFn(confirmPurchase);
@@ -159,22 +181,50 @@ export default function MissionControl() {
       if (isEmailApproval(vars.approval)) {
         return decideEmailFn({ data: { id: vars.id, decision: vars.decision } });
       }
+      if (isExternalActionApproval(vars.approval)) {
+        return decideExternalFn({ data: { id: vars.id, decision: vars.decision } });
+      }
       return decideFn({ data: { id: vars.id, decision: vars.decision } });
     },
     onSuccess: (res, vars) => {
       const workflowApproval = isWorkflowApproval(vars.approval);
       const emailApproval = isEmailApproval(vars.approval);
+      const externalApproval = isExternalActionApproval(vars.approval);
+      const execution = res?.execution;
       toast({
-        title: vars.decision === 'approve' ? 'Approved' : 'Rejected',
+        title: vars.decision === 'approve'
+          ? externalApproval && execution?.ok === false ? 'Approved, but action failed' : 'Approved'
+          : 'Rejected',
         description: workflowApproval
           ? (vars.decision === 'approve'
               ? 'The workflow has resumed from the approval step.'
               : 'The workflow recorded your rejection and applied its error policy.')
           : emailApproval && vars.decision === 'approve' && res?.emailDraft
             ? `The message is now a draft in ${res.emailDraft.provider === 'microsoft' ? 'Outlook' : 'Gmail'}. It has not been sent.`
+          : externalApproval && vars.decision === 'approve' && execution?.ok === true
+            ? `The approved action completed${execution.provider ? ` through ${execution.provider}` : ''}.`
+          : externalApproval && vars.decision === 'approve' && execution?.ok === false
+            ? execution.error ?? 'The provider action failed. Reconnect the integration and retry the approved action.'
           : vars.decision === 'approve' && res?.purchase
             ? 'Confirm the cost breakdown to continue to secure checkout.'
             : 'The agent has been told your decision.',
+        ...(externalApproval && execution?.ok === false ? { variant: 'destructive' } : {}),
+      });
+      refresh();
+    },
+    onError: fail,
+    onSettled: () => setBusyId(null),
+  });
+
+  const retryExternal = useMutation({
+    mutationFn: (id) => retryExternalFn({ data: { id } }),
+    onSuccess: (res) => {
+      toast({
+        title: res?.ok ? 'Action completed' : 'Retry failed',
+        description: res?.ok
+          ? `The approved action completed${res.provider ? ` through ${res.provider}` : ''}.`
+          : res?.error ?? 'The provider action could not be completed.',
+        ...(res?.ok ? {} : { variant: 'destructive' }),
       });
       refresh();
     },
@@ -358,6 +408,7 @@ export default function MissionControl() {
             loading={isLoading && session !== 'no'}
             busyId={busyId}
             onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision, approval: a }); }}
+            onRetry={(a) => { setBusyId(a.id); retryExternal.mutate(a.id); }}
             onChooseAlternative={(a, alt) => alternative.mutate({ approvalId: a.id, resultId: alt.id })}
             onConfirmPurchase={(p) => { setBusyId(p.id); checkout.mutate(p.id); }}
             onAskAgent={(a) => toast({ title: 'Ask the agent', description: `Send a follow-up about “${a.title}” from the console — the agent keeps this request open.` })}
