@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Archive, CalendarDays, CheckCircle2, CirclePause, FolderKanban, Loader2, Plus, Search, X } from 'lucide-react';
+import { Archive, Bot, CalendarDays, CheckCircle2, CirclePause, FolderKanban, Link2, Loader2, Plus, Search, Unlink, Workflow, X } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { archiveProject, createProject, listProjects, updateProject } from '@/lib/projects/project.functions';
+import {
+  addProjectResource,
+  archiveProject,
+  createProject,
+  listProjectResources,
+  listProjects,
+  removeProjectResource,
+  updateProject,
+} from '@/lib/projects/project.functions';
 import { friendlyMessage } from '@/lib/errors';
 
 const STATUS = {
@@ -32,6 +40,7 @@ export default function Projects() {
   const [showArchived, setShowArchived] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [managingResources, setManagingResources] = useState(null);
 
   const scope = workspace.activeOrgId ?? null;
   const projectsQuery = useQuery({
@@ -73,7 +82,7 @@ export default function Projects() {
       <PageHeader
         eyebrow="Workspace"
         title="Projects"
-        description={`Persistent projects for ${scopeName}. Project data, lifecycle state and activity are stored in the backend.`}
+        description={`Persistent projects for ${scopeName}. Project data, lifecycle state and linked AI resources are stored in the backend.`}
         action={(
           <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-violet-500">
             <Plus className="h-4 w-4" />New project
@@ -117,13 +126,21 @@ export default function Projects() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} onEdit={() => setEditing(project)} onArchive={() => archiveMutation.mutate(project.id)} archiving={archiveMutation.isPending} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onEdit={() => setEditing(project)}
+              onResources={() => setManagingResources(project)}
+              onArchive={() => archiveMutation.mutate(project.id)}
+              archiving={archiveMutation.isPending}
+            />
           ))}
         </div>
       )}
 
       {createOpen && <ProjectForm title="Create project" submitLabel="Create project" scope={scope} onClose={() => setCreateOpen(false)} onSubmit={(data) => createMutation.mutate(data)} pending={createMutation.isPending} error={createMutation.error} />}
       {editing && <ProjectForm title="Edit project" submitLabel="Save changes" project={editing} onClose={() => setEditing(null)} onSubmit={(data) => updateMutation.mutate({ id: editing.id, ...data })} pending={updateMutation.isPending} error={updateMutation.error} />}
+      {managingResources && <ResourceManager project={managingResources} onClose={() => setManagingResources(null)} />}
     </>
   );
 }
@@ -137,7 +154,7 @@ function Metric({ label, value, icon: Icon }) {
   );
 }
 
-function ProjectCard({ project, onEdit, onArchive, archiving }) {
+function ProjectCard({ project, onEdit, onResources, onArchive, archiving }) {
   const state = STATUS[project.status] ?? STATUS.active;
   return (
     <article className="rounded-2xl border border-white/10 bg-white/[.025] p-4 transition hover:border-white/20">
@@ -154,11 +171,110 @@ function ProjectCard({ project, onEdit, onArchive, archiving }) {
         <CalendarDays className="h-3 w-3" />
         <span>{project.due_at ? `Due ${new Date(project.due_at).toLocaleDateString()}` : `Updated ${new Date(project.updated_at).toLocaleDateString()}`}</span>
         <div className="ml-auto flex gap-1.5">
+          <button onClick={onResources} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-violet-300 hover:bg-violet-500/10"><Link2 className="h-3 w-3" />Resources</button>
           <button onClick={onEdit} className="rounded-lg border border-white/10 px-2 py-1 text-zinc-300 hover:bg-white/5">Edit</button>
           {project.status !== 'archived' && <button disabled={archiving} onClick={onArchive} className="rounded-lg border border-white/10 p-1.5 text-zinc-400 hover:bg-white/5" title="Archive project"><Archive className="h-3 w-3" /></button>}
         </div>
       </div>
     </article>
+  );
+}
+
+function ResourceManager({ project, onClose }) {
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listProjectResources);
+  const addFn = useServerFn(addProjectResource);
+  const removeFn = useServerFn(removeProjectResource);
+  const key = ['project-resources', project.id];
+  const q = useQuery({ queryKey: key, queryFn: () => listFn({ data: { projectId: project.id } }), retry: false });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: key });
+  const addMutation = useMutation({
+    mutationFn: ({ resourceType, resourceId }) => addFn({ data: { projectId: project.id, resourceType, resourceId } }),
+    onSuccess: refresh,
+  });
+  const removeMutation = useMutation({
+    mutationFn: (linkId) => removeFn({ data: { projectId: project.id, linkId } }),
+    onSuccess: refresh,
+  });
+
+  const links = q.data?.links ?? [];
+  const linkedKey = new Map(links.map((link) => [`${link.resource_type}:${link.resource_id}`, link]));
+  const agents = q.data?.agents ?? [];
+  const workflows = q.data?.workflows ?? [];
+  const error = q.error || addMutation.error || removeMutation.error;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-2xl border border-white/10 bg-[#0c0d13] shadow-2xl">
+        <div className="flex items-start justify-between border-b border-white/10 p-5">
+          <div><p className="text-[10px] uppercase tracking-wide text-violet-300">Project resources</p><h2 className="mt-1 text-base font-semibold text-white">{project.name}</h2><p className="mt-1 text-xs text-zinc-500">Link only agents and workflows from this same workspace.</p></div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="overflow-y-auto p-5">
+          {error && <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>}
+          {q.isLoading ? (
+            <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : (
+            <div className="space-y-6">
+              <ResourceSection
+                title="AI agents"
+                icon={Bot}
+                type="agent"
+                rows={agents}
+                linkedKey={linkedKey}
+                onAdd={(id) => addMutation.mutate({ resourceType: 'agent', resourceId: id })}
+                onRemove={(id) => removeMutation.mutate(id)}
+                pending={addMutation.isPending || removeMutation.isPending}
+              />
+              <ResourceSection
+                title="Workflows"
+                icon={Workflow}
+                type="workflow"
+                rows={workflows}
+                linkedKey={linkedKey}
+                onAdd={(id) => addMutation.mutate({ resourceType: 'workflow', resourceId: id })}
+                onRemove={(id) => removeMutation.mutate(id)}
+                pending={addMutation.isPending || removeMutation.isPending}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3 text-[10px] text-zinc-600">
+          <span>{links.length} linked resource{links.length === 1 ? '' : 's'}</span>
+          <button onClick={onClose} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5">Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResourceSection({ title, icon: Icon, type, rows, linkedKey, onAdd, onRemove, pending }) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center gap-2"><Icon className="h-4 w-4 text-violet-300" /><h3 className="text-sm font-semibold text-white">{title}</h3><span className="text-[10px] text-zinc-600">{rows.length} available</span></div>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-zinc-600">No {title.toLowerCase()} exist in this workspace yet.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((row) => {
+            const link = linkedKey.get(`${type}:${row.id}`);
+            return (
+              <div key={row.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-500/10 text-violet-300"><Icon className="h-4 w-4" /></span>
+                <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-white">{row.name}</p><p className="truncate text-[10px] text-zinc-600">{row.category || row.description || row.status || type}</p></div>
+                {link ? (
+                  <button disabled={pending} onClick={() => onRemove(link.id)} className="flex items-center gap-1 rounded-lg border border-rose-400/20 px-2.5 py-1.5 text-[10px] text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"><Unlink className="h-3 w-3" />Unlink</button>
+                ) : (
+                  <button disabled={pending} onClick={() => onAdd(row.id)} className="flex items-center gap-1 rounded-lg border border-violet-400/20 px-2.5 py-1.5 text-[10px] text-violet-300 hover:bg-violet-500/10 disabled:opacity-50"><Link2 className="h-3 w-3" />Link</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
