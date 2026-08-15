@@ -21,6 +21,12 @@ export type PublicRuntimeConfig = {
   SUPABASE_PROJECT_ID?: string;
 };
 
+declare global {
+  // Populated by the SSR bootstrap before the browser entry executes.
+  // Only public connection values are permitted in this object.
+  var __PALLADIUM_PUBLIC_CONFIG__: PublicRuntimeConfig | undefined;
+}
+
 const PUBLIC_KEYS = [
   ["SUPABASE_URL", "VITE_SUPABASE_URL"],
   ["SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"],
@@ -59,6 +65,11 @@ export function readPublicRuntimeConfig(
     if (typeof value === "string" && value.length > 0) config[key] = value;
   }
   return config;
+}
+
+/** Reads the SSR-injected browser config without relying on Vite env replacement. */
+export function readBrowserPublicRuntimeConfig(): PublicRuntimeConfig {
+  return globalThis.__PALLADIUM_PUBLIC_CONFIG__ ?? {};
 }
 
 /**

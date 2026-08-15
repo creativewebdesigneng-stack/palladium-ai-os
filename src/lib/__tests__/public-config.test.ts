@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { publicRuntimeConfigScript, readPublicRuntimeConfig } from "../public-config";
+import {
+  publicRuntimeConfigScript,
+  readBrowserPublicRuntimeConfig,
+  readPublicRuntimeConfig,
+} from "../public-config";
 
 describe("public runtime config", () => {
   it("prefers VITE_ values and falls back to unprefixed server values", () => {
@@ -39,5 +43,20 @@ describe("public runtime config", () => {
 
   it("returns an empty config when nothing is configured", () => {
     expect(readPublicRuntimeConfig({})).toEqual({});
+  });
+
+  it("reads the SSR-injected browser config directly from globalThis", () => {
+    const previous = globalThis.__PALLADIUM_PUBLIC_CONFIG__;
+    globalThis.__PALLADIUM_PUBLIC_CONFIG__ = {
+      SUPABASE_URL: "https://runtime.example",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_runtime",
+    };
+
+    expect(readBrowserPublicRuntimeConfig()).toEqual({
+      SUPABASE_URL: "https://runtime.example",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_runtime",
+    });
+
+    globalThis.__PALLADIUM_PUBLIC_CONFIG__ = previous;
   });
 });
