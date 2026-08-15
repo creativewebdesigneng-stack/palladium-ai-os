@@ -93,12 +93,11 @@ export async function listGoogleCalendarEvents(args: {
   url.searchParams.set("timeMax", toDate.toISOString());
   url.searchParams.set("maxResults", String(Math.min(Math.max(args.limit ?? 10, 1), 50)));
 
-  const response = await googleFetch(
-    args.userId,
-    url.toString(),
-    { method: "GET", signal: args.signal },
-    args.fetchImpl ?? fetch,
-  );
+  const init: RequestInit = {
+    method: "GET",
+    ...(args.signal ? { signal: args.signal } : {}),
+  };
+  const response = await googleFetch(args.userId, url.toString(), init, args.fetchImpl ?? fetch);
   const payload = (await response.json()) as any;
   const items = Array.isArray(payload?.items) ? payload.items : [];
   return items.map((event: any) => ({
@@ -163,14 +162,15 @@ export async function createGoogleGmailDraft(args: {
     body,
   ].join("\r\n");
 
+  const init: RequestInit = {
+    method: "POST",
+    body: JSON.stringify({ message: { raw: base64url(raw) } }),
+    ...(args.signal ? { signal: args.signal } : {}),
+  };
   const response = await googleFetch(
     args.userId,
     `${GMAIL}/users/me/drafts`,
-    {
-      method: "POST",
-      body: JSON.stringify({ message: { raw: base64url(raw) } }),
-      signal: args.signal,
-    },
+    init,
     args.fetchImpl ?? fetch,
   );
   const payload = (await response.json()) as any;
