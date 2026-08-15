@@ -383,7 +383,7 @@ describe("personal task execution", () => {
     const secondMessages = gateway.runChat.mock.calls[1]?.[0]?.messages ?? [];
     expect(
       secondMessages.some(
-        (m: any) => m.role === "tool" && m.content.includes("not permitted in a read-only personal-task run"),
+        (m: any) => m.role === "tool" && m.content.includes("not permitted in a personal-task run"),
       ),
     ).toBe(true);
   });
