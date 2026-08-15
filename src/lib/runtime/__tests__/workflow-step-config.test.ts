@@ -40,8 +40,8 @@ describe("workflow executable step contract", () => {
       nested: { enabled: true },
       ignored: ["a", { secret: "not copied" }, "b"],
     });
-    expect(String(config.title)).toHaveLength(2000);
-    expect(config.nested).toEqual({ enabled: true });
-    expect(config.ignored).toEqual(["a", "b"]);
+    expect(String(config["title"])).toHaveLength(2000);
+    expect(config["nested"]).toEqual({ enabled: true });
+    expect(config["ignored"]).toEqual(["a", "b"]);
   });
 });
