@@ -408,6 +408,18 @@ const REGISTRY: Record<string, ToolImpl> = {
             type: "string",
             description: "Provider resource id when an action needs one, e.g. Slack channel or Asana project.",
           },
+          repository: {
+            type: "string",
+            description: "GitHub repository in owner/name form for repository-scoped GitHub reads.",
+          },
+          path: {
+            type: "string",
+            description: "GitHub repository path for path_list or file_read.",
+          },
+          ref: {
+            type: "string",
+            description: "Optional GitHub branch, tag or commit ref.",
+          },
           limit: { type: "number" },
         },
         required: ["provider", "action"],
@@ -421,6 +433,9 @@ const REGISTRY: Record<string, ToolImpl> = {
           action: str(input["action"]),
           query: str(input["query"]),
           resource_id: str(input["resource_id"]),
+          repository: str(input["repository"]),
+          path: str(input["path"]),
+          ref: str(input["ref"]),
           limit: Number(input["limit"] ?? 10),
         },
         ctx.signal,
@@ -714,11 +729,58 @@ const REGISTRY: Record<string, ToolImpl> = {
     },
   },
 
+  email_draft: {
+    def: {
+      name: "email_draft",
+      description:
+        "Create an email draft in the operator's connected Gmail or Microsoft mailbox after explicit approval. This never delivers the message.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string" },
+          subject: { type: "string" },
+          body: { type: "string" },
+          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
+        },
+        required: ["to", "subject", "body"],
+      },
+    },
+    sensitive: true,
+    run: async (input, ctx) => {
+      const to = str(input["to"]).slice(0, 200);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to))
+        return { error: "A valid recipient address is required." };
+      const { data, error } = await ctx.sb
+        .from("approval_requests")
+        .insert({
+          user_id: ctx.userId,
+          org_id: ctx.orgId,
+          agent_id: ctx.agentId,
+          task_id: ctx.taskId,
+          action_type: "email_draft",
+          title: `Create email draft: ${str(input["subject"]).slice(0, 120)}`,
+          summary: str(input["body"]).slice(0, 1000),
+          details: {
+            to,
+            subject: str(input["subject"]).slice(0, 200),
+            body: str(input["body"]).slice(0, 20000),
+            provider: str(input["provider"], "auto"),
+          },
+          risk_level: "medium",
+          status: "pending",
+        })
+        .select("id")
+        .maybeSingle();
+      if (error) return { error: "Could not queue the email draft for approval." };
+      return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_draft" };
+    },
+  },
+
   email_send: {
     def: {
       name: "email_send",
       description:
-        "Draft an email for the operator. The draft is queued for explicit approval; the tool never sends mail itself.",
+        "Prepare an email for delivery through the operator's connected Gmail or Microsoft mailbox. The exact message is sent only after explicit operator approval.",
       parameters: {
         type: "object",
         properties: {
@@ -743,7 +805,7 @@ const REGISTRY: Record<string, ToolImpl> = {
           agent_id: ctx.agentId,
           task_id: ctx.taskId,
           action_type: "email_send",
-          title: `Create email draft: ${str(input["subject"]).slice(0, 120)}`,
+          title: `Send email: ${str(input["subject"]).slice(0, 120)}`,
           summary: str(input["body"]).slice(0, 1000),
           details: {
             to,
@@ -757,7 +819,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         .select("id")
         .maybeSingle();
       if (error) return { error: "Could not queue the email for approval." };
-      return { queued: true, approval_request_id: data?.id, status: "pending" };
+      return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_send" };
     },
   },
 
@@ -1218,6 +1280,7 @@ export async function executeTool(
 
   const SELF_QUEUING_APPROVAL_TOOLS = new Set([
     "request_approval",
+    "email_draft",
     "email_send",
     "slack_post",
     "prepare_purchase",
