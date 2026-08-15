@@ -226,7 +226,7 @@ describe("personal task execution", () => {
     expect(secondMessages.some((m: any) => m.role === "tool" && m.content.includes("Live item"))).toBe(true);
   });
 
-  it("exposes browser as a read-only schema while still filtering approval/write tools", async () => {
+  it("exposes browser as read-only plus an approval-gated interaction sequence", async () => {
     const grants = new Map([
       ["connected_service", { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null }],
       ["connected_service_write", { slug: "connected_service_write", requiresApproval: true, allowedDomains: [], spendCap: null }],
@@ -268,7 +268,7 @@ describe("personal task execution", () => {
     });
 
     const exposed = gateway.runChat.mock.calls[0]?.[0]?.tools ?? [];
-    expect(exposed.map((d: any) => d.name)).toEqual(["connected_service", "browser"]);
+    expect(exposed.map((d: any) => d.name)).toEqual(["connected_service", "browser", "browser_interact"]);
     const browserDef = exposed.find((d: any) => d.name === "browser");
     expect(browserDef.parameters.properties.action.enum).toEqual([
       "navigate",
@@ -282,6 +282,8 @@ describe("personal task execution", () => {
     ]);
     expect(browserDef.parameters.properties.action.enum).not.toContain("click");
     expect(browserDef.parameters.properties.action.enum).not.toContain("type");
+    const interactDef = exposed.find((d: any) => d.name === "browser_interact");
+    expect(interactDef.parameters.required).toEqual(["url", "steps"]);
   });
 
   it("executes an allowed browser read action through the shared tool layer", async () => {
@@ -331,7 +333,7 @@ describe("personal task execution", () => {
     );
   });
 
-  it("blocks and audits browser click/type even if the model emits an out-of-schema call", async () => {
+  it("blocks and audits direct browser click/type even if the model emits an out-of-schema call", async () => {
     const grants = new Map([
       ["browser", { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null }],
     ]);
