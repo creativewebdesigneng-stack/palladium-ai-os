@@ -9,6 +9,8 @@ import {
   runShoppingResearch,
 } from "./mission.server";
 import { assertWithinLimits } from "@/lib/shopping/limits.server";
+import { executePersonalTask } from "./personal-task-execution.server";
+
 import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any; rpc?: unknown };
