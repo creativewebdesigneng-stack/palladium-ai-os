@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useServerFn } from '@tanstack/react-start';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, CornerDownLeft, ArrowUp, ArrowDown, Command, Home, FolderKanban,
   Users, Bot, ListChecks, Workflow, Files, BookOpen, Plug, Store, Globe,
   Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, ShieldCheck, CreditCard,
-  Cpu, Lock,
+  Cpu, Lock, Loader2,
 } from 'lucide-react';
+import { searchWorkspace } from '@/lib/search/search.functions';
 
 const PAGES = [
   ['Home', '/dashboard', Home],
@@ -33,15 +35,20 @@ const PAGES = [
   ['System Settings', '/admin/system-settings', Cpu],
 ];
 
-// Navigation actions only. Resource search must come from authenticated backend
-// queries; never put illustrative project/agent/task/file records in the global
-// command surface because they look indistinguishable from real workspace data.
 const QUICK_ACTIONS = [
   { title: 'Create new project', href: '/projects', icon: FolderKanban },
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
   { title: 'Manage team members', href: '/team', icon: Users },
 ];
+
+const RESOURCE_ICON = {
+  project: FolderKanban,
+  agent: Bot,
+  task: ListChecks,
+  workflow: Workflow,
+  file: Files,
+};
 
 function match(item, q) {
   if (!q) return true;
@@ -51,25 +58,73 @@ function match(item, q) {
 
 export default function CommandMenu({ open, onClose }) {
   const navigate = useNavigate();
+  const searchFn = useServerFn(searchWorkspace);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
+  const [resources, setResources] = useState([]);
+  const [resourceLoading, setResourceLoading] = useState(false);
+  const [resourceError, setResourceError] = useState('');
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const requestRef = useRef(0);
 
   useEffect(() => {
-    if (open) { setQuery(''); setSelected(0); setTimeout(() => inputRef.current?.focus(), 30); }
+    if (open) {
+      setQuery('');
+      setSelected(0);
+      setResources([]);
+      setResourceError('');
+      setTimeout(() => inputRef.current?.focus(), 30);
+    }
   }, [open]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || q.length < 2) {
+      requestRef.current += 1;
+      setResources([]);
+      setResourceLoading(false);
+      setResourceError('');
+      return undefined;
+    }
+
+    const requestId = ++requestRef.current;
+    setResourceLoading(true);
+    setResourceError('');
+    const timer = setTimeout(() => {
+      searchFn({ data: { query: q, limit: 20 } })
+        .then((result) => {
+          if (requestId !== requestRef.current) return;
+          setResources((result?.results ?? []).map((item) => ({
+            ...item,
+            icon: RESOURCE_ICON[item.type] ?? Search,
+            group: 'Workspace',
+          })));
+        })
+        .catch((error) => {
+          if (requestId !== requestRef.current) return;
+          console.error('[command-search]', error);
+          setResources([]);
+          setResourceError('Workspace search is temporarily unavailable.');
+        })
+        .finally(() => {
+          if (requestId === requestRef.current) setResourceLoading(false);
+        });
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [open, query, searchFn]);
 
   const groups = useMemo(() => {
     const q = query.trim();
     const pages = PAGES.filter((p) => match({ title: p[0], type: 'Page' }, q)).map(([title, href, icon]) => ({ title, href, icon, group: 'Pages' }));
     const actions = QUICK_ACTIONS.filter((a) => match({ title: a.title, type: 'Action' }, q)).map((a) => ({ ...a, group: 'Actions' }));
-    return { pages, actions };
-  }, [query]);
+    return { pages, resources: q.length >= 2 ? resources : [], actions };
+  }, [query, resources]);
 
-  const flat = useMemo(() => [...groups.pages, ...groups.actions], [groups]);
+  const flat = useMemo(() => [...groups.pages, ...groups.resources, ...groups.actions], [groups]);
 
-  useEffect(() => { setSelected(0); }, [query]);
+  useEffect(() => { setSelected(0); }, [query, resources.length]);
 
   useEffect(() => {
     if (!open || !flat.length) return;
@@ -98,7 +153,7 @@ export default function CommandMenu({ open, onClose }) {
     const active = i === selected;
     return (
       <button
-        key={item.title + i}
+        key={`${item.group}-${item.id || item.title}-${i}`}
         data-idx={i}
         onMouseMove={() => setSelected(i)}
         onClick={() => go(item)}
@@ -109,7 +164,7 @@ export default function CommandMenu({ open, onClose }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-white">{item.title}</p>
-          <p className="truncate text-[11px] text-zinc-500">{item.group}</p>
+          <p className="truncate text-[11px] text-zinc-500">{item.subtitle || item.group}</p>
         </div>
         {active && <CornerDownLeft className="h-3.5 w-3.5 text-violet-300" />}
       </button>
@@ -137,23 +192,25 @@ export default function CommandMenu({ open, onClose }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Search pages and actions…"
+                placeholder="Search pages, projects, agents, tasks, workflows and files…"
                 aria-label="Command menu search"
                 className="h-14 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
               />
-              <kbd className="hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-500 sm:block">ESC</kbd>
+              {resourceLoading ? <Loader2 className="h-4 w-4 animate-spin text-violet-300" /> : <kbd className="hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-500 sm:block">ESC</kbd>}
             </div>
 
             <div ref={listRef} className="min-w-0 flex-1 overflow-y-auto p-3">
-              {flat.length === 0 ? (
+              {resourceError && <div className="mb-2 rounded-xl border border-amber-400/15 bg-amber-400/[.05] px-3 py-2 text-[11px] text-amber-200/80">{resourceError}</div>}
+              {flat.length === 0 && !resourceLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5"><Search className="h-5 w-5 text-zinc-500" /></span>
-                  <p className="mt-3 text-sm font-medium text-white">No navigation results for “{query}”</p>
-                  <p className="mt-1 max-w-sm text-xs text-zinc-500">Workspace-wide resource search is not connected here yet. Use the search controls inside Projects, Agents, Tasks, Files or Workflows for live records.</p>
+                  <p className="mt-3 text-sm font-medium text-white">No results for “{query}”</p>
+                  <p className="mt-1 max-w-sm text-xs text-zinc-500">Search checks the workspace records your authenticated account is allowed to read.</p>
                 </div>
               ) : (
                 <>
                   {groups.pages.length > 0 && <Group label="Pages">{groups.pages.map(renderItem)}</Group>}
+                  {groups.resources.length > 0 && <Group label="Workspace">{groups.resources.map(renderItem)}</Group>}
                   {groups.actions.length > 0 && <Group label="Quick Actions">{groups.actions.map(renderItem)}</Group>}
                 </>
               )}
