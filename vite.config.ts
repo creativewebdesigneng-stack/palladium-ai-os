@@ -5,6 +5,7 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import type { Plugin } from "vite";
@@ -20,9 +21,12 @@ function runtimeSupabasePublicConfigPlugin(): Plugin {
   return {
     name: "palladium-runtime-supabase-public-config",
     enforce: "pre",
-    transform(code, id) {
+    load(id, options) {
+      if (options?.ssr) return null;
       const normalizedId = id.replaceAll("\\", "/").replace(/\?.*$/, "");
       if (!normalizedId.endsWith("/src/integrations/supabase/client.ts")) return null;
+
+      const code = readFileSync(normalizedId, "utf8");
 
       const replacements = [
         [
