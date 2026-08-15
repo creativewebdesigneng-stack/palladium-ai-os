@@ -192,11 +192,17 @@ export async function readConnectedService(userId: string, input: ConnectedServi
 
   if (providerId === "github") {
     const { readConnectedGitHubService } = await import("./github-connected-service.server");
+    // `resource_id` and `query` remain accepted as compatibility aliases because
+    // the current runtime tool schema already exposes those fields. This makes
+    // GitHub repository reads usable before clients adopt repository/path/ref.
+    const repository = input.repository ?? input.resource_id;
+    const path = input.path ?? ((action === "path_list" || action === "file_read") ? input.query : undefined);
+    const ref = input.ref ?? (action === "commits_list" ? input.query : undefined);
     return readConnectedGitHubService(userId, {
       action,
-      ...(input.repository === undefined ? {} : { repository: input.repository }),
-      ...(input.path === undefined ? {} : { path: input.path }),
-      ...(input.ref === undefined ? {} : { ref: input.ref }),
+      ...(repository === undefined ? {} : { repository }),
+      ...(path === undefined ? {} : { path }),
+      ...(ref === undefined ? {} : { ref }),
       ...(input.limit === undefined ? {} : { limit: input.limit }),
     });
   }
