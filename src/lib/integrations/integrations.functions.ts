@@ -10,6 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { INTEGRATION_PROVIDERS, findProvider } from "./providers";
+import { assessIntegrationHealth } from "./integration-health";
 
 type Sb = { from: (t: string) => any };
 
@@ -23,7 +24,7 @@ const startInput = z.object({
   origin: z.string().trim().url().max(300).optional(),
 });
 
-/** Provider catalogue plus this user's connection state. */
+/** Provider catalogue plus this user's connection state and safe health summary. */
 export const listIntegrations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -36,18 +37,42 @@ export const listIntegrations = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    const { providerConfigured } = await import("./oauth.server");
-    const catalogue = INTEGRATION_PROVIDERS.map((provider) => ({
-      id: provider.id,
-      name: provider.name,
-      category: provider.category,
-      summary: provider.summary,
-      scopes: provider.scopes,
-      tools: provider.tools,
-      docsUrl: provider.docsUrl,
-      configured: providerConfigured(provider),
-      connection: (rows ?? []).find((r: any) => r.provider === provider.id) ?? null,
-    }));
+    const [{ providerConfigured }, { supabaseAdmin }] = await Promise.all([
+      import("./oauth.server"),
+      import("@/integrations/supabase/client.server"),
+    ]);
+    const { data: credentials } = await supabaseAdmin
+      .from("integration_credentials")
+      .select("provider,refresh_token_ciphertext,expires_at")
+      .eq("user_id", context.userId);
+    const credentialsByProvider = new Map(
+      (credentials ?? []).map((row: any) => [String(row.provider), row]),
+    );
+
+    const catalogue = INTEGRATION_PROVIDERS.map((provider) => {
+      const connection = (rows ?? []).find((r: any) => r.provider === provider.id) ?? null;
+      const credential: any = credentialsByProvider.get(provider.id);
+      const health = assessIntegrationHealth({
+        providerName: provider.name,
+        requiredScopes: provider.scopes,
+        status: connection?.status ?? null,
+        grantedScopes: connection?.granted_scopes ?? [],
+        expiresAt: credential?.expires_at ?? connection?.expires_at ?? null,
+        hasRefreshToken: Boolean(credential?.refresh_token_ciphertext),
+        lastError: connection?.last_error ?? null,
+      });
+      return {
+        id: provider.id,
+        name: provider.name,
+        category: provider.category,
+        summary: provider.summary,
+        scopes: provider.scopes,
+        tools: provider.tools,
+        docsUrl: provider.docsUrl,
+        configured: providerConfigured(provider),
+        connection: connection ? { ...connection, health } : null,
+      };
+    });
 
     return { integrations: rows ?? [], catalogue };
   });
