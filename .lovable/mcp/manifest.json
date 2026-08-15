@@ -232,8 +232,8 @@
       },
       {
         "name": "decide_approval",
-        "title": "Approve or reject a request",
-        "description": "Record the signed-in user's decision on a pending approval request. Approving may authorise an agent to spend money or act on the user's behalf.",
+        "title": "Reject a request or direct the user to Approval Centre",
+        "description": "Reject a pending approval request. Approval must be confirmed in PalladiumAI's Approval Centre so spend limits, workflow resume and external-action execution gates cannot be bypassed.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": true,
