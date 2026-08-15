@@ -96,6 +96,8 @@ import { Route as ShellAppWebRouteImport } from './routes/_shell/_app/web'
 import { Route as ShellAppWorkflowsRouteImport } from './routes/_shell/_app/workflows'
 import { Route as ShellAppWorkforceRouteImport } from './routes/_shell/_app/workforce'
 import { Route as ApiAgentsRunRouteImport } from './routes/api/agents/run'
+import { Route as ApiInternalWebhookRetriesRouteImport } from './routes/api/internal/webhook-retries'
+import { Route as ApiInternalWorkflowRunsRouteImport } from './routes/api/internal/workflow-runs'
 import { Route as ShellAppAdminIndexRouteImport } from './routes/_shell/_app/admin.index'
 import { Route as ShellAppAdminAuditLogsRouteImport } from './routes/_shell/_app/admin.audit-logs'
 import { Route as ShellAppAdminIntegrationsRouteImport } from './routes/_shell/_app/admin.integrations'
@@ -564,6 +566,17 @@ const ApiAgentsRunRoute = ApiAgentsRunRouteImport.update({
   path: '/api/agents/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInternalWebhookRetriesRoute =
+  ApiInternalWebhookRetriesRouteImport.update({
+    id: '/api/internal/webhook-retries',
+    path: '/api/internal/webhook-retries',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInternalWorkflowRunsRoute = ApiInternalWorkflowRunsRouteImport.update({
+  id: '/api/internal/workflow-runs',
+  path: '/api/internal/workflow-runs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellAppAdminIndexRoute = ShellAppAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -796,6 +809,8 @@ export interface FileRoutesByFullPath {
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
+  '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
+  '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -910,6 +925,8 @@ export interface FileRoutesByTo {
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
+  '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
+  '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1027,6 +1044,8 @@ export interface FileRoutesById {
   '/_shell/_app/workflows': typeof ShellAppWorkflowsRoute
   '/_shell/_app/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
+  '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
+  '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/_shell/_app/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/_shell/_app/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/_shell/_app/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1143,6 +1162,8 @@ export interface FileRouteTypes {
     | '/workflows'
     | '/workforce'
     | '/api/agents/run'
+    | '/api/internal/webhook-retries'
+    | '/api/internal/workflow-runs'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1257,6 +1278,8 @@ export interface FileRouteTypes {
     | '/workflows'
     | '/workforce'
     | '/api/agents/run'
+    | '/api/internal/webhook-retries'
+    | '/api/internal/workflow-runs'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1373,6 +1396,8 @@ export interface FileRouteTypes {
     | '/_shell/_app/workflows'
     | '/_shell/_app/workforce'
     | '/api/agents/run'
+    | '/api/internal/webhook-retries'
+    | '/api/internal/workflow-runs'
     | '/_shell/_app/admin/audit-logs'
     | '/_shell/_app/admin/integrations'
     | '/_shell/_app/admin/marketplace'
@@ -1431,6 +1456,8 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiAgentsRunRoute: typeof ApiAgentsRunRoute
+  ApiInternalWebhookRetriesRoute: typeof ApiInternalWebhookRetriesRoute
+  ApiInternalWorkflowRunsRoute: typeof ApiInternalWorkflowRunsRoute
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
@@ -2052,6 +2079,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAgentsRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/webhook-retries': {
+      id: '/api/internal/webhook-retries'
+      path: '/api/internal/webhook-retries'
+      fullPath: '/api/internal/webhook-retries'
+      preLoaderRoute: typeof ApiInternalWebhookRetriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/internal/workflow-runs': {
+      id: '/api/internal/workflow-runs'
+      path: '/api/internal/workflow-runs'
+      fullPath: '/api/internal/workflow-runs'
+      preLoaderRoute: typeof ApiInternalWorkflowRunsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/_app/admin/': {
       id: '/_shell/_app/admin/'
       path: '/admin'
@@ -2475,6 +2516,8 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiAgentsRunRoute: ApiAgentsRunRoute,
+  ApiInternalWebhookRetriesRoute: ApiInternalWebhookRetriesRoute,
+  ApiInternalWorkflowRunsRoute: ApiInternalWorkflowRunsRoute,
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
