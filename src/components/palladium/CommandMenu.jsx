@@ -5,7 +5,7 @@ import {
   Search, CornerDownLeft, ArrowUp, ArrowDown, Command, Home, FolderKanban,
   Users, Bot, ListChecks, Workflow, Files, BookOpen, Plug, Store, Globe,
   Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, ShieldCheck, CreditCard,
-  Building2, ScrollText, Cpu, Lock, Sparkles, ArrowUpRight, FileText,
+  Cpu, Lock,
 } from 'lucide-react';
 
 const PAGES = [
@@ -33,27 +33,14 @@ const PAGES = [
   ['System Settings', '/admin/system-settings', Cpu],
 ];
 
-// Mock searchable records across resource types
-const RECORDS = [
-  { type: 'Project', title: 'Website Redesign', desc: 'In progress · due 18 Aug', href: '/projects', icon: FolderKanban },
-  { type: 'Project', title: 'Mobile App v2', desc: 'Planning · 3 collaborators', href: '/projects', icon: FolderKanban },
-  { type: 'Agent', title: 'Sales Outreach Agent', desc: 'Running · Claude Sonnet', href: '/agents', icon: Bot },
-  { type: 'Agent', title: 'Research Assistant', desc: 'Idle · GPT-5', href: '/agents', icon: Bot },
-  { type: 'Task', title: 'Review Q3 pipeline', desc: 'To do · high priority', href: '/tasks', icon: ListChecks },
-  { type: 'Task', title: 'Publish blog draft', desc: 'In progress', href: '/tasks', icon: ListChecks },
-  { type: 'File', title: 'brand-guidelines.pdf', desc: 'Documents · 2.4 MB', href: '/files', icon: Files },
-  { type: 'File', title: 'agent-config.yaml', desc: 'Configs · 12 KB', href: '/files', icon: Files },
-  { type: 'Workflow', title: 'Lead enrichment', desc: 'Active · 12 runs today', href: '/workflows', icon: Workflow },
-  { type: 'Workflow', title: 'Incident escalation', desc: 'Paused', href: '/workflows', icon: Workflow },
-  { type: 'Setting', title: 'Profile & appearance', desc: 'Update your details', href: '/settings', icon: Settings },
-  { type: 'Setting', title: 'Notifications preferences', desc: 'Email & in-app', href: '/notifications', icon: Bell },
-];
-
+// Navigation actions only. Resource search must come from authenticated backend
+// queries; never put illustrative project/agent/task/file records in the global
+// command surface because they look indistinguishable from real workspace data.
 const QUICK_ACTIONS = [
   { title: 'Create new project', href: '/projects', icon: FolderKanban },
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
-  { title: 'Invite team member', href: '/team', icon: Users },
+  { title: 'Manage team members', href: '/team', icon: Users },
 ];
 
 function match(item, q) {
@@ -76,12 +63,11 @@ export default function CommandMenu({ open, onClose }) {
   const groups = useMemo(() => {
     const q = query.trim();
     const pages = PAGES.filter((p) => match({ title: p[0], type: 'Page' }, q)).map(([title, href, icon]) => ({ title, href, icon, group: 'Pages' }));
-    const records = RECORDS.filter((r) => match(r, q)).map((r) => ({ ...r, group: r.type + 's' }));
     const actions = QUICK_ACTIONS.filter((a) => match({ title: a.title, type: 'Action' }, q)).map((a) => ({ ...a, group: 'Actions' }));
-    return { pages, records, actions };
+    return { pages, actions };
   }, [query]);
 
-  const flat = useMemo(() => [...groups.pages, ...groups.actions, ...groups.records], [groups]);
+  const flat = useMemo(() => [...groups.pages, ...groups.actions], [groups]);
 
   useEffect(() => { setSelected(0); }, [query]);
 
@@ -108,7 +94,7 @@ export default function CommandMenu({ open, onClose }) {
   const renderItem = (item) => {
     idx += 1;
     const i = idx;
-    const Icon = item.icon || FileText;
+    const Icon = item.icon;
     const active = i === selected;
     return (
       <button
@@ -123,7 +109,7 @@ export default function CommandMenu({ open, onClose }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-white">{item.title}</p>
-          <p className="truncate text-[11px] text-zinc-500">{item.desc || item.group}</p>
+          <p className="truncate text-[11px] text-zinc-500">{item.group}</p>
         </div>
         {active && <CornerDownLeft className="h-3.5 w-3.5 text-violet-300" />}
       </button>
@@ -144,7 +130,6 @@ export default function CommandMenu({ open, onClose }) {
             className="flex h-[72vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#101119] shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* Input */}
             <div className="flex items-center gap-3 border-b border-white/10 px-4">
               <Search className="h-5 w-5 text-zinc-500" />
               <input
@@ -152,31 +137,28 @@ export default function CommandMenu({ open, onClose }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Search pages, projects, agents, tasks, files, workflows…"
+                placeholder="Search pages and actions…"
                 aria-label="Command menu search"
                 className="h-14 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
               />
               <kbd className="hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-500 sm:block">ESC</kbd>
             </div>
 
-            {/* Results */}
             <div ref={listRef} className="min-w-0 flex-1 overflow-y-auto p-3">
               {flat.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5"><Search className="h-5 w-5 text-zinc-500" /></span>
-                  <p className="mt-3 text-sm font-medium text-white">No results for “{query}”</p>
-                  <p className="mt-1 text-xs text-zinc-500">Try a different search term.</p>
+                  <p className="mt-3 text-sm font-medium text-white">No navigation results for “{query}”</p>
+                  <p className="mt-1 max-w-sm text-xs text-zinc-500">Workspace-wide resource search is not connected here yet. Use the search controls inside Projects, Agents, Tasks, Files or Workflows for live records.</p>
                 </div>
               ) : (
                 <>
                   {groups.pages.length > 0 && <Group label="Pages">{groups.pages.map(renderItem)}</Group>}
                   {groups.actions.length > 0 && <Group label="Quick Actions">{groups.actions.map(renderItem)}</Group>}
-                  {groups.records.length > 0 && <Group label="Resources">{groups.records.map(renderItem)}</Group>}
                 </>
               )}
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-between border-t border-white/10 px-4 py-2.5 text-[10px] text-zinc-600">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1"><kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5"><ArrowUp className="inline h-2.5 w-2.5" /></kbd><kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5"><ArrowDown className="inline h-2.5 w-2.5" /></kbd> navigate</span>
