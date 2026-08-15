@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: palladium-browser-worker
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./browser-worker/Dockerfile
+    dockerContext: ./browser-worker
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: BROWSER_WORKER_TOKEN
+        sync: false
+      - key: BROWSER_WORKER_HEADLESS
+        value: "true"
