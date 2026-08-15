@@ -450,12 +450,12 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         .insert({
           user_id: userId,
           agent_id: agent?.id ?? null,
-          personal_task_id: task.id,
-          query: decision.searchQuery ?? data.request,
+          task_id: task.id,
+          requirement: decision.searchQuery ?? data.request,
           budget,
           currency,
-          preferences: decision.preferences,
-          status: "searching",
+          notes: decision.preferences ? JSON.stringify(decision.preferences) : null,
+          status: "running",
         })
         .select()
         .maybeSingle();
