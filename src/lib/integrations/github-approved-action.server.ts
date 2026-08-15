@@ -52,10 +52,20 @@ function str(value: unknown, max: number): string {
 
 function safeBranch(value: unknown): string {
   const branch = str(value, 250);
-  if (!branch || branch.startsWith("/") || branch.endsWith("/") || branch.includes("..") || branch.includes("//")) {
-    throw new Error("Invalid GitHub branch name.");
-  }
-  if (/^[.-]|[.~^:?*[\\\s]|\.lock$/i.test(branch) || /[\u0000-\u001f\u007f]/.test(branch)) {
+  const invalidSpecial = /[~^:?*\[\\\s]/.test(branch);
+  const invalidControl = /[\u0000-\u001f\u007f]/.test(branch);
+  if (
+    !branch
+    || branch.startsWith("/")
+    || branch.endsWith("/")
+    || branch.startsWith(".")
+    || branch.endsWith(".")
+    || branch.includes("..")
+    || branch.includes("//")
+    || branch.endsWith(".lock")
+    || invalidSpecial
+    || invalidControl
+  ) {
     throw new Error("Invalid GitHub branch name.");
   }
   return branch;
