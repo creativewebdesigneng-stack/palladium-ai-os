@@ -61,11 +61,29 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkUserAuth();
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'TOKEN_REFRESHED') return;
-      checkUserAuth();
-    });
-    return () => data?.subscription?.unsubscribe();
+
+    // Supabase configuration is supplied by the deployment environment. A
+    // missing URL/key must never crash the entire React tree: keep the app
+    // mounted, surface the configuration error through AuthContext, and allow
+    // public/setup screens to render so the deployment can be repaired.
+    let unsubscribe = null;
+    try {
+      const { data } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'TOKEN_REFRESHED') return;
+        checkUserAuth();
+      });
+      unsubscribe = data?.subscription?.unsubscribe ?? null;
+    } catch (error) {
+      setUser(null);
+      setEntitlements(null);
+      setIsAuthenticated(false);
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+      setAuthError(error?.message ?? 'Authentication service is not configured.');
+      console.error('[AuthProvider] Supabase auth subscription could not start:', error);
+    }
+
+    return () => unsubscribe?.();
   }, [checkUserAuth]);
 
   const login = useCallback(async (email, password) => {
