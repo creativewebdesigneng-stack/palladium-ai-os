@@ -32,8 +32,23 @@ jobs:
       - name: Production build and route generation
         run: bun run build
 
-      - name: Typecheck
-        run: bun run typecheck
+      - name: Typecheck diagnostics
+        id: typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bun run typecheck 2>&1 | tee typecheck.log
+
+      - name: Upload typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-diagnostics
+          path: typecheck.log
+
+      - name: Fail when typecheck failed
+        if: steps.typecheck.outcome == 'failure'
+        run: exit 1
 
       - name: Tests
         run: bun run test
