@@ -17,6 +17,7 @@ export type GitHubConnectedServiceInput = {
 
 export const GITHUB_CONNECTED_SERVICE_ACTIONS = [
   "repositories_list",
+  "repository_overview",
   "branches_list",
   "commits_list",
   "path_list",
@@ -92,6 +93,22 @@ export async function executeGitHubConnectedService(
 
   const { owner, repo } = splitGitHubRepository(input.repository);
 
+  if (action === "repository_overview") {
+    const overviewLimit = Math.min(limit, 10);
+    const [branches, root, commits] = await Promise.all([
+      listGitHubBranches({ installationId, owner, repo, perPage: overviewLimit }),
+      listGitHubPath({ installationId, owner, repo, ...(ref ? { ref } : {}) }),
+      listGitHubCommits({ installationId, owner, repo, perPage: overviewLimit, ...(ref ? { ref } : {}) }),
+    ]);
+    return truncate({
+      repository: `${owner}/${repo}`,
+      ref: ref || null,
+      branches: branches.slice(0, overviewLimit),
+      root: root.slice(0, 100),
+      recentCommits: commits.slice(0, overviewLimit),
+      readOnly: true,
+    });
+  }
   if (action === "branches_list") {
     return truncate(await listGitHubBranches({ installationId, owner, repo, perPage: limit }));
   }
