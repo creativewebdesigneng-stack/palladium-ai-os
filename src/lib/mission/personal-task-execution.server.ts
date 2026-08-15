@@ -31,7 +31,7 @@ export type PersonalTaskRow = {
 };
 
 export type PersonalAgentRow = {
-  id?: string;
+  id: string;
   name?: string | null;
   category?: string | null;
   personality?: string | null;
