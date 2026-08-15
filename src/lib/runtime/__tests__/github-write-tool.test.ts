@@ -73,7 +73,7 @@ describe("github_write approval-only runtime tool", () => {
     expect(db.tables.approval_requests).toHaveLength(0);
   });
 
-  it("never exposes a direct-execution function through the agent tool contract", () => {
+  it("never exposes a direct-execution function or token through the model schema", () => {
     expect(Object.keys(GITHUB_WRITE_TOOL_DEF)).toEqual(expect.arrayContaining(["name", "description", "parameters"]));
     expect((GITHUB_WRITE_TOOL_DEF as any).run).toBeUndefined();
     expect(JSON.stringify(GITHUB_WRITE_TOOL_DEF)).not.toContain("token");
