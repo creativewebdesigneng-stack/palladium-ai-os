@@ -20,6 +20,8 @@ import { findProvider, type IntegrationProvider } from "./providers";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
+type ProviderConfig = Record<string, string>;
+
 function encryptionKey(): Buffer {
   const raw = process.env["INTEGRATION_TOKEN_KEY"];
   if (!raw) throw new Error("Integration token encryption key is not configured.");
@@ -133,9 +135,33 @@ export type TokenSet = {
   tokenType: string;
   scopes: string[];
   expiresAt: string | null;
+  providerConfig: ProviderConfig;
 };
 
-function parseTokenPayload(payload: Record<string, any>): TokenSet {
+/** Salesforce returns the tenant API base in the OAuth token response. */
+export function normaliseSalesforceInstanceUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
+    if (host !== "salesforce.com" && !host.endsWith(".salesforce.com")) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function providerConfigFromPayload(
+  provider: IntegrationProvider,
+  payload: Record<string, any>,
+): ProviderConfig {
+  if (provider.id !== "salesforce") return {};
+  const instanceUrl = normaliseSalesforceInstanceUrl(payload["instance_url"]);
+  return instanceUrl ? { instance_url: instanceUrl } : {};
+}
+
+function parseTokenPayload(payload: Record<string, any>): Omit<TokenSet, "providerConfig"> {
   // Slack nests the user grant; everything else is flat.
   const flat = payload["authed_user"]?.access_token ? payload["authed_user"] : payload;
   const accessToken = flat["access_token"];
@@ -181,35 +207,36 @@ export async function exchangeCode(
   provider: IntegrationProvider,
   args: { code: string; origin: string },
 ): Promise<TokenSet> {
-  return parseTokenPayload(
-    await postForm(
-      provider.tokenUrl,
-      new URLSearchParams({
-        grant_type: "authorization_code",
-        code: args.code,
-        redirect_uri: `${args.origin}${callbackPath}`,
-        client_id: process.env[provider.clientIdEnv]!,
-        client_secret: process.env[provider.clientSecretEnv]!,
-      }),
-    ),
+  const payload = await postForm(
+    provider.tokenUrl,
+    new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      client_id: process.env[provider.clientIdEnv]!,
+      client_secret: process.env[provider.clientSecretEnv]!,
+    }),
   );
+  return { ...parseTokenPayload(payload), providerConfig: providerConfigFromPayload(provider, payload) };
 }
 
 export async function refreshTokens(
   provider: IntegrationProvider,
   refreshToken: string,
 ): Promise<TokenSet> {
-  const next = parseTokenPayload(
-    await postForm(
-      provider.tokenUrl,
-      new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: process.env[provider.clientIdEnv]!,
-        client_secret: process.env[provider.clientSecretEnv]!,
-      }),
-    ),
+  const payload = await postForm(
+    provider.tokenUrl,
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: process.env[provider.clientIdEnv]!,
+      client_secret: process.env[provider.clientSecretEnv]!,
+    }),
   );
+  const next = {
+    ...parseTokenPayload(payload),
+    providerConfig: providerConfigFromPayload(provider, payload),
+  };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
 
@@ -233,6 +260,28 @@ export async function fetchAccountLabel(
     /* labelling is cosmetic */
   }
   return null;
+}
+
+/** Server-only, bounded provider metadata stored on the connection row. */
+export async function getIntegrationProviderConfig(
+  userId: string,
+  providerId: string,
+): Promise<ProviderConfig> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: row } = await supabaseAdmin
+    .from("integrations")
+    .select("config")
+    .eq("user_id", userId)
+    .eq("provider", providerId)
+    .eq("status", "connected")
+    .maybeSingle();
+  const config = row?.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) return {};
+  const result: ProviderConfig = {};
+  for (const [key, value] of Object.entries(config as Record<string, unknown>).slice(0, 20)) {
+    if (typeof value === "string") result[key.slice(0, 100)] = value.slice(0, 1000);
+  }
+  return result;
 }
 
 /**
@@ -269,6 +318,13 @@ export async function getIntegrationAccessToken(
         updated_at: new Date().toISOString(),
       })
       .eq("id", row.id);
+    if (Object.keys(next.providerConfig).length) {
+      await supabaseAdmin
+        .from("integrations")
+        .update({ config: next.providerConfig })
+        .eq("user_id", userId)
+        .eq("provider", providerId);
+    }
     return next.accessToken;
   } catch {
     await supabaseAdmin
