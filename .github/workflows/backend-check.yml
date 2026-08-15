@@ -31,3 +31,6 @@ jobs:
 
       - name: Typecheck and tests
         run: bun run backend:check
+
+      - name: Production build
+        run: bun run build
