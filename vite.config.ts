@@ -5,8 +5,52 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import type { Plugin } from "vite";
+
+/**
+ * The generated client retains a server-side process.env fallback. Vite
+ * correctly erases that fallback from browser chunks, so published clients
+ * must read the public values injected by the SSR shell instead. Keep this
+ * transform narrowly scoped to the generated browser client; server clients
+ * and every secret-bearing environment read remain untouched.
+ */
+function runtimeSupabasePublicConfigPlugin(): Plugin {
+  return {
+    name: "palladium-runtime-supabase-public-config",
+    enforce: "pre",
+    load(id, options) {
+      if (options?.ssr) return null;
+      const normalizedId = id.replaceAll("\\", "/").replace(/\?.*$/, "");
+      if (!normalizedId.endsWith("/src/integrations/supabase/client.ts")) return null;
+
+      const code = readFileSync(normalizedId, "utf8");
+
+      const replacements = [
+        [
+          'process.env["SUPABASE_URL"]',
+          'globalThis.__PALLADIUM_PUBLIC_CONFIG__?.SUPABASE_URL',
+        ],
+        [
+          'process.env["SUPABASE_PUBLISHABLE_KEY"]',
+          'globalThis.__PALLADIUM_PUBLIC_CONFIG__?.SUPABASE_PUBLISHABLE_KEY',
+        ],
+      ] as const;
+
+      let transformed = code;
+      for (const [source, replacement] of replacements) {
+        transformed = transformed.replace(source, replacement);
+      }
+
+      if (transformed === code) {
+        this.error("The generated Supabase client shape changed; runtime public config was not applied.");
+      }
+      return { code: transformed, map: null };
+    },
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -19,7 +63,10 @@ export default defineConfig({
     // Windows-native route paths and rejects the generated route directory. The
     // generated MCP routes are committed; keep generation enabled everywhere
     // except this local Windows path.
-    plugins: process.platform === "win32" ? [] : [mcpPlugin()],
+    plugins: [
+      runtimeSupabasePublicConfigPlugin(),
+      ...(process.platform === "win32" ? [] : [mcpPlugin()]),
+    ],
 
     resolve: {
       alias: [
