@@ -4,6 +4,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
+const startInput = z.object({
+  origin: z.string().trim().url().max(300).optional(),
+});
+
 const repoInput = z.object({
   repository: z.string().trim().min(3).max(220),
 });
@@ -61,7 +65,7 @@ async function githubConnection(sb: Sb, userId: string): Promise<{ installationI
 export const getGitHubConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { githubAppConfigured } = await import("./github-app.server");
+    const { githubConnectionConfigured } = await import("./github-app.server");
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
       .from("integrations")
@@ -75,13 +79,45 @@ export const getGitHubConnection = createServerFn({ method: "POST" })
       try { installationId = installationIdFromConfig(data.config); } catch { installationId = null; }
     }
     return {
-      configured: githubAppConfigured(),
+      configured: githubConnectionConfigured(),
       connected: data?.status === "connected" && installationId !== null,
       installationId,
       accountLabel: typeof data?.account_label === "string" ? data.account_label : null,
       connectedAt: typeof data?.connected_at === "string" ? data.connected_at : null,
       lastError: typeof data?.last_error === "string" ? data.last_error : null,
     };
+  });
+
+/** Starts GitHub App installation with PalladiumAI's signed user/origin state. */
+export const startGitHubConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => startInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { safeOrigin, createState } = await import("./oauth.server");
+    const { githubConnectionConfigured, buildGitHubInstallUrl } = await import("./github-app.server");
+    if (!githubConnectionConfigured()) {
+      throw new Error("GitHub App connection is not configured. Add the GitHub App ID, private key, slug, client ID and client secret to the deployment.");
+    }
+    const origin = safeOrigin(data.origin);
+    const sb = context.supabase as unknown as Sb;
+    const { error } = await sb.from("integrations").upsert(
+      {
+        user_id: context.userId,
+        org_id: null,
+        provider: "github",
+        name: "GitHub",
+        integration_type: "github_app",
+        status: "pending",
+        scopes: ["metadata:read", "contents:read"],
+        granted_scopes: [],
+        last_error: null,
+      },
+      { onConflict: "user_id,provider" },
+    );
+    if (error) throw new Error(error.message);
+
+    const state = createState({ userId: context.userId, provider: "github", origin });
+    return { installUrl: buildGitHubInstallUrl(state) };
   });
 
 export const listConnectedGitHubRepositories = createServerFn({ method: "POST" })
