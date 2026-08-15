@@ -15,13 +15,8 @@ import {
   recordUsage,
 } from "@/lib/platform/entitlements.server";
 import { writeAudit } from "@/lib/platform/audit.server";
-import {
-  normaliseProvider,
-  ProviderError,
-  resolveModel,
-  runChat,
-  type ChatMessage,
-} from "@/lib/runtime/model-gateway.server";
+import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
+import { ProviderError, runChat, type ChatMessage } from "@/lib/runtime/model-gateway.server";
 
 const SYSTEM_PROMPT = [
   "You are the PalladiumAI workspace assistant.",
@@ -63,8 +58,23 @@ export const assistantChat = createServerFn({ method: "POST" })
       throw error;
     }
 
-    const provider = normaliseProvider(process.env["ASSISTANT_PROVIDER"] ?? null);
-    const model = resolveModel(provider, process.env["ASSISTANT_MODEL"] ?? null);
+    let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
+    try {
+      const preferenceResult = await sb
+        .from("user_ai_preferences")
+        .select("default_provider,default_model")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (preferenceResult.error) {
+        console.warn("[assistant] AI preference lookup failed; using deployment default", preferenceResult.error.message);
+      } else {
+        storedPreference = preferenceResult.data;
+      }
+    } catch (error) {
+      console.warn("[assistant] AI preference lookup unavailable; using deployment default", error);
+    }
+
+    const { provider, model, source: preferenceSource } = resolveAssistantModelPreference(storedPreference);
 
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -84,6 +94,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         metadata: {
           provider: result.provider,
           model: result.model,
+          preference_source: preferenceSource,
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
         },
@@ -93,7 +104,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "success",
-        metadata: { provider: result.provider, model: result.model },
+        metadata: { provider: result.provider, model: result.model, preferenceSource },
       });
 
       return { text, provider: result.provider, model: result.model };
@@ -109,6 +120,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         metadata: {
           provider,
           model,
+          preferenceSource,
           status,
           error: error instanceof Error ? error.message : String(error),
         },
