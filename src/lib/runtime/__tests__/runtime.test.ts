@@ -600,4 +600,116 @@ describe("workflow approval gates", () => {
     expect(sb.tables.workflow_runs[0].status).toBe("cancelled");
     expect(sb.tables.workflow_step_runs).toHaveLength(1);
   });
+
+  async function pauseAtApproval(extraSteps: any[] = []) {
+    const approval = workflowStep("approval-1", 0, "approval");
+    const protectedStep = workflowStep("delay-after", 1, "delay");
+    const sb = workflowDb({ workflow_steps: [approval, protectedStep, ...extraSteps] });
+    const paused = await executeWorkflowRun({
+      sb,
+      db: sb,
+      userId: USER,
+      workflow: sb.tables.workflows[0],
+      steps: sb.tables.workflow_steps,
+      runId: "run-1",
+      objective: "objective",
+      completed: [],
+    });
+    expect(paused.paused).toBe(true);
+    return { sb, request: sb.tables.approval_requests[0] };
+  }
+
+  it("rejection marks the run terminal and never executes the gated work", async () => {
+    const { sb, request } = await pauseAtApproval();
+
+    const decided = await decideWorkflowApproval({
+      sb,
+      userId: USER,
+      approvalRequestId: request.id,
+      decision: "rejected",
+      note: "Not authorised.",
+    });
+
+    expect(decided.run.status).toBe("failed");
+    expect(sb.tables.approval_requests[0].status).toBe("rejected");
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after")).toBe(false);
+    expect(
+      sb.tables.workflow_step_runs.find((row: any) => row.step_id === "approval-1").status,
+    ).toBe("failed");
+  });
+
+  it("rejects a second decision on an already decided approval", async () => {
+    const { sb, request } = await pauseAtApproval();
+    await decideWorkflowApproval({
+      sb,
+      userId: USER,
+      approvalRequestId: request.id,
+      decision: "rejected",
+    });
+
+    await expect(
+      decideWorkflowApproval({
+        sb,
+        userId: USER,
+        approvalRequestId: request.id,
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "ALREADY_DECIDED" });
+    expect(sb.tables.approval_requests[0].status).toBe("rejected");
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after")).toBe(false);
+  });
+
+  it("refuses a decision from another user", async () => {
+    const { sb, request } = await pauseAtApproval();
+
+    await expect(
+      decideWorkflowApproval({
+        sb,
+        userId: "00000000-0000-4000-8000-00000000dead",
+        approvalRequestId: request.id,
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(sb.tables.approval_requests[0].status).toBe("pending");
+    expect(sb.tables.workflow_runs[0].status).toBe("waiting_for_approval");
+  });
+
+  it("refuses a stale or mismatched approval association", async () => {
+    const { sb, request } = await pauseAtApproval();
+    sb.tables.workflow_runs[0].waiting_step_id = "some-other-step";
+
+    await expect(
+      decideWorkflowApproval({
+        sb,
+        userId: USER,
+        approvalRequestId: request.id,
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "STALE_APPROVAL" });
+    expect(sb.tables.approval_requests[0].status).toBe("pending");
+    expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after")).toBe(false);
+  });
+
+  it("leaves workflows without approval steps untouched", async () => {
+    const sb = workflowDb({
+      workflow_steps: [workflowStep("delay-1", 0, "delay"), workflowStep("delay-2", 1, "delay")],
+    });
+
+    const result = await executeWorkflowRun({
+      sb,
+      db: sb,
+      userId: USER,
+      workflow: sb.tables.workflows[0],
+      steps: sb.tables.workflow_steps,
+      runId: "run-1",
+      objective: "objective",
+      completed: [],
+    });
+
+    expect(result.paused ?? false).toBe(false);
+    expect(result.run.status).toBe("succeeded");
+    expect(sb.tables.approval_requests).toHaveLength(0);
+    expect(sb.tables.workflow_runs[0].waiting_approval_request_id ?? null).toBeNull();
+  });
 });
+
