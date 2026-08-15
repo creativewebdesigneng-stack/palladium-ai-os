@@ -1,99 +1,81 @@
-import { useState } from 'react';
-import { Plus, LayoutGrid, Upload, Rocket } from 'lucide-react';
+import { Bot, Code2, Database, GitBranch, LockKeyhole, Rocket, Workflow } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import BuilderPrompt from '@/components/builder/BuilderPrompt';
-import BuilderOverviewCards from '@/components/builder/BuilderOverviewCards';
-import BuilderPipeline from '@/components/builder/BuilderPipeline';
-import BuilderLiveActivity from '@/components/builder/BuilderLiveActivity';
-import FileExplorer from '@/components/builder/FileExplorer';
-import CodeViewer from '@/components/builder/CodeViewer';
-import VisualPreview from '@/components/builder/VisualPreview';
-import ComponentLibrary from '@/components/builder/ComponentLibrary';
-import DatabaseDesign from '@/components/builder/DatabaseDesign';
-import ApiDesign from '@/components/builder/ApiDesign';
-import AIWorkforcePanel from '@/components/builder/AIWorkforcePanel';
-import BuildLogs from '@/components/builder/BuildLogs';
-import ProjectSettings from '@/components/builder/ProjectSettings';
-import ProjectTemplates from '@/components/builder/ProjectTemplates';
-import RecentProjects from '@/components/builder/RecentProjects';
-import BuilderRightSidebar from '@/components/builder/BuilderRightSidebar';
-import BuilderEmptyState from '@/components/builder/BuilderEmptyState';
 import NeuralNetworkBackground from '@/components/visual/NeuralNetworkBackground';
 
-const HEAD_ACTIONS = [
-  { label: 'New Project', icon: Plus, primary: true },
-  { label: 'Templates', icon: LayoutGrid },
-  { label: 'Import Project', icon: Upload },
-  { label: 'Deploy', icon: Rocket },
-];
-
 export default function Builder() {
-  const [activeFile, setActiveFile] = useState('App.jsx');
-  const [fullscreen, setFullscreen] = useState(false);
-  const [showEmpty, setShowEmpty] = useState(false);
-
-  const headerActions = (
-    <div className="flex flex-wrap gap-2">
-      {HEAD_ACTIONS.map(a => (
-        <button key={a.label} onClick={() => a.label === 'New Project' && setShowEmpty(false)} className={`pbtn ${a.primary ? 'pbtn-primary' : 'pbtn-secondary'} flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium ${a.primary ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/30' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}>
-          <a.icon className="h-4 w-4" />{a.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  if (showEmpty) {
-    return (
-      <>
-        <PageHeader eyebrow="Build" title="AI App Builder" description="Describe your idea and let your AI workforce build it." action={headerActions} />
-        <BuilderEmptyState onStart={() => setShowEmpty(false)} />
-      </>
-    );
-  }
-
   return (
     <>
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-30"><NeuralNetworkBackground intensity="low" /></div>
-      <PageHeader eyebrow="Build" title="AI App Builder" description="Describe your idea and let your AI workforce build it." action={headerActions} />
+      <PageHeader
+        eyebrow="Build"
+        title="AI App Builder"
+        description="App generation is not enabled until PalladiumAI has a real repository, sandbox and deployment pipeline behind this workspace."
+      />
 
-      <BuilderPrompt />
-      <div className="mt-4"><BuilderOverviewCards /></div>
-      <div className="mt-4"><BuilderPipeline /></div>
-
-      {/* IDE: file explorer + code + preview */}
-      <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr] xl:grid-cols-[220px_1fr_1.1fr]">
-        <div className="hidden lg:block"><FileExplorer active={activeFile} onSelect={setActiveFile} /></div>
-        <div className="min-w-0"><CodeViewer file={activeFile} fullscreen={fullscreen} onToggleFs={() => setFullscreen(f => !f)} /></div>
-        <div className="hidden min-w-0 xl:block"><VisualPreview /></div>
-      </div>
-
-      {/* Live activity + logs */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <BuilderLiveActivity />
-        <BuildLogs />
-      </div>
-
-      {/* Workforce */}
-      <div className="mt-4"><AIWorkforcePanel /></div>
-
-      {/* Component library + database + api */}
-      <div className="mt-4 space-y-4">
-        <ComponentLibrary />
-        <div className="grid gap-4 xl:grid-cols-2">
-          <DatabaseDesign />
-          <ApiDesign />
+      <div className="mb-5 rounded-2xl border border-amber-400/20 bg-amber-500/[.06] p-4">
+        <div className="flex items-start gap-3">
+          <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <div>
+            <p className="text-sm font-semibold text-amber-100">Builder backend not configured</p>
+            <p className="mt-1 max-w-4xl text-xs leading-5 text-amber-100/70">
+              The previous builder showed sample source files, build stages, logs, previews, database/API designs and deployment actions without creating an application. Those simulations are disabled. PalladiumAI will only show build progress when a real job and repository state exist.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Settings + templates */}
-      <div className="mt-4 space-y-4">
-        <ProjectSettings />
-        <ProjectTemplates />
-        <RecentProjects />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StateCard icon={Bot} title="AI planning" value="Not wired" text="No build plan is generated or persisted yet." />
+        <StateCard icon={Code2} title="Source generation" value="Unavailable" text="No repository is created or modified by Builder." />
+        <StateCard icon={Workflow} title="Build pipeline" value="Unavailable" text="No fake stages, activity or build logs are shown." />
+        <StateCard icon={Rocket} title="Deployment" value="Unavailable" text="Deploy is disabled until a real deployment provider exists." />
       </div>
 
-      {/* Right sidebar */}
-      <div className="mt-4 hidden xl:block"><BuilderRightSidebar /></div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <Panel title="Production builder flow" icon={Workflow}>
+          <ol className="space-y-2 text-xs leading-5 text-zinc-400">
+            <li>1. Save a build request and plan as a durable workspace job.</li>
+            <li>2. Create or select an authenticated repository and protected working branch.</li>
+            <li>3. Run generation and tests inside an isolated execution environment.</li>
+            <li>4. Persist exact source changes and display a reviewable diff.</li>
+            <li>5. Require approval before commit, pull request or deployment where policy demands it.</li>
+          </ol>
+        </Panel>
+        <Panel title="Backend capabilities still required" icon={GitBranch}>
+          <div className="grid gap-2 text-xs text-zinc-400 sm:grid-cols-2">
+            <Requirement icon={GitBranch} text="Git provider connection" />
+            <Requirement icon={Code2} text="Sandboxed code runner" />
+            <Requirement icon={Database} text="Migration/schema execution" />
+            <Requirement icon={Rocket} text="Deployment provider" />
+            <Requirement icon={Workflow} text="Durable build queue" />
+            <Requirement icon={LockKeyhole} text="Approval & audit policy" />
+          </div>
+        </Panel>
+      </div>
     </>
   );
+}
+
+function StateCard({ icon: Icon, title, value, text }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Icon className="h-4 w-4" /></span>
+      <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-zinc-600">{title}</p>
+      <p className="mt-1 text-sm font-semibold text-white">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-zinc-500">{text}</p>
+    </div>
+  );
+}
+
+function Panel({ title, icon: Icon, children }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
+      <div className="flex items-center gap-2"><Icon className="h-4 w-4 text-violet-300" /><h2 className="text-sm font-semibold text-white">{title}</h2></div>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function Requirement({ icon: Icon, text }) {
+  return <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><Icon className="h-3.5 w-3.5 shrink-0 text-violet-300" /><span>{text}</span></div>;
 }
