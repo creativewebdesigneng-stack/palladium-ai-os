@@ -17,6 +17,7 @@ export type PersonalTaskApprovalResumeState = {
   usage: { input: number; output: number };
   toolCalls: number;
   pendingCall: PersonalTaskPendingToolCall;
+  skippedCalls?: PersonalTaskPendingToolCall[];
 };
 
 export type PersonalTaskApprovalPause = {
