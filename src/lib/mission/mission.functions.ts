@@ -430,13 +430,9 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         priority: decision.priority,
         scope: agent?.scope ?? "personal",
         due_at: decision.dueAt,
-        budget,
-        currency,
-        metadata: {
-          intent: decision.intent,
-          tools: decision.requiredTools,
-          involves_money: decision.involvesMoney,
-        },
+        involves_money: decision.involvesMoney,
+        required_tools: decision.requiredTools,
+        requires_approval: requiresApproval,
       })
       .select()
       .maybeSingle();
@@ -454,12 +450,12 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         .insert({
           user_id: userId,
           agent_id: agent?.id ?? null,
-          personal_task_id: task.id,
-          query: decision.searchQuery ?? data.request,
+          task_id: task.id,
+          requirement: decision.searchQuery ?? data.request,
           budget,
           currency,
-          preferences: decision.preferences,
-          status: "searching",
+          notes: decision.preferences ? JSON.stringify(decision.preferences) : null,
+          status: "running",
         })
         .select()
         .maybeSingle();
