@@ -379,18 +379,20 @@ export const importWorkflow = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
 
-    // Agent references are checked before creating the workflow. personal_agents
-    // is owner-only under RLS, so a foreign agent id cannot be smuggled into an
-    // imported workflow even when it is a valid UUID.
+    // Imported workflows are personal (org_id is not set), so every referenced
+    // agent must also be personal and owned by this caller. Do not accept an
+    // organisation agent merely because RLS makes it visible to an org member.
     const agentIds = [...new Set(data.steps.map((s: any) => s.agent_id).filter(Boolean))] as string[];
     if (agentIds.length) {
       const { data: agents, error: agentError } = await sb
         .from("personal_agents")
         .select("id")
-        .in("id", agentIds);
+        .in("id", agentIds)
+        .eq("user_id", context.userId)
+        .is("org_id", null);
       if (agentError) throw new Error(agentError.message);
       if ((agents ?? []).length !== agentIds.length)
-        throw new Error("One or more workflow agents are not available to this account.");
+        throw new Error("One or more workflow agents are outside this personal workflow scope.");
     }
 
     const { data: workflow, error } = await sb
