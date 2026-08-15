@@ -89,6 +89,9 @@ const PERSONAL_BROWSER_ACTION_SET = new Set<string>(PERSONAL_BROWSER_ACTIONS);
 const PERSONAL_SELF_QUEUING_APPROVAL_TOOLS = new Set([
   "connected_service_write",
   "github_write",
+  "email_draft",
+  "email_send",
+  "slack_post",
 ]);
 
 // Personal tasks may only execute this bounded subset. Most approval-required
@@ -105,6 +108,10 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "connected_service",
   "connected_service_write",
   "github_write",
+  "email_draft",
+  "email_send",
+  "slack_post",
+  "calendar",
   "file_analysis",
   "data_analysis",
   "database_query",
@@ -117,7 +124,8 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
     "Carry out the operator's request using the tools available to you when they improve accuracy.",
     "The browser tool is read-only. Use browser_interact only when clicking or typing is genuinely necessary; it always pauses for explicit operator approval before anything happens.",
     "Never use browser_interact for checkout, payment, purchases or entering payment credentials. Those actions require the dedicated purchase flow.",
-    "connected_service_write and github_write only queue the exact external write for operator approval; a queued result does not mean the external service has been changed.",
+    "connected_service_write, github_write, email_draft, email_send and slack_post only queue the exact external action for operator approval; a queued result does not mean the external service has changed.",
+    "calendar may read connected calendars or queue a proposed event for approval; a proposed event has not been created yet.",
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
@@ -160,6 +168,7 @@ function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>):
   const grants = new Map<string, ToolGrant>();
   for (const [slug, grant] of resolved.grants) {
     if (!PERSONAL_SAFE_TOOLS.has(slug)) continue;
+    if (slug === "calendar" && grant.requiresApproval) continue;
     if (PERSONAL_SELF_QUEUING_APPROVAL_TOOLS.has(slug) && !grant.requiresApproval) continue;
     grants.set(slug, grant);
   }
