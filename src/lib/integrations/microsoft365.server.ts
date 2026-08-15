@@ -91,14 +91,15 @@ export async function listMicrosoftCalendarEvents(args: {
     "$orderby": "start/dateTime",
     "$select": "id,subject,start,end,isAllDay,isCancelled,webLink,location,attendees",
   });
+  const init: RequestInit = {
+    method: "GET",
+    headers: { Prefer: 'outlook.timezone="UTC"' },
+    ...(args.signal ? { signal: args.signal } : {}),
+  };
   const response = await graphFetch(
     args.userId,
     `/me/calendarView?${query.toString()}`,
-    {
-      method: "GET",
-      headers: { Prefer: 'outlook.timezone="UTC"' },
-      signal: args.signal,
-    },
+    init,
     args.fetchImpl ?? fetch,
   );
   const payload = (await response.json()) as any;
@@ -148,21 +149,17 @@ export async function createMicrosoftOutlookDraft(args: {
     throw new Microsoft365Error("A valid CC email address is required.");
   }
 
-  const response = await graphFetch(
-    args.userId,
-    "/me/messages",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        subject: cleanHeader(args.subject).slice(0, 998),
-        body: { contentType: "Text", content: String(args.body ?? "").slice(0, 100_000) },
-        toRecipients: [recipient(to)],
-        ...(cc ? { ccRecipients: [recipient(cc)] } : {}),
-      }),
-      signal: args.signal,
-    },
-    args.fetchImpl ?? fetch,
-  );
+  const init: RequestInit = {
+    method: "POST",
+    body: JSON.stringify({
+      subject: cleanHeader(args.subject).slice(0, 998),
+      body: { contentType: "Text", content: String(args.body ?? "").slice(0, 100_000) },
+      toRecipients: [recipient(to)],
+      ...(cc ? { ccRecipients: [recipient(cc)] } : {}),
+    }),
+    ...(args.signal ? { signal: args.signal } : {}),
+  };
+  const response = await graphFetch(args.userId, "/me/messages", init, args.fetchImpl ?? fetch);
   const payload = (await response.json()) as any;
   if (!payload?.id) throw new Microsoft365Error("Microsoft did not return an Outlook draft id.");
   return {
