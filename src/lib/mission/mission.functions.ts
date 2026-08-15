@@ -830,7 +830,46 @@ export const decideApproval = createServerFn({ method: "POST" })
       metadata: { action_type: approval.action_type, estimated_cost: approval.estimated_cost },
     });
 
-    return { status, purchase: purchase.data ?? null };
+    // An approved non-purchase task must now actually run. Purchases stay parked
+    // at approved_awaiting_checkout — money only moves through checkout.
+    let execution: Awaited<ReturnType<typeof executePersonalTask>> | null = null;
+    if (data.decision === "approve" && approval.task_id && !purchase.data) {
+      const taskRes = await sb
+        .from("personal_tasks")
+        .select("*")
+        .eq("id", approval.task_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      const task = taskRes.data;
+      if (task) {
+        const agentRes = task.agent_id
+          ? await sb
+              .from("personal_agents")
+              .select("*")
+              .eq("id", task.agent_id)
+              .eq("user_id", userId)
+              .maybeSingle()
+          : { data: null };
+        execution = await executePersonalTask({
+          sb,
+          userId,
+          task,
+          agent: agentRes.data ?? null,
+        });
+        await activity(
+          sb,
+          userId,
+          execution.status === "completed"
+            ? `Agent completed the approved action: ${approval.title}`
+            : `Agent could not complete the approved action: ${approval.title}`,
+          execution.status === "completed" ? "completed" : "failed",
+          { agent_id: approval.agent_id, task_id: approval.task_id },
+        );
+      }
+    }
+
+    return { status, purchase: purchase.data ?? null, execution };
+
   });
 
 export const chooseAlternative = createServerFn({ method: "POST" })
