@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { auth } from '@/lib/auth/client';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Login() {
+  const { authError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,8 +39,15 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
-    auth.loginWithProvider("google", returnTo);
+    try {
+      auth.loginWithProvider("google", returnTo);
+    } catch (err) {
+      setError(err?.message || "Google sign-in could not start.");
+    }
   };
+
+  const visibleError = error || authError || "";
+  const configurationBlocked = visibleError.includes("Supabase is not configured for this deployment");
 
   return (
     <AuthLayout
@@ -57,10 +66,22 @@ export default function Login() {
         </>
       }
     >
+      {visibleError && (
+        <div className="mb-5 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <p>{visibleError}</p>
+          {configurationBlocked && (
+            <p className="mt-2 text-xs opacity-80">
+              Configure the Supabase project/environment variables in the deployment, then reload this page. No credentials are stored in this browser by this setup notice.
+            </p>
+          )}
+        </div>
+      )}
+
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
         onClick={handleGoogle}
+        disabled={configurationBlocked}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />
         Continue with Google
@@ -74,12 +95,6 @@ export default function Login() {
           <span className="bg-card px-3 text-muted-foreground">or</span>
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -96,6 +111,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"
               required
+              disabled={configurationBlocked}
             />
           </div>
         </div>
@@ -117,15 +133,18 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               className="pl-10 h-12"
               required
+              disabled={configurationBlocked}
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading || configurationBlocked}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Logging in...
             </>
+          ) : configurationBlocked ? (
+            "Supabase setup required"
           ) : (
             "Log in"
           )}
