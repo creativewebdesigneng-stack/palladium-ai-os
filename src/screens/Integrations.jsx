@@ -31,6 +31,12 @@ const CATEGORY_LABELS = {
   developer: 'Developer tools',
 };
 
+function connectionHealthy(provider) {
+  if (provider.nativeGitHub) return provider.connection?.status === 'connected';
+  if (provider.connection?.health) return provider.connection.health.healthy === true;
+  return provider.connection?.status === 'connected';
+}
+
 export default function Integrations() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -103,7 +109,7 @@ export default function Integrations() {
     });
   }, [providers, query, category]);
 
-  const connectedCount = providers.filter((provider) => provider.connection?.status === 'connected').length;
+  const connectedCount = providers.filter(connectionHealthy).length;
   const configuredCount = providers.filter((provider) => provider.configured).length;
 
   async function connect(provider) {
@@ -143,7 +149,7 @@ export default function Integrations() {
       <PageHeader
         eyebrow="Workspace"
         title="Integrations"
-        description="Manage live, server-backed provider connections. Credentials and provider tokens remain server-side and connection state is loaded from PalladiumAI's persisted integration records."
+        description="Manage live, server-backed provider connections. Credentials and provider tokens remain server-side and connection health is calculated from persisted OAuth state."
         action={(
           <div className="flex gap-2">
             <button onClick={refresh} className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5">
@@ -166,7 +172,7 @@ export default function Integrations() {
           <div>
             <p className="text-sm font-semibold text-emerald-100">Live connection backend</p>
             <p className="mt-1 max-w-4xl text-xs leading-5 text-zinc-400">
-              Supported providers use persisted connection state, signed OAuth/GitHub App flows and server-side credentials. A provider marked “Setup required” is implemented in code but still needs its deployment credentials before Connect can be used.
+              PalladiumAI checks persisted connection status, granted OAuth permissions and refresh capability. If a provider needs a newly-added permission or can no longer refresh access, the card will ask you to reconnect instead of pretending the connection is healthy.
             </p>
           </div>
         </div>
@@ -175,7 +181,7 @@ export default function Integrations() {
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <Metric label="Live provider adapters" value={providers.length} icon={Wrench} />
         <Metric label="Configured adapters" value={configuredCount} icon={CheckCircle2} />
-        <Metric label="Connected accounts" value={connectedCount} icon={Plug} />
+        <Metric label="Healthy connections" value={connectedCount} icon={Plug} />
       </div>
 
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-3 lg:flex-row lg:items-center">
@@ -222,15 +228,19 @@ export default function Integrations() {
 
 function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub }) {
   const status = provider.connection?.status ?? 'disconnected';
-  const connected = status === 'connected';
+  const reconnectRequired = provider.connection?.health?.reconnectRequired === true;
+  const connected = connectionHealthy(provider);
   const errored = status === 'error';
+  const rawConnected = status === 'connected';
   const Icon = provider.nativeGitHub ? Github : Plug;
+  const healthReason = provider.connection?.health?.reason;
+  const missingScopes = provider.connection?.health?.missingScopes ?? [];
 
   return (
     <article className="flex min-h-[19rem] flex-col rounded-2xl border border-white/10 bg-white/[.03] p-5">
       <div className="flex items-start justify-between gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Icon className="h-5 w-5" /></span>
-        <StatusBadge connected={connected} errored={errored} configured={provider.configured} />
+        <StatusBadge connected={connected} errored={errored} reconnectRequired={reconnectRequired} configured={provider.configured} />
       </div>
 
       <div className="mt-4">
@@ -246,10 +256,16 @@ function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub })
       )}
 
       <div className="mt-auto pt-5">
-        {connected && provider.connection?.account_label && (
+        {rawConnected && provider.connection?.account_label && (
           <p className="mb-2 truncate text-[11px] text-emerald-300">Connected as {provider.connection.account_label}</p>
         )}
-        {provider.connection?.last_error && (
+        {healthReason && reconnectRequired && (
+          <p className="mb-2 text-[11px] leading-4 text-amber-300">{healthReason}</p>
+        )}
+        {missingScopes.length > 0 && (
+          <p className="mb-2 text-[10px] leading-4 text-zinc-500">Missing permissions: {missingScopes.join(', ')}</p>
+        )}
+        {!reconnectRequired && provider.connection?.last_error && (
           <p className="mb-2 line-clamp-2 text-[11px] leading-4 text-red-300">{provider.connection.last_error}</p>
         )}
 
@@ -266,6 +282,17 @@ function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub })
               <Unplug className="h-3.5 w-3.5" />{busy ? 'Disconnecting…' : 'Disconnect'}
             </button>
           </div>
+        ) : reconnectRequired ? (
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={onConnect} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:opacity-50">
+              <RefreshCw className="h-3.5 w-3.5" />{busy ? 'Opening provider…' : `Reconnect ${provider.name}`}
+            </button>
+            {rawConnected && (
+              <button disabled={busy} onClick={onDisconnect} className="rounded-xl border border-red-400/15 px-3 py-2.5 text-xs font-medium text-red-300 hover:bg-red-500/[.06] disabled:opacity-50">
+                <Unplug className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         ) : (
           <button disabled={busy} onClick={onConnect} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-3 py-2.5 text-xs font-semibold text-white hover:bg-violet-400 disabled:opacity-50">
             <Plug className="h-3.5 w-3.5" />{busy ? 'Opening provider…' : `Connect ${provider.name}`}
@@ -276,8 +303,9 @@ function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub })
   );
 }
 
-function StatusBadge({ connected, errored, configured }) {
+function StatusBadge({ connected, errored, reconnectRequired, configured }) {
   if (!configured) return <span className="rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300">Setup required</span>;
+  if (reconnectRequired) return <span className="rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300">Reconnect required</span>;
   if (connected) return <span className="rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-300">Connected</span>;
   if (errored) return <span className="rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-medium text-red-300">Needs attention</span>;
   return <span className="rounded-lg bg-zinc-500/10 px-2 py-1 text-[10px] font-medium text-zinc-400">Disconnected</span>;
