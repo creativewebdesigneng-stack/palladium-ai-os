@@ -192,7 +192,6 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
         ok: execution.ok,
         provider: execution.provider ?? null,
         error: execution.error ?? null,
-        result: execution.result ?? null,
       },
     };
   });
@@ -277,6 +276,5 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       ok: execution.ok,
       provider: execution.provider ?? null,
       error: execution.error ?? null,
-      result: execution.result ?? null,
     };
   });
