@@ -113,21 +113,29 @@ export function normaliseApprovedGitHubAction(action: ApprovedGitHubAction): Nor
     };
   }
 
-  if (action.actionType === "github_file_create" || action.actionType === "github_file_update") {
-    const base = {
-      actionType: action.actionType,
+  if (action.actionType === "github_file_update") {
+    return {
+      actionType: "github_file_update",
       owner,
       repo,
       branch: safeBranch(action.details["branch"]),
       path: safePath(action.details["path"]),
       content: safeContent(action.details["content"]),
       message: safeCommitMessage(action.details["message"]),
-    } as const;
+      sha: safeSha(action.details["sha"], "GitHub file sha"),
+    };
+  }
 
-    if (action.actionType === "github_file_update") {
-      return { ...base, actionType: action.actionType, sha: safeSha(action.details["sha"], "GitHub file sha") };
-    }
-    return base;
+  if (action.actionType === "github_file_create") {
+    return {
+      actionType: "github_file_create",
+      owner,
+      repo,
+      branch: safeBranch(action.details["branch"]),
+      path: safePath(action.details["path"]),
+      content: safeContent(action.details["content"]),
+      message: safeCommitMessage(action.details["message"]),
+    };
   }
 
   throw new Error(`Approved GitHub action "${String((action as { actionType?: unknown }).actionType ?? "")}" is not executable.`);
