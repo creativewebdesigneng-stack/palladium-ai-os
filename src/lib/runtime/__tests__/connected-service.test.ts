@@ -13,7 +13,7 @@ describe("connected service read request whitelist", () => {
     expect(Object.keys(CONNECTED_SERVICE_ACTIONS).sort()).toEqual(
       ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "slack"].sort(),
     );
-    expect(CONNECTED_SERVICE_ACTIONS.github).toEqual([
+    expect(CONNECTED_SERVICE_ACTIONS["github"]).toEqual([
       "repositories_list",
       "branches_list",
       "commits_list",
