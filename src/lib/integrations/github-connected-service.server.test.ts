@@ -34,6 +34,7 @@ describe("GitHub connected-service agent adapter", () => {
   it("exposes only the bounded read actions", () => {
     expect([...GITHUB_CONNECTED_SERVICE_ACTIONS]).toEqual([
       "repositories_list",
+      "repository_overview",
       "branches_list",
       "commits_list",
       "path_list",
@@ -66,6 +67,32 @@ describe("GitHub connected-service agent adapter", () => {
       { id: 2, fullName: "acme/two" },
     ]);
     expect(mocks.listRepositories).toHaveBeenCalledWith(42);
+  });
+
+  it("builds a bounded read-only repository overview", async () => {
+    mocks.listBranches.mockResolvedValue([{ name: "main" }, { name: "dev" }]);
+    mocks.listPath.mockResolvedValue([{ type: "dir", name: "src", path: "src" }, { type: "file", name: "README.md", path: "README.md" }]);
+    mocks.listCommits.mockResolvedValue([{ sha: "abc", message: "Ship overview" }]);
+
+    const result = await executeGitHubConnectedService(42, {
+      action: "repository_overview",
+      repository: "acme/app",
+      ref: "main",
+      limit: 99,
+    });
+
+    expect(result).toEqual({
+      repository: "acme/app",
+      ref: "main",
+      branches: [{ name: "main" }, { name: "dev" }],
+      root: [{ type: "dir", name: "src", path: "src" }, { type: "file", name: "README.md", path: "README.md" }],
+      recentCommits: [{ sha: "abc", message: "Ship overview" }],
+      readOnly: true,
+    });
+    expect(mocks.listBranches).toHaveBeenCalledWith({ installationId: 42, owner: "acme", repo: "app", perPage: 10 });
+    expect(mocks.listPath).toHaveBeenCalledWith({ installationId: 42, owner: "acme", repo: "app", ref: "main" });
+    expect(mocks.listCommits).toHaveBeenCalledWith({ installationId: 42, owner: "acme", repo: "app", perPage: 10, ref: "main" });
+    expect(mocks.readFile).not.toHaveBeenCalled();
   });
 
   it("passes only validated repository/ref data into commit reads", async () => {
