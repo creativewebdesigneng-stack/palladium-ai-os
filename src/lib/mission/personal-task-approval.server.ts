@@ -1,5 +1,5 @@
 import { notify } from "@/lib/notifications/notify.server";
-import type { ChatMessage } from "@/lib/runtime/model-gateway.server";
+import type { ChatMessage, Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -11,7 +11,7 @@ export type PersonalTaskPendingToolCall = {
 
 export type PersonalTaskApprovalResumeState = {
   version: 1;
-  provider: string;
+  provider: Provider;
   model: string;
   messages: ChatMessage[];
   usage: { input: number; output: number };
