@@ -20,8 +20,10 @@ beforeEach(() => {
 
 describe("Microsoft 365 executor", () => {
   it("normalises calendar events from Microsoft Graph", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push([input, init]);
+      return new Response(
         JSON.stringify({
           value: [
             {
@@ -43,8 +45,8 @@ describe("Microsoft 365 executor", () => {
           ],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      ),
-    );
+      );
+    };
 
     const events = await listMicrosoftCalendarEvents({
       userId: "user-1",
@@ -62,19 +64,21 @@ describe("Microsoft 365 executor", () => {
         location: "Teams",
       }),
     ]);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(calls).toHaveLength(1);
+    const [url, init] = calls[0]!;
     expect(String(url)).toContain("/me/calendarView?");
-    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer access-token");
+    expect((init?.headers as Record<string, string>)["Authorization"]).toBe("Bearer access-token");
   });
 
   it("creates an Outlook draft without calling a send endpoint", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ id: "draft-1", webLink: "https://outlook.office.com/mail/draft" }), {
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push([input, init]);
+      return new Response(JSON.stringify({ id: "draft-1", webLink: "https://outlook.office.com/mail/draft" }), {
         status: 201,
         headers: { "content-type": "application/json" },
-      }),
-    );
+      });
+    };
 
     const result = await createMicrosoftOutlookDraft({
       userId: "user-1",
@@ -85,7 +89,7 @@ describe("Microsoft 365 executor", () => {
     });
 
     expect(result.draftId).toBe("draft-1");
-    const [url, init] = fetchImpl.mock.calls[0]!;
+    const [url, init] = calls[0]!;
     expect(String(url)).toBe("https://graph.microsoft.com/v1.0/me/messages");
     expect(String(url)).not.toMatch(/send/i);
     expect(init?.method).toBe("POST");
