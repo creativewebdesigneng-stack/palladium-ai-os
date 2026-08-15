@@ -1,81 +1,112 @@
-import { useState, useMemo } from 'react';
-import { Info, Server, Plus } from 'lucide-react';
+import { Copy, KeyRound, LockKeyhole, Server, ShieldCheck, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import ServerCard from '@/components/mcp-hub/ServerCard';
-import ServerDetailDrawer from '@/components/mcp-hub/ServerDetailDrawer';
-import CustomServerForm from '@/components/mcp-hub/CustomServerForm';
-import { TABS, CATEGORIES, SERVERS, SECURITY } from '@/components/mcp-hub/mcpData';
+import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog';
+
+const ACCESS = {
+  read: { label: 'Read only', cls: 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300' },
+  write: { label: 'Writes data', cls: 'border-sky-400/20 bg-sky-400/[.08] text-sky-300' },
+  approval: { label: 'Consequential approval', cls: 'border-amber-400/20 bg-amber-400/[.08] text-amber-200' },
+};
+
+const GROUPS = ['Agents', 'Mission Control', 'Approvals', 'Memory'];
+
+function copy(value) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(value);
+}
 
 export default function McpHub() {
-  const [tab, setTab] = useState('featured');
-  const [cat, setCat] = useState('all');
-  const [servers, setServers] = useState(SERVERS);
-  const [detail, setDetail] = useState(null);
-  const [showCustom, setShowCustom] = useState(false);
-  const [toast, setToast] = useState(null);
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1600); };
-
-  const filtered = useMemo(() => {
-    let list = servers;
-    if (tab === 'featured') list = list.filter(s => s.featured);
-    else if (tab === 'installed') list = list.filter(s => s.installed);
-    else if (tab === 'available') list = list.filter(s => !s.installed);
-    else if (tab === 'custom') list = list.filter(s => s.custom);
-    if (cat !== 'all') list = list.filter(s => s.category === cat);
-    return list;
-  }, [tab, cat, servers]);
-
-  const install = (id) => {
-    setServers(prev => prev.map(s => s.id === id ? { ...s, installed: true } : s));
-    const s = servers.find(x => x.id === id);
-    flash(`Installed ${s?.name}`);
-  };
-
-  const saveCustom = (data) => {
-    const id = 'c' + Date.now();
-    setServers(prev => [...prev, { ...data, id, category: 'Developer', creator: 'You', version: '1.0.0', security: 'review', installed: true, featured: false, custom: true, grad: 'from-violet-500 to-indigo-500', resources: ['Custom'], permissions: ['custom'], agents: [], activity: [] }]);
-    setShowCustom(false);
-    setTab('custom');
-    flash('Custom server saved');
-  };
-
-  const counts = { featured: servers.filter(s=>s.featured).length, installed: servers.filter(s=>s.installed).length, available: servers.filter(s=>!s.installed).length, custom: servers.filter(s=>s.custom).length };
+  const reads = PALLADIUM_MCP_TOOLS.filter((tool) => tool.access === 'read').length;
+  const writes = PALLADIUM_MCP_TOOLS.length - reads;
 
   return (
     <>
-      <PageHeader eyebrow="MCP" title="MCP Hub" description="Marketplace and management for Model Context Protocol servers — connect any MCP-compatible server to your agents." action={
-        <button onClick={() => setShowCustom(true)} className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600"><Plus className="h-4 w-4" />Custom server</button>
-      } />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.06] px-3 py-2 text-[11px] text-amber-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Servers are illustrative mock data. The interface is backend-ready for a future MCP integration.</p></div>
+      <PageHeader
+        eyebrow="MCP"
+        title="MCP Hub"
+        description="The live Model Context Protocol surface bundled with PalladiumAI. This page shows the server and tools that actually ship with the application."
+      />
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium ${tab === t.id ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'bg-white/[.03] text-zinc-400 hover:text-white'}`}>{t.label}<span className="rounded bg-black/30 px-1 text-[10px] text-zinc-500">{counts[t.id]}</span></button>
-        ))}
-      </div>
-
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        <button onClick={() => setCat('all')} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${cat === 'all' ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'bg-white/[.03] text-zinc-400 hover:text-white'}`}>All categories</button>
-        {CATEGORIES.map(c => (
-          <button key={c} onClick={() => setCat(c)} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${cat === c ? 'bg-violet-500/20 text-white ring-1 ring-violet-400/20' : 'bg-white/[.03] text-zinc-400 hover:text-white'}`}>{c}</button>
-        ))}
-      </div>
-
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">{TABS.find(t => t.id === tab).label}</h3>
-        <p className="text-[11px] text-zinc-500">{filtered.length} servers</p>
-      </div>
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-10 text-center text-sm text-zinc-500">No servers in this view. <button onClick={() => setShowCustom(true)} className="text-violet-400 hover:underline">Add a custom server</button></div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map(s => <ServerCard key={s.id} server={s} onInstall={() => install(s.id)} onOpen={() => setDetail(s)} />)}
+      <div className="mb-5 grid gap-3 md:grid-cols-4">
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div className="mb-2 flex items-center gap-2 text-zinc-400"><Server className="h-4 w-4" /><span className="text-[11px] uppercase tracking-[.14em]">Server</span></div>
+          <p className="text-lg font-semibold text-white">{PALLADIUM_MCP_SERVER.title}</p>
+          <p className="mt-1 text-[11px] text-zinc-500">v{PALLADIUM_MCP_SERVER.version} · bundled</p>
         </div>
-      )}
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div className="mb-2 flex items-center gap-2 text-zinc-400"><Wrench className="h-4 w-4" /><span className="text-[11px] uppercase tracking-[.14em]">Tools</span></div>
+          <p className="text-lg font-semibold text-white">{PALLADIUM_MCP_TOOLS.length}</p>
+          <p className="mt-1 text-[11px] text-zinc-500">{reads} read · {writes} write/approval</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div className="mb-2 flex items-center gap-2 text-zinc-400"><LockKeyhole className="h-4 w-4" /><span className="text-[11px] uppercase tracking-[.14em]">Authentication</span></div>
+          <p className="text-sm font-semibold text-white">{PALLADIUM_MCP_SERVER.auth}</p>
+          <p className="mt-1 text-[11px] text-zinc-500">User-scoped bearer identity</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div className="mb-2 flex items-center gap-2 text-zinc-400"><ShieldCheck className="h-4 w-4" /><span className="text-[11px] uppercase tracking-[.14em]">Scope</span></div>
+          <p className="text-sm font-semibold text-white">Private user data</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Agents, missions, approvals, memory</p>
+        </div>
+      </div>
 
-      <ServerDetailDrawer server={detail} onClose={() => setDetail(null)} onInstall={() => { install(detail.id); }} />
-      {showCustom && <CustomServerForm onSave={saveCustom} onClose={() => setShowCustom(false)} />}
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#10121a] px-4 py-2 text-xs text-zinc-200 shadow-2xl">{toast}</div>}
+      <div className="mb-6 rounded-2xl border border-violet-400/15 bg-violet-400/[.04] p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-violet-300" />
+          <h3 className="text-sm font-semibold text-white">Protocol endpoints</h3>
+        </div>
+        <p className="mb-3 max-w-3xl text-xs leading-5 text-zinc-400">
+          PalladiumAI exposes an OAuth-protected MCP resource. External MCP clients must authenticate as the user; the browser UI does not store or reveal service-role credentials.
+        </p>
+        <div className="grid gap-2 md:grid-cols-2">
+          {[
+            ['MCP resource', PALLADIUM_MCP_SERVER.resourcePath],
+            ['Tool discovery', PALLADIUM_MCP_SERVER.listToolsPath],
+          ].map(([label, path]) => (
+            <div key={path} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[.12em] text-zinc-500">{label}</p>
+                <code className="text-xs text-zinc-200">{path}</code>
+              </div>
+              <button onClick={() => copy(path)} className="rounded-lg p-2 text-zinc-500 hover:bg-white/[.06] hover:text-white" aria-label={`Copy ${label}`}><Copy className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {GROUPS.map((group) => {
+          const tools = PALLADIUM_MCP_TOOLS.filter((tool) => tool.area === group);
+          return (
+            <section key={group}>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">{group}</h3>
+                <span className="text-[11px] text-zinc-500">{tools.length} tools</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {tools.map((tool) => {
+                  const access = ACCESS[tool.access];
+                  return (
+                    <article key={tool.name} className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+                      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{tool.title}</p>
+                          <code className="text-[11px] text-violet-300">{tool.name}</code>
+                        </div>
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${access.cls}`}>{access.label}</span>
+                      </div>
+                      <p className="text-xs leading-5 text-zinc-400">{tool.description}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 rounded-xl border border-amber-400/15 bg-amber-400/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80">
+        <strong className="text-amber-100">Approval safety:</strong> the <code>decide_approval</code> tool can authorise consequential actions, including actions involving money. MCP clients must obtain explicit user confirmation before approving them.
+      </div>
     </>
   );
 }
