@@ -14,6 +14,10 @@ import {
   createGoogleGmailDraft,
   listGoogleCalendarEvents,
 } from "@/lib/integrations/google-workspace.server";
+import {
+  createMicrosoftOutlookDraft,
+  listMicrosoftCalendarEvents,
+} from "@/lib/integrations/microsoft365.server";
 
 export type RoutingDecision = {
   category: string;
@@ -25,6 +29,8 @@ export type RoutingDecision = {
   reason: string;
   budget: number | null;
 };
+
+export type WorkspaceProvider = "google" | "microsoft";
 
 const MONEY_WORDS = /(buy|purchase|order|checkout|pay|book|reserve|subscribe)/i;
 
@@ -146,7 +152,6 @@ export async function runShoppingResearch(params: {
     allowedTools: params.allowedTools,
     spendCap: params.budget,
   };
-  // Throws BROWSER_NOT_CONFIGURED_MESSAGE when no provider may run — never silently simulates.
   const tool = createBrowserTool(resolveBrowserProvider(params.provider ?? null), config);
   const found = await tool.search(params.requirement, {
     budget: params.budget,
@@ -178,47 +183,57 @@ export async function prepareCheckoutDraft(params: {
   return draft;
 }
 
-/** Read-only live Google Calendar access for an authenticated operator. */
+/** Read-only live calendar access for a connected workspace provider. */
 export async function listMissionCalendar(params: {
   userId: string;
+  provider?: WorkspaceProvider;
   from?: string | null;
   to?: string | null;
   limit?: number;
   signal?: AbortSignal;
 }) {
-  return {
-    provider: "google",
-    events: await listGoogleCalendarEvents({
-      userId: params.userId,
-      from: params.from,
-      to: params.to,
-      limit: params.limit,
-      signal: params.signal,
-    }),
+  const provider = params.provider ?? "google";
+  const common = {
+    userId: params.userId,
+    from: params.from,
+    to: params.to,
+    limit: params.limit,
+    signal: params.signal,
   };
+  if (provider === "microsoft") {
+    return { provider, events: await listMicrosoftCalendarEvents(common) };
+  }
+  return { provider, events: await listGoogleCalendarEvents(common) };
 }
 
 /**
- * Creates a Gmail draft after an explicit approval decision. This helper does
- * not expose any send operation; the message remains a draft in Gmail.
+ * Creates a provider draft after explicit approval. No implementation exposed
+ * here can send mail; both Google and Microsoft paths create drafts only.
  */
 export async function createApprovedMissionEmailDraft(params: {
   userId: string;
+  provider?: WorkspaceProvider;
   to: string;
   subject: string;
   body: string;
   cc?: string | null;
   signal?: AbortSignal;
 }) {
-  const draft = await createGoogleGmailDraft({
+  const provider = params.provider ?? "google";
+  const common = {
     userId: params.userId,
     to: params.to,
     subject: params.subject,
     body: params.body,
     cc: params.cc,
     signal: params.signal,
-  });
-  return { provider: "google", status: "draft_created", ...draft };
+  };
+  if (provider === "microsoft") {
+    const draft = await createMicrosoftOutlookDraft(common);
+    return { provider, status: "draft_created", ...draft };
+  }
+  const draft = await createGoogleGmailDraft(common);
+  return { provider, status: "draft_created", ...draft };
 }
 
 /** Deterministic fallback briefing; the AI version augments this. */
