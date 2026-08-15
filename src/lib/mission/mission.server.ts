@@ -28,6 +28,12 @@ export type RoutingDecision = {
   autoCompletable: boolean;
   reason: string;
   budget: number | null;
+  estimatedCost: number | null;
+  priority: string;
+  dueAt: string | null;
+  intent: string;
+  searchQuery: string | null;
+  preferences: Record<string, unknown>;
 };
 
 export type WorkspaceProvider = "google" | "microsoft";
@@ -108,7 +114,10 @@ export function titleFor(request: string): string {
   return first.length > 72 ? `${first.slice(0, 69)}…` : first;
 }
 
-export function routeRequest(request: string): RoutingDecision {
+export function routeRequest(
+  request: string,
+  agent?: { preferences?: Record<string, unknown> | null } | null,
+): RoutingDecision {
   const match = RULES.find((r) => r.test.test(request));
   const category = match?.category ?? "custom";
   const tools = match?.tools ?? ["web_search"];
@@ -128,41 +137,85 @@ export function routeRequest(request: string): RoutingDecision {
     involvesMoney: money,
     autoCompletable: !sensitive,
     budget,
+    estimatedCost: budget,
+    priority: "normal",
+    dueAt: null,
+    intent: category,
+    searchQuery: category === "shopping" ? request : null,
+    preferences:
+      agent?.preferences && typeof agent.preferences === "object" ? agent.preferences : {},
     reason: sensitive
       ? "This request can involve money or an external commitment, so the agent will prepare it and wait for your approval."
       : "Research and organisation only — the agent can complete this on its own.",
   };
 }
 
-export async function runShoppingResearch(params: {
+type ShoppingResearchParams = {
   requirement: string;
   budget: number | null;
   currency: string;
   allowedDomains: string[];
   allowedTools: string[];
   provider?: string;
-}): Promise<{
+};
+
+type ShoppingResearchResult = {
   offers: BrowserProductOffer[];
   steps: unknown[];
   provider: string;
   simulated: boolean;
-}> {
+};
+
+export function runShoppingResearch(params: ShoppingResearchParams): Promise<ShoppingResearchResult>;
+export function runShoppingResearch(
+  requirement: string,
+  budget: number | null,
+  currency: string,
+  allowedDomains: string[],
+  allowedTools: string[],
+): Promise<BrowserProductOffer[]>;
+export async function runShoppingResearch(
+  paramsOrRequirement: ShoppingResearchParams | string,
+  legacyBudget: number | null = null,
+  legacyCurrency = "GBP",
+  legacyAllowedDomains: string[] = [],
+  legacyAllowedTools: string[] = [],
+): Promise<ShoppingResearchResult | BrowserProductOffer[]> {
+  const legacy = typeof paramsOrRequirement === "string";
+  const params: ShoppingResearchParams = legacy
+    ? {
+        requirement: paramsOrRequirement,
+        budget: legacyBudget,
+        currency: legacyCurrency,
+        allowedDomains: legacyAllowedDomains,
+        allowedTools: legacyAllowedTools,
+      }
+    : paramsOrRequirement;
+
   const config = {
     allowedDomains: params.allowedDomains,
     allowedTools: params.allowedTools,
     spendCap: params.budget,
   };
   const tool = createBrowserTool(resolveBrowserProvider(params.provider ?? null), config);
-  const found = await tool.search(params.requirement, {
-    budget: params.budget,
-    currency: params.currency,
-  });
-  const cap = params.budget;
-  const inBudget = cap ? found.filter((o) => o.price <= cap) : found;
-  const ranked = await tool.compare(inBudget.length ? inBudget : found);
-  const steps = tool.steps();
-  await tool.close();
-  return { offers: ranked, steps, provider: tool.provider, simulated: tool.kind === "development" };
+  try {
+    const found = await tool.search(params.requirement, {
+      budget: params.budget,
+      currency: params.currency,
+    });
+    const cap = params.budget;
+    const inBudget = cap ? found.filter((o) => o.price <= cap) : found;
+    const ranked = await tool.compare(inBudget.length ? inBudget : found);
+    const result: ShoppingResearchResult = {
+      offers: ranked,
+      steps: tool.steps(),
+      provider: tool.provider,
+      simulated: tool.kind === "development",
+    };
+    return legacy ? result.offers : result;
+  } finally {
+    await tool.close();
+  }
 }
 
 export async function prepareCheckoutDraft(params: {
@@ -178,9 +231,11 @@ export async function prepareCheckoutDraft(params: {
     allowedDomains: params.allowedDomains,
     allowedTools: params.allowedTools,
   });
-  const draft = await tool.prepareCheckout(params.offer);
-  await tool.close();
-  return draft;
+  try {
+    return await tool.prepareCheckout(params.offer);
+  } finally {
+    await tool.close();
+  }
 }
 
 /** Read-only live calendar access for a connected workspace provider. */
@@ -195,10 +250,10 @@ export async function listMissionCalendar(params: {
   const provider = params.provider ?? "google";
   const common = {
     userId: params.userId,
-    from: params.from,
-    to: params.to,
-    limit: params.limit,
-    signal: params.signal,
+    ...(params.from !== undefined ? { from: params.from } : {}),
+    ...(params.to !== undefined ? { to: params.to } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
+    ...(params.signal ? { signal: params.signal } : {}),
   };
   if (provider === "microsoft") {
     return { provider, events: await listMicrosoftCalendarEvents(common) };
@@ -225,15 +280,15 @@ export async function createApprovedMissionEmailDraft(params: {
     to: params.to,
     subject: params.subject,
     body: params.body,
-    cc: params.cc,
-    signal: params.signal,
+    ...(params.cc !== undefined ? { cc: params.cc } : {}),
+    ...(params.signal ? { signal: params.signal } : {}),
   };
   if (provider === "microsoft") {
     const draft = await createMicrosoftOutlookDraft(common);
-    return { provider, status: "draft_created", ...draft };
+    return { provider, status: "draft_created", ...draft } as const;
   }
   const draft = await createGoogleGmailDraft(common);
-  return { provider, status: "draft_created", ...draft };
+  return { provider, status: "draft_created", ...draft } as const;
 }
 
 /** Deterministic fallback briefing; the AI version augments this. */
