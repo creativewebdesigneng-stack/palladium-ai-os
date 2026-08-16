@@ -1,0 +1,73 @@
+name: One-shot wire Builder production publish
+on:
+  push:
+    branches: [feat/builder-production-publish]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/builder-production-publish
+      - name: Patch Builder production publish UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/screens/Builder.jsx')
+          s=p.read_text()
+          s=s.replace("import { createBuilderPreviewDeployment, listBuilderDeployments, refreshBuilderDeployment } from '@/lib/builder/builder-deploy.functions';", "import { createBuilderPreviewDeployment, listBuilderDeployments, promoteBuilderDeploymentToProduction, queueBuilderProductionApproval, refreshBuilderDeployment, refreshBuilderProductionApproval } from '@/lib/builder/builder-deploy.functions';")
+          s=s.replace("  const deploymentRefreshFn = useServerFn(refreshBuilderDeployment);", "  const deploymentRefreshFn = useServerFn(refreshBuilderDeployment);\n  const productionApprovalFn = useServerFn(queueBuilderProductionApproval);\n  const productionApprovalRefreshFn = useServerFn(refreshBuilderProductionApproval);\n  const productionPromoteFn = useServerFn(promoteBuilderDeploymentToProduction);")
+          marker="  const cancelJob = useMutation({"
+          insert="""  const queueProductionApproval = useMutation({
+    mutationFn: (id) => productionApprovalFn({ data: { id } }),
+    onSuccess: async () => { await refreshDeployments(); toast({ title: 'Production approval queued', description: 'Approve the high-risk production publish request before promotion can run.' }); },
+    onError: async (error) => { await refreshDeployments(); toast({ title: 'Could not queue production approval', description: friendlyMessage(error), variant: 'destructive' }); },
+  });
+  const refreshProductionApproval = useMutation({
+    mutationFn: (id) => productionApprovalRefreshFn({ data: { id } }),
+    onSuccess: async (result) => { await refreshDeployments(); toast({ title: 'Production approval refreshed', description: result.productionStatus === 'approved' ? 'Approval granted. Production promotion is now unlocked.' : result.productionStatus === 'failed' ? 'Production approval was rejected.' : 'Production approval is still pending.' }); },
+    onError: (error) => toast({ title: 'Could not refresh production approval', description: friendlyMessage(error), variant: 'destructive' }),
+  });
+  const promoteProduction = useMutation({
+    mutationFn: (id) => productionPromoteFn({ data: { id } }),
+    onSuccess: async () => { await refreshDeployments(); toast({ title: 'Production promotion completed', description: 'Vercel production domains now point to the approved deployment.' }); },
+    onError: async (error) => { await refreshDeployments(); toast({ title: 'Production promotion failed', description: friendlyMessage(error), variant: 'destructive' }); },
+  });
+"""
+          if insert not in s: s=s.replace(marker, insert+marker)
+          s=s.replace('            <Requirement icon={LockKeyhole} text="Production publish remains disabled" />', '            <Requirement icon={LockKeyhole} text="Production publish requires a separate high-risk approval" ready />')
+          s=s.replace("            const isRefreshingDeployment = refreshDeployment.isPending && refreshDeployment.variables === deployment?.id;", "            const isRefreshingDeployment = refreshDeployment.isPending && refreshDeployment.variables === deployment?.id;\n            const isQueueingProduction = queueProductionApproval.isPending && queueProductionApproval.variables === deployment?.id;\n            const isRefreshingProduction = refreshProductionApproval.isPending && refreshProductionApproval.variables === deployment?.id;\n            const isPromotingProduction = promoteProduction.isPending && promoteProduction.variables === deployment?.id;")
+          old="{sandbox.sandboxStatus === 'passed' && <PreviewDeployment deployment={deployment} deploying={isDeployingPreview} refreshing={isRefreshingDeployment} onDeploy={() => deployPreview.mutate(job.id)} onRefresh={() => deployment && refreshDeployment.mutate(deployment.id)} />}"
+          new="{sandbox.sandboxStatus === 'passed' && <PreviewDeployment deployment={deployment} deploying={isDeployingPreview} refreshing={isRefreshingDeployment} queueingProduction={isQueueingProduction} refreshingProduction={isRefreshingProduction} promotingProduction={isPromotingProduction} onDeploy={() => deployPreview.mutate(job.id)} onRefresh={() => deployment && refreshDeployment.mutate(deployment.id)} onQueueProduction={() => deployment && queueProductionApproval.mutate(deployment.id)} onRefreshProduction={() => deployment && refreshProductionApproval.mutate(deployment.id)} onPromoteProduction={() => deployment && promoteProduction.mutate(deployment.id)} />}"
+          if old not in s: raise SystemExit('PreviewDeployment call marker not found')
+          s=s.replace(old,new)
+          start=s.index('function PreviewDeployment(')
+          end=s.index('\nfunction RepairProposal(', start)
+          component=r'''function PreviewDeployment({ deployment, deploying, refreshing, queueingProduction, refreshingProduction, promotingProduction, onDeploy, onRefresh, onQueueProduction, onRefreshProduction, onPromoteProduction }) {
+  const active = deployment && ['queued', 'uploading', 'building'].includes(deployment.status);
+  const productionStatus = deployment?.productionStatus ?? 'not_started';
+  return (
+    <div className="mt-4 rounded-xl border border-blue-400/15 bg-blue-400/[.035] p-4 text-[11px] leading-5 text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2 font-medium text-blue-100"><Rocket className="h-4 w-4" />Vercel preview · {deploying ? 'uploading' : deployment?.status ?? 'not deployed'}</div><p className="mt-1 text-zinc-500">Vercel credentials stay on the PalladiumAI server and are never sent to generated code or the E2B sandbox.</p></div><div className="flex flex-wrap gap-2">{!deployment || ['failed', 'cancelled'].includes(deployment.status) ? <button onClick={onDeploy} disabled={deploying} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/15 px-3 py-1.5 font-medium text-blue-100 ring-1 ring-blue-400/20 disabled:opacity-40">{deploying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}{deployment?.status === 'failed' ? 'Retry preview deployment' : 'Deploy preview'}</button> : null}{active && <button onClick={onRefresh} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-zinc-300 disabled:opacity-40">{refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Refresh</button>}</div></div>
+      {deployment?.lastError && <ErrorBox text={deployment.lastError} />}
+      {deployment?.url && <a href={deployment.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-blue-300 underline decoration-blue-300/30 underline-offset-2">Open preview</a>}
+      {deployment?.status === 'ready' && <div className="mt-3 rounded-lg border border-amber-400/15 bg-amber-400/[.035] p-3"><div className="font-medium text-amber-100">Production publish · {productionStatus.replaceAll('_', ' ')}</div><p className="mt-1 text-zinc-500">Production promotion can change the domains serving real users. It is blocked behind a separate high-risk approval tied to this exact Vercel project and deployment ID.</p>{deployment.productionLastError && <ErrorBox text={deployment.productionLastError} />}<div className="mt-2 flex flex-wrap gap-2">{productionStatus === 'not_started' && <button onClick={onQueueProduction} disabled={queueingProduction} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 font-medium text-amber-100 ring-1 ring-amber-400/20 disabled:opacity-40">{queueingProduction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockKeyhole className="h-3.5 w-3.5" />}Request production approval</button>}{productionStatus === 'approval_pending' && <button onClick={onRefreshProduction} disabled={refreshingProduction} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-zinc-300 disabled:opacity-40">{refreshingProduction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Refresh approval</button>}{productionStatus === 'approved' && <button onClick={onPromoteProduction} disabled={promotingProduction} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/15 px-3 py-1.5 font-medium text-rose-100 ring-1 ring-rose-400/20 disabled:opacity-40">{promotingProduction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}Promote approved preview to production</button>}</div>{productionStatus === 'promoted' && <p className="mt-2 text-emerald-300">Production promotion recorded{deployment.productionPromotedAt ? ` · ${new Date(deployment.productionPromotedAt).toLocaleString()}` : ''}.</p>}</div>}
+    </div>
+  );
+}
+'''
+          s=s[:start]+component+s[end:]
+          s=s.replace('<StateCard icon={Rocket} title="Deployment" value="Preview live" text="Validated source can be explicitly deployed to Vercel preview; production publishing remains disabled." />', '<StateCard icon={Rocket} title="Deployment" value="Preview + approved production" text="Validated source can deploy to preview; production promotion requires a separate high-risk approval." />')
+          p.write_text(s)
+          PY
+      - name: Remove one-shot workflow and commit
+        run: |
+          rm .github/workflows/one-shot-wire-builder-production.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/screens/Builder.jsx .github/workflows/one-shot-wire-builder-production.yml
+          git commit -m "feat(builder): wire approved production publish UI"
+          git push origin HEAD:feat/builder-production-publish
