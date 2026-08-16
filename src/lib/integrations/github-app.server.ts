@@ -81,7 +81,33 @@ function base64url(value: string | Buffer): string {
 }
 
 function privateKey(): string {
-  return requiredEnv("GITHUB_APP_PRIVATE_KEY").replace(/\\n/g, "\n");
+  let value = requiredEnv("GITHUB_APP_PRIVATE_KEY")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\\n/g, "\n")
+    .trim();
+
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1).trim();
+  }
+
+  const formats = [
+    { begin: "-----BEGIN RSA PRIVATE KEY-----", end: "-----END RSA PRIVATE KEY-----" },
+    { begin: "-----BEGIN PRIVATE KEY-----", end: "-----END PRIVATE KEY-----" },
+  ];
+  const format = formats.find(({ begin, end }) => value.includes(begin) && value.includes(end));
+  if (!format) throw new Error("GITHUB_APP_PRIVATE_KEY is not a valid PEM private key.");
+
+  const start = value.indexOf(format.begin) + format.begin.length;
+  const finish = value.indexOf(format.end, start);
+  if (finish < start) throw new Error("GITHUB_APP_PRIVATE_KEY is not a valid PEM private key.");
+
+  const body = value.slice(start, finish).replace(/\s+/g, "");
+  if (!body || !/^[A-Za-z0-9+/=]+$/.test(body)) {
+    throw new Error("GITHUB_APP_PRIVATE_KEY is not a valid PEM private key.");
+  }
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `${format.begin}\n${lines.join("\n")}\n${format.end}\n`;
 }
 
 /** GitHub App JWTs are deliberately short lived and are never sent to the browser. */
