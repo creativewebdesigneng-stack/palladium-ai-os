@@ -104,5 +104,10 @@
     "typescript-eslint": "^8.56.1",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "brace-expansion": "1.1.18",
+    "nanoid": "3.3.18",
+    "js-yaml": "4.3.1"
   }
 }
