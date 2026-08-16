@@ -8,6 +8,20 @@ const getEnv = (key: string): string => {
 
 export type StripeEnv = "sandbox" | "live";
 
+/**
+ * The server is the authority for billing mode. The browser may display or
+ * submit its inferred Stripe environment for backwards compatibility, but it
+ * must never choose which Stripe account or secret the server uses.
+ *
+ * Existing deployments remain safely in sandbox until an operator explicitly
+ * sets PAYMENTS_ENVIRONMENT=live alongside the live Stripe credentials.
+ */
+export function getServerStripeEnvironment(): StripeEnv {
+  const configured = (process.env["PAYMENTS_ENVIRONMENT"] ?? "sandbox").trim().toLowerCase();
+  if (configured === "sandbox" || configured === "live") return configured;
+  throw new Error("PAYMENTS_ENVIRONMENT must be either sandbox or live");
+}
+
 const GATEWAY_STRIPE_BASE = "https://connector-gateway.lovable.dev/stripe";
 
 export function getConnectionApiKey(env: StripeEnv): string {
