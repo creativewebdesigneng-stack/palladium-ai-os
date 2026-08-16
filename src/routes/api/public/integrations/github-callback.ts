@@ -23,6 +23,65 @@ function redirect(location: string) {
   return new Response(null, { status: 302, headers: { Location: location } });
 }
 
+async function publicGitHubAppClientId(): Promise<string> {
+  const slug = process.env["GITHUB_APP_SLUG"]?.trim().toLowerCase();
+  if (!slug || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) {
+    throw new Error("GitHub App slug is not configured correctly.");
+  }
+  const response = await fetch(`https://api.github.com/apps/${encodeURIComponent(slug)}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2026-03-10",
+      "User-Agent": "PalladiumAI",
+    },
+  });
+  const text = await response.text();
+  let payload: any = null;
+  try { payload = text ? JSON.parse(text) : null; } catch { /* handled below */ }
+  if (!response.ok) {
+    const message = typeof payload?.message === "string"
+      ? payload.message
+      : `Could not resolve the GitHub App OAuth client (${response.status}).`;
+    throw new Error(message);
+  }
+  if (typeof payload?.client_id !== "string" || !payload.client_id.trim()) {
+    throw new Error("GitHub did not return an OAuth client id for this App.");
+  }
+  return payload.client_id.trim();
+}
+
+async function exchangeGitHubCode(code: string, redirectUri: string): Promise<string> {
+  const clientSecret = process.env["GITHUB_APP_CLIENT_SECRET"]?.trim();
+  if (!clientSecret) throw new Error("GitHub App client secret is not configured on this deployment.");
+  const clientId = await publicGitHubAppClientId();
+  const response = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "PalladiumAI",
+    },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+  const text = await response.text();
+  let payload: any = null;
+  try { payload = text ? JSON.parse(text) : null; } catch { /* handled below */ }
+  if (!response.ok || typeof payload?.access_token !== "string" || !payload.access_token) {
+    const message = typeof payload?.error_description === "string"
+      ? payload.error_description
+      : typeof payload?.error === "string"
+        ? payload.error
+        : `GitHub OAuth token exchange failed (${response.status}).`;
+    throw new Error(message);
+  }
+  return payload.access_token;
+}
+
 async function resolveCurrentAppUserInstallation(
   userAccessToken: string,
   suggestedInstallationId: string | null,
@@ -118,26 +177,19 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
           const {
             githubConnectionConfigured,
             normaliseInstallationId,
-            exchangeGitHubUserCode,
             verifyGitHubInstallation,
           } = await import("@/lib/integrations/github-app.server");
           if (!githubConnectionConfigured()) {
             return fail("GitHub App connection is not configured on this deployment.");
           }
 
-          // Keep installation-first callbacks working as a compatibility path.
-          // The primary connection flow now starts with user OAuth, so an
-          // already-installed PalladiumAI App can be discovered directly.
           if (!code) {
             if (!suggestedInstallationId) {
               return fail("GitHub App installation id is missing.");
             }
 
             const installationId = normaliseInstallationId(suggestedInstallationId);
-            const clientId = process.env["GITHUB_APP_CLIENT_ID"]?.trim();
-            if (!clientId) {
-              return fail("GitHub App client id is not configured on this deployment.");
-            }
+            const clientId = await publicGitHubAppClientId();
 
             const { error } = await supabaseAdmin
               .from("integrations")
@@ -176,7 +228,7 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
           }
 
           const redirectUri = `${origin}/api/public/integrations/github-callback`;
-          const userAccessToken = await exchangeGitHubUserCode(code, redirectUri);
+          const userAccessToken = await exchangeGitHubCode(code, redirectUri);
           const userInstallation = await resolveCurrentAppUserInstallation(
             userAccessToken,
             installationIdCandidate,
@@ -210,8 +262,6 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
           );
           if (error) throw new Error(error.message);
 
-          // GitHub App installation tokens are minted on demand; stale generic
-          // OAuth credentials for this provider must never be reused.
           await supabaseAdmin
             .from("integration_credentials")
             .delete()
