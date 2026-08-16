@@ -18,6 +18,7 @@ import {
   refreshBuilderRepositoryStatus,
 } from '@/lib/builder/builder.functions';
 import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';
+import { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';
 
 export default function Builder() {
   const qc = useQueryClient();
@@ -32,6 +33,9 @@ export default function Builder() {
   const cancelFn = useServerFn(cancelBuilderJob);
   const sandboxListFn = useServerFn(listBuilderSandboxStates);
   const sandboxRunFn = useServerFn(runBuilderSandboxJob);
+  const repairListFn = useServerFn(listBuilderRepairStates);
+  const repairGenerateFn = useServerFn(generateBuilderRepair);
+  const repairAcceptFn = useServerFn(acceptBuilderRepair);
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [repositoryChoice, setRepositoryChoice] = useState({});
@@ -39,8 +43,10 @@ export default function Builder() {
   const jobs = useQuery({ queryKey: ['builder-jobs'], queryFn: () => listFn(), retry: false });
   const repositories = useQuery({ queryKey: ['builder-github-repositories'], queryFn: () => repoListFn(), retry: false });
   const sandboxStates = useQuery({ queryKey: ['builder-sandbox-states'], queryFn: () => sandboxListFn(), retry: false });
+  const repairStates = useQuery({ queryKey: ['builder-repair-states'], queryFn: () => repairListFn(), retry: false });
   const refreshJobs = () => qc.invalidateQueries({ queryKey: ['builder-jobs'] });
   const refreshSandbox = () => qc.invalidateQueries({ queryKey: ['builder-sandbox-states'] });
+  const refreshRepair = () => qc.invalidateQueries({ queryKey: ['builder-repair-states'] });
 
   const createJob = useMutation({
     mutationFn: () => createFn({ data: { title, prompt } }),
@@ -81,6 +87,16 @@ export default function Builder() {
     onSuccess: async (result) => { await refreshSandbox(); toast({ title: result.sandboxStatus === 'passed' ? 'Isolated validation passed' : 'Isolated validation finished', description: result.sandboxStatus === 'passed' ? 'Install and available build/typecheck/test scripts passed in E2B.' : 'Review the isolated stage logs below.' }); },
     onError: async (error) => { await refreshSandbox(); toast({ title: 'Isolated validation failed', description: friendlyMessage(error), variant: 'destructive' }); },
   });
+  const generateRepair = useMutation({
+    mutationFn: (id) => repairGenerateFn({ data: { id } }),
+    onSuccess: async () => { await refreshRepair(); toast({ title: 'Repair proposal ready', description: 'Review every proposed file before accepting it.' }); },
+    onError: async (error) => { await refreshRepair(); toast({ title: 'Could not generate repair proposal', description: friendlyMessage(error), variant: 'destructive' }); },
+  });
+  const acceptRepair = useMutation({
+    mutationFn: (id) => repairAcceptFn({ data: { id } }),
+    onSuccess: async () => { await Promise.all([refreshJobs(), refreshSandbox(), refreshRepair()]); toast({ title: 'Repair accepted', description: 'The repaired source must now pass a fresh GitHub file-approval batch and isolated validation.' }); },
+    onError: (error) => toast({ title: 'Could not accept repair proposal', description: friendlyMessage(error), variant: 'destructive' }),
+  });
   const cancelJob = useMutation({
     mutationFn: (id) => cancelFn({ data: { id } }),
     onSuccess: async () => { await refreshJobs(); toast({ title: 'Build request cancelled' }); },
@@ -111,6 +127,7 @@ export default function Builder() {
             <Requirement icon={Code2} text="Generated source is bounded, persisted and reviewable" ready />
             <Requirement icon={GitBranch} text="Branch and file writes use high-risk approval with SHA-safe updates" ready />
             <Requirement icon={Workflow} text="Isolated E2B install/build/typecheck/test validation is live" ready />
+            <Requirement icon={Sparkles} text="Failed validation can generate a reviewable, approval-gated repair proposal" ready />
             <Requirement icon={Rocket} text="Deployment remains disabled" />
           </div>
         </Panel>
@@ -128,6 +145,9 @@ export default function Builder() {
             const selectedRepository = repositoryChoice[job.id] ?? repositories.data?.[0]?.fullName ?? '';
             const sandbox = (sandboxStates.data ?? []).find((state) => state.id === job.id) ?? { sandboxStatus: 'not_started', sandboxResults: null, sandboxLastError: null };
             const isRunningSandbox = sandboxRun.isPending && sandboxRun.variables === job.id;
+            const repair = (repairStates.data ?? []).find((state) => state.id === job.id) ?? { repairStatus: 'not_started', repairManifest: null, repairLastError: null, repairAttempt: 0 };
+            const isGeneratingRepair = generateRepair.isPending && generateRepair.variables === job.id;
+            const isAcceptingRepair = acceptRepair.isPending && acceptRepair.variables === job.id;
             return (
               <div key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -144,7 +164,8 @@ export default function Builder() {
                 {job.sourceManifest && <SourceView manifest={job.sourceManifest} />}
 
                 {job.sourceStatus === 'generated' && job.repositoryStatus === 'not_started' && <RepositoryPicker job={job} repositories={repositories} selectedRepository={selectedRepository} setRepositoryChoice={setRepositoryChoice} onQueue={() => branchApproval.mutate({ id: job.id, repository: selectedRepository })} pending={isQueueingBranch} />}
-                {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} onRun={() => sandboxRun.mutate(job.id)} />}
+                {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} repair={repair} onRun={() => sandboxRun.mutate(job.id)} />}
+                {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}
                 {['branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed'].includes(job.repositoryStatus) && (
                   <RepositoryHandoff
                     job={job}
@@ -165,14 +186,27 @@ export default function Builder() {
         <StateCard icon={Code2} title="Source generation" value="Live" text="Generated source is bounded, validated and reviewable." />
         <StateCard icon={GitBranch} title="GitHub handoff" value="Approval-gated" text="Branch creation and each changed file are individually approval-gated." />
         <StateCard icon={TerminalSquare} title="Sandbox validation" value="Live · E2B" text="Generated source is installed and checked in an isolated E2B sandbox." />
+        <StateCard icon={Sparkles} title="Repair loop" value="Review-gated" text="Failed sandbox evidence can generate a bounded repair proposal that must be accepted and re-approved." />
         <StateCard icon={Rocket} title="Deployment" value="Remaining" text="Deployment and final production hardening are not enabled yet." />
       </div>
     </>
   );
 }
 
-function SandboxValidation({ job, sandbox, pending, onRun }) {
-  const canRun = ['not_started', 'failed'].includes(sandbox.sandboxStatus) && !pending;
+function RepairProposal({ repair, generating, accepting, onGenerate, onAccept }) {
+  const proposal = repair.repairManifest;
+  const canGenerate = ['not_started', 'accepted', 'failed'].includes(repair.repairStatus) && repair.repairAttempt < 10 && !generating;
+  return (
+    <div className="mt-4 rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/[.035] p-4 text-[11px] leading-5 text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2 font-medium text-fuchsia-100"><Sparkles className="h-4 w-4" />AI repair proposal · attempt {repair.repairAttempt}/10</div><p className="mt-1 text-zinc-500">Uses failed sandbox evidence as untrusted diagnostic data. Nothing is written to GitHub until you accept the proposal and approve a new file batch.</p></div>{canGenerate && <button onClick={onGenerate} disabled={generating} className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-500/15 px-3 py-1.5 font-medium text-fuchsia-100 ring-1 ring-fuchsia-400/20 disabled:opacity-40">{generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{repair.repairStatus === 'failed' ? 'Retry repair proposal' : 'Generate repair proposal'}</button>}</div>
+      {repair.repairLastError && <ErrorBox text={repair.repairLastError} />}
+      {proposal && <><div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3"><p className="font-medium text-zinc-200">{proposal.summary}</p><div className="mt-2 space-y-2">{(proposal.files ?? []).map((file) => <details key={file.path} className="rounded border border-white/10"><summary className="cursor-pointer px-2 py-1.5 text-zinc-300">{file.path}<span className="ml-2 text-zinc-600">{file.purpose}</span></summary><pre className="max-h-64 overflow-auto border-t border-white/10 p-2 text-[10px] text-zinc-400">{file.content}</pre></details>)}</div></div><button onClick={onAccept} disabled={accepting} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 font-medium text-emerald-100 ring-1 ring-emerald-400/20 disabled:opacity-40">{accepting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Accept repair and re-enter approvals</button></>}
+    </div>
+  );
+}
+
+function SandboxValidation({ job, sandbox, pending, repair, onRun }) {
+  const canRun = ['not_started', 'failed'].includes(sandbox.sandboxStatus) && repair.repairStatus !== 'proposed' && repair.repairStatus !== 'generating' && !pending;
   const stages = sandbox.sandboxResults?.stages ?? [];
   return (
     <div className="mt-4 rounded-xl border border-cyan-400/15 bg-cyan-400/[.035] p-4 text-[11px] leading-5 text-zinc-400">

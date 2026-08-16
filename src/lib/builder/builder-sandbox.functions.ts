@@ -60,6 +60,7 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
       .eq("source_status", "generated")
       .eq("repository_status", "files_applied")
       .in("sandbox_status", ["not_started", "failed"])
+      .in("repair_status", ["not_started", "accepted", "failed"])
       .select("id,source_manifest," + sandboxColumns)
       .maybeSingle();
     if (claimError) throw new Error(claimError.message);

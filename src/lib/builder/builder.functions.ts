@@ -160,7 +160,7 @@ export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).midd
   const branches = await listGitHubBranches({ installationId, owner, repo, perPage: 100 });
   if (!branches.some((branch) => branch.name === job.branch_name)) throw new Error("The approved Builder branch is not available on GitHub yet.");
 
-  const { data: existingApprovals, error: existingError } = await sb.from("approval_requests").select("id,status,details").eq("user_id", context.userId).in("action_type", ["github_file_create", "github_file_update"]).eq("details->>builder_job_id", String(job.id)).in("status", ["pending", "approved"]);
+  const { data: existingApprovals, error: existingError } = await sb.from("approval_requests").select("id,status,details").eq("user_id", context.userId).in("action_type", ["github_file_create", "github_file_update"]).eq("details->>builder_job_id", String(job.id)).eq("status", "pending");
   if (existingError) throw new Error(existingError.message);
   if ((existingApprovals ?? []).length) throw new Error("File approvals have already been queued for this build request.");
 
