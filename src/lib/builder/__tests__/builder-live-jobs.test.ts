@@ -23,7 +23,8 @@ describe('Builder durable job contract', () => {
     expect(source).toContain('Repository creation and code writes remain disabled');
     expect(source).toContain('Sandboxed build/test execution remains disabled');
     expect(source).not.toContain('sample source files');
-    expect(source).not.toContain('fake stages');
+    expect(source).not.toContain('BUILD_STAGES');
+    expect(source).not.toContain('SAMPLE_FILES');
   });
 
   it('enforces owner-only RLS for builder jobs', () => {
