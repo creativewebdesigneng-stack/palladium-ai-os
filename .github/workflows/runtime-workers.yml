@@ -21,21 +21,35 @@ jobs:
       WORKFLOW_RUNNER_CRON_SECRET: ${{ secrets.WORKFLOW_RUNNER_CRON_SECRET }}
       WEBHOOK_RETRY_CRON_SECRET: ${{ secrets.WEBHOOK_RETRY_CRON_SECRET }}
     steps:
-      - name: Check scheduler configuration
+      - name: Validate scheduler configuration
         shell: bash
         run: |
+          missing=0
+
           if [ -z "$PALLADIUM_BASE_URL" ]; then
-            echo "::warning::PALLADIUM_BASE_URL is not configured; runtime workers will be skipped."
+            echo "::error::PALLADIUM_BASE_URL is not configured; runtime workers cannot reach PalladiumAI."
+            missing=1
+          elif [[ "$PALLADIUM_BASE_URL" != https://* ]]; then
+            echo "::error::PALLADIUM_BASE_URL must use https:// in production."
+            missing=1
           fi
-          if [ -z "$WORKFLOW_RUNNER_CRON_SECRET" ]; then
-            echo "::warning::WORKFLOW_RUNNER_CRON_SECRET is not configured; workflow queue drain will be skipped."
+
+          if [ ${#WORKFLOW_RUNNER_CRON_SECRET} -lt 32 ]; then
+            echo "::error::WORKFLOW_RUNNER_CRON_SECRET is missing or shorter than 32 characters; workflow queue draining is disabled."
+            missing=1
           fi
-          if [ -z "$WEBHOOK_RETRY_CRON_SECRET" ]; then
-            echo "::warning::WEBHOOK_RETRY_CRON_SECRET is not configured; webhook retry drain will be skipped."
+
+          if [ ${#WEBHOOK_RETRY_CRON_SECRET} -lt 32 ]; then
+            echo "::error::WEBHOOK_RETRY_CRON_SECRET is missing or shorter than 32 characters; webhook retry draining is disabled."
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Runtime worker configuration is incomplete. Failing closed instead of reporting a false-green scheduler run."
+            exit 1
           fi
 
       - name: Drain workflow queue
-        if: ${{ env.PALLADIUM_BASE_URL != '' && env.WORKFLOW_RUNNER_CRON_SECRET != '' }}
         shell: bash
         run: |
           curl --fail-with-body --silent --show-error \
@@ -46,7 +60,6 @@ jobs:
             "${PALLADIUM_BASE_URL%/}/api/internal/workflow-runs?limit=4"
 
       - name: Drain webhook retry queue
-        if: ${{ env.PALLADIUM_BASE_URL != '' && env.WEBHOOK_RETRY_CRON_SECRET != '' }}
         shell: bash
         run: |
           curl --fail-with-body --silent --show-error \
