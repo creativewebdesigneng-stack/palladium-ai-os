@@ -51,6 +51,22 @@ describe('Builder durable job contract', () => {
     expect(functions).not.toContain('executeApprovedGitHubAction(');
   });
 
+  it('verifies the approved branch and queues idempotent create/update approvals with optimistic concurrency', () => {
+    const functions = readSrc('lib/builder/builder.functions.ts');
+    expect(functions).toContain('queueBuilderFileApprovals');
+    expect(functions).toContain('refreshBuilderRepositoryStatus');
+    expect(functions).toContain('readGitHubFile');
+    expect(functions).toContain('buildGitHubWriteApproval');
+    expect(functions).toContain('github_file_update');
+    expect(functions).toContain('github_file_create');
+    expect(functions).toContain('sha: existing.sha');
+    expect(functions).toContain('builder_job_id');
+    expect(functions).toContain('builder_file_path');
+    expect(functions).toContain('repository_status: "files_approval_pending"');
+    expect(functions).toContain('repository_status: "files_applied"');
+    expect(functions).not.toContain('executeApprovedGitHubAction(');
+  });
+
   it('enforces owner-only RLS and persists Builder lifecycle state', () => {
     const migration = readRepo('supabase/migrations/20260816011500_builder_jobs.sql');
     expect(migration).toContain('alter table public.builder_jobs enable row level security');
@@ -59,6 +75,8 @@ describe('Builder durable job contract', () => {
     expect(migration).toContain("source_status text not null default 'not_started'");
     expect(migration).toContain("repository_status text not null default 'not_started'");
     expect(migration).toContain('branch_approval_id uuid');
-    expect(migration).toContain("'branch_approval_pending'");
+    expect(migration).toContain("file_approval_ids jsonb not null default '[]'::jsonb");
+    expect(migration).toContain("'files_approval_pending'");
+    expect(migration).toContain("'files_applied'");
   });
 });
