@@ -286,6 +286,7 @@ export type Database = {
       agent_tasks: {
         Row: {
           agent_id: string | null
+          approval_resume_state: Json | null
           cancel_requested: boolean
           completed_at: string | null
           cost_pence: number
@@ -309,9 +310,11 @@ export type Database = {
           tool_calls: number
           updated_at: string
           user_id: string
+          waiting_approval_request_id: string | null
         }
         Insert: {
           agent_id?: string | null
+          approval_resume_state?: Json | null
           cancel_requested?: boolean
           completed_at?: string | null
           cost_pence?: number
@@ -335,9 +338,11 @@ export type Database = {
           tool_calls?: number
           updated_at?: string
           user_id: string
+          waiting_approval_request_id?: string | null
         }
         Update: {
           agent_id?: string | null
+          approval_resume_state?: Json | null
           cancel_requested?: boolean
           completed_at?: string | null
           cost_pence?: number
@@ -361,6 +366,7 @@ export type Database = {
           tool_calls?: number
           updated_at?: string
           user_id?: string
+          waiting_approval_request_id?: string | null
         }
         Relationships: [
           {
@@ -562,6 +568,10 @@ export type Database = {
           decision_note: string | null
           details: Json
           estimated_cost: number | null
+          executed_at: string | null
+          execution_error: string | null
+          execution_result: Json | null
+          execution_status: string | null
           expires_at: string | null
           id: string
           org_id: string | null
@@ -583,6 +593,10 @@ export type Database = {
           decision_note?: string | null
           details?: Json
           estimated_cost?: number | null
+          executed_at?: string | null
+          execution_error?: string | null
+          execution_result?: Json | null
+          execution_status?: string | null
           expires_at?: string | null
           id?: string
           org_id?: string | null
@@ -604,6 +618,10 @@ export type Database = {
           decision_note?: string | null
           details?: Json
           estimated_cost?: number | null
+          executed_at?: string | null
+          execution_error?: string | null
+          execution_result?: Json | null
+          execution_status?: string | null
           expires_at?: string | null
           id?: string
           org_id?: string | null
@@ -681,7 +699,7 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           id?: string
-          provider?: string
+          provider: string
           started_at?: string | null
           status?: string
           steps?: Json
@@ -719,6 +737,170 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      builder_deployments: {
+        Row: {
+          builder_job_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          production_aliases: Json
+          production_approval_id: string | null
+          production_last_error: string | null
+          production_promoted_at: string | null
+          production_status: string
+          provider: string
+          provider_deployment_id: string | null
+          provider_project_id: string | null
+          status: string
+          target: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          builder_job_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          production_aliases?: Json
+          production_approval_id?: string | null
+          production_last_error?: string | null
+          production_promoted_at?: string | null
+          production_status?: string
+          provider?: string
+          provider_deployment_id?: string | null
+          provider_project_id?: string | null
+          status?: string
+          target?: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          builder_job_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          production_aliases?: Json
+          production_approval_id?: string | null
+          production_last_error?: string | null
+          production_promoted_at?: string | null
+          production_status?: string
+          provider?: string
+          provider_deployment_id?: string | null
+          provider_project_id?: string | null
+          status?: string
+          target?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "builder_deployments_builder_job_id_fkey"
+            columns: ["builder_job_id"]
+            isOneToOne: false
+            referencedRelation: "builder_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      builder_jobs: {
+        Row: {
+          branch_approval_id: string | null
+          branch_name: string | null
+          created_at: string
+          file_approval_ids: Json
+          id: string
+          last_error: string | null
+          plan: Json | null
+          prompt: string
+          repair_attempt: number
+          repair_last_error: string | null
+          repair_manifest: Json | null
+          repair_status: string
+          repository_full_name: string | null
+          repository_last_error: string | null
+          repository_status: string
+          sandbox_finished_at: string | null
+          sandbox_id: string | null
+          sandbox_last_error: string | null
+          sandbox_provider: string | null
+          sandbox_results: Json | null
+          sandbox_started_at: string | null
+          sandbox_status: string
+          source_last_error: string | null
+          source_manifest: Json | null
+          source_status: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          branch_approval_id?: string | null
+          branch_name?: string | null
+          created_at?: string
+          file_approval_ids?: Json
+          id?: string
+          last_error?: string | null
+          plan?: Json | null
+          prompt: string
+          repair_attempt?: number
+          repair_last_error?: string | null
+          repair_manifest?: Json | null
+          repair_status?: string
+          repository_full_name?: string | null
+          repository_last_error?: string | null
+          repository_status?: string
+          sandbox_finished_at?: string | null
+          sandbox_id?: string | null
+          sandbox_last_error?: string | null
+          sandbox_provider?: string | null
+          sandbox_results?: Json | null
+          sandbox_started_at?: string | null
+          sandbox_status?: string
+          source_last_error?: string | null
+          source_manifest?: Json | null
+          source_status?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          branch_approval_id?: string | null
+          branch_name?: string | null
+          created_at?: string
+          file_approval_ids?: Json
+          id?: string
+          last_error?: string | null
+          plan?: Json | null
+          prompt?: string
+          repair_attempt?: number
+          repair_last_error?: string | null
+          repair_manifest?: Json | null
+          repair_status?: string
+          repository_full_name?: string | null
+          repository_last_error?: string | null
+          repository_status?: string
+          sandbox_finished_at?: string | null
+          sandbox_id?: string | null
+          sandbox_last_error?: string | null
+          sandbox_provider?: string | null
+          sandbox_results?: Json | null
+          sandbox_started_at?: string | null
+          sandbox_status?: string
+          source_last_error?: string | null
+          source_manifest?: Json | null
+          source_status?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       creator_profiles: {
         Row: {
@@ -2000,6 +2182,27 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       product_watches: {
         Row: {
           agent_id: string | null
@@ -2107,6 +2310,132 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      project_activity: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          metadata: Json
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message: string
+          metadata?: Json
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          metadata?: Json
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_resources: {
+        Row: {
+          added_by: string
+          created_at: string
+          id: string
+          project_id: string
+          resource_id: string
+          resource_type: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          id?: string
+          project_id: string
+          resource_id: string
+          resource_type: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          resource_id?: string
+          resource_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_resources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          metadata: Json
+          name: string
+          org_id: string | null
+          priority: string
+          status: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          org_id?: string | null
+          priority?: string
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          org_id?: string | null
+          priority?: string
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_requests: {
         Row: {
@@ -2993,6 +3322,30 @@ export type Database = {
           },
         ]
       }
+      user_ai_preferences: {
+        Row: {
+          created_at: string
+          default_model: string
+          default_provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_model: string
+          default_provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_model?: string
+          default_provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3018,11 +3371,14 @@ export type Database = {
         Row: {
           attempts: number
           created_at: string
+          dead_lettered_at: string | null
           delivered_at: string | null
           duration_ms: number | null
           error: string | null
           event: string
           id: string
+          last_attempt_at: string | null
+          next_attempt_at: string | null
           org_id: string | null
           payload: Json
           response_status: number | null
@@ -3033,11 +3389,14 @@ export type Database = {
         Insert: {
           attempts?: number
           created_at?: string
+          dead_lettered_at?: string | null
           delivered_at?: string | null
           duration_ms?: number | null
           error?: string | null
           event: string
           id?: string
+          last_attempt_at?: string | null
+          next_attempt_at?: string | null
           org_id?: string | null
           payload?: Json
           response_status?: number | null
@@ -3048,11 +3407,14 @@ export type Database = {
         Update: {
           attempts?: number
           created_at?: string
+          dead_lettered_at?: string | null
           delivered_at?: string | null
           duration_ms?: number | null
           error?: string | null
           event?: string
           id?: string
+          last_attempt_at?: string | null
+          next_attempt_at?: string | null
           org_id?: string | null
           payload?: Json
           response_status?: number | null
@@ -3135,6 +3497,8 @@ export type Database = {
       workflow_runs: {
         Row: {
           attempt: number
+          cancel_requested: boolean
+          claimed_at: string | null
           completed_at: string | null
           cost_pence: number
           created_at: string
@@ -3143,6 +3507,7 @@ export type Database = {
           input: string | null
           org_id: string | null
           output: string | null
+          queued_at: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["exec_status"]
           step_results: Json
@@ -3151,11 +3516,18 @@ export type Database = {
           trigger: string
           updated_at: string
           user_id: string
+          waiting_approval_request_id: string | null
+          waiting_step_id: string | null
+          worker_attempts: number
+          worker_error: string | null
+          worker_heartbeat_at: string | null
           workflow_id: string
           workforce_id: string | null
         }
         Insert: {
           attempt?: number
+          cancel_requested?: boolean
+          claimed_at?: string | null
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
@@ -3164,6 +3536,7 @@ export type Database = {
           input?: string | null
           org_id?: string | null
           output?: string | null
+          queued_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           step_results?: Json
@@ -3172,11 +3545,18 @@ export type Database = {
           trigger?: string
           updated_at?: string
           user_id: string
+          waiting_approval_request_id?: string | null
+          waiting_step_id?: string | null
+          worker_attempts?: number
+          worker_error?: string | null
+          worker_heartbeat_at?: string | null
           workflow_id: string
           workforce_id?: string | null
         }
         Update: {
           attempt?: number
+          cancel_requested?: boolean
+          claimed_at?: string | null
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
@@ -3185,6 +3565,7 @@ export type Database = {
           input?: string | null
           org_id?: string | null
           output?: string | null
+          queued_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           step_results?: Json
@@ -3193,6 +3574,11 @@ export type Database = {
           trigger?: string
           updated_at?: string
           user_id?: string
+          waiting_approval_request_id?: string | null
+          waiting_step_id?: string | null
+          worker_attempts?: number
+          worker_error?: string | null
+          worker_heartbeat_at?: string | null
           workflow_id?: string
           workforce_id?: string | null
         }
