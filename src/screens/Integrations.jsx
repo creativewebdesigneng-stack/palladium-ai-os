@@ -57,15 +57,50 @@ export default function Integrations() {
       ]);
       setCatalogue(integrationResult.catalogue ?? []);
       setGithub(githubResult);
+      return githubResult;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load integration state.');
+      return null;
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    refresh();
+    let cancelled = false;
+    let retryTimer;
+
+    const syncConnectionState = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const githubReturned = params.get('integration_connected') === 'github';
+      const githubErrored = params.get('provider') === 'github' && params.has('integration_error');
+      let result = await refresh();
+
+      if (!cancelled && githubReturned && !result?.connected) {
+        retryTimer = window.setTimeout(async () => {
+          if (cancelled) return;
+          result = await refresh();
+          if (!cancelled && result?.connected) {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        }, 500);
+      } else if (!cancelled && (githubReturned || githubErrored)) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    const handlePageShow = () => {
+      if (!cancelled) void refresh();
+    };
+
+    void syncConnectionState();
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, []);
 
   const providers = useMemo(() => {
