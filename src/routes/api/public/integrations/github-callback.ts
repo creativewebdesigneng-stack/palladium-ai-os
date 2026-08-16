@@ -8,6 +8,11 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 
+type UserInstallation = {
+  id: number;
+  accountLogin: string | null;
+};
+
 function done(origin: string, params: Record<string, string>) {
   const url = new URL(`${origin}/integrations`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -16,6 +21,67 @@ function done(origin: string, params: Record<string, string>) {
 
 function redirect(location: string) {
   return new Response(null, { status: 302, headers: { Location: location } });
+}
+
+async function resolveCurrentAppUserInstallation(
+  userAccessToken: string,
+  suggestedInstallationId: string | null,
+): Promise<UserInstallation> {
+  const rawAppId = process.env["GITHUB_APP_ID"]?.trim() ?? "";
+  const appId = Number(rawAppId);
+  if (!Number.isSafeInteger(appId) || appId <= 0) {
+    throw new Error("GitHub App id is not configured correctly on this deployment.");
+  }
+
+  const response = await fetch("https://api.github.com/user/installations?per_page=100", {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${userAccessToken}`,
+      "X-GitHub-Api-Version": "2026-03-10",
+      "User-Agent": "PalladiumAI",
+    },
+  });
+  const text = await response.text();
+  let payload: any = null;
+  try { payload = text ? JSON.parse(text) : null; } catch { /* handled below */ }
+  if (!response.ok) {
+    const message = typeof payload?.message === "string"
+      ? payload.message
+      : `GitHub installation lookup failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  const rows = Array.isArray(payload?.installations) ? payload.installations : [];
+  const installations: UserInstallation[] = rows.flatMap((installation: any) => {
+    if (!Number.isSafeInteger(installation?.id) || installation.id <= 0) return [];
+    if (Number(installation?.app_id) !== appId) return [];
+    return [{
+      id: installation.id,
+      accountLogin: typeof installation?.account?.login === "string"
+        ? installation.account.login.slice(0, 120)
+        : null,
+    }];
+  });
+
+  if (suggestedInstallationId) {
+    const suggested = Number(suggestedInstallationId);
+    if (!Number.isSafeInteger(suggested) || suggested <= 0) {
+      throw new Error("Invalid GitHub App installation id.");
+    }
+    const match = installations.find((installation) => installation.id === suggested);
+    if (!match) {
+      throw new Error("The PalladiumAI GitHub App installation is not accessible to the authorized GitHub user.");
+    }
+    return match;
+  }
+
+  if (installations.length === 0) {
+    throw new Error("The PalladiumAI GitHub App is not installed for this GitHub user. Install it, then reconnect from PalladiumAI.");
+  }
+  if (installations.length > 1) {
+    throw new Error("Multiple PalladiumAI GitHub App installations are available. Reconnect after selecting the intended GitHub account installation.");
+  }
+  return installations[0]!;
 }
 
 export const Route = createFileRoute("/api/public/integrations/github-callback")({
@@ -53,18 +119,15 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
             githubConnectionConfigured,
             normaliseInstallationId,
             exchangeGitHubUserCode,
-            resolveVerifiedUserInstallation,
             verifyGitHubInstallation,
           } = await import("@/lib/integrations/github-app.server");
           if (!githubConnectionConfigured()) {
             return fail("GitHub App connection is not configured on this deployment.");
           }
 
-          // If GitHub returns from installation setup before user authorization,
-          // persist only the unverified installation id on the pending row and
-          // continue into OAuth using GitHub's registered callback URL. The id is
-          // never trusted here; it is verified against both the consenting GitHub
-          // user and this GitHub App before the connection becomes active.
+          // Keep installation-first callbacks working as a compatibility path.
+          // The primary connection flow now starts with user OAuth, so an
+          // already-installed PalladiumAI App can be discovered directly.
           if (!code) {
             if (!suggestedInstallationId) {
               return fail("GitHub App installation id is missing.");
@@ -114,7 +177,7 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
 
           const redirectUri = `${origin}/api/public/integrations/github-callback`;
           const userAccessToken = await exchangeGitHubUserCode(code, redirectUri);
-          const userInstallation = await resolveVerifiedUserInstallation(
+          const userInstallation = await resolveCurrentAppUserInstallation(
             userAccessToken,
             installationIdCandidate,
           );

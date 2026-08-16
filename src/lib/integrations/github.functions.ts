@@ -88,16 +88,19 @@ export const getGitHubConnection = createServerFn({ method: "POST" })
     };
   });
 
-/** Starts GitHub App installation with PalladiumAI's signed user/origin state. */
+/** Starts GitHub user authorization first so existing App installations can be discovered reliably. */
 export const startGitHubConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => startInput.parse(input))
   .handler(async ({ data, context }) => {
     const { safeOrigin, createState } = await import("./oauth.server");
-    const { githubConnectionConfigured, buildGitHubInstallUrl } = await import("./github-app.server");
+    const { githubConnectionConfigured } = await import("./github-app.server");
     if (!githubConnectionConfigured()) {
       throw new Error("GitHub App connection is not configured. Add the GitHub App ID, private key, slug, client ID and client secret to the deployment.");
     }
+    const clientId = process.env["GITHUB_APP_CLIENT_ID"]?.trim();
+    if (!clientId) throw new Error("GitHub App client id is not configured on this deployment.");
+
     const origin = safeOrigin(data.origin);
     const sb = context.supabase as unknown as Sb;
     const { error } = await sb.from("integrations").upsert(
@@ -110,6 +113,7 @@ export const startGitHubConnection = createServerFn({ method: "POST" })
         status: "pending",
         scopes: ["metadata:read", "contents:read"],
         granted_scopes: [],
+        config: {},
         last_error: null,
       },
       { onConflict: "user_id,provider" },
@@ -117,7 +121,10 @@ export const startGitHubConnection = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     const state = createState({ userId: context.userId, provider: "github", origin });
-    return { installUrl: buildGitHubInstallUrl(state) };
+    const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
+    authorizeUrl.searchParams.set("client_id", clientId);
+    authorizeUrl.searchParams.set("state", state);
+    return { installUrl: authorizeUrl.toString() };
   });
 
 export const listConnectedGitHubRepositories = createServerFn({ method: "POST" })
