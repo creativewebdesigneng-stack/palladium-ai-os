@@ -4,6 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
+const PALLADIUM_GITHUB_CLIENT_ID = "Iv23li0ghSDXwVsJCoFo";
+
 const startInput = z.object({
   origin: z.string().trim().url().max(300).optional(),
 });
@@ -37,7 +39,7 @@ function splitRepository(repository: string): { owner: string; repo: string } {
   return { owner: parts[0], repo: parts[1] };
 }
 
-async function publicGitHubAppClientId(): Promise<string> {
+async function validatedGitHubAppClientId(): Promise<string> {
   const slug = process.env["GITHUB_APP_SLUG"]?.trim().toLowerCase();
   if (!slug || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) {
     throw new Error("GitHub App slug is not configured correctly.");
@@ -51,10 +53,11 @@ async function publicGitHubAppClientId(): Promise<string> {
   });
   if (!response.ok) throw new Error(`Could not resolve the GitHub App OAuth client (${response.status}).`);
   const payload = await response.json() as { client_id?: unknown };
-  if (typeof payload.client_id !== "string" || !payload.client_id.trim()) {
-    throw new Error("GitHub did not return an OAuth client id for this App.");
+  const publicClientId = typeof payload.client_id === "string" ? payload.client_id.trim() : "";
+  if (publicClientId !== PALLADIUM_GITHUB_CLIENT_ID) {
+    throw new Error("The configured PalladiumAI GitHub App does not match the expected OAuth client.");
   }
-  return payload.client_id.trim();
+  return PALLADIUM_GITHUB_CLIENT_ID;
 }
 
 export function installationIdFromConfig(config: unknown): number {
@@ -118,7 +121,7 @@ export const startGitHubConnection = createServerFn({ method: "POST" })
     if (!githubConnectionConfigured()) {
       throw new Error("GitHub App connection is not configured. Add the GitHub App ID, private key, slug, client ID and client secret to the deployment.");
     }
-    const clientId = await publicGitHubAppClientId();
+    const clientId = await validatedGitHubAppClientId();
 
     const origin = safeOrigin(data.origin);
     const sb = context.supabase as unknown as Sb;
