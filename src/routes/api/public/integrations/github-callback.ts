@@ -60,11 +60,11 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
             return fail("GitHub App connection is not configured on this deployment.");
           }
 
-          // GitHub's App installation setup redirect normally contains
-          // installation_id + setup_action + state, but no OAuth code. Continue
-          // into the GitHub App user-authorization flow and carry the untrusted
-          // installation id in the redirect URI. It is verified against both the
-          // consenting GitHub user and this GitHub App before it is persisted.
+          // If GitHub returns from installation setup before user authorization,
+          // persist only the unverified installation id on the pending row and
+          // continue into OAuth using GitHub's registered callback URL. The id is
+          // never trusted here; it is verified against both the consenting GitHub
+          // user and this GitHub App before the connection becomes active.
           if (!code) {
             if (!suggestedInstallationId) {
               return fail("GitHub App installation id is missing.");
@@ -76,28 +76,47 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
               return fail("GitHub App client id is not configured on this deployment.");
             }
 
-            const redirectUri = new URL(`${origin}/api/public/integrations/github-callback`);
-            redirectUri.searchParams.set("installation_id", String(installationId));
+            const { error } = await supabaseAdmin
+              .from("integrations")
+              .update({
+                status: "pending",
+                config: { pending_installation_id: String(installationId) },
+                last_error: null,
+              })
+              .eq("user_id", verified.userId)
+              .eq("provider", "github");
+            if (error) throw new Error(error.message);
 
             const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
             authorizeUrl.searchParams.set("client_id", clientId);
-            authorizeUrl.searchParams.set("redirect_uri", redirectUri.toString());
             authorizeUrl.searchParams.set("state", state);
             return redirect(authorizeUrl.toString());
           }
 
-          const redirectUri = new URL(`${origin}/api/public/integrations/github-callback`);
-          if (suggestedInstallationId) {
-            redirectUri.searchParams.set(
-              "installation_id",
-              String(normaliseInstallationId(suggestedInstallationId)),
-            );
+          let installationIdCandidate = suggestedInstallationId;
+          if (!installationIdCandidate) {
+            const { data, error } = await supabaseAdmin
+              .from("integrations")
+              .select("config")
+              .eq("user_id", verified.userId)
+              .eq("provider", "github")
+              .maybeSingle();
+            if (error) throw new Error(error.message);
+
+            const config = data?.config;
+            if (config && typeof config === "object" && !Array.isArray(config)) {
+              const pending = (config as Record<string, unknown>)["pending_installation_id"];
+              if (typeof pending === "string" || typeof pending === "number") {
+                installationIdCandidate = String(pending);
+              }
+            }
           }
 
-          const userAccessToken = await exchangeGitHubUserCode(code, redirectUri.toString());
+          const redirectUri = `${origin}/api/public/integrations/github-callback`;
+          const userAccessToken = await exchangeGitHubUserCode(code, redirectUri);
           const userInstallation = await resolveVerifiedUserInstallation(
             userAccessToken,
-            suggestedInstallationId,
+            installationIdCandidate,
           );
           const appInstallation = await verifyGitHubInstallation(userInstallation.id);
           if (appInstallation.id !== userInstallation.id) {
