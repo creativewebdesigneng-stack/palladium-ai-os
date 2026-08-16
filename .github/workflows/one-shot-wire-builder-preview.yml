@@ -1,0 +1,49 @@
+name: One-shot wire Builder Vercel preview UI
+
+on:
+  push:
+    branches: [feat/builder-vercel-preview]
+    paths: [.github/workflows/one-shot-wire-builder-preview.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/builder-vercel-preview
+      - name: Patch Builder preview deployment UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/screens/Builder.jsx')
+          s = p.read_text()
+          def rep(old, new):
+              global s
+              assert old in s, f'missing UI pattern: {old[:140]}'
+              s = s.replace(old, new, 1)
+
+          rep("import { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';", "import { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';\nimport { createBuilderPreviewDeployment, listBuilderDeployments, refreshBuilderDeployment } from '@/lib/builder/builder-deploy.functions';")
+          rep("  const repairAcceptFn = useServerFn(acceptBuilderRepair);", "  const repairAcceptFn = useServerFn(acceptBuilderRepair);\n  const deploymentListFn = useServerFn(listBuilderDeployments);\n  const previewDeployFn = useServerFn(createBuilderPreviewDeployment);\n  const deploymentRefreshFn = useServerFn(refreshBuilderDeployment);")
+          rep("  const repairStates = useQuery({ queryKey: ['builder-repair-states'], queryFn: () => repairListFn(), retry: false });", "  const repairStates = useQuery({ queryKey: ['builder-repair-states'], queryFn: () => repairListFn(), retry: false });\n  const deployments = useQuery({ queryKey: ['builder-deployments'], queryFn: () => deploymentListFn(), retry: false });")
+          rep("  const refreshRepair = () => qc.invalidateQueries({ queryKey: ['builder-repair-states'] });", "  const refreshRepair = () => qc.invalidateQueries({ queryKey: ['builder-repair-states'] });\n  const refreshDeployments = () => qc.invalidateQueries({ queryKey: ['builder-deployments'] });")
+          rep("  const cancelJob = useMutation({", "  const deployPreview = useMutation({\n    mutationFn: (id) => previewDeployFn({ data: { id } }),\n    onSuccess: async (result) => { await refreshDeployments(); toast({ title: result.status === 'ready' ? 'Preview deployment ready' : 'Preview deployment started', description: result.status === 'ready' ? 'The Vercel preview URL is ready.' : 'Refresh the deployment status while Vercel builds it.' }); },\n    onError: async (error) => { await refreshDeployments(); toast({ title: 'Could not deploy preview', description: friendlyMessage(error), variant: 'destructive' }); },\n  });\n  const refreshDeployment = useMutation({\n    mutationFn: (id) => deploymentRefreshFn({ data: { id } }),\n    onSuccess: async (result) => { await refreshDeployments(); toast({ title: 'Preview status refreshed', description: result.status === 'ready' ? 'The preview is ready.' : result.status === 'failed' ? 'The preview deployment failed.' : 'Vercel is still building the preview.' }); },\n    onError: (error) => toast({ title: 'Could not refresh preview deployment', description: friendlyMessage(error), variant: 'destructive' }),\n  });\n  const cancelJob = useMutation({")
+          rep("<Requirement icon={Rocket} text=\"Deployment remains disabled\" />", "<Requirement icon={Rocket} text=\"Vercel preview deployment is explicit, owner-scoped and sandbox-gated\" ready />\n            <Requirement icon={LockKeyhole} text=\"Production publish remains disabled\" />")
+          rep("            const isAcceptingRepair = acceptRepair.isPending && acceptRepair.variables === job.id;", "            const isAcceptingRepair = acceptRepair.isPending && acceptRepair.variables === job.id;\n            const deployment = (deployments.data ?? []).find((item) => item.builderJobId === job.id) ?? null;\n            const isDeployingPreview = deployPreview.isPending && deployPreview.variables === job.id;\n            const isRefreshingDeployment = refreshDeployment.isPending && refreshDeployment.variables === deployment?.id;")
+          rep("                {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}", "                {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}\n                {sandbox.sandboxStatus === 'passed' && <PreviewDeployment deployment={deployment} deploying={isDeployingPreview} refreshing={isRefreshingDeployment} onDeploy={() => deployPreview.mutate(job.id)} onRefresh={() => deployment && refreshDeployment.mutate(deployment.id)} />}")
+          rep("        <StateCard icon={Rocket} title=\"Deployment\" value=\"Remaining\" text=\"Deployment and final production hardening are not enabled yet.\" />", "        <StateCard icon={Rocket} title=\"Deployment\" value=\"Vercel preview live\" text=\"Sandbox-passed apps can be explicitly deployed to preview. Production publish remains disabled.\" />")
+          rep("function RepairProposal({ repair, generating, accepting, onGenerate, onAccept }) {", "function PreviewDeployment({ deployment, deploying, refreshing, onDeploy, onRefresh }) {\n  const active = deployment && ['queued', 'uploading', 'building'].includes(deployment.status);\n  return (\n    <div className=\"mt-4 rounded-xl border border-blue-400/15 bg-blue-400/[.035] p-4 text-[11px] leading-5 text-zinc-400\">\n      <div className=\"flex flex-wrap items-center justify-between gap-2\"><div><div className=\"flex items-center gap-2 font-medium text-blue-100\"><Rocket className=\"h-4 w-4\" />Vercel preview · {deploying ? 'uploading' : deployment?.status ?? 'not deployed'}</div><p className=\"mt-1 text-zinc-500\">Preview only. Vercel credentials stay on the PalladiumAI server and are never sent to generated code or the E2B sandbox.</p></div><div className=\"flex gap-2\">{!deployment || ['failed', 'cancelled'].includes(deployment.status) ? <button onClick={onDeploy} disabled={deploying} className=\"inline-flex items-center gap-1.5 rounded-lg bg-blue-500/15 px-3 py-1.5 font-medium text-blue-100 ring-1 ring-blue-400/20 disabled:opacity-40\">{deploying ? <Loader2 className=\"h-3.5 w-3.5 animate-spin\" /> : <Rocket className=\"h-3.5 w-3.5\" />}{deployment?.status === 'failed' ? 'Retry preview deployment' : 'Deploy preview'}</button> : null}{active && <button onClick={onRefresh} disabled={refreshing} className=\"inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-zinc-300 disabled:opacity-40\">{refreshing ? <Loader2 className=\"h-3.5 w-3.5 animate-spin\" /> : <RefreshCw className=\"h-3.5 w-3.5\" />}Refresh</button>}</div></div>\n      {deployment?.lastError && <ErrorBox text={deployment.lastError} />}\n      {deployment?.url && <a href={deployment.url} target=\"_blank\" rel=\"noreferrer\" className=\"mt-3 inline-flex break-all text-blue-300 underline decoration-blue-400/30 underline-offset-4 hover:text-blue-200\">{deployment.url}</a>}\n      {deployment?.providerDeploymentId && <p className=\"mt-2 text-[10px] text-zinc-600\">Vercel deployment: {deployment.providerDeploymentId}</p>}\n      <p className=\"mt-2 text-[10px] text-zinc-600\">Production publish is intentionally disabled.</p>\n    </div>\n  );\n}\n\nfunction RepairProposal({ repair, generating, accepting, onGenerate, onAccept }) {")
+          p.write_text(s)
+          PY
+          rm .github/workflows/one-shot-wire-builder-preview.yml
+      - name: Commit preview UI wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/screens/Builder.jsx .github/workflows/one-shot-wire-builder-preview.yml
+          git commit -m "Wire Builder Vercel preview deployment UI"
+          git push origin HEAD:feat/builder-vercel-preview
