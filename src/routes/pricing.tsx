@@ -8,13 +8,13 @@ export const Route = createFileRoute("/pricing")({
       {
         name: "description",
         content:
-          "Simple plans that scale from a single operator to an enterprise AI workforce. Start free.",
+          "Paid PalladiumAI plans for operators, teams, and enterprise AI workforces, starting from £150 per month.",
       },
       { property: "og:title", content: "Pricing — PalladiumAI" },
       {
         property: "og:description",
         content:
-          "Simple plans that scale from a single operator to an enterprise AI workforce. Start free.",
+          "Paid PalladiumAI plans for operators, teams, and enterprise AI workforces, starting from £150 per month.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

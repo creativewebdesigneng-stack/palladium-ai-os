@@ -3,7 +3,12 @@
  * plan <-> price mapping the frontend is never allowed to influence.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { normalizePlanCode, planForPriceKey, priceKeyForPlan } from "../catalog";
+import {
+  normalizePlanCode,
+  planForPriceKey,
+  priceKeyForPlan,
+  pricePenceForPlan,
+} from "../catalog";
 import { verifyWebhook } from "@/lib/stripe.server";
 
 const SECRET = "whsec_test_secret";
@@ -34,15 +39,28 @@ async function signedRequest(
 }
 
 describe("plan catalog", () => {
-  it("maps internal plan codes to approved Stripe lookup keys", () => {
-    expect(priceKeyForPlan("builder", "monthly")).toBe("pro_monthly");
-    expect(priceKeyForPlan("business", "yearly")).toBe("business_yearly");
-    expect(priceKeyForPlan("enterprise", "monthly")).toBe("enterprise_monthly");
+  it("maps internal plan codes to the current approved Stripe lookup keys", () => {
+    expect(priceKeyForPlan("builder", "monthly")).toBe("builder_monthly_150_gbp");
+    expect(priceKeyForPlan("builder", "yearly")).toBe("builder_yearly_1530_gbp");
+    expect(priceKeyForPlan("business", "monthly")).toBe("business_monthly_1500_gbp");
+    expect(priceKeyForPlan("business", "yearly")).toBe("business_yearly_15300_gbp");
+    expect(priceKeyForPlan("enterprise", "monthly")).toBe("enterprise_monthly_3500_gbp");
+    expect(priceKeyForPlan("enterprise", "yearly")).toBe("enterprise_yearly_35700_gbp");
+  });
+
+  it("maps paid plans to the expected GBP amounts in pence", () => {
+    expect(pricePenceForPlan("builder", "monthly")).toBe(15_000);
+    expect(pricePenceForPlan("builder", "yearly")).toBe(153_000);
+    expect(pricePenceForPlan("business", "monthly")).toBe(150_000);
+    expect(pricePenceForPlan("business", "yearly")).toBe(1_530_000);
+    expect(pricePenceForPlan("enterprise", "monthly")).toBe(350_000);
+    expect(pricePenceForPlan("enterprise", "yearly")).toBe(3_570_000);
   });
 
   it("never resolves a price for the free plan", () => {
     expect(priceKeyForPlan("explorer", "monthly")).toBeNull();
     expect(priceKeyForPlan("free", "yearly")).toBeNull();
+    expect(pricePenceForPlan("explorer", "monthly")).toBeNull();
   });
 
   it("rejects plan codes and raw price ids injected by a client", () => {
@@ -52,8 +70,12 @@ describe("plan catalog", () => {
     expect(planForPriceKey("price_1AttackerControlled")).toBeNull();
   });
 
-  it("resolves webhook price keys back to a plan", () => {
+  it("resolves current and historic webhook price keys back to a plan", () => {
+    expect(planForPriceKey("builder_yearly_1530_gbp")).toBe("builder");
+    expect(planForPriceKey("business_monthly_1500_gbp")).toBe("business");
+    expect(planForPriceKey("enterprise_monthly_3500_gbp")).toBe("enterprise");
     expect(planForPriceKey("pro_yearly")).toBe("builder");
+    expect(planForPriceKey("business_yearly")).toBe("business");
     expect(planForPriceKey("enterprise_monthly")).toBe("enterprise");
   });
 });

@@ -21,14 +21,14 @@ export default function Pricing() {
         <SectionReveal className="relative mx-auto max-w-7xl px-6 text-center">
           <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Pricing</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Plans that scale with you</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">Every plan includes the full PalladiumAI platform. Choose monthly or yearly billing and scale your AI workforce as you grow.</p>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-400">Every plan includes the PalladiumAI platform. Choose monthly or yearly billing and scale your AI workforce as you grow.</p>
         </SectionReveal>
       </section>
       <section className="relative py-10">
         <SectionReveal className="mx-auto max-w-7xl px-6 text-center">
           <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Get started</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Start free. Build with Pro.</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-zinc-400">Begin with the Free Explorer plan to discover the PalladiumAI ecosystem, then upgrade to Pro Builder to create and deploy your own AI agents.</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Start building with PalladiumAI.</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-zinc-400">Builder starts at £150 per month, with Business and Enterprise plans for larger AI workforces and advanced automation.</p>
         </SectionReveal>
         <div className="mt-10"><FreemiumPlans /></div>
       </section>

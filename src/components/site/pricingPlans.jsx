@@ -1,10 +1,7 @@
-// Canonical PalladiumAI pricing — single source of truth for plan names,
-// prices, features and limits. Four plans: Free (Explorer), Pro (Builder),
-// Business, and Enterprise. Same shape so it can later be served from a
-// backend entity or Stripe Products/Prices.
-//
-// `FREEMIUM_PLANS` holds the entry tiers (Free + Pro); `PLANS` holds the
-// business/enterprise tiers. The billing plan grid merges both arrays.
+// Canonical PalladiumAI marketing pricing — single source of truth for plan
+// names, prices, features and limits. PalladiumAI is a paid product: Builder,
+// Business, and Enterprise. The stable plan ids remain unchanged so existing
+// billing/webhook/entitlement mappings stay backwards compatible.
 
 export const CURRENCY = '£';
 
@@ -36,8 +33,8 @@ export const PLANS = [
     id: 'enterprise',
     name: 'Enterprise',
     description: 'Enterprise-grade AI workforce with advanced security and priority infrastructure.',
-    monthly: 3000,
-    yearly: 30600,
+    monthly: 3500,
+    yearly: 35700,
     currency: '£',
     features: [
       'Everything in Business',
@@ -57,57 +54,29 @@ export const PLANS = [
 ];
 
 export async function loadPlans() {
-  // Placeholder — swap for a backend / Stripe fetch when pricing is served dynamically.
   return [...FREEMIUM_PLANS, ...PLANS];
 }
 
-// Entry tiers. `limits` uses the same keys as the premium plans so the billing
-// plan grid can render them uniformly.
+// Kept under the historical export name to avoid breaking existing imports.
+// It now contains only the paid entry tier; Explorer is legacy-only and is no
+// longer offered to new customers.
 export const FREEMIUM_PLANS = [
-  {
-    id: 'free',
-    name: 'Free',
-    subtitle: 'Explorer',
-    description: 'Explore the PalladiumAI marketplace and discover AI agents.',
-    tagline: 'Explore the AI workforce marketplace',
-    monthly: 0,
-    yearly: 0,
-    currency: '£',
-    cta: 'Get Started',
-    ctaTo: '/register?returnTo=/dashboard',
-    grad: 'from-zinc-400 to-zinc-600',
-    features: [
-      'Account creation',
-      'Browse the marketplace',
-      'View AI agents',
-      'View upcoming AI agents',
-      'View public workflows',
-      'View community content',
-    ],
-    notIncluded: [
-      'Create AI agents',
-      'Deploy agents',
-      'Advanced workflows',
-      'Advanced memory',
-    ],
-    limits: { projects: '—', agents: 'Browse only', aiUsage: '—', storage: '1GB', members: '1', integrations: '—', automation: '—', support: 'Community' },
-  },
   {
     id: 'pro',
     name: 'Pro',
     subtitle: 'Builder',
-    description: 'Build and deploy your own AI agents.',
+    description: 'Build and deploy your own AI workforce.',
     tagline: 'Build and deploy your own AI agents',
-    monthly: 20,
-    yearly: 204,
+    monthly: 150,
+    yearly: 1530,
     currency: '£',
-    cta: 'Upgrade to Pro',
+    cta: 'Get Started',
     ctaTo: '/payment?plan=pro',
     highlight: true,
     popular: true,
     grad: 'from-violet-500 to-indigo-500',
     features: [
-      'Everything in Free',
+      'Full PalladiumAI platform access',
       'AI Agent Builder',
       'Create AI agents',
       'Deploy agents',
