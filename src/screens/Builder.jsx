@@ -19,7 +19,7 @@ import {
 } from '@/lib/builder/builder.functions';
 import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';
 import { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';
-import { createBuilderPreviewDeployment, listBuilderDeployments, refreshBuilderDeployment } from '@/lib/builder/builder-deploy.functions';
+import { createBuilderPreviewDeployment, listBuilderDeployments, promoteBuilderDeploymentToProduction, queueBuilderProductionApproval, refreshBuilderDeployment, refreshBuilderProductionApproval } from '@/lib/builder/builder-deploy.functions';
 
 export default function Builder() {
   const qc = useQueryClient();
@@ -40,6 +40,9 @@ export default function Builder() {
   const deploymentListFn = useServerFn(listBuilderDeployments);
   const previewDeployFn = useServerFn(createBuilderPreviewDeployment);
   const deploymentRefreshFn = useServerFn(refreshBuilderDeployment);
+  const productionApprovalFn = useServerFn(queueBuilderProductionApproval);
+  const productionApprovalRefreshFn = useServerFn(refreshBuilderProductionApproval);
+  const productionPromoteFn = useServerFn(promoteBuilderDeploymentToProduction);
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [repositoryChoice, setRepositoryChoice] = useState({});
@@ -113,6 +116,9 @@ export default function Builder() {
     onSuccess: async (result) => { await refreshDeployments(); toast({ title: 'Preview status refreshed', description: result.status === 'ready' ? 'The preview is ready.' : result.status === 'failed' ? 'The preview deployment failed.' : 'Vercel is still building the preview.' }); },
     onError: (error) => toast({ title: 'Could not refresh preview deployment', description: friendlyMessage(error), variant: 'destructive' }),
   });
+  const queueProductionApproval = useMutation({ mutationFn: (id) => productionApprovalFn({ data: { id } }), onSuccess: async () => { await refreshDeployments(); toast({ title: 'Production approval queued' }); }, onError: (error) => toast({ title: 'Could not queue production approval', description: friendlyMessage(error), variant: 'destructive' }) });
+  const refreshProductionApproval = useMutation({ mutationFn: (id) => productionApprovalRefreshFn({ data: { id } }), onSuccess: async () => { await refreshDeployments(); toast({ title: 'Production approval refreshed' }); }, onError: (error) => toast({ title: 'Could not refresh production approval', description: friendlyMessage(error), variant: 'destructive' }) });
+  const promoteProduction = useMutation({ mutationFn: (id) => productionPromoteFn({ data: { id } }), onSuccess: async () => { await refreshDeployments(); toast({ title: 'Production promotion completed' }); }, onError: (error) => toast({ title: 'Production promotion failed', description: friendlyMessage(error), variant: 'destructive' }) });
   const cancelJob = useMutation({
     mutationFn: (id) => cancelFn({ data: { id } }),
     onSuccess: async () => { await refreshJobs(); toast({ title: 'Build request cancelled' }); },
@@ -145,7 +151,7 @@ export default function Builder() {
             <Requirement icon={Workflow} text="Isolated E2B install/build/typecheck/test validation is live" ready />
             <Requirement icon={Sparkles} text="Failed validation can generate a reviewable, approval-gated repair proposal" ready />
             <Requirement icon={Rocket} text="Vercel preview deployment is explicit, owner-scoped and sandbox-gated" ready />
-            <Requirement icon={LockKeyhole} text="Production publish remains disabled" />
+            <Requirement icon={LockKeyhole} text="Production publish requires a separate high-risk approval" ready />
           </div>
         </Panel>
       </div>
@@ -187,6 +193,7 @@ export default function Builder() {
                 {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} repair={repair} onRun={() => sandboxRun.mutate(job.id)} />}
                 {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}
                 {sandbox.sandboxStatus === 'passed' && <PreviewDeployment deployment={deployment} deploying={isDeployingPreview} refreshing={isRefreshingDeployment} onDeploy={() => deployPreview.mutate(job.id)} onRefresh={() => deployment && refreshDeployment.mutate(deployment.id)} />}
+                {deployment?.status === 'ready' && <ProductionPublish deployment={deployment} queueing={queueProductionApproval.isPending && queueProductionApproval.variables === deployment.id} refreshing={refreshProductionApproval.isPending && refreshProductionApproval.variables === deployment.id} promoting={promoteProduction.isPending && promoteProduction.variables === deployment.id} onQueue={() => queueProductionApproval.mutate(deployment.id)} onRefresh={() => refreshProductionApproval.mutate(deployment.id)} onPromote={() => promoteProduction.mutate(deployment.id)} />}
                 {['branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed'].includes(job.repositoryStatus) && (
                   <RepositoryHandoff
                     job={job}
@@ -225,6 +232,11 @@ function PreviewDeployment({ deployment, deploying, refreshing, onDeploy, onRefr
       <p className="mt-2 text-[10px] text-zinc-600">Production publish is intentionally disabled.</p>
     </div>
   );
+}
+
+function ProductionPublish({ deployment, queueing, refreshing, promoting, onQueue, onRefresh, onPromote }) {
+  const status = deployment.productionStatus ?? 'not_started';
+  return <div className="mt-3 rounded-xl border border-amber-400/15 bg-amber-400/[.035] p-4 text-[11px] text-zinc-400"><div className="font-medium text-amber-100">Production publish · {status.replaceAll('_', ' ')}</div><p className="mt-1 text-zinc-500">This changes real production traffic and is tied to the exact ready Vercel deployment through a separate high-risk approval.</p>{deployment.productionLastError && <ErrorBox text={deployment.productionLastError} />}<div className="mt-2 flex flex-wrap gap-2">{status === 'not_started' && <ActionButton onClick={onQueue} disabled={queueing} icon={queueing ? Loader2 : LockKeyhole} spin={queueing}>Request production approval</ActionButton>}{status === 'approval_pending' && <ActionButton onClick={onRefresh} disabled={refreshing} icon={refreshing ? Loader2 : RefreshCw} spin={refreshing}>Refresh approval</ActionButton>}{status === 'approved' && <ActionButton onClick={onPromote} disabled={promoting} icon={promoting ? Loader2 : Rocket} spin={promoting}>Promote approved preview</ActionButton>}{status === 'promoted' && <span className="text-emerald-300">Production promotion recorded.</span>}</div></div>;
 }
 
 function RepairProposal({ repair, generating, accepting, onGenerate, onAccept }) {
