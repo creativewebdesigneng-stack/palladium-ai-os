@@ -19,6 +19,7 @@ import {
 } from '@/lib/builder/builder.functions';
 import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';
 import { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';
+import { createBuilderPreviewDeployment, listBuilderDeployments, refreshBuilderDeployment } from '@/lib/builder/builder-deploy.functions';
 
 export default function Builder() {
   const qc = useQueryClient();
@@ -36,6 +37,9 @@ export default function Builder() {
   const repairListFn = useServerFn(listBuilderRepairStates);
   const repairGenerateFn = useServerFn(generateBuilderRepair);
   const repairAcceptFn = useServerFn(acceptBuilderRepair);
+  const deploymentListFn = useServerFn(listBuilderDeployments);
+  const previewDeployFn = useServerFn(createBuilderPreviewDeployment);
+  const deploymentRefreshFn = useServerFn(refreshBuilderDeployment);
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [repositoryChoice, setRepositoryChoice] = useState({});
@@ -44,9 +48,11 @@ export default function Builder() {
   const repositories = useQuery({ queryKey: ['builder-github-repositories'], queryFn: () => repoListFn(), retry: false });
   const sandboxStates = useQuery({ queryKey: ['builder-sandbox-states'], queryFn: () => sandboxListFn(), retry: false });
   const repairStates = useQuery({ queryKey: ['builder-repair-states'], queryFn: () => repairListFn(), retry: false });
+  const deployments = useQuery({ queryKey: ['builder-deployments'], queryFn: () => deploymentListFn(), retry: false });
   const refreshJobs = () => qc.invalidateQueries({ queryKey: ['builder-jobs'] });
   const refreshSandbox = () => qc.invalidateQueries({ queryKey: ['builder-sandbox-states'] });
   const refreshRepair = () => qc.invalidateQueries({ queryKey: ['builder-repair-states'] });
+  const refreshDeployments = () => qc.invalidateQueries({ queryKey: ['builder-deployments'] });
 
   const createJob = useMutation({
     mutationFn: () => createFn({ data: { title, prompt } }),
@@ -97,6 +103,16 @@ export default function Builder() {
     onSuccess: async () => { await Promise.all([refreshJobs(), refreshSandbox(), refreshRepair()]); toast({ title: 'Repair accepted', description: 'The repaired source must now pass a fresh GitHub file-approval batch and isolated validation.' }); },
     onError: (error) => toast({ title: 'Could not accept repair proposal', description: friendlyMessage(error), variant: 'destructive' }),
   });
+  const deployPreview = useMutation({
+    mutationFn: (id) => previewDeployFn({ data: { id } }),
+    onSuccess: async (result) => { await refreshDeployments(); toast({ title: result.status === 'ready' ? 'Preview deployment ready' : 'Preview deployment started', description: result.status === 'ready' ? 'The Vercel preview URL is ready.' : 'Refresh the deployment status while Vercel builds it.' }); },
+    onError: async (error) => { await refreshDeployments(); toast({ title: 'Could not deploy preview', description: friendlyMessage(error), variant: 'destructive' }); },
+  });
+  const refreshDeployment = useMutation({
+    mutationFn: (id) => deploymentRefreshFn({ data: { id } }),
+    onSuccess: async (result) => { await refreshDeployments(); toast({ title: 'Preview status refreshed', description: result.status === 'ready' ? 'The preview is ready.' : result.status === 'failed' ? 'The preview deployment failed.' : 'Vercel is still building the preview.' }); },
+    onError: (error) => toast({ title: 'Could not refresh preview deployment', description: friendlyMessage(error), variant: 'destructive' }),
+  });
   const cancelJob = useMutation({
     mutationFn: (id) => cancelFn({ data: { id } }),
     onSuccess: async () => { await refreshJobs(); toast({ title: 'Build request cancelled' }); },
@@ -128,7 +144,8 @@ export default function Builder() {
             <Requirement icon={GitBranch} text="Branch and file writes use high-risk approval with SHA-safe updates" ready />
             <Requirement icon={Workflow} text="Isolated E2B install/build/typecheck/test validation is live" ready />
             <Requirement icon={Sparkles} text="Failed validation can generate a reviewable, approval-gated repair proposal" ready />
-            <Requirement icon={Rocket} text="Deployment remains disabled" />
+            <Requirement icon={Rocket} text="Vercel preview deployment is explicit, owner-scoped and sandbox-gated" ready />
+            <Requirement icon={LockKeyhole} text="Production publish remains disabled" />
           </div>
         </Panel>
       </div>
@@ -148,6 +165,9 @@ export default function Builder() {
             const repair = (repairStates.data ?? []).find((state) => state.id === job.id) ?? { repairStatus: 'not_started', repairManifest: null, repairLastError: null, repairAttempt: 0 };
             const isGeneratingRepair = generateRepair.isPending && generateRepair.variables === job.id;
             const isAcceptingRepair = acceptRepair.isPending && acceptRepair.variables === job.id;
+            const deployment = (deployments.data ?? []).find((item) => item.builderJobId === job.id) ?? null;
+            const isDeployingPreview = deployPreview.isPending && deployPreview.variables === job.id;
+            const isRefreshingDeployment = refreshDeployment.isPending && refreshDeployment.variables === deployment?.id;
             return (
               <div key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -166,6 +186,7 @@ export default function Builder() {
                 {job.sourceStatus === 'generated' && job.repositoryStatus === 'not_started' && <RepositoryPicker job={job} repositories={repositories} selectedRepository={selectedRepository} setRepositoryChoice={setRepositoryChoice} onQueue={() => branchApproval.mutate({ id: job.id, repository: selectedRepository })} pending={isQueueingBranch} />}
                 {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} repair={repair} onRun={() => sandboxRun.mutate(job.id)} />}
                 {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}
+                {sandbox.sandboxStatus === 'passed' && <PreviewDeployment deployment={deployment} deploying={isDeployingPreview} refreshing={isRefreshingDeployment} onDeploy={() => deployPreview.mutate(job.id)} onRefresh={() => deployment && refreshDeployment.mutate(deployment.id)} />}
                 {['branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed'].includes(job.repositoryStatus) && (
                   <RepositoryHandoff
                     job={job}
@@ -187,9 +208,22 @@ export default function Builder() {
         <StateCard icon={GitBranch} title="GitHub handoff" value="Approval-gated" text="Branch creation and each changed file are individually approval-gated." />
         <StateCard icon={TerminalSquare} title="Sandbox validation" value="Live · E2B" text="Generated source is installed and checked in an isolated E2B sandbox." />
         <StateCard icon={Sparkles} title="Repair loop" value="Review-gated" text="Failed sandbox evidence can generate a bounded repair proposal that must be accepted and re-approved." />
-        <StateCard icon={Rocket} title="Deployment" value="Remaining" text="Deployment and final production hardening are not enabled yet." />
+        <StateCard icon={Rocket} title="Deployment" value="Vercel preview live" text="Sandbox-passed apps can be explicitly deployed to preview. Production publish remains disabled." />
       </div>
     </>
+  );
+}
+
+function PreviewDeployment({ deployment, deploying, refreshing, onDeploy, onRefresh }) {
+  const active = deployment && ['queued', 'uploading', 'building'].includes(deployment.status);
+  return (
+    <div className="mt-4 rounded-xl border border-blue-400/15 bg-blue-400/[.035] p-4 text-[11px] leading-5 text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2 font-medium text-blue-100"><Rocket className="h-4 w-4" />Vercel preview · {deploying ? 'uploading' : deployment?.status ?? 'not deployed'}</div><p className="mt-1 text-zinc-500">Preview only. Vercel credentials stay on the PalladiumAI server and are never sent to generated code or the E2B sandbox.</p></div><div className="flex gap-2">{!deployment || ['failed', 'cancelled'].includes(deployment.status) ? <button onClick={onDeploy} disabled={deploying} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/15 px-3 py-1.5 font-medium text-blue-100 ring-1 ring-blue-400/20 disabled:opacity-40">{deploying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}{deployment?.status === 'failed' ? 'Retry preview deployment' : 'Deploy preview'}</button> : null}{active && <button onClick={onRefresh} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-zinc-300 disabled:opacity-40">{refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Refresh</button>}</div></div>
+      {deployment?.lastError && <ErrorBox text={deployment.lastError} />}
+      {deployment?.url && <a href={deployment.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex break-all text-blue-300 underline decoration-blue-400/30 underline-offset-4 hover:text-blue-200">{deployment.url}</a>}
+      {deployment?.providerDeploymentId && <p className="mt-2 text-[10px] text-zinc-600">Vercel deployment: {deployment.providerDeploymentId}</p>}
+      <p className="mt-2 text-[10px] text-zinc-600">Production publish is intentionally disabled.</p>
+    </div>
   );
 }
 
