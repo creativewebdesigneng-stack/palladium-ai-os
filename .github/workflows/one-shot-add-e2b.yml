@@ -1,0 +1,33 @@
+name: One-shot add E2B dependency
+
+on:
+  push:
+    branches:
+      - feat/builder-e2b-sandbox
+    paths:
+      - .github/workflows/one-shot-add-e2b.yml
+
+permissions:
+  contents: write
+
+jobs:
+  add-e2b:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/builder-e2b-sandbox
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Add E2B SDK and refresh lockfile
+        run: bun add e2b
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/one-shot-add-e2b.yml
+      - name: Commit dependency update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json bun.lock .github/workflows/one-shot-add-e2b.yml
+          git commit -m "chore: add E2B sandbox SDK"
+          git push origin HEAD:feat/builder-e2b-sandbox
