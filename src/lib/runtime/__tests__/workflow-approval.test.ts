@@ -3,10 +3,18 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "./fake-supabase";
 
-const notify = vi.fn(async () => true);
+const { notify } = vi.hoisted(() => ({ notify: vi.fn(async () => true) }));
 vi.mock("@/lib/notifications/notify.server", () => ({ notify }));
 
 import { pauseForWorkflowApproval } from "../workflow-approval.server";
+
+type FakeDb = ReturnType<typeof createFakeSupabase>;
+
+function requiredRow(db: FakeDb, table: string, index = 0) {
+  const value = db.tables[table]?.[index];
+  if (!value) throw new Error(`Expected ${table}[${index}] to exist.`);
+  return value;
+}
 
 const approvalStep = {
   id: "step-approval",
@@ -57,21 +65,21 @@ describe("workflow approval pause", () => {
 
     expect(pause.kind).toBe("paused_for_approval");
     expect(pause.stepId).toBe("step-approval");
-    expect(db.tables.workflow_runs[0]).toMatchObject({
+    expect(requiredRow(db, "workflow_runs")).toMatchObject({
       id: "run-1",
       status: "waiting_for_approval",
       waiting_step_id: "step-approval",
       waiting_approval_request_id: pause.approvalRequestId,
       step_results: completed,
     });
-    expect(db.tables.workflow_step_runs).toHaveLength(1);
-    expect(db.tables.workflow_step_runs[0]).toMatchObject({
+    expect(db.tables["workflow_step_runs"] ?? []).toHaveLength(1);
+    expect(requiredRow(db, "workflow_step_runs")).toMatchObject({
       run_id: "run-1",
       step_id: "step-approval",
       status: "waiting_for_approval",
     });
-    expect(db.tables.approval_requests).toHaveLength(1);
-    expect(db.tables.approval_requests[0]).toMatchObject({
+    expect(db.tables["approval_requests"] ?? []).toHaveLength(1);
+    expect(requiredRow(db, "approval_requests")).toMatchObject({
       user_id: "user-1",
       action_type: "workflow_step",
       status: "pending",
@@ -102,9 +110,10 @@ describe("workflow approval pause", () => {
       completed: [{ step_id: "secret-step", output: "sensitive-output" }],
     });
 
-    const approval = db.tables.approval_requests[0];
-    expect(JSON.stringify(approval.details)).not.toContain("sensitive-output");
-    expect(Object.keys(approval.details).sort()).toEqual([
+    const approval = requiredRow(db, "approval_requests");
+    const details = approval["details"] as Record<string, unknown>;
+    expect(JSON.stringify(details)).not.toContain("sensitive-output");
+    expect(Object.keys(details).sort()).toEqual([
       "workflow_id",
       "workflow_run_id",
       "workflow_step_id",
@@ -130,8 +139,8 @@ describe("workflow approval pause", () => {
       }),
     ).rejects.toThrow(/could not enter approval state/i);
 
-    expect(db.tables.approval_requests[0]).toMatchObject({ status: "expired" });
-    expect(db.tables.workflow_runs[0].status).toBe("cancelled");
+    expect(requiredRow(db, "approval_requests")).toMatchObject({ status: "expired" });
+    expect(requiredRow(db, "workflow_runs")["status"]).toBe("cancelled");
   });
 });
 
