@@ -5,15 +5,14 @@ import { useAuth } from '@/lib/AuthContext';
 import { getPlanKey } from '@/lib/permissions';
 import { FREEMIUM_PLANS } from '@/components/site/pricingPlans';
 
-// Freemium tier showcase (Free "Explorer" + Pro "Builder") shown on the public
-// pricing page. Sits above the existing premium tier grid. Highlights the
-// user's current plan when signed in.
+// Historical component name retained to avoid breaking imports. The public
+// pricing page now uses this section solely for the paid Builder entry tier.
 export default function FreemiumPlans() {
   const { user } = useAuth();
   const current = getPlanKey(user);
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
+    <div className="mx-auto grid max-w-xl gap-5">
       {FREEMIUM_PLANS.map((p, i) => {
         const isCurrent = p.id === current;
         const isPro = p.id === 'pro';
