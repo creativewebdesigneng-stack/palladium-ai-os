@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: High severity dependency audit
+        run: bun audit --audit-level high
+
       - name: Production build and route generation
         run: bun run build
 
