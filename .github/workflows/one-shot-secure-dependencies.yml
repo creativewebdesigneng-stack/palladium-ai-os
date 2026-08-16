@@ -15,15 +15,28 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - name: Refresh compatible dependency graph
-        run: bun update
+      - name: Pin patched transitive versions
+        run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.overrides={...(p.overrides||{}),'brace-expansion':'1.1.17','nanoid':'3.3.18','js-yaml':'4.3.1'};fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+      - name: Resolve audited dependency graph
+        run: bun install
       - name: Require zero high severity advisories
         run: bun audit --audit-level high
-      - name: Commit audited dependency graph and self-delete
+      - name: Production build
+        run: bun run build
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Tests
+        run: bun run test
+      - name: Browser worker checks
+        working-directory: browser-worker
+        run: |
+          npm run check
+          npm test
+      - name: Commit validated dependency graph and self-delete
         run: |
           rm .github/workflows/one-shot-secure-dependencies.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add package.json bun.lock .github/workflows/one-shot-secure-dependencies.yml
-          git commit -m "chore: refresh audited dependencies"
+          git commit -m "chore: pin audited transitive dependencies"
           git push origin HEAD:feat/builder-production-publish
