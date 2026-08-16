@@ -6,10 +6,15 @@
  * plus a billing interval, and this module resolves the approved Stripe price
  * lookup key and expected GBP amount. Anything unknown is rejected.
  *
- * Current paid pricing (GBP, sandbox + live use the same lookup keys):
- *   Builder     £150/mo   | £1,530/yr  pro_monthly / pro_yearly
- *   Business    £1,500/mo | £15,300/yr business_monthly / business_yearly
- *   Enterprise  £3,500/mo | £35,700/yr enterprise_monthly / enterprise_yearly
+ * Current paid pricing (GBP):
+ *   Builder     £150/mo   | £1,530/yr
+ *   Business    £1,500/mo | £15,300/yr
+ *   Enterprise  £3,500/mo | £35,700/yr
+ *
+ * Price lookup keys include the amount so an old Stripe Price can never be
+ * silently reused after a commercial pricing change. Old lookup keys remain
+ * recognised below only so historic webhook/subscription records still map to
+ * the correct internal plan.
  *
  * Explorer remains a recognised legacy code for existing records/webhooks but
  * is no longer publicly purchasable or an active product tier.
@@ -32,9 +37,9 @@ export const PLAN_PRICE_KEYS: Record<
   Exclude<PlanCode, "explorer">,
   Record<BillingInterval, string>
 > = {
-  builder: { monthly: "pro_monthly", yearly: "pro_yearly" },
-  business: { monthly: "business_monthly", yearly: "business_yearly" },
-  enterprise: { monthly: "enterprise_monthly", yearly: "enterprise_yearly" },
+  builder: { monthly: "builder_monthly_150_gbp", yearly: "builder_yearly_1530_gbp" },
+  business: { monthly: "business_monthly_1500_gbp", yearly: "business_yearly_15300_gbp" },
+  enterprise: { monthly: "enterprise_monthly_3500_gbp", yearly: "enterprise_yearly_35700_gbp" },
 };
 
 /** Expected Stripe unit amounts, in GBP pence. */
@@ -49,6 +54,13 @@ export const PLAN_PRICE_PENCE: Record<
 
 /** Stripe price lookup key -> internal plan code (used by webhooks). */
 export const PLAN_BY_PRICE_KEY: Record<string, PlanCode> = {
+  builder_monthly_150_gbp: "builder",
+  builder_yearly_1530_gbp: "builder",
+  business_monthly_1500_gbp: "business",
+  business_yearly_15300_gbp: "business",
+  enterprise_monthly_3500_gbp: "enterprise",
+  enterprise_yearly_35700_gbp: "enterprise",
+  // Historic keys retained for existing subscription/webhook compatibility.
   pro_monthly: "builder",
   pro_yearly: "builder",
   business_monthly: "business",
