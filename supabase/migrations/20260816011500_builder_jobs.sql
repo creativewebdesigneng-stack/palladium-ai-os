@@ -11,6 +11,7 @@ create table if not exists public.builder_jobs (
   repository_full_name text,
   branch_name text,
   branch_approval_id uuid,
+  file_approval_ids jsonb not null default '[]'::jsonb,
   repository_status text not null default 'not_started' check (repository_status in ('not_started', 'branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed')),
   repository_last_error text,
   last_error text,
