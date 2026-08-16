@@ -225,13 +225,13 @@ export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" })
   if (approvalIds.length) {
     const { data: approvals, error: approvalsError } = await sb.from("approval_requests").select("id,status").eq("user_id", context.userId).in("id", approvalIds);
     if (approvalsError) throw new Error(approvalsError.message);
-    const statuses = (approvals ?? []).map((row: any) => String(row.status));
-    if (statuses.some((status) => status === "rejected")) {
+    const statuses: string[] = (approvals ?? []).map((row: any) => String(row.status));
+    if (statuses.some((status: string) => status === "rejected")) {
       const { data: failed, error: failedError } = await sb.from("builder_jobs").update({ repository_status: "failed", repository_last_error: "One or more GitHub file approvals were rejected.", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
       if (failedError) throw new Error(failedError.message);
       return mapJob(failed ?? job);
     }
-    if (statuses.length === approvalIds.length && statuses.every((status) => status === "approved")) {
+    if (statuses.length === approvalIds.length && statuses.every((status: string) => status === "approved")) {
       const { data: applied, error: appliedError } = await sb.from("builder_jobs").update({ repository_status: "files_applied", repository_last_error: null, file_approval_ids: (job.file_approval_ids ?? []).map((entry: any) => ({ ...entry, status: "approved" })), updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
       if (appliedError) throw new Error(appliedError.message);
       return mapJob(applied ?? job);
