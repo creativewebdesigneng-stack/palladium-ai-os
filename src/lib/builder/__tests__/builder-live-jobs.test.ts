@@ -27,25 +27,31 @@ describe('Builder durable job contract', () => {
     expect(planner).toContain('parseBuilderPlan');
   });
 
-  it('keeps unfinished Builder stages explicitly disabled rather than simulated', () => {
-    const source = readSrc('screens/Builder.jsx');
-    expect(source).toContain('createBuilderJob');
-    expect(source).toContain('listBuilderJobs');
-    expect(source).toContain('generateBuilderJobPlan');
-    expect(source).toContain('Save build request');
-    expect(source).toContain('Repository creation and code writes remain disabled');
-    expect(source).toContain('Sandboxed build/test execution remains disabled');
-    expect(source).not.toContain('sample source files');
-    expect(source).not.toContain('BUILD_STAGES');
-    expect(source).not.toContain('SAMPLE_FILES');
+  it('generates bounded source manifests without performing repository writes', () => {
+    const functions = readSrc('lib/builder/builder.functions.ts');
+    const generator = readSrc('lib/builder/builder-source.server.ts');
+    const screen = readSrc('screens/Builder.jsx');
+    expect(functions).toContain('generateBuilderJobSource');
+    expect(functions).toContain('source_status: "generating"');
+    expect(functions).toContain('source_status: "generated"');
+    expect(generator).toContain('generateBuilderSourceManifest');
+    expect(generator).toContain('parseBuilderSourceManifest');
+    expect(generator).toContain('runChat');
+    expect(screen).toContain('Generate source');
+    expect(screen).toContain('GitHub writes require the existing high-risk approval pipeline');
+    expect(screen).not.toContain('BUILD_STAGES');
+    expect(screen).not.toContain('SAMPLE_FILES');
   });
 
-  it('enforces owner-only RLS for builder jobs', () => {
+  it('enforces owner-only RLS and persists source lifecycle state', () => {
     const migration = readRepo('supabase/migrations/20260816011500_builder_jobs.sql');
     expect(migration).toContain('alter table public.builder_jobs enable row level security');
     expect(migration).toContain('using (auth.uid() = user_id)');
     expect(migration).toContain('with check (auth.uid() = user_id)');
     expect(migration).toContain("'planning'");
     expect(migration).toContain("'planned'");
+    expect(migration).toContain("source_status text not null default 'not_started'");
+    expect(migration).toContain("'generating'");
+    expect(migration).toContain("'generated'");
   });
 });
