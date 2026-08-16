@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateBuilderPlan } from "@/lib/builder/builder-plan.server";
+import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -16,7 +17,7 @@ const jobInput = z.object({
   id: z.string().uuid(),
 });
 
-const jobColumns = "id,title,prompt,status,plan,repository_full_name,branch_name,last_error,created_at,updated_at";
+const jobColumns = "id,title,prompt,status,plan,source_status,source_manifest,source_last_error,repository_full_name,branch_name,last_error,created_at,updated_at";
 
 function mapJob(row: any) {
   return {
@@ -25,12 +26,30 @@ function mapJob(row: any) {
     prompt: String(row.prompt),
     status: String(row.status),
     plan: row.plan ?? null,
+    sourceStatus: row.source_status ? String(row.source_status) : "not_started",
+    sourceManifest: row.source_manifest ?? null,
+    sourceLastError: row.source_last_error ? String(row.source_last_error) : null,
     repositoryFullName: row.repository_full_name ? String(row.repository_full_name) : null,
     branchName: row.branch_name ? String(row.branch_name) : null,
     lastError: row.last_error ? String(row.last_error) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
+}
+
+async function resolveBuilderPreference(sb: Sb, userId: string) {
+  let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
+  try {
+    const preferenceResult = await sb
+      .from("user_ai_preferences")
+      .select("default_provider,default_model")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!preferenceResult.error) storedPreference = preferenceResult.data;
+  } catch (error) {
+    console.warn("[builder] AI preference lookup unavailable; using deployment default", error);
+  }
+  return resolveAssistantModelPreference(storedPreference);
 }
 
 export const listBuilderJobs = createServerFn({ method: "POST" })
@@ -84,19 +103,7 @@ export const generateBuilderJobPlan = createServerFn({ method: "POST" })
     if (claimError) throw new Error(claimError.message);
     if (!claimed) throw new Error("This build request is no longer ready for planning.");
 
-    let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
-    try {
-      const preferenceResult = await sb
-        .from("user_ai_preferences")
-        .select("default_provider,default_model")
-        .eq("user_id", context.userId)
-        .maybeSingle();
-      if (!preferenceResult.error) storedPreference = preferenceResult.data;
-    } catch (error) {
-      console.warn("[builder] AI preference lookup unavailable; using deployment default", error);
-    }
-
-    const { provider, model } = resolveAssistantModelPreference(storedPreference);
+    const { provider, model } = await resolveBuilderPreference(sb, context.userId);
 
     try {
       const plan = await generateBuilderPlan({
@@ -133,6 +140,71 @@ export const generateBuilderJobPlan = createServerFn({ method: "POST" })
         .eq("status", "planning");
       if (failureError) console.error("[builder] could not persist planning failure", failureError.message);
       console.error("[builder] planning failed", error);
+      throw new Error(safeMessage);
+    }
+  });
+
+export const generateBuilderJobSource = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => jobInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: claimed, error: claimError } = await sb
+      .from("builder_jobs")
+      .update({ source_status: "generating", source_last_error: null, updated_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .eq("status", "planned")
+      .in("source_status", ["not_started", "failed"])
+      .select(jobColumns)
+      .maybeSingle();
+    if (claimError) throw new Error(claimError.message);
+    if (!claimed || !claimed.plan) throw new Error("This build request is not ready for source generation.");
+
+    const { provider, model } = await resolveBuilderPreference(sb, context.userId);
+
+    try {
+      const sourceManifest = await generateBuilderSourceManifest({
+        title: String(claimed.title),
+        prompt: String(claimed.prompt),
+        plan: claimed.plan,
+        provider,
+        model,
+      });
+
+      const { data: generated, error: persistError } = await sb
+        .from("builder_jobs")
+        .update({
+          source_manifest: sourceManifest,
+          source_status: "generated",
+          source_last_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id)
+        .eq("user_id", context.userId)
+        .eq("status", "planned")
+        .eq("source_status", "generating")
+        .select(jobColumns)
+        .maybeSingle();
+      if (persistError) throw new Error(persistError.message);
+      if (!generated) throw new Error("Source generation was interrupted before the manifest could be saved.");
+      return mapJob(generated);
+    } catch (error) {
+      const safeMessage =
+        error instanceof ProviderError && error.status === 503
+          ? "AI provider is not configured."
+          : error instanceof Error && error.message.startsWith("The AI source generator returned")
+            ? error.message
+            : "AI source generation failed. Try again.";
+
+      const { error: failureError } = await sb
+        .from("builder_jobs")
+        .update({ source_status: "failed", source_last_error: safeMessage, updated_at: new Date().toISOString() })
+        .eq("id", data.id)
+        .eq("user_id", context.userId)
+        .eq("source_status", "generating");
+      if (failureError) console.error("[builder] could not persist source generation failure", failureError.message);
+      console.error("[builder] source generation failed", error);
       throw new Error(safeMessage);
     }
   });
