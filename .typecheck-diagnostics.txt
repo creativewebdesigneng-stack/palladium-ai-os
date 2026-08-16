@@ -1,7 +1,0 @@
-src/lib/builder/builder-sandbox.server.ts(52,27): error TS4111: Property 'build' comes from an index signature, so it must be accessed with ['build'].
-src/lib/builder/builder-sandbox.server.ts(52,57): error TS4111: Property 'build' comes from an index signature, so it must be accessed with ['build'].
-src/lib/builder/builder-sandbox.server.ts(53,31): error TS4111: Property 'typecheck' comes from an index signature, so it must be accessed with ['typecheck'].
-src/lib/builder/builder-sandbox.server.ts(53,65): error TS4111: Property 'typecheck' comes from an index signature, so it must be accessed with ['typecheck'].
-src/lib/builder/builder-sandbox.server.ts(54,26): error TS4111: Property 'test' comes from an index signature, so it must be accessed with ['test'].
-src/lib/builder/builder-sandbox.server.ts(54,55): error TS4111: Property 'test' comes from an index signature, so it must be accessed with ['test'].
-exit_code=2
