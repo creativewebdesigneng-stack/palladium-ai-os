@@ -37,6 +37,26 @@ function splitRepository(repository: string): { owner: string; repo: string } {
   return { owner: parts[0], repo: parts[1] };
 }
 
+async function publicGitHubAppClientId(): Promise<string> {
+  const slug = process.env["GITHUB_APP_SLUG"]?.trim().toLowerCase();
+  if (!slug || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug)) {
+    throw new Error("GitHub App slug is not configured correctly.");
+  }
+  const response = await fetch(`https://api.github.com/apps/${encodeURIComponent(slug)}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2026-03-10",
+      "User-Agent": "PalladiumAI",
+    },
+  });
+  if (!response.ok) throw new Error(`Could not resolve the GitHub App OAuth client (${response.status}).`);
+  const payload = await response.json() as { client_id?: unknown };
+  if (typeof payload.client_id !== "string" || !payload.client_id.trim()) {
+    throw new Error("GitHub did not return an OAuth client id for this App.");
+  }
+  return payload.client_id.trim();
+}
+
 export function installationIdFromConfig(config: unknown): number {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     throw new Error("GitHub is not connected.");
@@ -98,8 +118,7 @@ export const startGitHubConnection = createServerFn({ method: "POST" })
     if (!githubConnectionConfigured()) {
       throw new Error("GitHub App connection is not configured. Add the GitHub App ID, private key, slug, client ID and client secret to the deployment.");
     }
-    const clientId = process.env["GITHUB_APP_CLIENT_ID"]?.trim();
-    if (!clientId) throw new Error("GitHub App client id is not configured on this deployment.");
+    const clientId = await publicGitHubAppClientId();
 
     const origin = safeOrigin(data.origin);
     const sb = context.supabase as unknown as Sb;
