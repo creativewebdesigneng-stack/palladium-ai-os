@@ -29,7 +29,11 @@ export function getConnectionApiKey(env: StripeEnv): string {
 }
 
 export function createStripeClient(env: StripeEnv): Stripe {
-  const connectionApiKey = getConnectionApiKey(env);
+  const serverEnv = getServerStripeEnvironment();
+  if (env !== serverEnv) {
+    throw new Error(`Payments are configured for ${serverEnv} mode on this deployment`);
+  }
+  const connectionApiKey = getConnectionApiKey(serverEnv);
   const lovableApiKey = getEnv("LOVABLE_API_KEY");
 
   return new Stripe(connectionApiKey, {
