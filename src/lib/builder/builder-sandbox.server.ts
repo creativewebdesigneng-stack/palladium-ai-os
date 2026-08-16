@@ -49,9 +49,9 @@ function scriptsFrom(files: ManifestFile[]) {
   try { parsed = JSON.parse(packageFile.content); } catch { throw new Error("Generated package.json is not valid JSON."); }
   const scripts = parsed?.scripts && typeof parsed.scripts === "object" ? parsed.scripts as Record<string, unknown> : {};
   return {
-    build: typeof scripts.build === "string" && scripts.build.trim() ? "npm run build" : null,
-    typecheck: typeof scripts.typecheck === "string" && scripts.typecheck.trim() ? "npm run typecheck" : null,
-    test: typeof scripts.test === "string" && scripts.test.trim() ? "npm test -- --run" : null,
+    build: typeof scripts["build"] === "string" && scripts["build"].trim() ? "npm run build" : null,
+    typecheck: typeof scripts["typecheck"] === "string" && scripts["typecheck"].trim() ? "npm run typecheck" : null,
+    test: typeof scripts["test"] === "string" && scripts["test"].trim() ? "npm test -- --run" : null,
   };
 }
 
