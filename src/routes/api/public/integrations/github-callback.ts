@@ -14,6 +14,10 @@ function done(origin: string, params: Record<string, string>) {
   return new Response(null, { status: 302, headers: { Location: url.toString() } });
 }
 
+function redirect(location: string) {
+  return new Response(null, { status: 302, headers: { Location: location } });
+}
+
 export const Route = createFileRoute("/api/public/integrations/github-callback")({
   server: {
     handlers: {
@@ -43,11 +47,11 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
         };
 
         if (providerError) return fail("GitHub authorization was declined.");
-        if (!code) return fail("GitHub authorization code is missing.");
 
         try {
           const {
             githubConnectionConfigured,
+            normaliseInstallationId,
             exchangeGitHubUserCode,
             resolveVerifiedUserInstallation,
             verifyGitHubInstallation,
@@ -56,8 +60,41 @@ export const Route = createFileRoute("/api/public/integrations/github-callback")
             return fail("GitHub App connection is not configured on this deployment.");
           }
 
-          const redirectUri = `${origin}/api/public/integrations/github-callback`;
-          const userAccessToken = await exchangeGitHubUserCode(code, redirectUri);
+          // GitHub's App installation setup redirect normally contains
+          // installation_id + setup_action + state, but no OAuth code. Continue
+          // into the GitHub App user-authorization flow and carry the untrusted
+          // installation id in the redirect URI. It is verified against both the
+          // consenting GitHub user and this GitHub App before it is persisted.
+          if (!code) {
+            if (!suggestedInstallationId) {
+              return fail("GitHub App installation id is missing.");
+            }
+
+            const installationId = normaliseInstallationId(suggestedInstallationId);
+            const clientId = process.env["GITHUB_APP_CLIENT_ID"]?.trim();
+            if (!clientId) {
+              return fail("GitHub App client id is not configured on this deployment.");
+            }
+
+            const redirectUri = new URL(`${origin}/api/public/integrations/github-callback`);
+            redirectUri.searchParams.set("installation_id", String(installationId));
+
+            const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
+            authorizeUrl.searchParams.set("client_id", clientId);
+            authorizeUrl.searchParams.set("redirect_uri", redirectUri.toString());
+            authorizeUrl.searchParams.set("state", state);
+            return redirect(authorizeUrl.toString());
+          }
+
+          const redirectUri = new URL(`${origin}/api/public/integrations/github-callback`);
+          if (suggestedInstallationId) {
+            redirectUri.searchParams.set(
+              "installation_id",
+              String(normaliseInstallationId(suggestedInstallationId)),
+            );
+          }
+
+          const userAccessToken = await exchangeGitHubUserCode(code, redirectUri.toString());
           const userInstallation = await resolveVerifiedUserInstallation(
             userAccessToken,
             suggestedInstallationId,
