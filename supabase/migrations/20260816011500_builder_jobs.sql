@@ -10,6 +10,9 @@ create table if not exists public.builder_jobs (
   source_last_error text,
   repository_full_name text,
   branch_name text,
+  branch_approval_id uuid,
+  repository_status text not null default 'not_started' check (repository_status in ('not_started', 'branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed')),
+  repository_last_error text,
   last_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
