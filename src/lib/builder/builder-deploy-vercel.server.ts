@@ -10,6 +10,7 @@ type UploadedFile = { file: string; sha: string; size: number };
 
 type VercelDeployment = {
   id: string;
+  projectId: string | null;
   url: string | null;
   status: "building" | "ready" | "failed";
   rawState: string | null;
@@ -46,6 +47,12 @@ function manifestFiles(manifest: unknown): ManifestFile[] {
   });
 }
 
+function safeVercelId(value: string, label: string) {
+  const id = value.trim();
+  if (!/^[A-Za-z0-9_.-]{1,200}$/.test(id)) throw new Error(`Invalid Vercel ${label}.`);
+  return id;
+}
+
 function url(path: string, teamId: string | null) {
   const endpoint = new URL(`${VERCEL_API}${path}`);
   if (teamId) endpoint.searchParams.set("teamId", teamId);
@@ -73,12 +80,13 @@ async function vercelJson<T>(path: string, init: RequestInit, token: string, tea
 function deploymentState(payload: any): VercelDeployment {
   const id = typeof payload?.id === "string" ? payload.id : "";
   if (!id) throw new Error("Vercel did not return a deployment id.");
+  const projectId = typeof payload?.projectId === "string" ? payload.projectId : typeof payload?.project?.id === "string" ? payload.project.id : null;
   const rawState = typeof payload?.readyState === "string" ? payload.readyState : typeof payload?.status === "string" ? payload.status : null;
   const state = (rawState ?? "").toUpperCase();
   const status: VercelDeployment["status"] = state === "READY" ? "ready" : ["ERROR", "CANCELED", "FAILED"].includes(state) ? "failed" : "building";
   const rawUrl = typeof payload?.url === "string" ? payload.url.trim() : "";
   const deploymentUrl = rawUrl ? (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`) : null;
-  return { id, url: deploymentUrl, status, rawState };
+  return { id, projectId, url: deploymentUrl, status, rawState };
 }
 
 async function uploadFile(file: ManifestFile, token: string, teamId: string | null): Promise<UploadedFile> {
@@ -115,9 +123,24 @@ export async function createVercelPreviewDeployment(args: { title: string; sourc
 }
 
 export async function getVercelDeployment(deploymentId: string) {
-  const id = deploymentId.trim();
-  if (!/^[A-Za-z0-9_.-]{1,200}$/.test(id)) throw new Error("Invalid Vercel deployment id.");
+  const id = safeVercelId(deploymentId, "deployment id");
   const { token, teamId } = credentials();
   const payload = await vercelJson<any>(`/v13/deployments/${encodeURIComponent(id)}`, { method: "GET" }, token, teamId);
   return deploymentState(payload);
+}
+
+export async function promoteVercelDeployment(args: { projectId: string; deploymentId: string }) {
+  const projectId = safeVercelId(args.projectId, "project id");
+  const deploymentId = safeVercelId(args.deploymentId, "deployment id");
+  const { token, teamId } = credentials();
+  const result = await vercelJson<any>(
+    `/v10/projects/${encodeURIComponent(projectId)}/promote/${encodeURIComponent(deploymentId)}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+    token,
+    teamId,
+  );
+  return {
+    status: typeof result?.status === "string" ? result.status : "promoted",
+    aliases: Array.isArray(result?.aliases) ? result.aliases.filter((value: unknown) => typeof value === "string").slice(0, 20) : [],
+  };
 }
