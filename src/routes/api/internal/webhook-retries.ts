@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { processDueWebhookRetries } from "@/lib/devapi/webhooks.server";
+import { isValidRuntimeWorkerToken } from "@/lib/runtime/runtime-worker-auth.server";
 
 /**
  * Scheduler endpoint for the durable webhook retry queue.
@@ -15,14 +15,11 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env["WEBHOOK_RETRY_CRON_SECRET"] ?? "";
-        if (expected.length < 32) {
-          return json({ error: "Webhook retry scheduler is not configured." }, 503);
-        }
-
         const authorization = request.headers.get("authorization") ?? "";
         const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-        if (!safeEqual(supplied, expected)) return json({ error: "Unauthorized" }, 401);
+        if (!(await isValidRuntimeWorkerToken("webhook_retry", supplied))) {
+          return json({ error: "Unauthorized" }, 401);
+        }
 
         const url = new URL(request.url);
         const requested = Number(url.searchParams.get("limit") ?? 20);
@@ -35,12 +32,6 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
     },
   },
 });
-
-function safeEqual(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 function json(payload: unknown, status: number) {
   return new Response(JSON.stringify(payload), {
