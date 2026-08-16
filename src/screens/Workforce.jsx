@@ -117,8 +117,8 @@ export default function Workforce() {
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
       <button onClick={() => { setEditTeam(null); setDeptOpen(true); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"><UserPlus className="h-4 w-4" />New department</button>
-      <button onClick={() => gate('runTasks')} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"><ClipboardPlus className="h-4 w-4" />Assign Task</button>
-      <button onClick={() => gate('createAgents')} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />Create Agent</button>
+      <Link to="/mission-control" onClick={(event) => { if (!gate('runTasks')) event.preventDefault(); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"><ClipboardPlus className="h-4 w-4" />Assign Task</Link>
+      <Link to="/agents/new" onClick={(event) => { if (!gate('createAgents')) event.preventDefault(); }} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />Create Agent</Link>
     </div>
   );
 
