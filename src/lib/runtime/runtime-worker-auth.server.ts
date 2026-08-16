@@ -2,6 +2,11 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 type WorkerCredentialName = "workflow_runner" | "webhook_retry";
 
+type CredentialRow = {
+  token_sha256: string;
+  enabled: boolean;
+};
+
 const ENV_BY_NAME: Record<WorkerCredentialName, string> = {
   workflow_runner: "WORKFLOW_RUNNER_CRON_SECRET",
   webhook_retry: "WEBHOOK_RETRY_CRON_SECRET",
@@ -27,12 +32,16 @@ export async function isValidRuntimeWorkerToken(
   if (envSecret.length >= 32 && safeEqual(supplied, envSecret)) return true;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
+  const db = supabaseAdmin as unknown as {
+    from: (table: string) => any;
+  };
+  const { data, error } = await db
     .from("runtime_worker_credentials")
     .select("token_sha256,enabled")
     .eq("name", name)
     .maybeSingle();
+  const row = data as CredentialRow | null;
 
-  if (error || !data?.enabled || typeof data.token_sha256 !== "string") return false;
-  return safeEqual(sha256(supplied), data.token_sha256);
+  if (error || !row?.enabled || typeof row.token_sha256 !== "string") return false;
+  return safeEqual(sha256(supplied), row.token_sha256);
 }
