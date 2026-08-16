@@ -1,0 +1,68 @@
+name: One-shot wire Builder repair loop
+
+on:
+  push:
+    branches: [feat/builder-repair-loop]
+    paths: [.github/workflows/one-shot-wire-builder-repair.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/builder-repair-loop
+      - name: Patch approval, sandbox and Builder UI lifecycle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              assert old in s, f'missing pattern in {path}: {old[:120]}'
+              p.write_text(s.replace(old, new, 1))
+
+          replace_once(
+              'src/lib/builder/builder.functions.ts',
+              '.eq("details->>builder_job_id", String(job.id)).in("status", ["pending", "approved"]);',
+              '.eq("details->>builder_job_id", String(job.id)).eq("status", "pending");'
+          )
+
+          replace_once(
+              'src/lib/builder/builder-sandbox.functions.ts',
+              '.in("sandbox_status", ["not_started", "failed"])\n      .select("id,source_manifest," + sandboxColumns)',
+              '.in("sandbox_status", ["not_started", "failed"])\n      .in("repair_status", ["not_started", "accepted", "failed"])\n      .select("id,source_manifest," + sandboxColumns)'
+          )
+
+          p = Path('src/screens/Builder.jsx')
+          s = p.read_text()
+          def rep(old, new):
+              global s
+              assert old in s, f'missing UI pattern: {old[:120]}'
+              s = s.replace(old, new, 1)
+
+          rep("import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';", "import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';\nimport { acceptBuilderRepair, generateBuilderRepair, listBuilderRepairStates } from '@/lib/builder/builder-repair.functions';")
+          rep("  const sandboxRunFn = useServerFn(runBuilderSandboxJob);", "  const sandboxRunFn = useServerFn(runBuilderSandboxJob);\n  const repairListFn = useServerFn(listBuilderRepairStates);\n  const repairGenerateFn = useServerFn(generateBuilderRepair);\n  const repairAcceptFn = useServerFn(acceptBuilderRepair);")
+          rep("  const sandboxStates = useQuery({ queryKey: ['builder-sandbox-states'], queryFn: () => sandboxListFn(), retry: false });", "  const sandboxStates = useQuery({ queryKey: ['builder-sandbox-states'], queryFn: () => sandboxListFn(), retry: false });\n  const repairStates = useQuery({ queryKey: ['builder-repair-states'], queryFn: () => repairListFn(), retry: false });")
+          rep("  const refreshSandbox = () => qc.invalidateQueries({ queryKey: ['builder-sandbox-states'] });", "  const refreshSandbox = () => qc.invalidateQueries({ queryKey: ['builder-sandbox-states'] });\n  const refreshRepair = () => qc.invalidateQueries({ queryKey: ['builder-repair-states'] });")
+          rep("  const cancelJob = useMutation({", "  const generateRepair = useMutation({\n    mutationFn: (id) => repairGenerateFn({ data: { id } }),\n    onSuccess: async () => { await refreshRepair(); toast({ title: 'Repair proposal ready', description: 'Review every proposed file before accepting it.' }); },\n    onError: async (error) => { await refreshRepair(); toast({ title: 'Could not generate repair proposal', description: friendlyMessage(error), variant: 'destructive' }); },\n  });\n  const acceptRepair = useMutation({\n    mutationFn: (id) => repairAcceptFn({ data: { id } }),\n    onSuccess: async () => { await Promise.all([refreshJobs(), refreshSandbox(), refreshRepair()]); toast({ title: 'Repair accepted', description: 'The repaired source must now pass a fresh GitHub file-approval batch and isolated validation.' }); },\n    onError: (error) => toast({ title: 'Could not accept repair proposal', description: friendlyMessage(error), variant: 'destructive' }),\n  });\n  const cancelJob = useMutation({")
+          rep("<Requirement icon={Workflow} text=\"Isolated E2B install/build/typecheck/test validation is live\" ready />", "<Requirement icon={Workflow} text=\"Isolated E2B install/build/typecheck/test validation is live\" ready />\n            <Requirement icon={Sparkles} text=\"Failed validation can generate a reviewable, approval-gated repair proposal\" ready />")
+          rep("            const isRunningSandbox = sandboxRun.isPending && sandboxRun.variables === job.id;", "            const isRunningSandbox = sandboxRun.isPending && sandboxRun.variables === job.id;\n            const repair = (repairStates.data ?? []).find((state) => state.id === job.id) ?? { repairStatus: 'not_started', repairManifest: null, repairLastError: null, repairAttempt: 0 };\n            const isGeneratingRepair = generateRepair.isPending && generateRepair.variables === job.id;\n            const isAcceptingRepair = acceptRepair.isPending && acceptRepair.variables === job.id;")
+          rep("                {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} onRun={() => sandboxRun.mutate(job.id)} />}", "                {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} repair={repair} onRun={() => sandboxRun.mutate(job.id)} />}\n                {sandbox.sandboxStatus === 'failed' && <RepairProposal repair={repair} generating={isGeneratingRepair} accepting={isAcceptingRepair} onGenerate={() => generateRepair.mutate(job.id)} onAccept={() => acceptRepair.mutate(job.id)} />}")
+          rep("        <StateCard icon={Rocket} title=\"Deployment\" value=\"Remaining\" text=\"Deployment and final production hardening are not enabled yet.\" />", "        <StateCard icon={Sparkles} title=\"Repair loop\" value=\"Review-gated\" text=\"Failed sandbox evidence can generate a bounded repair proposal that must be accepted and re-approved.\" />\n        <StateCard icon={Rocket} title=\"Deployment\" value=\"Remaining\" text=\"Deployment and final production hardening are not enabled yet.\" />")
+          rep("function SandboxValidation({ job, sandbox, pending, onRun }) {\n  const canRun = ['not_started', 'failed'].includes(sandbox.sandboxStatus) && !pending;", "function RepairProposal({ repair, generating, accepting, onGenerate, onAccept }) {\n  const proposal = repair.repairManifest;\n  const canGenerate = ['not_started', 'accepted', 'failed'].includes(repair.repairStatus) && repair.repairAttempt < 10 && !generating;\n  return (\n    <div className=\"mt-4 rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/[.035] p-4 text-[11px] leading-5 text-zinc-400\">\n      <div className=\"flex flex-wrap items-center justify-between gap-2\"><div><div className=\"flex items-center gap-2 font-medium text-fuchsia-100\"><Sparkles className=\"h-4 w-4\" />AI repair proposal · attempt {repair.repairAttempt}/10</div><p className=\"mt-1 text-zinc-500\">Uses failed sandbox evidence as untrusted diagnostic data. Nothing is written to GitHub until you accept the proposal and approve a new file batch.</p></div>{canGenerate && <button onClick={onGenerate} disabled={generating} className=\"inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-500/15 px-3 py-1.5 font-medium text-fuchsia-100 ring-1 ring-fuchsia-400/20 disabled:opacity-40\">{generating ? <Loader2 className=\"h-3.5 w-3.5 animate-spin\" /> : <Sparkles className=\"h-3.5 w-3.5\" />}{repair.repairStatus === 'failed' ? 'Retry repair proposal' : 'Generate repair proposal'}</button>}</div>\n      {repair.repairLastError && <ErrorBox text={repair.repairLastError} />}\n      {proposal && <><div className=\"mt-3 rounded-lg border border-white/10 bg-black/20 p-3\"><p className=\"font-medium text-zinc-200\">{proposal.summary}</p><div className=\"mt-2 space-y-2\">{(proposal.files ?? []).map((file) => <details key={file.path} className=\"rounded border border-white/10\"><summary className=\"cursor-pointer px-2 py-1.5 text-zinc-300\">{file.path}<span className=\"ml-2 text-zinc-600\">{file.purpose}</span></summary><pre className=\"max-h-64 overflow-auto border-t border-white/10 p-2 text-[10px] text-zinc-400\">{file.content}</pre></details>)}</div></div><button onClick={onAccept} disabled={accepting} className=\"mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 font-medium text-emerald-100 ring-1 ring-emerald-400/20 disabled:opacity-40\">{accepting ? <Loader2 className=\"h-3.5 w-3.5 animate-spin\" /> : <CheckCircle2 className=\"h-3.5 w-3.5\" />}Accept repair and re-enter approvals</button></>}\n    </div>\n  );\n}\n\nfunction SandboxValidation({ job, sandbox, pending, repair, onRun }) {\n  const canRun = ['not_started', 'failed'].includes(sandbox.sandboxStatus) && repair.repairStatus !== 'proposed' && repair.repairStatus !== 'generating' && !pending;")
+          p.write_text(s)
+          PY
+          rm .github/workflows/one-shot-wire-builder-repair.yml
+      - name: Commit repair wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/builder/builder.functions.ts src/lib/builder/builder-sandbox.functions.ts src/screens/Builder.jsx .github/workflows/one-shot-wire-builder-repair.yml
+          git commit -m "Wire Builder repair review loop"
+          git push origin HEAD:feat/builder-repair-loop
