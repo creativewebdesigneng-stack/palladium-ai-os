@@ -15,10 +15,23 @@ describe('Builder durable job contract', () => {
     expect(source).toContain('status: "requested"');
   });
 
+  it('runs live planning through the shared model gateway and persists only while planning', () => {
+    const functions = readSrc('lib/builder/builder.functions.ts');
+    const planner = readSrc('lib/builder/builder-plan.server.ts');
+    expect(functions).toContain('generateBuilderJobPlan');
+    expect(functions).toContain('resolveAssistantModelPreference');
+    expect(functions).toContain('status: "planning"');
+    expect(functions).toContain('.eq("status", "planning")');
+    expect(functions).toContain('status: "planned"');
+    expect(planner).toContain('runChat');
+    expect(planner).toContain('parseBuilderPlan');
+  });
+
   it('keeps unfinished Builder stages explicitly disabled rather than simulated', () => {
     const source = readSrc('screens/Builder.jsx');
     expect(source).toContain('createBuilderJob');
     expect(source).toContain('listBuilderJobs');
+    expect(source).toContain('generateBuilderJobPlan');
     expect(source).toContain('Save build request');
     expect(source).toContain('Repository creation and code writes remain disabled');
     expect(source).toContain('Sandboxed build/test execution remains disabled');
@@ -32,5 +45,7 @@ describe('Builder durable job contract', () => {
     expect(migration).toContain('alter table public.builder_jobs enable row level security');
     expect(migration).toContain('using (auth.uid() = user_id)');
     expect(migration).toContain('with check (auth.uid() = user_id)');
+    expect(migration).toContain("'planning'");
+    expect(migration).toContain("'planned'");
   });
 });
