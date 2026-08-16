@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Bot, CheckCircle2, Code2, Database, GitBranch, Loader2, LockKeyhole, RefreshCw, Rocket, Sparkles, TriangleAlert, Workflow, X } from 'lucide-react';
+import { Bot, CheckCircle2, Code2, Database, GitBranch, Loader2, LockKeyhole, RefreshCw, Rocket, Sparkles, TerminalSquare, TriangleAlert, Workflow, X } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import NeuralNetworkBackground from '@/components/visual/NeuralNetworkBackground';
 import { toast } from '@/components/ui/use-toast';
@@ -17,6 +17,7 @@ import {
   queueBuilderFileApprovals,
   refreshBuilderRepositoryStatus,
 } from '@/lib/builder/builder.functions';
+import { listBuilderSandboxStates, runBuilderSandboxJob } from '@/lib/builder/builder-sandbox.functions';
 
 export default function Builder() {
   const qc = useQueryClient();
@@ -29,13 +30,17 @@ export default function Builder() {
   const fileApprovalFn = useServerFn(queueBuilderFileApprovals);
   const refreshRepositoryFn = useServerFn(refreshBuilderRepositoryStatus);
   const cancelFn = useServerFn(cancelBuilderJob);
+  const sandboxListFn = useServerFn(listBuilderSandboxStates);
+  const sandboxRunFn = useServerFn(runBuilderSandboxJob);
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [repositoryChoice, setRepositoryChoice] = useState({});
 
   const jobs = useQuery({ queryKey: ['builder-jobs'], queryFn: () => listFn(), retry: false });
   const repositories = useQuery({ queryKey: ['builder-github-repositories'], queryFn: () => repoListFn(), retry: false });
+  const sandboxStates = useQuery({ queryKey: ['builder-sandbox-states'], queryFn: () => sandboxListFn(), retry: false });
   const refreshJobs = () => qc.invalidateQueries({ queryKey: ['builder-jobs'] });
+  const refreshSandbox = () => qc.invalidateQueries({ queryKey: ['builder-sandbox-states'] });
 
   const createJob = useMutation({
     mutationFn: () => createFn({ data: { title, prompt } }),
@@ -71,6 +76,11 @@ export default function Builder() {
     onSuccess: async (result) => { await refreshJobs(); toast({ title: 'Repository status refreshed', description: repositoryStatusCopy(result.repositoryStatus) }); },
     onError: (error) => toast({ title: 'Could not refresh repository status', description: friendlyMessage(error), variant: 'destructive' }),
   });
+  const sandboxRun = useMutation({
+    mutationFn: (id) => sandboxRunFn({ data: { id } }),
+    onSuccess: async (result) => { await refreshSandbox(); toast({ title: result.sandboxStatus === 'passed' ? 'Isolated validation passed' : 'Isolated validation finished', description: result.sandboxStatus === 'passed' ? 'Install and available build/typecheck/test scripts passed in E2B.' : 'Review the isolated stage logs below.' }); },
+    onError: async (error) => { await refreshSandbox(); toast({ title: 'Isolated validation failed', description: friendlyMessage(error), variant: 'destructive' }); },
+  });
   const cancelJob = useMutation({
     mutationFn: (id) => cancelFn({ data: { id } }),
     onSuccess: async () => { await refreshJobs(); toast({ title: 'Build request cancelled' }); },
@@ -82,7 +92,7 @@ export default function Builder() {
   return (
     <>
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-30"><NeuralNetworkBackground intensity="low" /></div>
-      <PageHeader eyebrow="Build" title="AI App Builder" description="Create durable requests, live AI plans and reviewable source, then move every GitHub mutation through explicit high-risk approval. Sandbox execution and deployment remain disabled." />
+      <PageHeader eyebrow="Build" title="AI App Builder" description="Create durable requests, live AI plans and reviewable source, move GitHub mutations through approval, then validate the generated app in an isolated E2B sandbox before deployment." />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,.85fr)]">
         <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
@@ -100,7 +110,7 @@ export default function Builder() {
             <Requirement icon={Bot} text="AI planning uses the live model gateway" ready />
             <Requirement icon={Code2} text="Generated source is bounded, persisted and reviewable" ready />
             <Requirement icon={GitBranch} text="Branch and file writes use high-risk approval with SHA-safe updates" ready />
-            <Requirement icon={Workflow} text="Sandboxed build/test execution remains disabled" />
+            <Requirement icon={Workflow} text="Isolated E2B install/build/typecheck/test validation is live" ready />
             <Requirement icon={Rocket} text="Deployment remains disabled" />
           </div>
         </Panel>
@@ -116,6 +126,8 @@ export default function Builder() {
             const isQueueingFiles = fileApprovals.isPending && fileApprovals.variables === job.id;
             const isRefreshing = refreshRepository.isPending && refreshRepository.variables === job.id;
             const selectedRepository = repositoryChoice[job.id] ?? repositories.data?.[0]?.fullName ?? '';
+            const sandbox = (sandboxStates.data ?? []).find((state) => state.id === job.id) ?? { sandboxStatus: 'not_started', sandboxResults: null, sandboxLastError: null };
+            const isRunningSandbox = sandboxRun.isPending && sandboxRun.variables === job.id;
             return (
               <div key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -132,6 +144,7 @@ export default function Builder() {
                 {job.sourceManifest && <SourceView manifest={job.sourceManifest} />}
 
                 {job.sourceStatus === 'generated' && job.repositoryStatus === 'not_started' && <RepositoryPicker job={job} repositories={repositories} selectedRepository={selectedRepository} setRepositoryChoice={setRepositoryChoice} onQueue={() => branchApproval.mutate({ id: job.id, repository: selectedRepository })} pending={isQueueingBranch} />}
+                {job.repositoryStatus === 'files_applied' && <SandboxValidation job={job} sandbox={sandbox} pending={isRunningSandbox} onRun={() => sandboxRun.mutate(job.id)} />}
                 {['branch_approval_pending', 'branch_ready', 'files_approval_pending', 'files_applied', 'failed'].includes(job.repositoryStatus) && (
                   <RepositoryHandoff
                     job={job}
@@ -151,9 +164,26 @@ export default function Builder() {
         <StateCard icon={Bot} title="AI planning" value="Live" text="Plans are generated by the configured live model and persisted." />
         <StateCard icon={Code2} title="Source generation" value="Live" text="Generated source is bounded, validated and reviewable." />
         <StateCard icon={GitBranch} title="GitHub handoff" value="Approval-gated" text="Branch creation and each changed file are individually approval-gated." />
-        <StateCard icon={Rocket} title="Sandbox + deploy" value="Remaining" text="Execution, repair validation and deployment are not enabled yet." />
+        <StateCard icon={TerminalSquare} title="Sandbox validation" value="Live · E2B" text="Generated source is installed and checked in an isolated E2B sandbox." />
+        <StateCard icon={Rocket} title="Deployment" value="Remaining" text="Deployment and final production hardening are not enabled yet." />
       </div>
     </>
+  );
+}
+
+function SandboxValidation({ job, sandbox, pending, onRun }) {
+  const canRun = ['not_started', 'failed'].includes(sandbox.sandboxStatus) && !pending;
+  const stages = sandbox.sandboxResults?.stages ?? [];
+  return (
+    <div className="mt-4 rounded-xl border border-cyan-400/15 bg-cyan-400/[.035] p-4 text-[11px] leading-5 text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><div className="flex items-center gap-2 font-medium text-cyan-100"><TerminalSquare className="h-4 w-4" />Isolated E2B validation · {pending ? 'running' : sandbox.sandboxStatus.replaceAll('_', ' ')}</div><p className="mt-1 text-zinc-500">Runs the exact persisted source manifest in a temporary sandbox. No validation command executes on the PalladiumAI app server.</p></div>
+        {canRun && <button onClick={onRun} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-500/15 px-3 py-1.5 font-medium text-cyan-100 ring-1 ring-cyan-400/20 disabled:opacity-40">{pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TerminalSquare className="h-3.5 w-3.5" />}{sandbox.sandboxStatus === 'failed' ? 'Retry isolated validation' : 'Run isolated validation'}</button>}
+      </div>
+      {sandbox.sandboxLastError && <ErrorBox text={sandbox.sandboxLastError} />}
+      {stages.length > 0 && <div className="mt-3 space-y-2">{stages.map((stage) => <details key={stage.name} className="rounded-lg border border-white/10 bg-black/20"><summary className="cursor-pointer px-3 py-2 text-zinc-300">{stage.name} · {stage.status}{stage.exitCode != null ? ` · exit ${stage.exitCode}` : ''}</summary><div className="border-t border-white/10 p-3">{stage.command && <p className="mb-2 font-mono text-[10px] text-zinc-500">{stage.command}</p>}{stage.reason && <p>{stage.reason}</p>}{stage.stdout && <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-zinc-400">{stage.stdout}</pre>}{stage.stderr && <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-rose-300">{stage.stderr}</pre>}</div></details>)}</div>}
+      {sandbox.sandboxId && <p className="mt-2 text-[10px] text-zinc-600">E2B sandbox: {sandbox.sandboxId}</p>}
+    </div>
   );
 }
 
