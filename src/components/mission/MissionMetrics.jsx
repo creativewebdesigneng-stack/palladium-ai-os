@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   Bot, Activity, CalendarClock, ShieldAlert, CheckCircle2, User, Briefcase, AlertTriangle,
-  Bell, Users, Coins,
+  Bell, Users,
 } from 'lucide-react';
 
 const CARDS = [
@@ -9,14 +9,14 @@ const CARDS = [
   { key: 'runningTasks', label: 'Running tasks', icon: Activity, grad: 'from-cyan-500 to-blue-600' },
   { key: 'upcomingTasks', label: 'Upcoming tasks', icon: CalendarClock, grad: 'from-sky-500 to-cyan-600' },
   { key: 'awaitingApproval', label: 'Awaiting approval', icon: ShieldAlert, grad: 'from-amber-500 to-orange-600' },
-  { key: 'completedTasks', label: 'Completed', icon: CheckCircle2, grad: 'from-emerald-500 to-teal-600' },
-  { key: 'failedTasks', label: 'Failed', icon: AlertTriangle, grad: 'from-rose-500 to-red-600' },
-  { key: 'personalTasks', label: 'Personal AI', icon: User, grad: 'from-fuchsia-500 to-rose-500' },
-  { key: 'professionalTasks', label: 'Professional AI', icon: Briefcase, grad: 'from-indigo-500 to-violet-600' },
+  { key: 'completedTasks', label: 'Completed tasks', icon: CheckCircle2, grad: 'from-emerald-500 to-teal-600' },
+  { key: 'failedTasks', label: 'Failed tasks', icon: AlertTriangle, grad: 'from-rose-500 to-red-600' },
+  { key: 'personalTasks', label: 'Personal tasks', icon: User, grad: 'from-fuchsia-500 to-rose-500' },
+  { key: 'professionalTasks', label: 'Professional tasks', icon: Briefcase, grad: 'from-indigo-500 to-violet-600' },
   { key: 'activeWorkforces', label: 'Active workforces', icon: Users, grad: 'from-violet-500 to-fuchsia-600' },
-  { key: 'unreadNotifications', label: 'Notifications', icon: Bell, grad: 'from-amber-500 to-yellow-600' },
+  { key: 'runningWorkforceRuns', label: 'Workforce runs', icon: Activity, grad: 'from-cyan-500 to-violet-600' },
+  { key: 'unreadNotifications', label: 'Unread notifications', icon: Bell, grad: 'from-amber-500 to-yellow-600' },
 ];
-
 
 export default function MissionMetrics({ metrics = {}, loading }) {
   return (

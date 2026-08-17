@@ -20,6 +20,7 @@ import TaskBoard from '@/components/mission/TaskBoard';
 import SignalsPanel from '@/components/mission/SignalsPanel';
 import { DEFAULT_ALLOWED_DOMAINS } from '@/lib/mission/catalog';
 import { friendlyMessage } from '@/lib/errors';
+import { useAuth } from '@/lib/AuthContext';
 import {
   getMissionOverview, savePersonalAgent, deletePersonalAgent, submitPersonalTask,
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
@@ -78,6 +79,7 @@ function isExternalActionApproval(approval) {
 
 export default function MissionControl() {
   const qc = useQueryClient();
+  const { isAuthenticated, isLoadingAuth } = useAuth();
   const [tab, setTab] = useState('overview');
   const [builder, setBuilder] = useState({ open: false, initial: null });
   const [busyId, setBusyId] = useState(null);
@@ -99,30 +101,21 @@ export default function MissionControl() {
   const markNotificationsFn = useServerFn(markNotifications);
   const clearCategoryFn = useServerFn(clearMemoryCategory);
 
-  // Mission Control's server functions require a real backend session bearer
-  // token, so only query once a session exists on the client.
-  const [session, setSession] = useState('unknown');
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
-    return () => { alive = false; sub?.subscription?.unsubscribe(); };
-  }, []);
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['mission-overview'],
     queryFn: () => overviewFn({ data: {} }),
-    enabled: session === 'yes',
-    retry: false,
-    refetchInterval: 30000,
+    enabled: isAuthenticated,
+    retry: 1,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
-
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['mission-overview'] });
 
   // Live updates: agent activity, tasks, approvals and notifications stream in.
   useEffect(() => {
-    if (session !== 'yes') return undefined;
+    if (!isAuthenticated) return undefined;
     const channel = supabase
       .channel('mission-control')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_activities' }, refresh)
@@ -136,7 +129,8 @@ export default function MissionControl() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [isAuthenticated]);
+
   const fail = (e) => {
     console.error('[mission-control]', e);
     toast({ title: 'Something went wrong', description: friendlyMessage(e), variant: 'destructive' });
@@ -146,9 +140,25 @@ export default function MissionControl() {
     mutationFn: (vars) => submitTaskFn({ data: { request: vars.request, agentId: vars.agentId ?? null } }),
     onSuccess: (res) => {
       const d = res?.decision;
+      const execution = res?.execution;
+      if (execution?.status === 'failed') {
+        toast({
+          title: 'Task failed',
+          description: execution.error ?? 'The agent could not complete this task.',
+          variant: 'destructive',
+        });
+        refresh();
+        return;
+      }
       toast({
-        title: d?.requiresApproval ? 'Prepared — awaiting your approval' : 'Task dispatched',
-        description: d?.reason ?? 'Mission Control routed your request.',
+        title: d?.requiresApproval
+          ? 'Prepared — awaiting your approval'
+          : execution?.status === 'completed'
+            ? 'Task completed'
+            : 'Task dispatched',
+        description: execution?.status === 'completed'
+          ? execution.summary
+          : d?.reason ?? 'Mission Control routed your request.',
       });
       if (d?.category === 'shopping') setTab('approvals');
       refresh();
@@ -282,6 +292,8 @@ export default function MissionControl() {
   const agents = data?.agents ?? [];
   const approvals = data?.approvals ?? [];
   const pendingCount = useMemo(() => approvals.filter((a) => a.status === 'pending').length, [approvals]);
+  const activeAgentCount = data?.metrics?.activeAgents ?? 0;
+  const loading = isLoadingAuth || (isAuthenticated && isLoading);
 
   const openTemplate = (t) => setBuilder({
     open: true,
@@ -301,7 +313,7 @@ export default function MissionControl() {
         action={
           <div className="flex items-center gap-2">
             <span className="hidden items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[11px] text-zinc-400 sm:inline-flex">
-              <Cpu className="h-3.5 w-3.5 text-violet-400" />{agents.length} agents online
+              <Cpu className="h-3.5 w-3.5 text-violet-400" />{activeAgentCount} active agents
             </span>
             {pendingCount > 0 && (
               <button onClick={() => setTab('approvals')} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200">
@@ -312,7 +324,7 @@ export default function MissionControl() {
         }
       />
 
-      {session === 'yes' && error && (
+      {isAuthenticated && error && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-rose-400/25 bg-rose-500/[.06] p-4">
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-xs font-semibold text-rose-100"><ShieldAlert className="h-4 w-4" />Mission Control could not load</p>
@@ -322,7 +334,7 @@ export default function MissionControl() {
         </div>
       )}
 
-      {session === 'no' && (
+      {!isLoadingAuth && !isAuthenticated && (
         <div className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-500/[.06] p-4">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-100"><ShieldAlert className="h-4 w-4" />Sign in to activate Mission Control</p>
           <p className="mt-1 text-[11px] text-amber-200/80">Your agents, tasks, approvals and memory are private to your account, so Mission Control needs a signed-in session before it can load or run anything.</p>
@@ -331,12 +343,11 @@ export default function MissionControl() {
 
       <BriefingConsole
         briefing={data?.briefing}
-        loading={isLoading && session !== 'no'}
+        loading={loading}
         agents={agents}
-        submitting={dispatch.isPending}
+        submitting={dispatch.isPending || !isAuthenticated}
         onSubmit={(vars) => dispatch.mutate(vars)}
       />
-
 
       <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
         {TABS.map(([id, label, Icon]) => (
@@ -356,12 +367,12 @@ export default function MissionControl() {
       <div className="mt-4 space-y-4">
         {tab === 'overview' && (
           <>
-            <MissionMetrics metrics={data?.metrics} loading={isLoading && session !== 'no'} />
+            <MissionMetrics metrics={data?.metrics} loading={loading} />
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />
               </div>
-              <ActivityStream activities={data?.activities ?? []} loading={isLoading && session !== 'no'} />
+              <ActivityStream activities={data?.activities ?? []} loading={loading} />
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Globe2 className="h-4 w-4 text-cyan-400" />Browser agent</h2>
@@ -378,8 +389,7 @@ export default function MissionControl() {
         {tab === 'personal' && (
           <PersonalAISection
             agents={data?.personalAgents ?? agents}
-
-            loading={isLoading && session !== 'no'}
+            loading={loading}
             onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })}
             onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })}
             onDelete={(agent) => removeAgent.mutate(agent.id)}
@@ -394,18 +404,16 @@ export default function MissionControl() {
             workforces={data?.workforces ?? []}
             runs={data?.workforceRuns ?? []}
             agentRuns={data?.agentRuns ?? []}
-            loading={isLoading && session !== 'no'}
+            loading={loading}
           />
         )}
-
-
 
         {tab === 'approvals' && (
           <ApprovalCentre
             approvals={approvals}
             purchases={data?.purchases ?? []}
             results={data?.shoppingResults ?? []}
-            loading={isLoading && session !== 'no'}
+            loading={loading}
             busyId={busyId}
             onDecide={(a, decision) => { setBusyId(a.id); decide.mutate({ id: a.id, decision, approval: a }); }}
             onRetry={(a) => { setBusyId(a.id); retryExternal.mutate(a.id); }}
@@ -425,7 +433,7 @@ export default function MissionControl() {
           <SignalsPanel
             notifications={data?.notifications ?? []}
             usage={data?.usage}
-            loading={isLoading && session !== 'no'}
+            loading={loading}
             onRead={(n) => notificationsMutation.mutate({ id: n.id })}
             onReadAll={() => notificationsMutation.mutate({ all: true })}
           />
@@ -434,7 +442,7 @@ export default function MissionControl() {
         {tab === 'memory' && (
           <MemoryVault
             memories={data?.memories ?? []}
-            loading={isLoading && session !== 'no'}
+            loading={loading}
             saving={memoryMutation.isPending}
             onSave={(m) => memoryMutation.mutate(m)}
             onDelete={(m) => memoryDelete.mutate(m.id)}
