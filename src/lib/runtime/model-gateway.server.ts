@@ -5,6 +5,7 @@
  *   - `lovable`     Lovable AI Gateway (default, no key management required)
  *   - `openai`      OpenAI                      -> OPENAI_API_KEY
  *   - `anthropic`   Anthropic Messages API      -> ANTHROPIC_API_KEY
+ *   - `groq`        Groq OpenAI-compatible API  -> GROQ_API_KEY
  *   - `compatible`  Any OpenAI-compatible/local endpoint
  *                   -> OPENAI_COMPATIBLE_BASE_URL (+ optional OPENAI_COMPATIBLE_API_KEY)
  *
@@ -12,7 +13,7 @@
  * the caller and never leave this module.
  */
 
-export type Provider = "lovable" | "openai" | "anthropic" | "compatible";
+export type Provider = "lovable" | "openai" | "anthropic" | "groq" | "compatible";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -57,6 +58,7 @@ const DEFAULT_MODEL: Record<Provider, string> = {
   lovable: "google/gemini-3-flash-preview",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
+  groq: "openai/gpt-oss-120b",
   compatible: "local-model",
 };
 
@@ -64,16 +66,17 @@ export function normaliseProvider(value?: string | null): Provider {
   const v = (value ?? "").toLowerCase();
   if (v === "openai") return "openai";
   if (v === "anthropic" || v === "claude") return "anthropic";
+  if (v === "groq") return "groq";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
   // No explicit choice: prefer a directly configured vendor key over the gateway.
   if (!v) {
+    if (process.env["GROQ_API_KEY"]) return "groq";
     if (process.env["OPENAI_API_KEY"]) return "openai";
     if (process.env["ANTHROPIC_API_KEY"]) return "anthropic";
   }
   return "lovable";
 }
-
 
 export function resolveModel(provider: Provider, model?: string | null): string {
   const m = (model ?? "").trim();
@@ -107,6 +110,15 @@ function endpointFor(provider: Provider): Endpoint {
         "Content-Type": "application/json",
       },
       kind: "anthropic",
+    };
+  }
+  if (provider === "groq") {
+    const key = process.env["GROQ_API_KEY"];
+    if (!key) throw new ProviderError("Groq is not configured for this workspace.", 503, false);
+    return {
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      kind: "chat",
     };
   }
   if (provider === "compatible") {
