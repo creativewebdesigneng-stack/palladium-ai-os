@@ -163,7 +163,11 @@ export function chatBody(args: RunArgs, stream: boolean) {
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
     ...(args.temperature != null ? { temperature: args.temperature } : {}),
-    ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}),
+    ...(args.maxTokens
+      ? usesMaxCompletionTokens(args.provider, args.model)
+        ? { max_completion_tokens: args.maxTokens }
+        : { max_tokens: args.maxTokens }
+      : {}),
     ...(args.tools?.length
       ? {
           tools: args.tools.map((t) => ({
