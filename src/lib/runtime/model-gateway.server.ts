@@ -133,7 +133,12 @@ function endpointFor(provider: Provider): Endpoint {
 
 /* -------------------------------------------------------------- request bodies */
 
-function chatBody(args: RunArgs, stream: boolean) {
+/** GPT-5 family models reject `max_tokens` and require `max_completion_tokens`. */
+function usesMaxCompletionTokens(provider: Provider, model: string): boolean {
+  return provider === "openai" && model.trim().toLowerCase().startsWith("gpt-5");
+}
+
+export function chatBody(args: RunArgs, stream: boolean) {
   const messages = args.messages.map((m) => {
     if (m.role === "tool") {
       return { role: "tool", tool_call_id: m.tool_call_id, content: m.content };
