@@ -18,6 +18,12 @@ import {
   createMicrosoftOutlookDraft,
   listMicrosoftCalendarEvents,
 } from "@/lib/integrations/microsoft365.server";
+import {
+  normaliseProvider,
+  resolveModel,
+  runChat,
+  type ChatMessage,
+} from "@/lib/runtime/model-gateway.server";
 
 type RoutingPreferenceValue = string | number | boolean | null;
 type RoutingPreferences = Record<string, RoutingPreferenceValue>;
@@ -205,31 +211,53 @@ export function fallbackBriefing(counts: { tasks: number; approvals: number; sho
   const bits = [`You have ${counts.tasks} task${counts.tasks === 1 ? "" : "s"} today`, `${counts.approvals} pending approval${counts.approvals === 1 ? "" : "s"}`];
   if (counts.shopping) bits.push(`your Shopping Agent found ${counts.shopping} item${counts.shopping === 1 ? "" : "s"} matching your saved requirements`);
   if (counts.running) bits.push(`${counts.running} agent run${counts.running === 1 ? "" : "s"} in progress`);
-  return `${greeting}. ${bits.join(", ")}. ${counts.agents} agent${counts.agents === 1 ? "" : "s"} on duty.`;
+  return `${greeting}. ${bits.join(", ")}. ${counts.agents} active agent${counts.agents === 1 ? "" : "s"}.`;
 }
 
 export async function aiBriefing(context: string, fallback: string): Promise<string> {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) return fallback;
+  const configuredProvider = process.env["ASSISTANT_PROVIDER"]?.trim() || null;
+  const primaryProvider = normaliseProvider(configuredProvider);
+  const primaryModel = resolveModel(
+    primaryProvider,
+    configuredProvider ? (process.env["ASSISTANT_MODEL"]?.trim() || null) : null,
+  );
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: "You write a short daily briefing (3-5 sentences) for an AI operating system. British English, calm and factual. Use ONLY the facts supplied: never invent tasks, prices, dates, names or numbers, and say a section is clear when its facts say 'none'. Lead with anything awaiting approval, then what is running, then what is upcoming. Never give medical or financial advice.",
+    },
+    { role: "user", content: `Facts for today:\n${context}` },
+  ];
+
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You write a short daily briefing (3-5 sentences) for an AI operating system. British English, calm and factual. Use ONLY the facts supplied: never invent tasks, prices, dates, names or numbers, and say a section is clear when its facts say 'none'. Lead with anything awaiting approval, then what is running, then what is upcoming. Never give medical or financial advice." },
-          { role: "user", content: `Facts for today:\n${context}` },
-        ],
-      }),
+    const result = await runChat({
+      provider: primaryProvider,
+      model: primaryModel,
+      messages,
+      maxTokens: 320,
     });
-    if (!res.ok) return fallback;
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = json.choices?.[0]?.message?.content;
-    return typeof text === "string" && text.trim() ? text.trim() : fallback;
-  } catch {
-    return fallback;
+    const text = result.text.trim();
+    if (text) return text;
+  } catch (error) {
+    console.warn("[mission] primary briefing provider failed", primaryProvider, error);
   }
+
+  if (primaryProvider !== "groq" && process.env["GROQ_API_KEY"]) {
+    try {
+      const result = await runChat({
+        provider: "groq",
+        model: resolveModel("groq", null),
+        messages,
+        maxTokens: 320,
+      });
+      const text = result.text.trim();
+      if (text) return text;
+    } catch (error) {
+      console.warn("[mission] Groq briefing fallback failed", error);
+    }
+  }
+
+  return fallback;
 }
 
 export async function emitWebhook(userId: string, event: string, payload: Record<string, unknown>) {
