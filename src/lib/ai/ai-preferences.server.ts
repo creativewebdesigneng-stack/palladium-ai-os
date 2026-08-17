@@ -8,6 +8,7 @@ export type ProviderOption = {
 };
 
 const DEFINITIONS: Array<Omit<ProviderOption, "configured">> = [
+  { id: "groq", name: "Groq", defaultModel: "openai/gpt-oss-120b" },
   { id: "lovable", name: "Lovable AI Gateway", defaultModel: "google/gemini-3-flash-preview" },
   { id: "openai", name: "OpenAI", defaultModel: "gpt-5-mini" },
   { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-5-20250929" },
@@ -15,6 +16,7 @@ const DEFINITIONS: Array<Omit<ProviderOption, "configured">> = [
 ];
 
 export function isProviderConfigured(provider: Provider): boolean {
+  if (provider === "groq") return Boolean(process.env["GROQ_API_KEY"]);
   if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
   if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);
   if (provider === "anthropic") return Boolean(process.env["ANTHROPIC_API_KEY"]);

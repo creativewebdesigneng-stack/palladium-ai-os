@@ -2,9 +2,9 @@
  * Workspace assistant — real AI execution only.
  *
  * There is no simulated, demo or canned reply path here. Every answer comes
- * from a live model provider through the server-side gateway. When no provider
- * is configured, or a provider fails, the caller receives an explicit error —
- * never a fabricated assistant message.
+ * from a live model provider through the server-side gateway. When a selected
+ * provider is unavailable and Groq is configured, Chat safely fails over to
+ * Groq rather than fabricating a response or leaving the operator stuck.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -15,8 +15,12 @@ import {
   recordUsage,
 } from "@/lib/platform/entitlements.server";
 import { writeAudit } from "@/lib/platform/audit.server";
-import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
-import { ProviderError, runChat, type ChatMessage } from "@/lib/runtime/model-gateway.server";
+import {
+  defaultModelFor,
+  isProviderConfigured,
+  resolveAssistantModelPreference,
+} from "@/lib/ai/ai-preferences.server";
+import { ProviderError, runChat, type ChatMessage, type Provider } from "@/lib/runtime/model-gateway.server";
 
 const SYSTEM_PROMPT = [
   "You are the PalladiumAI workspace assistant.",
@@ -28,6 +32,63 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 type Turn = { role: "user" | "assistant"; content: string };
+
+type AssistantRun = {
+  text: string;
+  provider: Provider;
+  model: string;
+  usage: { input: number; output: number };
+  fallbackFrom?: Provider;
+};
+
+async function runAssistantWithFallback(args: {
+  provider: Provider;
+  model: string;
+  messages: ChatMessage[];
+}): Promise<AssistantRun> {
+  try {
+    const primary = await runChat({
+      provider: args.provider,
+      model: args.model,
+      messages: args.messages,
+      maxTokens: 900,
+    });
+    const text = primary.text.trim();
+    if (!text) throw new ProviderError("The model returned an empty response.", 502, true);
+    return {
+      text,
+      provider: primary.provider,
+      model: primary.model,
+      usage: primary.usage,
+    };
+  } catch (primaryError) {
+    const canUseGroq = args.provider !== "groq" && isProviderConfigured("groq");
+    if (!canUseGroq) throw primaryError;
+
+    console.warn(
+      "[assistant] primary provider failed; retrying with Groq",
+      args.provider,
+      primaryError instanceof Error ? primaryError.message : String(primaryError),
+    );
+
+    const fallbackModel = defaultModelFor("groq");
+    const fallback = await runChat({
+      provider: "groq",
+      model: fallbackModel,
+      messages: args.messages,
+      maxTokens: 900,
+    });
+    const text = fallback.text.trim();
+    if (!text) throw new ProviderError("The fallback model returned an empty response.", 502, true);
+    return {
+      text,
+      provider: fallback.provider,
+      model: fallback.model,
+      usage: fallback.usage,
+      fallbackFrom: args.provider,
+    };
+  }
+}
 
 /** Runs one real assistant turn. Throws with a safe message on any failure. */
 export const assistantChat = createServerFn({ method: "POST" })
@@ -83,9 +144,7 @@ export const assistantChat = createServerFn({ method: "POST" })
     ];
 
     try {
-      const result = await runChat({ provider, model, messages, maxTokens: 900 });
-      const text = result.text.trim();
-      if (!text) throw new ProviderError("The model returned an empty response.", 502, true);
+      const result = await runAssistantWithFallback({ provider, model, messages });
 
       await recordUsage({
         userId: context.userId,
@@ -95,6 +154,7 @@ export const assistantChat = createServerFn({ method: "POST" })
           provider: result.provider,
           model: result.model,
           preference_source: preferenceSource,
+          fallback_from: result.fallbackFrom ?? null,
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
         },
@@ -104,13 +164,17 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "success",
-        metadata: { provider: result.provider, model: result.model, preferenceSource },
+        metadata: {
+          provider: result.provider,
+          model: result.model,
+          preferenceSource,
+          fallbackFrom: result.fallbackFrom ?? null,
+        },
       });
 
-      return { text, provider: result.provider, model: result.model };
+      return { text: result.text, provider: result.provider, model: result.model };
     } catch (error) {
       const status = error instanceof ProviderError ? error.status : 500;
-      // The real error is recorded server-side; the caller gets a safe message.
       console.error("[assistant] provider failure", status, error);
       await writeAudit({
         userId: context.userId,
