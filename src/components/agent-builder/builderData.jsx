@@ -1,4 +1,4 @@
-// Static option catalogues for the Agent Builder (labels, not data).
+// Static option catalogues for the Agent Builder (labels, not user data).
 // Agent test runs execute on the real runtime; no seeded transcripts exist here.
 
 export const TOOLS = [
@@ -16,11 +16,29 @@ export const TOOLS = [
   { id: 'discord', label: 'Discord', icon: 'MessagesSquare', grad: 'from-indigo-500 to-purple-500', desc: 'Post to channels' },
 ];
 
+// These IDs and model values intentionally mirror src/lib/runtime/model-gateway.server.ts.
+// Store canonical API model IDs, never display-only names, so saved agents execute unchanged.
 export const PROVIDERS = [
-  { id: 'anthropic', label: 'Anthropic', models: ['Claude Sonnet 4.6', 'Claude Opus 4.6'] },
-  { id: 'openai', label: 'OpenAI', models: ['GPT-5.4', 'GPT-5 Mini'] },
-  { id: 'google', label: 'Google', models: ['Gemini 2.5 Pro', 'Gemini 3 Flash'] },
-  { id: 'meta', label: 'Meta', models: ['Llama 3.3 70B'] },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    models: ['gpt-5-mini', 'gpt-5.1'],
+  },
+  {
+    id: 'lovable',
+    label: 'Lovable AI Gateway',
+    models: ['google/gemini-3-flash-preview'],
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic',
+    models: ['claude-sonnet-4-5-20250929'],
+  },
+  {
+    id: 'compatible',
+    label: 'OpenAI-compatible / local',
+    models: ['local-model'],
+  },
 ];
 
 export const CONTEXT_OPTIONS = ['8K', '32K', '128K', '1M tokens'];
@@ -41,11 +59,8 @@ export const KNOWLEDGE_SOURCES = [
   { id: 'databases', label: 'Databases', icon: 'Database', grad: 'from-fuchsia-500 to-pink-500' },
 ];
 
-export const ATTACHED = [
-  { id: 'k1', type: 'files', label: 'Brand guidelines.pdf' },
-  { id: 'k2', type: 'collections', label: 'Product knowledge base' },
-  { id: 'k3', type: 'websites', label: 'docs.palladiumai.com' },
-];
+// Attached knowledge is user/workspace data and must never be fabricated in production.
+export const ATTACHED = [];
 
 export const PERMISSIONS = [
   { id: 'read', label: 'Read', desc: 'View data & resources.', danger: false },
@@ -56,10 +71,8 @@ export const PERMISSIONS = [
   { id: 'send', label: 'Send', desc: 'Send messages & emails.', danger: true },
 ];
 
-export const VERSIONS = [
-  { v: 'v3', date: '7 Aug 2026 · 11:02', status: 'current', summary: 'Added GitHub tool + lowered temperature', author: 'Alex K.' },
-  { v: 'v2', date: '5 Aug 2026 · 16:40', status: 'archived', summary: 'Switched to Claude Sonnet 4.6', author: 'Maya P.' },
-  { v: 'v1', date: '1 Aug 2026 · 09:15', status: 'archived', summary: 'Initial agent draft', author: 'Alex K.' },
-];
+// Version history belongs to persisted agent revisions. Keep this empty until real
+// version rows are wired into the builder rather than showing invented authors/dates.
+export const VERSIONS = [];
 
 export const DEPLOYMENT_STATES = ['Draft', 'Testing', 'Published', 'Paused'];
