@@ -11,7 +11,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type Sb = { from: (t: string) => any };
 
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
-const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "compatible"];
+const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "groq", "compatible"];
+const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
+  lovable: "google/gemini-3-flash-preview",
+  openai: "gpt-5-mini",
+  anthropic: "claude-sonnet-4-5-20250929",
+  groq: "openai/gpt-oss-120b",
+  compatible: "local-model",
+};
 
 type AgentWriteInput = {
   name: string;
@@ -46,6 +53,7 @@ function normaliseAgentWrite(input: AgentWriteInput) {
   const maxTokens = Number.isFinite(Number(input.max_tokens))
     ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
     : 4096;
+  const model = String(input.model ?? "").trim() || DEFAULT_MODEL_BY_PROVIDER[modelProvider] || "gpt-5-mini";
 
   return {
     name: name.slice(0, 80),
@@ -54,7 +62,7 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     purpose: (input.purpose ?? "").slice(0, 4000),
     personality: (input.personality ?? "").slice(0, 2000),
     system_prompt: (input.system_prompt ?? "").slice(0, 8000),
-    model: (input.model ?? "gpt-5-mini").slice(0, 160),
+    model: model.slice(0, 160),
     model_provider: modelProvider,
     temperature,
     max_tokens: maxTokens,
