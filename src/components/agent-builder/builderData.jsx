@@ -34,6 +34,11 @@ export const PROVIDERS = [
     models: ['gpt-5-mini', 'gpt-5.1'],
   },
   {
+    id: 'groq',
+    label: 'Groq',
+    models: ['openai/gpt-oss-120b'],
+  },
+  {
     id: 'lovable',
     label: 'Lovable AI Gateway',
     models: ['google/gemini-3-flash-preview'],
