@@ -2525,6 +2525,30 @@ export type Database = {
           },
         ]
       }
+      runtime_worker_credentials: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          name: string
+          token_sha256: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          name: string
+          token_sha256: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          name?: string
+          token_sha256?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shopping_list_items: {
         Row: {
           budget: number | null
