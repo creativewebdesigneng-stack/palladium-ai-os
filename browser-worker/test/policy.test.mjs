@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   bearerAuthorised,
   cleanAllowedDomains,
@@ -8,6 +11,9 @@ import {
   safeSelector,
   safeText,
 } from "../policy.mjs";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const workerDir = path.resolve(here, "..");
 
 test("normalises and bounds allowed domains", () => {
   assert.deepEqual(cleanAllowedDomains(["WWW.Example.com", "example.com", "docs.example.com"]), ["example.com", "docs.example.com"]);
@@ -37,4 +43,13 @@ test("bounds model-controlled selectors and text", () => {
   assert.equal(safeSelector(" #submit "), "#submit");
   assert.throws(() => safeSelector(""), /selector/i);
   assert.equal(safeText("abcdef", 3), "abc");
+});
+
+test("pins the Playwright package to the Docker image browser version", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(workerDir, "package.json"), "utf8"));
+  const dockerfile = fs.readFileSync(path.join(workerDir, "Dockerfile"), "utf8");
+  const imageVersion = dockerfile.match(/playwright:v([^\s-]+)/)?.[1];
+  assert.ok(imageVersion, "Dockerfile must pin a Playwright image version");
+  assert.equal(pkg.dependencies?.playwright, imageVersion);
+  assert.match(pkg.dependencies.playwright, /^\d+\.\d+\.\d+$/);
 });
