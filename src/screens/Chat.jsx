@@ -66,7 +66,13 @@ export default function Chat() {
 
     try {
       const result = await assistantFn({ data: { message, history } });
-      const assistantMessage = { id: `msg-${Date.now()}-assistant`, role: 'ai', text: result.text };
+      const assistantMessage = {
+        id: `msg-${Date.now()}-assistant`,
+        role: 'ai',
+        text: result.text,
+        sources: result.sources ?? [],
+        webSearchAttempted: Boolean(result.webSearchAttempted),
+      };
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
         messages: [...conversation.messages, assistantMessage],
@@ -97,7 +103,13 @@ export default function Chat() {
       const result = await assistantFn({ data: { message: failedMessage, history } });
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
-        messages: [...conversation.messages, { id: `msg-${Date.now()}-assistant`, role: 'ai', text: result.text }],
+        messages: [...conversation.messages, {
+          id: `msg-${Date.now()}-assistant`,
+          role: 'ai',
+          text: result.text,
+          sources: result.sources ?? [],
+          webSearchAttempted: Boolean(result.webSearchAttempted),
+        }],
         provider: result.provider,
         model: result.model,
       }));
