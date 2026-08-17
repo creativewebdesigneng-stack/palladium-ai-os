@@ -107,8 +107,16 @@ export const createAgent = createServerFn({ method: "POST" })
       name: string;
       description?: string;
       category?: string;
+      purpose?: string;
+      personality?: string;
+      system_prompt?: string;
       model?: string;
       model_provider?: string;
+      temperature?: number;
+      max_tokens?: number;
+      memory_enabled?: boolean;
+      requires_approval?: boolean;
+      autonomy?: string;
       instructions?: string;
       allowed_tools?: string[];
       preferences?: Record<string, unknown>;
@@ -121,12 +129,26 @@ export const createAgent = createServerFn({ method: "POST" })
       if (!MODEL_PROVIDERS.includes(modelProvider)) {
         throw new Error("Unknown AI model provider");
       }
+      const temperature = Number.isFinite(Number(input.temperature))
+        ? Math.min(Math.max(Number(input.temperature), 0), 2)
+        : 0.4;
+      const maxTokens = Number.isFinite(Number(input.max_tokens))
+        ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
+        : 4096;
       return {
         name: name.slice(0, 80),
         description: (input.description ?? "").slice(0, 2000),
         category: (input.category ?? "custom").slice(0, 40),
-        model: (input.model ?? "gpt-5-mini").slice(0, 80),
+        purpose: (input.purpose ?? "").slice(0, 4000),
+        personality: (input.personality ?? "").slice(0, 2000),
+        system_prompt: (input.system_prompt ?? "").slice(0, 8000),
+        model: (input.model ?? "gpt-5-mini").slice(0, 160),
         model_provider: modelProvider,
+        temperature,
+        max_tokens: maxTokens,
+        memory_enabled: input.memory_enabled !== false,
+        requires_approval: input.requires_approval !== false,
+        autonomy: (input.autonomy ?? "supervised").slice(0, 40),
         instructions: (input.instructions ?? "").slice(0, 8000),
         allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
         preferences: input.preferences ?? {},
@@ -143,8 +165,16 @@ export const createAgent = createServerFn({ method: "POST" })
         name: data.name,
         description: data.description || null,
         category: data.category,
+        purpose: data.purpose || null,
+        personality: data.personality || null,
+        system_prompt: data.system_prompt || null,
         model: data.model,
         model_provider: data.model_provider,
+        temperature: data.temperature,
+        max_tokens: data.max_tokens,
+        memory_enabled: data.memory_enabled,
+        requires_approval: data.requires_approval,
+        autonomy: data.autonomy,
         instructions: data.instructions || null,
         allowed_tools: data.allowed_tools,
         preferences: data.preferences,
