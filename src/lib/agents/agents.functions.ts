@@ -11,6 +11,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type Sb = { from: (t: string) => any };
 
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
+const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "compatible"];
 
 /** The caller's agents, newest first, plus their recent task rows. */
 export const listAgents = createServerFn({ method: "POST" })
@@ -116,12 +117,16 @@ export const createAgent = createServerFn({ method: "POST" })
       const name = String(input?.name ?? "").trim();
       if (!name) throw new Error("Agent name is required");
       const status = AGENT_STATUSES.includes(input.status ?? "") ? input.status! : "draft";
+      const modelProvider = String(input.model_provider ?? "openai").trim().toLowerCase();
+      if (!MODEL_PROVIDERS.includes(modelProvider)) {
+        throw new Error("Unknown AI model provider");
+      }
       return {
         name: name.slice(0, 80),
         description: (input.description ?? "").slice(0, 2000),
         category: (input.category ?? "custom").slice(0, 40),
-        model: (input.model ?? "gpt-4o-mini").slice(0, 80),
-        model_provider: (input.model_provider ?? "openai").slice(0, 40),
+        model: (input.model ?? "gpt-5-mini").slice(0, 80),
+        model_provider: modelProvider,
         instructions: (input.instructions ?? "").slice(0, 8000),
         allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
         preferences: input.preferences ?? {},
