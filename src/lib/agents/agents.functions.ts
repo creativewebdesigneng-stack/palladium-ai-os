@@ -13,6 +13,61 @@ type Sb = { from: (t: string) => any };
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
 const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "compatible"];
 
+type AgentWriteInput = {
+  name: string;
+  description?: string;
+  category?: string;
+  purpose?: string;
+  personality?: string;
+  system_prompt?: string;
+  model?: string;
+  model_provider?: string;
+  temperature?: number;
+  max_tokens?: number;
+  memory_enabled?: boolean;
+  requires_approval?: boolean;
+  autonomy?: string;
+  instructions?: string;
+  allowed_tools?: string[];
+  preferences?: Record<string, unknown>;
+  status?: string;
+};
+
+function normaliseAgentWrite(input: AgentWriteInput) {
+  const name = String(input?.name ?? "").trim();
+  if (!name) throw new Error("Agent name is required");
+  const status = AGENT_STATUSES.includes(input.status ?? "") ? input.status! : "draft";
+  const modelProvider = String(input.model_provider ?? "openai").trim().toLowerCase();
+  if (!MODEL_PROVIDERS.includes(modelProvider)) throw new Error("Unknown AI model provider");
+
+  const temperature = Number.isFinite(Number(input.temperature))
+    ? Math.min(Math.max(Number(input.temperature), 0), 2)
+    : 0.4;
+  const maxTokens = Number.isFinite(Number(input.max_tokens))
+    ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
+    : 4096;
+
+  return {
+    name: name.slice(0, 80),
+    description: (input.description ?? "").slice(0, 2000),
+    category: (input.category ?? "custom").slice(0, 40),
+    purpose: (input.purpose ?? "").slice(0, 4000),
+    personality: (input.personality ?? "").slice(0, 2000),
+    system_prompt: (input.system_prompt ?? "").slice(0, 8000),
+    model: (input.model ?? "gpt-5-mini").slice(0, 160),
+    model_provider: modelProvider,
+    temperature,
+    max_tokens: maxTokens,
+    memory_enabled: input.memory_enabled !== false,
+    requires_approval: input.requires_approval !== false,
+    autonomy: (input.autonomy ?? "supervised").slice(0, 40),
+    instructions: (input.instructions ?? "").slice(0, 8000),
+    allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
+    preferences: input.preferences ?? {},
+    status,
+  };
+}
+
 /** The caller's agents, newest first, plus their recent task rows. */
 export const listAgents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -102,60 +157,7 @@ export const duplicateAgent = createServerFn({ method: "POST" })
 /** Creates an agent for the caller from the workspace / wizard form. */
 export const createAgent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (input: {
-      name: string;
-      description?: string;
-      category?: string;
-      purpose?: string;
-      personality?: string;
-      system_prompt?: string;
-      model?: string;
-      model_provider?: string;
-      temperature?: number;
-      max_tokens?: number;
-      memory_enabled?: boolean;
-      requires_approval?: boolean;
-      autonomy?: string;
-      instructions?: string;
-      allowed_tools?: string[];
-      preferences?: Record<string, unknown>;
-      status?: string;
-    }) => {
-      const name = String(input?.name ?? "").trim();
-      if (!name) throw new Error("Agent name is required");
-      const status = AGENT_STATUSES.includes(input.status ?? "") ? input.status! : "draft";
-      const modelProvider = String(input.model_provider ?? "openai").trim().toLowerCase();
-      if (!MODEL_PROVIDERS.includes(modelProvider)) {
-        throw new Error("Unknown AI model provider");
-      }
-      const temperature = Number.isFinite(Number(input.temperature))
-        ? Math.min(Math.max(Number(input.temperature), 0), 2)
-        : 0.4;
-      const maxTokens = Number.isFinite(Number(input.max_tokens))
-        ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
-        : 4096;
-      return {
-        name: name.slice(0, 80),
-        description: (input.description ?? "").slice(0, 2000),
-        category: (input.category ?? "custom").slice(0, 40),
-        purpose: (input.purpose ?? "").slice(0, 4000),
-        personality: (input.personality ?? "").slice(0, 2000),
-        system_prompt: (input.system_prompt ?? "").slice(0, 8000),
-        model: (input.model ?? "gpt-5-mini").slice(0, 160),
-        model_provider: modelProvider,
-        temperature,
-        max_tokens: maxTokens,
-        memory_enabled: input.memory_enabled !== false,
-        requires_approval: input.requires_approval !== false,
-        autonomy: (input.autonomy ?? "supervised").slice(0, 40),
-        instructions: (input.instructions ?? "").slice(0, 8000),
-        allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
-        preferences: input.preferences ?? {},
-        status,
-      };
-    },
-  )
+  .inputValidator((input: AgentWriteInput) => normaliseAgentWrite(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data: row, error } = await sb
@@ -183,6 +185,36 @@ export const createAgent = createServerFn({ method: "POST" })
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);
+    return row;
+  });
+
+/** Updates the full intelligence configuration of one of the caller's agents. */
+export const updateAgent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: AgentWriteInput & { id: string }) => {
+    if (!input?.id) throw new Error("Agent id is required");
+    return { id: String(input.id), ...normaliseAgentWrite(input) };
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { id, ...write } = data;
+    const { data: row, error } = await sb
+      .from("personal_agents")
+      .update({
+        ...write,
+        description: write.description || null,
+        purpose: write.purpose || null,
+        personality: write.personality || null,
+        system_prompt: write.system_prompt || null,
+        instructions: write.instructions || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("user_id", context.userId)
+      .select()
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Agent not found");
     return row;
   });
 
