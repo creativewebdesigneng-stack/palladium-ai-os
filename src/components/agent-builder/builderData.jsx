@@ -1,19 +1,28 @@
 // Static option catalogues for the Agent Builder (labels, not user data).
 // Agent test runs execute on the real runtime; no seeded transcripts exist here.
 
+// IMPORTANT: these IDs are the executable runtime slugs from tools.server.ts.
+// Never store display-only aliases here, otherwise the runtime will correctly
+// drop the unknown tool during server-side grant resolution.
 export const TOOLS = [
-  { id: 'web_search', label: 'Web Search', icon: 'Globe', grad: 'from-sky-500 to-cyan-500', desc: 'Search the live web' },
-  { id: 'browser', label: 'Browser', icon: 'AppWindow', grad: 'from-violet-500 to-indigo-500', desc: 'Navigate & extract pages' },
-  { id: 'code', label: 'Code Execution', icon: 'Code2', grad: 'from-emerald-500 to-teal-500', desc: 'Run sandboxed code' },
-  { id: 'terminal', label: 'Terminal', icon: 'SquareTerminal', grad: 'from-zinc-500 to-slate-600', desc: 'Execute shell commands' },
-  { id: 'files', label: 'Files', icon: 'FileText', grad: 'from-amber-500 to-orange-500', desc: 'Read & write files' },
-  { id: 'database', label: 'Database', icon: 'Database', grad: 'from-indigo-500 to-violet-500', desc: 'Query data stores' },
-  { id: 'http', label: 'HTTP Requests', icon: 'Send', grad: 'from-rose-500 to-red-500', desc: 'Call any API' },
-  { id: 'email', label: 'Email', icon: 'Mail', grad: 'from-cyan-500 to-blue-500', desc: 'Send & triage email' },
-  { id: 'calendar', label: 'Calendar', icon: 'Calendar', grad: 'from-emerald-500 to-green-600', desc: 'Manage events' },
-  { id: 'github', label: 'GitHub', icon: 'Github', grad: 'from-zinc-600 to-zinc-800', desc: 'Repos, PRs, issues' },
-  { id: 'slack', label: 'Slack', icon: 'MessageSquare', grad: 'from-fuchsia-500 to-pink-500', desc: 'Send messages' },
-  { id: 'discord', label: 'Discord', icon: 'MessagesSquare', grad: 'from-indigo-500 to-purple-500', desc: 'Post to channels' },
+  { id: 'web_search', label: 'Web Search', icon: 'Globe', grad: 'from-sky-500 to-cyan-500', desc: 'Search the live public web' },
+  { id: 'web_fetch', label: 'Web Page Reader', icon: 'Globe', grad: 'from-cyan-500 to-blue-500', desc: 'Read public web pages' },
+  { id: 'browser', label: 'Browser', icon: 'AppWindow', grad: 'from-violet-500 to-indigo-500', desc: 'Navigate and extract pages' },
+  { id: 'file_analysis', label: 'Knowledge Files', icon: 'FileText', grad: 'from-amber-500 to-orange-500', desc: 'Read attached knowledge documents' },
+  { id: 'data_analysis', label: 'Data Analysis', icon: 'Database', grad: 'from-indigo-500 to-violet-500', desc: 'Analyse numeric datasets' },
+  { id: 'database_query', label: 'Workspace Data', icon: 'Database', grad: 'from-purple-500 to-indigo-500', desc: 'Read approved workspace tables' },
+  { id: 'code_exec', label: 'Code Execution', icon: 'Code2', grad: 'from-emerald-500 to-teal-500', desc: 'Run sandboxed JavaScript expressions' },
+  { id: 'calculator', label: 'Calculator', icon: 'Code2', grad: 'from-teal-500 to-cyan-500', desc: 'Evaluate arithmetic safely' },
+  { id: 'current_time', label: 'Current Time', icon: 'Clock', grad: 'from-zinc-500 to-slate-600', desc: 'Get current UTC date and time' },
+  { id: 'memory_search', label: 'Memory Search', icon: 'Brain', grad: 'from-fuchsia-500 to-violet-500', desc: 'Search stored facts and preferences' },
+  { id: 'memory_write', label: 'Memory Write', icon: 'Brain', grad: 'from-pink-500 to-fuchsia-500', desc: 'Remember durable facts and preferences' },
+  { id: 'http_request', label: 'HTTP Requests', icon: 'Send', grad: 'from-rose-500 to-red-500', desc: 'Call allow-listed HTTP APIs' },
+  { id: 'connected_service', label: 'Connected Apps — Read', icon: 'MessageSquare', grad: 'from-blue-500 to-indigo-500', desc: 'Read connected GitHub, Google, Slack and other services' },
+  { id: 'connected_service_write', label: 'Connected Apps — Write', icon: 'Send', grad: 'from-orange-500 to-rose-500', desc: 'Prepare approved writes to supported connected services' },
+  { id: 'github_write', label: 'GitHub Write', icon: 'Github', grad: 'from-zinc-600 to-zinc-800', desc: 'Prepare approved repository changes' },
+  { id: 'request_approval', label: 'Request Approval', icon: 'ShieldCheck', grad: 'from-yellow-500 to-orange-500', desc: 'Ask the operator before sensitive actions' },
+  { id: 'shopping_search', label: 'Shopping Research', icon: 'Globe', grad: 'from-emerald-500 to-green-600', desc: 'Research products without purchasing' },
+  { id: 'prepare_purchase', label: 'Prepare Purchase', icon: 'Send', grad: 'from-red-500 to-rose-600', desc: 'Prepare a purchase for explicit approval' },
 ];
 
 // These IDs and model values intentionally mirror src/lib/runtime/model-gateway.server.ts.
