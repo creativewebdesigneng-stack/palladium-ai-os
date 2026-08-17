@@ -12,6 +12,12 @@ import {
   safeSelector,
   safeText,
 } from "./policy.mjs";
+import {
+  normaliseProductCandidates,
+  retailerSearchUrl,
+  sellerLabel,
+  supportedRetailerDomains,
+} from "./shopping.mjs";
 
 const PORT = Number(process.env.PORT || process.env.BROWSER_WORKER_PORT || 8787);
 const TOKEN = process.env.BROWSER_WORKER_TOKEN || "";
@@ -76,6 +82,7 @@ async function createSession(allowedDomains) {
     ignoreHTTPSErrors: false,
     acceptDownloads: false,
     javaScriptEnabled: true,
+    locale: "en-GB",
   });
   const page = await context.newPage();
   const id = crypto.randomUUID();
@@ -110,6 +117,82 @@ async function extract(session, params) {
   const loc = session.page.locator(selector).first();
   const text = safeText(await loc.innerText({ timeout: 10_000 }), MAX_TEXT_CHARS);
   return { text, items: [] };
+}
+
+async function searchRetailerPage(session, domain, query, currency) {
+  const url = retailerSearchUrl(domain, query);
+  if (!url) return [];
+  await navigate(session, { url });
+  await session.page.waitForTimeout(900).catch(() => {});
+
+  return session.page.evaluate(({ seller, requestedCurrency }) => {
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const anchors = [...document.querySelectorAll("a[href]")].slice(0, 1800);
+    const out = [];
+    const seen = new Set();
+
+    for (const anchor of anchors) {
+      const container = anchor.closest("article, li, [data-testid*='product'], [class*='product'], [class*='Product']") || anchor.parentElement;
+      const text = clean(container?.innerText || anchor.innerText);
+      if (!text || text.length < 8 || text.length > 1600) continue;
+      const priceMatch = text.match(/£\s?(\d{1,5}(?:[.,]\d{2})?)/);
+      if (!priceMatch) continue;
+      const price = Number(priceMatch[1].replace(",", ""));
+      if (!Number.isFinite(price) || price <= 0) continue;
+
+      const heading = container?.querySelector("h1,h2,h3,h4,[data-testid*='title'],[class*='title'],[class*='Title']");
+      const product = clean(heading?.textContent || anchor.textContent || text.split("£")[0]).slice(0, 300);
+      if (!product || product.length < 3) continue;
+
+      let href;
+      try { href = new URL(anchor.href, location.href).toString(); } catch { continue; }
+      if (!href.startsWith("http")) continue;
+      const key = `${href}|${product.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const ratingMatch = text.match(/([0-5](?:\.\d)?)\s*(?:out of 5|stars?)/i);
+      const inStock = !/(out of stock|currently unavailable|not available)/i.test(text);
+      out.push({
+        product,
+        price,
+        currency: requestedCurrency,
+        seller,
+        delivery: /free delivery/i.test(text) ? "Free delivery shown by retailer" : "Check retailer for delivery",
+        deliveryCost: 0,
+        rating: ratingMatch ? Number(ratingMatch[1]) : 0,
+        url: href,
+        inStock,
+        specs: { source: "live retailer search" },
+        reason: "Live retailer search result matching the shopping request.",
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, { seller: sellerLabel(domain), requestedCurrency: currency });
+}
+
+async function searchRetailers(session, params) {
+  const query = safeText(params.query || "", 500).trim();
+  if (!query) throw new Error("Shopping search query is required");
+  const currency = safeText(params.currency || "GBP", 8).toUpperCase();
+  const budget = Number(params.budget);
+  const domains = supportedRetailerDomains(session.allowedDomains).slice(0, 7);
+  if (!domains.length) throw new Error("No supported shopping retailers are present in this agent's allow-list");
+
+  const candidates = [];
+  for (const domain of domains) {
+    try {
+      candidates.push(...await searchRetailerPage(session, domain, query, currency));
+    } catch (error) {
+      console.warn(`[browser-worker] retailer search failed for ${domain}:`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  return normaliseProductCandidates(candidates, {
+    budget: Number.isFinite(budget) && budget > 0 ? budget : null,
+    currency,
+  });
 }
 
 async function performAction(session, action, params = {}) {
@@ -157,7 +240,7 @@ async function performAction(session, action, params = {}) {
       return { ok: true };
     }
     case "search":
-      return { offers: [] };
+      return { offers: await searchRetailers(session, params) };
     case "prepare_checkout":
       return { ...params.offer, paymentAuthorised: false };
     case "compare":
