@@ -98,12 +98,13 @@ export const runResearch = createServerFn({ method: "POST" })
     }
 
     const { provider, model, source: preferenceSource } = resolveAssistantModelPreference(preference);
-    const sources = await searchPublicWeb(data.query, 8);
+    const search = await searchPublicWeb(data.query, 8);
+    const sources = search.results;
     if (!sources.length) throw new Error("No live web sources were found for that research question.");
 
     const messages: ChatMessage[] = [
       { role: "system", content: RESEARCH_SYSTEM_PROMPT },
-      { role: "user", content: evidenceBlock(data.query, sources) },
+      { role: "user", content: evidenceBlock(search.query || data.query, sources) },
     ];
 
     try {
