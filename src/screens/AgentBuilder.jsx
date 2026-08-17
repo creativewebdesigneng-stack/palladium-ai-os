@@ -18,7 +18,7 @@ const DEFAULT_CONFIG = {
   rules: 'Never fabricate citations\nFlag low-confidence claims',
   provider: 'openai', model: 'gpt-5-mini',
   temperature: 0.4, context: '128K tokens', reasoning: 'Medium',
-  tools: ['web_search', 'files'],
+  tools: ['web_search', 'web_fetch', 'file_analysis', 'memory_search'],
   memory: ['short', 'long', 'project'],
   permissions: ['read', 'write', 'execute'],
 };
