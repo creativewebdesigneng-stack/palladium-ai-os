@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Check, Copy, Sparkles } from 'lucide-react';
+import { Check, Copy, ExternalLink, Globe2, Sparkles } from 'lucide-react';
 
 function CodeBlock({ children, lang }) {
   const [copied, setCopied] = useState(false);
@@ -39,6 +39,7 @@ function CodeBlock({ children, lang }) {
 export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const sources = Array.isArray(message.sources) ? message.sources.filter((source) => source?.url) : [];
   const copy = () => {
     navigator.clipboard?.writeText(message.text);
     setCopied(true);
@@ -77,6 +78,29 @@ export default function MessageBubble({ message }) {
             </div>
           )}
         </div>
+
+        {!isUser && sources.length > 0 && (
+          <div className="mt-2 w-full rounded-xl border border-white/10 bg-white/[.02] p-2.5">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+              <Globe2 className="h-3.5 w-3.5" /> Live web sources
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {sources.slice(0, 6).map((source, index) => (
+                <a
+                  key={`${source.url}-${index}`}
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex max-w-full items-center gap-1 rounded-lg border border-white/10 bg-white/[.03] px-2 py-1 text-[10px] text-zinc-400 transition hover:border-violet-400/30 hover:text-violet-200"
+                  title={source.url}
+                >
+                  <span className="max-w-[220px] truncate">{source.title || new URL(source.url).hostname}</span>
+                  <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!isUser && (
           <button onClick={copy} className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-zinc-600 opacity-0 transition hover:bg-white/5 hover:text-white group-hover:opacity-100" aria-label="Copy response">

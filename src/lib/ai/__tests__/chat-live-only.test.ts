@@ -25,4 +25,19 @@ describe('workspace chat live-only contract', () => {
     expect(sidebar).toContain('session-local');
     expect(emptyState).toContain('instead of a simulated answer');
   });
+
+  it('grounds time-sensitive chat questions with live public web results', () => {
+    const assistant = read('lib/ai/assistant.functions.ts');
+    const web = read('lib/ai/web-access.server.ts');
+    const bubble = read('components/chat/MessageBubble.jsx');
+
+    expect(assistant).toContain('searchPublicWeb(data.message, 6)');
+    expect(assistant).toContain('shouldUseLiveWeb');
+    expect(assistant).toContain('LIVE WEB CONTEXT');
+    expect(assistant).toContain('sources: webSources.map');
+    expect(web).toContain('https://duckduckgo.com/html/');
+    expect(web).toContain('isSafePublicUrl');
+    expect(web).toContain('localhost');
+    expect(bubble).toContain('Live web sources');
+  });
 });
