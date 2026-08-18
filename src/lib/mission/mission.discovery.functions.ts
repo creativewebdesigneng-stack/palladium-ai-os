@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
 import {
@@ -92,9 +91,10 @@ function providerDiagnostic(configured: boolean, provider: string, results: numb
   };
 }
 
-function requestTimeZone(explicit: string | null | undefined): string | null {
+async function requestTimeZone(explicit: string | null | undefined): Promise<string | null> {
   if (explicit?.trim()) return explicit.trim();
   try {
+    const { getRequest } = await import("@tanstack/react-start/server");
     const request = getRequest();
     const cfTimezone = (request as Request & { cf?: { timezone?: string } } | undefined)?.cf?.timezone;
     return request?.headers.get("x-palladium-timezone")
@@ -141,7 +141,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
     if (isPersonalReminderRequest(data.request)) {
       const parsed = parsePersonalReminder({
         request: data.request,
-        timezone: requestTimeZone(data.timezone),
+        timezone: await requestTimeZone(data.timezone),
       });
       if (!parsed) throw new Error("Could not parse reminder request.");
 
