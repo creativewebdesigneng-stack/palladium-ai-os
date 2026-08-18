@@ -26,6 +26,7 @@ import {
   decideApproval, chooseAlternative, confirmPurchase, saveMemory, deleteMemory, updateTaskStatus,
   markNotifications, clearMemoryCategory,
 } from '@/lib/mission/mission.functions';
+import { submitMissionDiscovery } from '@/lib/mission/mission.discovery.functions';
 import { decideEmailApproval } from '@/lib/mission/email-approval.functions';
 import {
   decideExternalActionApproval,
@@ -39,7 +40,7 @@ const TABS = [
   ['professional', 'Professional AI', Briefcase],
   ['approvals', 'Approval centre', ShieldAlert],
 
-  ['shopping', 'Shopping', ShoppingBag],
+  ['shopping', 'Live Explorer', ShoppingBag],
   ['tasks', 'Tasks', ListChecks],
   ['signals', 'Notifications & usage', Bell],
   ['memory', 'Memory', Brain],
@@ -88,6 +89,7 @@ export default function MissionControl() {
   const saveAgentFn = useServerFn(savePersonalAgent);
   const deleteAgentFn = useServerFn(deletePersonalAgent);
   const submitTaskFn = useServerFn(submitPersonalTask);
+  const discoveryFn = useServerFn(submitMissionDiscovery);
   const decideFn = useServerFn(decideApproval);
   const decideEmailFn = useServerFn(decideEmailApproval);
   const decideExternalFn = useServerFn(decideExternalActionApproval);
@@ -112,6 +114,7 @@ export default function MissionControl() {
   });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['mission-overview'] });
+  const refreshExplorer = () => qc.invalidateQueries({ queryKey: ['shopping-workspace'] });
 
   // Live updates: agent activity, tasks, approvals and notifications stream in.
   useEffect(() => {
@@ -137,10 +140,28 @@ export default function MissionControl() {
   };
 
   const dispatch = useMutation({
-    mutationFn: (vars) => submitTaskFn({ data: { request: vars.request, agentId: vars.agentId ?? null } }),
+    mutationFn: async (vars) => {
+      const payload = { request: vars.request, agentId: vars.agentId ?? null };
+      const discovery = await discoveryFn({ data: payload });
+      if (discovery?.handled) return discovery;
+      return submitTaskFn({ data: payload });
+    },
     onSuccess: (res) => {
       const d = res?.decision;
       const execution = res?.execution;
+      if (res?.discovery) {
+        const count = res?.results?.length ?? 0;
+        toast({
+          title: `${count} live option${count === 1 ? '' : 's'} found`,
+          description: res?.simulated
+            ? 'Explorer is using the development browser provider. Connect a production provider for real listings and live availability.'
+            : `Searched and compared live results via ${res?.provider ?? 'the browser provider'}. Nothing has been purchased or reserved.`,
+        });
+        setTab('shopping');
+        refresh();
+        refreshExplorer();
+        return;
+      }
       if (execution?.status === 'failed') {
         toast({
           title: 'Task failed',
@@ -160,7 +181,7 @@ export default function MissionControl() {
           ? execution.summary
           : d?.reason ?? 'Mission Control routed your request.',
       });
-      if (d?.category === 'shopping') setTab('approvals');
+      if (d?.category === 'shopping') setTab(d?.requiresApproval ? 'approvals' : 'shopping');
       refresh();
     },
     onError: fail,
