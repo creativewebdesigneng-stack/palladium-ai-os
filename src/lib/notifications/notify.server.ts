@@ -31,6 +31,8 @@ type NotifyArgs = {
   metadata?: Record<string, unknown>;
 };
 
+export type NotifyOutcome = "emitted" | "suppressed" | "failed";
+
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin as unknown as { from: (t: string) => any };
@@ -58,13 +60,17 @@ export async function loadPreferences(userId: string): Promise<NotificationPrefe
   }
 }
 
-/** Writes one notification, honouring the recipient's preferences. */
-export async function notify(args: NotifyArgs): Promise<boolean> {
+/**
+ * Writes one notification, honouring the recipient's preferences, while
+ * distinguishing an intentional preference suppression from an infrastructure
+ * failure. Durable jobs use this outcome so they retry only real failures.
+ */
+export async function notifyWithOutcome(args: NotifyArgs): Promise<NotifyOutcome> {
   try {
     const def = NOTIFICATION_TYPE_MAP[args.type];
     const severity: NotificationSeverity = args.severity ?? def?.severity ?? "info";
     const prefs = await loadPreferences(args.userId);
-    if (!passesPreferences(prefs, args.type, severity)) return false;
+    if (!passesPreferences(prefs, args.type, severity)) return "suppressed";
 
     const db = await admin();
     const { error } = await db.from("notifications").insert({
@@ -79,13 +85,18 @@ export async function notify(args: NotifyArgs): Promise<boolean> {
     });
     if (error) {
       console.error("[notify] insert failed", error.message);
-      return false;
+      return "failed";
     }
-    return true;
+    return "emitted";
   } catch (error) {
     console.error("[notify] failed", error);
-    return false;
+    return "failed";
   }
+}
+
+/** Writes one notification, honouring the recipient's preferences. */
+export async function notify(args: NotifyArgs): Promise<boolean> {
+  return (await notifyWithOutcome(args)) === "emitted";
 }
 
 /**
