@@ -35,6 +35,7 @@ export function sellerLabel(domain) {
 export function normaliseProductCandidates(items, opts = {}) {
   const budget = Number.isFinite(Number(opts.budget)) && Number(opts.budget) > 0 ? Number(opts.budget) : null;
   const currency = String(opts.currency || "GBP").toUpperCase();
+  const requireVerified = opts.requireVerified === true;
   const seen = new Set();
   const result = [];
 
@@ -43,8 +44,10 @@ export function normaliseProductCandidates(items, opts = {}) {
     const url = String(item?.url || "").trim();
     const seller = String(item?.seller || "").trim().slice(0, 120);
     const price = Number(item?.price);
+    const specs = item?.specs && typeof item.specs === "object" ? item.specs : {};
     if (!product || !url || !seller || !Number.isFinite(price) || price <= 0) continue;
     if (budget != null && price > budget) continue;
+    if (requireVerified && (specs.verified_product_page !== true || !String(specs.image_url || "").startsWith("http"))) continue;
     const key = `${url}|${product.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -60,7 +63,7 @@ export function normaliseProductCandidates(items, opts = {}) {
       rating: Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0,
       url,
       inStock: item?.inStock !== false,
-      specs: item?.specs && typeof item.specs === "object" ? item.specs : {},
+      specs,
       reason: String(item?.reason || "Live retailer result matching the request.").slice(0, 500),
     });
   }
