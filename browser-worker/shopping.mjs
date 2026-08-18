@@ -18,18 +18,41 @@ const SELLER_LABELS = {
   "sainsburys.co.uk": "Sainsbury's",
 };
 
+const PRODUCT_PATHS = {
+  "amazon.co.uk": [/\/dp\/[A-Z0-9]{8,}/i, /\/gp\/product\/[A-Z0-9]{8,}/i],
+  "johnlewis.com": [/\/p\d+(?:[/?#]|$)/i],
+  "argos.co.uk": [/\/product\/\d+(?:[/?#]|$)/i],
+  "currys.co.uk": [/\/products\//i, /\.html(?:[?#]|$)/i],
+  "ikea.com": [/\/p\//i, /\/p\d{8}(?:[/?#]|$)/i],
+  "tesco.com": [/\/products\/\d+(?:[/?#]|$)/i],
+  "sainsburys.co.uk": [/\/product\//i],
+};
+
+function normaliseDomain(value) {
+  return String(value || "").replace(/^www\./, "").toLowerCase();
+}
+
 export function supportedRetailerDomains(allowedDomains = []) {
-  return [...new Set(allowedDomains.map((d) => String(d || "").replace(/^www\./, "").toLowerCase()))]
-    .filter((d) => Boolean(RETAILER_SEARCH[d]));
+  return [...new Set(allowedDomains.map(normaliseDomain))].filter((d) => Boolean(RETAILER_SEARCH[d]));
 }
 
 export function retailerSearchUrl(domain, query) {
-  const fn = RETAILER_SEARCH[String(domain || "").replace(/^www\./, "").toLowerCase()];
+  const fn = RETAILER_SEARCH[normaliseDomain(domain)];
   return fn ? fn(String(query || "").trim()) : null;
 }
 
 export function sellerLabel(domain) {
-  return SELLER_LABELS[String(domain || "").replace(/^www\./, "").toLowerCase()] || domain;
+  return SELLER_LABELS[normaliseDomain(domain)] || domain;
+}
+
+export function isLikelyProductUrl(domain, rawUrl) {
+  let url;
+  try { url = new URL(String(rawUrl || "")); } catch { return false; }
+  const cleanDomain = normaliseDomain(domain);
+  const host = normaliseDomain(url.hostname);
+  if (!(host === cleanDomain || host.endsWith(`.${cleanDomain}`))) return false;
+  const patterns = PRODUCT_PATHS[cleanDomain] ?? [];
+  return patterns.some((pattern) => pattern.test(`${url.pathname}${url.search}${url.hash}`));
 }
 
 export function normaliseProductCandidates(items, opts = {}) {
