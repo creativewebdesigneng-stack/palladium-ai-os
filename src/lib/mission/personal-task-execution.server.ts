@@ -207,6 +207,7 @@ function providerFailure(error: unknown): string {
 
 function providerFailureAudit(error: unknown): string {
   if (error instanceof ProviderError) {
+    if (error.status === 503 && !error.retryable) return "AI provider is not configured.";
     return `AI provider call failed (status ${error.status}, retryable ${error.retryable ? "yes" : "no"}).`;
   }
   return "AI runtime failed before the task could complete.";
