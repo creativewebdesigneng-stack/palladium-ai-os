@@ -77,6 +77,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A workflow stopped on a failing step.",
   },
   {
+    type: "reminder.due",
+    label: "Reminder due",
+    category: "system",
+    severity: "info",
+    desc: "A reminder you scheduled in Mission Control is due.",
+  },
+  {
     type: "subscription.changed",
     label: "Subscription changed",
     category: "billing",
