@@ -30,6 +30,14 @@ function isVerifiedProduct(row: any): boolean {
     && !String(row?.reason ?? "").includes("SIMULATED DEVELOPMENT DATA");
 }
 
+function readProviderDiagnostic(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = (value as Record<string, unknown>)["provider_diagnostic"];
+  return result && typeof result === "object" && !Array.isArray(result)
+    ? result as Record<string, unknown>
+    : null;
+}
+
 /**
  * Returns only the newest shopping search's live, product-level results.
  * Historical/demo rows are intentionally excluded so a new search that finds
@@ -57,10 +65,12 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
         purchases: [],
         rejectedUnverified: 0,
         googleShoppingConfigured: googleShoppingConfigured(),
+        providerDiagnostic: null,
       };
     }
 
-    const [resultRows, purchaseRows] = await Promise.all([
+    const personalTaskId = typeof latestTask.data.task_id === "string" ? latestTask.data.task_id : null;
+    const [resultRows, purchaseRows, personalTask] = await Promise.all([
       sb
         .from("shopping_results")
         .select("*")
@@ -71,9 +81,18 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
         .select("*")
         .eq("shopping_task_id", latestTask.data.id)
         .order("created_at", { ascending: false }),
+      personalTaskId
+        ? sb
+            .from("personal_tasks")
+            .select("result")
+            .eq("id", personalTaskId)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
     if (resultRows.error) throw new Error(resultRows.error.message);
     if (purchaseRows.error) throw new Error(purchaseRows.error.message);
+    if (personalTask.error) throw new Error(personalTask.error.message);
 
     const allResults = resultRows.data ?? [];
     const results = allResults.filter(isVerifiedProduct);
@@ -83,5 +102,6 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
       purchases: purchaseRows.data ?? [],
       rejectedUnverified: Math.max(0, allResults.length - results.length),
       googleShoppingConfigured: googleShoppingConfigured(),
+      providerDiagnostic: readProviderDiagnostic(personalTask.data?.result),
     };
   });
