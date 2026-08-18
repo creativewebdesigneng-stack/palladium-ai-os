@@ -52,7 +52,7 @@ create policy "Users can cancel their own personal reminders"
   for update
   using (
     auth.uid() = user_id
-    and status in ('scheduled', 'processing')
+    and status = 'scheduled'
   )
   with check (
     auth.uid() = user_id
