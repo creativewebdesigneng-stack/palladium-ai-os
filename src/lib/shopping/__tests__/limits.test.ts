@@ -29,8 +29,11 @@ function db(seed: Record<string, any[]> = {}) {
 }
 
 describe("spend limit checks", () => {
-  it("allows a purchase when no limits are configured", () => {
-    expect(checkAgainstLimits(999, { ...base }).ok).toBe(true);
+  it("blocks monetary actions until at least one spend control is configured", () => {
+    const verdict = checkAgainstLimits(999, { ...base });
+    expect(verdict.ok).toBe(false);
+    expect(!verdict.ok && verdict.reason).toMatch(/Set a spend limit/);
+    expect(!verdict.ok && verdict.reason).toMatch(/search and comparison remain available/i);
   });
 
   it("blocks a purchase above the per-transaction ceiling", () => {
@@ -92,6 +95,10 @@ describe("resolving limits from the database", () => {
       USER,
     );
     expect(limits.userMonthSpend).toBe(40);
+  });
+
+  it("fails closed when the account has no configured spend controls", async () => {
+    await expect(assertWithinLimits(db(), USER, null, 25)).rejects.toThrow(/Set a spend limit/);
   });
 
   it("throws with a human-readable reason when a purchase breaches a cap", async () => {
