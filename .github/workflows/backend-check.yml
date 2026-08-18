@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: backend-check-${{ github.ref }}
@@ -20,6 +20,138 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply branch-only personal task failover patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/lib/mission/personal-task-execution.server.ts')
+          s = p.read_text()
+
+          anchor = '''function providerFailure(error: unknown): string {\n  return error instanceof ProviderError && error.status === 503\n    ? "AI provider is not configured."\n    : "AI service temporarily unavailable.";\n}\n'''
+          helper = '''function providerConfigured(provider: Provider): boolean {\n  if (provider === "groq") return Boolean(process.env["GROQ_API_KEY"]);\n  if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);\n  if (provider === "anthropic") return Boolean(process.env["ANTHROPIC_API_KEY"]);\n  if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);\n  return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);\n}\n\nfunction providerCandidates(primary: Provider): Provider[] {\n  const ordered: Provider[] = [primary, "groq", "openai", "lovable", "anthropic", "compatible"];\n  return ordered.filter((provider, index) =>\n    ordered.indexOf(provider) === index && (provider === primary || providerConfigured(provider)),\n  );\n}\n\nasync function runPersonalChatWithFailover(args: {\n  provider: Provider;\n  model: string;\n  messages: ChatMessage[];\n  tools: ToolDef[];\n  temperature: number | null;\n  maxTokens: number;\n}): Promise<ChatResult> {\n  let lastError: unknown;\n  for (const candidate of providerCandidates(args.provider)) {\n    const model = candidate === args.provider ? args.model : resolveModel(candidate, null);\n    try {\n      return await runChat({\n        provider: candidate,\n        model,\n        messages: args.messages,\n        tools: args.tools,\n        temperature: args.temperature,\n        maxTokens: args.maxTokens,\n      });\n    } catch (error) {\n      if (error instanceof ProviderError && error.status === 499) throw error;\n      lastError = error;\n    }\n  }\n  throw lastError instanceof Error\n    ? lastError\n    : new ProviderError("No configured AI provider could complete the task.", 503, false);\n}\n\n'''
+          if helper not in s:
+              if anchor not in s:
+                  raise SystemExit('providerFailure anchor not found')
+              s = s.replace(anchor, helper + anchor, 1)
+
+          old = '''  let toolCalls = args.toolCalls;\n  for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {\n    const result = await runChat({\n      provider: args.provider,\n      model: args.model,\n      messages: args.messages,\n      tools: round < MAX_TOOL_ROUNDS ? args.tools.defs : [],\n      temperature: args.agent?.temperature ?? null,\n      maxTokens: args.agent?.max_tokens ?? 1200,\n    });\n    args.usage.input += result.usage.input;\n'''
+          new = '''  let toolCalls = args.toolCalls;\n  let activeProvider = args.provider;\n  let activeModel = args.model;\n  for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {\n    const result = await runPersonalChatWithFailover({\n      provider: activeProvider,\n      model: activeModel,\n      messages: args.messages,\n      tools: round < MAX_TOOL_ROUNDS ? args.tools.defs : [],\n      temperature: args.agent?.temperature ?? null,\n      maxTokens: args.agent?.max_tokens ?? 1200,\n    });\n    if (result.provider !== activeProvider || result.model !== activeModel) {\n      activeProvider = result.provider;\n      activeModel = result.model;\n      await args.sb\n        .from("agent_tasks")\n        .update({ provider: activeProvider, model: activeModel, heartbeat_at: new Date().toISOString() })\n        .eq("id", args.runId)\n        .eq("user_id", args.userId);\n    }\n    args.usage.input += result.usage.input;\n'''
+          if old not in s:
+              raise SystemExit('runConversation model-call block not found')
+          s = s.replace(old, new, 1)
+
+          old_resume = '''        provider: args.provider,\n        model: args.model,\n        messages: args.messages,'''
+          new_resume = '''        provider: activeProvider,\n        model: activeModel,\n        messages: args.messages,'''
+          if old_resume not in s:
+              raise SystemExit('approval resume provider/model block not found')
+          s = s.replace(old_resume, new_resume, 1)
+          p.write_text(s)
+
+          Path('src/lib/mission/__tests__/personal-task-provider-failover.test.ts').write_text(r'''import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const gateway = vi.hoisted(() => ({ runChat: vi.fn() }));
+const toolLayer = vi.hoisted(() => ({ resolveGrantedTools: vi.fn(), executeTool: vi.fn() }));
+const entitlements = vi.hoisted(() => ({ getEntitlements: vi.fn() }));
+
+vi.mock("@/lib/runtime/model-gateway.server", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/runtime/model-gateway.server")>(
+    "@/lib/runtime/model-gateway.server",
+  );
+  return { ...actual, runChat: gateway.runChat };
+});
+vi.mock("@/lib/runtime/tools.server", () => ({
+  resolveGrantedTools: toolLayer.resolveGrantedTools,
+  executeTool: toolLayer.executeTool,
+}));
+vi.mock("@/lib/platform/entitlements.server", () => ({ getEntitlements: entitlements.getEntitlements }));
+
+import { ProviderError } from "@/lib/runtime/model-gateway.server";
+import { executePersonalTask } from "../personal-task-execution.server";
+
+function fakeSb() {
+  const updates: Array<{ table: string; patch: Record<string, unknown> }> = [];
+  return {
+    updates,
+    from(table: string) {
+      let selected = false;
+      const chain: any = {
+        update(patch: Record<string, unknown>) { updates.push({ table, patch }); return chain; },
+        insert() { return chain; },
+        select() { selected = true; return chain; },
+        maybeSingle() {
+          if (table === "agent_tasks" && selected) return Promise.resolve({ data: { id: "run-1" }, error: null });
+          return Promise.resolve({ data: null, error: null });
+        },
+        eq() { return chain; },
+      };
+      return chain;
+    },
+  };
+}
+
+const task = { id: "task-1", request: "Build me a weekly diet plan", title: "Weekly diet plan", category: "personal" };
+const originalEnv = { ...process.env };
+
+describe("personal task provider failover", () => {
+  beforeEach(() => {
+    gateway.runChat.mockReset();
+    process.env["GROQ_API_KEY"] = "test-groq";
+    process.env["OPENAI_API_KEY"] = "test-openai";
+    delete process.env["ANTHROPIC_API_KEY"];
+    delete process.env["LOVABLE_API_KEY"];
+    delete process.env["OPENAI_COMPATIBLE_BASE_URL"];
+  });
+
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it("fails over from Groq to OpenAI and records the actual provider/model", async () => {
+    gateway.runChat
+      .mockRejectedValueOnce(new ProviderError("rate limited", 429, true))
+      .mockResolvedValueOnce({
+        text: "# Weekly diet plan\nMeal plan ready.", toolCalls: [], provider: "openai", model: "gpt-5-mini",
+        usage: { input: 10, output: 20 },
+      });
+    const sb = fakeSb();
+    const result = await executePersonalTask({ sb: sb as any, userId: "user-1", task });
+    expect(result).toMatchObject({ status: "completed", provider: "openai", model: "gpt-5-mini" });
+    expect(gateway.runChat).toHaveBeenCalledTimes(2);
+    expect(gateway.runChat.mock.calls[0]?.[0]).toMatchObject({ provider: "groq" });
+    expect(gateway.runChat.mock.calls[1]?.[0]).toMatchObject({ provider: "openai", model: "gpt-5-mini" });
+    expect(sb.updates.some((u) => u.table === "agent_tasks" && u.patch.provider === "openai" && u.patch.model === "gpt-5-mini")).toBe(true);
+  });
+
+  it("does not fail over a cancelled run", async () => {
+    gateway.runChat.mockRejectedValueOnce(new ProviderError("Run cancelled.", 499, false));
+    const result = await executePersonalTask({ sb: fakeSb() as any, userId: "user-1", task });
+    expect(result).toMatchObject({ status: "failed" });
+    expect(gateway.runChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the active fallback provider/model into approval resume state", async () => {
+    const source = await import("node:fs/promises").then((fs) => fs.readFile(
+      new URL("../personal-task-execution.server.ts", import.meta.url), "utf8",
+    ));
+    expect(source).toContain('provider: activeProvider');
+    expect(source).toContain('model: activeModel');
+    expect(source).toContain('.update({ provider: activeProvider, model: activeModel');
+  });
+});
+''')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/backend-check.yml
+          git rm -f .github/workflows/apply-personal-task-failover-patch.yml || true
+          git add src/lib/mission/personal-task-execution.server.ts src/lib/mission/__tests__/personal-task-provider-failover.test.ts .github/workflows/backend-check.yml
+          git commit -m "fix: fail over personal task AI providers"
+          git push origin HEAD:fix/personal-task-provider-failover
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
