@@ -12,7 +12,6 @@ export type ParsedPersonalReminder = {
 };
 
 const REMINDER_INTENT = /\bremind(?:\s+me)?\b|\breminder\b/i;
-const TIME_RE = /\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i;
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
 export function isPersonalReminderRequest(request: string): boolean {
@@ -43,12 +42,12 @@ function localParts(date: Date, timeZone: string) {
   }).formatToParts(date);
   const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
   return {
-    year: Number(map.year),
-    month: Number(map.month),
-    day: Number(map.day),
-    hour: Number(map.hour),
-    minute: Number(map.minute),
-    second: Number(map.second),
+    year: Number(map["year"]),
+    month: Number(map["month"]),
+    day: Number(map["day"]),
+    hour: Number(map["hour"]),
+    minute: Number(map["minute"]),
+    second: Number(map["second"]),
   };
 }
 
@@ -89,7 +88,7 @@ function parseClock(request: string): { hour: number; minute: number; explicit: 
   const contextual = /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i.exec(request)
     ?? /\b(\d{1,2}):(\d{2})\b/i.exec(request);
   if (!contextual) return { hour: 9, minute: 0, explicit: false };
-  let hour = Number(contextual[1]);
+  let hour = Number(contextual[1] ?? 0);
   const minute = Number(contextual[2] ?? 0);
   const meridiem = contextual[3]?.toLowerCase();
   if (meridiem === "pm" && hour < 12) hour += 12;
@@ -124,9 +123,9 @@ export function parsePersonalReminder(args: {
   let assumedTime = false;
 
   if (relative) {
-    const amount = Number(relative[1]);
+    const amount = Number(relative[1] ?? 0);
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("The reminder delay is invalid.");
-    const unit = relative[2].toLowerCase();
+    const unit = (relative[2] ?? "").toLowerCase();
     const multiplier = unit.startsWith("minute") ? 60_000 : unit.startsWith("hour") ? 3_600_000 : 86_400_000;
     due = new Date(now.getTime() + amount * multiplier);
   } else {
@@ -142,7 +141,11 @@ export function parsePersonalReminder(args: {
     } else {
       const iso = /\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/.exec(request);
       if (iso) {
-        target = { year: Number(iso[1]), month: Number(iso[2]), day: Number(iso[3]) };
+        target = {
+          year: Number(iso[1] ?? 0),
+          month: Number(iso[2] ?? 0),
+          day: Number(iso[3] ?? 0),
+        };
       } else {
         const weekdayIndex = WEEKDAYS.findIndex((day) => new RegExp(`\\b${day}\\b`, "i").test(request));
         if (weekdayIndex >= 0) {
@@ -151,7 +154,7 @@ export function parsePersonalReminder(args: {
           if (delta === 0) delta = 7;
           target = addLocalDays(nowLocal, delta);
         } else {
-          throw new Error("I couldn't find when to send that reminder. Include today, tomorrow, a weekday, a YYYY-MM-DD date, or a delay such as ‘in 20 minutes’. ");
+          throw new Error("I couldn't find when to send that reminder. Include today, tomorrow, a weekday, a YYYY-MM-DD date, or a delay such as ‘in 20 minutes’.");
         }
       }
     }
@@ -259,7 +262,10 @@ export async function processDuePersonalReminders(limit = 20) {
         .eq("user_id", claimed.user_id)
         .maybeSingle();
       if (!task || task.status === "cancelled") {
-        await sb.from("personal_reminders").update({ status: "cancelled", claimed_at: null, updated_at: new Date().toISOString() }).eq("id", claimed.id);
+        await sb
+          .from("personal_reminders")
+          .update({ status: "cancelled", claimed_at: null, updated_at: new Date().toISOString() })
+          .eq("id", claimed.id);
         continue;
       }
 
@@ -278,34 +284,52 @@ export async function processDuePersonalReminders(limit = 20) {
       }
 
       const completedAt = new Date().toISOString();
-      await sb.from("personal_reminders").update({
-        status: "delivered",
-        delivered_at: completedAt,
-        claimed_at: null,
-        last_error: null,
-        updated_at: completedAt,
-      }).eq("id", claimed.id).eq("status", "processing");
-      await sb.from("personal_tasks").update({
-        status: "completed",
-        completed_at: completedAt,
-        result: { reminder_delivered: true, reminder_id: claimed.id, due_at: claimed.due_at },
-      }).eq("id", claimed.task_id).eq("user_id", claimed.user_id).neq("status", "cancelled");
+      await sb
+        .from("personal_reminders")
+        .update({
+          status: "delivered",
+          delivered_at: completedAt,
+          claimed_at: null,
+          last_error: null,
+          updated_at: completedAt,
+        })
+        .eq("id", claimed.id)
+        .eq("status", "processing");
+      await sb
+        .from("personal_tasks")
+        .update({
+          status: "completed",
+          completed_at: completedAt,
+          result: { reminder_delivered: true, reminder_id: claimed.id, due_at: claimed.due_at },
+        })
+        .eq("id", claimed.task_id)
+        .eq("user_id", claimed.user_id)
+        .neq("status", "cancelled");
       delivered += 1;
     } catch (err) {
       const message = err instanceof Error ? err.message.slice(0, 500) : "Reminder delivery failed.";
       const attempts = Number(claimed.attempts ?? 1);
       const terminal = attempts >= 3;
-      await sb.from("personal_reminders").update({
-        status: terminal ? "failed" : "scheduled",
-        claimed_at: null,
-        last_error: message,
-        updated_at: new Date().toISOString(),
-      }).eq("id", claimed.id).eq("status", "processing");
+      await sb
+        .from("personal_reminders")
+        .update({
+          status: terminal ? "failed" : "scheduled",
+          claimed_at: null,
+          last_error: message,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", claimed.id)
+        .eq("status", "processing");
       if (terminal) {
-        await sb.from("personal_tasks").update({
-          status: "failed",
-          result: { error: "The reminder could not be delivered after multiple attempts." },
-        }).eq("id", claimed.task_id).eq("user_id", claimed.user_id).neq("status", "cancelled");
+        await sb
+          .from("personal_tasks")
+          .update({
+            status: "failed",
+            result: { error: "The reminder could not be delivered after multiple attempts." },
+          })
+          .eq("id", claimed.task_id)
+          .eq("user_id", claimed.user_id)
+          .neq("status", "cancelled");
       }
       failed += 1;
     }
