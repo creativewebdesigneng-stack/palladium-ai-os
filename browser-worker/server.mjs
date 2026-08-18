@@ -18,6 +18,7 @@ import {
   sellerLabel,
   supportedRetailerDomains,
 } from "./shopping.mjs";
+import { extractVerifiedProductPage } from "./product-page.mjs";
 
 const PORT = Number(process.env.PORT || process.env.BROWSER_WORKER_PORT || 8787);
 const TOKEN = process.env.BROWSER_WORKER_TOKEN || "";
@@ -180,6 +181,26 @@ async function searchRetailerPage(session, domain, query, currency) {
   }, { seller: sellerLabel(domain), requestedCurrency: currency });
 }
 
+async function verifyProductCandidates(session, candidates, opts) {
+  const verified = [];
+  for (const candidate of candidates.slice(0, 10)) {
+    try {
+      const target = await assertPublicHttpUrl(String(candidate.url || ""), session.allowedDomains, { requireAllowedDomain: true });
+      const response = await session.page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout: 12_000 });
+      if (response && response.status() >= 400) continue;
+      await session.page.waitForTimeout(250).catch(() => {});
+      const product = await extractVerifiedProductPage(session.page, candidate);
+      await assertPublicHttpUrl(product.url, session.allowedDomains, { requireAllowedDomain: true });
+      if (!product.specs?.verified_product_page || !product.specs?.image_url) continue;
+      verified.push(product);
+      if (verified.length >= 8) break;
+    } catch (error) {
+      console.warn("[browser-worker] product-page verification skipped:", error instanceof Error ? error.message : error);
+    }
+  }
+  return normaliseProductCandidates(verified, opts);
+}
+
 async function searchRetailers(session, params) {
   const query = safeText(params.query || "", 500).trim();
   if (!query) throw new Error("Shopping search query is required");
@@ -197,10 +218,12 @@ async function searchRetailers(session, params) {
     }
   }
 
-  return normaliseProductCandidates(candidates, {
+  const opts = {
     budget: Number.isFinite(budget) && budget > 0 ? budget : null,
     currency,
-  });
+  };
+  const ranked = normaliseProductCandidates(candidates, opts);
+  return verifyProductCandidates(session, ranked, opts);
 }
 
 async function performAction(session, action, params = {}) {
