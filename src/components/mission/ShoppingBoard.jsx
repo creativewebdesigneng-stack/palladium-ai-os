@@ -1,5 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { ShoppingBag, Star, Truck, Store, ExternalLink, PackageSearch, CheckCircle2, ShieldCheck, Bookmark, Image as ImageIcon } from 'lucide-react';
 import { formatMoney } from '@/lib/mission/catalog';
+import { getLatestVerifiedExplorerResults } from '@/lib/shopping/explorer.functions';
 
 function ProductImage({ result }) {
   const src = result?.specs?.image_url || result?.specs?.imageUrl || null;
@@ -21,13 +24,23 @@ function ProductImage({ result }) {
 }
 
 export default function ShoppingBoard({
-  shoppingResults = [],
-  purchases = [],
   loading,
   onPrepare,
   onTrack,
   busyId,
 }) {
+  const verifiedFn = useServerFn(getLatestVerifiedExplorerResults);
+  const verifiedQuery = useQuery({
+    queryKey: ['shopping-workspace', 'verified-products'],
+    queryFn: () => verifiedFn({ data: {} }),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  const shoppingResults = verifiedQuery.data?.results ?? [];
+  const purchases = verifiedQuery.data?.purchases ?? [];
+  const latestTask = verifiedQuery.data?.task ?? null;
+  const rejectedUnverified = verifiedQuery.data?.rejectedUnverified ?? 0;
   const grouped = shoppingResults.reduce((acc, r) => {
     const key = r.shopping_task_id;
     acc[key] = acc[key] ? [...acc[key], r] : [r];
@@ -35,19 +48,30 @@ export default function ShoppingBoard({
   }, {});
   const groups = Object.entries(grouped);
   const actionable = Boolean(onPrepare || onTrack);
+  const isLoading = loading || verifiedQuery.isLoading;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
       <div className="mb-4 flex items-center gap-2">
         <ShoppingBag className="h-4 w-4 text-violet-400" />
-        <h2 className="text-sm font-semibold text-white">Shopping agent</h2>
-        <p className="text-[11px] text-zinc-500">visual product comparison — purchases always need your approval</p>
+        <h2 className="text-sm font-semibold text-white">Live Explorer</h2>
+        <p className="text-[11px] text-zinc-500">verified retailer product pages only — purchases always need your approval</p>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-72 animate-pulse rounded-xl bg-white/5" />)}</div>
       ) : groups.length === 0 ? (
-        <p className="text-xs text-zinc-600">No shopping research yet. Try “I need a new office chair under £250.”</p>
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <p className="text-xs font-medium text-zinc-300">
+            {latestTask
+              ? `No verified live products were found for “${latestTask.requirement}”.`
+              : 'No live product search has been run yet.'}
+          </p>
+          <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+            Explorer will not recycle older or simulated cards. Only products confirmed on a live retailer product page with a usable image and direct product link are shown here.
+            {rejectedUnverified > 0 ? ` ${rejectedUnverified} unverified candidate${rejectedUnverified === 1 ? '' : 's'} were hidden.` : ''}
+          </p>
+        </div>
       ) : (
         <div className="space-y-6">
           {groups.map(([taskId, rows]) => {
@@ -55,7 +79,7 @@ export default function ShoppingBoard({
             return (
               <section key={taskId}>
                 <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-600">
-                  <PackageSearch className="h-3 w-3" />{rows.length} options compared
+                  <PackageSearch className="h-3 w-3" />{rows.length} verified live option{rows.length === 1 ? '' : 's'}
                   {purchase && (
                     <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] normal-case tracking-normal ${purchase.status === 'checkout_ready' ? 'bg-emerald-500/15 text-emerald-300' : purchase.status === 'rejected' ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
                       {purchase.status === 'awaiting_approval' ? 'Status: awaiting approval' : `Status: ${purchase.status.replace(/_/g, ' ')}`}
@@ -80,11 +104,9 @@ export default function ShoppingBoard({
                         {r.reason && <p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-zinc-500">{r.reason}</p>}
 
                         <div className="mt-auto pt-3">
-                          {r.url && (
-                            <a href={r.url} target="_blank" rel="noreferrer noopener" className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-500/10 px-2.5 py-2 text-[10px] font-semibold text-violet-200 hover:bg-violet-500/15">
-                              View on {r.seller || 'retailer'} <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
+                          <a href={r.url} target="_blank" rel="noreferrer noopener" className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-500/10 px-2.5 py-2 text-[10px] font-semibold text-violet-200 hover:bg-violet-500/15">
+                            View real product on {r.seller || 'retailer'} <ExternalLink className="h-3 w-3" />
+                          </a>
                           {actionable && (
                             <div className="grid grid-cols-2 gap-2">
                               {onPrepare && (
