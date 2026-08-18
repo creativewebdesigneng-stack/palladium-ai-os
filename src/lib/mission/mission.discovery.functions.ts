@@ -96,8 +96,10 @@ function requestTimeZone(explicit: string | null | undefined): string | null {
   if (explicit?.trim()) return explicit.trim();
   try {
     const request = getRequest();
-    return request?.headers.get("x-vercel-ip-timezone")
-      ?? request?.headers.get("x-palladium-timezone")
+    const cfTimezone = (request as Request & { cf?: { timezone?: string } } | undefined)?.cf?.timezone;
+    return request?.headers.get("x-palladium-timezone")
+      ?? cfTimezone
+      ?? request?.headers.get("x-vercel-ip-timezone")
       ?? null;
   } catch {
     return null;
