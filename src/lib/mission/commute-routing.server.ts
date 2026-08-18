@@ -1,5 +1,3 @@
-import "server-only";
-
 export type CommuteTravelMode = "DRIVE" | "WALK" | "BICYCLE" | "TRANSIT";
 
 export type CommuteRoute = {
