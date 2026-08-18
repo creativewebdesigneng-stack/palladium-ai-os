@@ -34,6 +34,7 @@ export type RoutingDecision = {
   requiredTools: string[];
   requiresApproval: boolean;
   involvesMoney: boolean;
+  commitmentRequested: boolean;
   autoCompletable: boolean;
   reason: string;
   budget: number | null;
@@ -47,11 +48,13 @@ export type RoutingDecision = {
 
 export type WorkspaceProvider = "google" | "microsoft";
 
-const MONEY_WORDS = /(buy|purchase|order|checkout|pay|book|reserve|subscribe)/i;
+const COMMITMENT_WORDS = /\b(buy|purchase|order|checkout|pay|book|booking|reserve|subscribe|confirm purchase|place (?:the )?order|complete (?:the )?purchase)\b/i;
+const DISCOVERY_WORDS = /\b(find|search|show|compare|recommend|research|look for|look up|price check|prices|deals?)\b/i;
+const SHOPPING_DISCOVERY_WORDS = /\b(product|item|chair|laptop|computer|pc|ink|printer|gift|t-?shirt|shirt|clothes?|clothing|shoes?|trainers?|phone|tablet|tv|television|monitor|headphones?|earbuds?|furniture|sofa|table|watch|bag|handbag|jacket|coat|dress|jeans|console|camera|appliance)\b/i;
 
 const RULES: Array<{ category: string; test: RegExp; tools: string[] }> = [
-  { category: "shopping", test: /(buy|purchase|shop|price|cheap|cheapest|deal|product|chair|laptop|ink|printer|order|gift)/i, tools: ["web_search", "shopping_search", "browser"] },
   { category: "travel", test: /(hotel|flight|trip|travel|holiday|airbnb|train|weekend away)/i, tools: ["web_search", "browser", "booking"] },
+  { category: "shopping", test: /(buy|purchase|shop|price|cheap|cheapest|deal|product|item|chair|laptop|computer|pc|ink|printer|order|gift|t-?shirt|shirt|clothes?|clothing|shoes?|trainers?|phone|tablet|tv|television|monitor|headphones?|earbuds?|furniture|sofa|table|watch|bag|handbag|jacket|coat|dress|jeans|console|camera|appliance)/i, tools: ["web_search", "shopping_search", "browser"] },
   { category: "food", test: /(meal|recipe|dinner|lunch|grocer|food|cook|menu)/i, tools: ["web_search", "documents"] },
   { category: "health", test: /(gym|workout|exercise|sleep|habit|wellness|fitness|hydrat)/i, tools: ["web_search", "reminders"] },
   { category: "finance", test: /(budget|insurance|bill|spend|saving|subscription cost)/i, tools: ["documents", "reminders"] },
@@ -92,30 +95,51 @@ export function routeRequest(
   agent?: { preferences?: unknown } | null,
 ): RoutingDecision {
   const match = RULES.find((r) => r.test.test(request));
-  const category = match?.category ?? "custom";
-  const tools = match?.tools ?? ["web_search"];
+  let category = match?.category ?? "custom";
+  let tools = match?.tools ?? ["web_search"];
   const budget = extractBudget(request);
-  const money = category === "shopping" || MONEY_WORDS.test(request) || budget !== null;
-  const sensitive = money || category === "travel";
-  const requiredTools = money && !tools.includes("checkout") && category === "shopping" ? [...tools, "checkout"] : tools;
+  const commitmentRequested = COMMITMENT_WORDS.test(request);
+
+  if (
+    category === "custom" &&
+    DISCOVERY_WORDS.test(request) &&
+    (SHOPPING_DISCOVERY_WORDS.test(request) || budget !== null)
+  ) {
+    category = "shopping";
+    tools = ["web_search", "shopping_search", "browser"];
+  }
+
+  const involvesMoney = commitmentRequested;
+  const sensitive = commitmentRequested;
+
+  if (category === "shopping") {
+    tools = tools.filter((tool) => tool !== "checkout");
+    if (commitmentRequested) tools = [...tools, "checkout"];
+  }
+  if (category === "travel" && !commitmentRequested) {
+    tools = tools.filter((tool) => tool !== "booking");
+  }
 
   return {
     category,
     title: titleFor(request),
-    requiredTools,
+    requiredTools: tools,
     requiresApproval: sensitive,
-    involvesMoney: money,
+    involvesMoney,
+    commitmentRequested,
     autoCompletable: !sensitive,
     budget,
-    estimatedCost: budget,
+    estimatedCost: commitmentRequested ? budget : null,
     priority: "normal",
     dueAt: null,
     intent: category,
     searchQuery: category === "shopping" ? request : null,
     preferences: serializablePreferences(agent?.preferences),
-    reason: sensitive
-      ? "This request can involve money or an external commitment, so the agent will prepare it and wait for your approval."
-      : "Research and organisation only — the agent can complete this on its own.",
+    reason: commitmentRequested
+      ? "This request asks the agent to make an external commitment. The agent can research and prepare it, but must wait for your approval before purchase, booking or payment."
+      : category === "shopping" || category === "travel"
+        ? "Live discovery only — the agent can search and compare results now. A budget is treated as a filter, not permission to spend money."
+        : "Research and organisation only — the agent can complete this on its own.",
   };
 }
 
