@@ -76,6 +76,7 @@ export default function ShoppingBoard({
             {googleConfigured
               ? 'Google Shopping is connected. Explorer only shows live results with a usable product image and product link.'
               : 'Google Shopping is not configured, so this search is falling back to Playwright retailer browsing. Add the server-side SERPAPI_API_KEY to activate Google Shopping product cards.'}
+            {' Explorer will not recycle older or simulated cards.'}
             {rejectedUnverified > 0 ? ` ${rejectedUnverified} unusable candidate${rejectedUnverified === 1 ? '' : 's'} were hidden.` : ''}
           </p>
         </div>
@@ -112,7 +113,7 @@ export default function ShoppingBoard({
 
                         <div className="mt-auto pt-3">
                           <a href={r.url} target="_blank" rel="noreferrer noopener" className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-500/10 px-2.5 py-2 text-[10px] font-semibold text-violet-200 hover:bg-violet-500/15">
-                            View product on {r.seller || 'seller'} <ExternalLink className="h-3 w-3" />
+                            View real product on {r.seller || 'seller'} <ExternalLink className="h-3 w-3" />
                           </a>
                           {actionable && (
                             <div className="grid grid-cols-2 gap-2">
