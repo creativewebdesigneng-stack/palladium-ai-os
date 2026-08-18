@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const missionServer = readFileSync(new URL('../mission.server.ts', import.meta.url), 'utf8');
+const missionDiscovery = readFileSync(new URL('../mission.discovery.functions.ts', import.meta.url), 'utf8');
 const missionScreen = readFileSync(new URL('../../../screens/MissionControl.jsx', import.meta.url), 'utf8');
 const metrics = readFileSync(new URL('../../../components/mission/MissionMetrics.jsx', import.meta.url), 'utf8');
 
@@ -27,6 +28,26 @@ describe('Mission Control live wiring', () => {
     expect(missionScreen).not.toContain('agents online');
     expect(missionScreen).toContain("execution?.status === 'failed'");
     expect(missionScreen).toContain("execution?.status === 'completed'");
+  });
+
+  it('routes read-only product discovery to Live Explorer before the approval executor', () => {
+    expect(missionServer).toContain('commitmentRequested');
+    expect(missionServer).toContain('A budget is treated as a filter, not permission to spend money.');
+    expect(missionDiscovery).toContain('Read-only discovery lane');
+    expect(missionDiscovery).toContain('requires_approval: false');
+    expect(missionDiscovery).not.toContain('approval_requests');
+    expect(missionDiscovery).not.toContain('purchase_requests');
+    expect(missionScreen).toContain('submitMissionDiscovery');
+    expect(missionScreen).toContain("if (discovery?.handled) return discovery");
+    expect(missionScreen).toContain("setTab('shopping')");
+    expect(missionScreen).toContain("['shopping', 'Live Explorer', ShoppingBag]");
+  });
+
+  it('keeps commitment words on the approval path', () => {
+    expect(missionServer).toContain('COMMITMENT_WORDS');
+    expect(missionServer).toContain('if (commitmentRequested) tools = [...tools, "checkout"]');
+    expect(missionDiscovery).toContain('decision.commitmentRequested');
+    expect(missionScreen).toContain("setTab(d?.requiresApproval ? 'approvals' : 'shopping')");
   });
 
   it('labels task metrics according to what they actually count', () => {
