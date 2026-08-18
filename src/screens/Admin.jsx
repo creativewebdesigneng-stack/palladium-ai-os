@@ -6,11 +6,13 @@ import Panel from '@/components/palladium/Panel';
 import AdminMetricCards from '@/components/admin/AdminMetricCards';
 import QuickActions from '@/components/admin/QuickActions';
 import SystemHealth from '@/components/admin/SystemHealth';
+import ProductionCapabilities from '@/components/admin/ProductionCapabilities';
 import AuditLog from '@/components/admin/AuditLog';
 import { RevenueChart, AIUsageChart, ErrorsChart } from '@/components/admin/AdminCharts';
 import { QUICK_ACTIONS } from '@/components/admin/adminData';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { getAdminOverview, getPlatformAnalytics, listSystemHealth } from '@/lib/admin/admin.functions';
+import { getProductionCapabilities } from '@/lib/admin/production-health.functions';
 import { listAuditLogs } from '@/lib/platform/audit.functions';
 
 function timeAgo(iso) {
@@ -27,11 +29,13 @@ export default function Admin() {
   const overviewFn = useServerFn(getAdminOverview);
   const analyticsFn = useServerFn(getPlatformAnalytics);
   const healthFn = useServerFn(listSystemHealth);
+  const capabilitiesFn = useServerFn(getProductionCapabilities);
   const auditFn = useServerFn(listAuditLogs);
 
   const overview = useQuery({ queryKey: ['admin-overview'], queryFn: () => overviewFn(), enabled: session === 'yes', retry: false });
   const analytics = useQuery({ queryKey: ['admin-analytics', 'Monthly'], queryFn: () => analyticsFn({ data: { range: 'Monthly' } }), enabled: session === 'yes', retry: false });
   const health = useQuery({ queryKey: ['admin-health'], queryFn: () => healthFn(), enabled: session === 'yes', retry: false });
+  const capabilities = useQuery({ queryKey: ['admin-production-capabilities'], queryFn: () => capabilitiesFn(), enabled: session === 'yes', retry: false, refetchInterval: 60_000 });
   const audit = useQuery({ queryKey: ['admin-audit'], queryFn: () => auditFn({ data: { limit: 8 } }), enabled: session === 'yes', retry: false });
 
   const forbidden = overview.data?.forbidden;
@@ -104,6 +108,9 @@ export default function Admin() {
         </Panel>
         <Panel title="System Health" subtitle="Live signals from the last hour">
           {services.length ? <SystemHealth services={services} /> : <EmptyChart label="Not enough traffic in the last hour to report health." />}
+        </Panel>
+        <Panel title="Launch Capabilities" subtitle="Server-side production configuration — no secrets exposed" className="xl:col-span-2">
+          <ProductionCapabilities data={capabilities.data} loading={capabilities.isLoading} />
         </Panel>
       </div>
 
