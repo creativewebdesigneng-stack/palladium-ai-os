@@ -1,4 +1,4 @@
-import { notify } from "@/lib/notifications/notify.server";
+import { notifyWithOutcome } from "@/lib/notifications/notify.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type Sb = { from: (table: string) => any };
@@ -206,7 +206,7 @@ export async function cancelPersonalReminder(sb: Sb, userId: string, taskId: str
     .update({ status: "cancelled", claimed_at: null, updated_at: new Date().toISOString() })
     .eq("task_id", taskId)
     .eq("user_id", userId)
-    .in("status", ["scheduled", "processing"]);
+    .eq("status", "scheduled");
 }
 
 async function notificationAlreadyExists(sb: Sb, reminderId: string): Promise<boolean> {
@@ -270,8 +270,9 @@ export async function processDuePersonalReminders(limit = 20) {
       }
 
       const duplicate = await notificationAlreadyExists(sb, claimed.id);
+      let suppressed = false;
       if (!duplicate) {
-        const emitted = await notify({
+        const outcome = await notifyWithOutcome({
           userId: claimed.user_id,
           orgId: claimed.org_id ?? null,
           type: "reminder.due",
@@ -280,7 +281,8 @@ export async function processDuePersonalReminders(limit = 20) {
           link: "/mission-control",
           metadata: { reminder_id: claimed.id, task_id: claimed.task_id, due_at: claimed.due_at },
         });
-        if (!emitted) throw new Error("Reminder notification could not be emitted.");
+        if (outcome === "failed") throw new Error("Reminder notification could not be emitted.");
+        suppressed = outcome === "suppressed";
       }
 
       const completedAt = new Date().toISOString();
@@ -290,7 +292,7 @@ export async function processDuePersonalReminders(limit = 20) {
           status: "delivered",
           delivered_at: completedAt,
           claimed_at: null,
-          last_error: null,
+          last_error: suppressed ? "Notification suppressed by user preferences." : null,
           updated_at: completedAt,
         })
         .eq("id", claimed.id)
@@ -300,7 +302,12 @@ export async function processDuePersonalReminders(limit = 20) {
         .update({
           status: "completed",
           completed_at: completedAt,
-          result: { reminder_delivered: true, reminder_id: claimed.id, due_at: claimed.due_at },
+          result: {
+            reminder_delivered: !suppressed,
+            reminder_suppressed: suppressed,
+            reminder_id: claimed.id,
+            due_at: claimed.due_at,
+          },
         })
         .eq("id", claimed.task_id)
         .eq("user_id", claimed.user_id)
