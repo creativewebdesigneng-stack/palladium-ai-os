@@ -4,6 +4,14 @@ import { googleShoppingConfigured } from "./google-shopping.server";
 
 type Sb = { from: (table: string) => any };
 
+type ProviderDiagnostic = {
+  googleConfigured: boolean;
+  googleUsed: boolean;
+  fallbackUsed: boolean;
+  provider: string;
+  message: string;
+};
+
 function isHttpUrl(value: unknown): boolean {
   if (typeof value !== "string" || !value.trim()) return false;
   try {
@@ -30,12 +38,21 @@ function isVerifiedProduct(row: any): boolean {
     && !String(row?.reason ?? "").includes("SIMULATED DEVELOPMENT DATA");
 }
 
-function readProviderDiagnostic(value: unknown): Record<string, unknown> | null {
+function readProviderDiagnostic(value: unknown): ProviderDiagnostic | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const result = (value as Record<string, unknown>)["provider_diagnostic"];
-  return result && typeof result === "object" && !Array.isArray(result)
-    ? result as Record<string, unknown>
-    : null;
+  if (!result || typeof result !== "object" || Array.isArray(result)) return null;
+  const raw = result as Record<string, unknown>;
+  const provider = typeof raw["provider"] === "string" ? raw["provider"] : "";
+  const message = typeof raw["message"] === "string" ? raw["message"] : "";
+  if (!provider && !message) return null;
+  return {
+    googleConfigured: raw["googleConfigured"] === true,
+    googleUsed: raw["googleUsed"] === true,
+    fallbackUsed: raw["fallbackUsed"] === true,
+    provider,
+    message,
+  };
 }
 
 /**
