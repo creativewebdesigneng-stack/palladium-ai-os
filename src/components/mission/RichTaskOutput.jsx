@@ -1,5 +1,7 @@
 import { Download, ExternalLink, FileText, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { getLiveCommuteRoute } from '@/lib/mission/commute-routing.functions';
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -198,8 +200,29 @@ function MapAction({ map }) {
 }
 
 export default function RichTaskOutput({ result, task }) {
+  const [liveRich, setLiveRich] = useState(null);
+  const fallbackMap = inferMap(task);
+  const cachedRoutes = safeArray(result?.rich?.routes).length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!task?.id || task?.status !== 'completed' || !fallbackMap || cachedRoutes) {
+      setLiveRich(null);
+      return () => { cancelled = true; };
+    }
+    getLiveCommuteRoute({ data: { taskId: task.id } })
+      .then((response) => {
+        if (!cancelled && response?.available && response?.rich) setLiveRich(response.rich);
+      })
+      .catch(() => {
+        // Keep the existing Google Maps handoff when live routing is unavailable.
+      });
+    return () => { cancelled = true; };
+  }, [task?.id, task?.status, fallbackMap?.url, cachedRoutes]);
+
   if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
-  const rich = inferRich(result, task);
+  const hydratedResult = liveRich ? { ...result, rich: { ...(result.rich || {}), ...liveRich } } : result;
+  const rich = inferRich(hydratedResult, task);
   const hasRich = rich.summary || safeArray(rich.links).length || safeArray(rich.files).length || rich.table || safeArray(rich.metrics).length || rich.map;
   if (!hasRich) return null;
 
