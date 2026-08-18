@@ -16,12 +16,7 @@ import {
   type Provider,
   type ToolDef,
 } from "@/lib/runtime/model-gateway.server";
-import {
-  executeTool,
-  resolveGrantedTools,
-  TOOL_SLUGS,
-  type ToolGrant,
-} from "@/lib/runtime/tools.server";
+import { executeTool, resolveGrantedTools, type ToolGrant } from "@/lib/runtime/tools.server";
 import {
   executeApprovedPersonalBrowserInteraction,
   PERSONAL_BROWSER_INTERACT,
@@ -99,10 +94,6 @@ const PERSONAL_SELF_QUEUING_APPROVAL_TOOLS = new Set([
   "slack_post",
 ]);
 
-// Personal tasks may only execute this bounded subset. Most approval-required
-// tools pause the durable run before execution. Self-queuing approval tools are
-// the exception: their execution only creates the existing approval request and
-// never performs the external write itself.
 const PERSONAL_SAFE_TOOLS = new Set([
   "current_time",
   "calculator",
@@ -123,10 +114,9 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "browser",
 ]);
 
-// An unassigned Mission Control task has no agent-specific grant set. Only
-// read-only/research capabilities may be derived from the server router in that
-// case. Unsupported aliases (booking, checkout, documents, reminders, etc.)
-// never become executable merely because they appeared in required_tools.
+// Unassigned Mission Control tasks may derive only read-only/research tools
+// from the server router. resolveGrantedTools still applies the executable
+// registry, catalogue state, plan gates and account-level permission rows.
 const UNASSIGNED_PERSONAL_SAFE_TOOLS = new Set([
   "current_time",
   "calculator",
@@ -139,7 +129,6 @@ const UNASSIGNED_PERSONAL_SAFE_TOOLS = new Set([
   "database_query",
   "browser",
 ]);
-const EXECUTABLE_TOOL_SLUGS = new Set<string>(TOOL_SLUGS);
 const DEFAULT_PERSONAL_TASK_AGENT_ID = "personal-task-default";
 
 function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
@@ -339,8 +328,8 @@ async function resolvePersonalTools(args: {
     return safeToolSet(await resolveGrantedTools(args.sb, args.agent, entitlements.planCode));
   }
 
-  const requested = [...new Set(args.task.required_tools ?? [])].filter(
-    (slug) => EXECUTABLE_TOOL_SLUGS.has(slug) && UNASSIGNED_PERSONAL_SAFE_TOOLS.has(slug),
+  const requested = [...new Set(args.task.required_tools ?? [])].filter((slug) =>
+    UNASSIGNED_PERSONAL_SAFE_TOOLS.has(slug),
   );
   if (!requested.length) {
     return { defs: [] as ToolDef[], grants: new Map<string, ToolGrant>() };
@@ -351,9 +340,7 @@ async function resolvePersonalTools(args: {
     allowed_tools: requested,
     requires_approval: false,
   };
-  return safeToolSet(
-    await resolveGrantedTools(args.sb, syntheticAgent, entitlements.planCode),
-  );
+  return safeToolSet(await resolveGrantedTools(args.sb, syntheticAgent, entitlements.planCode));
 }
 
 function toolMessage(call: PersonalTaskPendingToolCall, output: unknown): ChatMessage {
