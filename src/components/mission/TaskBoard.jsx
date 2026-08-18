@@ -1,5 +1,7 @@
 import { ListChecks, Clock, CheckCircle2, PlayCircle, ShieldAlert, XCircle, CalendarDays, User, Briefcase } from 'lucide-react';
 import { TASK_STATUS_STYLE, CATEGORY_LABEL } from '@/lib/mission/catalog';
+import { generatedDocumentTitle, isDocumentTask } from '@/lib/mission/document-output';
+import GeneratedDocumentCard from './GeneratedDocumentCard';
 import RichTaskOutput from './RichTaskOutput';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -18,6 +20,9 @@ function Group({ title, icon: Icon, tasks, tone, onComplete }) {
         <ul className="space-y-2">
           {tasks.slice(0, 8).map((t) => {
             const st = TASK_STATUS_STYLE[t.status] ?? TASK_STATUS_STYLE.pending;
+            const documentContent = t.status === 'completed' && isDocumentTask(t) && typeof t.result?.summary === 'string'
+              ? t.result.summary.trim()
+              : '';
             return (
               <li key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-2.5">
                 <div className="flex items-start gap-2">
@@ -34,7 +39,15 @@ function Group({ title, icon: Icon, tasks, tone, onComplete }) {
                   </div>
                   <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${st.badge}`}>{st.label}</span>
                 </div>
-                <RichTaskOutput result={t.result} task={t} />
+                {documentContent ? (
+                  <GeneratedDocumentCard
+                    title={generatedDocumentTitle(t)}
+                    content={documentContent}
+                    kind={/\b(?:meal|diet|nutrition)\b/i.test(t.request || '') ? 'meal-plan' : 'generated-document'}
+                  />
+                ) : (
+                  <RichTaskOutput result={t.result} task={t} />
+                )}
                 {onComplete && t.status !== 'completed' && (
                   <button onClick={() => onComplete(t)} className="mt-2 rounded-md border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400 transition hover:text-white">Mark done</button>
                 )}
