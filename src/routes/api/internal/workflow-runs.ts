@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
           processQueuedWorkflowRuns(limit),
           processDuePersonalReminders(Math.max(10, limit * 5)),
         ]);
-        return json({ ok: true, workflows, reminders }, 200);
+        return json({ ok: true, ...workflows, reminders }, 200);
       },
     },
   },
