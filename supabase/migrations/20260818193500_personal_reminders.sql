@@ -35,11 +35,30 @@ create policy "Users can view their own personal reminders"
   for select
   using (auth.uid() = user_id);
 
+create policy "Users can create their own personal reminders"
+  on public.personal_reminders
+  for insert
+  with check (
+    auth.uid() = user_id
+    and status = 'scheduled'
+    and attempts = 0
+    and claimed_at is null
+    and delivered_at is null
+    and last_error is null
+  );
+
 create policy "Users can cancel their own personal reminders"
   on public.personal_reminders
   for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    and status in ('scheduled', 'processing')
+  )
+  with check (
+    auth.uid() = user_id
+    and status = 'cancelled'
+    and claimed_at is null
+  );
 
 comment on table public.personal_reminders is
   'Durable one-shot reminders scheduled by explicit Mission Control reminder requests.';
