@@ -170,8 +170,12 @@ export async function searchGoogleShopping(params: {
   const payload = (await response.json()) as SerpShoppingResponse;
   if (payload.error) throw new Error(clean(payload.error, 300));
 
+  const normaliseParams: NormaliseParams = {
+    ...(params.budget !== undefined ? { budget: params.budget } : {}),
+    ...(params.currency !== undefined ? { currency: params.currency } : {}),
+  };
   return normaliseGoogleShoppingRows(
     [...(payload.shopping_results ?? []), ...(payload.inline_shopping_results ?? [])],
-    { budget: params.budget, currency: params.currency },
+    normaliseParams,
   );
 }
