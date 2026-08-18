@@ -34,3 +34,17 @@ test("normalises, ranks and budget-filters retailer products", () => {
   assert.equal(results[1].inStock, false);
   assert.ok(results.every((item) => item.price <= 80));
 });
+
+test("verified Explorer mode rejects placeholders without a verified product page and image", () => {
+  const results = normaliseProductCandidates([
+    { product: "Search page placeholder", price: 50, seller: "Shop A", url: "https://shop.test/search?q=headphones", specs: { image_url: "https://cdn.shop.test/search.jpg" } },
+    { product: "Verified without image", price: 55, seller: "Shop A", url: "https://shop.test/product/no-image", specs: { verified_product_page: true } },
+    { product: "Verified headphones", price: 60, seller: "Shop A", url: "https://shop.test/product/headphones", specs: { verified_product_page: true, image_url: "https://cdn.shop.test/headphones.jpg", canonical_url: "https://shop.test/product/headphones" } },
+  ], { budget: 80, currency: "GBP", requireVerified: true });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].product, "Verified headphones");
+  assert.equal(results[0].specs.verified_product_page, true);
+  assert.match(results[0].specs.image_url, /^https:\/\//);
+  assert.match(results[0].url, /\/product\/headphones$/);
+});
