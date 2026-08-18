@@ -3,7 +3,7 @@ import {
   isPersonalReminderRequest,
   parsePersonalReminder,
   validTimeZone,
-} from "./personal-reminders.server";
+} from "./personal-reminders";
 
 describe("personal reminder parsing", () => {
   const now = new Date("2026-08-18T12:00:00.000Z");
