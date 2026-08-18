@@ -33,7 +33,7 @@ describe('Mission Control live wiring', () => {
   it('routes read-only product discovery to Live Explorer before the approval executor', () => {
     expect(missionServer).toContain('commitmentRequested');
     expect(missionServer).toContain('A budget is treated as a filter, not permission to spend money.');
-    expect(missionDiscovery).toContain('Read-only discovery lane');
+    expect(missionDiscovery).toContain('Read-only/preparation lane');
     expect(missionDiscovery).toContain('requires_approval: false');
     expect(missionDiscovery).not.toContain('approval_requests');
     expect(missionDiscovery).not.toContain('purchase_requests');
