@@ -24,6 +24,10 @@ import {
   runChat,
   type ChatMessage,
 } from "@/lib/runtime/model-gateway.server";
+import {
+  googleShoppingConfigured,
+  searchGoogleShopping,
+} from "@/lib/shopping/google-shopping.server";
 
 type RoutingPreferenceValue = string | number | boolean | null;
 type RoutingPreferences = Record<string, RoutingPreferenceValue>;
@@ -172,6 +176,29 @@ export async function runShoppingResearch(
   const params: ShoppingResearchParams = legacy
     ? { requirement: paramsOrRequirement, budget: legacyBudget, currency: legacyCurrency, allowedDomains: legacyAllowedDomains, allowedTools: legacyAllowedTools }
     : paramsOrRequirement;
+
+  if (googleShoppingConfigured()) {
+    try {
+      const googleOffers = await searchGoogleShopping({
+        query: params.requirement,
+        budget: params.budget,
+        currency: params.currency,
+        location: process.env["GOOGLE_SHOPPING_LOCATION"]?.trim() || "United Kingdom",
+      });
+      if (googleOffers.length) {
+        const result: ShoppingResearchResult = {
+          offers: googleOffers,
+          steps: [{ kind: "search", target: "Google Shopping", detail: `${googleOffers.length} live Google Shopping results`, at: new Date().toISOString(), simulated: false }],
+          provider: "google-shopping",
+          simulated: false,
+        };
+        return legacy ? result.offers : result;
+      }
+    } catch (error) {
+      console.warn("[mission] Google Shopping provider failed; falling back to browser", error);
+    }
+  }
+
   const tool = createBrowserTool(resolveBrowserProvider(params.provider ?? null), {
     allowedDomains: params.allowedDomains,
     allowedTools: params.allowedTools,
