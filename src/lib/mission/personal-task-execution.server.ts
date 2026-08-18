@@ -16,7 +16,12 @@ import {
   type Provider,
   type ToolDef,
 } from "@/lib/runtime/model-gateway.server";
-import { executeTool, resolveGrantedTools, type ToolGrant } from "@/lib/runtime/tools.server";
+import {
+  executeTool,
+  resolveGrantedTools,
+  TOOL_SLUGS,
+  type ToolGrant,
+} from "@/lib/runtime/tools.server";
 import {
   executeApprovedPersonalBrowserInteraction,
   PERSONAL_BROWSER_INTERACT,
@@ -118,6 +123,25 @@ const PERSONAL_SAFE_TOOLS = new Set([
   "browser",
 ]);
 
+// An unassigned Mission Control task has no agent-specific grant set. Only
+// read-only/research capabilities may be derived from the server router in that
+// case. Unsupported aliases (booking, checkout, documents, reminders, etc.)
+// never become executable merely because they appeared in required_tools.
+const UNASSIGNED_PERSONAL_SAFE_TOOLS = new Set([
+  "current_time",
+  "calculator",
+  "web_search",
+  "web_fetch",
+  "memory_search",
+  "connected_service",
+  "file_analysis",
+  "data_analysis",
+  "database_query",
+  "browser",
+]);
+const EXECUTABLE_TOOL_SLUGS = new Set<string>(TOOL_SLUGS);
+const DEFAULT_PERSONAL_TASK_AGENT_ID = "personal-task-default";
+
 function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
   const lines = [
     `You are ${agent?.name ?? "a PalladiumAI personal agent"}, working inside PalladiumAI Mission Control.`,
@@ -192,6 +216,13 @@ function providerFailure(error: unknown): string {
     : "AI service temporarily unavailable.";
 }
 
+function providerFailureAudit(error: unknown): string {
+  if (error instanceof ProviderError) {
+    return `AI provider call failed (status ${error.status}, retryable ${error.retryable ? "yes" : "no"}).`;
+  }
+  return "AI runtime failed before the task could complete.";
+}
+
 async function writeFailed(sb: Sb, userId: string, taskId: string, message: string) {
   await sb
     .from("personal_tasks")
@@ -243,7 +274,7 @@ async function finishAuditRun(args: {
   outputText?: string | null;
   error?: string | null;
 }) {
-  await args.sb
+  const result = await args.sb
     .from("agent_tasks")
     .update({
       status: args.status,
@@ -261,6 +292,9 @@ async function finishAuditRun(args: {
     })
     .eq("id", args.runId)
     .eq("user_id", args.userId);
+  if (result?.error) {
+    console.error("[mission] could not finalise personal task audit run", args.runId, result.error);
+  }
 }
 
 async function blockedPersonalBrowserCall(args: {
@@ -296,13 +330,30 @@ async function resolvePersonalTools(args: {
   sb: Sb;
   userId: string;
   orgId: string | null;
+  task: PersonalTaskRow;
   agent: PersonalAgentRow;
 }) {
-  if (!args.agent?.id || !args.agent.allowed_tools?.length) {
+  const entitlements = await getEntitlements(args.sb as never, args.userId, args.orgId);
+
+  if (args.agent?.id && args.agent.allowed_tools?.length) {
+    return safeToolSet(await resolveGrantedTools(args.sb, args.agent, entitlements.planCode));
+  }
+
+  const requested = [...new Set(args.task.required_tools ?? [])].filter(
+    (slug) => EXECUTABLE_TOOL_SLUGS.has(slug) && UNASSIGNED_PERSONAL_SAFE_TOOLS.has(slug),
+  );
+  if (!requested.length) {
     return { defs: [] as ToolDef[], grants: new Map<string, ToolGrant>() };
   }
-  const entitlements = await getEntitlements(args.sb as never, args.userId, args.orgId);
-  return safeToolSet(await resolveGrantedTools(args.sb, args.agent, entitlements.planCode));
+
+  const syntheticAgent = {
+    id: DEFAULT_PERSONAL_TASK_AGENT_ID,
+    allowed_tools: requested,
+    requires_approval: false,
+  };
+  return safeToolSet(
+    await resolveGrantedTools(args.sb, syntheticAgent, entitlements.planCode),
+  );
 }
 
 function toolMessage(call: PersonalTaskPendingToolCall, output: unknown): ChatMessage {
@@ -416,7 +467,7 @@ async function runConversation(args: {
               {
                 userId: args.userId,
                 orgId: args.task.org_id ?? null,
-                agentId: args.agent?.id ?? "personal-task",
+                agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
                 taskId: args.runId,
                 sb: args.sb,
               },
@@ -550,6 +601,7 @@ export async function resumePersonalTaskApproval(args: {
     sb: args.sb,
     userId: args.userId,
     orgId: task.org_id ?? null,
+    task,
     agent,
   });
   const grant = tools.grants.get(state.pendingCall.name);
@@ -593,7 +645,7 @@ export async function resumePersonalTaskApproval(args: {
             {
               userId: args.userId,
               orgId: task.org_id ?? null,
-              agentId: agent?.id ?? "personal-task",
+              agentId: agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
               taskId: String(run.id),
               sb: args.sb,
             },
@@ -666,7 +718,7 @@ export async function resumePersonalTaskApproval(args: {
       status: "failed",
       usage,
       toolCalls: state.toolCalls,
-      error: message,
+      error: providerFailureAudit(error),
     });
     await writeFailed(args.sb, args.userId, task.id, message);
     return { status: "failed", error: message, runId: String(run.id) };
@@ -709,6 +761,7 @@ export async function executePersonalTask(args: {
       sb,
       userId,
       orgId: task.org_id ?? null,
+      task,
       agent,
     });
     const outcome = await runConversation({
@@ -758,7 +811,7 @@ export async function executePersonalTask(args: {
         status: "failed",
         usage,
         toolCalls,
-        error: message,
+        error: providerFailureAudit(error),
       });
     }
     await writeFailed(sb, userId, task.id, message);
