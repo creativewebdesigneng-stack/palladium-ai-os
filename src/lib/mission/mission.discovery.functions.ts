@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
+import {
+  isPersonalReminderRequest,
+  parsePersonalReminder,
+  persistPersonalReminder,
+} from "./personal-reminders.server";
 import { routeRequest, runShoppingResearch } from "./mission.server";
 
 type Sb = { from: (table: string) => any };
@@ -8,6 +13,7 @@ type Sb = { from: (table: string) => any };
 type DiscoveryInput = {
   request: string;
   agentId?: string | null;
+  timezone?: string | null;
 };
 
 const DEFAULT_DOMAINS = [
@@ -85,15 +91,34 @@ function providerDiagnostic(configured: boolean, provider: string, results: numb
   };
 }
 
+async function requestTimeZone(explicit: string | null | undefined): Promise<string | null> {
+  if (explicit?.trim()) return explicit.trim();
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    const cfTimezone = (request as Request & { cf?: { timezone?: string } } | undefined)?.cf?.timezone;
+    return request?.headers.get("x-palladium-timezone")
+      ?? cfTimezone
+      ?? request?.headers.get("x-vercel-ip-timezone")
+      ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Read-only discovery lane used by Mission Control before the normal task
- * executor. It may search and compare live product listings, but it never
- * prepares checkout, creates an approval request, or records a purchase.
+ * Read-only/preparation lane used by Mission Control before the normal task
+ * executor. It may schedule an explicit one-shot reminder or search and compare
+ * live product listings, but it never creates a purchase or external commitment.
  */
 export const submitMissionDiscovery = createServerFn({ method: "POST" })
   .inputValidator((input: DiscoveryInput) => {
     if (!input?.request?.trim()) throw new Error("Tell your agent what you need");
-    return { request: input.request.trim(), agentId: input.agentId ?? null };
+    return {
+      request: input.request.trim(),
+      agentId: input.agentId ?? null,
+      timezone: input.timezone?.trim().slice(0, 100) || null,
+    };
   })
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -112,6 +137,95 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
     const agent = agentRes.data;
 
     const decision = routeRequest(data.request, agent);
+
+    if (isPersonalReminderRequest(data.request)) {
+      const parsed = parsePersonalReminder({
+        request: data.request,
+        timezone: await requestTimeZone(data.timezone),
+      });
+      if (!parsed) throw new Error("Could not parse reminder request.");
+
+      const taskRes = await sb
+        .from("personal_tasks")
+        .insert({
+          user_id: userId,
+          agent_id: agent?.id ?? null,
+          title: decision.title,
+          request: data.request,
+          category: "organisation",
+          status: "queued",
+          priority: decision.priority,
+          scope: agent?.scope ?? "personal",
+          due_at: parsed.dueAt,
+          involves_money: false,
+          required_tools: ["reminders"],
+          requires_approval: false,
+          result: {
+            type: "scheduled_reminder",
+            due_at: parsed.dueAt,
+            timezone: parsed.timezone,
+            assumed_time: parsed.assumedTime,
+          },
+        })
+        .select()
+        .maybeSingle();
+      if (taskRes.error || !taskRes.data) {
+        throw new Error(taskRes.error?.message ?? "Could not create reminder task");
+      }
+      const task = taskRes.data;
+
+      try {
+        const reminder = await persistPersonalReminder({
+          sb,
+          userId,
+          orgId: task.org_id ?? null,
+          taskId: task.id,
+          parsed,
+        });
+        await activity(sb, userId, `Reminder scheduled: ${parsed.body}`, "task_scheduled", {
+          agent_id: agent?.id ?? null,
+          task_id: task.id,
+          metadata: { due_at: parsed.dueAt, timezone: parsed.timezone },
+        });
+        await audit(sb, userId, "personal_reminder_scheduled", {
+          agent_id: agent?.id ?? null,
+          target_type: "personal_reminder",
+          target_id: reminder.id,
+          metadata: {
+            task_id: task.id,
+            due_at: parsed.dueAt,
+            timezone: parsed.timezone,
+            assumed_time: parsed.assumedTime,
+          },
+        });
+        return {
+          handled: true as const,
+          reminder: true as const,
+          taskId: task.id,
+          decision: { ...decision, dueAt: parsed.dueAt },
+          scheduledReminder: {
+            id: reminder.id,
+            dueAt: parsed.dueAt,
+            timezone: parsed.timezone,
+            body: parsed.body,
+            assumedTime: parsed.assumedTime,
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not schedule reminder";
+        await sb
+          .from("personal_tasks")
+          .update({ status: "failed", result: { error: message } })
+          .eq("id", task.id)
+          .eq("user_id", userId);
+        await activity(sb, userId, `Reminder scheduling failed: ${message}`, "failed", {
+          agent_id: agent?.id ?? null,
+          task_id: task.id,
+        });
+        throw error;
+      }
+    }
+
     if (decision.category !== "shopping" || decision.commitmentRequested || decision.requiresApproval) {
       return { handled: false as const, decision };
     }

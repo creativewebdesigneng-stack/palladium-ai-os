@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { processDuePersonalReminders } from "@/lib/mission/personal-reminders.server";
 import { processQueuedWorkflowRuns } from "@/lib/runtime/workflow-queue.server";
 import { isValidRuntimeWorkerToken } from "@/lib/runtime/runtime-worker-auth.server";
 
 /**
- * Scheduler endpoint for durable workflow execution.
+ * Scheduler endpoint for durable workflow and personal reminder execution.
  *
  * Configure a deployment scheduler to POST here with:
  *   Authorization: Bearer <WORKFLOW_RUNNER_CRON_SECRET>
  *
- * The caller cannot choose a workflow, user, agent or run id. The worker only
- * claims rows already persisted in PalladiumAI's workflow queue.
+ * The caller cannot choose a workflow, user, agent, run id or reminder. The
+ * worker only claims rows already persisted in PalladiumAI's durable queues.
  */
 export const Route = createFileRoute("/api/internal/workflow-runs")({
   server: {
@@ -26,8 +27,11 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         const limit = Number.isFinite(requested)
           ? Math.max(1, Math.min(4, Math.trunc(requested)))
           : 2;
-        const result = await processQueuedWorkflowRuns(limit);
-        return json({ ok: true, ...result }, 200);
+        const [workflows, reminders] = await Promise.all([
+          processQueuedWorkflowRuns(limit),
+          processDuePersonalReminders(Math.max(10, limit * 5)),
+        ]);
+        return json({ ok: true, ...workflows, reminders }, 200);
       },
     },
   },
