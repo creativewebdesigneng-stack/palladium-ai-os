@@ -35,8 +35,8 @@ describe('Mission Control live wiring', () => {
     expect(missionServer).toContain('A budget is treated as a filter, not permission to spend money.');
     expect(missionDiscovery).toContain('read-only discovery lane');
     expect(missionDiscovery).toContain('requires_approval: false');
-    expect(missionDiscovery).not.toContain('approval_requests').toBeTruthy;
-    expect(missionDiscovery).not.toContain('purchase_requests').toBeTruthy;
+    expect(missionDiscovery).not.toContain('approval_requests');
+    expect(missionDiscovery).not.toContain('purchase_requests');
     expect(missionScreen).toContain('submitMissionDiscovery');
     expect(missionScreen).toContain("if (discovery?.handled) return discovery");
     expect(missionScreen).toContain("setTab('shopping')");
