@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  isLikelyProductUrl,
   normaliseProductCandidates,
   retailerSearchUrl,
   sellerLabel,
@@ -16,6 +17,17 @@ test("builds real search URLs only for supported allowlisted retailers", () => {
     ["amazon.co.uk", "argos.co.uk"],
   );
   assert.equal(sellerLabel("currys.co.uk"), "Currys");
+});
+
+test("recognises direct retailer product URLs and rejects search/category URLs", () => {
+  assert.equal(isLikelyProductUrl("amazon.co.uk", "https://www.amazon.co.uk/dp/B0ABC12345?th=1"), true);
+  assert.equal(isLikelyProductUrl("amazon.co.uk", "https://www.amazon.co.uk/s?k=chair"), false);
+  assert.equal(isLikelyProductUrl("johnlewis.com", "https://www.johnlewis.com/example-chair/p1234567"), true);
+  assert.equal(isLikelyProductUrl("argos.co.uk", "https://www.argos.co.uk/product/1234567"), true);
+  assert.equal(isLikelyProductUrl("currys.co.uk", "https://www.currys.co.uk/products/example-chair-10200000.html"), true);
+  assert.equal(isLikelyProductUrl("ikea.com", "https://www.ikea.com/gb/en/p/markus-office-chair-vissle-dark-grey-70261150/"), true);
+  assert.equal(isLikelyProductUrl("tesco.com", "https://www.tesco.com/groceries/en-GB/products/123456789"), true);
+  assert.equal(isLikelyProductUrl("amazon.co.uk", "https://example.com/dp/B0ABC12345"), false);
 });
 
 test("normalises, ranks and budget-filters retailer products", () => {
