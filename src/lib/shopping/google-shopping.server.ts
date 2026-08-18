@@ -99,7 +99,7 @@ export async function searchGoogleShopping(params: {
       inStock: true,
       specs: {
         image_url: imageUrl,
-        verified_product_page: "true",
+        verified_product_page: true as unknown as string,
         source: "Google Shopping live result",
         google_shopping: "true",
         ...(Number.isFinite(Number(row.reviews)) ? { reviews: String(row.reviews) } : {}),
