@@ -97,10 +97,11 @@ export async function computeCommuteRoutes(request: string): Promise<CommuteRout
 
   const payload = (await response.json()) as { routes?: Array<Record<string, any>> };
   const routes = (payload.routes ?? []).slice(0, 3).map((route) => {
-    const durationSeconds = parseDuration(route.duration) ?? 0;
-    const staticDurationSeconds = parseDuration(route.staticDuration);
+    const durationSeconds = parseDuration(route["duration"]) ?? 0;
+    const staticDurationSeconds = parseDuration(route["staticDuration"]);
     const trafficDelaySeconds = staticDurationSeconds === null ? null : Math.max(0, durationSeconds - staticDurationSeconds);
-    const distanceMeters = Number(route.distanceMeters ?? 0);
+    const distanceMeters = Number(route["distanceMeters"] ?? 0);
+    const polyline = route["polyline"] as Record<string, unknown> | undefined;
     return {
       durationSeconds,
       staticDurationSeconds,
@@ -109,7 +110,7 @@ export async function computeCommuteRoutes(request: string): Promise<CommuteRout
       durationText: formatDuration(durationSeconds),
       trafficDelaySeconds,
       trafficDelayText: trafficDelaySeconds && trafficDelaySeconds >= 60 ? `+${formatDuration(trafficDelaySeconds)} traffic` : null,
-      encodedPolyline: typeof route.polyline?.encodedPolyline === "string" ? route.polyline.encodedPolyline : null,
+      encodedPolyline: typeof polyline?.["encodedPolyline"] === "string" ? polyline["encodedPolyline"] : null,
     } satisfies CommuteRoute;
   }).filter((route) => route.durationSeconds > 0 && route.distanceMeters > 0);
 
