@@ -151,6 +151,14 @@ async function searchRetailerPage(session, domain, query, currency) {
       if (seen.has(key)) continue;
       seen.add(key);
 
+      const image = container?.querySelector("img");
+      let imageUrl = "";
+      const imageCandidate = image?.currentSrc || image?.src || image?.getAttribute("data-src") || image?.getAttribute("data-lazy-src") || "";
+      try {
+        const resolvedImage = imageCandidate ? new URL(imageCandidate, location.href) : null;
+        if (resolvedImage && (resolvedImage.protocol === "https:" || resolvedImage.protocol === "http:")) imageUrl = resolvedImage.toString();
+      } catch {}
+
       const ratingMatch = text.match(/([0-5](?:\.\d)?)\s*(?:out of 5|stars?)/i);
       const inStock = !/(out of stock|currently unavailable|not available)/i.test(text);
       out.push({
@@ -163,7 +171,7 @@ async function searchRetailerPage(session, domain, query, currency) {
         rating: ratingMatch ? Number(ratingMatch[1]) : 0,
         url: href,
         inStock,
-        specs: { source: "live retailer search" },
+        specs: { source: "live retailer search", ...(imageUrl ? { image_url: imageUrl } : {}) },
         reason: "Live retailer search result matching the shopping request.",
       });
       if (out.length >= 8) break;
