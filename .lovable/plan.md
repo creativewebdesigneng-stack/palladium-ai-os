@@ -1,65 +1,44 @@
-# Launch Configuration Audit — 11 Missing Settings
+# Plan: Add SERPAPI_API_KEY to Published Server Runtime
 
-Audit only. No code, secrets, schema, or settings were changed. No existing secret values were read or shown.
+## Goal
+Make `SERPAPI_API_KEY` available to the published PalladiumAI server runtime so `src/lib/shopping/google-shopping.server.ts` can reach SerpApi, without exposing the key value in any code, logs, or UI.
 
-## Verdict
+## Mechanism for adding the secret
 
-**None of the 11 are required for core launch.** The app boots, signs users in, runs agents (OpenAI key already present), bills through Stripe, and executes workflows on demand without any of them. Each one gates one specific optional feature, and every gate fails clearly rather than faking behaviour.
+1. **Open Project Settings → Secrets** in the Lovable editor for the PalladiumAI project.
+2. **Add a new Runtime secret** (not a Build secret):
+   - Name: `SERPAPI_API_KEY`
+   - Value: the SerpApi API key obtained from the SerpApi dashboard.
+3. **Save the secret.** Lovable stores it in the project-level secret manager and injects it into server function handlers at runtime.
+4. **Why this works:** `src/lib/shopping/google-shopping.server.ts` reads the value inside its handler with `process.env['SERPAPI_API_KEY']`, which is the canonical pattern for Lovable Cloud/TanStack Start server-only secrets. The value is never bundled into the browser bundle because it is read only inside a server function module.
 
-## Per-setting findings
+## Redeploy / re-publish requirement
 
-### 1. E2B_API_KEY — Builder sandbox validation
-- Read in `src/lib/builder/builder-sandbox.server.ts:86` (throws "E2B sandbox is not configured.").
-- Reached from `src/lib/builder/builder-sandbox.functions.ts`, surfaced in `src/screens/Builder.jsx`.
-- Required for launch: **No** — only for running install/build/test stages of Builder-generated apps.
-- Format: E2B API key from e2b.dev (`e2b_...`). Cannot be derived automatically.
+- **Yes, a re-publish is required.** Lovable Cloud runtime secrets are injected into the serverless environment at deploy time; adding or changing a secret does not automatically roll out to the currently live published deployment.
+- After saving the secret in Project Settings, trigger a fresh publish from the Lovable editor. The new deployment will then include `SERPAPI_API_KEY` in its server function runtime environment.
+- The preview environment will also pick up the secret on its next build, but the published production URL only updates after a successful publish.
 
-### 2. VERCEL_TOKEN — Builder preview deployment
-- Read in `src/lib/builder/builder-deploy-vercel.server.ts:20` (throws "Vercel preview deployment is not configured.").
-- Reached from `src/lib/builder/builder-deploy.functions.ts`.
-- Required for launch: **No** — only for deploying Builder output to Vercel previews.
-- Format: Vercel personal/team access token. Not derivable.
+## Verification without exposing the value
 
-### 3. VERCEL_TEAM_ID — optional companion to the above
-- Read in `builder-deploy-vercel.server.ts:22`, already optional (`|| null`).
-- Required for launch: **No**. Only needed if the Vercel token belongs to a team scope rather than a personal account.
-- Format: `team_...`. Not derivable.
+Use one of these read-only, non-exposing approaches:
 
-### 4. APP_ORIGIN — canonical public origin for OAuth redirects
-- Read in `src/lib/integrations/oauth.server.ts:68` (`safeOrigin`), used by `integrations.functions.ts` and `github.functions.ts` to build `redirect_uri`.
-- Required for launch: **No, with a caveat.** When unset, the code falls back to the request origin and accepts it only if it is `https://*.lovable.app`, `https://*.lovable.dev`, or localhost. Current hosting satisfies that, so third-party OAuth redirects work today.
-- Becomes required the moment a custom domain is attached — otherwise `safeOrigin` throws "Unsupported application origin for the OAuth redirect."
-- Safe derivable value: `https://palladium-ai-os.lovable.app` (no trailing slash) — the current published URL. This is the only one of the 11 with a value derivable from the project.
+1. **Code-level readiness check:** `googleShoppingConfigured()` in `src/lib/shopping/google-shopping.server.ts` returns `Boolean(process.env['SERPAPI_API_KEY']?.trim())`. A server function can call this and return only `{ configured: true/false }` — never the key itself.
+2. **Functional smoke test:** Trigger a live `searchGoogleShopping({ query: "test" })` call from the published server and return only:
+   - `success: true/false`
+   - HTTP status or error category (e.g., `serpapi_unauthorized`, `network_error`, `empty_results`)
+   - count of normalized offers
+   No raw SerpApi response or key is returned.
+3. **Browser UI check:** In the published app, attempt a shopping search in the Shopping/Explorer module. If results load from Google Shopping, the key is present and valid. If it silently falls back to Playwright/browser fallback, the key is missing or invalid.
 
-### 5–9. GITHUB_APP_ID / GITHUB_APP_SLUG / GITHUB_APP_CLIENT_ID / GITHUB_APP_CLIENT_SECRET / GITHUB_APP_PRIVATE_KEY
-- Read via `requiredEnv()` in `src/lib/integrations/github-app.server.ts` (lines 54, 61–68, 84, 89–90, 123–124, 147–148). Readiness helpers already report "not configured" instead of throwing at import.
-- Guidance text shown to users in `src/screens/CodeExplorer.jsx:273`.
-- Required for launch: **No** — they gate the GitHub repository integration (Code Explorer / repo reads and writes) only.
-- Formats enforced by the code:
-  - `GITHUB_APP_ID` — digits only (`/^\d+$/`).
-  - `GITHUB_APP_SLUG` — lowercase slug, `[a-z0-9][a-z0-9-]{0,99}`.
-  - `GITHUB_APP_CLIENT_ID` — GitHub App client id (`Iv1.` / `Iv23...`).
-  - `GITHUB_APP_CLIENT_SECRET` — GitHub-issued secret string.
-  - `GITHUB_APP_PRIVATE_KEY` — full PEM; literal `\n` sequences are accepted and unescaped at read time, so a single-line PEM is fine.
-- All five come from a GitHub App you create; none are derivable. The App callback URL is `${APP_ORIGIN}/api/public/integrations/github-callback`, so APP_ORIGIN should be set first.
+## Recommended verification steps
 
-### 10. WEBHOOK_RETRY_CRON_SECRET — scheduler bearer for webhook retries
-- Read in `src/routes/api/internal/webhook-retries.ts:18`. Endpoint returns 503 "not configured" unless the value is at least 32 characters; otherwise it timing-safe compares the `Authorization: Bearer` header.
-- Required for launch: **No for the app to run; yes for reliable webhook delivery.** Without it, failed developer-API webhook deliveries are queued but never retried.
-- Format: random string, minimum 32 chars (64 recommended). Must be identical in the app and in whatever scheduler POSTs the endpoint, so it is a shared value the user must hold — generated by them, not auto-minted.
+1. Add `SERPAPI_API_KEY` in Project Settings → Secrets.
+2. Publish the project from the Lovable editor.
+3. After publish completes, run a server-side smoke test that calls `searchGoogleShopping` with a trivial query and returns only the boolean/result-count summary.
+4. Confirm the response shows real Google Shopping offers (or a clear non-sensitive error category if the key is invalid) rather than an empty fallback.
 
-### 11. WORKFLOW_RUNNER_CRON_SECRET — scheduler bearer for queued workflow runs
-- Read in `src/routes/api/internal/workflow-runs.ts:18`, same 32-char minimum and timing-safe check.
-- Required for launch: **No for the app to run; yes for durable/queued workflow execution.** Interactive runs are unaffected; rows sitting in the workflow queue will not drain without a scheduler calling this endpoint.
-- Format: same as above — random 32+ chars, shared with the scheduler.
+## Out of scope for this plan
 
-## Recommended launch minimum
-
-1. `APP_ORIGIN` = `https://palladium-ai-os.lovable.app` (safe, derivable, future-proofs a custom domain).
-2. The two cron secrets, if queued workflows and webhook retries should actually drain in production.
-3. Everything else (E2B, Vercel, GitHub App) only when you want Builder sandboxing/deploys or the GitHub integration live.
-
-## Caveats
-
-- Findings come from reading source and the checked-in `.env.example`; no runtime probe was performed and no secret values were inspected.
-- I can only see secrets in this project's Lovable secret store; anything set outside it is invisible to this audit.
+- No code changes, schema changes, or migrations.
+- No changes to existing secrets, provider routing, or model settings.
+- The key value itself will not be requested, shown, or logged.
