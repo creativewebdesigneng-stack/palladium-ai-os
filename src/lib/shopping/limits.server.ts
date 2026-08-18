@@ -112,6 +112,23 @@ const money = (currency: string, value: number) => `${currency} ${value.toFixed(
 export function checkAgainstLimits(total: number, limits: SpendLimits): LimitVerdict {
   const amount = Math.round(total * 100) / 100;
 
+  // Read-only discovery never calls this gate. A monetary action must have at
+  // least one explicit user/agent ceiling before PalladiumAI will prepare it.
+  // This makes a missing spend_limits row fail closed rather than meaning
+  // "unlimited" by accident.
+  if (
+    limits.perTransaction == null &&
+    limits.userMonthlyCap == null &&
+    limits.agentMonthlyCap == null
+  ) {
+    return {
+      ok: false,
+      limits,
+      reason:
+        "Set a spend limit before preparing a purchase. Product search and comparison remain available without a spend limit.",
+    };
+  }
+
   if (limits.perTransaction != null && amount > limits.perTransaction) {
     return {
       ok: false,
