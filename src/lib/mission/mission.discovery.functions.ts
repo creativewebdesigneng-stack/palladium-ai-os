@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
 import { routeRequest, runShoppingResearch } from "./mission.server";
 
 type Sb = { from: (table: string) => any };
@@ -53,6 +54,35 @@ async function audit(
     status: "success",
     metadata: (extra["metadata"] as Record<string, unknown>) ?? {},
   });
+}
+
+function providerDiagnostic(configured: boolean, provider: string, results: number) {
+  const googleUsed = provider === "google-shopping";
+  if (googleUsed) {
+    return {
+      googleConfigured: true,
+      googleUsed: true,
+      fallbackUsed: false,
+      provider,
+      message: `Google Shopping returned ${results} live product${results === 1 ? "" : "s"} for this search.`,
+    };
+  }
+  if (!configured) {
+    return {
+      googleConfigured: false,
+      googleUsed: false,
+      fallbackUsed: true,
+      provider,
+      message: `Google Shopping is not configured in this runtime, so Live Explorer used ${provider}.`,
+    };
+  }
+  return {
+    googleConfigured: true,
+    googleUsed: false,
+    fallbackUsed: true,
+    provider,
+    message: `Google Shopping was configured but returned no usable products or failed, so Live Explorer fell back to ${provider}.`,
+  };
 }
 
 /**
@@ -141,6 +171,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
     });
 
     try {
+      const googleConfigured = googleShoppingConfigured();
       const research = await runShoppingResearch({
         requirement: decision.searchQuery ?? data.request,
         budget,
@@ -170,6 +201,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
         : { data: [], error: null };
       if (resultsRes.error) throw new Error(resultsRes.error.message);
       const results = resultsRes.data ?? [];
+      const diagnostic = providerDiagnostic(googleConfigured, research.provider, results.length);
 
       await sb
         .from("shopping_tasks")
@@ -187,6 +219,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
             shopping_task_id: shoppingTask.id,
             provider: research.provider,
             simulated: research.simulated,
+            provider_diagnostic: diagnostic,
           },
         })
         .eq("id", task.id)
@@ -197,7 +230,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
         userId,
         `Live Explorer found ${results.length} matching option${results.length === 1 ? "" : "s"}`,
         "results_found",
-        { agent_id: agent?.id ?? null, task_id: task.id },
+        { agent_id: agent?.id ?? null, task_id: task.id, metadata: { provider_diagnostic: diagnostic } },
       );
       await audit(sb, userId, "discovery_search_performed", {
         agent_id: agent?.id ?? null,
@@ -209,6 +242,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
           provider: research.provider,
           simulated: research.simulated,
           read_only: true,
+          provider_diagnostic: diagnostic,
         },
       });
 
@@ -221,6 +255,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
         results,
         provider: research.provider,
         simulated: research.simulated,
+        providerDiagnostic: diagnostic,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Live discovery failed";

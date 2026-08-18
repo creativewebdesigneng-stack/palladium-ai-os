@@ -4,21 +4,31 @@ type SerpShoppingResult = {
   title?: string;
   source?: string;
   price?: string;
-  extracted_price?: number;
+  extracted_price?: number | string;
   delivery?: string;
-  rating?: number;
-  reviews?: number;
+  rating?: number | string;
+  reviews?: number | string;
   thumbnail?: string;
+  thumbnails?: string[];
   serpapi_thumbnail?: string;
+  serpapi_thumbnails?: string[];
   product_link?: string;
   link?: string;
   tracking_link?: string;
+  product_id?: string | number;
+  immersive_product_page_token?: string;
+  serpapi_immersive_product_api?: string;
 };
 
 type SerpShoppingResponse = {
   shopping_results?: SerpShoppingResult[];
   inline_shopping_results?: SerpShoppingResult[];
   error?: string;
+};
+
+type NormaliseParams = {
+  budget?: number | null;
+  currency?: string;
 };
 
 function isHttpUrl(value: unknown): value is string {
@@ -33,6 +43,98 @@ function isHttpUrl(value: unknown): value is string {
 
 function clean(value: unknown, max = 500): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function parsePositiveNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function parsePrice(extracted: unknown, display: unknown): number | null {
+  const direct = parsePositiveNumber(extracted);
+  if (direct !== null) return direct;
+
+  const text = clean(display, 100).replace(/,/g, "");
+  const match = text.match(/(?:GBP|USD|EUR|£|\$|€)?\s*(\d+(?:\.\d{1,2})?)/i);
+  return match?.[1] ? parsePositiveNumber(match[1]) : null;
+}
+
+function firstHttpUrl(values: unknown[]): string | null {
+  for (const value of values) {
+    if (isHttpUrl(value)) return value;
+    if (Array.isArray(value)) {
+      const nested = value.find(isHttpUrl);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+export function normaliseGoogleShoppingRows(
+  rows: SerpShoppingResult[],
+  params: NormaliseParams = {},
+): BrowserProductOffer[] {
+  const budget = params.budget != null && Number.isFinite(Number(params.budget)) && Number(params.budget) > 0
+    ? Number(params.budget)
+    : null;
+  const currency = clean(params.currency ?? "GBP", 8).toUpperCase() || "GBP";
+  const seen = new Set<string>();
+  const offers: BrowserProductOffer[] = [];
+
+  for (const row of rows) {
+    const product = clean(row.title, 300);
+    const seller = clean(row.source, 120) || "Google Shopping seller";
+    const price = parsePrice(row.extracted_price, row.price);
+    const imageUrl = firstHttpUrl([
+      row.thumbnail,
+      row.serpapi_thumbnail,
+      row.thumbnails,
+      row.serpapi_thumbnails,
+    ]);
+    const productUrl = firstHttpUrl([row.link, row.product_link, row.tracking_link]);
+
+    if (!product || price === null || !imageUrl || !productUrl) continue;
+    if (budget != null && price > budget) continue;
+
+    const productId = clean(row.product_id, 160);
+    const dedupeKey = productId
+      ? `id:${productId}`
+      : `${product.toLowerCase()}|${seller.toLowerCase()}|${price}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const ratingNumber = Number(row.rating);
+    offers.push({
+      product,
+      price: Math.round(price * 100) / 100,
+      currency,
+      seller,
+      delivery: clean(row.delivery, 200) || "Check seller for delivery",
+      deliveryCost: 0,
+      rating: Number.isFinite(ratingNumber) ? Math.max(0, Math.min(5, ratingNumber)) : 0,
+      url: productUrl,
+      inStock: true,
+      specs: {
+        image_url: imageUrl,
+        verified_product_page: "true",
+        source: "Google Shopping live result",
+        source_provider: "google-shopping",
+        google_shopping: "true",
+        ...(productId ? { google_product_id: productId } : {}),
+        ...(clean(row.immersive_product_page_token, 500)
+          ? { google_immersive_token: clean(row.immersive_product_page_token, 500) }
+          : {}),
+        ...(isHttpUrl(row.serpapi_immersive_product_api)
+          ? { serpapi_immersive_product_api: row.serpapi_immersive_product_api }
+          : {}),
+        ...(Number.isFinite(Number(row.reviews)) ? { reviews: String(row.reviews) } : {}),
+      },
+      reason: "Live Google Shopping result matching the request.",
+    });
+    if (offers.length >= 16) break;
+  }
+
+  return offers;
 }
 
 export function googleShoppingConfigured(): boolean {
@@ -68,46 +170,12 @@ export async function searchGoogleShopping(params: {
   const payload = (await response.json()) as SerpShoppingResponse;
   if (payload.error) throw new Error(clean(payload.error, 300));
 
-  const rows = [...(payload.shopping_results ?? []), ...(payload.inline_shopping_results ?? [])];
-  const budget = params.budget != null && Number.isFinite(Number(params.budget)) && Number(params.budget) > 0
-    ? Number(params.budget)
-    : null;
-  const seen = new Set<string>();
-  const offers: BrowserProductOffer[] = [];
-
-  for (const row of rows) {
-    const product = clean(row.title, 300);
-    const seller = clean(row.source, 120) || "Google Shopping seller";
-    const price = Number(row.extracted_price);
-    const imageUrl = isHttpUrl(row.thumbnail) ? row.thumbnail : isHttpUrl(row.serpapi_thumbnail) ? row.serpapi_thumbnail : null;
-    const productUrl = isHttpUrl(row.link) ? row.link : isHttpUrl(row.product_link) ? row.product_link : isHttpUrl(row.tracking_link) ? row.tracking_link : null;
-    if (!product || !Number.isFinite(price) || price <= 0 || !imageUrl || !productUrl) continue;
-    if (budget != null && price > budget) continue;
-    const key = `${product.toLowerCase()}|${seller.toLowerCase()}|${price}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    offers.push({
-      product,
-      price: Math.round(price * 100) / 100,
-      currency: clean(params.currency ?? "GBP", 8).toUpperCase(),
-      seller,
-      delivery: clean(row.delivery, 200) || "Check seller for delivery",
-      deliveryCost: 0,
-      rating: Number.isFinite(Number(row.rating)) ? Math.max(0, Math.min(5, Number(row.rating))) : 0,
-      url: productUrl,
-      inStock: true,
-      specs: {
-        image_url: imageUrl,
-        verified_product_page: true as unknown as string,
-        source: "Google Shopping live result",
-        google_shopping: "true",
-        ...(Number.isFinite(Number(row.reviews)) ? { reviews: String(row.reviews) } : {}),
-      },
-      reason: "Live Google Shopping result matching the request.",
-    });
-    if (offers.length >= 16) break;
-  }
-
-  return offers;
+  const normaliseParams: NormaliseParams = {
+    ...(params.budget !== undefined ? { budget: params.budget } : {}),
+    ...(params.currency !== undefined ? { currency: params.currency } : {}),
+  };
+  return normaliseGoogleShoppingRows(
+    [...(payload.shopping_results ?? []), ...(payload.inline_shopping_results ?? [])],
+    normaliseParams,
+  );
 }

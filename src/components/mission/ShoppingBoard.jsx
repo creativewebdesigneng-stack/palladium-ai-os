@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { ShoppingBag, Star, Truck, Store, ExternalLink, PackageSearch, CheckCircle2, ShieldCheck, Bookmark, Image as ImageIcon, SearchCheck, TriangleAlert } from 'lucide-react';
+import { ShoppingBag, Star, Truck, Store, ExternalLink, PackageSearch, CheckCircle2, ShieldCheck, Bookmark, Image as ImageIcon, SearchCheck, TriangleAlert, Route } from 'lucide-react';
 import { formatMoney } from '@/lib/mission/catalog';
 import { getLatestVerifiedExplorerResults } from '@/lib/shopping/explorer.functions';
 
@@ -42,6 +42,10 @@ export default function ShoppingBoard({
   const latestTask = verifiedQuery.data?.task ?? null;
   const rejectedUnverified = verifiedQuery.data?.rejectedUnverified ?? 0;
   const googleConfigured = verifiedQuery.data?.googleShoppingConfigured === true;
+  const providerDiagnostic = verifiedQuery.data?.providerDiagnostic ?? null;
+  const providerName = typeof providerDiagnostic?.provider === 'string' ? providerDiagnostic.provider : null;
+  const googleUsed = providerDiagnostic?.googleUsed === true;
+  const fallbackUsed = providerDiagnostic?.fallbackUsed === true;
   const grouped = shoppingResults.reduce((acc, r) => {
     const key = r.shopping_task_id;
     acc[key] = acc[key] ? [...acc[key], r] : [r];
@@ -61,7 +65,19 @@ export default function ShoppingBoard({
           {googleConfigured ? <SearchCheck className="h-3 w-3" /> : <TriangleAlert className="h-3 w-3" />}
           {googleConfigured ? 'Google Shopping connected' : 'Google Shopping needs API key'}
         </span>
+        {providerName && (
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-medium ${googleUsed ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-300' : fallbackUsed ? 'border-amber-400/25 bg-amber-500/10 text-amber-300' : 'border-white/10 bg-white/5 text-zinc-400'}`}>
+            <Route className="h-3 w-3" />
+            Current search: {googleUsed ? 'Google Shopping' : providerName}
+          </span>
+        )}
       </div>
+
+      {providerDiagnostic?.message && (
+        <div className={`mb-4 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${googleUsed ? 'border-emerald-400/15 bg-emerald-500/[.05] text-emerald-200/80' : fallbackUsed ? 'border-amber-400/15 bg-amber-500/[.05] text-amber-200/80' : 'border-white/10 bg-black/20 text-zinc-500'}`}>
+          {providerDiagnostic.message}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-72 animate-pulse rounded-xl bg-white/5" />)}</div>
@@ -73,9 +89,11 @@ export default function ShoppingBoard({
               : 'No live product search has been run yet.'}
           </p>
           <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
-            {googleConfigured
-              ? 'Google Shopping is connected. Explorer only shows live results with a usable product image and product link.'
-              : 'Google Shopping is not configured, so this search is falling back to Playwright retailer browsing. Add the server-side SERPAPI_API_KEY to activate Google Shopping product cards.'}
+            {providerDiagnostic?.message
+              ? providerDiagnostic.message
+              : googleConfigured
+                ? 'Google Shopping is connected. Explorer only shows live results with a usable product image and product link.'
+                : 'Google Shopping is not configured, so this search is falling back to Playwright retailer browsing. Add the server-side SERPAPI_API_KEY to activate Google Shopping product cards.'}
             {' Explorer will not recycle older or simulated cards.'}
             {rejectedUnverified > 0 ? ` ${rejectedUnverified} unusable candidate${rejectedUnverified === 1 ? '' : 's'} were hidden.` : ''}
           </p>

@@ -4,6 +4,14 @@ import { googleShoppingConfigured } from "./google-shopping.server";
 
 type Sb = { from: (table: string) => any };
 
+type ProviderDiagnostic = {
+  googleConfigured: boolean;
+  googleUsed: boolean;
+  fallbackUsed: boolean;
+  provider: string;
+  message: string;
+};
+
 function isHttpUrl(value: unknown): boolean {
   if (typeof value !== "string" || !value.trim()) return false;
   try {
@@ -28,6 +36,23 @@ function isVerifiedProduct(row: any): boolean {
     && isHttpUrl(specs["image_url"])
     && isHttpUrl(row?.url)
     && !String(row?.reason ?? "").includes("SIMULATED DEVELOPMENT DATA");
+}
+
+function readProviderDiagnostic(value: unknown): ProviderDiagnostic | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = (value as Record<string, unknown>)["provider_diagnostic"];
+  if (!result || typeof result !== "object" || Array.isArray(result)) return null;
+  const raw = result as Record<string, unknown>;
+  const provider = typeof raw["provider"] === "string" ? raw["provider"] : "";
+  const message = typeof raw["message"] === "string" ? raw["message"] : "";
+  if (!provider && !message) return null;
+  return {
+    googleConfigured: raw["googleConfigured"] === true,
+    googleUsed: raw["googleUsed"] === true,
+    fallbackUsed: raw["fallbackUsed"] === true,
+    provider,
+    message,
+  };
 }
 
 /**
@@ -57,10 +82,12 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
         purchases: [],
         rejectedUnverified: 0,
         googleShoppingConfigured: googleShoppingConfigured(),
+        providerDiagnostic: null,
       };
     }
 
-    const [resultRows, purchaseRows] = await Promise.all([
+    const personalTaskId = typeof latestTask.data.task_id === "string" ? latestTask.data.task_id : null;
+    const [resultRows, purchaseRows, personalTask] = await Promise.all([
       sb
         .from("shopping_results")
         .select("*")
@@ -71,9 +98,18 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
         .select("*")
         .eq("shopping_task_id", latestTask.data.id)
         .order("created_at", { ascending: false }),
+      personalTaskId
+        ? sb
+            .from("personal_tasks")
+            .select("result")
+            .eq("id", personalTaskId)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
     if (resultRows.error) throw new Error(resultRows.error.message);
     if (purchaseRows.error) throw new Error(purchaseRows.error.message);
+    if (personalTask.error) throw new Error(personalTask.error.message);
 
     const allResults = resultRows.data ?? [];
     const results = allResults.filter(isVerifiedProduct);
@@ -83,5 +119,6 @@ export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" 
       purchases: purchaseRows.data ?? [],
       rejectedUnverified: Math.max(0, allResults.length - results.length),
       googleShoppingConfigured: googleShoppingConfigured(),
+      providerDiagnostic: readProviderDiagnostic(personalTask.data?.result),
     };
   });
