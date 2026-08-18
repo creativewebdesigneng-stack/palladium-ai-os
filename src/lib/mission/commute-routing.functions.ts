@@ -1,12 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { computeCommuteRoutes } from "./commute-routing.server";
+import { computeCommuteRoutes, type CommuteRoute } from "./commute-routing.server";
 
 type Sb = { from: (table: string) => any };
 
-type RichResult = Record<string, unknown>;
+type LiveCommuteRich = {
+  map: { label: string; summary: string; url: string };
+  routes: CommuteRoute[];
+  metrics: Array<{ label: string; value: number; display: string }>;
+};
 
-function routeRich(commute: Awaited<ReturnType<typeof computeCommuteRoutes>>): RichResult | null {
+function routeRich(commute: Awaited<ReturnType<typeof computeCommuteRoutes>>): LiveCommuteRich | null {
   if (!commute || !commute.routes.length) return null;
   const best = commute.routes[0];
   return {
@@ -45,16 +49,16 @@ export const getLiveCommuteRoute = createServerFn({ method: "POST" })
     if (taskRes.error) throw new Error(taskRes.error.message);
     const task = taskRes.data;
     if (!task || task.user_id !== userId) throw new Error("Task not found");
-    if (task.status !== "completed") return { available: false, reason: "task_not_completed" };
+    if (task.status !== "completed") return { available: false, reason: "task_not_completed" as const };
 
     const existingResult = task.result && typeof task.result === "object" && !Array.isArray(task.result)
       ? (task.result as Record<string, unknown>)
       : {};
     const existingRich = existingResult["rich"] && typeof existingResult["rich"] === "object" && !Array.isArray(existingResult["rich"])
-      ? (existingResult["rich"] as RichResult)
+      ? (existingResult["rich"] as Record<string, unknown>)
       : {};
     if (Array.isArray(existingRich["routes"]) && existingRich["routes"].length) {
-      return { available: true, cached: true, rich: existingRich };
+      return { available: true, cached: true, rich: existingRich as unknown as LiveCommuteRich };
     }
 
     const commute = await computeCommuteRoutes(String(task.request ?? ""));
@@ -62,7 +66,7 @@ export const getLiveCommuteRoute = createServerFn({ method: "POST" })
     if (!rich) {
       return {
         available: false,
-        reason: process.env["GOOGLE_MAPS_API_KEY"]?.trim() ? "route_unavailable" : "maps_not_configured",
+        reason: (process.env["GOOGLE_MAPS_API_KEY"]?.trim() ? "route_unavailable" : "maps_not_configured") as "route_unavailable" | "maps_not_configured",
       };
     }
 
@@ -74,5 +78,5 @@ export const getLiveCommuteRoute = createServerFn({ method: "POST" })
       .eq("user_id", userId);
     if (update.error) throw new Error(update.error.message);
 
-    return { available: true, cached: false, rich: mergedRich };
+    return { available: true, cached: false, rich };
   });
