@@ -33,10 +33,10 @@ describe("normaliseGoogleShoppingRows", () => {
     ]);
 
     expect(offers).toHaveLength(1);
-    expect(offers[0]?.specs?.image_url).toBe("https://images.example.com/headphones.jpg");
-    expect(offers[0]?.specs?.google_product_id).toBe("123");
-    expect(offers[0]?.specs?.google_immersive_token).toBe("token-abc");
-    expect(offers[0]?.specs?.source_provider).toBe("google-shopping");
+    expect(offers[0]?.specs?.["image_url"]).toBe("https://images.example.com/headphones.jpg");
+    expect(offers[0]?.specs?.["google_product_id"]).toBe("123");
+    expect(offers[0]?.specs?.["google_immersive_token"]).toBe("token-abc");
+    expect(offers[0]?.specs?.["source_provider"]).toBe("google-shopping");
   });
 
   it("filters over-budget and duplicate product ids", () => {
