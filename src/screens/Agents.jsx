@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, LayoutGrid, List, Plus, Sparkles, ArrowRight, Bot, Activity, Zap, CheckCircle2, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Activity, ArrowRight, Bot, CheckCircle2, CirclePause, Clock3, GitBranch,
+  LayoutGrid, List, Loader2, Plus, RefreshCw, Search, Sparkles, Workflow, XCircle,
+} from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import AgentCard from '@/components/agents/AgentCard';
 import { CATEGORIES, STATUS_STYLE, AVATAR_COLORS } from '@/components/agents/agentsData';
@@ -14,6 +17,7 @@ const TOOL_NAMES = {
   terminal: 'Terminal', vision: 'Vision', image: 'Image Generation', browser: 'Browser',
   api: 'API Calls', workflow: 'Workflow Builder',
 };
+const LIVE_STATUSES = new Set(['running', 'queued', 'waiting_for_approval', 'awaiting_approval']);
 
 function hashGrad(str) {
   const i = (str || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length;
@@ -22,8 +26,8 @@ function hashGrad(str) {
 function relTime(iso) {
   if (!iso) return '—';
   const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 0) return 'now';
-  if (s < 60) return s <= 5 ? 'now' : `${s}s ago`;
+  if (s < 0 || s <= 5) return 'now';
+  if (s < 60) return `${s}s ago`;
   const m = Math.round(s / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.round(m / 60);
@@ -40,7 +44,7 @@ function mapAgent(r) {
     grad: cfg.grad || hashGrad(r.id || r.name || ''),
     desc: r.description || 'No description set.',
     status: STATUS_MAP[r.status] || 'Idle',
-    model: r.model || 'gpt-4o-mini',
+    model: r.model || 'gpt-5-mini',
     modelGrad: 'from-emerald-400 to-teal-500',
     caps: tools.map((t) => TOOL_NAMES[t] || t),
     memory: cfg.memory !== false,
@@ -54,169 +58,202 @@ function mapAgent(r) {
     _raw: r,
   };
 }
-
-function SectionHead({ title, icon: Icon, count, link }) {
-  return (
-    <div className="mb-3 flex items-center gap-2">
-      <Icon className="h-4 w-4 text-violet-400" />
-      <h2 className="text-sm font-semibold text-white">{title}</h2>
-      <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-500">{count}</span>
-      {link && <Link to={link} className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-white">View all <ArrowRight className="h-3.5 w-3.5" /></Link>}
-    </div>
-  );
+function statusTone(status) {
+  if (status === 'running' || status === 'queued') return 'border-cyan-400/25 bg-cyan-500/10 text-cyan-200';
+  if (status === 'waiting_for_approval' || status === 'awaiting_approval') return 'border-amber-400/25 bg-amber-500/10 text-amber-200';
+  if (status === 'failed') return 'border-rose-400/25 bg-rose-500/10 text-rose-200';
+  if (status === 'succeeded' || status === 'completed') return 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200';
+  return 'border-white/10 bg-white/5 text-zinc-400';
+}
+function StatusBadge({ status }) {
+  return <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${statusTone(status)}`}>{String(status || 'unknown').replace(/_/g, ' ')}</span>;
 }
 
 export default function Agents() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { gate } = useUpgrade();
   const [agents, setAgents] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [workflows, setWorkflows] = useState([]);
+  const [workflowRuns, setWorkflowRuns] = useState([]);
+  const [workflowStepRuns, setWorkflowStepRuns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState('grid');
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('All');
+  const focusActive = params.get('view') === 'active';
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { agents: recs } = await listAgents({ data: { limit: 50, withTasks: false } });
-        setAgents((recs || []).map(mapAgent));
-      } catch (e) {
-        // keep empty list on error
-      }
+  const load = useCallback(async (quiet = false) => {
+    if (quiet) setRefreshing(true); else setLoading(true);
+    try {
+      const data = await listAgents({ data: { limit: 100, withTasks: true } });
+      setAgents((data?.agents || []).map(mapAgent));
+      setTasks(data?.tasks || []);
+      setWorkflows(data?.workflows || []);
+      setWorkflowRuns(data?.workflowRuns || []);
+      setWorkflowStepRuns(data?.workflowStepRuns || []);
+    } catch (e) {
+      console.error('[agents] could not load live operations', e);
+    } finally {
       setLoading(false);
-    })();
+      setRefreshing(false);
+    }
   }, []);
 
-  const featured = agents.filter((a) => a.featured);
-  const running = agents.filter((a) => a.status === 'Running');
-  const stopped = agents.filter((a) => a.status === 'Stopped');
-  const recent = agents.filter((a) => a.recent);
+  useEffect(() => {
+    load(false);
+    const timer = window.setInterval(() => load(true), 15000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const workflowById = useMemo(() => new Map(workflows.map((w) => [w.id, w])), [workflows]);
+  const runById = useMemo(() => new Map(workflowRuns.map((r) => [r.id, r])), [workflowRuns]);
+  const taskRunsByAgent = useMemo(() => {
+    const map = new Map();
+    for (const task of tasks) {
+      if (!task.agent_id) continue;
+      const rows = map.get(task.agent_id) || [];
+      rows.push(task);
+      map.set(task.agent_id, rows);
+    }
+    return map;
+  }, [tasks]);
+  const workflowStepsByAgent = useMemo(() => {
+    const map = new Map();
+    for (const step of workflowStepRuns) {
+      if (!step.agent_id) continue;
+      const rows = map.get(step.agent_id) || [];
+      rows.push(step);
+      map.set(step.agent_id, rows);
+    }
+    return map;
+  }, [workflowStepRuns]);
+
+  const actuallyRunningIds = useMemo(() => {
+    const ids = new Set();
+    for (const task of tasks) if (task.agent_id && LIVE_STATUSES.has(task.status)) ids.add(task.agent_id);
+    for (const step of workflowStepRuns) if (step.agent_id && LIVE_STATUSES.has(step.status)) ids.add(step.agent_id);
+    return ids;
+  }, [tasks, workflowStepRuns]);
+
+  const configuredActive = agents.filter((a) => a.status === 'Running');
+  const executing = agents.filter((a) => actuallyRunningIds.has(a.id));
   const mine = agents.filter((a) => (cat === 'All' || a.category === cat) && a.name.toLowerCase().includes(q.toLowerCase()));
-  const avgScore = agents.length ? Math.round(agents.reduce((s, a) => s + (a.score || 0), 0) / agents.length) : 0;
+  const shown = focusActive ? mine.filter((a) => a.status === 'Running' || actuallyRunningIds.has(a.id)) : mine;
+  const runningWorkflowRuns = workflowRuns.filter((r) => LIVE_STATUSES.has(r.status));
 
   const remove = async (a) => {
-    try { await deleteAgent({ data: { id: a.id } }); } catch { /* row already gone */ }
-    setAgents((list) => list.filter((x) => x.id !== a.id));
+    try { await deleteAgent({ data: { id: a.id } }); } catch { /* handled by refresh */ }
+    await load(true);
   };
   const run = async (a) => {
-    try { await setAgentStatus({ data: { id: a.id, status: 'active' } }); } catch { /* keep optimistic state */ }
-    setAgents((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'Running', lastRun: 'now' } : x)));
+    try { await setAgentStatus({ data: { id: a.id, status: 'active' } }); } catch { /* handled by refresh */ }
+    await load(true);
   };
   const duplicate = async (a) => {
-    try {
-      const copy = await duplicateAgent({ data: { id: a.id } });
-      if (copy) setAgents((list) => [mapAgent(copy), ...list]);
-    } catch { /* surfaced by the empty state */ }
+    try { await duplicateAgent({ data: { id: a.id } }); } catch { /* handled by refresh */ }
+    await load(true);
   };
-  const edit = (a) => navigate('/agents/new');
 
   return (
     <>
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-40"><AnimatedBrain agentStates={agents.map((a) => a.status)} /></div>
-      <PageHeader eyebrow="AI" title="Agent Workspace" description="Create, manage, and monitor your autonomous AI workforce." action={<button onClick={() => { if (gate('createAgents')) navigate('/agents/new'); }} className="pbtn pbtn-primary flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />New agent</button>} />
-
-      {/* Hero */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-600/15 via-[#0c0d13] to-cyan-500/10 p-6">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(139,92,246,.25),transparent_55%)]" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-[0_0_30px_rgba(139,92,246,.4)]"><Sparkles className="h-7 w-7 text-white" /></div>
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold text-white sm:text-2xl">Your AI workforce, on demand</h2>
-            <p className="mt-1 max-w-xl text-sm text-zinc-400">Spin up specialized agents that research, write, code, and operate — then let them work autonomously across your tools.</p>
-          </div>
-          <div className="flex gap-3">
-            {[[agents.length, 'Total'], [running.length, 'Running'], [`${avgScore}%`, 'Avg score']].map(([v, l]) => (
-              <div key={l} className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-center"><p className="text-lg font-semibold text-white">{v}</p><p className="text-[10px] uppercase tracking-widest text-zinc-500">{l}</p></div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Featured */}
-      {featured.length > 0 && (
-        <div className="mb-8">
-          <SectionHead title="Featured agents" icon={Sparkles} count={featured.length} />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{featured.map((a) => <AgentCard key={a.id} agent={a} onEdit={edit} onDuplicate={duplicate} onDelete={remove} onRun={run} />)}</div>
-        </div>
-      )}
-
-      {/* Controls */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.04] px-3 py-2"><Search className="h-4 w-4 text-zinc-600" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents" className="w-44 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600" /></div>
-        <div className="flex max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {CATEGORIES.map((c) => <button key={c} onClick={() => setCat(c)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${cat === c ? 'bg-white text-black' : 'border border-white/10 text-zinc-400 hover:bg-white/5'}`}>{c}</button>)}
-        </div>
-        <div className="ml-auto flex items-center gap-1 rounded-xl border border-white/10 bg-white/[.04] p-1">
-          <button onClick={() => setView('grid')} className={`rounded-lg p-1.5 ${view === 'grid' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}><LayoutGrid className="h-4 w-4" /></button>
-          <button onClick={() => setView('list')} className={`rounded-lg p-1.5 ${view === 'list' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}><List className="h-4 w-4" /></button>
-        </div>
-      </div>
-
-      {/* My agents */}
-      <div className="mb-8">
-        <SectionHead title="My agents" icon={Bot} count={mine.length} />
-        {loading ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.02] p-8 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading your agents…</div>
-        ) : mine.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-cyan-400/20 text-violet-300"><Sparkles className="h-7 w-7" /></div>
-            <h3 className="text-base font-semibold text-white">No agents yet</h3>
-            <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">Create your first AI agent to start building your workforce. It’ll appear here once deployed.</p>
-            <button onClick={() => { if (gate('createAgents')) navigate('/agents/new'); }} className="pbtn pbtn-primary mx-auto mt-5 flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />Create your first agent</button>
-          </div>
-        ) : view === 'grid' ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{mine.map((a) => <AgentCard key={a.id} agent={a} onEdit={edit} onDuplicate={duplicate} onDelete={remove} onRun={run} />)}</div>
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-zinc-500">
-                <tr>{['Agent', 'Status', 'Model', 'Capabilities', 'Memory', 'Last run', 'Score', ''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {mine.map((a) => {
-                  const st = STATUS_STYLE[a.status] || STATUS_STYLE.Idle;
-                  return (
-                    <tr key={a.id} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={`grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br ${a.grad} text-xs font-semibold`}>{a.letter}</span>{a.name}</div></td>
-                      <td className={`px-4 py-3 ${st.text}`}>● {a.status}</td>
-                      <td className="px-4 py-3 text-zinc-400">{a.model}</td>
-                      <td className="px-4 py-3 text-zinc-500">{a.caps.length} tools</td>
-                      <td className="px-4 py-3 text-zinc-400">{a.memory ? 'On' : 'Off'}</td>
-                      <td className="px-4 py-3 text-zinc-500">{a.lastRun}</td>
-                      <td className="px-4 py-3 text-zinc-300">{a.score}%</td>
-                      <td className="px-4 py-3 text-right"><Link to={`/agents/${a.id}`} className="inline-flex text-violet-400"><ArrowRight className="h-4 w-4" /></Link></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-35"><AnimatedBrain agentStates={agents.map((a) => a.status)} /></div>
+      <PageHeader
+        eyebrow="AI Operations"
+        title="Agent Workspace"
+        description="See which agents are enabled, which are actually executing work, their current task runs, and live workflow handoffs."
+        action={(
+          <div className="flex items-center gap-2">
+            <button onClick={() => load(true)} disabled={refreshing} className="rounded-xl border border-white/10 bg-white/[.04] p-2 text-zinc-300 hover:bg-white/10 disabled:opacity-50" title="Refresh live operations"><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
+            <button onClick={() => { if (gate('createAgents')) navigate('/agents/new'); }} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4" />New agent</button>
           </div>
         )}
+      />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={Bot} label="Total agents" value={agents.length} tone="violet" />
+        <Metric icon={Activity} label="Executing now" value={executing.length} tone="cyan" live />
+        <Metric icon={CheckCircle2} label="Enabled agents" value={configuredActive.length} tone="green" />
+        <Metric icon={Workflow} label="Running workflows" value={runningWorkflowRuns.length} tone="amber" />
       </div>
 
-      {/* Running */}
-      {running.length > 0 && (
-        <div className="mb-8">
-          <SectionHead title="Running agents" icon={Activity} count={running.length} />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{running.map((a) => <AgentCard key={a.id} agent={a} onEdit={edit} onDuplicate={duplicate} onDelete={remove} onRun={run} />)}</div>
+      {focusActive && (
+        <div className="mb-5 flex items-center justify-between rounded-2xl border border-violet-400/25 bg-violet-500/[.07] px-4 py-3">
+          <div><p className="text-xs font-semibold text-violet-100">Opened from Mission Control: Active agents</p><p className="mt-0.5 text-[11px] text-violet-200/60">Showing agents that are enabled or have a live task/workflow execution.</p></div>
+          <button onClick={() => { params.delete('view'); setParams(params); }} className="text-xs text-violet-200 hover:text-white">Show all</button>
         </div>
       )}
 
-      {/* Stopped */}
-      {stopped.length > 0 && (
-        <div className="mb-8">
-          <SectionHead title="Stopped agents" icon={Zap} count={stopped.length} />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{stopped.map((a) => <AgentCard key={a.id} agent={a} onEdit={edit} onDuplicate={duplicate} onDelete={remove} onRun={run} />)}</div>
+      <section className="mb-8 rounded-2xl border border-cyan-400/15 bg-[#06101c]/80 p-4 shadow-[0_0_40px_rgba(0,180,255,.04)] backdrop-blur-xl">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div><h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Activity className="h-4 w-4 text-cyan-300" />Live operations</h2><p className="mt-1 text-[11px] text-zinc-500">Actual runtime activity from agent_tasks and workflow_step_runs.</p></div>
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-cyan-300"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" />Auto-refresh 15s</span>
         </div>
-      )}
 
-      {/* Recently used */}
-      {recent.length > 0 && (
-        <div>
-          <SectionHead title="Recently used" icon={CheckCircle2} count={recent.length} />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{recent.map((a) => <AgentCard key={a.id} agent={a} onEdit={edit} onDuplicate={duplicate} onDelete={remove} onRun={run} />)}</div>
-        </div>
-      )}
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Loading live agent operations…</div>
+        ) : executing.length === 0 && runningWorkflowRuns.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center"><CirclePause className="mx-auto h-6 w-6 text-zinc-600" /><p className="mt-2 text-sm font-medium text-zinc-300">No agents are executing right now</p><p className="mt-1 text-xs text-zinc-600">Enabled agents remain ready. Their next real run will appear here automatically.</p></div>
+        ) : (
+          <div className="space-y-3">
+            {executing.map((agent) => (
+              <AgentOperation key={agent.id} agent={agent} tasks={taskRunsByAgent.get(agent.id) || []} steps={workflowStepsByAgent.get(agent.id) || []} workflowById={workflowById} runById={runById} />
+            ))}
+            {runningWorkflowRuns.filter((run) => !(workflowStepRuns.some((s) => s.run_id === run.id && s.agent_id))).map((run) => (
+              <div key={run.id} className="rounded-xl border border-amber-400/15 bg-amber-500/[.04] p-3">
+                <div className="flex items-center gap-2"><Workflow className="h-4 w-4 text-amber-300" /><p className="text-xs font-semibold text-white">{workflowById.get(run.workflow_id)?.name || 'Workflow run'}</p><StatusBadge status={run.status} /></div>
+                <p className="mt-2 line-clamp-2 text-[11px] text-zinc-500">{run.input || 'Workflow is running a built-in or unassigned step.'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.04] px-3 py-2"><Search className="h-4 w-4 text-zinc-600" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents" className="w-44 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600" /></div>
+        <div className="flex max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{CATEGORIES.map((c) => <button key={c} onClick={() => setCat(c)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${cat === c ? 'bg-white text-black' : 'border border-white/10 text-zinc-400 hover:bg-white/5'}`}>{c}</button>)}</div>
+        <div className="ml-auto flex items-center gap-1 rounded-xl border border-white/10 bg-white/[.04] p-1"><button onClick={() => setView('grid')} className={`rounded-lg p-1.5 ${view === 'grid' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('list')} className={`rounded-lg p-1.5 ${view === 'list' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}><List className="h-4 w-4" /></button></div>
+      </div>
+
+      <section className="mb-8">
+        <div className="mb-3 flex items-center gap-2"><Sparkles className="h-4 w-4 text-violet-400" /><h2 className="text-sm font-semibold text-white">{focusActive ? 'Active agents' : 'My agents'}</h2><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-zinc-500">{shown.length}</span></div>
+        {loading ? <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.02] p-8 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Loading your agents…</div> : shown.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] p-10 text-center"><Bot className="mx-auto h-8 w-8 text-zinc-700" /><h3 className="mt-3 text-base font-semibold text-white">No matching agents</h3><p className="mt-1 text-sm text-zinc-500">Create an agent or clear the filters.</p></div>
+        ) : view === 'grid' ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{shown.map((a) => <div key={a.id} className="relative"><AgentCard agent={a} onEdit={() => navigate(`/agents/${a.id}`)} onDuplicate={duplicate} onDelete={remove} onRun={run} />{actuallyRunningIds.has(a.id) && <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-cyan-300/30 bg-[#06101c]/90 px-2 py-1 text-[9px] font-semibold text-cyan-200"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" />EXECUTING</span>}</div>)}</div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.025]"><table className="w-full min-w-[780px] text-sm"><thead className="border-b border-white/10 text-left text-xs text-zinc-500"><tr>{['Agent','Lifecycle','Runtime','Current task','Workflow','Last run',''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr></thead><tbody>{shown.map((a) => { const currentTask = (taskRunsByAgent.get(a.id) || []).find((t) => LIVE_STATUSES.has(t.status)); const currentStep = (workflowStepsByAgent.get(a.id) || []).find((s) => LIVE_STATUSES.has(s.status)); const wfRun = currentStep ? runById.get(currentStep.run_id) : null; const wf = wfRun ? workflowById.get(wfRun.workflow_id) : null; return <tr key={a.id} className="border-b border-white/5 hover:bg-white/5"><td className="px-4 py-3 font-medium text-white">{a.name}</td><td className="px-4 py-3 text-zinc-400">{a.status}</td><td className="px-4 py-3">{actuallyRunningIds.has(a.id) ? <StatusBadge status="running" /> : <span className="text-zinc-600">Ready</span>}</td><td className="max-w-[240px] truncate px-4 py-3 text-zinc-400">{currentTask?.title || currentStep?.name || '—'}</td><td className="px-4 py-3 text-zinc-500">{wf?.name || '—'}</td><td className="px-4 py-3 text-zinc-500">{a.lastRun}</td><td className="px-4 py-3 text-right"><Link to={`/agents/${a.id}`} className="inline-flex text-violet-400"><ArrowRight className="h-4 w-4" /></Link></td></tr>; })}</tbody></table></div>
+        )}
+      </section>
     </>
+  );
+}
+
+function Metric({ icon: Icon, label, value, tone, live }) {
+  const tones = { violet: 'text-violet-300 bg-violet-500/10 border-violet-400/20', cyan: 'text-cyan-300 bg-cyan-500/10 border-cyan-400/20', green: 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20', amber: 'text-amber-300 bg-amber-500/10 border-amber-400/20' };
+  return <div className={`rounded-2xl border p-4 ${tones[tone] || tones.violet}`}><div className="flex items-center justify-between"><Icon className="h-4 w-4" />{live && <span className="flex items-center gap-1 text-[9px]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />LIVE</span>}</div><p className="mt-3 text-2xl font-semibold text-white">{value}</p><p className="text-[10px] uppercase tracking-wider opacity-70">{label}</p></div>;
+}
+
+function AgentOperation({ agent, tasks, steps, workflowById, runById }) {
+  const activeTasks = tasks.filter((t) => LIVE_STATUSES.has(t.status));
+  const activeSteps = steps.filter((s) => LIVE_STATUSES.has(s.status));
+  const recentTask = activeTasks[0] || tasks[0];
+  const recentStep = activeSteps[0] || steps[0];
+  const run = recentStep ? runById.get(recentStep.run_id) : null;
+  const workflow = run ? workflowById.get(run.workflow_id) : null;
+  const title = recentTask?.title || recentStep?.name || 'Agent is active';
+  const status = recentTask?.status || recentStep?.status || 'running';
+  return (
+    <div className="rounded-xl border border-cyan-400/20 bg-black/25 p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${agent.grad} text-sm font-semibold text-white`}>{agent.letter}</span>
+        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Link to={`/agents/${agent.id}`} className="text-sm font-semibold text-white hover:text-cyan-200">{agent.name}</Link><StatusBadge status={status} /></div><p className="mt-1 truncate text-xs text-zinc-400">{title}</p><p className="mt-1 text-[10px] text-zinc-600">{recentTask?.provider ? `${recentTask.provider} · ${recentTask.model || agent.model}` : agent.model} · started {relTime(recentTask?.started_at || recentStep?.started_at || recentTask?.created_at || recentStep?.created_at)}</p></div>
+        <Link to={`/agents/${agent.id}`} className="rounded-lg border border-white/10 p-2 text-zinc-400 hover:bg-white/5 hover:text-white"><ArrowRight className="h-4 w-4" /></Link>
+      </div>
+      {workflow && <div className="mt-3 rounded-lg border border-violet-400/15 bg-violet-500/[.05] p-3"><div className="flex flex-wrap items-center gap-2"><GitBranch className="h-3.5 w-3.5 text-violet-300" /><span className="text-[11px] font-semibold text-violet-100">{workflow.name}</span><StatusBadge status={run?.status} /></div><div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500"><Workflow className="h-3 w-3" /><span>Step {Number(recentStep.position ?? 0) + 1}: {recentStep.name || recentStep.kind || 'Agent step'}</span><span>· attempt {recentStep.attempt || 1}</span></div></div>}
+      {!workflow && recentTask?.input && <p className="mt-3 line-clamp-2 rounded-lg border border-white/5 bg-white/[.025] p-3 text-[11px] leading-5 text-zinc-500">{recentTask.input}</p>}
+    </div>
   );
 }
