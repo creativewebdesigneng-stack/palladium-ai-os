@@ -1,4 +1,9 @@
-import { performanceSelectionBonus, type AgentPerformanceSnapshot } from "./agent-performance";
+import {
+  performanceSelectionBonus,
+  similaritySelectionBonus,
+  type AgentPerformanceSnapshot,
+  type AgentSimilaritySnapshot,
+} from "./agent-performance";
 import type { AgentOperatingProfile } from "./agent-spec";
 
 export type OrchestratorCandidate = {
@@ -11,6 +16,7 @@ export type OrchestratorCandidate = {
   model?: string | null;
   operating_profile?: AgentOperatingProfile | null;
   performance?: AgentPerformanceSnapshot | null;
+  similar_performance?: AgentSimilaritySnapshot | null;
 };
 
 export type OrchestratorAssignment = {
@@ -67,7 +73,7 @@ function candidateText(candidate: OrchestratorCandidate): string {
 
 /**
  * Deterministic pre-ranking. Declared role/skill fit remains primary; verified
- * historical performance supplies only a bounded secondary bonus.
+ * global history and similar-task history supply only bounded secondary bonuses.
  */
 export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate): number {
   const wanted = tokens(goal);
@@ -81,6 +87,7 @@ export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate
   if (profile.success_criteria?.length) score += 2;
   if (candidate.allowed_tools?.length) score += 1;
   score += performanceSelectionBonus(candidate.performance);
+  score += similaritySelectionBonus(candidate.similar_performance);
   return score;
 }
 
@@ -205,6 +212,15 @@ function performanceLine(candidate: OrchestratorCandidate): string | null {
   return `Recent performance: ${performance.successes}/${performance.runs} successful; verifier ${verifier}; avg replans ${performance.average_replans.toFixed(1)}`;
 }
 
+function similarityLine(candidate: OrchestratorCandidate): string | null {
+  const similarity = candidate.similar_performance;
+  if (!similarity || similarity.similarity_runs < 2) return null;
+  const verifier = similarity.average_verifier_score === null
+    ? "n/a"
+    : `${Math.round(similarity.average_verifier_score * 100)}%`;
+  return `Similar-task evidence: ${similarity.successes}/${similarity.similarity_runs} successful; verifier ${verifier}; match ${Math.round(similarity.average_similarity * 100)}%`;
+}
+
 export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): string {
   return candidates
     .map((candidate) => {
@@ -217,6 +233,7 @@ export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): s
         `Skills: ${(profile.skills ?? []).join(", ") || "not specified"}`,
         `Tools: ${(candidate.allowed_tools ?? []).join(", ") || "none"}`,
         performanceLine(candidate),
+        similarityLine(candidate),
       ].filter(Boolean).join("\n");
     })
     .join("\n\n");
