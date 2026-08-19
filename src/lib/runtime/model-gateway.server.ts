@@ -1,3 +1,4 @@
+import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import * as base from "./model-gateway.base";
 import type { ChatMessage, ChatResult, Provider, RunArgs } from "./model-gateway.base";
 
@@ -26,12 +27,70 @@ function fallbackOrder(primary: Provider): Provider[] {
   );
 }
 
+function latestUserQuery(messages: ChatMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role === "user" && message.content.trim()) return message.content.trim().slice(0, 300);
+  }
+  return "";
+}
+
+async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provider, primaryModel: string) {
+  if (!args.tools?.some((tool) => tool.name === "web_search")) return null;
+  const query = latestUserQuery(args.messages);
+  if (!query) return null;
+
+  let search: Awaited<ReturnType<typeof searchPublicWeb>>;
+  try {
+    search = await searchPublicWeb(query, 8, args.signal);
+  } catch {
+    return null;
+  }
+  if (!search.results.length) return null;
+
+  const evidence = search.results
+    .map((item, index) => `${index + 1}. ${item.title}\n${item.url}\n${item.snippet ?? ""}`)
+    .join("\n\n")
+    .slice(0, 12000);
+  const messages: ChatMessage[] = [
+    ...args.messages,
+    {
+      role: "system",
+      content:
+        `A server-authorised live web search was completed for the operator's request. Use the sources below as evidence. ` +
+        `Do not invent prices, availability, ratings, addresses or facts that are not supported by these results. ` +
+        `If the results are insufficient, say what could not be verified.\n\n${evidence}`,
+    },
+  ];
+
+  for (const provider of fallbackOrder(primaryProvider)) {
+    const model = provider === primaryProvider ? primaryModel : base.resolveModel(provider, null);
+    try {
+      const result = await base.runChat({ ...args, provider, model, messages, tools: [] });
+      activeProviderByConversation.set(args.messages, {
+        provider: result.provider,
+        model: result.model,
+      });
+      return result;
+    } catch (error) {
+      if (error instanceof base.ProviderError && error.status === 499) throw error;
+    }
+  }
+  return null;
+}
+
 /**
  * Non-streaming model calls get bounded cross-provider failover.
  *
  * Each underlying provider still owns its normal retry/backoff policy. Only
  * after that provider has definitively failed do we move to another configured
  * provider. Cancellation is never retried or failed over.
+ *
+ * If every configured provider rejects an already-authorised `web_search` tool
+ * call before it can execute, the gateway performs the same safe public search
+ * server-side and retries once without tools using the live sources as evidence.
+ * This keeps research useful across provider-specific tool-call incompatibilities
+ * without granting any tool that the caller did not already authorise.
  */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
   const remembered = activeProviderByConversation.get(args.messages);
@@ -56,6 +115,9 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
       lastError = error;
     }
   }
+
+  const rescued = await rescueAuthorizedWebSearch(args, primaryProvider, primaryModel);
+  if (rescued) return rescued;
 
   throw lastError instanceof Error
     ? lastError
