@@ -6,7 +6,11 @@ import {
   type OrchestratorCandidate,
   type OrchestratorPlan,
 } from "@/lib/agents/agent-orchestrator";
-import { summariseAgentPerformance, type AgentPerformanceTask } from "@/lib/agents/agent-performance";
+import {
+  summariseAgentPerformance,
+  summariseSimilarPerformance,
+  type AgentPerformanceTask,
+} from "@/lib/agents/agent-performance";
 import { normaliseProvider, resolveModel, runChat, type ChatMessage } from "./model-gateway.server";
 import { executeWorkflow } from "./workforce.server";
 
@@ -54,7 +58,7 @@ function orchestrationPrompt(goal: string, candidates: OrchestratorCandidate[]):
         "You are the PalladiumAI Orchestrator. You plan delegation only; you do not execute tools or claim tasks are complete.",
         "Break the operator goal into the smallest useful set of specialist assignments. Choose only Agent IDs in the catalogue.",
         "Use dependencies only when an assignment truly needs another assignment's output. Independent work should have no dependency so the workforce engine may run it in parallel.",
-        "Prefer specialists whose role and skills match the assignment. Recent verified performance is supporting evidence, not permission to assign an unrelated specialist.",
+        "Prefer specialists whose role and skills match the assignment. Recent verified performance and similar-task evidence are supporting signals, not permission to assign an unrelated specialist.",
         "Never expand permissions. Each selected agent will execute through its own tool grants, memory scope, approval rules and verification contract.",
         "Return one JSON object only. Do not include hidden reasoning.",
         'Shape: {"summary":"...","assignments":[{"id":"research","title":"Research market","objective":"...","agent_id":"uuid","depends_on":[],"success_criteria":["..."],"requires_approval":false}]}',
@@ -68,13 +72,17 @@ function orchestrationPrompt(goal: string, candidates: OrchestratorCandidate[]):
   ];
 }
 
-async function attachPerformance(sb: Sb, agents: EligibleAgentRow[]): Promise<EligibleAgentRow[]> {
+async function attachPerformance(
+  sb: Sb,
+  agents: EligibleAgentRow[],
+  goal: string,
+): Promise<EligibleAgentRow[]> {
   if (!agents.length) return agents;
   try {
     const ids = agents.map((agent) => String(agent.id));
     const { data, error } = await sb
       .from("agent_tasks")
-      .select("agent_id,status,duration_ms,replan_count,verification_state,created_at")
+      .select("agent_id,status,input,duration_ms,replan_count,verification_state,created_at")
       .in("agent_id", ids)
       .order("created_at", { ascending: false })
       .limit(1000);
@@ -83,6 +91,7 @@ async function attachPerformance(sb: Sb, agents: EligibleAgentRow[]): Promise<El
     return agents.map((agent) => ({
       ...agent,
       performance: summariseAgentPerformance(String(agent.id), tasks),
+      similar_performance: summariseSimilarPerformance(String(agent.id), goal, tasks),
     }));
   } catch (error) {
     console.error("[orchestrator] performance history unavailable; using skill-only ranking", error);
@@ -93,6 +102,7 @@ async function attachPerformance(sb: Sb, agents: EligibleAgentRow[]): Promise<El
 async function loadEligibleAgents(args: {
   sb: Sb;
   userId: string;
+  goal: string;
   workforceId?: string | null;
   orgId?: string | null;
 }): Promise<{ agents: EligibleAgentRow[]; orgId: string | null; workforceId: string | null }> {
@@ -139,7 +149,7 @@ async function loadEligibleAgents(args: {
       "NO_ELIGIBLE_AGENTS",
       409,
     );
-  return { agents: await attachPerformance(args.sb, agents), orgId, workforceId };
+  return { agents: await attachPerformance(args.sb, agents, args.goal), orgId, workforceId };
 }
 
 async function createDelegationPlan(goal: string, candidates: EligibleAgentRow[]): Promise<OrchestratorPlan> {
@@ -259,6 +269,7 @@ export async function orchestrateGoal(args: {
   const eligible = await loadEligibleAgents({
     sb: args.sb,
     userId: args.userId,
+    goal,
     ...(args.workforceId !== undefined ? { workforceId: args.workforceId } : {}),
     ...(args.orgId !== undefined ? { orgId: args.orgId } : {}),
   });
