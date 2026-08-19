@@ -182,9 +182,10 @@ async function persistGeneratedWorkflow(args: {
 
   const stepIds = new Map(args.plan.assignments.map((assignment) => [assignment.id, crypto.randomUUID()]));
   const steps = args.plan.assignments.map((assignment, position) => {
-    const dependencies = assignment.depends_on
+    const dependencies: string[] = assignment.depends_on
       .map((id) => stepIds.get(id))
-      .filter((id): id is string => Boolean(id));
+      .filter((id) => id !== undefined)
+      .map((id) => String(id));
     const upstreamTemplate = dependencies.length
       ? `\n\nDeclared upstream evidence:\n${dependencies
           .map((id, index) => `Source ${index + 1}: {{steps.${id}.output}}`)
@@ -234,8 +235,8 @@ export async function orchestrateGoal(args: {
   const eligible = await loadEligibleAgents({
     sb: args.sb,
     userId: args.userId,
-    workforceId: args.workforceId,
-    orgId: args.orgId,
+    ...(args.workforceId !== undefined ? { workforceId: args.workforceId } : {}),
+    ...(args.orgId !== undefined ? { orgId: args.orgId } : {}),
   });
   const plan = await createDelegationPlan(goal, eligible.agents);
   const workflow = await persistGeneratedWorkflow({
