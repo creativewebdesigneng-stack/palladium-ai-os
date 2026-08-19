@@ -78,78 +78,92 @@ export default function Projects() {
     : 'Personal workspace';
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Workspace"
-        title="Projects"
-        description={`Persistent projects for ${scopeName}. Project data, lifecycle state and linked AI resources are stored in the backend.`}
-        action={(
-          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-violet-500">
-            <Plus className="h-4 w-4" />New project
-          </button>
+    <div className="relative isolate -mx-3 -mt-3 min-h-[calc(100vh-5rem)] overflow-hidden rounded-[28px] px-3 pb-8 pt-3 sm:-mx-5 sm:px-5">
+      <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden rounded-[28px]">
+        <div
+          className="absolute inset-0 scale-[1.02] bg-cover bg-center opacity-70"
+          style={{ backgroundImage: "url('/projects-palladium-bg.webp')" }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(1,5,14,.46)_0%,rgba(1,7,19,.70)_35%,rgba(1,6,16,.90)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,transparent_0%,rgba(0,5,15,.18)_38%,rgba(0,4,12,.82)_100%)]" />
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(33,157,255,.08) 1px, transparent 1px),linear-gradient(90deg,rgba(33,157,255,.06) 1px,transparent 1px)', backgroundSize: '44px 44px' }} />
+      </div>
+
+      <div className="pointer-events-none absolute left-1/2 top-[42%] -z-10 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-blue-500/[.035] blur-3xl" />
+
+      <div className="relative z-10">
+        <PageHeader
+          eyebrow="Workspace"
+          title="Projects"
+          description={`Persistent projects for ${scopeName}. Project data, lifecycle state and linked AI resources are stored in the backend.`}
+          action={(
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-blue-600/80 px-3.5 py-2 text-sm font-medium text-white shadow-[0_0_28px_rgba(0,140,255,.22)] backdrop-blur hover:bg-blue-500">
+              <Plus className="h-4 w-4" />New project
+            </button>
+          )}
+        />
+
+        {(workspace.error || projectsQuery.error) && (
+          <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-xs text-rose-200 backdrop-blur-xl">
+            {friendlyMessage(workspace.error || projectsQuery.error)}
+          </div>
         )}
-      />
 
-      {(workspace.error || projectsQuery.error) && (
-        <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-xs text-rose-200">
-          {friendlyMessage(workspace.error || projectsQuery.error)}
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric label="Projects" value={counts.total} icon={FolderKanban} />
+          <Metric label="Active" value={counts.active} icon={CheckCircle2} />
+          <Metric label="Paused" value={counts.paused} icon={CirclePause} />
+          <Metric label="Completed" value={counts.completed} icon={CheckCircle2} />
         </div>
-      )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Projects" value={counts.total} icon={FolderKanban} />
-        <Metric label="Active" value={counts.active} icon={CheckCircle2} />
-        <Metric label="Paused" value={counts.paused} icon={CirclePause} />
-        <Metric label="Completed" value={counts.completed} icon={CheckCircle2} />
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-cyan-300/10 bg-[#04101d]/70 p-3 shadow-[0_0_35px_rgba(0,100,255,.05)] backdrop-blur-xl sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/40" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search projects or tags…" className="w-full rounded-xl border border-cyan-300/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/35" />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-400">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            Include archived
+          </label>
+        </div>
+
+        {workspace.isLoading || projectsQuery.isLoading ? (
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/10 bg-[#04101d]/70 p-12 text-sm text-zinc-500 backdrop-blur-xl"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" />Loading projects…</div>
+        ) : filtered.length === 0 ? (
+          <div className="grid place-items-center rounded-2xl border border-dashed border-cyan-300/15 bg-[#03101c]/55 p-14 text-center backdrop-blur-xl">
+            <FolderKanban className="h-9 w-9 text-cyan-400/35" />
+            <h2 className="mt-3 text-base font-semibold text-white">{search ? 'No matching projects' : 'No projects yet'}</h2>
+            <p className="mt-1 max-w-md text-xs leading-5 text-zinc-500">{search ? 'Try a different search.' : `Create the first project in ${scopeName}. It will be persisted and protected by workspace access rules.`}</p>
+            {!search && <button onClick={() => setCreateOpen(true)} className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-medium text-white shadow-[0_0_24px_rgba(0,140,255,.20)]">Create project</button>}
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onEdit={() => setEditing(project)}
+                onResources={() => setManagingResources(project)}
+                onArchive={() => archiveMutation.mutate(project.id)}
+                archiving={archiveMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[.025] p-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search projects or tags…" className="w-full rounded-xl border border-white/10 bg-black/20 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40" />
-        </div>
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-400">
-          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          Include archived
-        </label>
-      </div>
-
-      {workspace.isLoading || projectsQuery.isLoading ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[.025] p-12 text-sm text-zinc-500"><Loader2 className="h-5 w-5 animate-spin" />Loading projects…</div>
-      ) : filtered.length === 0 ? (
-        <div className="grid place-items-center rounded-2xl border border-dashed border-white/10 p-14 text-center">
-          <FolderKanban className="h-9 w-9 text-zinc-700" />
-          <h2 className="mt-3 text-base font-semibold text-white">{search ? 'No matching projects' : 'No projects yet'}</h2>
-          <p className="mt-1 max-w-md text-xs leading-5 text-zinc-500">{search ? 'Try a different search.' : `Create the first project in ${scopeName}. It will be persisted and protected by workspace access rules.`}</p>
-          {!search && <button onClick={() => setCreateOpen(true)} className="mt-4 rounded-xl bg-violet-600 px-4 py-2 text-xs font-medium text-white">Create project</button>}
-        </div>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onEdit={() => setEditing(project)}
-              onResources={() => setManagingResources(project)}
-              onArchive={() => archiveMutation.mutate(project.id)}
-              archiving={archiveMutation.isPending}
-            />
-          ))}
-        </div>
-      )}
 
       {createOpen && <ProjectForm title="Create project" submitLabel="Create project" scope={scope} onClose={() => setCreateOpen(false)} onSubmit={(data) => createMutation.mutate(data)} pending={createMutation.isPending} error={createMutation.error} />}
       {editing && <ProjectForm title="Edit project" submitLabel="Save changes" project={editing} onClose={() => setEditing(null)} onSubmit={(data) => updateMutation.mutate({ id: editing.id, ...data })} pending={updateMutation.isPending} error={updateMutation.error} />}
       {managingResources && <ResourceManager project={managingResources} onClose={() => setManagingResources(null)} />}
-    </>
+    </div>
   );
 }
 
 function Metric({ label, value, icon: Icon }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.025] p-4">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-400/[.08] text-violet-300"><Icon className="h-4 w-4" /></span>
-      <div><p className="text-xl font-semibold text-white">{value}</p><p className="text-[10px] text-zinc-500">{label}</p></div>
+    <div className="flex items-center gap-3 rounded-2xl border border-cyan-300/10 bg-[#04101d]/68 p-4 shadow-[0_0_28px_rgba(0,111,255,.05)] backdrop-blur-xl">
+      <span className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/10 bg-blue-500/[.08] text-cyan-300"><Icon className="h-4 w-4" /></span>
+      <div><p className="text-xl font-semibold text-white">{value}</p><p className="text-[10px] text-cyan-100/45">{label}</p></div>
     </div>
   );
 }
@@ -157,7 +171,7 @@ function Metric({ label, value, icon: Icon }) {
 function ProjectCard({ project, onEdit, onResources, onArchive, archiving }) {
   const state = STATUS[project.status] ?? STATUS.active;
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/[.025] p-4 transition hover:border-white/20">
+    <article className="rounded-2xl border border-cyan-300/10 bg-[#04101d]/72 p-4 shadow-[0_8px_36px_rgba(0,0,0,.28),0_0_30px_rgba(0,119,255,.045)] backdrop-blur-xl transition hover:border-cyan-300/25 hover:bg-[#061522]/80 hover:shadow-[0_8px_36px_rgba(0,0,0,.30),0_0_32px_rgba(0,119,255,.09)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold text-white">{project.name}</h3>
@@ -165,13 +179,13 @@ function ProjectCard({ project, onEdit, onResources, onArchive, archiving }) {
         </div>
         <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] ${state.cls}`}>{state.label}</span>
       </div>
-      <p className="mt-3 min-h-10 text-xs leading-5 text-zinc-500">{project.description || 'No description.'}</p>
-      {(project.tags ?? []).length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{project.tags.map((tag) => <span key={tag} className="rounded-md bg-white/5 px-2 py-1 text-[10px] text-zinc-400">{tag}</span>)}</div>}
-      <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-3 text-[10px] text-zinc-600">
-        <CalendarDays className="h-3 w-3" />
+      <p className="mt-3 min-h-10 text-xs leading-5 text-zinc-400">{project.description || 'No description.'}</p>
+      {(project.tags ?? []).length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{project.tags.map((tag) => <span key={tag} className="rounded-md border border-cyan-300/5 bg-white/[.035] px-2 py-1 text-[10px] text-zinc-400">{tag}</span>)}</div>}
+      <div className="mt-4 flex items-center gap-2 border-t border-cyan-300/10 pt-3 text-[10px] text-zinc-500">
+        <CalendarDays className="h-3 w-3 text-cyan-300/55" />
         <span>{project.due_at ? `Due ${new Date(project.due_at).toLocaleDateString()}` : `Updated ${new Date(project.updated_at).toLocaleDateString()}`}</span>
         <div className="ml-auto flex gap-1.5">
-          <button onClick={onResources} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-violet-300 hover:bg-violet-500/10"><Link2 className="h-3 w-3" />Resources</button>
+          <button onClick={onResources} className="flex items-center gap-1 rounded-lg border border-cyan-300/10 px-2 py-1 text-cyan-300 hover:bg-cyan-500/10"><Link2 className="h-3 w-3" />Resources</button>
           <button onClick={onEdit} className="rounded-lg border border-white/10 px-2 py-1 text-zinc-300 hover:bg-white/5">Edit</button>
           {project.status !== 'archived' && <button disabled={archiving} onClick={onArchive} className="rounded-lg border border-white/10 p-1.5 text-zinc-400 hover:bg-white/5" title="Archive project"><Archive className="h-3 w-3" /></button>}
         </div>
