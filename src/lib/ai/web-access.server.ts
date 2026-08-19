@@ -44,6 +44,92 @@ export function isSafePublicUrl(value: string): boolean {
   }
 }
 
+function pushUnique(results: WebSource[], item: WebSource, limit: number) {
+  if (results.length >= limit || !isSafePublicUrl(item.url)) return;
+  if (results.some((existing) => existing.url === item.url)) return;
+  results.push(item);
+}
+
+function parseDuckDuckGoHtml(html: string, limit: number): WebSource[] {
+  const results: WebSource[] = [];
+  const blockRe = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(html)) && results.length < limit) {
+    const url = decodeDdg(match[1] ?? "");
+    pushUnique(
+      results,
+      {
+        url,
+        title: stripHtml(match[2] ?? "") || url,
+        snippet: stripHtml(match[3] ?? "").slice(0, 700),
+      },
+      limit,
+    );
+  }
+  return results;
+}
+
+function parseDuckDuckGoLite(html: string, limit: number): WebSource[] {
+  const results: WebSource[] = [];
+  const linkRe = /<a[^>]+href="([^"]+)"[^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = linkRe.exec(html)) && results.length < limit) {
+    const url = decodeDdg(match[1] ?? "");
+    pushUnique(results, { url, title: stripHtml(match[2] ?? "") || url }, limit);
+  }
+  return results;
+}
+
+function decodeXml(value: string): string {
+  return value
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function parseBingRss(xml: string, limit: number): WebSource[] {
+  const results: WebSource[] = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = itemRe.exec(xml)) && results.length < limit) {
+    const item = match[1] ?? "";
+    const title = decodeXml(/<title>([\s\S]*?)<\/title>/i.exec(item)?.[1] ?? "").trim();
+    const url = decodeXml(/<link>([\s\S]*?)<\/link>/i.exec(item)?.[1] ?? "").trim();
+    const description = decodeXml(/<description>([\s\S]*?)<\/description>/i.exec(item)?.[1] ?? "");
+    if (!url) continue;
+    pushUnique(
+      results,
+      { url, title: stripHtml(title) || url, snippet: stripHtml(description).slice(0, 700) },
+      limit,
+    );
+  }
+  return results;
+}
+
+async function trySearchEndpoint(
+  url: string,
+  parser: (body: string, limit: number) => WebSource[],
+  limit: number,
+  signal?: AbortSignal,
+): Promise<WebSource[]> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; PalladiumAI/1.0; +https://palladium-ai-os.lovable.app)",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: signal ?? AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return [];
+    return parser(await response.text(), limit);
+  } catch {
+    return [];
+  }
+}
+
 export async function searchPublicWeb(
   queryInput: string,
   limitInput = 5,
@@ -52,26 +138,20 @@ export async function searchPublicWeb(
   const query = queryInput.trim().slice(0, 300);
   if (!query) return { query: "", results: [] };
   const limit = Math.max(1, Math.min(Number(limitInput) || 5, 8));
-  const response = await fetch(`https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-    headers: { "User-Agent": "PalladiumAI-Chat/1.0" },
-    signal: signal ?? AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`Web search failed (${response.status}).`);
+  const encoded = encodeURIComponent(query);
 
-  const html = await response.text();
-  const results: WebSource[] = [];
-  const blockRe = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-  let match: RegExpExecArray | null;
-  while ((match = blockRe.exec(html)) && results.length < limit) {
-    const url = decodeDdg(match[1] ?? "");
-    if (!isSafePublicUrl(url)) continue;
-    results.push({
-      url,
-      title: stripHtml(match[2] ?? "") || url,
-      snippet: stripHtml(match[3] ?? "").slice(0, 700),
-    });
+  const providers: Array<[string, (body: string, limit: number) => WebSource[]]> = [
+    [`https://duckduckgo.com/html/?q=${encoded}`, parseDuckDuckGoHtml],
+    [`https://lite.duckduckgo.com/lite/?q=${encoded}`, parseDuckDuckGoLite],
+    [`https://www.bing.com/search?format=rss&q=${encoded}`, parseBingRss],
+  ];
+
+  for (const [url, parser] of providers) {
+    const results = await trySearchEndpoint(url, parser, limit, signal);
+    if (results.length) return { query, results };
   }
-  return { query, results };
+
+  throw new Error("Public web search providers are temporarily unavailable.");
 }
 
 export async function fetchPublicWebPage(
