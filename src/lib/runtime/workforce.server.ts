@@ -21,7 +21,8 @@ import {
   assertWithinLimit,
   recordUsage,
 } from "@/lib/platform/entitlements.server";
-import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { executePlannedRun } from "./planner-runtime.server";
 import { notify } from "@/lib/notifications/notify.server";
 import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
 import {
@@ -221,7 +222,6 @@ function buildWaves(steps: StepRow[]): StepRow[][] {
   if (!hasExplicit) {
     const waves = new Map<number, StepRow[]>();
     for (const step of steps) {
-      // Sequential steps get their own wave; parallel steps share their position.
       const key = step.mode === "parallel" ? step.position : step.position + 0.5;
       const list = waves.get(key) ?? [];
       list.push(step);
@@ -446,9 +446,6 @@ export async function runStep(args: {
         agentId: step.agent_id,
         input: args.input,
       });
-      // Do not use Promise.race for deadlines: losing promises continue running.
-      // The abort signal reaches model and tool calls so a timed-out/cancelled
-      // workflow cannot spend tokens or execute tools after its ledger closed.
       const controller = new AbortController();
       const abortFromWorkflow = () => {
         controller.abort(
@@ -476,7 +473,7 @@ export async function runStep(args: {
 
       let task: any;
       try {
-        task = await executeRun({
+        task = await executePlannedRun({
           sb: args.sb as never,
           userId: args.userId,
           run,
@@ -516,7 +513,6 @@ export async function runStep(args: {
           .eq("id", stepRunId);
       }
 
-      // Controlled handoff: the only channel agents use to talk to each other.
       await db.from("agent_messages").insert({
         run_id: args.runId,
         from_step_run_id: stepRunId,
@@ -561,11 +557,6 @@ export async function runStep(args: {
 
 /* ------------------------------------------------------------ resumable core */
 
-/**
- * Executes (or resumes) a workflow on an existing workflow_runs row.
- * Previously persisted outcomes are authoritative for this run and are never
- * replayed. They remain available to dependency resolution and templates.
- */
 export async function executeWorkflowRun(args: {
   sb: Sb;
   db: Sb;
@@ -604,10 +595,6 @@ export async function executeWorkflowRun(args: {
   try {
     for (const wave of waves) {
       if (failure) break;
-
-      // Approval is a safety barrier. If a parallel wave contains an approval,
-      // execute that gate alone first. On resume, the completed approval is
-      // skipped and the remaining siblings may execute normally.
       while (true) {
         const pendingWave = wave.filter((step) => !completedIds.has(step.id));
         if (!pendingWave.length) break;
@@ -683,9 +670,6 @@ export async function executeWorkflowRun(args: {
           break;
         }
         if (!approval) break;
-        // A conditional approval may be skipped. In that case continue with
-        // the remaining siblings in the same wave. A real approval throws the
-        // pause sentinel above and exits before reaching this point.
       }
     }
 
@@ -814,7 +798,6 @@ export async function executeWorkflowRun(args: {
 
 /* ------------------------------------------------------------ orchestrator */
 
-/** Creates a workflow run, then delegates execution to the resumable core. */
 export async function executeWorkflow(args: {
   sb: Sb;
   userId: string;
@@ -842,8 +825,6 @@ export async function executeWorkflow(args: {
   if (!steps.length) throw new WorkforceError("This workflow has no steps yet.", "NO_STEPS");
 
   const orgId = (workflow.org_id as string | null) ?? null;
-
-  // Subscription gate: a workforce run costs at least one execution per step.
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
   assertWithinLimit(ent, "tasks_per_month");
 
@@ -877,8 +858,6 @@ export async function executeWorkflow(args: {
   });
 }
 
-/** Requests cancellation without directly closing the run ledger. The active
- * worker observes the flag and aborts its child agent work before finalising. */
 export async function requestWorkflowCancellation(args: { sb: Sb; userId: string; runId: string }) {
   const { data: visibleRun } = await args.sb
     .from("workflow_runs")
