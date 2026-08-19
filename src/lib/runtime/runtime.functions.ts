@@ -5,7 +5,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
-import { executeRun, failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { failRun, prepareRun, RuntimeError } from "./runtime.server";
+import { executePlannedRun } from "./planner-runtime.server";
 import { TOOL_SLUGS } from "./tools.server";
 
 type Sb = { from: (t: string) => any };
@@ -34,7 +35,7 @@ export const runAgentTask = createServerFn({ method: "POST" })
         agentId: data.agent_id,
         input: data.input,
       });
-      const task = await executeRun({ sb, userId: context.userId, run });
+      const task = await executePlannedRun({ sb, userId: context.userId, run });
       return { task, output: (task as any)?.output_text ?? "" };
     } catch (error) {
       if (run) await failRun({ userId: context.userId, run, error });
