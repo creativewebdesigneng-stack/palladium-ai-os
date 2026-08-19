@@ -29,6 +29,7 @@ export async function captureVerifiedAgentExperience(args: {
       .eq("id", args.taskId)
       .maybeSingle();
     if (taskError || !task || !["succeeded", "completed"].includes(String(task.status))) return null;
+    if (!task.planner_state || !task.verification_state) return null;
 
     const { data: agent, error: agentError } = await args.sb
       .from("personal_agents")
