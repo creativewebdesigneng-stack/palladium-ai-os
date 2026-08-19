@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
 import { failRun, prepareRun, RuntimeError } from "./runtime.server";
 import { executePlannedRun } from "./planner-runtime.server";
+import { captureVerifiedAgentExperience } from "./agent-learning.server";
 import { TOOL_SLUGS } from "./tools.server";
 
 type Sb = { from: (t: string) => any };
@@ -36,6 +37,11 @@ export const runAgentTask = createServerFn({ method: "POST" })
         input: data.input,
       });
       const task = await executePlannedRun({ sb, userId: context.userId, run });
+      await captureVerifiedAgentExperience({
+        sb: sb as never,
+        userId: context.userId,
+        taskId: run.taskId,
+      });
       return { task, output: (task as any)?.output_text ?? "" };
     } catch (error) {
       if (run) await failRun({ userId: context.userId, run, error });
