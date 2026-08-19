@@ -7,6 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  compileAgentSystemPrompt,
   hasAgentSpecV2,
   normaliseOperatingProfile,
   type AgentOperatingProfile,
@@ -62,6 +63,7 @@ function normaliseAgentWrite(input: AgentWriteInput) {
   const operatingProfile = input.operating_profile === undefined
     ? undefined
     : normaliseOperatingProfile(input.operating_profile);
+  const baseSystemPrompt = (input.system_prompt ?? "").slice(0, 8000);
 
   return {
     name: name.slice(0, 80),
@@ -69,7 +71,9 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     category: (input.category ?? "custom").slice(0, 40),
     purpose: (input.purpose ?? "").slice(0, 4000),
     personality: (input.personality ?? "").slice(0, 2000),
-    system_prompt: (input.system_prompt ?? "").slice(0, 8000),
+    system_prompt: operatingProfile === undefined
+      ? baseSystemPrompt
+      : compileAgentSystemPrompt(baseSystemPrompt, operatingProfile).slice(0, 16000),
     model: model.slice(0, 160),
     model_provider: modelProvider,
     temperature,
