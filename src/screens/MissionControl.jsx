@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 
-import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2, Bell, Briefcase } from 'lucide-react';
+import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Cpu, Globe2, Bell, Briefcase, Network } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
 import BriefingConsole from '@/components/mission/BriefingConsole';
+import OrchestratorConsole from '@/components/mission/OrchestratorConsole';
 import MissionMetrics from '@/components/mission/MissionMetrics';
 import ActivityStream from '@/components/mission/ActivityStream';
 import ProfessionalPanel from '@/components/mission/ProfessionalPanel';
@@ -33,9 +34,11 @@ import {
   retryExternalApprovedAction,
 } from '@/lib/mission/external-action-approval.functions';
 import { decideWorkflowApprovalRequest } from '@/lib/runtime/workforce.functions';
+import { runOrchestrator } from '@/lib/runtime/orchestrator.functions';
 
 const TABS = [
   ['overview', 'Overview', Gauge],
+  ['orchestrator', 'Orchestrator', Network],
   ['personal', 'Personal AI', User],
   ['professional', 'Professional AI', Briefcase],
   ['approvals', 'Approval centre', ShieldAlert],
@@ -84,6 +87,7 @@ export default function MissionControl() {
   const [tab, setTab] = useState('overview');
   const [builder, setBuilder] = useState({ open: false, initial: null });
   const [busyId, setBusyId] = useState(null);
+  const [orchestration, setOrchestration] = useState(null);
 
   const overviewFn = useServerFn(getMissionOverview);
   const saveAgentFn = useServerFn(savePersonalAgent);
@@ -95,6 +99,7 @@ export default function MissionControl() {
   const decideExternalFn = useServerFn(decideExternalActionApproval);
   const retryExternalFn = useServerFn(retryExternalApprovedAction);
   const decideWorkflowFn = useServerFn(decideWorkflowApprovalRequest);
+  const orchestratorFn = useServerFn(runOrchestrator);
   const altFn = useServerFn(chooseAlternative);
   const confirmFn = useServerFn(confirmPurchase);
   const saveMemoryFn = useServerFn(saveMemory);
@@ -138,6 +143,19 @@ export default function MissionControl() {
     console.error('[mission-control]', e);
     toast({ title: 'Something went wrong', description: friendlyMessage(e), variant: 'destructive' });
   };
+
+  const orchestrate = useMutation({
+    mutationFn: (goal) => orchestratorFn({ data: { goal } }),
+    onSuccess: (res) => {
+      setOrchestration(res);
+      toast({
+        title: res?.execution?.paused ? 'Mission awaiting approval' : 'Orchestration complete',
+        description: res?.plan?.summary ?? 'Palladium delegated the mission to the selected specialists.',
+      });
+      refresh();
+    },
+    onError: fail,
+  });
 
   const dispatch = useMutation({
     mutationFn: async (vars) => {
@@ -389,6 +407,18 @@ export default function MissionControl() {
         {tab === 'overview' && (
           <>
             <MissionMetrics metrics={data?.metrics} loading={loading} />
+            <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[.04] p-5">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Network className="h-4 w-4 text-violet-400" />Palladium Orchestrator</h2>
+              <p className="mt-1 text-[11px] text-zinc-400">
+                Give Palladium one high-level outcome and it will select specialists, build dependencies, delegate the work and verify the mission.
+              </p>
+              <button
+                onClick={() => setTab('orchestrator')}
+                className="mt-3 rounded-xl bg-violet-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-400"
+              >
+                Open Orchestrator
+              </button>
+            </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <TaskBoard tasks={data?.tasks ?? []} onComplete={(t) => completeTask.mutate(t.id)} />
@@ -405,6 +435,14 @@ export default function MissionControl() {
               </div>
             </div>
           </>
+        )}
+
+        {tab === 'orchestrator' && (
+          <OrchestratorConsole
+            onRun={(goal) => orchestrate.mutate(goal)}
+            pending={orchestrate.isPending || !isAuthenticated}
+            result={orchestration}
+          />
         )}
 
         {tab === 'personal' && (
