@@ -165,6 +165,42 @@ describe("model gateway provider failover", () => {
     expect(rescueCall?.messages.at(-1)?.content).toContain("Do not invent prices");
   });
 
+  it("returns authorised live-search evidence when every model provider is unavailable", async () => {
+    delete process.env["OPENAI_API_KEY"];
+    baseGateway.runChat.mockRejectedValue(new ProviderError("bad gateway", 502, true));
+    webAccess.searchPublicWeb.mockResolvedValueOnce({
+      query: "Find me three good hotels in London for next weekend.",
+      results: [
+        { title: "Hotel One", url: "https://example.com/one", snippet: "London hotel listing one." },
+        { title: "Hotel Two", url: "https://example.com/two", snippet: "London hotel listing two." },
+        { title: "Hotel Three", url: "https://example.com/three", snippet: "London hotel listing three." },
+        { title: "Hotel Four", url: "https://example.com/four", snippet: "London hotel listing four." },
+      ],
+    });
+
+    const messages = [{
+      role: "user" as const,
+      content: "Find me three good hotels in London for next weekend.",
+    }];
+    const result = await runChat({
+      ...makeArgs(messages),
+      tools: [{
+        name: "web_search",
+        description: "Search the public web",
+        parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+      }],
+    });
+
+    expect(result).toMatchObject({ provider: "groq", model: "live-search-evidence" });
+    expect(result.text).toContain("Live discovery results");
+    expect(result.text).toContain("Hotel One");
+    expect(result.text).toContain("Hotel Three");
+    expect(result.text).not.toContain("Hotel Four");
+    expect(result.text).toContain("not a booking or purchase");
+    expect(webAccess.searchPublicWeb).toHaveBeenCalledTimes(1);
+    expect(baseGateway.runChat).toHaveBeenCalledTimes(4);
+  });
+
   it("does not perform server-side research rescue unless web_search was already authorised", async () => {
     baseGateway.runChat
       .mockRejectedValueOnce(new ProviderError("failed", 400, false))
