@@ -265,8 +265,8 @@ export const updateAgent = createServerFn({ method: "POST" })
     };
     // Old clients do not know about Spec v2 yet. Omission must preserve an
     // existing operating profile rather than silently downgrading the agent.
-    if (operating_profile !== undefined) payload.operating_profile = operating_profile;
-    if (spec_version !== undefined) payload.spec_version = spec_version;
+    if (operating_profile !== undefined) payload["operating_profile"] = operating_profile;
+    if (spec_version !== undefined) payload["spec_version"] = spec_version;
 
     const { data: row, error } = await sb
       .from("personal_agents")
