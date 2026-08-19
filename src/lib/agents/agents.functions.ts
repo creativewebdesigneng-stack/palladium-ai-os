@@ -1,12 +1,17 @@
 /**
  * Agent workspace API (typed RPC).
  *
- * Replaces the legacy `base44.entities.Agent.*` client surface. Every call runs
- * behind `requireSupabaseAuth`, so the caller identity comes from the verified
- * bearer token and RLS scopes every row to its owner.
+ * Every call runs behind `requireSupabaseAuth`, so the caller identity comes
+ * from the verified bearer token and RLS scopes every row to its owner.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  compileAgentSystemPrompt,
+  hasAgentSpecV2,
+  normaliseOperatingProfile,
+  type AgentOperatingProfile,
+} from "./agent-spec";
 
 type Sb = { from: (t: string) => any };
 
@@ -38,6 +43,7 @@ type AgentWriteInput = {
   allowed_tools?: string[];
   preferences?: Record<string, unknown>;
   status?: string;
+  operating_profile?: AgentOperatingProfile | Record<string, unknown> | null;
 };
 
 function normaliseAgentWrite(input: AgentWriteInput) {
@@ -54,6 +60,10 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
     : 4096;
   const model = String(input.model ?? "").trim() || DEFAULT_MODEL_BY_PROVIDER[modelProvider] || "gpt-5-mini";
+  const operatingProfile = input.operating_profile === undefined
+    ? undefined
+    : normaliseOperatingProfile(input.operating_profile);
+  const baseSystemPrompt = (input.system_prompt ?? "").slice(0, 8000);
 
   return {
     name: name.slice(0, 80),
@@ -61,7 +71,9 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     category: (input.category ?? "custom").slice(0, 40),
     purpose: (input.purpose ?? "").slice(0, 4000),
     personality: (input.personality ?? "").slice(0, 2000),
-    system_prompt: (input.system_prompt ?? "").slice(0, 8000),
+    system_prompt: operatingProfile === undefined
+      ? baseSystemPrompt
+      : compileAgentSystemPrompt(baseSystemPrompt, operatingProfile).slice(0, 16000),
     model: model.slice(0, 160),
     model_provider: modelProvider,
     temperature,
@@ -73,6 +85,8 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
     preferences: input.preferences ?? {},
     status,
+    operating_profile: operatingProfile,
+    spec_version: operatingProfile && hasAgentSpecV2(operatingProfile) ? 2 : undefined,
   };
 }
 
@@ -221,6 +235,8 @@ export const createAgent = createServerFn({ method: "POST" })
         allowed_tools: data.allowed_tools,
         preferences: data.preferences,
         status: data.status,
+        ...(data.operating_profile !== undefined ? { operating_profile: data.operating_profile } : {}),
+        ...(data.spec_version !== undefined ? { spec_version: data.spec_version } : {}),
       })
       .select()
       .maybeSingle();
@@ -237,18 +253,24 @@ export const updateAgent = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { id, ...write } = data;
+    const { id, operating_profile, spec_version, ...write } = data;
+    const payload: Record<string, unknown> = {
+      ...write,
+      description: write.description || null,
+      purpose: write.purpose || null,
+      personality: write.personality || null,
+      system_prompt: write.system_prompt || null,
+      instructions: write.instructions || null,
+      updated_at: new Date().toISOString(),
+    };
+    // Old clients do not know about Spec v2 yet. Omission must preserve an
+    // existing operating profile rather than silently downgrading the agent.
+    if (operating_profile !== undefined) payload["operating_profile"] = operating_profile;
+    if (spec_version !== undefined) payload["spec_version"] = spec_version;
+
     const { data: row, error } = await sb
       .from("personal_agents")
-      .update({
-        ...write,
-        description: write.description || null,
-        purpose: write.purpose || null,
-        personality: write.personality || null,
-        system_prompt: write.system_prompt || null,
-        instructions: write.instructions || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq("id", id)
       .eq("user_id", context.userId)
       .select()
