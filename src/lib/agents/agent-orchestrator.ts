@@ -1,3 +1,4 @@
+import { performanceSelectionBonus, type AgentPerformanceSnapshot } from "./agent-performance";
 import type { AgentOperatingProfile } from "./agent-spec";
 
 export type OrchestratorCandidate = {
@@ -9,6 +10,7 @@ export type OrchestratorCandidate = {
   model_provider?: string | null;
   model?: string | null;
   operating_profile?: AgentOperatingProfile | null;
+  performance?: AgentPerformanceSnapshot | null;
 };
 
 export type OrchestratorAssignment = {
@@ -63,7 +65,10 @@ function candidateText(candidate: OrchestratorCandidate): string {
     .join(" ");
 }
 
-/** Deterministic pre-ranking. The model only sees a bounded shortlist. */
+/**
+ * Deterministic pre-ranking. Declared role/skill fit remains primary; verified
+ * historical performance supplies only a bounded secondary bonus.
+ */
 export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate): number {
   const wanted = tokens(goal);
   const available = tokens(candidateText(candidate));
@@ -75,6 +80,7 @@ export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate
   if (profile.skills?.length) score += Math.min(profile.skills.length, 5);
   if (profile.success_criteria?.length) score += 2;
   if (candidate.allowed_tools?.length) score += 1;
+  score += performanceSelectionBonus(candidate.performance);
   return score;
 }
 
@@ -190,6 +196,15 @@ export function fallbackOrchestratorPlan(
   };
 }
 
+function performanceLine(candidate: OrchestratorCandidate): string | null {
+  const performance = candidate.performance;
+  if (!performance || performance.runs < 2) return null;
+  const verifier = performance.average_verifier_score === null
+    ? "n/a"
+    : `${Math.round(performance.average_verifier_score * 100)}%`;
+  return `Recent performance: ${performance.successes}/${performance.runs} successful; verifier ${verifier}; avg replans ${performance.average_replans.toFixed(1)}`;
+}
+
 export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): string {
   return candidates
     .map((candidate) => {
@@ -201,7 +216,8 @@ export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): s
         `Objective: ${profile.objective ?? candidate.purpose ?? "not specified"}`,
         `Skills: ${(profile.skills ?? []).join(", ") || "not specified"}`,
         `Tools: ${(candidate.allowed_tools ?? []).join(", ") || "none"}`,
-      ].join("\n");
+        performanceLine(candidate),
+      ].filter(Boolean).join("\n");
     })
     .join("\n\n");
 }
