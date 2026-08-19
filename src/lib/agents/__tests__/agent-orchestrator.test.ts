@@ -40,6 +40,28 @@ describe("Palladium Orchestrator", () => {
     expect(shortlistAgents("research competitors", [coder, research])[0]?.id).toBe("research");
   });
 
+  it("uses verified performance as a bounded tie-breaker between similarly qualified specialists", () => {
+    const reliable: OrchestratorCandidate = {
+      ...research,
+      id: "reliable",
+      name: "Reliable Researcher",
+      performance: {
+        agent_id: "reliable",
+        runs: 10,
+        successes: 10,
+        failures: 0,
+        verified_runs: 10,
+        success_rate: 1,
+        average_verifier_score: 0.96,
+        average_replans: 0.1,
+        average_duration_ms: 1500,
+        performance_score: 0.96,
+      },
+    };
+    const unproven: OrchestratorCandidate = { ...research, id: "unproven", name: "Unproven Researcher" };
+    expect(shortlistAgents("research competitors", [unproven, reliable])[0]?.id).toBe("reliable");
+  });
+
   it("rejects assignments to agents outside the authorised shortlist", () => {
     const plan = normaliseOrchestratorPlan({
       goal: "Research and build a report",
