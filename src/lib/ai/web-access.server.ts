@@ -56,15 +56,11 @@ function parseDuckDuckGoHtml(html: string, limit: number): WebSource[] {
   let match: RegExpExecArray | null;
   while ((match = blockRe.exec(html)) && results.length < limit) {
     const url = decodeDdg(match[1] ?? "");
-    pushUnique(
-      results,
-      {
-        url,
-        title: stripHtml(match[2] ?? "") || url,
-        snippet: stripHtml(match[3] ?? "").slice(0, 700),
-      },
-      limit,
-    );
+    pushUnique(results, {
+      url,
+      title: stripHtml(match[2] ?? "") || url,
+      snippet: stripHtml(match[3] ?? "").slice(0, 700),
+    }, limit);
   }
   return results;
 }
@@ -100,11 +96,11 @@ function parseBingRss(xml: string, limit: number): WebSource[] {
     const url = decodeXml(/<link>([\s\S]*?)<\/link>/i.exec(item)?.[1] ?? "").trim();
     const description = decodeXml(/<description>([\s\S]*?)<\/description>/i.exec(item)?.[1] ?? "");
     if (!url) continue;
-    pushUnique(
-      results,
-      { url, title: stripHtml(title) || url, snippet: stripHtml(description).slice(0, 700) },
-      limit,
-    );
+    pushUnique(results, {
+      url,
+      title: stripHtml(title) || url,
+      snippet: stripHtml(description).slice(0, 700),
+    }, limit);
   }
   return results;
 }
@@ -130,6 +126,29 @@ async function trySearchEndpoint(
   }
 }
 
+export function buildPublicSearchQueries(queryInput: string): string[] {
+  const query = queryInput.trim().slice(0, 300);
+  if (!query) return [];
+  const wantsVideo = /\b(youtube|you tube|video|videos)\b/i.test(query);
+  return wantsVideo
+    ? [`site:youtube.com/watch ${query}`.slice(0, 300), query]
+    : [query];
+}
+
+async function runProviderSet(query: string, limit: number, signal?: AbortSignal): Promise<WebSource[]> {
+  const encoded = encodeURIComponent(query);
+  const providers: Array<[string, (body: string, limit: number) => WebSource[]]> = [
+    [`https://duckduckgo.com/html/?q=${encoded}`, parseDuckDuckGoHtml],
+    [`https://lite.duckduckgo.com/lite/?q=${encoded}`, parseDuckDuckGoLite],
+    [`https://www.bing.com/search?format=rss&q=${encoded}`, parseBingRss],
+  ];
+  for (const [url, parser] of providers) {
+    const results = await trySearchEndpoint(url, parser, limit, signal);
+    if (results.length) return results;
+  }
+  return [];
+}
+
 export async function searchPublicWeb(
   queryInput: string,
   limitInput = 5,
@@ -138,19 +157,15 @@ export async function searchPublicWeb(
   const query = queryInput.trim().slice(0, 300);
   if (!query) return { query: "", results: [] };
   const limit = Math.max(1, Math.min(Number(limitInput) || 5, 8));
-  const encoded = encodeURIComponent(query);
+  const results: WebSource[] = [];
 
-  const providers: Array<[string, (body: string, limit: number) => WebSource[]]> = [
-    [`https://duckduckgo.com/html/?q=${encoded}`, parseDuckDuckGoHtml],
-    [`https://lite.duckduckgo.com/lite/?q=${encoded}`, parseDuckDuckGoLite],
-    [`https://www.bing.com/search?format=rss&q=${encoded}`, parseBingRss],
-  ];
-
-  for (const [url, parser] of providers) {
-    const results = await trySearchEndpoint(url, parser, limit, signal);
-    if (results.length) return { query, results };
+  for (const searchQuery of buildPublicSearchQueries(query)) {
+    const batch = await runProviderSet(searchQuery, limit, signal);
+    for (const item of batch) pushUnique(results, item, limit);
+    if (results.length >= limit) break;
   }
 
+  if (results.length) return { query, results };
   throw new Error("Public web search providers are temporarily unavailable.");
 }
 
