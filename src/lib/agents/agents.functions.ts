@@ -117,7 +117,7 @@ export const listAgents = createServerFn({ method: "POST" })
         .limit(100),
       sb
         .from("workflow_step_runs")
-        .select("id,run_id,workflow_step_id,agent_id,name,kind,position,attempt,status,input,output,error,started_at,completed_at,created_at")
+        .select("id,run_id,workflow_id,step_id,agent_id,name,kind,position,attempt,status,input,output,error,started_at,completed_at,created_at")
         .order("created_at", { ascending: false })
         .limit(500),
     ]);
