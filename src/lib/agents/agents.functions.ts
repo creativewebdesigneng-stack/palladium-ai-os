@@ -76,7 +76,10 @@ function normaliseAgentWrite(input: AgentWriteInput) {
   };
 }
 
-/** The caller's agents, newest first, plus their recent task rows. */
+/**
+ * The caller's agents plus the execution ledgers needed by the Agent Operations
+ * view. RLS scopes every table to rows the caller can access.
+ */
 export const listAgents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { limit?: number; withTasks?: boolean } | undefined) => ({
@@ -92,16 +95,45 @@ export const listAgents = createServerFn({ method: "POST" })
       .limit(data.limit);
     if (error) throw new Error(error.message);
 
-    let tasks: any[] = [];
-    if (data.withTasks) {
-      const res = await sb
-        .from("agent_tasks")
-        .select("id,agent_id,title,status,created_at,updated_at,completed_at")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      tasks = res.data ?? [];
+    if (!data.withTasks) {
+      return { agents: agents ?? [], tasks: [], workflows: [], workflowRuns: [], workflowStepRuns: [] };
     }
-    return { agents: agents ?? [], tasks };
+
+    const [tasksRes, workflowsRes, runsRes, stepRunsRes] = await Promise.all([
+      sb
+        .from("agent_tasks")
+        .select("id,agent_id,task_id,title,input,status,provider,model,started_at,heartbeat_at,created_at,updated_at,completed_at,error")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      sb
+        .from("workflows")
+        .select("id,name,description,status,workforce_id,updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(100),
+      sb
+        .from("workflow_runs")
+        .select("id,workflow_id,workforce_id,status,input,output,started_at,completed_at,created_at,waiting_step_id")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      sb
+        .from("workflow_step_runs")
+        .select("id,run_id,workflow_step_id,agent_id,name,kind,position,attempt,status,input,output,error,started_at,completed_at,created_at")
+        .order("created_at", { ascending: false })
+        .limit(500),
+    ]);
+
+    if (tasksRes.error) throw new Error(tasksRes.error.message);
+    if (workflowsRes.error) throw new Error(workflowsRes.error.message);
+    if (runsRes.error) throw new Error(runsRes.error.message);
+    if (stepRunsRes.error) throw new Error(stepRunsRes.error.message);
+
+    return {
+      agents: agents ?? [],
+      tasks: tasksRes.data ?? [],
+      workflows: workflowsRes.data ?? [],
+      workflowRuns: runsRes.data ?? [],
+      workflowStepRuns: stepRunsRes.data ?? [],
+    };
   });
 
 /** Flips an agent's lifecycle status. Ownership is enforced by RLS + filter. */
