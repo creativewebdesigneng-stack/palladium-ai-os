@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const baseGateway = vi.hoisted(() => ({ runChat: vi.fn() }));
+const webAccess = vi.hoisted(() => ({ searchPublicWeb: vi.fn() }));
 
 vi.mock("../model-gateway.base", async () => {
   const actual = await vi.importActual<typeof import("../model-gateway.base")>("../model-gateway.base");
   return { ...actual, runChat: baseGateway.runChat };
 });
+
+vi.mock("@/lib/ai/web-access.server", () => ({
+  searchPublicWeb: webAccess.searchPublicWeb,
+}));
 
 import { ProviderError, runChat } from "../model-gateway.server";
 
@@ -23,6 +28,7 @@ const makeArgs = (messages: Array<{ role: "user"; content: string }>) => ({
 describe("model gateway provider failover", () => {
   beforeEach(() => {
     baseGateway.runChat.mockReset();
+    webAccess.searchPublicWeb.mockReset();
     process.env["GROQ_API_KEY"] = "test-groq";
     process.env["OPENAI_API_KEY"] = "test-openai";
     delete process.env["ANTHROPIC_API_KEY"];
@@ -87,6 +93,64 @@ describe("model gateway provider failover", () => {
       provider: "openai",
       model: "gpt-5-mini",
     });
+  });
+
+  it("rescues an authorised web-search task when every provider rejects tool calling", async () => {
+    baseGateway.runChat
+      .mockRejectedValueOnce(new ProviderError("tool schema rejected", 400, false))
+      .mockRejectedValueOnce(new ProviderError("tool schema rejected", 400, false))
+      .mockResolvedValueOnce({
+        text: "Three live London hotel options",
+        toolCalls: [],
+        usage: { input: 50, output: 30 },
+        provider: "groq",
+        model: "openai/gpt-oss-120b",
+      });
+    webAccess.searchPublicWeb.mockResolvedValueOnce({
+      query: "Find me three good hotels in London for next weekend.",
+      results: [
+        {
+          title: "Example London Hotel",
+          url: "https://example.com/london-hotel",
+          snippet: "Central London hotel with current listing information.",
+        },
+      ],
+    });
+
+    const messages = [{
+      role: "user" as const,
+      content: "Find me three good hotels in London for next weekend.",
+    }];
+    const result = await runChat({
+      ...makeArgs(messages),
+      tools: [{
+        name: "web_search",
+        description: "Search the public web",
+        parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+      }],
+    });
+
+    expect(result.text).toContain("London hotel");
+    expect(webAccess.searchPublicWeb).toHaveBeenCalledWith(
+      "Find me three good hotels in London for next weekend.",
+      8,
+      undefined,
+    );
+    expect(baseGateway.runChat).toHaveBeenCalledTimes(3);
+    const rescueCall = baseGateway.runChat.mock.calls[2]?.[0];
+    expect(rescueCall?.tools).toEqual([]);
+    expect(rescueCall?.messages.at(-1)?.content).toContain("Example London Hotel");
+    expect(rescueCall?.messages.at(-1)?.content).toContain("Do not invent prices");
+  });
+
+  it("does not perform server-side research rescue unless web_search was already authorised", async () => {
+    baseGateway.runChat
+      .mockRejectedValueOnce(new ProviderError("failed", 400, false))
+      .mockRejectedValueOnce(new ProviderError("failed", 400, false));
+    const messages = [{ role: "user" as const, content: "Find a hotel" }];
+
+    await expect(runChat(makeArgs(messages))).rejects.toMatchObject({ status: 400 });
+    expect(webAccess.searchPublicWeb).not.toHaveBeenCalled();
   });
 
   it("never fails over a cancelled model call", async () => {
