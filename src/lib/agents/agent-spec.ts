@@ -28,6 +28,8 @@ export type AgentOperatingProfile = {
   max_replans?: number;
 };
 
+const PROFILE_MARKER = "<!-- PALLADIUM_AGENT_SPEC_V2 -->";
+
 const text = (value: unknown, max: number) =>
   typeof value === "string" ? value.trim().slice(0, max) : "";
 
@@ -138,4 +140,15 @@ export function renderOperatingProfilePrompt(profile: AgentOperatingProfile | nu
     "Execution discipline: plan before acting when the task has multiple steps; observe tool results; revise the plan when evidence contradicts assumptions; never fabricate completion evidence.",
   );
   return sections.join("\n\n");
+}
+
+/** Compile the durable operating contract into the runtime system prompt. */
+export function compileAgentSystemPrompt(
+  basePrompt: string | null | undefined,
+  profile: AgentOperatingProfile | null | undefined,
+): string {
+  const base = String(basePrompt ?? "").split(PROFILE_MARKER)[0]?.trim() ?? "";
+  const rendered = renderOperatingProfilePrompt(profile);
+  if (!rendered) return base;
+  return [base, PROFILE_MARKER, rendered].filter(Boolean).join("\n\n");
 }
