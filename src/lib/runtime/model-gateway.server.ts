@@ -8,9 +8,6 @@ type ActiveProvider = { provider: Provider; model: string };
 
 const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
 
-// A single personal/runtime conversation reuses the same messages array across
-// tool rounds. Remember a successful fallback for that array so a provider that
-// has already failed is not retried on every subsequent model turn.
 const activeProviderByConversation = new WeakMap<ChatMessage[], ActiveProvider>();
 
 function providerConfigured(provider: Provider): boolean {
@@ -42,6 +39,45 @@ function latestUserQuery(messages: ChatMessage[]): string {
     if (message?.role === "user" && message.content.trim()) return message.content.trim().slice(0, 300);
   }
   return "";
+}
+
+function requestedResultLimit(query: string, available: number): number {
+  const numeric = /\b([1-8])\b/.exec(query)?.[1];
+  if (numeric) return Math.min(Number(numeric), available);
+  const words: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+  };
+  const word = /\b(one|two|three|four|five|six|seven|eight)\b/i.exec(query)?.[1]?.toLowerCase();
+  return Math.min(word ? words[word] ?? 5 : 5, available);
+}
+
+function liveSearchOnlyResult(
+  query: string,
+  search: Awaited<ReturnType<typeof searchPublicWeb>>,
+  provider: Provider,
+): ChatResult {
+  const limit = requestedResultLimit(query, search.results.length);
+  const items = search.results.slice(0, limit).map((item, index) => {
+    const snippet = item.snippet?.trim();
+    return `${index + 1}. [${item.title}](${item.url})${snippet ? `\n   ${snippet}` : ""}`;
+  });
+  return {
+    text:
+      `### Live discovery results\n\n` +
+      `The AI model provider is temporarily unavailable, so PalladiumAI completed this read-only request directly from live web-search evidence. ` +
+      `These are search results to compare, not a booking or purchase.\n\n${items.join("\n\n")}`,
+    toolCalls: [],
+    usage: { input: 0, output: 0 },
+    provider,
+    model: "live-search-evidence",
+  };
 }
 
 async function tryProviderModels(args: RunArgs, provider: Provider, model: string) {
@@ -101,7 +137,11 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
       if (error instanceof base.ProviderError && error.status === 499) throw error;
     }
   }
-  return null;
+
+  // Read-only discovery must not fail solely because every model provider is down.
+  // At this point web_search was already authorised and returned live public evidence,
+  // so return that evidence directly without inventing any additional facts.
+  return liveSearchOnlyResult(query, search, primaryProvider);
 }
 
 /**
@@ -115,9 +155,10 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
  *
  * If every configured provider rejects an already-authorised `web_search` tool
  * call before it can execute, the gateway performs the same safe public search
- * server-side and retries once without tools using the live sources as evidence.
- * This keeps research useful across provider-specific tool-call incompatibilities
- * without granting any tool that the caller did not already authorise.
+ * server-side and retries without tools using the live sources as evidence. If
+ * model providers are still unavailable after that search, the gateway returns
+ * the live search evidence directly so a read-only discovery task can complete
+ * without bypassing tool authorisation or inventing facts.
  */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
   const remembered = activeProviderByConversation.get(args.messages);
@@ -126,10 +167,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   let lastError: unknown;
 
   for (const provider of fallbackOrder(primaryProvider)) {
-    const model =
-      provider === primaryProvider
-        ? primaryModel
-        : base.resolveModel(provider, null);
+    const model = provider === primaryProvider ? primaryModel : base.resolveModel(provider, null);
     try {
       const result = await tryProviderModels(args, provider, model);
       activeProviderByConversation.set(args.messages, {
