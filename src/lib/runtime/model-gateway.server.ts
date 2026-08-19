@@ -6,6 +6,8 @@ export * from "./model-gateway.base";
 
 type ActiveProvider = { provider: Provider; model: string };
 
+const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
+
 // A single personal/runtime conversation reuses the same messages array across
 // tool rounds. Remember a successful fallback for that array so a provider that
 // has already failed is not retried on every subsequent model turn.
@@ -27,12 +29,35 @@ function fallbackOrder(primary: Provider): Provider[] {
   );
 }
 
+function modelCandidates(provider: Provider, model: string): string[] {
+  if (provider !== "groq") return [model];
+  const candidates = [model];
+  if (model !== GROQ_MODEL_FALLBACK) candidates.push(GROQ_MODEL_FALLBACK);
+  return candidates;
+}
+
 function latestUserQuery(messages: ChatMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role === "user" && message.content.trim()) return message.content.trim().slice(0, 300);
   }
   return "";
+}
+
+async function tryProviderModels(args: RunArgs, provider: Provider, model: string) {
+  let lastError: unknown;
+  for (const candidate of modelCandidates(provider, model)) {
+    try {
+      return await base.runChat({ ...args, provider, model: candidate });
+    } catch (error) {
+      if (error instanceof base.ProviderError && error.status === 499) throw error;
+      lastError = error;
+      if (!(error instanceof base.ProviderError) || !error.retryable || error.status < 500) break;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new base.ProviderError("Model call failed.", 500, false);
 }
 
 async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provider, primaryModel: string) {
@@ -66,7 +91,7 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
   for (const provider of fallbackOrder(primaryProvider)) {
     const model = provider === primaryProvider ? primaryModel : base.resolveModel(provider, null);
     try {
-      const result = await base.runChat({ ...args, provider, model, messages, tools: [] });
+      const result = await tryProviderModels({ ...args, messages, tools: [] }, provider, model);
       activeProviderByConversation.set(args.messages, {
         provider: result.provider,
         model: result.model,
@@ -84,7 +109,9 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
  *
  * Each underlying provider still owns its normal retry/backoff policy. Only
  * after that provider has definitively failed do we move to another configured
- * provider. Cancellation is never retried or failed over.
+ * provider. Groq additionally gets a bounded model fallback from its configured
+ * model to the production GPT-OSS 20B model on retryable 5xx failures.
+ * Cancellation is never retried or failed over.
  *
  * If every configured provider rejects an already-authorised `web_search` tool
  * call before it can execute, the gateway performs the same safe public search
@@ -104,7 +131,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
         ? primaryModel
         : base.resolveModel(provider, null);
     try {
-      const result = await base.runChat({ ...args, provider, model });
+      const result = await tryProviderModels(args, provider, model);
       activeProviderByConversation.set(args.messages, {
         provider: result.provider,
         model: result.model,

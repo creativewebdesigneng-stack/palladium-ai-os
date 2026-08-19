@@ -66,22 +66,44 @@ describe("model gateway provider failover", () => {
     });
   });
 
-  it("remembers the working provider for later tool rounds in the same conversation", async () => {
+  it("falls back from Groq 120B to Groq 20B on retryable 5xx errors", async () => {
     baseGateway.runChat
-      .mockRejectedValueOnce(new ProviderError("temporary outage", 503, true))
+      .mockRejectedValueOnce(new ProviderError("bad gateway", 502, true))
+      .mockResolvedValueOnce({
+        text: "Three London hotel options",
+        toolCalls: [],
+        usage: { input: 12, output: 25 },
+        provider: "groq",
+        model: "openai/gpt-oss-20b",
+      });
+
+    const messages = [{ role: "user" as const, content: "Find me three hotels in London" }];
+    const result = await runChat(makeArgs(messages));
+
+    expect(result).toMatchObject({ provider: "groq", model: "openai/gpt-oss-20b" });
+    expect(baseGateway.runChat).toHaveBeenCalledTimes(2);
+    expect(baseGateway.runChat.mock.calls[1]?.[0]).toMatchObject({
+      provider: "groq",
+      model: "openai/gpt-oss-20b",
+    });
+  });
+
+  it("remembers the working provider and model for later tool rounds in the same conversation", async () => {
+    baseGateway.runChat
+      .mockRejectedValueOnce(new ProviderError("temporary outage", 502, true))
       .mockResolvedValueOnce({
         text: "first",
         toolCalls: [],
         usage: { input: 1, output: 1 },
-        provider: "openai",
-        model: "gpt-5-mini",
+        provider: "groq",
+        model: "openai/gpt-oss-20b",
       })
       .mockResolvedValueOnce({
         text: "second",
         toolCalls: [],
         usage: { input: 1, output: 1 },
-        provider: "openai",
-        model: "gpt-5-mini",
+        provider: "groq",
+        model: "openai/gpt-oss-20b",
       });
 
     const messages = [{ role: "user" as const, content: "Plan meals" }];
@@ -90,8 +112,8 @@ describe("model gateway provider failover", () => {
 
     expect(baseGateway.runChat).toHaveBeenCalledTimes(3);
     expect(baseGateway.runChat.mock.calls[2]?.[0]).toMatchObject({
-      provider: "openai",
-      model: "gpt-5-mini",
+      provider: "groq",
+      model: "openai/gpt-oss-20b",
     });
   });
 
