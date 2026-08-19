@@ -1,6 +1,7 @@
 export type AgentPerformanceTask = {
   agent_id?: string | null;
   status?: string | null;
+  input?: string | null;
   duration_ms?: number | null;
   replan_count?: number | null;
   verification_state?: unknown;
@@ -19,12 +20,38 @@ export type AgentPerformanceSnapshot = {
   performance_score: number;
 };
 
+export type AgentSimilaritySnapshot = AgentPerformanceSnapshot & {
+  goal: string;
+  similarity_runs: number;
+  average_similarity: number;
+  similarity_score: number;
+};
+
 const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
 
 function verificationScore(value: unknown): number | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const score = Number((value as Record<string, unknown>)["score"]);
   return Number.isFinite(score) ? clamp(score) : null;
+}
+
+function tokenSet(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 2),
+  );
+}
+
+export function taskSimilarity(goal: string, taskInput: string): number {
+  const wanted = tokenSet(goal);
+  const historic = tokenSet(taskInput);
+  if (!wanted.size || !historic.size) return 0;
+  let overlap = 0;
+  for (const token of wanted) if (historic.has(token)) overlap += 1;
+  return clamp(overlap / Math.max(3, Math.min(wanted.size, 12)));
 }
 
 /**
@@ -62,8 +89,6 @@ export function summariseAgentPerformance(
     ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length
     : null;
 
-  // Confidence reaches full weight at 10 terminal runs. Verification quality is
-  // the strongest signal, followed by successful completion and re-plan cost.
   const confidence = clamp(runs / 10);
   const quality = averageVerifierScore ?? successRate;
   const replanEfficiency = 1 - clamp(averageReplans / 4);
@@ -84,7 +109,40 @@ export function summariseAgentPerformance(
   };
 }
 
+export function summariseSimilarPerformance(
+  agentId: string,
+  goal: string,
+  tasks: AgentPerformanceTask[],
+): AgentSimilaritySnapshot {
+  const similar = tasks
+    .filter((task) => String(task.agent_id ?? "") === agentId)
+    .map((task) => ({ task, similarity: taskSimilarity(goal, String(task.input ?? "")) }))
+    .filter(({ task, similarity }) =>
+      similarity >= 0.2 && ["succeeded", "completed", "failed", "cancelled"].includes(String(task.status ?? "")),
+    )
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 20);
+  const base = summariseAgentPerformance(agentId, similar.map(({ task }) => task));
+  const averageSimilarity = similar.length
+    ? similar.reduce((sum, item) => sum + item.similarity, 0) / similar.length
+    : 0;
+  const similarityConfidence = clamp(similar.length / 6);
+  const similarityScore = clamp(base.performance_score * averageSimilarity * similarityConfidence);
+  return {
+    ...base,
+    goal: goal.slice(0, 1000),
+    similarity_runs: similar.length,
+    average_similarity: averageSimilarity,
+    similarity_score: similarityScore,
+  };
+}
+
 export function performanceSelectionBonus(snapshot: AgentPerformanceSnapshot | null | undefined): number {
   if (!snapshot || snapshot.runs < 2) return 0;
   return Math.round(clamp(snapshot.performance_score) * 12);
+}
+
+export function similaritySelectionBonus(snapshot: AgentSimilaritySnapshot | null | undefined): number {
+  if (!snapshot || snapshot.similarity_runs < 2) return 0;
+  return Math.round(clamp(snapshot.similarity_score) * 8);
 }
