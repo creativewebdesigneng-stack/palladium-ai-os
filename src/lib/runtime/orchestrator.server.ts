@@ -6,6 +6,7 @@ import {
   type OrchestratorCandidate,
   type OrchestratorPlan,
 } from "@/lib/agents/agent-orchestrator";
+import { summariseAgentPerformance, type AgentPerformanceTask } from "@/lib/agents/agent-performance";
 import { normaliseProvider, resolveModel, runChat, type ChatMessage } from "./model-gateway.server";
 import { executeWorkflow } from "./workforce.server";
 
@@ -53,6 +54,7 @@ function orchestrationPrompt(goal: string, candidates: OrchestratorCandidate[]):
         "You are the PalladiumAI Orchestrator. You plan delegation only; you do not execute tools or claim tasks are complete.",
         "Break the operator goal into the smallest useful set of specialist assignments. Choose only Agent IDs in the catalogue.",
         "Use dependencies only when an assignment truly needs another assignment's output. Independent work should have no dependency so the workforce engine may run it in parallel.",
+        "Prefer specialists whose role and skills match the assignment. Recent verified performance is supporting evidence, not permission to assign an unrelated specialist.",
         "Never expand permissions. Each selected agent will execute through its own tool grants, memory scope, approval rules and verification contract.",
         "Return one JSON object only. Do not include hidden reasoning.",
         'Shape: {"summary":"...","assignments":[{"id":"research","title":"Research market","objective":"...","agent_id":"uuid","depends_on":[],"success_criteria":["..."],"requires_approval":false}]}',
@@ -64,6 +66,28 @@ function orchestrationPrompt(goal: string, candidates: OrchestratorCandidate[]):
       content: `Goal:\n${goal}\n\nAvailable specialists:\n${catalogue}`,
     },
   ];
+}
+
+async function attachPerformance(sb: Sb, agents: EligibleAgentRow[]): Promise<EligibleAgentRow[]> {
+  if (!agents.length) return agents;
+  try {
+    const ids = agents.map((agent) => String(agent.id));
+    const { data, error } = await sb
+      .from("agent_tasks")
+      .select("agent_id,status,duration_ms,replan_count,verification_state,created_at")
+      .in("agent_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw error;
+    const tasks = (data ?? []) as AgentPerformanceTask[];
+    return agents.map((agent) => ({
+      ...agent,
+      performance: summariseAgentPerformance(String(agent.id), tasks),
+    }));
+  } catch (error) {
+    console.error("[orchestrator] performance history unavailable; using skill-only ranking", error);
+    return agents;
+  }
 }
 
 async function loadEligibleAgents(args: {
@@ -115,7 +139,7 @@ async function loadEligibleAgents(args: {
       "NO_ELIGIBLE_AGENTS",
       409,
     );
-  return { agents, orgId, workforceId };
+  return { agents: await attachPerformance(args.sb, agents), orgId, workforceId };
 }
 
 async function createDelegationPlan(goal: string, candidates: EligibleAgentRow[]): Promise<OrchestratorPlan> {
