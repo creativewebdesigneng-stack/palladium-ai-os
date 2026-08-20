@@ -136,11 +136,11 @@ export function documentMetrics(rows: Array<Record<string, any>>) {
   ]);
   return {
     total: rows.length,
-    aiGenerated: rows.filter((row) => aiSources.has(String(row.source))).length,
-    derived: rows.filter((row) => Boolean(row.origin_document_id)).length,
-    updatedThisWeek: rows.filter((row) => new Date(row.updated_at ?? 0).getTime() >= weekAgo).length,
+    aiGenerated: rows.filter((row) => aiSources.has(String(row["source"]))).length,
+    derived: rows.filter((row) => Boolean(row["origin_document_id"])).length,
+    updatedThisWeek: rows.filter((row) => new Date(row["updated_at"] ?? 0).getTime() >= weekAgo).length,
     words: rows.reduce(
-      (sum, row) => sum + String(row.body ?? "").split(/\s+/).filter(Boolean).length,
+      (sum, row) => sum + String(row["body"] ?? "").split(/\s+/).filter(Boolean).length,
       0,
     ),
   };
@@ -216,9 +216,9 @@ export const saveDocument = createServerFn({ method: "POST" })
       userId: context.userId,
       action: data.id ? "document.updated" : "document.created",
       targetType: "user_document",
-      targetId: row.id,
+      targetId: row["id"],
       status: "success",
-      metadata: { doc_type: row.doc_type, format: row.format },
+      metadata: { doc_type: row["doc_type"], format: row["format"] },
     });
     return row;
   });
