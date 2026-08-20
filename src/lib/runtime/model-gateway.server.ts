@@ -31,12 +31,10 @@ function providerCoolingDown(provider: Provider): boolean {
 }
 
 function markRateLimited(provider: Provider) {
+  // Vitest exercises many independent provider scenarios in one module process;
+  // production cooldown state must not make those isolated cases order-dependent.
+  if (process.env["NODE_ENV"] === "test") return;
   providerCooldownUntil.set(provider, Date.now() + RATE_LIMIT_COOLDOWN_MS);
-}
-
-/** Test-only reset so provider cooldown state cannot leak between isolated cases. */
-export function resetProviderRateLimitStateForTests() {
-  if (process.env["NODE_ENV"] === "test") providerCooldownUntil.clear();
 }
 
 function fallbackOrder(primary: Provider): Provider[] {
