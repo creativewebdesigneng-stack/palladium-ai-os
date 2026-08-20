@@ -3385,6 +3385,65 @@ export type Database = {
         }
         Relationships: []
       }
+      user_documents: {
+        Row: {
+          body: string
+          created_at: string
+          doc_type: string
+          format: string
+          id: string
+          input_tokens: number
+          model: string | null
+          origin_document_id: string | null
+          output_tokens: number
+          provider: string | null
+          source: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          doc_type?: string
+          format?: string
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          origin_document_id?: string | null
+          output_tokens?: number
+          provider?: string | null
+          source?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          doc_type?: string
+          format?: string
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          origin_document_id?: string | null
+          output_tokens?: number
+          provider?: string | null
+          source?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_documents_origin_document_id_fkey"
+            columns: ["origin_document_id"]
+            isOneToOne: false
+            referencedRelation: "user_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
