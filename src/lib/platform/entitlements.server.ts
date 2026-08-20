@@ -4,7 +4,11 @@
  * The browser is never the source of truth for plans, limits or usage. Every
  * gated action resolves its plan from the `subscriptions` table (written only
  * by trusted server code) and counts real usage rows from the database.
+ * Platform admins are the sole exception: the trusted database role grants an
+ * internal unlimited entitlement without creating or requiring a subscription.
  */
+
+import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 
 export type PlanCode = "explorer" | "builder" | "business" | "enterprise";
 
@@ -24,6 +28,7 @@ export type Entitlements = {
   usage: { agents: number; tasksThisMonth: number; seats: number };
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  isPlatformAdmin?: boolean;
 };
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
@@ -47,6 +52,17 @@ function monthStart(): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
+function unionFeatures(rows: Array<{ features?: unknown }> | null | undefined): string[] {
+  const features = new Set<string>();
+  for (const row of rows ?? []) {
+    if (!Array.isArray(row.features)) continue;
+    for (const feature of row.features) {
+      if (typeof feature === "string" && feature.trim()) features.add(feature);
+    }
+  }
+  return [...features].sort();
+}
+
 /**
  * Resolves the effective plan + real usage for a user (or their organisation).
  *
@@ -54,6 +70,11 @@ function monthStart(): string {
  * used as the counting scope. Without that check a caller could pass an
  * unrelated organisation id and be measured against an empty usage window,
  * sidestepping their own personal allowance.
+ *
+ * A caller holding the trusted platform `admin` role receives unlimited limits
+ * and every feature configured across the plans table. This is intentionally
+ * derived server-side from `has_role`; no email, browser flag or Stripe record
+ * can grant the override. Organisation membership is still enforced first.
  */
 export async function getEntitlements(
   sb: Sb,
@@ -79,22 +100,9 @@ export async function getEntitlements(
     orgId = requestedOrgId;
   }
 
-  const subQuery = sb
-    .from("subscriptions")
-    .select("plan_code,status,seats,current_period_end,cancel_at_period_end")
-    .in("status", ["trialing", "active", "past_due"])
-    .order("updated_at", { ascending: false })
-    .limit(1);
+  const platformAdmin = await isPlatformAdmin(sb, userId);
 
-  const { data: subs } = orgId
-    ? await subQuery.eq("org_id", orgId)
-    : await subQuery.is("org_id", null).eq("user_id", userId);
-
-  const sub = subs?.[0] ?? null;
-  const planCode = (sub?.plan_code ?? "explorer") as PlanCode;
-
-  const [{ data: plan }, agentCount, taskCount, seatCount] = await Promise.all([
-    sb.from("plans").select("code,name,limits,features").eq("code", planCode).maybeSingle(),
+  const [agentCount, taskCount, seatCount] = await Promise.all([
     orgId
       ? sb
           .from("personal_agents")
@@ -116,6 +124,51 @@ export async function getEntitlements(
       : Promise.resolve({ count: 1 }),
   ]);
 
+  const usage = {
+    agents: agentCount?.count ?? 0,
+    tasksThisMonth: taskCount?.count ?? 0,
+    seats: seatCount?.count ?? 1,
+  };
+
+  if (platformAdmin) {
+    const { data: allPlans } = await sb.from("plans").select("features");
+    return {
+      planCode: "enterprise",
+      planName: "Platform Admin",
+      status: "internal",
+      limits: {
+        agents: UNLIMITED,
+        tasks_per_month: UNLIMITED,
+        seats: UNLIMITED,
+        storage_mb: UNLIMITED,
+      },
+      features: unionFeatures(allPlans as Array<{ features?: unknown }> | null),
+      usage,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      isPlatformAdmin: true,
+    };
+  }
+
+  const subQuery = sb
+    .from("subscriptions")
+    .select("plan_code,status,seats,current_period_end,cancel_at_period_end")
+    .in("status", ["trialing", "active", "past_due"])
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  const { data: subs } = orgId
+    ? await subQuery.eq("org_id", orgId)
+    : await subQuery.is("org_id", null).eq("user_id", userId);
+
+  const sub = subs?.[0] ?? null;
+  const planCode = (sub?.plan_code ?? "explorer") as PlanCode;
+  const { data: plan } = await sb
+    .from("plans")
+    .select("code,name,limits,features")
+    .eq("code", planCode)
+    .maybeSingle();
+
   const limits = { ...FALLBACK_LIMITS, ...((plan?.limits as Partial<PlanLimits> | null) ?? {}) };
 
   return {
@@ -124,13 +177,10 @@ export async function getEntitlements(
     status: (sub?.status as string) ?? "active",
     limits,
     features: Array.isArray(plan?.features) ? (plan.features as string[]) : [],
-    usage: {
-      agents: agentCount?.count ?? 0,
-      tasksThisMonth: taskCount?.count ?? 0,
-      seats: seatCount?.count ?? 1,
-    },
+    usage,
     currentPeriodEnd: (sub?.current_period_end as string | null) ?? null,
     cancelAtPeriodEnd: Boolean(sub?.cancel_at_period_end),
+    isPlatformAdmin: false,
   };
 }
 
@@ -155,7 +205,8 @@ export function assertWithinLimit(ent: Entitlements, metric: keyof PlanLimits) {
 }
 
 /** Records a usage event. Usage is written with elevated privileges so users
- * cannot forge, edit or delete their own consumption records. */
+ * cannot forge, edit or delete their own consumption records. Platform-admin
+ * activity is still recorded for observability even though it is not limited. */
 export async function recordUsage(args: {
   userId: string;
   orgId?: string | null;

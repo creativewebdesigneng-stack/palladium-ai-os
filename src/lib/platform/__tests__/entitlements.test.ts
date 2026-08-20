@@ -27,6 +27,12 @@ const PLANS = [
     limits: { agents: UNLIMITED, tasks_per_month: 50_000, seats: 25, storage_mb: 100_000 },
     features: ["workforces"],
   },
+  {
+    code: "enterprise",
+    name: "Enterprise",
+    limits: { agents: UNLIMITED, tasks_per_month: UNLIMITED, seats: UNLIMITED, storage_mb: UNLIMITED },
+    features: ["orchestrator", "advanced_models"],
+  },
 ];
 
 function db(seed: Record<string, any[]> = {}) {
@@ -40,11 +46,24 @@ function db(seed: Record<string, any[]> = {}) {
   }) as any;
 }
 
+function adminDb(seed: Record<string, any[]> = {}) {
+  const fake = db(seed);
+  fake.rpc = async (fn: string, args?: Record<string, unknown>) => ({
+    data:
+      fn === "has_role" &&
+      args?.["_user_id"] === USER &&
+      args?.["_role"] === "admin",
+    error: null,
+  });
+  return fake;
+}
+
 describe("entitlements", () => {
   it("falls back to the free plan when there is no subscription", async () => {
     const ent = await getEntitlements(db(), USER);
     expect(ent.planCode).toBe("explorer");
     expect(ent.limits.agents).toBe(3);
+    expect(ent.isPlatformAdmin).toBe(false);
   });
 
   it("reads the plan from the subscriptions table, not from the client", async () => {
@@ -86,6 +105,12 @@ describe("entitlements", () => {
 
   it("refuses an organisation id the caller does not belong to", async () => {
     await expect(getEntitlements(db(), USER, OTHER_ORG)).rejects.toBeInstanceOf(EntitlementError);
+  });
+
+  it("still enforces organisation membership for a platform admin", async () => {
+    await expect(getEntitlements(adminDb(), USER, OTHER_ORG)).rejects.toBeInstanceOf(
+      EntitlementError,
+    );
   });
 
   it("counts usage in the caller's own organisation once membership is proven", async () => {
@@ -134,5 +159,34 @@ describe("entitlements", () => {
       USER,
     );
     expect(() => assertWithinLimit(ent, "agents")).not.toThrow();
+  });
+
+  it("grants platform admins all configured features and unlimited limits without a subscription", async () => {
+    const ent = await getEntitlements(
+      adminDb({
+        personal_agents: Array.from({ length: 25 }, (_, i) => ({ id: `a${i}`, user_id: USER })),
+      }),
+      USER,
+    );
+
+    expect(ent.isPlatformAdmin).toBe(true);
+    expect(ent.planName).toBe("Platform Admin");
+    expect(ent.status).toBe("internal");
+    expect(ent.currentPeriodEnd).toBeNull();
+    expect(ent.limits).toEqual({
+      agents: UNLIMITED,
+      tasks_per_month: UNLIMITED,
+      seats: UNLIMITED,
+      storage_mb: UNLIMITED,
+    });
+    expect(ent.features).toEqual(expect.arrayContaining(["workforces", "orchestrator", "advanced_models"]));
+    expect(() => assertWithinLimit(ent, "agents")).not.toThrow();
+  });
+
+  it("does not grant the platform-admin override when has_role is false", async () => {
+    const ent = await getEntitlements(db(), USER);
+    expect(ent.isPlatformAdmin).toBe(false);
+    expect(ent.planName).not.toBe("Platform Admin");
+    expect(ent.limits.agents).toBe(3);
   });
 });
