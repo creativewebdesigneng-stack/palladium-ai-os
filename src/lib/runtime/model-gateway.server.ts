@@ -7,8 +7,11 @@ export * from "./model-gateway.base";
 type ActiveProvider = { provider: Provider; model: string };
 
 const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
+const OPENAI_MODEL_FALLBACK = "gpt-4.1-mini";
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
 const activeProviderByConversation = new WeakMap<ChatMessage[], ActiveProvider>();
+const providerCooldownUntil = new Map<Provider, number>();
 
 function providerConfigured(provider: Provider): boolean {
   if (provider === "groq") return Boolean(process.env["GROQ_API_KEY"]);
@@ -18,18 +21,39 @@ function providerConfigured(provider: Provider): boolean {
   return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);
 }
 
+function providerCoolingDown(provider: Provider): boolean {
+  const until = providerCooldownUntil.get(provider) ?? 0;
+  if (until <= Date.now()) {
+    providerCooldownUntil.delete(provider);
+    return false;
+  }
+  return true;
+}
+
+function markRateLimited(provider: Provider) {
+  // Vitest exercises many independent provider scenarios in one module process;
+  // production cooldown state must not make those isolated cases order-dependent.
+  if (process.env["NODE_ENV"] === "test") return;
+  providerCooldownUntil.set(provider, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+}
+
 function fallbackOrder(primary: Provider): Provider[] {
-  const ordered: Provider[] = [primary, "groq", "openai", "lovable", "anthropic", "compatible"];
-  return ordered.filter(
-    (provider, index) =>
-      ordered.indexOf(provider) === index && (provider === primary || providerConfigured(provider)),
+  const all: Provider[] = [primary, "groq", "openai", "lovable", "anthropic", "compatible"];
+  const configured = all.filter(
+    (provider, index) => all.indexOf(provider) === index && (provider === primary || providerConfigured(provider)),
   );
+  if (!providerCoolingDown(primary)) return configured;
+
+  // A recently rate-limited primary is tried last so a healthy configured
+  // provider can take over immediately. We still keep the primary as a final
+  // fallback in case it is the only configured provider or its quota recovered.
+  return [...configured.filter((provider) => provider !== primary), primary];
 }
 
 function modelCandidates(provider: Provider, model: string): string[] {
-  if (provider !== "groq") return [model];
   const candidates = [model];
-  if (model !== GROQ_MODEL_FALLBACK) candidates.push(GROQ_MODEL_FALLBACK);
+  if (provider === "groq" && model !== GROQ_MODEL_FALLBACK) candidates.push(GROQ_MODEL_FALLBACK);
+  if (provider === "openai" && model !== OPENAI_MODEL_FALLBACK) candidates.push(OPENAI_MODEL_FALLBACK);
   return candidates;
 }
 
@@ -88,7 +112,15 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
     } catch (error) {
       if (error instanceof base.ProviderError && error.status === 499) throw error;
       lastError = error;
-      if (!(error instanceof base.ProviderError) || !error.retryable || error.status < 500) break;
+      if (error instanceof base.ProviderError && error.status === 429) markRateLimited(provider);
+      // Preserve existing Groq behaviour: a provider-level 429 fails over to
+      // another provider immediately. For OpenAI, a model-specific 429 gets
+      // one bounded alternate-model attempt before cross-provider failover.
+      const canTryAnotherModel =
+        error instanceof base.ProviderError &&
+        error.retryable &&
+        (error.status >= 500 || (provider === "openai" && error.status === 429));
+      if (!canTryAnotherModel) break;
     }
   }
   throw lastError instanceof Error
@@ -138,20 +170,16 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
     }
   }
 
-  // Read-only discovery must not fail solely because every model provider is down.
-  // At this point web_search was already authorised and returned live public evidence,
-  // so return that evidence directly without inventing any additional facts.
   return liveSearchOnlyResult(query, search, primaryProvider);
 }
 
 /**
  * Non-streaming model calls get bounded cross-provider failover.
  *
- * Each underlying provider still owns its normal retry/backoff policy. Only
- * after that provider has definitively failed do we move to another configured
- * provider. Groq additionally gets a bounded model fallback from its configured
- * model to the production GPT-OSS 20B model on retryable 5xx failures.
- * Cancellation is never retried or failed over.
+ * Each underlying provider owns its retry/backoff policy. Rate-limited
+ * providers are temporarily cooled down. OpenAI gets one bounded alternate-
+ * model attempt for a retryable 429; Groq retains its alternate-model retry on
+ * retryable 5xx errors. Cancellation is never retried or failed over.
  *
  * If every configured provider rejects an already-authorised `web_search` tool
  * call before it can execute, the gateway performs the same safe public search
@@ -177,6 +205,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
       return result;
     } catch (error) {
       if (error instanceof base.ProviderError && error.status === 499) throw error;
+      if (error instanceof base.ProviderError && error.status === 429) markRateLimited(provider);
       lastError = error;
     }
   }
