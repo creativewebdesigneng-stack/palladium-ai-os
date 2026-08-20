@@ -300,7 +300,9 @@ export type Database = {
           org_id: string | null
           output: Json | null
           output_text: string | null
+          planner_state: Json
           provider: string | null
+          replan_count: number
           started_at: string | null
           status: Database["public"]["Enums"]["exec_status"]
           task_id: string | null
@@ -310,6 +312,7 @@ export type Database = {
           tool_calls: number
           updated_at: string
           user_id: string
+          verification_state: Json
           waiting_approval_request_id: string | null
         }
         Insert: {
@@ -328,7 +331,9 @@ export type Database = {
           org_id?: string | null
           output?: Json | null
           output_text?: string | null
+          planner_state?: Json
           provider?: string | null
+          replan_count?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           task_id?: string | null
@@ -338,6 +343,7 @@ export type Database = {
           tool_calls?: number
           updated_at?: string
           user_id: string
+          verification_state?: Json
           waiting_approval_request_id?: string | null
         }
         Update: {
@@ -356,7 +362,9 @@ export type Database = {
           org_id?: string | null
           output?: Json | null
           output_text?: string | null
+          planner_state?: Json
           provider?: string | null
+          replan_count?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["exec_status"]
           task_id?: string | null
@@ -366,6 +374,7 @@ export type Database = {
           tool_calls?: number
           updated_at?: string
           user_id?: string
+          verification_state?: Json
           waiting_approval_request_id?: string | null
         }
         Relationships: [
@@ -1882,6 +1891,7 @@ export type Database = {
           model: string
           model_provider: string
           name: string
+          operating_profile: Json
           org_id: string | null
           org_id_fk: string | null
           personality: string | null
@@ -1891,6 +1901,7 @@ export type Database = {
           schedule: string | null
           scope: string
           slug: string | null
+          spec_version: number
           status: string
           system_prompt: string | null
           team_id: string | null
@@ -1917,6 +1928,7 @@ export type Database = {
           model?: string
           model_provider?: string
           name: string
+          operating_profile?: Json
           org_id?: string | null
           org_id_fk?: string | null
           personality?: string | null
@@ -1926,6 +1938,7 @@ export type Database = {
           schedule?: string | null
           scope?: string
           slug?: string | null
+          spec_version?: number
           status?: string
           system_prompt?: string | null
           team_id?: string | null
@@ -1952,6 +1965,7 @@ export type Database = {
           model?: string
           model_provider?: string
           name?: string
+          operating_profile?: Json
           org_id?: string | null
           org_id_fk?: string | null
           personality?: string | null
@@ -1961,6 +1975,7 @@ export type Database = {
           schedule?: string | null
           scope?: string
           slug?: string | null
+          spec_version?: number
           status?: string
           system_prompt?: string | null
           team_id?: string | null
