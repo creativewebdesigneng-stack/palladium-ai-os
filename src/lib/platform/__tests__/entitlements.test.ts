@@ -49,7 +49,10 @@ function db(seed: Record<string, any[]> = {}) {
 function adminDb(seed: Record<string, any[]> = {}) {
   const fake = db(seed);
   fake.rpc = async (fn: string, args?: Record<string, unknown>) => ({
-    data: fn === "has_role" && args?._user_id === USER && args?._role === "admin",
+    data:
+      fn === "has_role" &&
+      args?.["_user_id"] === USER &&
+      args?.["_role"] === "admin",
     error: null,
   });
   return fake;
