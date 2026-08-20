@@ -52,7 +52,7 @@ export default function ToolsFramework() {
   const { gate } = useUpgrade();
   const [tab, setTab] = useState('tools');
   const [framework, setFramework] = useState({ tools: [], executions: [], agents: [], browser: null, plan: 'explorer' });
-  const [integrations, setIntegrations] = useState([]);
+  const [integrationCatalogue, setIntegrationCatalogue] = useState([]);
   const [agentId, setAgentId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +69,7 @@ export default function ToolsFramework() {
       setAgentId((prev) => prev || data.agents?.[0]?.id || '');
       try {
         const integRes = await listIntegrations({ data: {} });
-        setIntegrations(integRes.integrations || []);
+        setIntegrationCatalogue(integRes.catalogue || []);
       } catch { /* integrations are optional */ }
     } catch (e) {
       toast({ title: 'Failed to load framework', description: e.message, variant: 'destructive' });
@@ -123,13 +123,13 @@ export default function ToolsFramework() {
 
   const connectIntegration = async (def) => {
     try {
-      const { authorizeUrl } = await startIntegrationOAuth({ data: { provider: def.key, origin: window.location.origin } });
+      const { authorizeUrl } = await startIntegrationOAuth({ data: { provider: def.id, origin: window.location.origin } });
       window.location.href = authorizeUrl;
     } catch (e) { toast({ title: 'Connection failed', description: e.message, variant: 'destructive' }); }
   };
   const disconnectIntegration = async (def) => {
     try {
-      await disconnectIntegrationFn({ data: { provider: def.key } });
+      await disconnectIntegrationFn({ data: { provider: def.id } });
       toast({ title: `${def.name} disconnected` });
       load();
     } catch (e) { toast({ title: 'Disconnect failed', description: e.message, variant: 'destructive' }); }
@@ -156,7 +156,7 @@ export default function ToolsFramework() {
       {tab === 'tools' && <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />}
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
-      {tab === 'integrations' && <IntegrationsTab connections={integrations} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}
+      {tab === 'integrations' && <IntegrationsTab catalogue={integrationCatalogue} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}
     </div>
   );
 }
