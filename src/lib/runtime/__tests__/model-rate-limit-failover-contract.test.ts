@@ -7,15 +7,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(here, "../model-gateway.server.ts"), "utf8");
 
 describe("model gateway rate-limit failover contract", () => {
-  it("provides an alternate OpenAI model for a rate-limited primary model", () => {
+  it("provides a bounded alternate OpenAI model for an OpenAI 429", () => {
     expect(source).toContain('const OPENAI_MODEL_FALLBACK = "gpt-4.1-mini"');
     expect(source).toContain('provider === "openai" && model !== OPENAI_MODEL_FALLBACK');
-    expect(source).toContain("error.status === 429 || error.status >= 500");
+    expect(source).toContain('provider === "openai" && error.status === 429');
   });
 
   it("temporarily deprioritises providers after a 429", () => {
     expect(source).toContain("const RATE_LIMIT_COOLDOWN_MS = 60_000");
     expect(source).toContain("markRateLimited(provider)");
-    expect(source).toContain("return [...configured.filter((provider) => provider !== primary), primary]");
+    expect(source).toContain("providerCoolingDown(primary)");
+    expect(source).toContain("configured.filter((provider) => provider !== primary)");
   });
 });
