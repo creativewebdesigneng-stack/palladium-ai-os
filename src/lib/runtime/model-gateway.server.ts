@@ -34,6 +34,11 @@ function markRateLimited(provider: Provider) {
   providerCooldownUntil.set(provider, Date.now() + RATE_LIMIT_COOLDOWN_MS);
 }
 
+/** Test-only reset so provider cooldown state cannot leak between isolated cases. */
+export function resetProviderRateLimitStateForTests() {
+  if (process.env["NODE_ENV"] === "test") providerCooldownUntil.clear();
+}
+
 function fallbackOrder(primary: Provider): Provider[] {
   const all: Provider[] = [primary, "groq", "openai", "lovable", "anthropic", "compatible"];
   const configured = all.filter(
@@ -110,8 +115,13 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
       if (error instanceof base.ProviderError && error.status === 499) throw error;
       lastError = error;
       if (error instanceof base.ProviderError && error.status === 429) markRateLimited(provider);
+      // Preserve existing Groq behaviour: a provider-level 429 fails over to
+      // another provider immediately. For OpenAI, a model-specific 429 gets
+      // one bounded alternate-model attempt before cross-provider failover.
       const canTryAnotherModel =
-        error instanceof base.ProviderError && error.retryable && (error.status === 429 || error.status >= 500);
+        error instanceof base.ProviderError &&
+        error.retryable &&
+        (error.status >= 500 || (provider === "openai" && error.status === 429));
       if (!canTryAnotherModel) break;
     }
   }
@@ -169,9 +179,9 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
  * Non-streaming model calls get bounded cross-provider failover.
  *
  * Each underlying provider owns its retry/backoff policy. Rate-limited
- * providers are temporarily cooled down, and OpenAI/Groq also receive a
- * bounded alternate-model attempt before the gateway moves to another
- * configured provider. Cancellation is never retried or failed over.
+ * providers are temporarily cooled down. OpenAI gets one bounded alternate-
+ * model attempt for a retryable 429; Groq retains its alternate-model retry on
+ * retryable 5xx errors. Cancellation is never retried or failed over.
  *
  * If every configured provider rejects an already-authorised `web_search` tool
  * call before it can execute, the gateway performs the same safe public search
