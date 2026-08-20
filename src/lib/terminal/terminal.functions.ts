@@ -4,7 +4,10 @@ import { assertWithinLimit, getEntitlements, recordUsage } from "@/lib/platform/
 import { writeAudit } from "@/lib/platform/audit.server";
 import { executeTerminalCommand, terminalConfigured, validateTerminalCommand } from "./terminal.server";
 
-type Sb = { from: (table: string) => any };
+type Sb = {
+  from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
+};
 
 export const getTerminalStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
