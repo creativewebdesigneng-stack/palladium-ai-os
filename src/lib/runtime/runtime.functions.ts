@@ -19,6 +19,19 @@ function surface(error: unknown): never {
   throw new Error(error instanceof Error ? error.message : "The agent runtime is unavailable.");
 }
 
+function taskOutputText(task: unknown): string {
+  if (!task || typeof task !== "object") return "";
+  const row = task as Record<string, unknown>;
+  const direct = typeof row["output_text"] === "string" ? row["output_text"].trim() : "";
+  if (direct) return direct;
+  const output = row["output"];
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const text = (output as Record<string, unknown>)["text"];
+    if (typeof text === "string") return text.trim();
+  }
+  return "";
+}
+
 /** Runs an agent task end to end and returns the finished task row. */
 export const runAgentTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -36,13 +49,46 @@ export const runAgentTask = createServerFn({ method: "POST" })
         agentId: data.agent_id,
         input: data.input,
       });
-      const task = await executePlannedRun({ sb, userId: context.userId, run });
+      let task = await executePlannedRun({ sb, userId: context.userId, run });
+
+      // A successful agent run must return an actual deliverable. Some model
+      // providers can finish a tool turn with an empty assistant message. Give
+      // the same task one bounded recovery pass instead of reporting a false
+      // success with "No output".
+      if (!taskOutputText(task)) {
+        run = {
+          ...run,
+          messages: [
+            ...run.messages,
+            {
+              role: "system",
+              content: [
+                "DELIVERABLE RECOVERY REQUIRED.",
+                "The previous attempt ended without a user-visible final answer.",
+                "Complete the original task now and return a concrete non-empty deliverable.",
+                "Use enabled read-only tools when evidence is needed. Do not finish with an empty response.",
+              ].join("\n"),
+            },
+          ],
+        };
+        task = await executePlannedRun({ sb, userId: context.userId, run });
+      }
+
+      const output = taskOutputText(task);
+      if (!output) {
+        throw new RuntimeError(
+          "The agent could not produce a usable final deliverable. Please review its tools/model configuration and retry.",
+          "EMPTY_DELIVERABLE",
+          502,
+        );
+      }
+
       await captureVerifiedAgentExperience({
         sb: sb as never,
         userId: context.userId,
         taskId: run.taskId,
       });
-      return { task, output: (task as any)?.output_text ?? "" };
+      return { task, output };
     } catch (error) {
       if (run) await failRun({ userId: context.userId, run, error });
       surface(error);
