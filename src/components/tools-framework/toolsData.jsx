@@ -26,6 +26,13 @@ export const PERMISSION_META = {
   Sandboxed: { icon: Box, color: 'text-zinc-300' },
 };
 
+export const PLAN_BADGE = {
+  free: { label: 'Free', cls: 'bg-zinc-500/15 text-zinc-300' },
+  pro: { label: 'Pro', cls: 'bg-violet-500/15 text-violet-300' },
+  business: { label: 'Business', cls: 'bg-amber-500/15 text-amber-300' },
+  enterprise: { label: 'Enterprise', cls: 'bg-fuchsia-500/15 text-fuchsia-300' },
+};
+
 export const SECURITY_FIELDS = [
   { key: 'allowNetwork', label: 'Allow network tools', desc: 'Permit tools that make outbound HTTP requests (Web search, API calls).' },
   { key: 'allowCodeExecution', label: 'Allow code execution', desc: 'Permit tools that evaluate code in the sandbox.' },
