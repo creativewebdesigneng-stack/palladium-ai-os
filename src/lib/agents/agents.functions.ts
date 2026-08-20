@@ -6,6 +6,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normaliseAutonomyLevel } from "./agent-autonomy";
 import {
   compileAgentSystemPrompt,
   hasAgentSpecV2,
@@ -80,7 +81,7 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     max_tokens: maxTokens,
     memory_enabled: input.memory_enabled !== false,
     requires_approval: input.requires_approval !== false,
-    autonomy: (input.autonomy ?? "supervised").slice(0, 40),
+    autonomy: normaliseAutonomyLevel(input.autonomy),
     instructions: (input.instructions ?? "").slice(0, 8000),
     allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
     preferences: input.preferences ?? {},
