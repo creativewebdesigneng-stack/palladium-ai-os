@@ -46,12 +46,13 @@ export default function BillingOverviewCards() {
   const seatsMax = entitlements?.limits?.seats;
   const seatsUsed = entitlements?.usage?.seats ?? 0;
   const planName = entitlements?.planName ?? 'Free';
+  const isPlatformAdmin = entitlements?.isPlatformAdmin === true;
 
   const cards = [
     {
       label: 'Current plan',
       value: planName,
-      detail: sub ? `Status: ${sub.status}` : 'No active subscription',
+      detail: isPlatformAdmin ? 'Trusted platform-admin entitlement' : sub ? `Status: ${sub.status}` : 'No active subscription',
       grad: 'from-violet-500 to-indigo-500',
     },
     {
@@ -61,15 +62,15 @@ export default function BillingOverviewCards() {
       grad: 'from-emerald-500 to-teal-500',
     },
     {
-      label: 'Renewal',
-      value: sub?.current_period_end ? fmtDate(sub.current_period_end) : '—',
-      detail: sub?.cancel_at_period_end ? 'Cancels at period end' : sub ? 'Auto-renews' : 'No billing cycle yet',
+      label: isPlatformAdmin ? 'Renewal' : 'Renewal',
+      value: isPlatformAdmin ? 'Not required' : sub?.current_period_end ? fmtDate(sub.current_period_end) : '—',
+      detail: isPlatformAdmin ? 'Internal access does not expire with billing' : sub?.cancel_at_period_end ? 'Cancels at period end' : sub ? 'Auto-renews' : 'No billing cycle yet',
       grad: 'from-amber-500 to-orange-500',
     },
     {
       label: 'Billing environment',
-      value: sub?.environment ?? '—',
-      detail: sub ? `Seats on this plan: ${sub.seats}` : 'Choose a plan to get started',
+      value: isPlatformAdmin ? 'Internal' : sub?.environment ?? '—',
+      detail: isPlatformAdmin ? 'No Stripe subscription required' : sub ? `Seats on this plan: ${sub.seats}` : 'Choose a plan to get started',
       grad: 'from-sky-500 to-cyan-500',
     },
   ];
