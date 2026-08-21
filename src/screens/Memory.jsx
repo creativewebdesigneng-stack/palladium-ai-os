@@ -4,6 +4,7 @@ import MemoryToolbar from '@/components/memory/MemoryToolbar';
 import MemoryCard from '@/components/memory/MemoryCard';
 import MemorySettings from '@/components/memory/MemorySettings';
 import MemoryGraph from '@/components/memory/MemoryGraph';
+import MemoryBrain from '@/components/memory/MemoryBrain';
 import VectorPanel from '@/components/memory/VectorPanel';
 import AddMemoryModal from '@/components/memory/AddMemoryModal';
 import UploadKnowledgeModal from '@/components/memory/UploadKnowledgeModal';
@@ -23,7 +24,6 @@ import {
   removeMemories,
   removeKnowledgeDocument,
   editMemory,
-  ingestKnowledgeDocument,
   listMemories,
   pruneMemory,
   reindexMemory,
@@ -44,6 +44,7 @@ export default function Memory() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [brainPulse, setBrainPulse] = useState(0);
 
   const [type, setType] = useState('all');
   const [scope, setScope] = useState('all');
@@ -93,7 +94,6 @@ export default function Memory() {
     })();
   }, [session, reload]);
 
-  // Semantic recall: the vector search runs server-side, keyword filtering stays local.
   useEffect(() => {
     if (session !== 'yes' || query.trim().length < 3) {
       setSemantic(null);
@@ -154,6 +154,8 @@ export default function Memory() {
     return c;
   }, [entries]);
 
+  const pulseBrain = () => setBrainPulse((value) => value + 1);
+
   const handleCreate = async (form) => {
     if (!gate('createAgents')) return;
     try {
@@ -172,6 +174,7 @@ export default function Memory() {
       });
       toast({ title: 'Memory saved', description: 'Stored and indexed for recall.' });
       setAddOpen(false);
+      pulseBrain();
       await reload();
     } catch (e) {
       fail('Could not save memory')(e);
@@ -196,6 +199,7 @@ export default function Memory() {
         description: `${res.chunks} chunks indexed${res.storedFile ? ' — the file is stored privately.' : '.'}`,
       });
       setUploadOpen(false);
+      pulseBrain();
       await reload();
     } catch (e) {
       fail('Upload failed')(e);
@@ -267,6 +271,7 @@ export default function Memory() {
       await editMemory({ data: { id, patch: form } });
       toast({ title: 'Memory updated' });
       setEditEntry(null);
+      pulseBrain();
       await reload();
     } catch (e) {
       fail('Could not update')(e);
@@ -279,6 +284,7 @@ export default function Memory() {
       const res = await reindexMemory({ data: { id: indexEntry.id, provider } });
       toast({ title: res.status === 'indexed' ? 'Indexed' : 'Queued for indexing', description: res.message });
       setIndexEntry(null);
+      pulseBrain();
       await reload();
     } catch (e) {
       fail('Indexing failed')(e);
@@ -295,72 +301,69 @@ export default function Memory() {
   };
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Cognition"
-        title="AI Memory"
-        description="Control what your agents remember — and what they forget."
-        action={
-          <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.length} memories</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{entries.filter((e) => e.pinned).length} pinned</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{documents.length} documents</span>
-          </div>
-        }
-      />
-
-      <MemoryToolbar type={type} onType={setType} scope={scope} onScope={setScope} query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} counts={counts} />
-
-      {semantic && (
-        <div className="mb-3 text-[11px] text-zinc-400">
-          Semantic recall found {semantic.length} relevant {semantic.length === 1 ? 'entry' : 'entries'} — ranked by meaning, not keywords.
-        </div>
-      )}
-
-      {session === 'no' ? (
-        <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">Sign in to view your agent memory.</div>
-      ) : (
-        <>
-          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((e) => <MemoryCard key={e.id} entry={e} onAction={onAction} />)}
-          </div>
-          {!loading && filtered.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No memories match your filters. Add a memory or upload knowledge to get started.</div>
-          )}
-          {loading && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">Loading memory…</div>}
-        </>
-      )}
-
-      {session === 'yes' && entries.length > 0 && (
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={handleClearLayer}
-            disabled={clearing}
-            className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-1.5 text-[11px] font-medium text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-50"
-          >
-            {clearing ? 'Deleting…' : type === 'all' ? 'Delete all memories' : `Delete all ${type.replace('_', ' ')} memories`}
-          </button>
-        </div>
-      )}
-
-      <div className="mt-8 grid gap-4 xl:grid-cols-2">
-        <DocumentVault documents={documents} onDelete={handleDeleteDocument} onError={fail('Could not open document')} />
-        <MemorySettings
-          preferences={prefs}
-          onSave={savePrefs}
-          saving={savingPrefs}
-          disabled={session !== 'yes'}
+    <div className="relative isolate min-h-full">
+      <MemoryBrain memoryCount={entries.length} active={loading || indexing || uploading || !!semantic} pulse={brainPulse} />
+      <div className="relative z-10">
+        <PageHeader
+          eyebrow="Cognition"
+          title="AI Memory"
+          description="A living memory network that becomes richer as your agents learn."
+          action={
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[11px] text-zinc-300 backdrop-blur-md">{entries.length} memories</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[11px] text-zinc-300 backdrop-blur-md">{entries.filter((e) => e.pinned).length} pinned</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[11px] text-zinc-300 backdrop-blur-md">{documents.length} documents</span>
+            </div>
+          }
         />
+
+        <MemoryToolbar type={type} onType={setType} scope={scope} onScope={setScope} query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} counts={counts} />
+
+        {semantic && (
+          <div className="mb-3 text-[11px] text-zinc-400">
+            Semantic recall found {semantic.length} relevant {semantic.length === 1 ? 'entry' : 'entries'} — the neural network is tracing related memories by meaning.
+          </div>
+        )}
+
+        {session === 'no' ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-12 text-center text-sm text-zinc-500 backdrop-blur-sm">Sign in to view your agent memory.</div>
+        ) : (
+          <>
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((e) => <MemoryCard key={e.id} entry={e} onAction={onAction} />)}
+            </div>
+            {!loading && filtered.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-12 text-center text-sm text-zinc-500 backdrop-blur-sm">No memories match your filters. Add a memory or upload knowledge to grow the network.</div>
+            )}
+            {loading && <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-12 text-center text-sm text-zinc-500 backdrop-blur-sm">Loading memory…</div>}
+          </>
+        )}
+
+        {session === 'yes' && entries.length > 0 && (
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleClearLayer}
+              disabled={clearing}
+              className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-1.5 text-[11px] font-medium text-rose-200 transition hover:bg-rose-500/15 disabled:opacity-50"
+            >
+              {clearing ? 'Deleting…' : type === 'all' ? 'Delete all memories' : `Delete all ${type.replace('_', ' ')} memories`}
+            </button>
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-4 xl:grid-cols-2">
+          <DocumentVault documents={documents} onDelete={handleDeleteDocument} onError={fail('Could not open document')} />
+          <MemorySettings preferences={prefs} onSave={savePrefs} saving={savingPrefs} disabled={session !== 'yes'} />
+        </div>
+
+        <div className="mt-8"><VectorPanel /></div>
+        <div className="mt-8"><MemoryGraph entries={entries} /></div>
+
+        <AddMemoryModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} agents={agents} />
+        <UploadKnowledgeModal open={uploadOpen} onClose={() => setUploadOpen(false)} onSubmit={handleUpload} agents={agents} uploading={uploading} />
+        <EditMemoryModal open={!!editEntry} onClose={() => setEditEntry(null)} onSubmit={handleEdit} entry={editEntry} />
+        <VectorIndexModal open={!!indexEntry} onClose={() => setIndexEntry(null)} onIndex={handleIndex} entry={indexEntry} indexing={indexing} />
       </div>
-
-      <div className="mt-8"><VectorPanel /></div>
-
-      <div className="mt-8"><MemoryGraph entries={entries} /></div>
-
-      <AddMemoryModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} agents={agents} />
-      <UploadKnowledgeModal open={uploadOpen} onClose={() => setUploadOpen(false)} onSubmit={handleUpload} agents={agents} uploading={uploading} />
-      <EditMemoryModal open={!!editEntry} onClose={() => setEditEntry(null)} onSubmit={handleEdit} entry={editEntry} />
-      <VectorIndexModal open={!!indexEntry} onClose={() => setIndexEntry(null)} onIndex={handleIndex} entry={indexEntry} indexing={indexing} />
-    </>
+    </div>
   );
 }
