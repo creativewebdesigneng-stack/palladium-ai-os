@@ -98,7 +98,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     tokenUrl: "https://slack.com/api/oauth.v2.access",
     clientIdEnv: "SLACK_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "SLACK_INTEGRATION_CLIENT_SECRET",
-    authorizeParams: { user_scope: "" },
+    authorizeParams: { scope: "channels:read,channels:history,chat:write,users:read", user_scope: "" },
     docsUrl: "https://api.slack.com/authentication/oauth-v2",
   },
   {
