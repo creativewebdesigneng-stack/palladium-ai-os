@@ -45,7 +45,7 @@ describe("approved connected-service writes", () => {
   it("builds a bounded HubSpot contact PATCH without accepting arbitrary properties", () => {
     const req = buildApprovedActionRequest({ actionType: "hubspot_contact_update", details: { object_id: "12345", properties: { firstname: "Ada", jobtitle: "CTO" } } }, "hubspot");
     expect(req.method).toBe("PATCH");
-    expect(req.url).toBe("https://api.hubapi.com/crm/objects/2026-03/contacts/12345");
+    expect(req.url).toBe("https://api.hubapi.com/crm/v3/objects/contacts/12345");
     expect(JSON.parse(req.body)).toEqual({ properties: { firstname: "Ada", jobtitle: "CTO" } });
     expect(() => buildApprovedActionRequest({ actionType: "hubspot_contact_update", details: { object_id: "123", properties: { owner_secret: "x" } } }, "hubspot")).toThrow(/not allowed/);
   });
