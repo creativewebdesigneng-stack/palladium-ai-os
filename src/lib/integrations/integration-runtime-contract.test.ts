@@ -30,4 +30,10 @@ describe('integration catalogue runtime contract', () => {
     expect(discord?.tools).toEqual([]);
     expect(CONNECTED_SERVICE_ACTIONS['discord']).toBeUndefined();
   });
+
+  it('uses Linear\'s required comma-separated OAuth scope encoding', () => {
+    const linear = INTEGRATION_PROVIDERS.find((provider) => provider.id === 'linear');
+    expect(linear?.scopes).toEqual(['read', 'write']);
+    expect(linear?.authorizeParams?.scope).toBe('read,write');
+  });
 });
