@@ -31,9 +31,16 @@ describe('integration catalogue runtime contract', () => {
     expect(CONNECTED_SERVICE_ACTIONS['discord']).toBeUndefined();
   });
 
-  it('uses Linear\'s required comma-separated OAuth scope encoding', () => {
+  it('uses comma-separated OAuth scopes for Linear and Slack while keeping Asana space-delimited', () => {
     const linear = INTEGRATION_PROVIDERS.find((provider) => provider.id === 'linear');
     expect(linear?.scopes).toEqual(['read', 'write']);
     expect(linear?.authorizeParams?.scope).toBe('read,write');
+
+    const slack = INTEGRATION_PROVIDERS.find((provider) => provider.id === 'slack');
+    expect(slack?.authorizeParams?.scope).toBe('channels:read,channels:history,chat:write,users:read');
+
+    const asana = INTEGRATION_PROVIDERS.find((provider) => provider.id === 'asana');
+    expect(asana?.authorizeParams?.scope).toBeUndefined();
+    expect(asana?.scopes.join(' ')).toBe('workspaces:read projects:read tasks:read tasks:write');
   });
 });
