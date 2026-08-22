@@ -206,7 +206,7 @@ export async function readConnectedService(userId: string, input: ConnectedServi
   }
 
   if (providerId === "salesforce") {
-    if (!CONNECTED_SERVICE_ACTIONS.salesforce.includes(action)) return { error: `Action "${action}" is not available for connected provider "salesforce".` };
+    if (!CONNECTED_SERVICE_ACTIONS["salesforce"]?.includes(action)) return { error: `Action "${action}" is not available for connected provider "salesforce".` };
     const query = clean(input.query, MAX_QUERY);
     if (!query) return { error: `Action "${action}" requires query.` };
     const limit = boundedLimit(input.limit);
