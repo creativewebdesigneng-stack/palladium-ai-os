@@ -251,7 +251,7 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     return {
       provider,
       method: "PATCH",
-      url: `https://api.hubapi.com/crm/objects/2026-03/${objectType}/${encodeURIComponent(objectId)}`,
+      url: `https://api.hubapi.com/crm/v3/objects/${objectType}/${encodeURIComponent(objectId)}`,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ properties }),
     };
