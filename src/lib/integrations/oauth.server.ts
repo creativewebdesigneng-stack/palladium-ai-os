@@ -117,7 +117,41 @@ function providerConfigFromPayload(provider: IntegrationProvider, payload: Recor
   }
   return {};
 }
-function parseTokenPayload(payload: Record<string, any>): Omit<TokenSet, "providerConfig"> {
+
+/**
+ * Normalises provider grant reporting without trusting browser input.
+ * HubSpot returns `scopes` as an array, while most providers return a singular
+ * `scope` string. Asana's successful code exchange does not include a scope
+ * field, so the exact scopes PalladiumAI requested are the effective grant.
+ */
+export function grantedScopesFromTokenPayload(
+  provider: IntegrationProvider,
+  payload: Record<string, any>,
+): string[] {
+  const flat = payload["authed_user"]?.access_token ? payload["authed_user"] : payload;
+  const arrayScopes = Array.isArray(flat["scopes"])
+    ? flat["scopes"]
+    : Array.isArray(payload["scopes"])
+      ? payload["scopes"]
+      : null;
+  if (arrayScopes) {
+    const scopes = arrayScopes
+      .filter((value: unknown): value is string => typeof value === "string")
+      .map((value: string) => value.trim())
+      .filter(Boolean);
+    if (scopes.length) return scopes;
+  }
+
+  const stringScopes = String(flat["scope"] ?? payload["scope"] ?? "")
+    .split(/[\s,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (stringScopes.length) return stringScopes;
+
+  return provider.id === "asana" ? [...provider.scopes] : [];
+}
+
+function parseTokenPayload(provider: IntegrationProvider, payload: Record<string, any>): Omit<TokenSet, "providerConfig"> {
   const flat = payload["authed_user"]?.access_token ? payload["authed_user"] : payload;
   const accessToken = flat["access_token"];
   if (!accessToken) throw new Error(payload["error_description"] ?? payload["error"] ?? "No access token returned.");
@@ -126,7 +160,7 @@ function parseTokenPayload(payload: Record<string, any>): Omit<TokenSet, "provid
     accessToken,
     refreshToken: flat["refresh_token"] ?? payload["refresh_token"] ?? null,
     tokenType: flat["token_type"] ?? "Bearer",
-    scopes: String(flat["scope"] ?? payload["scope"] ?? "").split(/[\s,]+/).filter(Boolean),
+    scopes: grantedScopesFromTokenPayload(provider, payload),
     expiresAt: expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
   };
 }
@@ -161,7 +195,7 @@ export async function exchangeCode(provider: IntegrationProvider, args: { code: 
         grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
         client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
       }));
-  return { ...parseTokenPayload(payload), providerConfig: providerConfigFromPayload(provider, payload) };
+  return { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
 }
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
   const payload = provider.id === "notion"
@@ -170,7 +204,7 @@ export async function refreshTokens(provider: IntegrationProvider, refreshToken:
         grant_type: "refresh_token", refresh_token: refreshToken,
         client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
       }));
-  const next = { ...parseTokenPayload(payload), providerConfig: providerConfigFromPayload(provider, payload) };
+  const next = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
 export async function fetchAccountLabel(provider: IntegrationProvider, accessToken: string): Promise<string | null> {
