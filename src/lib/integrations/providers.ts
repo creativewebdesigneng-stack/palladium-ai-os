@@ -129,10 +129,10 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     ],
     tools: ["connected_service", "connected_service_write"],
     authorizeUrl: "https://app.hubspot.com/oauth/authorize",
-    tokenUrl: "https://api.hubapi.com/oauth/v1/token",
+    tokenUrl: "https://api.hubapi.com/oauth/v3/token",
     clientIdEnv: "HUBSPOT_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "HUBSPOT_INTEGRATION_CLIENT_SECRET",
-    docsUrl: "https://developers.hubspot.com/docs/api/working-with-oauth",
+    docsUrl: "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/oauth/oauth-quickstart-guide",
   },
   {
     id: "salesforce",
