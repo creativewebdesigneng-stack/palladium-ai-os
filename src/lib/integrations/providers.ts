@@ -27,7 +27,7 @@ export type IntegrationProvider = {
   /** Env var names holding the OAuth client credentials (server-side only). */
   clientIdEnv: string;
   clientSecretEnv: string;
-  /** Extra authorize params (offline access, consent prompts, etc.). */
+  /** Extra authorize params (offline access, consent prompts, provider-specific scope encoding, etc.). */
   authorizeParams?: Record<string, string>;
   /** Provider endpoint used once after consent to label the connected account. */
   identity?: { url: string; labelKeys: string[] };
@@ -98,7 +98,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     tokenUrl: "https://slack.com/api/oauth.v2.access",
     clientIdEnv: "SLACK_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "SLACK_INTEGRATION_CLIENT_SECRET",
-    authorizeParams: { user_scope: "" },
+    authorizeParams: { scope: "channels:read,channels:history,chat:write,users:read", user_scope: "" },
     docsUrl: "https://api.slack.com/authentication/oauth-v2",
   },
   {
@@ -186,6 +186,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     tokenUrl: "https://api.linear.app/oauth/token",
     clientIdEnv: "LINEAR_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "LINEAR_INTEGRATION_CLIENT_SECRET",
+    authorizeParams: { scope: "read,write" },
     docsUrl: "https://developers.linear.app/docs/oauth/authentication",
   },
 ];
