@@ -20,6 +20,8 @@ export type IntegrationProvider = {
   summary: string;
   /** Scopes requested at consent — the least needed for the listed tools. */
   scopes: string[];
+  /** Separator required by the provider when serialising OAuth scopes. */
+  scopeSeparator?: " " | ",";
   /** Agent tools this connection feeds. Empty means account connection only. */
   tools: string[];
   authorizeUrl: string;
@@ -181,6 +183,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     category: "project_management",
     summary: "Read issues and create or update issues after explicit approval.",
     scopes: ["read", "write"],
+    scopeSeparator: ",",
     tools: ["connected_service", "connected_service_write"],
     authorizeUrl: "https://linear.app/oauth/authorize",
     tokenUrl: "https://api.linear.app/oauth/token",
