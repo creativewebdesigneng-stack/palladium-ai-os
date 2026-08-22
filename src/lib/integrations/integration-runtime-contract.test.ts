@@ -16,7 +16,7 @@ describe('integration catalogue runtime contract', () => {
   });
 
   it('exposes Salesforce account and opportunity search through the shared agent connector', () => {
-    expect(CONNECTED_SERVICE_ACTIONS.salesforce).toEqual([
+    expect(CONNECTED_SERVICE_ACTIONS['salesforce']).toEqual([
       'accounts_search',
       'opportunities_search',
     ]);
@@ -28,6 +28,6 @@ describe('integration catalogue runtime contract', () => {
     const discord = INTEGRATION_PROVIDERS.find((provider) => provider.id === 'discord');
     expect(discord).toBeDefined();
     expect(discord?.tools).toEqual([]);
-    expect(CONNECTED_SERVICE_ACTIONS.discord).toBeUndefined();
+    expect(CONNECTED_SERVICE_ACTIONS['discord']).toBeUndefined();
   });
 });
