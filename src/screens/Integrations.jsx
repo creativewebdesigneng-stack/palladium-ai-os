@@ -17,6 +17,7 @@ import {
   disconnectIntegration,
   listIntegrations,
   startIntegrationOAuth,
+  testIntegrationConnection,
 } from '@/lib/integrations/integrations.functions';
 import {
   getGitHubConnection,
@@ -37,6 +38,12 @@ function connectionHealthy(provider) {
   return provider.connection?.status === 'connected';
 }
 
+function agentReady(provider) {
+  return provider.nativeGitHub || (provider.tools ?? []).some((tool) =>
+    ['connected_service', 'connected_service_write', 'email_draft', 'email_send', 'calendar', 'slack_post'].includes(tool),
+  );
+}
+
 export default function Integrations() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -45,6 +52,7 @@ export default function Integrations() {
   const [github, setGithub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState('');
+  const [testResults, setTestResults] = useState({});
   const [error, setError] = useState('');
 
   async function refresh() {
@@ -110,7 +118,8 @@ export default function Integrations() {
       category: 'developer',
       summary: 'Read selected repositories, branches, commits and bounded source files through a scoped GitHub App installation.',
       scopes: ['Metadata: read', 'Contents: read'],
-      tools: ['Code Explorer', 'Version Control'],
+      tools: ['connected_service', 'Code Explorer', 'Version Control'],
+      docsUrl: 'https://docs.github.com/en/apps/creating-github-apps',
       configured: Boolean(github?.configured),
       nativeGitHub: true,
       connection: github?.connected ? {
@@ -146,6 +155,7 @@ export default function Integrations() {
 
   const connectedCount = providers.filter(connectionHealthy).length;
   const configuredCount = providers.filter((provider) => provider.configured).length;
+  const agentReadyCount = providers.filter(agentReady).length;
 
   async function connect(provider) {
     setBusyProvider(provider.id);
@@ -171,9 +181,25 @@ export default function Integrations() {
     setError('');
     try {
       await disconnectIntegration({ data: { provider: provider.id } });
+      setTestResults((current) => ({ ...current, [provider.id]: null }));
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Could not disconnect ${provider.name}.`);
+    } finally {
+      setBusyProvider('');
+    }
+  }
+
+  async function testConnection(provider) {
+    setBusyProvider(provider.id);
+    setError('');
+    setTestResults((current) => ({ ...current, [provider.id]: { status: 'testing', message: 'Testing live provider access…' } }));
+    try {
+      const result = await testIntegrationConnection({ data: { provider: provider.id } });
+      setTestResults((current) => ({ ...current, [provider.id]: { status: 'success', message: result.message, checkedAt: result.checkedAt } }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not verify ${provider.name}.`;
+      setTestResults((current) => ({ ...current, [provider.id]: { status: 'error', message } }));
     } finally {
       setBusyProvider('');
     }
@@ -184,7 +210,7 @@ export default function Integrations() {
       <PageHeader
         eyebrow="Workspace"
         title="Integrations"
-        description="Manage live, server-backed provider connections. Credentials and provider tokens remain server-side and connection health is calculated from persisted OAuth state."
+        description="Connect real services to PalladiumAI, verify them live, and expose only server-backed capabilities to your agents. Credentials and tokens remain server-side."
         action={(
           <div className="flex gap-2">
             <button onClick={refresh} className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5">
@@ -207,15 +233,16 @@ export default function Integrations() {
           <div>
             <p className="text-sm font-semibold text-emerald-100">Live connection backend</p>
             <p className="mt-1 max-w-4xl text-xs leading-5 text-zinc-400">
-              PalladiumAI checks persisted connection status, granted OAuth permissions and refresh capability. If a provider needs a newly-added permission or can no longer refresh access, the card will ask you to reconnect instead of pretending the connection is healthy.
+              PalladiumAI checks persisted OAuth status, granted permissions and refresh capability. Connected cards can also run a bounded read-only provider test, so a green connection means the external API actually responded—not merely that a token row exists.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <Metric label="Live provider adapters" value={providers.length} icon={Wrench} />
-        <Metric label="Configured adapters" value={configuredCount} icon={CheckCircle2} />
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Provider adapters" value={providers.length} icon={Wrench} />
+        <Metric label="Agent-ready" value={agentReadyCount} icon={ShieldCheck} />
+        <Metric label="Configured" value={configuredCount} icon={CheckCircle2} />
         <Metric label="Healthy connections" value={connectedCount} icon={Plug} />
       </div>
 
@@ -225,7 +252,7 @@ export default function Integrations() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search live integration adapters…"
+            placeholder="Search integrations, agent tools or permissions…"
             className="w-full rounded-xl border border-white/10 bg-black/20 py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
           />
         </div>
@@ -250,8 +277,10 @@ export default function Integrations() {
               key={provider.id}
               provider={provider}
               busy={busyProvider === provider.id}
+              testResult={testResults[provider.id]}
               onConnect={() => connect(provider)}
               onDisconnect={() => disconnect(provider)}
+              onTest={() => testConnection(provider)}
               onOpenGitHub={() => navigate('/code-explorer')}
             />
           ))}
@@ -261,33 +290,41 @@ export default function Integrations() {
   );
 }
 
-function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub }) {
+function ProviderCard({ provider, busy, testResult, onConnect, onDisconnect, onTest, onOpenGitHub }) {
   const status = provider.connection?.status ?? 'disconnected';
   const reconnectRequired = provider.connection?.health?.reconnectRequired === true;
   const connected = connectionHealthy(provider);
   const errored = status === 'error';
   const rawConnected = status === 'connected';
+  const readyForAgents = agentReady(provider);
   const Icon = provider.nativeGitHub ? Github : Plug;
   const healthReason = provider.connection?.health?.reason;
   const missingScopes = provider.connection?.health?.missingScopes ?? [];
 
   return (
-    <article className="flex min-h-[19rem] flex-col rounded-2xl border border-white/10 bg-white/[.03] p-5">
+    <article className="flex min-h-[21rem] flex-col rounded-2xl border border-white/10 bg-white/[.03] p-5">
       <div className="flex items-start justify-between gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Icon className="h-5 w-5" /></span>
         <StatusBadge connected={connected} errored={errored} reconnectRequired={reconnectRequired} configured={provider.configured} />
       </div>
 
       <div className="mt-4">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">{CATEGORY_LABELS[provider.category] || provider.category}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">{CATEGORY_LABELS[provider.category] || provider.category}</p>
+          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${readyForAgents ? 'bg-cyan-400/10 text-cyan-300' : 'bg-zinc-500/10 text-zinc-500'}`}>
+            {readyForAgents ? 'Agent ready' : 'Account only'}
+          </span>
+        </div>
         <h2 className="mt-1 text-base font-semibold text-white">{provider.name}</h2>
         <p className="mt-2 text-xs leading-5 text-zinc-500">{provider.summary}</p>
       </div>
 
-      {(provider.tools ?? []).length > 0 && (
+      {(provider.tools ?? []).length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {provider.tools.slice(0, 4).map((tool) => <span key={tool} className="rounded-lg bg-white/[.04] px-2 py-1 text-[10px] text-zinc-500">{tool}</span>)}
+          {provider.tools.slice(0, 5).map((tool) => <span key={tool} className="rounded-lg bg-white/[.04] px-2 py-1 text-[10px] text-zinc-500">{tool}</span>)}
         </div>
+      ) : (
+        <p className="mt-4 text-[10px] leading-4 text-zinc-600">No executable agent actions are advertised for this provider yet.</p>
       )}
 
       <div className="mt-auto pt-5">
@@ -303,18 +340,31 @@ function ProviderCard({ provider, busy, onConnect, onDisconnect, onOpenGitHub })
         {!reconnectRequired && provider.connection?.last_error && (
           <p className="mb-2 line-clamp-2 text-[11px] leading-4 text-red-300">{provider.connection.last_error}</p>
         )}
+        {testResult && (
+          <p className={`mb-2 rounded-lg px-2.5 py-2 text-[10px] leading-4 ${testResult.status === 'success' ? 'bg-emerald-500/[.06] text-emerald-300' : testResult.status === 'error' ? 'bg-red-500/[.06] text-red-300' : 'bg-violet-500/[.06] text-violet-300'}`}>
+            {testResult.message}
+          </p>
+        )}
 
         {!provider.configured ? (
-          <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-500/[.05] px-3 py-2.5 text-xs text-amber-200/80">
-            <LockKeyhole className="h-4 w-4 shrink-0" />Server setup required
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-xl border border-amber-400/15 bg-amber-500/[.05] px-3 py-2.5 text-xs text-amber-200/80">
+              <LockKeyhole className="h-4 w-4 shrink-0" />OAuth app credentials required on the server
+            </div>
+            {provider.docsUrl && <a href={provider.docsUrl} target="_blank" rel="noreferrer" className="block text-center text-[10px] text-zinc-500 hover:text-violet-300">Open provider setup documentation</a>}
           </div>
         ) : connected ? (
-          <div className="flex gap-2">
-            {provider.nativeGitHub && (
-              <button onClick={onOpenGitHub} className="flex-1 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-zinc-300 hover:bg-white/5">Open repositories</button>
-            )}
-            <button disabled={busy} onClick={onDisconnect} className="flex items-center justify-center gap-1.5 rounded-xl border border-red-400/15 px-3 py-2.5 text-xs font-medium text-red-300 hover:bg-red-500/[.06] disabled:opacity-50">
-              <Unplug className="h-3.5 w-3.5" />{busy ? 'Disconnecting…' : 'Disconnect'}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {provider.nativeGitHub && (
+                <button onClick={onOpenGitHub} className="flex-1 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-zinc-300 hover:bg-white/5">Open repositories</button>
+              )}
+              <button disabled={busy} onClick={onTest} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-400/20 px-3 py-2.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/[.06] disabled:opacity-50">
+                <CheckCircle2 className="h-3.5 w-3.5" />{busy ? 'Testing…' : 'Test connection'}
+              </button>
+            </div>
+            <button disabled={busy} onClick={onDisconnect} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-400/15 px-3 py-2.5 text-xs font-medium text-red-300 hover:bg-red-500/[.06] disabled:opacity-50">
+              <Unplug className="h-3.5 w-3.5" />Disconnect
             </button>
           </div>
         ) : reconnectRequired ? (

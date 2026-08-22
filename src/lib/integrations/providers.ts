@@ -20,7 +20,7 @@ export type IntegrationProvider = {
   summary: string;
   /** Scopes requested at consent — the least needed for the listed tools. */
   scopes: string[];
-  /** Agent tools this connection feeds. */
+  /** Agent tools this connection feeds. Empty means account connection only. */
   tools: string[];
   authorizeUrl: string;
   tokenUrl: string;
@@ -105,9 +105,9 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     id: "discord",
     name: "Discord",
     category: "communication",
-    summary: "Connect a Discord identity and guild list. Channel posting is not enabled yet.",
+    summary: "Connect a Discord identity and guild list. This connection is account-only today; agent channel actions are not enabled yet.",
     scopes: ["identify", "guilds"],
-    tools: ["http_request"],
+    tools: [],
     authorizeUrl: "https://discord.com/oauth2/authorize",
     tokenUrl: "https://discord.com/api/oauth2/token",
     clientIdEnv: "DISCORD_INTEGRATION_CLIENT_ID",
@@ -140,7 +140,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     category: "crm",
     summary: "Read-only CRM search across Accounts and Opportunities on the connected Salesforce org.",
     scopes: ["api", "refresh_token", "openid"],
-    tools: ["http_request", "database_query"],
+    tools: ["connected_service"],
     authorizeUrl: "https://login.salesforce.com/services/oauth2/authorize",
     tokenUrl: "https://login.salesforce.com/services/oauth2/token",
     clientIdEnv: "SALESFORCE_INTEGRATION_CLIENT_ID",

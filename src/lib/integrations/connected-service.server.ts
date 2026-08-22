@@ -42,6 +42,7 @@ export const CONNECTED_SERVICE_ACTIONS: Record<string, readonly string[]> = {
   microsoft: ["calendar_upcoming", "onedrive_search", "mail_search"],
   slack: ["channels_list", "channel_history"],
   hubspot: ["contacts_list", "deals_list"],
+  salesforce: ["accounts_search", "opportunities_search"],
   notion: ["search"],
   asana: ["workspaces_list", "project_tasks"],
   linear: ["issues_search"],
@@ -64,7 +65,7 @@ function requireResourceId(input: ConnectedServiceInput): string {
   return id;
 }
 
-/** Pure request builder for fixed OAuth-provider reads. GitHub App reads use the dedicated server adapter. */
+/** Pure request builder for fixed OAuth-provider reads. GitHub App and Salesforce use dedicated server adapters. */
 export function buildConnectedServiceRequest(input: ConnectedServiceInput): RequestSpec {
   const provider = clean(input.provider, 40).toLowerCase();
   const action = clean(input.action, 80).toLowerCase();
@@ -192,9 +193,6 @@ export async function readConnectedService(userId: string, input: ConnectedServi
 
   if (providerId === "github") {
     const { readConnectedGitHubService } = await import("./github-connected-service.server");
-    // `resource_id` and `query` remain accepted as compatibility aliases because
-    // the current runtime tool schema already exposes those fields. This makes
-    // GitHub repository reads usable before clients adopt repository/path/ref.
     const repository = input.repository ?? input.resource_id;
     const path = input.path ?? ((action === "path_list" || action === "file_read") ? input.query : undefined);
     const ref = input.ref ?? ((action === "commits_list" || action === "repository_overview") ? input.query : undefined);
@@ -205,6 +203,22 @@ export async function readConnectedService(userId: string, input: ConnectedServi
       ...(ref === undefined ? {} : { ref }),
       ...(input.limit === undefined ? {} : { limit: input.limit }),
     });
+  }
+
+  if (providerId === "salesforce") {
+    if (!CONNECTED_SERVICE_ACTIONS["salesforce"]?.includes(action)) return { error: `Action "${action}" is not available for connected provider "salesforce".` };
+    const query = clean(input.query, MAX_QUERY);
+    if (!query) return { error: `Action "${action}" requires query.` };
+    const limit = boundedLimit(input.limit);
+    try {
+      const { searchSalesforceAccounts, searchSalesforceOpportunities } = await import("./salesforce.server");
+      const data = action === "accounts_search"
+        ? await searchSalesforceAccounts({ userId, query, limit, ...(signal ? { signal } : {}) })
+        : await searchSalesforceOpportunities({ userId, query, limit, ...(signal ? { signal } : {}) });
+      return { provider: providerId, action, read_only: true, data: truncate(data) };
+    } catch (error) {
+      return { error: (error as Error).message || "Salesforce could not be reached." };
+    }
   }
 
   const provider = findProvider(providerId);

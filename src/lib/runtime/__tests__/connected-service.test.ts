@@ -11,7 +11,7 @@ import {
 describe("connected service read request whitelist", () => {
   it("contains only the intended read-capable providers", () => {
     expect(Object.keys(CONNECTED_SERVICE_ACTIONS).sort()).toEqual(
-      ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "slack"].sort(),
+      ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "salesforce", "slack"].sort(),
     );
     expect(CONNECTED_SERVICE_ACTIONS["github"]).toEqual([
       "repositories_list",
@@ -28,7 +28,7 @@ describe("connected service read request whitelist", () => {
       buildConnectedServiceRequest({ provider: "google", action: "gmail_send", query: "hello" }),
     ).toThrow(/not available/);
     expect(() =>
-      buildConnectedServiceRequest({ provider: "evil", action: "fetch", query: "https:\/\/evil.test" }),
+      buildConnectedServiceRequest({ provider: "evil", action: "fetch", query: "https://evil.test" }),
     ).toThrow(/not available/);
   });
 

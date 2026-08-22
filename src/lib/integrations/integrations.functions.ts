@@ -78,6 +78,51 @@ export const listIntegrations = createServerFn({ method: "POST" })
   });
 
 /**
+ * Performs one bounded, read-only provider request to prove the stored
+ * credential works now. No external data is written by this health check.
+ */
+export const testIntegrationConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => providerInput.pick({ provider: true }).parse(input))
+  .handler(async ({ data, context }) => {
+    const providerId = data.provider.trim().toLowerCase();
+    const checkedAt = new Date().toISOString();
+
+    if (providerId === "discord") {
+      const provider = findProvider(providerId);
+      if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
+      const { getIntegrationAccessToken } = await import("./oauth.server");
+      const token = await getIntegrationAccessToken(context.userId, providerId);
+      if (!token) throw new Error("Discord is not connected, has expired, or needs to be reconnected.");
+      const response = await fetch(provider.identity.url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error(`Discord returned ${response.status}. Reconnect the account and try again.`);
+      return { ok: true, checkedAt, message: "Discord account token is valid. Agent channel actions are not enabled." };
+    }
+
+    const probes: Record<string, { action: string; query?: string; limit?: number }> = {
+      google: { action: "calendar_upcoming", limit: 1 },
+      microsoft: { action: "calendar_upcoming", limit: 1 },
+      slack: { action: "channels_list", limit: 1 },
+      hubspot: { action: "contacts_list", limit: 1 },
+      salesforce: { action: "accounts_search", query: "a", limit: 1 },
+      notion: { action: "search", limit: 1 },
+      asana: { action: "workspaces_list", limit: 1 },
+      linear: { action: "issues_search", query: "a", limit: 1 },
+      github: { action: "repositories_list", limit: 1 },
+    };
+    const probe = probes[providerId];
+    if (!probe) throw new Error("Unknown integration provider.");
+
+    const { readConnectedService } = await import("./connected-service.server");
+    const result = await readConnectedService(context.userId, { provider: providerId, ...probe }, AbortSignal.timeout(12_000)) as any;
+    if (result?.error) throw new Error(String(result.error).slice(0, 300));
+    return { ok: true, checkedAt, message: `${providerId === "github" ? "GitHub" : findProvider(providerId)?.name ?? providerId} responded successfully.` };
+  });
+
+/**
  * Step 1 of OAuth: mint a signed state and hand back the provider consent URL.
  * Nothing is trusted from the browser except the return origin, which is
  * validated against the app's own origins.
