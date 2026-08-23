@@ -134,6 +134,48 @@ export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
     : [];
 }
 
+export async function ensureNangoIntegration(providerId: NangoProviderId) {
+  const definition = findNangoProvider(providerId)!;
+  const integrationId = configuredIntegrationId(providerId)!;
+  let existing: any = null;
+  try {
+    const result = await nangoFetch(`/integrations/${encodeURIComponent(integrationId)}`);
+    existing = result?.data ?? result;
+  } catch (error) {
+    if (!(error instanceof NangoHttpError) || error.status !== 404) throw error;
+  }
+
+  if (existing) {
+    if (existing.provider !== providerId) {
+      throw new Error(`Integration ID is already assigned to ${existing.provider}.`);
+    }
+    return { integrationId, created: false };
+  }
+
+  try {
+    await nangoFetch("/integrations", {
+      method: "POST",
+      body: JSON.stringify({
+        unique_key: integrationId,
+        provider: providerId,
+        display_name: `PalladiumAI ${definition.name}`,
+        forward_webhooks: true,
+      }),
+    });
+  } catch (error) {
+    // A simultaneous Connect request may have created the same fixed record.
+    if (!(error instanceof NangoHttpError) || error.status !== 409) throw error;
+    const result = await nangoFetch(`/integrations/${encodeURIComponent(integrationId)}`);
+    const current = result?.data ?? result;
+    if (current?.provider !== providerId) {
+      throw new Error(
+        `Integration ID is already assigned to ${current?.provider || "another provider"}.`,
+      );
+    }
+  }
+  return { integrationId, created: true };
+}
+
 export async function provisionNangoIntegrations() {
   const existing = await listNangoIntegrations();
   const byKey = new Map(existing.map((integration) => [integration.unique_key, integration]));
@@ -259,6 +301,7 @@ export async function createNangoConnectSession(
     throw new Error(
       `${findNangoProvider(providerId)?.name ?? providerId} is not configured in Nango.`,
     );
+  await ensureNangoIntegration(providerId);
   const tags: Record<string, string> = { end_user_id: user.id, palladium_provider: providerId };
   if (user.email) tags["end_user_email"] = user.email;
   const stored = await getPersistedNangoConnection(user.id, providerId);
