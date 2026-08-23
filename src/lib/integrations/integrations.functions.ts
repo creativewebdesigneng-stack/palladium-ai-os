@@ -134,7 +134,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const provider = findProvider(data.provider);
     if (!provider) throw new Error("Unknown integration provider.");
 
-    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } =
+    const { providerConfigured, createAuthorization, safeOrigin } =
       await import("./oauth.server");
     if (!providerConfigured(provider)) {
       throw new Error(
