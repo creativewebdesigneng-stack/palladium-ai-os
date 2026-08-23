@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
         if (!code) return fail("Authorisation code missing from the provider response.");
 
         try {
-          const tokens = await exchangeCode(provider, { code, origin });
+          const tokens = await exchangeCode(provider, { code, origin, state });
           const label = await fetchAccountLabel(provider, tokens.accessToken);
 
           const { data: connection, error } = await supabaseAdmin
