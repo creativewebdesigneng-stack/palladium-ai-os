@@ -76,7 +76,7 @@ describe("Salesforce OAuth PKCE", () => {
     });
     expect(verifyState(state)?.codeVerifier).toBe("verifier-value");
 
-    const [payload, signature] = state.split(".");
+    const [payload, signature] = state.split(".") as [string, string];
     expect(verifyState(`${payload}x.${signature}`)).toBeNull();
     expect(verifyState(`${payload}.${signature.slice(0, -1)}A`)).toBeNull();
 
