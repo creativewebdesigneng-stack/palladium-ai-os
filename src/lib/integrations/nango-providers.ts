@@ -12,6 +12,7 @@ export const NANGO_PROVIDERS = [
     name: "Google Workspace",
     category: "productivity",
     env: "NANGO_GOOGLE_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-google",
     probe: { path: "/oauth2/v2/userinfo", label: "email" },
   },
   {
@@ -19,6 +20,7 @@ export const NANGO_PROVIDERS = [
     name: "Microsoft 365",
     category: "productivity",
     env: "NANGO_MICROSOFT_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-microsoft",
     probe: { path: "/v1.0/me", label: "displayName" },
   },
   {
@@ -26,6 +28,7 @@ export const NANGO_PROVIDERS = [
     name: "Slack",
     category: "communication",
     env: "NANGO_SLACK_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-slack",
     probe: { path: "/api/auth.test", label: "user" },
   },
   {
@@ -33,6 +36,7 @@ export const NANGO_PROVIDERS = [
     name: "HubSpot",
     category: "crm",
     env: "NANGO_HUBSPOT_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-hubspot",
     probe: { path: "/crm/v3/owners?limit=1", label: "results.0.email" },
   },
   {
@@ -40,6 +44,7 @@ export const NANGO_PROVIDERS = [
     name: "Salesforce",
     category: "crm",
     env: "NANGO_SALESFORCE_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-salesforce",
     probe: { path: "/services/data/v61.0/limits", label: "DailyApiRequests" },
   },
   {
@@ -47,6 +52,7 @@ export const NANGO_PROVIDERS = [
     name: "Notion",
     category: "productivity",
     env: "NANGO_NOTION_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-notion",
     probe: { path: "/v1/users/me", label: "name", header: ["Notion-Version", "2026-03-11"] },
   },
   {
@@ -54,6 +60,7 @@ export const NANGO_PROVIDERS = [
     name: "Asana",
     category: "project_management",
     env: "NANGO_ASANA_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-asana",
     probe: { path: "/api/1.0/users/me", label: "data.name" },
   },
   {
@@ -61,6 +68,7 @@ export const NANGO_PROVIDERS = [
     name: "Linear",
     category: "project_management",
     env: "NANGO_LINEAR_INTEGRATION_ID",
+    defaultIntegrationId: "palladium-linear",
     probe: {
       path: "/graphql",
       method: "POST",

@@ -54,7 +54,8 @@ describe("Nango multi-provider integrations", () => {
     );
     expect(server).toContain("provider_config_key: integrationId");
     expect(functions).toContain("disconnectNangoGitHubConnection");
-    expect(functions).toContain("const providerInput = z.object({ provider:");
+    expect(functions).toContain("const providerInput = z.object({");
+    expect(functions).toContain("provider: z");
     expect(functions).not.toContain("z.object({ connectionId:");
     expect(integrationsScreen).toContain(
       "await disconnectNangoConnection({ data: { provider: provider.providerId } })",
