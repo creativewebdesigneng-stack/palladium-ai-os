@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { persistNangoGitHubConnection, markNangoGitHubConnectionError } = vi.hoisted(() => ({
-  persistNangoGitHubConnection: vi.fn(),
-  markNangoGitHubConnectionError: vi.fn(),
+const { persistNangoConnection, markNangoConnectionError } = vi.hoisted(() => ({
+  persistNangoConnection: vi.fn(),
+  markNangoConnectionError: vi.fn(),
 }));
 
 vi.mock("./nango.server", () => ({
-  NANGO_GITHUB_INTEGRATION: "github-getting-started",
-  persistNangoGitHubConnection,
-  markNangoGitHubConnectionError,
+  nangoProviderFromIntegrationId: (id: string) =>
+    id === "github-getting-started" ? { id: "github" } : null,
+  persistNangoConnection,
+  markNangoConnectionError,
 }));
 
 import {
@@ -66,13 +67,13 @@ describe("Nango auth webhooks", () => {
     });
 
     expect(result).toEqual({ accepted: true, handled: true });
-    expect(persistNangoGitHubConnection).toHaveBeenCalledWith(
-      expect.objectContaining({ userId, connectionId: "nango-connection-1" }),
+    expect(persistNangoConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ userId, providerId: "github", connectionId: "nango-connection-1" }),
     );
   });
 
   it("marks the matching stored connection for reconnect after an auth failure", async () => {
-    markNangoGitHubConnectionError.mockResolvedValue(true);
+    markNangoConnectionError.mockResolvedValue(true);
     const result = await processNangoWebhook({
       type: "auth",
       operation: "refresh",
@@ -84,8 +85,9 @@ describe("Nango auth webhooks", () => {
     });
 
     expect(result).toEqual({ accepted: true, handled: true });
-    expect(markNangoGitHubConnectionError).toHaveBeenCalledWith({
+    expect(markNangoConnectionError).toHaveBeenCalledWith({
       userId,
+      providerId: "github",
       connectionId: "nango-connection-1",
       error: "Provider refresh token expired.",
     });
@@ -106,6 +108,6 @@ describe("Nango auth webhooks", () => {
         tags: { end_user_id: userId },
       }),
     ).resolves.toEqual({ accepted: true, handled: false });
-    expect(persistNangoGitHubConnection).not.toHaveBeenCalled();
+    expect(persistNangoConnection).not.toHaveBeenCalled();
   });
 });

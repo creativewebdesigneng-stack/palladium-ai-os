@@ -24,7 +24,7 @@ export type ConnectedServiceInput = {
   limit?: number;
 };
 
-type RequestSpec = {
+export type RequestSpec = {
   url: string;
   method?: "GET" | "POST";
   headers?: Record<string, string>;
@@ -46,7 +46,14 @@ export const CONNECTED_SERVICE_ACTIONS: Record<string, readonly string[]> = {
   notion: ["search"],
   asana: ["workspaces_list", "project_tasks"],
   linear: ["issues_search"],
-  github: ["repositories_list", "repository_overview", "branches_list", "commits_list", "path_list", "file_read"],
+  github: [
+    "repositories_list",
+    "repository_overview",
+    "branches_list",
+    "commits_list",
+    "path_list",
+    "file_read",
+  ],
 };
 
 function clean(value: unknown, max: number): string {
@@ -89,7 +96,10 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
     case "google:drive_search": {
       const url = new URL("https://www.googleapis.com/drive/v3/files");
       url.searchParams.set("pageSize", String(limit));
-      url.searchParams.set("fields", "files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken");
+      url.searchParams.set(
+        "fields",
+        "files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken",
+      );
       url.searchParams.set("orderBy", "modifiedTime desc");
       if (query) {
         const escaped = query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -108,7 +118,9 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
     }
     case "microsoft:onedrive_search": {
       const safeQuery = (query || "*").replace(/'/g, "''");
-      const url = new URL(`https://graph.microsoft.com/v1.0/me/drive/root/search(q='${safeQuery}')`);
+      const url = new URL(
+        `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${safeQuery}')`,
+      );
       url.searchParams.set("$top", String(limit));
       url.searchParams.set("$select", "id,name,size,lastModifiedDateTime,webUrl,file,folder");
       return { url: url.toString() };
@@ -118,7 +130,7 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
       url.searchParams.set("$top", String(limit));
       url.searchParams.set("$select", "id,subject,from,receivedDateTime,isRead,webLink");
       url.searchParams.set("$orderby", "receivedDateTime desc");
-      if (query) url.searchParams.set("$search", `\"${query.replace(/\"/g, "")}\"`);
+      if (query) url.searchParams.set("$search", `"${query.replace(/"/g, "")}"`);
       return { url: url.toString(), headers: { ConsistencyLevel: "eventual" } };
     }
     case "slack:channels_list": {
@@ -138,13 +150,19 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
     case "hubspot:contacts_list": {
       const url = new URL("https://api.hubapi.com/crm/v3/objects/contacts");
       url.searchParams.set("limit", String(limit));
-      url.searchParams.set("properties", "firstname,lastname,email,company,jobtitle,lastmodifieddate");
+      url.searchParams.set(
+        "properties",
+        "firstname,lastname,email,company,jobtitle,lastmodifieddate",
+      );
       return { url: url.toString() };
     }
     case "hubspot:deals_list": {
       const url = new URL("https://api.hubapi.com/crm/v3/objects/deals");
       url.searchParams.set("limit", String(limit));
-      url.searchParams.set("properties", "dealname,amount,dealstage,closedate,pipeline,hs_lastmodifieddate");
+      url.searchParams.set(
+        "properties",
+        "dealname,amount,dealstage,closedate,pipeline,hs_lastmodifieddate",
+      );
       return { url: url.toString() };
     }
     case "notion:search":
@@ -152,13 +170,21 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
         url: "https://api.notion.com/v1/search",
         method: "POST",
         headers: { "Notion-Version": "2026-03-11", "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(query ? { query } : {}), page_size: limit, sort: { direction: "descending", timestamp: "last_edited_time" } }),
+        body: JSON.stringify({
+          ...(query ? { query } : {}),
+          page_size: limit,
+          sort: { direction: "descending", timestamp: "last_edited_time" },
+        }),
       };
     case "asana:workspaces_list":
-      return { url: "https://app.asana.com/api/1.0/workspaces?opt_fields=gid,name,is_organization" };
+      return {
+        url: "https://app.asana.com/api/1.0/workspaces?opt_fields=gid,name,is_organization",
+      };
     case "asana:project_tasks": {
       const project = requireResourceId(input);
-      const url = new URL(`https://app.asana.com/api/1.0/projects/${encodeURIComponent(project)}/tasks`);
+      const url = new URL(
+        `https://app.asana.com/api/1.0/projects/${encodeURIComponent(project)}/tasks`,
+      );
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("opt_fields", "gid,name,completed,due_on,assignee.name,permalink_url");
       return { url: url.toString() };
@@ -178,7 +204,11 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
 }
 
 function safeJson(text: string): unknown {
-  try { return JSON.parse(text); } catch { return { text: text.slice(0, MAX_RESPONSE_CHARS) }; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { text: text.slice(0, MAX_RESPONSE_CHARS) };
+  }
 }
 
 function truncate(value: unknown): unknown {
@@ -187,64 +217,163 @@ function truncate(value: unknown): unknown {
   return { truncated: true, preview: text.slice(0, MAX_RESPONSE_CHARS) };
 }
 
-export async function readConnectedService(userId: string, input: ConnectedServiceInput, signal?: AbortSignal): Promise<unknown> {
+export async function readConnectedService(
+  userId: string,
+  input: ConnectedServiceInput,
+  signal?: AbortSignal,
+): Promise<unknown> {
   const providerId = clean(input.provider, 40).toLowerCase();
   const action = clean(input.action, 80).toLowerCase();
 
   if (providerId === "github") {
     const { readConnectedGitHubService } = await import("./github-connected-service.server");
     const repository = input.repository ?? input.resource_id;
-    const path = input.path ?? ((action === "path_list" || action === "file_read") ? input.query : undefined);
-    const ref = input.ref ?? ((action === "commits_list" || action === "repository_overview") ? input.query : undefined);
-    return readConnectedGitHubService(userId, {
-      action,
-      ...(repository === undefined ? {} : { repository }),
-      ...(path === undefined ? {} : { path }),
-      ...(ref === undefined ? {} : { ref }),
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-    });
+    const path =
+      input.path ?? (action === "path_list" || action === "file_read" ? input.query : undefined);
+    const ref =
+      input.ref ??
+      (action === "commits_list" || action === "repository_overview" ? input.query : undefined);
+    try {
+      const native = await readConnectedGitHubService(userId, {
+        action,
+        ...(repository === undefined ? {} : { repository }),
+        ...(path === undefined ? {} : { path }),
+        ...(ref === undefined ? {} : { ref }),
+        ...(input.limit === undefined ? {} : { limit: input.limit }),
+      });
+      if (!(native as any)?.error) return native;
+    } catch {
+      /* Nango is the safe fallback below. */
+    }
+    try {
+      const { buildNangoGitHubRequest } = await import("./nango-github-actions.server");
+      const { proxyOwnedNangoRequest } = await import("./nango.server");
+      const data = await proxyOwnedNangoRequest(
+        userId,
+        "github",
+        buildNangoGitHubRequest({ ...input, provider: "github", action }),
+        signal,
+      );
+      return {
+        provider: "github",
+        action,
+        read_only: true,
+        transport: "nango",
+        data: truncate(data),
+      };
+    } catch (error) {
+      return { error: (error as Error).message || "GitHub could not be reached." };
+    }
   }
 
   if (providerId === "salesforce") {
-    if (!CONNECTED_SERVICE_ACTIONS["salesforce"]?.includes(action)) return { error: `Action "${action}" is not available for connected provider "salesforce".` };
+    if (!CONNECTED_SERVICE_ACTIONS["salesforce"]?.includes(action))
+      return { error: `Action "${action}" is not available for connected provider "salesforce".` };
     const query = clean(input.query, MAX_QUERY);
     if (!query) return { error: `Action "${action}" requires query.` };
     const limit = boundedLimit(input.limit);
     try {
-      const { searchSalesforceAccounts, searchSalesforceOpportunities } = await import("./salesforce.server");
-      const data = action === "accounts_search"
-        ? await searchSalesforceAccounts({ userId, query, limit, ...(signal ? { signal } : {}) })
-        : await searchSalesforceOpportunities({ userId, query, limit, ...(signal ? { signal } : {}) });
+      const { searchSalesforceAccounts, searchSalesforceOpportunities } =
+        await import("./salesforce.server");
+      const data =
+        action === "accounts_search"
+          ? await searchSalesforceAccounts({ userId, query, limit, ...(signal ? { signal } : {}) })
+          : await searchSalesforceOpportunities({
+              userId,
+              query,
+              limit,
+              ...(signal ? { signal } : {}),
+            });
       return { provider: providerId, action, read_only: true, data: truncate(data) };
     } catch (error) {
-      return { error: (error as Error).message || "Salesforce could not be reached." };
+      try {
+        const escaped = query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+        const object = action === "accounts_search" ? "Account" : "Opportunity";
+        const fields =
+          action === "accounts_search"
+            ? "Id,Name,Industry,Website,Phone,LastModifiedDate"
+            : "Id,Name,StageName,Amount,CloseDate,Account.Name,LastModifiedDate";
+        const filters =
+          action === "accounts_search"
+            ? `(Name LIKE '%${escaped}%' OR Website LIKE '%${escaped}%')`
+            : `Name LIKE '%${escaped}%'`;
+        const soql = `SELECT ${fields} FROM ${object} WHERE ${filters} ORDER BY LastModifiedDate DESC LIMIT ${limit}`;
+        const { proxyOwnedNangoRequest } = await import("./nango.server");
+        const data = await proxyOwnedNangoRequest(
+          userId,
+          "salesforce",
+          {
+            url: `https://salesforce.invalid/services/data/v61.0/query?q=${encodeURIComponent(soql)}`,
+          },
+          signal,
+        );
+        return {
+          provider: providerId,
+          action,
+          read_only: true,
+          transport: "nango",
+          data: truncate(data),
+        };
+      } catch {
+        return { error: (error as Error).message || "Salesforce could not be reached." };
+      }
     }
   }
 
   const provider = findProvider(providerId);
   if (!provider) return { error: "Unknown integration provider." };
-  if (!CONNECTED_SERVICE_ACTIONS[providerId]) return { error: `${provider.name} does not yet expose a read-only agent connector.` };
+  if (!CONNECTED_SERVICE_ACTIONS[providerId])
+    return { error: `${provider.name} does not yet expose a read-only agent connector.` };
 
   let spec: RequestSpec;
-  try { spec = buildConnectedServiceRequest({ ...input, provider: providerId }); }
-  catch (error) { return { error: (error as Error).message }; }
+  try {
+    spec = buildConnectedServiceRequest({ ...input, provider: providerId });
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
 
   const accessToken = await getIntegrationAccessToken(userId, providerId);
-  if (!accessToken) return { error: `${provider.name} is not connected, has expired, or needs to be reconnected.` };
+  if (!accessToken) {
+    try {
+      const { proxyOwnedNangoRequest } = await import("./nango.server");
+      const data = await proxyOwnedNangoRequest(userId, providerId as any, spec, signal);
+      return {
+        provider: providerId,
+        action,
+        read_only: true,
+        transport: "nango",
+        data: truncate(data),
+      };
+    } catch {
+      return {
+        error: `${provider.name} is not connected, has expired, or needs to be reconnected.`,
+      };
+    }
+  }
 
   try {
     const response = await fetch(spec.url, {
       method: spec.method ?? "GET",
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", ...spec.headers },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        ...spec.headers,
+      },
       ...(spec.body ? { body: spec.body } : {}),
       signal: signal ?? AbortSignal.timeout(20_000),
     });
     const text = (await response.text()).slice(0, MAX_RESPONSE_CHARS * 2);
     const payload = safeJson(text);
-    if (!response.ok) return { error: `${provider.name} returned ${response.status}.`, status: response.status, details: truncate(payload) };
+    if (!response.ok)
+      return {
+        error: `${provider.name} returned ${response.status}.`,
+        status: response.status,
+        details: truncate(payload),
+      };
     return { provider: providerId, action, read_only: true, data: truncate(payload) };
   } catch (error) {
-    if ((error as Error).name === "AbortError" || (error as Error).name === "TimeoutError") return { error: `${provider.name} request timed out.` };
+    if ((error as Error).name === "AbortError" || (error as Error).name === "TimeoutError")
+      return { error: `${provider.name} request timed out.` };
     return { error: `${provider.name} could not be reached.` };
   }
 }
