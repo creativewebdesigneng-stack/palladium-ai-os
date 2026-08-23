@@ -174,18 +174,34 @@ export default function Integrations() {
       providerId: item.id,
       name: `${item.name} via Nango`,
       category: item.category,
-      summary: item.agentReady
-        ? `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`
-        : `Connect ${item.name} securely now. Agent actions stay disabled until PalladiumAI adds reviewed, provider-specific tools.`,
+      summary:
+        item.capabilityCount > 0
+          ? `${item.capabilityCount} live Nango actions discovered. Read-only actions can run autonomously; writes and destructive actions use PalladiumAI approval controls.`
+          : item.agentReady
+            ? `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`
+            : `Connect ${item.name} securely. PalladiumAI discovers and activates its typed Nango actions on demand.`,
       scopes: [
         `${String(item.authMode || "Provider").replaceAll("_", " ")} authentication`,
         "Credentials remain server-side",
       ],
-      tools: item.agentReady ? ["connected_service", "connected_service_write", "Nango Proxy"] : [],
+      tools:
+        item.capabilityCount > 0
+          ? [
+              `${item.autonomousActionCount} autonomous reads`,
+              `${item.approvalActionCount} approval actions`,
+              "JIT action activation",
+            ]
+          : item.agentReady
+            ? ["connected_service", "connected_service_write", "Dynamic Nango actions"]
+            : [],
       docsUrl: item.docsUrl || "https://nango.dev/docs/guides/auth/auth-guide",
       logoUrl: item.logoUrl,
       authMode: item.authMode,
       agentReady: Boolean(item.agentReady),
+      capabilityCount: item.capabilityCount ?? 0,
+      autonomousActionCount: item.autonomousActionCount ?? 0,
+      approvalActionCount: item.approvalActionCount ?? 0,
+      capabilityError: item.capabilityError,
       marketplaceProvider: !item.curated,
       configured: Boolean(item.configured),
       nangoProvider: true,
@@ -531,7 +547,10 @@ function ProviderCard({
         </div>
       ) : (
         <p className="mt-4 text-[10px] leading-4 text-zinc-600">
-          No executable agent actions are advertised for this provider yet.
+          {provider.capabilityError ||
+            (connected
+              ? "No executable Nango action templates are advertised for this provider yet."
+              : "Connect the account to discover its live agent actions.")}
         </p>
       )}
 

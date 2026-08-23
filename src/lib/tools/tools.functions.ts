@@ -165,7 +165,9 @@ export const runToolManually = createServerFn({ method: "POST" })
     if (!grant)
       throw new Error(`"${data.tool}" is not enabled for ${agent.name} on your current plan.`);
 
-    if (grant.requiresApproval) {
+    // nango_action performs its own schema-aware risk classification and queues
+    // an immutable provider/action payload when this grant requires approval.
+    if (grant.requiresApproval && data.tool !== "nango_action") {
       const { data: approval } = await sb
         .from("approval_requests")
         .insert({

@@ -82,6 +82,94 @@ async function nangoFetch(path: string, init: RequestInit = {}) {
   return body;
 }
 
+export type NangoActionFunction = {
+  name: string;
+  description?: string;
+  type: "action";
+  input?: string;
+  returns?: string[];
+  json_schema?: Record<string, unknown> | null;
+  deployed?: {
+    id?: number;
+    enabled?: boolean;
+    last_deployed?: string;
+    source?: string;
+  };
+};
+
+function normalizeActionFunction(value: unknown): NangoActionFunction | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const name = typeof row["name"] === "string" ? row["name"].trim() : "";
+  if (!name || name.length > 160 || !/^[a-zA-Z0-9._:-]+$/.test(name)) return null;
+  if (row["type"] !== "action") return null;
+  return {
+    name,
+    type: "action",
+    ...(typeof row["description"] === "string"
+      ? { description: row["description"].slice(0, 1000) }
+      : {}),
+    ...(typeof row["input"] === "string" ? { input: row["input"] } : {}),
+    ...(Array.isArray(row["returns"])
+      ? { returns: row["returns"].filter((item): item is string => typeof item === "string") }
+      : {}),
+    ...(row["json_schema"] && typeof row["json_schema"] === "object"
+      ? { json_schema: row["json_schema"] as Record<string, unknown> }
+      : {}),
+    ...(row["deployed"] && typeof row["deployed"] === "object"
+      ? { deployed: row["deployed"] as NonNullable<NangoActionFunction["deployed"]> }
+      : {}),
+  };
+}
+
+export async function listNangoProviderActionTemplates(providerId: NangoProviderId) {
+  if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
+  const result = await nangoFetch(`/providers/${encodeURIComponent(providerId)}/templates`);
+  const rows = Array.isArray(result?.data) ? result.data : [];
+  return rows
+    .map(normalizeActionFunction)
+    .filter((row: NangoActionFunction | null): row is NangoActionFunction => Boolean(row));
+}
+
+export async function listNangoIntegrationActions(integrationId: string) {
+  if (!integrationId || integrationId.length > 160 || !/^[a-zA-Z0-9._:-]+$/.test(integrationId))
+    throw new Error("Invalid Nango integration ID.");
+  const query = new URLSearchParams({ type: "action", limit: "100" });
+  const result = await nangoFetch(
+    `/integrations/${encodeURIComponent(integrationId)}/functions?${query}`,
+  );
+  const rows = Array.isArray(result?.data) ? result.data : [];
+  return rows
+    .map(normalizeActionFunction)
+    .filter((row: NangoActionFunction | null): row is NangoActionFunction => Boolean(row));
+}
+
+export async function deployNangoActionTemplate(integrationId: string, actionName: string) {
+  try {
+    const result = await nangoFetch("/functions/deployments", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "template",
+        integration_id: integrationId,
+        template: actionName,
+        function_type: "action",
+      }),
+    });
+    if (result?.status === "failed")
+      throw new Error(String(result?.error?.message || "Nango action deployment failed."));
+    return { deployed: true, deploymentId: result?.id ? String(result.id) : null };
+  } catch (error) {
+    if (
+      error instanceof NangoHttpError &&
+      error.status === 409 &&
+      (error.body as any)?.error?.code === "template_already_deployed"
+    ) {
+      return { deployed: false, deploymentId: null };
+    }
+    throw error;
+  }
+}
+
 function connectionId(connection: any): string | null {
   const value = connection?.connection_id || connection?.id;
   return value ? String(value) : null;
@@ -437,6 +525,35 @@ export async function getOwnedNangoConnection(userId: string, providerId: NangoP
       tags: connection.tags,
     });
   return connection;
+}
+
+export async function triggerOwnedNangoAction(
+  userId: string,
+  providerId: NangoProviderId,
+  actionName: string,
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
+  if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
+  if (!actionName || actionName.length > 160 || !/^[a-zA-Z0-9._:-]+$/.test(actionName))
+    throw new Error("Invalid Nango action name.");
+  const connection = await getOwnedNangoConnection(userId, providerId);
+  const id = connectionId(connection);
+  const integrationId =
+    connection?.integration_id ||
+    connection?.provider_config_key ||
+    connection?.providerConfigKey ||
+    configuredIntegrationId(providerId);
+  if (!id || !integrationId)
+    throw new Error(
+      `${findNangoProvider(providerId)?.name ?? providerId} is not connected through Nango.`,
+    );
+  return nangoFetch("/action/trigger", {
+    method: "POST",
+    headers: { "Connection-Id": id, "Provider-Config-Key": integrationId },
+    body: JSON.stringify({ action_name: actionName, input }),
+    ...(signal ? { signal } : {}),
+  });
 }
 
 export async function disconnectOwnedNangoConnection(userId: string, providerId: NangoProviderId) {

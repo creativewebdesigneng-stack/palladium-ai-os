@@ -38,6 +38,18 @@ describe("agent connected-service contract", () => {
     expect(properties.ref).toBeTruthy();
   });
 
+  it("upgrades existing connected-service agents with dynamic Nango capabilities", async () => {
+    const { defs, grants } = await resolveGrantedTools(
+      sb(),
+      { id: "agent-1", allowed_tools: ["connected_service"] },
+      "enterprise",
+    );
+    expect(defs.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["connected_service", "nango_capabilities", "nango_action"]),
+    );
+    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
+  });
+
   it("exposes separate approval-gated draft and send tools", async () => {
     const { defs, grants } = await resolveGrantedTools(
       sb(),
