@@ -1,7 +1,7 @@
 import {
-  markNangoGitHubConnectionError,
-  NANGO_GITHUB_INTEGRATION,
-  persistNangoGitHubConnection,
+  markNangoConnectionError,
+  nangoProviderFromIntegrationId,
+  persistNangoConnection,
 } from "./nango.server";
 
 type NangoAuthWebhook = {
@@ -92,15 +92,15 @@ function isAuthWebhook(value: any): value is NangoAuthWebhook {
 
 export async function processNangoWebhook(payload: unknown) {
   if (!isAuthWebhook(payload)) return { accepted: true, handled: false };
-  if (payload.providerConfigKey !== NANGO_GITHUB_INTEGRATION) {
-    return { accepted: true, handled: false };
-  }
+  const definition = nangoProviderFromIntegrationId(payload.providerConfigKey);
+  if (!definition) return { accepted: true, handled: false };
   const userId = payload.tags?.["end_user_id"];
   if (!isUuid(userId)) return { accepted: true, handled: false };
 
   if (payload.success) {
-    await persistNangoGitHubConnection({
+    await persistNangoConnection({
       userId,
+      providerId: definition.id,
       connectionId: payload.connectionId,
       integrationId: payload.providerConfigKey,
       ...(payload.provider ? { provider: payload.provider } : {}),
@@ -116,8 +116,9 @@ export async function processNangoWebhook(payload: unknown) {
     (payload.operation === "refresh"
       ? "Nango could not refresh this connection. Reconnect the account."
       : "Nango could not authorize this connection. Try connecting again.");
-  const handled = await markNangoGitHubConnectionError({
+  const handled = await markNangoConnectionError({
     userId,
+    providerId: definition.id,
     connectionId: payload.connectionId,
     error: description,
   });

@@ -22,10 +22,10 @@ import {
 } from "@/lib/integrations/integrations.functions";
 import { getGitHubConnection, startGitHubConnection } from "@/lib/integrations/github.functions";
 import {
-  disconnectNangoGitHubConnection,
-  getNangoGitHubConnection,
-  startNangoGitHubConnection,
-  testNangoGitHubConnection,
+  disconnectNangoConnection,
+  listNangoConnections,
+  startNangoConnection,
+  testNangoConnection,
 } from "@/lib/integrations/nango.functions";
 
 const CATEGORY_LABELS = {
@@ -37,7 +37,7 @@ const CATEGORY_LABELS = {
 };
 
 function connectionHealthy(provider) {
-  if (provider.nativeGitHub || provider.nangoGitHub)
+  if (provider.nativeGitHub || provider.nangoProvider)
     return provider.connection?.status === "connected";
   if (provider.connection?.health) return provider.connection.health.healthy === true;
   return provider.connection?.status === "connected";
@@ -46,7 +46,7 @@ function connectionHealthy(provider) {
 function agentReady(provider) {
   return (
     provider.nativeGitHub ||
-    provider.nangoGitHub ||
+    provider.nangoProvider ||
     (provider.tools ?? []).some((tool) =>
       [
         "connected_service",
@@ -66,7 +66,7 @@ export default function Integrations() {
   const [category, setCategory] = useState("all");
   const [catalogue, setCatalogue] = useState([]);
   const [github, setGithub] = useState(null);
-  const [nangoGithub, setNangoGithub] = useState(null);
+  const [nangoConnections, setNangoConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
   const [testResults, setTestResults] = useState({});
@@ -80,15 +80,11 @@ export default function Integrations() {
       const [integrationResult, githubResult, nangoResult] = await Promise.all([
         listIntegrations(),
         getGitHubConnection(),
-        getNangoGitHubConnection().catch((err) => ({
-          configured: true,
-          connected: false,
-          error: err instanceof Error ? err.message : "Could not load the Nango pilot state.",
-        })),
+        listNangoConnections().catch(() => []),
       ]);
       setCatalogue(integrationResult.catalogue ?? []);
       setGithub(githubResult);
-      setNangoGithub(nangoResult);
+      setNangoConnections(nangoResult);
       return githubResult;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load integration state.");
@@ -165,45 +161,36 @@ export default function Integrations() {
             }
           : null,
     };
-    const nangoGithubProvider = {
-      id: "github-nango-pilot",
-      name: "GitHub via Nango",
-      category: "developer",
-      summary:
-        "Pilot Nango-managed GitHub authentication with Palladium user ownership tags and a server-side live API probe.",
-      scopes: ["Pilot connection", "Credentials remain server-side"],
-      tools: ["Nango Proxy", "GitHub health probe"],
+    const nangoProviders = nangoConnections.map((item) => ({
+      id: `${item.id}-nango`,
+      providerId: item.id,
+      name: `${item.name} via Nango`,
+      category: item.category,
+      summary: `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`,
+      scopes: ["Nango-managed OAuth", "Credentials remain server-side"],
+      tools: ["connected_service", "connected_service_write", "Nango Proxy"],
       docsUrl: "https://nango.dev/docs/guides/auth/auth-guide",
-      configured: Boolean(nangoGithub?.configured),
-      nangoGitHub: true,
-      pilot: true,
-      connection: nangoGithub?.connected
+      configured: Boolean(item.configured),
+      nangoProvider: true,
+      connection: item.connected
         ? {
             status: "connected",
-            account_label: nangoGithub.accountLabel,
-            connected_at: nangoGithub.createdAt,
-            last_error: nangoGithub.lastError,
+            account_label: item.accountLabel,
+            connected_at: item.createdAt,
+            last_error: item.lastError,
           }
-        : nangoGithub?.reconnectRequired
+        : item.reconnectRequired || item.lastError
           ? {
               status: "error",
-              account_label: nangoGithub.accountLabel,
-              connected_at: nangoGithub.createdAt,
-              last_error: nangoGithub.lastError,
-              health: {
-                reconnectRequired: true,
-                reason: nangoGithub.lastError || "Reconnect this Nango-managed GitHub account.",
-              },
+              account_label: item.accountLabel,
+              connected_at: item.createdAt,
+              last_error: item.lastError,
+              health: { reconnectRequired: item.reconnectRequired, reason: item.lastError },
             }
-          : nangoGithub?.error
-            ? {
-                status: "error",
-                last_error: nangoGithub.error,
-              }
-            : null,
-    };
-    return [...catalogue, githubProvider, nangoGithubProvider];
-  }, [catalogue, github, nangoGithub]);
+          : null,
+    }));
+    return [...catalogue, githubProvider, ...nangoProviders];
+  }, [catalogue, github, nangoConnections]);
 
   const categories = useMemo(
     () => Array.from(new Set(providers.map((provider) => provider.category))).sort(),
@@ -234,7 +221,7 @@ export default function Integrations() {
     setBusyProvider(provider.id);
     setError("");
     try {
-      if (provider.nangoGitHub) {
+      if (provider.nangoProvider) {
         nangoConnectRef.current?.close();
         const nango = new Nango();
         const connectUI = nango.openConnectUI({
@@ -246,7 +233,7 @@ export default function Integrations() {
                 ...current,
                 [provider.id]: {
                   status: "success",
-                  message: "GitHub connected through the Nango pilot.",
+                  message: `${provider.name} connected.`,
                 },
               }));
               await refresh();
@@ -262,7 +249,7 @@ export default function Integrations() {
         });
         nangoConnectRef.current = connectUI;
         connectUI.open();
-        const result = await startNangoGitHubConnection();
+        const result = await startNangoConnection({ data: { provider: provider.providerId } });
         connectUI.setSessionToken(result.sessionToken);
         return;
       }
@@ -276,7 +263,7 @@ export default function Integrations() {
       });
       window.location.assign(result.authorizeUrl);
     } catch (err) {
-      if (provider.nangoGitHub) {
+      if (provider.nangoProvider) {
         nangoConnectRef.current?.close();
         nangoConnectRef.current = null;
       }
@@ -289,7 +276,8 @@ export default function Integrations() {
     setBusyProvider(provider.id);
     setError("");
     try {
-      if (provider.nangoGitHub) await disconnectNangoGitHubConnection();
+      if (provider.nangoProvider)
+        await disconnectNangoConnection({ data: { provider: provider.providerId } });
       else await disconnectIntegration({ data: { provider: provider.id } });
       setTestResults((current) => ({ ...current, [provider.id]: null }));
       await refresh();
@@ -308,8 +296,8 @@ export default function Integrations() {
       [provider.id]: { status: "testing", message: "Testing live provider access…" },
     }));
     try {
-      const result = provider.nangoGitHub
-        ? await testNangoGitHubConnection()
+      const result = provider.nangoProvider
+        ? await testNangoConnection({ data: { provider: provider.providerId } })
         : await testIntegrationConnection({ data: { provider: provider.id } });
       setTestResults((current) => ({
         ...current,
@@ -443,7 +431,7 @@ function ProviderCard({
   const errored = status === "error";
   const rawConnected = status === "connected";
   const readyForAgents = agentReady(provider);
-  const Icon = provider.nativeGitHub || provider.nangoGitHub ? Github : Plug;
+  const Icon = provider.nativeGitHub || provider.providerId === "github" ? Github : Plug;
   const healthReason = provider.connection?.health?.reason;
   const missingScopes = provider.connection?.health?.missingScopes ?? [];
 
@@ -471,11 +459,6 @@ function ProviderCard({
           >
             {readyForAgents ? "Agent ready" : "Account only"}
           </span>
-          {provider.pilot && (
-            <span className="rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-300">
-              Pilot
-            </span>
-          )}
         </div>
         <h2 className="mt-1 text-base font-semibold text-white">{provider.name}</h2>
         <p className="mt-2 text-xs leading-5 text-zinc-500">{provider.summary}</p>

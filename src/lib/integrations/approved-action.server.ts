@@ -31,7 +31,8 @@ export type ApprovedAction = {
   details: Record<string, unknown>;
 };
 
-type ApprovedProvider = "google" | "microsoft" | "slack" | "hubspot" | "asana" | "linear" | "notion";
+type ApprovedProvider =
+  "google" | "microsoft" | "slack" | "hubspot" | "asana" | "linear" | "notion";
 
 type RequestSpec = {
   provider: ApprovedProvider;
@@ -106,29 +107,49 @@ function dateOnly(value: unknown, label: string): string | undefined {
   return raw;
 }
 
-function safeProperties(raw: unknown, allowed: readonly string[], maxValue = 1000): Record<string, string> {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("properties must be an object.");
+function safeProperties(
+  raw: unknown,
+  allowed: readonly string[],
+  maxValue = 1000,
+): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    throw new Error("properties must be an object.");
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!allowed.includes(key)) throw new Error(`Property \"${key}\" is not allowed for this action.`);
+    if (!allowed.includes(key))
+      throw new Error(`Property "${key}" is not allowed for this action.`);
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-      throw new Error(`Property \"${key}\" must be a scalar value.`);
+      throw new Error(`Property "${key}" must be a scalar value.`);
     }
     out[key] = String(value).slice(0, maxValue);
   }
-  if (!Object.keys(out).length) throw new Error("At least one approved property change is required.");
+  if (!Object.keys(out).length)
+    throw new Error("At least one approved property change is required.");
   return out;
 }
 
 const HUBSPOT_CONTACT_PROPERTIES = [
-  "firstname", "lastname", "email", "phone", "company", "jobtitle", "lifecyclestage",
+  "firstname",
+  "lastname",
+  "email",
+  "phone",
+  "company",
+  "jobtitle",
+  "lifecyclestage",
 ] as const;
 const HUBSPOT_DEAL_PROPERTIES = [
-  "dealname", "amount", "dealstage", "closedate", "pipeline",
+  "dealname",
+  "amount",
+  "dealstage",
+  "closedate",
+  "pipeline",
 ] as const;
 
 /** Pure provider request builder for unit tests. Tokens are never part of the spec. */
-export function buildApprovedActionRequest(action: ApprovedAction, provider: ApprovedProvider): RequestSpec {
+export function buildApprovedActionRequest(
+  action: ApprovedAction,
+  provider: ApprovedProvider,
+): RequestSpec {
   const details = action.details ?? {};
 
   if (action.actionType === "email_send" || action.actionType === "email_draft") {
@@ -156,9 +177,10 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
       return {
         provider,
         method: "POST",
-        url: action.actionType === "email_send"
-          ? "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
-          : "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+        url:
+          action.actionType === "email_send"
+            ? "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+            : "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(action.actionType === "email_send" ? { raw } : { message: { raw } }),
       };
@@ -172,13 +194,14 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     return {
       provider,
       method: "POST",
-      url: action.actionType === "email_send"
-        ? "https://graph.microsoft.com/v1.0/me/sendMail"
-        : "https://graph.microsoft.com/v1.0/me/messages",
+      url:
+        action.actionType === "email_send"
+          ? "https://graph.microsoft.com/v1.0/me/sendMail"
+          : "https://graph.microsoft.com/v1.0/me/messages",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action.actionType === "email_send"
-        ? { message, saveToSentItems: true }
-        : message),
+      body: JSON.stringify(
+        action.actionType === "email_send" ? { message, saveToSentItems: true } : message,
+      ),
     };
   }
 
@@ -229,7 +252,8 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     if (provider !== "slack") throw new Error("Slack posts require a Slack connection.");
     const channel = str(details["channel"], 80);
     const text = str(details["text"], MAX_SLACK_TEXT);
-    if (!/^[A-Z0-9]{2,80}$/i.test(channel)) throw new Error("A valid Slack channel ID is required.");
+    if (!/^[A-Z0-9]{2,80}$/i.test(channel))
+      throw new Error("A valid Slack channel ID is required.");
     if (!text) throw new Error("Slack message text is required.");
     return {
       provider,
@@ -240,13 +264,18 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     };
   }
 
-  if (action.actionType === "hubspot_contact_update" || action.actionType === "hubspot_deal_update") {
+  if (
+    action.actionType === "hubspot_contact_update" ||
+    action.actionType === "hubspot_deal_update"
+  ) {
     if (provider !== "hubspot") throw new Error("This CRM action requires HubSpot.");
     const objectId = requireId(details["object_id"], "HubSpot object id");
     const objectType = action.actionType === "hubspot_contact_update" ? "contacts" : "deals";
     const properties = safeProperties(
       details["properties"],
-      action.actionType === "hubspot_contact_update" ? HUBSPOT_CONTACT_PROPERTIES : HUBSPOT_DEAL_PROPERTIES,
+      action.actionType === "hubspot_contact_update"
+        ? HUBSPOT_CONTACT_PROPERTIES
+        : HUBSPOT_DEAL_PROPERTIES,
     );
     return {
       provider,
@@ -271,7 +300,15 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
       method: "POST",
       url: "https://app.asana.com/api/1.0/tasks",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: { name, workspace, ...(project ? { projects: [project] } : {}), ...(notes ? { notes } : {}), ...(dueOn ? { due_on: dueOn } : {}) } }),
+      body: JSON.stringify({
+        data: {
+          name,
+          workspace,
+          ...(project ? { projects: [project] } : {}),
+          ...(notes ? { notes } : {}),
+          ...(dueOn ? { due_on: dueOn } : {}),
+        },
+      }),
     };
   }
 
@@ -282,7 +319,8 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     if (typeof details["name"] === "string") data["name"] = str(details["name"], 300);
     if (typeof details["notes"] === "string") data["notes"] = str(details["notes"], MAX_NOTES);
     if (typeof details["completed"] === "boolean") data["completed"] = details["completed"];
-    if (details["due_on"] != null) data["due_on"] = dateOnly(details["due_on"], "Asana due date") ?? null;
+    if (details["due_on"] != null)
+      data["due_on"] = dateOnly(details["due_on"], "Asana due date") ?? null;
     if (!Object.keys(data).length) throw new Error("At least one Asana task field must change.");
     return {
       provider,
@@ -305,7 +343,10 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
       method: "POST",
       url: "https://api.linear.app/graphql",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, variables: { input: { teamId, title, ...(description ? { description } : {}) } } }),
+      body: JSON.stringify({
+        query,
+        variables: { input: { teamId, title, ...(description ? { description } : {}) } },
+      }),
     };
   }
 
@@ -314,8 +355,15 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
     const issueId = requireId(details["issue_id"], "Linear issue id");
     const input: Record<string, unknown> = {};
     if (typeof details["title"] === "string") input["title"] = str(details["title"], 300);
-    if (typeof details["description"] === "string") input["description"] = str(details["description"], MAX_NOTES);
-    if (typeof details["priority"] === "number" && Number.isInteger(details["priority"]) && details["priority"] >= 0 && details["priority"] <= 4) input["priority"] = details["priority"];
+    if (typeof details["description"] === "string")
+      input["description"] = str(details["description"], MAX_NOTES);
+    if (
+      typeof details["priority"] === "number" &&
+      Number.isInteger(details["priority"]) &&
+      details["priority"] >= 0 &&
+      details["priority"] <= 4
+    )
+      input["priority"] = details["priority"];
     if (!Object.keys(input).length) throw new Error("At least one Linear issue field must change.");
     const query = `mutation ConnectedIssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { id identifier title url } }`;
     return {
@@ -342,7 +390,13 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
       body: JSON.stringify({
         parent: { page_id: parentPageId },
         properties: { title: { type: "title", title: rich(title) } },
-        ...(content ? { children: [{ object: "block", type: "paragraph", paragraph: { rich_text: rich(content) } }] } : {}),
+        ...(content
+          ? {
+              children: [
+                { object: "block", type: "paragraph", paragraph: { rich_text: rich(content) } },
+              ],
+            }
+          : {}),
       }),
     };
   }
@@ -352,14 +406,19 @@ export function buildApprovedActionRequest(action: ApprovedAction, provider: App
 
 function providersFor(actionType: ApprovedActionType): ApprovedProvider[] {
   if (actionType === "slack_post") return ["slack"];
-  if (actionType === "hubspot_contact_update" || actionType === "hubspot_deal_update") return ["hubspot"];
+  if (actionType === "hubspot_contact_update" || actionType === "hubspot_deal_update")
+    return ["hubspot"];
   if (actionType === "asana_task_create" || actionType === "asana_task_update") return ["asana"];
-  if (actionType === "linear_issue_create" || actionType === "linear_issue_update") return ["linear"];
+  if (actionType === "linear_issue_create" || actionType === "linear_issue_update")
+    return ["linear"];
   if (actionType === "notion_page_create") return ["notion"];
   return ["google", "microsoft"];
 }
 
-async function resolveProvider(userId: string, action: ApprovedAction): Promise<ApprovedProvider | null> {
+async function resolveProvider(
+  userId: string,
+  action: ApprovedAction,
+): Promise<ApprovedProvider | null> {
   const requested = asProvider(action.details["provider"]);
   const candidates = providersFor(action.actionType);
   if (requested !== "auto") {
@@ -371,13 +430,14 @@ async function resolveProvider(userId: string, action: ApprovedAction): Promise<
     .from("integrations")
     .select("provider,status,connected_at")
     .eq("user_id", userId)
-    .in("provider", candidates)
+    .in("provider", [...candidates, ...candidates.map((provider) => `nango_${provider}`)])
     .eq("status", "connected")
     .order("connected_at", { ascending: false });
 
   const rows = (data ?? []) as Array<{ provider?: string }>;
   for (const candidate of candidates) {
-    if (rows.some((row) => row.provider === candidate)) return candidate;
+    if (rows.some((row) => row.provider === candidate || row.provider === `nango_${candidate}`))
+      return candidate;
   }
   return null;
 }
@@ -385,7 +445,8 @@ async function resolveProvider(userId: string, action: ApprovedAction): Promise<
 function safeProviderResult(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object") return {};
   const row = payload as Record<string, any>;
-  const nested = row["data"] && typeof row["data"] === "object" ? row["data"] as Record<string, any> : null;
+  const nested =
+    row["data"] && typeof row["data"] === "object" ? (row["data"] as Record<string, any>) : null;
   const linear = nested?.["issueCreate"] ?? nested?.["issueUpdate"];
   return {
     ...(typeof row["id"] === "string" ? { id: row["id"] } : {}),
@@ -394,10 +455,14 @@ function safeProviderResult(payload: unknown): Record<string, unknown> {
     ...(typeof nested?.["permalink_url"] === "string" ? { url: nested["permalink_url"] } : {}),
     ...(typeof row["webLink"] === "string" ? { web_link: row["webLink"] } : {}),
     ...(typeof row["htmlLink"] === "string" ? { web_link: row["htmlLink"] } : {}),
-    ...(row["message"] && typeof row["message"]?.["id"] === "string" ? { message_id: row["message"]["id"] } : {}),
+    ...(row["message"] && typeof row["message"]?.["id"] === "string"
+      ? { message_id: row["message"]["id"] }
+      : {}),
     ...(typeof row["ts"] === "string" ? { message_ts: row["ts"] } : {}),
     ...(typeof row["channel"] === "string" ? { channel: row["channel"] } : {}),
-    ...(linear?.issue?.id ? { id: linear.issue.id, identifier: linear.issue.identifier, url: linear.issue.url } : {}),
+    ...(linear?.issue?.id
+      ? { id: linear.issue.id, identifier: linear.issue.identifier, url: linear.issue.url }
+      : {}),
   };
 }
 
@@ -407,7 +472,11 @@ export async function executeApprovedAction(
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; provider?: string; result?: Record<string, unknown>; error?: string }> {
   const provider = await resolveProvider(userId, action);
-  if (!provider) return { ok: false, error: "No compatible connected account is available for this approved action." };
+  if (!provider)
+    return {
+      ok: false,
+      error: "No compatible connected account is available for this approved action.",
+    };
 
   let spec: RequestSpec;
   try {
@@ -417,31 +486,51 @@ export async function executeApprovedAction(
   }
 
   const token = await getIntegrationAccessToken(userId, provider);
-  if (!token) return { ok: false, provider, error: `${provider} needs to be connected again before this action can run.` };
 
   try {
-    const response = await fetch(spec.url, {
-      method: spec.method,
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...spec.headers },
-      body: spec.body,
-      signal: signal ?? AbortSignal.timeout(20_000),
-    });
-    const text = (await response.text()).slice(0, 12_000);
     let payload: any = {};
-    try { payload = text ? JSON.parse(text) : {}; } catch { payload = {}; }
+    let responseStatus = 200;
+    let responseOk = true;
+    if (token) {
+      const response = await fetch(spec.url, {
+        method: spec.method,
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...spec.headers },
+        body: spec.body,
+        signal: signal ?? AbortSignal.timeout(20_000),
+      });
+      responseStatus = response.status;
+      responseOk = response.ok;
+      const text = (await response.text()).slice(0, 12_000);
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch {
+        payload = {};
+      }
+    } else {
+      const { proxyOwnedNangoRequest } = await import("./nango.server");
+      payload = await proxyOwnedNangoRequest(userId, provider as any, spec, signal);
+    }
 
-    const graphqlError = provider === "linear" && Array.isArray(payload?.errors) && payload.errors.length > 0;
-    if (!response.ok || (provider === "slack" && payload?.ok === false) || graphqlError) {
+    const graphqlError =
+      provider === "linear" && Array.isArray(payload?.errors) && payload.errors.length > 0;
+    if (!responseOk || (provider === "slack" && payload?.ok === false) || graphqlError) {
       const providerMessage =
-        typeof payload?.error === "string" ? payload.error
-          : typeof payload?.message === "string" ? payload.message
-            : graphqlError && typeof payload.errors?.[0]?.message === "string" ? payload.errors[0].message
-              : `provider returned ${response.status}`;
-      const reconnect = response.status === 401 || response.status === 403;
+        typeof payload?.error === "string"
+          ? payload.error
+          : typeof payload?.message === "string"
+            ? payload.message
+            : graphqlError && typeof payload.errors?.[0]?.message === "string"
+              ? payload.errors[0].message
+              : `provider returned ${responseStatus}`;
+      const reconnect = responseStatus === 401 || responseStatus === 403;
       return {
         ok: false,
         provider,
-        error: `${provider} action failed: ${providerMessage}${reconnect ? ". Reconnect the integration if permissions were recently upgraded." : ""}`.slice(0, 500),
+        error:
+          `${provider} action failed: ${providerMessage}${reconnect ? ". Reconnect the integration if permissions were recently upgraded." : ""}`.slice(
+            0,
+            500,
+          ),
       };
     }
 
@@ -450,7 +539,10 @@ export async function executeApprovedAction(
     return {
       ok: false,
       provider,
-      error: (error as Error).name === "AbortError" ? "Approved action was cancelled." : (error as Error).message.slice(0, 500),
+      error:
+        (error as Error).name === "AbortError"
+          ? "Approved action was cancelled."
+          : (error as Error).message.slice(0, 500),
     };
   }
 }
