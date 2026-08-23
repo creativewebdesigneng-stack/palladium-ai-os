@@ -114,6 +114,7 @@ import { Route as ShellAppAgentsNewRouteImport } from './routes/_shell/_app/agen
 import { Route as ShellAppCreatorsIdRouteImport } from './routes/_shell/_app/creators.$id'
 import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
 import { Route as ApiPublicIntegrationsGithubCallbackRouteImport } from './routes/api/public/integrations/github-callback'
+import { Route as ApiPublicIntegrationsNangoWebhookRouteImport } from './routes/api/public/integrations/nango-webhook'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/agents'
 import { Route as ApiPublicV1MarketplaceRouteImport } from './routes/api/public/v1/marketplace'
@@ -666,6 +667,12 @@ const ApiPublicIntegrationsGithubCallbackRoute =
     path: '/api/public/integrations/github-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicIntegrationsNangoWebhookRoute =
+  ApiPublicIntegrationsNangoWebhookRouteImport.update({
+    id: '/api/public/integrations/nango-webhook',
+    path: '/api/public/integrations/nango-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -832,6 +839,7 @@ export interface FileRoutesByFullPath {
   '/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
+  '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -949,6 +957,7 @@ export interface FileRoutesByTo {
   '/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
+  '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -1069,6 +1078,7 @@ export interface FileRoutesById {
   '/_shell/_app/creators/$id': typeof ShellAppCreatorsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
+  '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
@@ -1188,6 +1198,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
+    | '/api/public/integrations/nango-webhook'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1305,6 +1316,7 @@ export interface FileRouteTypes {
     | '/creators/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
+    | '/api/public/integrations/nango-webhook'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1424,6 +1436,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/creators/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
+    | '/api/public/integrations/nango-webhook'
     | '/api/public/payments/webhook'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
@@ -1473,6 +1486,7 @@ export interface RootRouteChildren {
   ApiInternalWorkflowRunsRoute: typeof ApiInternalWorkflowRunsRoute
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
   ApiPublicIntegrationsGithubCallbackRoute: typeof ApiPublicIntegrationsGithubCallbackRoute
+  ApiPublicIntegrationsNangoWebhookRoute: typeof ApiPublicIntegrationsNangoWebhookRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
   ApiPublicV1MarketplaceRoute: typeof ApiPublicV1MarketplaceRoute
@@ -2219,6 +2233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIntegrationsGithubCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/integrations/nango-webhook': {
+      id: '/api/public/integrations/nango-webhook'
+      path: '/api/public/integrations/nango-webhook'
+      fullPath: '/api/public/integrations/nango-webhook'
+      preLoaderRoute: typeof ApiPublicIntegrationsNangoWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -2542,6 +2563,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
   ApiPublicIntegrationsGithubCallbackRoute:
     ApiPublicIntegrationsGithubCallbackRoute,
+  ApiPublicIntegrationsNangoWebhookRoute:
+    ApiPublicIntegrationsNangoWebhookRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
   ApiPublicV1MarketplaceRoute: ApiPublicV1MarketplaceRoute,
