@@ -64,6 +64,19 @@ export function verifyState(state: string): { userId: string; provider: string; 
     return { userId: parsed.userId, provider: parsed.provider, origin: String(parsed.origin ?? "") };
   } catch { return null; }
 }
+
+/**
+ * Salesforce External Client Apps can require PKCE even for server-side web
+ * flows. Derive the verifier from the already HMAC-protected OAuth state so no
+ * additional verifier secret needs to be stored in browser storage or the DB.
+ */
+export function salesforcePkceVerifier(state: string): string {
+  return b64url(createHmac("sha256", stateSecret()).update(`salesforce-pkce:${state}`).digest());
+}
+export function salesforcePkceChallenge(state: string): string {
+  return b64url(createHash("sha256").update(salesforcePkceVerifier(state), "ascii").digest());
+}
+
 export function safeOrigin(candidate: string | undefined): string {
   const configured = process.env["APP_ORIGIN"];
   if (configured) return configured.replace(/\/$/, "");
@@ -82,6 +95,10 @@ export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: 
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", args.state);
   if (provider.scopes.length) url.searchParams.set("scope", provider.scopes.join(" "));
+  if (provider.id === "salesforce") {
+    url.searchParams.set("code_challenge", salesforcePkceChallenge(args.state));
+    url.searchParams.set("code_challenge_method", "S256");
+  }
   for (const [key, value] of Object.entries(provider.authorizeParams ?? {})) if (value !== "") url.searchParams.set(key, value);
   return url.toString();
 }
@@ -121,8 +138,8 @@ function providerConfigFromPayload(provider: IntegrationProvider, payload: Recor
 /**
  * Normalises provider grant reporting without trusting browser input.
  * HubSpot returns `scopes` as an array, while most providers return a singular
- * `scope` string. Asana's successful code exchange does not include a scope
- * field, so the exact scopes PalladiumAI requested are the effective grant.
+ * `scope` string. Asana and Salesforce successful exchanges do not reliably
+ * echo scopes, so the exact scopes PalladiumAI requested are the effective grant.
  */
 export function grantedScopesFromTokenPayload(
   provider: IntegrationProvider,
@@ -148,7 +165,7 @@ export function grantedScopesFromTokenPayload(
     .filter(Boolean);
   if (stringScopes.length) return stringScopes;
 
-  return provider.id === "asana" ? [...provider.scopes] : [];
+  return provider.id === "asana" || provider.id === "salesforce" ? [...provider.scopes] : [];
 }
 
 function parseTokenPayload(provider: IntegrationProvider, payload: Record<string, any>): Omit<TokenSet, "providerConfig"> {
@@ -188,13 +205,27 @@ async function postNotionToken(provider: IntegrationProvider, body: Record<strin
     body: JSON.stringify(body),
   }));
 }
-export async function exchangeCode(provider: IntegrationProvider, args: { code: string; origin: string }): Promise<TokenSet> {
-  const payload = provider.id === "notion"
-    ? await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` })
-    : await postForm(provider.tokenUrl, new URLSearchParams({
-        grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
-        client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-      }));
+export async function exchangeCode(
+  provider: IntegrationProvider,
+  args: { code: string; origin: string; state?: string },
+): Promise<TokenSet> {
+  let payload: Record<string, any>;
+  if (provider.id === "notion") {
+    payload = await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` });
+  } else {
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      client_id: process.env[provider.clientIdEnv]!,
+      client_secret: process.env[provider.clientSecretEnv]!,
+    });
+    if (provider.id === "salesforce") {
+      if (!args.state) throw new Error("Salesforce authorization state is required to complete PKCE.");
+      body.set("code_verifier", salesforcePkceVerifier(args.state));
+    }
+    payload = await postForm(provider.tokenUrl, body);
+  }
   return { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
 }
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
