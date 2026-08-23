@@ -1,5 +1,6 @@
 import {
   findNangoProvider,
+  isSafeNangoProviderId,
   NANGO_PROVIDERS,
   nangoStorageProvider,
   type NangoProviderId,
@@ -91,21 +92,24 @@ function connectionConfig(row: any): NangoConnectionConfig {
     : {};
 }
 function configuredIntegrationId(providerId: NangoProviderId) {
-  const provider = findNangoProvider(providerId)!;
-  return (
-    process.env[provider.env]?.trim() ||
-    ("defaultIntegrationId" in provider ? provider.defaultIntegrationId : "") ||
-    null
-  );
+  if (!isSafeNangoProviderId(providerId)) return null;
+  const provider = findNangoProvider(providerId);
+  if (!provider) return `palladium-${providerId}`;
+  return process.env[provider.env]?.trim() || provider.defaultIntegrationId;
 }
 export function nangoIntegrationId(providerId: NangoProviderId) {
   return configuredIntegrationId(providerId);
 }
 export function nangoProviderFromIntegrationId(integrationId: string) {
-  return (
-    NANGO_PROVIDERS.find((provider) => configuredIntegrationId(provider.id) === integrationId) ??
-    null
+  const curated = NANGO_PROVIDERS.find(
+    (provider) => configuredIntegrationId(provider.id) === integrationId,
   );
+  if (curated) return curated;
+  if (!integrationId.startsWith("palladium-")) return null;
+  const id = integrationId.slice("palladium-".length);
+  return isSafeNangoProviderId(id)
+    ? { id, name: id, category: "other", defaultIntegrationId: integrationId }
+    : null;
 }
 export function nangoConfigured() {
   return Boolean(process.env["NANGO_SECRET_KEY"]?.trim() || process.env["NANGO_API_KEY"]?.trim());
@@ -119,6 +123,58 @@ type NangoIntegration = {
   display_name?: string;
   provider: string;
 };
+
+export type NangoCatalogueProvider = {
+  id: string;
+  name: string;
+  categories: string[];
+  category: string;
+  authMode: string;
+  logoUrl: string | null;
+  docsUrl: string | null;
+  curated: boolean;
+};
+
+function normalizeCatalogueProvider(row: any): NangoCatalogueProvider | null {
+  const id = typeof row?.name === "string" ? row.name.trim() : "";
+  if (!isSafeNangoProviderId(id)) return null;
+  const categories = Array.isArray(row.categories)
+    ? row.categories.filter((value: unknown): value is string => typeof value === "string")
+    : [];
+  const curated = findNangoProvider(id);
+  return {
+    id,
+    name:
+      typeof row.display_name === "string" && row.display_name.trim()
+        ? row.display_name.trim()
+        : curated?.name || id,
+    categories,
+    category: curated?.category || categories[0] || "other",
+    authMode: typeof row.auth_mode === "string" ? row.auth_mode : "UNKNOWN",
+    logoUrl: typeof row.logo_url === "string" ? row.logo_url : null,
+    docsUrl: typeof row.docs === "string" ? row.docs : null,
+    curated: Boolean(curated),
+  };
+}
+
+export async function listNangoProviderCatalogue(): Promise<NangoCatalogueProvider[]> {
+  const result = await nangoFetch("/providers");
+  const rows = Array.isArray(result?.data) ? result.data : [];
+  return rows
+    .map(normalizeCatalogueProvider)
+    .filter((row: NangoCatalogueProvider | null): row is NangoCatalogueProvider => Boolean(row))
+    .sort((left: NangoCatalogueProvider, right: NangoCatalogueProvider) =>
+      left.curated === right.curated ? left.name.localeCompare(right.name) : left.curated ? -1 : 1,
+    );
+}
+
+async function getNangoCatalogueProvider(providerId: string) {
+  if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
+  const result = await nangoFetch(`/providers/${encodeURIComponent(providerId)}`);
+  const provider = normalizeCatalogueProvider(result?.data ?? result);
+  if (!provider || provider.id !== providerId) throw new Error("Unsupported Nango provider.");
+  return provider;
+}
 
 export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
   const result = await nangoFetch("/integrations");
@@ -135,7 +191,9 @@ export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
 }
 
 export async function ensureNangoIntegration(providerId: NangoProviderId) {
-  const definition = findNangoProvider(providerId)!;
+  if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
+  const curated = findNangoProvider(providerId);
+  const definition = curated ? { name: curated.name } : await getNangoCatalogueProvider(providerId);
   const integrationId = configuredIntegrationId(providerId)!;
   let existing: any = null;
   try {
@@ -233,6 +291,24 @@ export async function getPersistedNangoConnection(
   return data ? ({ ...data, config: connectionConfig(data) } as StoredNangoConnection) : null;
 }
 
+export async function listPersistedNangoConnections(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("integrations")
+    .select("id,provider,status,account_label,connected_at,last_error,config")
+    .eq("user_id", userId)
+    .like("provider", "nango_%");
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((row: any) => {
+    const storageProvider = String(row.provider || "");
+    if (!storageProvider.startsWith("nango_")) return [];
+    const providerId = storageProvider.slice("nango_".length);
+    return isSafeNangoProviderId(providerId)
+      ? [{ ...row, providerId, config: connectionConfig(row) }]
+      : [];
+  });
+}
+
 export async function persistNangoConnection(input: {
   userId: string;
   providerId: NangoProviderId;
@@ -243,9 +319,11 @@ export async function persistNangoConnection(input: {
   authMode?: string;
   tags?: Record<string, string>;
 }) {
-  const definition = findNangoProvider(input.providerId)!;
+  if (!isSafeNangoProviderId(input.providerId)) throw new Error("Unsupported Nango provider.");
+  const definition = findNangoProvider(input.providerId);
   const integrationId = input.integrationId || configuredIntegrationId(input.providerId);
-  if (!integrationId) throw new Error(`${definition.name} is not configured in Nango.`);
+  if (!integrationId)
+    throw new Error(`${definition?.name || input.providerId} is not configured in Nango.`);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const now = new Date().toISOString();
   const current = await getPersistedNangoConnection(input.userId, input.providerId);
@@ -254,7 +332,7 @@ export async function persistNangoConnection(input: {
       user_id: input.userId,
       org_id: null,
       provider: nangoStorageProvider(input.providerId),
-      name: `${definition.name} via Nango`,
+      name: `${definition?.name || input.providerId} via Nango`,
       integration_type: "nango",
       status: "connected",
       account_label: input.tags?.["end_user_email"] ?? current?.account_label ?? null,
@@ -421,7 +499,11 @@ function nestedValue(value: any, path: string) {
   return path.split(".").reduce((row, key) => row?.[key], value);
 }
 export async function testOwnedNangoConnection(userId: string, providerId: NangoProviderId) {
-  const definition = findNangoProvider(providerId)!;
+  const definition = findNangoProvider(providerId);
+  if (!definition)
+    throw new Error(
+      "This account is connected. A provider-specific live test is not available yet.",
+    );
   const probe = definition.probe;
   const headers = "header" in probe ? { [probe.header[0]]: probe.header[1] } : undefined;
   const result = await proxyOwnedNangoRequest(userId, providerId, {
