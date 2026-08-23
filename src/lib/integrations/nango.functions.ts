@@ -21,7 +21,8 @@ export const startNangoGitHubConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { createNangoGitHubConnectSession } = await import("./nango.server");
-    return createNangoGitHubConnectSession({ id: context.userId, email: context.user?.email ?? null });
+    const email = typeof context.claims?.email === "string" ? context.claims.email : null;
+    return createNangoGitHubConnectSession({ id: context.userId, email });
   });
 
 export const testNangoGitHubConnection = createServerFn({ method: "POST" })
