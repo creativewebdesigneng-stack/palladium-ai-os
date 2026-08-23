@@ -22,6 +22,7 @@ import {
 } from "@/lib/integrations/integrations.functions";
 import { getGitHubConnection, startGitHubConnection } from "@/lib/integrations/github.functions";
 import {
+  disconnectNangoGitHubConnection,
   getNangoGitHubConnection,
   startNangoGitHubConnection,
   testNangoGitHubConnection,
@@ -176,19 +177,30 @@ export default function Integrations() {
       configured: Boolean(nangoGithub?.configured),
       nangoGitHub: true,
       pilot: true,
-      supportsDisconnect: false,
       connection: nangoGithub?.connected
         ? {
             status: "connected",
             account_label: nangoGithub.accountLabel,
             connected_at: nangoGithub.createdAt,
+            last_error: nangoGithub.lastError,
           }
-        : nangoGithub?.error
+        : nangoGithub?.reconnectRequired
           ? {
               status: "error",
-              last_error: nangoGithub.error,
+              account_label: nangoGithub.accountLabel,
+              connected_at: nangoGithub.createdAt,
+              last_error: nangoGithub.lastError,
+              health: {
+                reconnectRequired: true,
+                reason: nangoGithub.lastError || "Reconnect this Nango-managed GitHub account.",
+              },
             }
-          : null,
+          : nangoGithub?.error
+            ? {
+                status: "error",
+                last_error: nangoGithub.error,
+              }
+            : null,
     };
     return [...catalogue, githubProvider, nangoGithubProvider];
   }, [catalogue, github, nangoGithub]);
@@ -277,7 +289,8 @@ export default function Integrations() {
     setBusyProvider(provider.id);
     setError("");
     try {
-      await disconnectIntegration({ data: { provider: provider.id } });
+      if (provider.nangoGitHub) await disconnectNangoGitHubConnection();
+      else await disconnectIntegration({ data: { provider: provider.id } });
       setTestResults((current) => ({ ...current, [provider.id]: null }));
       await refresh();
     } catch (err) {
@@ -570,7 +583,7 @@ function ProviderCard({
               <RefreshCw className="h-3.5 w-3.5" />
               {busy ? "Opening provider…" : `Reconnect ${provider.name}`}
             </button>
-            {rawConnected && (
+            {provider.supportsDisconnect !== false && (
               <button
                 disabled={busy}
                 onClick={onDisconnect}

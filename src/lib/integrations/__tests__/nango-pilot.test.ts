@@ -18,7 +18,9 @@ describe("Nango integration pilot", () => {
   });
 
   it("uses a short-lived connect session and an allow-listed GitHub integration", () => {
-    expect(server).toContain('nangoFetch("/connect/sessions"');
+    expect(server).toContain(
+      'storedConnectionId ? "/connect/sessions/reconnect" : "/connect/sessions"',
+    );
     expect(server).toContain("allowed_integrations: [NANGO_GITHUB_INTEGRATION]");
     expect(server).toContain("result?.data?.token");
     expect(server).not.toContain("connect_link");
@@ -34,7 +36,7 @@ describe("Nango integration pilot", () => {
   });
 
   it("requires authenticated Palladium requests for every browser-facing operation", () => {
-    expect((functions.match(/middleware\(\[requireSupabaseAuth\]\)/g) ?? []).length).toBe(3);
+    expect((functions.match(/middleware\(\[requireSupabaseAuth\]\)/g) ?? []).length).toBe(4);
   });
 
   it("exposes the Nango pilot without replacing the native GitHub integration", () => {
@@ -43,5 +45,14 @@ describe("Nango integration pilot", () => {
     expect(integrationsScreen).toContain("GitHub via Nango");
     expect(integrationsScreen).toContain("openConnectUI");
     expect(integrationsScreen).toContain("setSessionToken(result.sessionToken)");
+  });
+
+  it("supports owner-scoped reconnect and disconnect without accepting a browser connection id", () => {
+    expect(server).toContain('"/connect/sessions/reconnect"');
+    expect(server).toContain("disconnectOwnedNangoGitHubConnection(userId: string)");
+    expect(server).toContain("provider_config_key: integrationId");
+    expect(functions).toContain("disconnectNangoGitHubConnection");
+    expect(functions).not.toMatch(/connectionId.*inputValidator/s);
+    expect(integrationsScreen).toContain("await disconnectNangoGitHubConnection()");
   });
 });

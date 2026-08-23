@@ -9,14 +9,20 @@ export const getNangoGitHubConnection = createServerFn({ method: "POST" })
     if (!nangoConfigured())
       return { configured: false, connected: false, integrationId: NANGO_GITHUB_INTEGRATION };
     const connection = await getOwnedNangoGitHubConnection(context.userId);
+    const persisted = connection?.persisted;
     return {
       configured: true,
-      connected: Boolean(connection),
+      connected: Boolean(connection) && persisted?.status !== "error",
+      reconnectRequired: persisted?.status === "error",
       integrationId: NANGO_GITHUB_INTEGRATION,
       connectionId: connection?.connection_id || connection?.id || null,
       accountLabel:
-        connection?.metadata?.display_name || connection?.connection_config?.username || null,
-      createdAt: connection?.created_at || null,
+        persisted?.account_label ||
+        connection?.metadata?.display_name ||
+        connection?.connection_config?.username ||
+        null,
+      createdAt: persisted?.connected_at || connection?.created_at || null,
+      lastError: persisted?.last_error || null,
     };
   });
 
@@ -40,4 +46,11 @@ export const testNangoGitHubConnection = createServerFn({ method: "POST" })
         ? `Nango reached GitHub successfully as ${result.login}.`
         : "Nango reached GitHub successfully.",
     };
+  });
+
+export const disconnectNangoGitHubConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { disconnectOwnedNangoGitHubConnection } = await import("./nango.server");
+    return disconnectOwnedNangoGitHubConnection(context.userId);
   });
