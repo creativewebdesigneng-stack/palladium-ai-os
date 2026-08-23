@@ -8,8 +8,8 @@ PalladiumAI supports native OAuth and Nango side-by-side. Native connections are
 - Connect sessions are short-lived and restricted to one configured integration.
 - Every connection is tagged with the authenticated PalladiumAI user ID.
 - Signed auth webhooks persist connection state and ignore unknown or unowned events.
-- Read actions use the fixed `connected_service` allow-list. The model cannot supply a URL, method, header, or token.
-- Write actions use the existing approval request lifecycle. Nango does not bypass approval or mutate the approved request.
+- Curated reads can use the fixed `connected_service` allow-list. Dynamic actions are resolved against Nango's typed provider templates; the model cannot invent an action, URL, header, token, or credentials.
+- Dynamic read-only actions activate just in time and can run autonomously under the agent's policy. Unknown, write, and destructive actions use the existing immutable approval request lifecycle.
 
 ## Environment configuration
 
@@ -47,9 +47,20 @@ The normal Integrations page also loads Nango's live provider catalogue from `GE
 Providers outside PalladiumAI's curated list can be searched and connected immediately. Their
 integration ID is generated deterministically as `palladium-<provider>`, the provider is verified
 against Nango before creation, and the connection is stored under the authenticated PalladiumAI
-user. Marketplace providers start as **Account only**: connecting credentials does not give an AI
-agent arbitrary API access. Agent-ready status is added only with bounded, typed actions and the
-appropriate approval policy.
+user. After connection, PalladiumAI discovers its typed action templates and shows autonomous-read
+and approval-action counts. Templates activate individually on first use, avoiding unused bulk
+deployments. A provider with no advertised or deployed actions remains **Account only**.
+
+The runtime exposes two generic tools: `nango_capabilities` returns exact action names and input
+schemas for the current user's connected accounts, while `nango_action` re-verifies ownership,
+schema availability, input bounds, and risk at execution time. Read-only verbs run immediately
+unless the agent has a stricter approval policy. Writes, destructive actions, and unclassified
+actions store the exact provider/action/input payload in `approval_requests` and execute only after
+the owner approves it. Existing agents with `connected_service` automatically inherit this pair.
+
+For scoped Nango API keys, dynamic execution also needs `environment:functions:list`,
+`environment:deploy`, and `environment:actions:execute`. Provider-template discovery itself does
+not require a special scope. A legacy full environment secret key continues to cover these calls.
 
 The production webhook URL is:
 

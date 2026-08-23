@@ -27,9 +27,19 @@ export const listNangoConnections = createServerFn({ method: "POST" })
       }));
     }
     const persisted = await server.listPersistedNangoConnections(context.userId);
+    const capabilities = await import("./nango-capabilities.server")
+      .then((module) => module.listNangoAgentCapabilities(context.userId))
+      .catch(() => []);
+    const capabilitiesByProvider = new Map<string, typeof capabilities>();
+    for (const capability of capabilities) {
+      const current = capabilitiesByProvider.get(capability.provider) ?? [];
+      current.push(capability);
+      capabilitiesByProvider.set(capability.provider, current);
+    }
     const byProvider = new Map(persisted.map((connection) => [connection.providerId, connection]));
     return providers.map((provider) => {
       const connection = byProvider.get(provider.id);
+      const providerCapabilities = capabilitiesByProvider.get(provider.id) ?? [];
       return {
         ...provider,
         configured: server.nangoConfigured(),
@@ -39,7 +49,15 @@ export const listNangoConnections = createServerFn({ method: "POST" })
         accountLabel: connection?.account_label || null,
         createdAt: connection?.connected_at || null,
         lastError: connection?.last_error || null,
-        agentReady: Boolean(findNangoProvider(provider.id)),
+        agentReady: Boolean(findNangoProvider(provider.id)) || providerCapabilities.length > 0,
+        capabilityCount: providerCapabilities.length,
+        autonomousActionCount: providerCapabilities.filter((action) => !action.requiresApproval)
+          .length,
+        approvalActionCount: providerCapabilities.filter((action) => action.requiresApproval).length,
+        capabilityError:
+          connection && providerCapabilities.length === 0
+            ? "No Nango action templates are available for this provider yet."
+            : null,
       };
     });
   });

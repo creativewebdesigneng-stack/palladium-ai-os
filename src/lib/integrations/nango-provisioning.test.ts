@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NANGO_PROVIDERS } from "./nango-providers";
 import {
+  deployNangoActionTemplate,
   ensureNangoIntegration,
+  listNangoIntegrationActions,
+  listNangoProviderActionTemplates,
   listNangoProviderCatalogue,
   nangoIntegrationId,
   nangoProviderFromIntegrationId,
@@ -125,6 +128,46 @@ describe("Nango management provisioning", () => {
         curated: false,
       }),
     ]);
+  });
+
+  it("discovers typed template and deployed actions", async () => {
+    const action = {
+      name: "list-repositories",
+      type: "action",
+      description: "List repositories",
+      input: "ListInput",
+      json_schema: { definitions: { ListInput: { type: "object" } } },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response({ data: [action, { name: "issues", type: "sync" }] }))
+      .mockResolvedValueOnce(response({ data: [{ ...action, enabled: true }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listNangoProviderActionTemplates("github")).resolves.toEqual([
+      expect.objectContaining({ name: "list-repositories", type: "action" }),
+    ]);
+    await expect(listNangoIntegrationActions("github-getting-started")).resolves.toEqual([
+      expect.objectContaining({ name: "list-repositories", type: "action" }),
+    ]);
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("type=action");
+  });
+
+  it("activates one action template just in time with an explicit action type", async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      response({ id: "deployment-1", status: "success" }, 202),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deployNangoActionTemplate("github-getting-started", "list-repositories"),
+    ).resolves.toEqual({ deployed: true, deploymentId: "deployment-1" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual({
+      type: "template",
+      integration_id: "github-getting-started",
+      template: "list-repositories",
+      function_type: "action",
+    });
   });
 
   it("verifies a marketplace provider before creating its integration", async () => {

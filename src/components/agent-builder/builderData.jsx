@@ -19,6 +19,8 @@ export const TOOLS = [
   { id: 'http_request', label: 'HTTP Requests', icon: 'Send', grad: 'from-rose-500 to-red-500', desc: 'Call allow-listed HTTP APIs' },
   { id: 'connected_service', label: 'Connected Apps — Read', icon: 'MessageSquare', grad: 'from-blue-500 to-indigo-500', desc: 'Read connected GitHub, Google, Slack and other services' },
   { id: 'connected_service_write', label: 'Connected Apps — Write', icon: 'Send', grad: 'from-orange-500 to-rose-500', desc: 'Prepare approved writes to supported connected services' },
+  { id: 'nango_capabilities', label: 'Dynamic App Discovery', icon: 'Plug', grad: 'from-cyan-500 to-violet-500', desc: 'Discover typed actions from connected Nango providers' },
+  { id: 'nango_action', label: 'Dynamic App Actions', icon: 'Wrench', grad: 'from-violet-500 to-fuchsia-500', desc: 'Run safe reads and queue writes for approval' },
   { id: 'github_write', label: 'GitHub Write', icon: 'Github', grad: 'from-zinc-600 to-zinc-800', desc: 'Prepare approved repository changes' },
   { id: 'request_approval', label: 'Request Approval', icon: 'ShieldCheck', grad: 'from-yellow-500 to-orange-500', desc: 'Ask the operator before sensitive actions' },
   { id: 'shopping_search', label: 'Shopping Research', icon: 'Globe', grad: 'from-emerald-500 to-green-600', desc: 'Research products without purchasing' },

@@ -8,6 +8,11 @@
 import type { ToolDef } from "./model-gateway.server";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
+import {
+  executeNangoAgentAction,
+  listNangoAgentCapabilities,
+  prepareNangoAgentAction,
+} from "@/lib/integrations/nango-capabilities.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
 import {
   createBrowserTool,
@@ -26,6 +31,8 @@ export type ToolContext = {
   /** Injected per call from the resolved grant — never from model input. */
   allowedDomains?: string[];
   spendCap?: number | null;
+  /** True when the agent/account policy requires even low-risk actions to pause. */
+  requiresApproval?: boolean;
 };
 
 type ToolImpl = {
@@ -440,6 +447,107 @@ const REGISTRY: Record<string, ToolImpl> = {
         },
         ctx.signal,
       ),
+  },
+
+  nango_capabilities: {
+    def: {
+      name: "nango_capabilities",
+      description:
+        "Discover the authenticated user's live Nango actions. Returns typed input schemas and whether each action can run autonomously or needs operator approval.",
+      parameters: {
+        type: "object",
+        properties: {
+          provider: {
+            type: "string",
+            description: "Optional connected Nango provider ID. Omit to inspect every connected provider.",
+          },
+        },
+        required: [],
+      },
+    },
+    run: async (input, ctx) => {
+      const provider = str(input["provider"]).toLowerCase();
+      const capabilities = await listNangoAgentCapabilities(ctx.userId, provider || undefined);
+      return {
+        capabilities,
+        count: capabilities.length,
+        autonomous: capabilities.filter((item) => !item.requiresApproval).length,
+        approvalRequired: capabilities.filter((item) => item.requiresApproval).length,
+      };
+    },
+  },
+
+  nango_action: {
+    def: {
+      name: "nango_action",
+      description:
+        "Run a discovered Nango action for the authenticated user. Read-only actions run under policy; writes and destructive actions queue the exact payload for operator approval.",
+      parameters: {
+        type: "object",
+        properties: {
+          provider: { type: "string", description: "Connected Nango provider ID." },
+          action: { type: "string", description: "Exact action returned by nango_capabilities." },
+          input: {
+            type: "object",
+            description: "Action input matching the schema returned by nango_capabilities.",
+          },
+        },
+        required: ["provider", "action", "input"],
+      },
+    },
+    run: async (input, ctx) => {
+      const provider = str(input["provider"]).toLowerCase();
+      const action = str(input["action"]);
+      const actionInput =
+        input["input"] && typeof input["input"] === "object" && !Array.isArray(input["input"])
+          ? (input["input"] as Record<string, unknown>)
+          : {};
+      const prepared = await prepareNangoAgentAction({
+        userId: ctx.userId,
+        provider,
+        action,
+        actionInput,
+      });
+      if (prepared.requiresApproval || ctx.requiresApproval) {
+        const { data, error } = await ctx.sb
+          .from("approval_requests")
+          .insert({
+            user_id: ctx.userId,
+            org_id: ctx.orgId,
+            agent_id: ctx.agentId,
+            task_id: ctx.taskId,
+            action_type: "nango_dynamic_action",
+            title: `${prepared.action.replace(/[-_.]/g, " ")}: ${prepared.provider}`.slice(0, 180),
+            summary:
+              "Approve this Nango action. The provider, action name and exact bounded input are immutable during execution and retry.",
+            details: {
+              provider: prepared.provider,
+              action: prepared.action,
+              input: prepared.input,
+            },
+            risk_level: ctx.requiresApproval && prepared.risk === "low" ? "medium" : prepared.risk,
+            status: "pending",
+          })
+          .select("id")
+          .maybeSingle();
+        if (error) return { error: "Could not queue the Nango action for approval." };
+        return {
+          queued: true,
+          approval_request_id: data?.id,
+          status: "pending",
+          provider: prepared.provider,
+          action: prepared.action,
+          risk: prepared.risk,
+        };
+      }
+      return executeNangoAgentAction({
+        userId: ctx.userId,
+        provider: prepared.provider,
+        action: prepared.action,
+        actionInput: prepared.input,
+        ...(ctx.signal ? { signal: ctx.signal } : {}),
+      });
+    },
   },
 
   connected_service_write: {
@@ -1163,7 +1271,14 @@ export async function resolveGrantedTools(
   agent: { id: string; allowed_tools?: string[] | null; requires_approval?: boolean | null },
   plan: string = "explorer",
 ): Promise<{ defs: ToolDef[]; grants: Map<string, ToolGrant> }> {
-  const requested = (agent.allowed_tools ?? []).filter((slug) => slug in REGISTRY);
+  const requestedSet = new Set((agent.allowed_tools ?? []).filter((slug) => slug in REGISTRY));
+  // Existing agents that were granted Connected Services automatically receive
+  // the safe dynamic discovery/execution pair. Per-tool policy still applies.
+  if (requestedSet.has("connected_service")) {
+    requestedSet.add("nango_capabilities");
+    requestedSet.add("nango_action");
+  }
+  const requested = [...requestedSet];
   const grants = new Map<string, ToolGrant>();
   if (!requested.length) return { defs: [], grants };
 
@@ -1192,10 +1307,12 @@ export async function resolveGrantedTools(
     grants.set(slug, {
       slug,
       requiresApproval:
-        Boolean(REGISTRY[slug]?.sensitive) ||
-        Boolean(entry?.requires_approval) ||
-        Boolean(row?.requires_approval) ||
-        Boolean(agent.requires_approval),
+        slug === "nango_capabilities"
+          ? false
+          : Boolean(REGISTRY[slug]?.sensitive) ||
+            Boolean(entry?.requires_approval) ||
+            Boolean(row?.requires_approval) ||
+            Boolean(agent.requires_approval),
       allowedDomains: (row?.allowed_domains as string[] | null) ?? [],
       spendCap: row?.spend_cap == null ? null : Number(row.spend_cap),
     });
@@ -1286,6 +1403,7 @@ export async function executeTool(
     "prepare_purchase",
     "connected_service_write",
     "github_write",
+    "nango_action",
   ]);
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });
@@ -1304,6 +1422,7 @@ export async function executeTool(
       ...ctx,
       allowedDomains: grant.allowedDomains,
       spendCap: grant.spendCap ?? ctx.spendCap ?? null,
+      requiresApproval: grant.requiresApproval,
     });
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
