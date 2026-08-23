@@ -20,7 +20,7 @@ type To = string;
 function useGo() {
   const router = useRouter();
   return (to: To, options?: { replace?: boolean | undefined }) => {
-    void router.navigate({ href: to, replace: options?.replace } as never);
+    void router.navigate({ to, replace: options?.replace } as never);
   };
 }
 
@@ -100,7 +100,7 @@ export function useNavigate() {
       void router.history.go(to);
       return;
     }
-    void router.navigate({ href: to, replace: options?.replace } as never);
+    void router.navigate({ to, replace: options?.replace } as never);
   };
 }
 
