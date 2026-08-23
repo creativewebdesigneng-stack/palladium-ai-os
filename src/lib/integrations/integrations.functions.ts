@@ -159,10 +159,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     );
 
     return {
-      authorizeUrl: buildAuthorizeUrl(provider, {
-        origin,
-        state: createState({ userId: context.userId, provider: provider.id, origin }),
-      }),
+      authorizeUrl: createAuthorization(provider, { userId: context.userId, origin }).authorizeUrl,
     };
   });
 
