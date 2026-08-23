@@ -255,15 +255,25 @@ async function postNotionToken(provider: IntegrationProvider, body: Record<strin
     body: JSON.stringify(body),
   }));
 }
-export async function exchangeCode(provider: IntegrationProvider, args: { code: string; origin: string }): Promise<TokenSet> {
+export async function exchangeCode(
+  provider: IntegrationProvider,
+  args: { code: string; origin: string; codeVerifier?: string | null },
+): Promise<TokenSet> {
+  if (providerRequiresPkce(provider) && !args.codeVerifier) {
+    throw new Error(`${provider.name} requires PKCE: the authorization request could not be verified.`);
+  }
+  const form = new URLSearchParams({
+    grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
+    // The External Client App is a confidential client: the secret stays server-side.
+    client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+  });
+  if (args.codeVerifier) form.set("code_verifier", args.codeVerifier);
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` })
-    : await postForm(provider.tokenUrl, new URLSearchParams({
-        grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
-        client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-      }));
+    : await postForm(provider.tokenUrl, form);
   return { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
 }
+
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "refresh_token", refresh_token: refreshToken })
