@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NANGO_PROVIDERS } from "./nango-providers";
-import { nangoIntegrationId, provisionNangoIntegrations } from "./nango.server";
+import {
+  ensureNangoIntegration,
+  nangoIntegrationId,
+  provisionNangoIntegrations,
+} from "./nango.server";
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -61,6 +66,40 @@ describe("Nango management provisioning", () => {
     for (const [, init] of fetchMock.mock.calls) {
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test-environment-key");
     }
+  });
+
+  it("creates a missing provider just in time before Connect", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response({ message: "Not found" }, 404))
+      .mockResolvedValueOnce(
+        response({ data: { unique_key: "palladium-google", provider: "google" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(ensureNangoIntegration("google")).resolves.toEqual({
+      integrationId: "palladium-google",
+      created: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstCall = fetchMock.mock.calls[0]!;
+    const secondCall = fetchMock.mock.calls[1]!;
+    expect(String(firstCall[0])).toContain("/integrations/palladium-google");
+    expect(secondCall[1]?.method).toBe("POST");
+    expect(JSON.parse(String(secondCall[1]?.body))).toMatchObject({
+      unique_key: "palladium-google",
+      provider: "google",
+    });
+  });
+
+  it("keeps Connect tied to the just-in-time integration check", () => {
+    const source = readFileSync("src/lib/integrations/nango.server.ts", "utf8");
+    const connectSession = source.slice(
+      source.indexOf("export async function createNangoConnectSession"),
+      source.indexOf("export async function listOwnedNangoConnections"),
+    );
+    expect(connectSession).toContain("await ensureNangoIntegration(providerId)");
+    expect(connectSession).toContain("allowed_integrations: [integrationId]");
   });
 
   it("does not overwrite an integration ID assigned to another provider", async () => {

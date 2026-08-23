@@ -38,6 +38,11 @@ IDs (`github-getting-started` and `palladium-<provider>`). A platform administra
 any missing fixed-list records from **Admin → Integration Management → Provision missing
 providers**. This calls Nango's server API; it never sends the Nango key to the browser.
 
+Provider records are also created just in time. When an authenticated user selects **Connect**
+on the normal Integrations page, the server checks the fixed integration ID, creates it when
+missing, and then opens a provider-restricted Connect session. A conflicting ID is rejected and
+never overwritten. This makes the admin provisioning control optional.
+
 The production webhook URL is:
 
 `https://palladium-ai-os.lovable.app/api/public/integrations/nango-webhook`
