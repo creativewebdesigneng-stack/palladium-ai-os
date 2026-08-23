@@ -228,6 +228,89 @@ function providerFailureAudit(error: unknown): string {
   return "AI runtime failed before the task could complete.";
 }
 
+export function connectedServiceReadFallbackSpec(task: PersonalTaskRow): {
+  provider: "github";
+  action: "repositories_list";
+  limit: number;
+} | null {
+  const request = String(task.request ?? "");
+  const tools = new Set(task.required_tools ?? []);
+  if (!tools.has("connected_service") || !/\bgithub\b/i.test(request)) return null;
+  if (!/\b(list|show|get|find)\b[\s\S]{0,80}\b(repositories|repository|repos?)\b/i.test(request))
+    return null;
+  const numeric = /\b([1-9]|1\d|2[0-5])\b/.exec(request)?.[1];
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+  const word = /\b(one|two|three|four|five)\b/i.exec(request)?.[1]?.toLowerCase();
+  return {
+    provider: "github",
+    action: "repositories_list",
+    limit: numeric ? Number(numeric) : words[word ?? ""] ?? 3,
+  };
+}
+
+function githubRepositorySummary(output: unknown, limit: number): string | null {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return null;
+  const result = output as Record<string, any>;
+  if (result["error"] || !Array.isArray(result["data"])) return null;
+  const repositories = result["data"].slice(0, limit);
+  if (!repositories.length) return null;
+  const rows = repositories.map((repository: Record<string, unknown>, index: number) => {
+    const name = String(repository["full_name"] ?? repository["name"] ?? `Repository ${index + 1}`);
+    const url = typeof repository["html_url"] === "string" ? repository["html_url"] : null;
+    const updated = typeof repository["updated_at"] === "string" ? repository["updated_at"] : null;
+    return `${index + 1}. ${url ? `[${name}](${url})` : name}${updated ? ` — updated ${updated}` : ""}`;
+  });
+  const transport = result["transport"] === "nango" ? " through Nango" : "";
+  return `### Recently updated GitHub repositories\n\n${rows.join("\n")}\n\n_Read-only GitHub data retrieved${transport}; no repository was changed._`;
+}
+
+async function rescueConnectedServiceRead(args: {
+  sb: Sb;
+  userId: string;
+  task: PersonalTaskRow;
+  agent: PersonalAgentRow;
+  runId: string;
+  startedMs: number;
+  tools: Awaited<ReturnType<typeof resolvePersonalTools>>;
+  error: unknown;
+}) {
+  if (!(args.error instanceof ProviderError) || !args.error.retryable) return null;
+  const spec = connectedServiceReadFallbackSpec(args.task);
+  if (!spec || !args.tools.grants.has("connected_service")) return null;
+  const execution = await executeTool(
+    "connected_service",
+    spec,
+    {
+      userId: args.userId,
+      orgId: args.task.org_id ?? null,
+      agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
+      taskId: args.runId,
+      sb: args.sb,
+    },
+    args.tools.grants,
+  );
+  if (!execution.ok) return null;
+  const summary = githubRepositorySummary(execution.output, spec.limit);
+  if (!summary) return null;
+  return completePersonalTask({
+    sb: args.sb,
+    userId: args.userId,
+    task: args.task,
+    runId: args.runId,
+    startedMs: args.startedMs,
+    final: {
+      text: summary,
+      toolCalls: [],
+      usage: { input: 0, output: 0 },
+      provider: "compatible",
+      model: "deterministic-read-fallback",
+    },
+    usage: { input: 0, output: 0 },
+    toolCalls: 1,
+    tools: args.tools,
+  });
+}
+
 async function writeFailed(sb: Sb, userId: string, taskId: string, message: string) {
   await sb
     .from("personal_tasks")
@@ -751,6 +834,7 @@ export async function executePersonalTask(args: {
   let runId: string | undefined;
   const usage = { input: 0, output: 0 };
   let toolCalls = 0;
+  let tools: Awaited<ReturnType<typeof resolvePersonalTools>> | null = null;
 
   await sb
     .from("personal_tasks")
@@ -760,7 +844,7 @@ export async function executePersonalTask(args: {
 
   try {
     runId = await createAuditRun({ sb, userId, task, agent, provider, model });
-    const tools = await resolvePersonalTools({
+    tools = await resolvePersonalTools({
       sb,
       userId,
       orgId: task.org_id ?? null,
@@ -803,6 +887,19 @@ export async function executePersonalTask(args: {
       tools,
     });
   } catch (error) {
+    if (runId && tools) {
+      const rescued = await rescueConnectedServiceRead({
+        sb,
+        userId,
+        task,
+        agent,
+        runId,
+        startedMs,
+        tools,
+        error,
+      });
+      if (rescued) return rescued;
+    }
     const message = providerFailure(error);
     console.error("[mission] personal task execution failed", task.id, error);
     if (runId) {
