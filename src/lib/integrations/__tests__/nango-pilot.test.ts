@@ -4,11 +4,15 @@ import path from "node:path";
 
 const root = process.cwd();
 const server = fs.readFileSync(path.join(root, "src/lib/integrations/nango.server.ts"), "utf8");
-const functions = fs.readFileSync(path.join(root, "src/lib/integrations/nango.functions.ts"), "utf8");
+const functions = fs.readFileSync(
+  path.join(root, "src/lib/integrations/nango.functions.ts"),
+  "utf8",
+);
+const integrationsScreen = fs.readFileSync(path.join(root, "src/screens/Integrations.jsx"), "utf8");
 
 describe("Nango integration pilot", () => {
   it("keeps the Nango secret server-side and tags connections with the Palladium user", () => {
-    expect(server).toContain("process.env.NANGO_SECRET_KEY");
+    expect(server).toContain('process.env["NANGO_SECRET_KEY"]');
     expect(server).toContain("end_user_id: user.id");
     expect(server).not.toContain("VITE_NANGO_SECRET");
   });
@@ -16,9 +20,12 @@ describe("Nango integration pilot", () => {
   it("uses a short-lived connect session and an allow-listed GitHub integration", () => {
     expect(server).toContain('nangoFetch("/connect/sessions"');
     expect(server).toContain("allowed_integrations: [NANGO_GITHUB_INTEGRATION]");
+    expect(server).toContain("result?.data?.token");
+    expect(server).not.toContain("connect_link");
   });
 
   it("proves the credential through Nango proxy rather than exposing a provider token", () => {
+    expect(server).toContain('"tags[end_user_id]": userId');
     expect(server).toContain('nangoFetch("/proxy/user"');
     expect(server).toContain('"Connection-Id"');
     expect(server).toContain('"Provider-Config-Key"');
@@ -28,5 +35,13 @@ describe("Nango integration pilot", () => {
 
   it("requires authenticated Palladium requests for every browser-facing operation", () => {
     expect((functions.match(/middleware\(\[requireSupabaseAuth\]\)/g) ?? []).length).toBe(3);
+  });
+
+  it("exposes the Nango pilot without replacing the native GitHub integration", () => {
+    expect(integrationsScreen).toContain("getGitHubConnection");
+    expect(integrationsScreen).toContain("getNangoGitHubConnection");
+    expect(integrationsScreen).toContain("GitHub via Nango");
+    expect(integrationsScreen).toContain("openConnectUI");
+    expect(integrationsScreen).toContain("setSessionToken(result.sessionToken)");
   });
 });
