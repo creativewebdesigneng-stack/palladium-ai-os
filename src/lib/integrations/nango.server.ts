@@ -98,6 +98,9 @@ function configuredIntegrationId(providerId: NangoProviderId) {
     null
   );
 }
+export function nangoIntegrationId(providerId: NangoProviderId) {
+  return configuredIntegrationId(providerId);
+}
 export function nangoProviderFromIntegrationId(integrationId: string) {
   return (
     NANGO_PROVIDERS.find((provider) => configuredIntegrationId(provider.id) === integrationId) ??
@@ -109,6 +112,68 @@ export function nangoConfigured() {
 }
 export function nangoProviderConfigured(providerId: NangoProviderId) {
   return nangoConfigured() && Boolean(configuredIntegrationId(providerId));
+}
+
+type NangoIntegration = {
+  unique_key: string;
+  display_name?: string;
+  provider: string;
+};
+
+export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
+  const result = await nangoFetch("/integrations");
+  return Array.isArray(result?.data)
+    ? result.data.filter((row: unknown): row is NangoIntegration =>
+        Boolean(
+          row &&
+          typeof row === "object" &&
+          typeof (row as NangoIntegration).unique_key === "string" &&
+          typeof (row as NangoIntegration).provider === "string",
+        ),
+      )
+    : [];
+}
+
+export async function provisionNangoIntegrations() {
+  const existing = await listNangoIntegrations();
+  const byKey = new Map(existing.map((integration) => [integration.unique_key, integration]));
+
+  return Promise.all(
+    NANGO_PROVIDERS.map(async (definition) => {
+      const integrationId = configuredIntegrationId(definition.id)!;
+      const current = byKey.get(integrationId);
+      if (current) {
+        return current.provider === definition.id
+          ? { id: definition.id, integrationId, status: "existing" as const }
+          : {
+              id: definition.id,
+              integrationId,
+              status: "error" as const,
+              error: `Integration ID is already assigned to ${current.provider}.`,
+            };
+      }
+
+      try {
+        await nangoFetch("/integrations", {
+          method: "POST",
+          body: JSON.stringify({
+            unique_key: integrationId,
+            provider: definition.id,
+            display_name: `PalladiumAI ${definition.name}`,
+            forward_webhooks: true,
+          }),
+        });
+        return { id: definition.id, integrationId, status: "created" as const };
+      } catch (error) {
+        return {
+          id: definition.id,
+          integrationId,
+          status: "error" as const,
+          error: error instanceof Error ? error.message : "Nango integration creation failed.",
+        };
+      }
+    }),
+  );
 }
 
 export async function getPersistedNangoConnection(

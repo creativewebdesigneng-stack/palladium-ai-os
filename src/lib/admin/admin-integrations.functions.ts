@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { INTEGRATION_PROVIDERS } from "@/lib/integrations/providers";
+import { NANGO_PROVIDERS } from "@/lib/integrations/nango-providers";
 
 type Sb = { from: (t: string) => any };
 
@@ -20,9 +21,18 @@ type IntegrationRow = {
 };
 
 export function aggregateIntegrationRows(rows: IntegrationRow[]) {
-  const byProvider = new Map<string, { total: number; connected: number; errors: number; pending: number; disconnected: number }>();
+  const byProvider = new Map<
+    string,
+    { total: number; connected: number; errors: number; pending: number; disconnected: number }
+  >();
   for (const row of rows) {
-    const current = byProvider.get(row.provider) ?? { total: 0, connected: 0, errors: 0, pending: 0, disconnected: 0 };
+    const current = byProvider.get(row.provider) ?? {
+      total: 0,
+      connected: 0,
+      errors: 0,
+      pending: 0,
+      disconnected: 0,
+    };
     current.total += 1;
     if (row.status === "connected") current.connected += 1;
     else if (row.status === "error") current.errors += 1;
@@ -41,11 +51,16 @@ export const listAdminIntegrationOverview = createServerFn({ method: "POST" })
       return { forbidden: true as const };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { providerConfigured } = await import("@/lib/integrations/oauth.server");
+    const [{ supabaseAdmin }, { providerConfigured }, nango] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("@/lib/integrations/oauth.server"),
+      import("@/lib/integrations/nango.server"),
+    ]);
     const { data, error } = await supabaseAdmin
       .from("integrations")
-      .select("id,user_id,org_id,provider,status,account_label,last_error,connected_at,last_sync_at,expires_at,created_at")
+      .select(
+        "id,user_id,org_id,provider,status,account_label,last_error,connected_at,last_sync_at,expires_at,created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) throw new Error(error.message);
@@ -53,7 +68,13 @@ export const listAdminIntegrationOverview = createServerFn({ method: "POST" })
     const rows = (data ?? []) as IntegrationRow[];
     const aggregate = aggregateIntegrationRows(rows);
     const providers = INTEGRATION_PROVIDERS.map((provider) => {
-      const counts = aggregate.get(provider.id) ?? { total: 0, connected: 0, errors: 0, pending: 0, disconnected: 0 };
+      const counts = aggregate.get(provider.id) ?? {
+        total: 0,
+        connected: 0,
+        errors: 0,
+        pending: 0,
+        disconnected: 0,
+      };
       return {
         id: provider.id,
         name: provider.name,
@@ -78,6 +99,17 @@ export const listAdminIntegrationOverview = createServerFn({ method: "POST" })
       createdAt: row.created_at ? String(row.created_at) : null,
     }));
 
+    let nangoIntegrations: Awaited<ReturnType<typeof nango.listNangoIntegrations>> = [];
+    let nangoError: string | null = null;
+    if (nango.nangoConfigured()) {
+      try {
+        nangoIntegrations = await nango.listNangoIntegrations();
+      } catch (error) {
+        nangoError = error instanceof Error ? error.message : "Unable to inspect Nango.";
+      }
+    }
+    const nangoByKey = new Map(nangoIntegrations.map((row) => [row.unique_key, row]));
+
     return {
       forbidden: false as const,
       summary: {
@@ -88,6 +120,34 @@ export const listAdminIntegrationOverview = createServerFn({ method: "POST" })
         providerCount: providers.length,
       },
       providers,
+      nango: {
+        keyConfigured: nango.nangoConfigured(),
+        error: nangoError,
+        providers: NANGO_PROVIDERS.map((provider) => {
+          const integrationId = nango.nangoIntegrationId(provider.id);
+          const remote = integrationId ? nangoByKey.get(integrationId) : null;
+          return {
+            id: provider.id,
+            name: provider.name,
+            integrationId,
+            provisioned: Boolean(remote && remote.provider === provider.id),
+            providerMismatch: Boolean(remote && remote.provider !== provider.id),
+          };
+        }),
+      },
       recent,
     };
+  });
+
+export const provisionAdminNangoIntegrations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const caller = context.supabase as unknown as Sb;
+    if (!(await isPlatformAdmin(caller as never, context.userId))) {
+      return { forbidden: true as const };
+    }
+    const nango = await import("@/lib/integrations/nango.server");
+    if (!nango.nangoConfigured()) throw new Error("Nango's server key is not configured.");
+    const results = await nango.provisionNangoIntegrations();
+    return { forbidden: false as const, results };
   });
