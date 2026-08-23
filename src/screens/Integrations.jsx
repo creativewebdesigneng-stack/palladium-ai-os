@@ -34,6 +34,13 @@ const CATEGORY_LABELS = {
   crm: "CRM",
   project_management: "Project management",
   developer: "Developer tools",
+  "dev-tools": "Developer tools",
+  marketing: "Marketing",
+  support: "Support",
+  storage: "Storage",
+  finance: "Finance",
+  hr: "People & HR",
+  other: "Other",
 };
 
 function connectionHealthy(provider) {
@@ -46,7 +53,7 @@ function connectionHealthy(provider) {
 function agentReady(provider) {
   return (
     provider.nativeGitHub ||
-    provider.nangoProvider ||
+    provider.agentReady === true ||
     (provider.tools ?? []).some((tool) =>
       [
         "connected_service",
@@ -70,6 +77,7 @@ export default function Integrations() {
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
   const [testResults, setTestResults] = useState({});
+  const [visibleLimit, setVisibleLimit] = useState(48);
   const [error, setError] = useState("");
   const nangoConnectRef = useRef(null);
 
@@ -166,10 +174,19 @@ export default function Integrations() {
       providerId: item.id,
       name: `${item.name} via Nango`,
       category: item.category,
-      summary: `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`,
-      scopes: ["Nango-managed OAuth", "Credentials remain server-side"],
-      tools: ["connected_service", "connected_service_write", "Nango Proxy"],
-      docsUrl: "https://nango.dev/docs/guides/auth/auth-guide",
+      summary: item.agentReady
+        ? `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`
+        : `Connect ${item.name} securely now. Agent actions stay disabled until PalladiumAI adds reviewed, provider-specific tools.`,
+      scopes: [
+        `${String(item.authMode || "Provider").replaceAll("_", " ")} authentication`,
+        "Credentials remain server-side",
+      ],
+      tools: item.agentReady ? ["connected_service", "connected_service_write", "Nango Proxy"] : [],
+      docsUrl: item.docsUrl || "https://nango.dev/docs/guides/auth/auth-guide",
+      logoUrl: item.logoUrl,
+      authMode: item.authMode,
+      agentReady: Boolean(item.agentReady),
+      marketplaceProvider: !item.curated,
       configured: Boolean(item.configured),
       nangoProvider: true,
       connection: item.connected
@@ -216,6 +233,11 @@ export default function Integrations() {
   const connectedCount = providers.filter(connectionHealthy).length;
   const configuredCount = providers.filter((provider) => provider.configured).length;
   const agentReadyCount = providers.filter(agentReady).length;
+  const visibleProviders = filtered.slice(0, visibleLimit);
+
+  useEffect(() => {
+    setVisibleLimit(48);
+  }, [query, category]);
 
   async function connect(provider) {
     setBusyProvider(provider.id);
@@ -357,6 +379,21 @@ export default function Integrations() {
         </div>
       </div>
 
+      <div className="mb-5 rounded-2xl border border-violet-400/15 bg-violet-500/[.045] p-4">
+        <div className="flex items-start gap-3">
+          <Plug className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" />
+          <div>
+            <p className="text-sm font-semibold text-violet-100">Live Nango provider marketplace</p>
+            <p className="mt-1 max-w-4xl text-xs leading-5 text-zinc-400">
+              Search Nango's current provider catalogue and connect a new account without asking an
+              administrator to create the integration first. New marketplace providers begin as
+              account-only connections; agent actions are enabled only after their tools and
+              approval rules have been reviewed.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Provider adapters" value={providers.length} icon={Wrench} />
         <Metric label="Agent-ready" value={agentReadyCount} icon={ShieldCheck} />
@@ -398,7 +435,7 @@ export default function Integrations() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((provider) => (
+          {visibleProviders.map((provider) => (
             <ProviderCard
               key={provider.id}
               provider={provider}
@@ -410,6 +447,14 @@ export default function Integrations() {
               onOpenGitHub={() => navigate("/code-explorer")}
             />
           ))}
+          {visibleLimit < filtered.length && (
+            <button
+              onClick={() => setVisibleLimit((current) => current + 48)}
+              className="min-h-[8rem] rounded-2xl border border-dashed border-violet-400/25 bg-violet-500/[.035] p-5 text-sm font-medium text-violet-300 hover:bg-violet-500/[.07]"
+            >
+              Show 48 more providers · {filtered.length - visibleLimit} remaining
+            </button>
+          )}
         </div>
       )}
     </>
@@ -438,8 +483,12 @@ function ProviderCard({
   return (
     <article className="flex min-h-[21rem] flex-col rounded-2xl border border-white/10 bg-white/[.03] p-5">
       <div className="flex items-start justify-between gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300">
-          <Icon className="h-5 w-5" />
+        <span className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-300">
+          {provider.logoUrl ? (
+            <img src={provider.logoUrl} alt="" className="h-7 w-7 object-contain" loading="lazy" />
+          ) : (
+            <Icon className="h-5 w-5" />
+          )}
         </span>
         <StatusBadge
           connected={connected}
@@ -459,6 +508,11 @@ function ProviderCard({
           >
             {readyForAgents ? "Agent ready" : "Account only"}
           </span>
+          {provider.marketplaceProvider && (
+            <span className="rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-300">
+              Marketplace
+            </span>
+          )}
         </div>
         <h2 className="mt-1 text-base font-semibold text-white">{provider.name}</h2>
         <p className="mt-2 text-xs leading-5 text-zinc-500">{provider.summary}</p>
@@ -536,14 +590,16 @@ function ProviderCard({
                   Open repositories
                 </button>
               )}
-              <button
-                disabled={busy}
-                onClick={onTest}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-400/20 px-3 py-2.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/[.06] disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {busy ? "Testing…" : "Test connection"}
-              </button>
+              {readyForAgents && (
+                <button
+                  disabled={busy}
+                  onClick={onTest}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-400/20 px-3 py-2.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/[.06] disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {busy ? "Testing…" : "Test connection"}
+                </button>
+              )}
             </div>
             {provider.supportsDisconnect !== false && (
               <button

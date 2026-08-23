@@ -1,51 +1,47 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { NANGO_PROVIDERS } from "./nango-providers";
+import { findNangoProvider, isSafeNangoProviderId, NANGO_PROVIDERS } from "./nango-providers";
 
-const providerIds = NANGO_PROVIDERS.map((provider) => provider.id);
 const providerInput = z.object({
-  provider: z
-    .string()
-    .trim()
-    .refine((id) => providerIds.includes(id as any), "Unsupported Nango provider."),
+  provider: z.string().trim().refine(isSafeNangoProviderId, "Unsupported Nango provider."),
 });
 
 export const listNangoConnections = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const server = await import("./nango.server");
-    return Promise.all(
-      NANGO_PROVIDERS.map(async (provider) => {
-        const configured = server.nangoProviderConfigured(provider.id);
-        let connection: any = null;
-        let loadError: string | null = null;
-        if (configured) {
-          try {
-            connection = await server.getOwnedNangoConnection(context.userId, provider.id);
-          } catch (error) {
-            loadError = (error as Error).message;
-          }
-        }
-        const persisted = connection?.persisted;
-        return {
-          id: provider.id,
-          name: provider.name,
-          category: provider.category,
-          configured,
-          connected: Boolean(connection) && persisted?.status !== "error",
-          reconnectRequired: persisted?.status === "error",
-          connectionId: connection?.connection_id || connection?.id || null,
-          accountLabel:
-            persisted?.account_label ||
-            connection?.metadata?.display_name ||
-            connection?.connection_config?.username ||
-            null,
-          createdAt: persisted?.connected_at || connection?.created_at || null,
-          lastError: persisted?.last_error || loadError,
-        };
-      }),
-    );
+    let providers: Awaited<ReturnType<typeof server.listNangoProviderCatalogue>>;
+    try {
+      providers = await server.listNangoProviderCatalogue();
+    } catch {
+      providers = NANGO_PROVIDERS.map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        categories: [provider.category],
+        category: provider.category,
+        authMode: "OAUTH2",
+        logoUrl: null,
+        docsUrl: "https://nango.dev/docs/guides/auth/auth-guide",
+        curated: true,
+      }));
+    }
+    const persisted = await server.listPersistedNangoConnections(context.userId);
+    const byProvider = new Map(persisted.map((connection) => [connection.providerId, connection]));
+    return providers.map((provider) => {
+      const connection = byProvider.get(provider.id);
+      return {
+        ...provider,
+        configured: server.nangoConfigured(),
+        connected: Boolean(connection) && connection?.status !== "error",
+        reconnectRequired: connection?.status === "error",
+        connectionId: connection?.config?.connection_id || null,
+        accountLabel: connection?.account_label || null,
+        createdAt: connection?.connected_at || null,
+        lastError: connection?.last_error || null,
+        agentReady: Boolean(findNangoProvider(provider.id)),
+      };
+    });
   });
 
 export const startNangoConnection = createServerFn({ method: "POST" })
@@ -54,7 +50,7 @@ export const startNangoConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { createNangoConnectSession } = await import("./nango.server");
     const email = typeof context.claims?.email === "string" ? context.claims.email : null;
-    return createNangoConnectSession({ id: context.userId, email }, data.provider as any);
+    return createNangoConnectSession({ id: context.userId, email }, data.provider);
   });
 
 export const testNangoConnection = createServerFn({ method: "POST" })
@@ -62,14 +58,14 @@ export const testNangoConnection = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const { testOwnedNangoConnection } = await import("./nango.server");
-    const result = await testOwnedNangoConnection(context.userId, data.provider as any);
-    const definition = NANGO_PROVIDERS.find((provider) => provider.id === data.provider)!;
+    const result = await testOwnedNangoConnection(context.userId, data.provider);
+    const definition = NANGO_PROVIDERS.find((provider) => provider.id === data.provider);
     return {
       ok: true,
       checkedAt: new Date().toISOString(),
       message: result.label
-        ? `Nango reached ${definition.name} successfully as ${result.label}.`
-        : `Nango reached ${definition.name} successfully.`,
+        ? `Nango reached ${definition?.name || data.provider} successfully as ${result.label}.`
+        : `Nango reached ${definition?.name || data.provider} successfully.`,
     };
   });
 
@@ -78,7 +74,7 @@ export const disconnectNangoConnection = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const { disconnectOwnedNangoConnection } = await import("./nango.server");
-    return disconnectOwnedNangoConnection(context.userId, data.provider as any);
+    return disconnectOwnedNangoConnection(context.userId, data.provider);
   });
 
 // Compatibility aliases for the original GitHub pilot.

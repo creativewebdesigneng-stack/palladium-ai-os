@@ -79,7 +79,15 @@ export const NANGO_PROVIDERS = [
   },
 ] as const;
 
-export type NangoProviderId = (typeof NANGO_PROVIDERS)[number]["id"];
+export type CuratedNangoProviderId = (typeof NANGO_PROVIDERS)[number]["id"];
+export type NangoProviderId = string;
+
+const SAFE_NANGO_PROVIDER_ID = /^[a-z0-9][a-z0-9_-]{0,99}$/;
+
+export function isSafeNangoProviderId(id: string) {
+  return SAFE_NANGO_PROVIDER_ID.test(id);
+}
+
 export function findNangoProvider(id: string) {
   return NANGO_PROVIDERS.find((provider) => provider.id === id);
 }

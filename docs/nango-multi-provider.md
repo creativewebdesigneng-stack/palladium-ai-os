@@ -43,6 +43,14 @@ on the normal Integrations page, the server checks the fixed integration ID, cre
 missing, and then opens a provider-restricted Connect session. A conflicting ID is rejected and
 never overwritten. This makes the admin provisioning control optional.
 
+The normal Integrations page also loads Nango's live provider catalogue from `GET /providers`.
+Providers outside PalladiumAI's curated list can be searched and connected immediately. Their
+integration ID is generated deterministically as `palladium-<provider>`, the provider is verified
+against Nango before creation, and the connection is stored under the authenticated PalladiumAI
+user. Marketplace providers start as **Account only**: connecting credentials does not give an AI
+agent arbitrary API access. Agent-ready status is added only with bounded, typed actions and the
+appropriate approval policy.
+
 The production webhook URL is:
 
 `https://palladium-ai-os.lovable.app/api/public/integrations/nango-webhook`

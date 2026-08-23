@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NANGO_PROVIDERS } from "./nango-providers";
 import {
   ensureNangoIntegration,
+  listNangoProviderCatalogue,
   nangoIntegrationId,
+  nangoProviderFromIntegrationId,
   provisionNangoIntegrations,
 } from "./nango.server";
 
@@ -31,6 +33,8 @@ describe("Nango management provisioning", () => {
     expect(nangoIntegrationId("google")).toBe("palladium-google");
     expect(nangoIntegrationId("microsoft")).toBe("palladium-microsoft");
     expect(nangoIntegrationId("linear")).toBe("palladium-linear");
+    expect(nangoIntegrationId("posthog")).toBe("palladium-posthog");
+    expect(nangoProviderFromIntegrationId("palladium-posthog")).toMatchObject({ id: "posthog" });
   });
 
   it("creates only missing fixed-list integrations", async () => {
@@ -90,6 +94,58 @@ describe("Nango management provisioning", () => {
       unique_key: "palladium-google",
       provider: "google",
     });
+  });
+
+  it("loads and normalizes Nango's live provider marketplace", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        response({
+          data: [
+            {
+              name: "posthog",
+              display_name: "PostHog",
+              categories: ["dev-tools"],
+              auth_mode: "API_KEY",
+              logo_url: "https://app.nango.dev/posthog.svg",
+              docs: "https://nango.dev/docs/api-integrations/posthog",
+            },
+            { name: "../../unsafe", display_name: "Unsafe" },
+          ],
+        }),
+      ),
+    );
+
+    await expect(listNangoProviderCatalogue()).resolves.toEqual([
+      expect.objectContaining({
+        id: "posthog",
+        name: "PostHog",
+        category: "dev-tools",
+        authMode: "API_KEY",
+        curated: false,
+      }),
+    ]);
+  });
+
+  it("verifies a marketplace provider before creating its integration", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({ data: { name: "posthog", display_name: "PostHog", auth_mode: "API_KEY" } }),
+      )
+      .mockResolvedValueOnce(response({ message: "Not found" }, 404))
+      .mockResolvedValueOnce(
+        response({ data: { unique_key: "palladium-posthog", provider: "posthog" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(ensureNangoIntegration("posthog")).resolves.toEqual({
+      integrationId: "palladium-posthog",
+      created: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/providers/posthog");
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("/integrations/palladium-posthog");
   });
 
   it("keeps Connect tied to the just-in-time integration check", () => {
