@@ -134,7 +134,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const provider = findProvider(data.provider);
     if (!provider) throw new Error("Unknown integration provider.");
 
-    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } =
+    const { providerConfigured, createAuthorization, safeOrigin } =
       await import("./oauth.server");
     if (!providerConfigured(provider)) {
       throw new Error(
@@ -159,10 +159,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     );
 
     return {
-      authorizeUrl: buildAuthorizeUrl(provider, {
-        origin,
-        state: createState({ userId: context.userId, provider: provider.id, origin }),
-      }),
+      authorizeUrl: createAuthorization(provider, { userId: context.userId, origin }).authorizeUrl,
     };
   });
 

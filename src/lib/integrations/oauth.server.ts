@@ -48,11 +48,27 @@ const b64url = (v: Buffer | string) =>
 function sign(payload: string): string {
   return b64url(createHmac("sha256", stateSecret()).update(payload).digest());
 }
-export function createState(input: { userId: string; provider: string; origin: string }): string {
-  const payload = b64url(JSON.stringify({ ...input, ts: Date.now(), n: randomBytes(8).toString("hex") }));
+export function createState(input: {
+  userId: string;
+  provider: string;
+  origin: string;
+  codeVerifier?: string;
+}): string {
+  const payload = b64url(
+    JSON.stringify({
+      userId: input.userId,
+      provider: input.provider,
+      origin: input.origin,
+      ...(input.codeVerifier ? { v: input.codeVerifier } : {}),
+      ts: Date.now(),
+      n: randomBytes(8).toString("hex"),
+    }),
+  );
   return `${payload}.${sign(payload)}`;
 }
-export function verifyState(state: string): { userId: string; provider: string; origin: string } | null {
+export function verifyState(
+  state: string,
+): { userId: string; provider: string; origin: string; codeVerifier: string | null } | null {
   const [payload, signature] = state.split(".");
   if (!payload || !signature) return null;
   const expected = sign(payload);
@@ -61,7 +77,12 @@ export function verifyState(state: string): { userId: string; provider: string; 
     const parsed = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
     if (typeof parsed?.ts !== "number" || Date.now() - parsed.ts > STATE_TTL_MS) return null;
     if (typeof parsed.userId !== "string" || typeof parsed.provider !== "string") return null;
-    return { userId: parsed.userId, provider: parsed.provider, origin: String(parsed.origin ?? "") };
+    return {
+      userId: parsed.userId,
+      provider: parsed.provider,
+      origin: String(parsed.origin ?? ""),
+      codeVerifier: typeof parsed.v === "string" && parsed.v ? parsed.v : null,
+    };
   } catch { return null; }
 }
 export function safeOrigin(candidate: string | undefined): string {
@@ -75,7 +96,27 @@ export function safeOrigin(candidate: string | undefined): string {
   return url.origin;
 }
 export const callbackPath = "/api/public/integrations/callback";
-export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: string; origin: string }): string {
+
+/**
+ * Salesforce External Client Apps mandate PKCE (RFC 7636) on the Web Server
+ * flow. Other providers keep their existing plain authorization-code behavior.
+ */
+export function providerRequiresPkce(provider: IntegrationProvider): boolean {
+  return provider.id === "salesforce";
+}
+/** RFC 7636 §4.1 code verifier: 43-128 chars of unreserved base64url entropy. */
+export function generateCodeVerifier(): string {
+  return b64url(randomBytes(48));
+}
+/** RFC 7636 §4.2 S256 challenge. */
+export function deriveCodeChallenge(codeVerifier: string): string {
+  return b64url(createHash("sha256").update(codeVerifier).digest());
+}
+
+export function buildAuthorizeUrl(
+  provider: IntegrationProvider,
+  args: { state: string; origin: string; codeVerifier?: string },
+): string {
   const url = new URL(provider.authorizeUrl);
   url.searchParams.set("client_id", process.env[provider.clientIdEnv]!);
   url.searchParams.set("redirect_uri", `${args.origin}${callbackPath}`);
@@ -83,8 +124,34 @@ export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: 
   url.searchParams.set("state", args.state);
   if (provider.scopes.length) url.searchParams.set("scope", provider.scopes.join(" "));
   for (const [key, value] of Object.entries(provider.authorizeParams ?? {})) if (value !== "") url.searchParams.set(key, value);
+  if (args.codeVerifier) {
+    url.searchParams.set("code_challenge", deriveCodeChallenge(args.codeVerifier));
+    url.searchParams.set("code_challenge_method", "S256");
+  }
   return url.toString();
 }
+
+/**
+ * Mints the signed state and consent URL together so the PKCE verifier only
+ * ever lives inside the HMAC-signed state — never in browser storage.
+ */
+export function createAuthorization(
+  provider: IntegrationProvider,
+  args: { userId: string; origin: string },
+): { state: string; authorizeUrl: string } {
+  const codeVerifier = providerRequiresPkce(provider) ? generateCodeVerifier() : undefined;
+  const state = createState({
+    userId: args.userId,
+    provider: provider.id,
+    origin: args.origin,
+    ...(codeVerifier ? { codeVerifier } : {}),
+  });
+  return {
+    state,
+    authorizeUrl: buildAuthorizeUrl(provider, { state, origin: args.origin, ...(codeVerifier ? { codeVerifier } : {}) }),
+  };
+}
+
 
 export type TokenSet = {
   accessToken: string;
@@ -188,15 +255,25 @@ async function postNotionToken(provider: IntegrationProvider, body: Record<strin
     body: JSON.stringify(body),
   }));
 }
-export async function exchangeCode(provider: IntegrationProvider, args: { code: string; origin: string }): Promise<TokenSet> {
+export async function exchangeCode(
+  provider: IntegrationProvider,
+  args: { code: string; origin: string; codeVerifier?: string | null },
+): Promise<TokenSet> {
+  if (providerRequiresPkce(provider) && !args.codeVerifier) {
+    throw new Error(`${provider.name} requires PKCE: the authorization request could not be verified.`);
+  }
+  const form = new URLSearchParams({
+    grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
+    // The External Client App is a confidential client: the secret stays server-side.
+    client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+  });
+  if (args.codeVerifier) form.set("code_verifier", args.codeVerifier);
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` })
-    : await postForm(provider.tokenUrl, new URLSearchParams({
-        grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}`,
-        client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-      }));
+    : await postForm(provider.tokenUrl, form);
   return { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
 }
+
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "refresh_token", refresh_token: refreshToken })
