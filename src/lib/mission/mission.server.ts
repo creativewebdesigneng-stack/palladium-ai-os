@@ -55,8 +55,14 @@ export type WorkspaceProvider = "google" | "microsoft";
 const COMMITMENT_WORDS = /\b(buy|purchase|order|checkout|pay|book|booking|reserve|subscribe|confirm purchase|place (?:the )?order|complete (?:the )?purchase)\b/i;
 const DISCOVERY_WORDS = /\b(find|search|show|compare|recommend|research|look for|look up|price check|prices|deals?)\b/i;
 const SHOPPING_DISCOVERY_WORDS = /\b(product|item|chair|laptop|computer|pc|ink|printer|gift|t-?shirt|shirt|clothes?|clothing|shoes?|trainers?|phone|tablet|tv|television|monitor|headphones?|earbuds?|furniture|sofa|table|watch|bag|handbag|jacket|coat|dress|jeans|console|camera|appliance)\b/i;
+const CONNECTED_SERVICE_WORDS = /\b(nango|github|gitlab|linear|notion|slack|discord|salesforce|hubspot|posthog|shopify|stripe|airtable|jira|trello|asana|connected (?:account|app|service|integration))\b/i;
 
 const RULES: Array<{ category: string; test: RegExp; tools: string[] }> = [
+  {
+    category: "integration",
+    test: CONNECTED_SERVICE_WORDS,
+    tools: ["connected_service", "nango_capabilities", "nango_action"],
+  },
   { category: "travel", test: /(hotel|flight|trip|travel|holiday|airbnb|train|weekend away)/i, tools: ["web_search", "browser", "booking"] },
   { category: "shopping", test: /(buy|purchase|shop|price|cheap|cheapest|deal|product|item|chair|laptop|computer|pc|ink|printer|order|gift|t-?shirt|shirt|clothes?|clothing|shoes?|trainers?|phone|tablet|tv|television|monitor|headphones?|earbuds?|furniture|sofa|table|watch|bag|handbag|jacket|coat|dress|jeans|console|camera|appliance)/i, tools: ["web_search", "shopping_search", "browser"] },
   { category: "food", test: /(meal|recipe|dinner|lunch|grocer|food|cook|menu)/i, tools: ["web_search", "documents"] },
