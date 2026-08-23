@@ -139,7 +139,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     name: "Salesforce",
     category: "crm",
     summary: "Read-only CRM search across Accounts and Opportunities on the connected Salesforce org.",
-    scopes: ["api", "refresh_token", "openid"],
+    scopes: ["api", "refresh_token", "id"],
     tools: ["connected_service"],
     authorizeUrl: "https://login.salesforce.com/services/oauth2/authorize",
     tokenUrl: "https://login.salesforce.com/services/oauth2/token",
