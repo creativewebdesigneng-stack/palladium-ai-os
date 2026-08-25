@@ -52,6 +52,7 @@ export type Agent = {
   max_tokens: number | null;
   memory_enabled: boolean | null;
   allowed_tools: string[] | null;
+  allowed_providers: string[] | null;
   requires_approval: boolean | null;
   autonomy: string | null;
   status: string | null;
@@ -607,6 +608,7 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
           taskId: deps.run.taskId,
           sb: deps.sb,
           signal: deps.signal,
+          allowedProviders: deps.run.agent.allowed_providers ?? [],
         },
         deps.grants,
       );
