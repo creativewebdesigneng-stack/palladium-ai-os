@@ -5,7 +5,10 @@ import {
   hasDirectConnectedService,
   isDirectConnectedServiceProvider,
 } from "./direct-connected-service.server";
-import { buildConnectedServiceRequest } from "./connected-service.server";
+import {
+  buildConnectedServiceRequest,
+  type ConnectedServiceInput,
+} from "./connected-service.server";
 import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
@@ -79,6 +82,24 @@ const DIRECT_INPUT_SCHEMA: Record<string, unknown> = {
   additionalProperties: false,
 };
 
+function asDirectInput(
+  provider: string,
+  action: string,
+  actionInput: Record<string, unknown>,
+): ConnectedServiceInput {
+  const value = actionInput as Partial<ConnectedServiceInput>;
+  return {
+    provider,
+    action,
+    ...(typeof value.query === "string" ? { query: value.query } : {}),
+    ...(typeof value.resource_id === "string" ? { resource_id: value.resource_id } : {}),
+    ...(typeof value.repository === "string" ? { repository: value.repository } : {}),
+    ...(typeof value.path === "string" ? { path: value.path } : {}),
+    ...(typeof value.ref === "string" ? { ref: value.ref } : {}),
+    ...(typeof value.limit === "number" ? { limit: value.limit } : {}),
+  };
+}
+
 const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
@@ -116,11 +137,7 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
-    buildConnectedServiceRequest({
-      provider: input.provider,
-      action: input.action,
-      ...input.actionInput,
-    });
+    buildConnectedServiceRequest(asDirectInput(input.provider, input.action, input.actionInput));
     if (!(await hasDirectConnectedService(input.userId, input.provider))) {
       throw new Error(`${input.provider} is not connected through its native OAuth integration.`);
     }
@@ -137,7 +154,7 @@ const directOAuthAdapter: IntegrationAdapter = {
     try {
       const result = await executeDirectConnectedService(
         input.userId,
-        { provider: input.provider, action: input.action, ...input.actionInput },
+        asDirectInput(input.provider, input.action, input.actionInput),
         input.signal,
       );
       return { ok: true, result };
