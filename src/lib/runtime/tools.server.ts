@@ -33,6 +33,8 @@ export type ToolContext = {
   spendCap?: number | null;
   /** True when the agent/account policy requires even low-risk actions to pause. */
   requiresApproval?: boolean;
+  /** Provider IDs assigned to this agent. Undefined is reserved for trusted system routing. */
+  allowedProviders?: string[];
 };
 
 type ToolImpl = {
@@ -43,6 +45,23 @@ type ToolImpl = {
 };
 
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+
+function normalizeProvider(value: unknown) {
+  return str(value).trim().toLowerCase().replace(/^nango_/, "");
+}
+
+function providerForTool(name: string, input: Record<string, unknown>) {
+  if (name === "github_write") return "github";
+  if (
+    name === "connected_service" ||
+    name === "connected_service_write" ||
+    name === "nango_action" ||
+    name === "nango_capabilities"
+  ) {
+    return normalizeProvider(input["provider"]);
+  }
+  return "";
+}
 
 const REGISTRY: Record<string, ToolImpl> = {
   current_time: {
@@ -466,13 +485,19 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input, ctx) => {
-      const provider = str(input["provider"]).toLowerCase();
+      const provider = normalizeProvider(input["provider"]);
       const capabilities = await listNangoAgentCapabilities(ctx.userId, provider || undefined);
+      const allowed = ctx.allowedProviders
+        ? new Set(ctx.allowedProviders.map(normalizeProvider).filter(Boolean))
+        : null;
+      const visibleCapabilities = allowed
+        ? capabilities.filter((item) => allowed.has(normalizeProvider(item.provider)))
+        : capabilities;
       return {
-        capabilities,
-        count: capabilities.length,
-        autonomous: capabilities.filter((item) => !item.requiresApproval).length,
-        approvalRequired: capabilities.filter((item) => item.requiresApproval).length,
+        capabilities: visibleCapabilities,
+        count: visibleCapabilities.length,
+        autonomous: visibleCapabilities.filter((item) => !item.requiresApproval).length,
+        approvalRequired: visibleCapabilities.filter((item) => item.requiresApproval).length,
       };
     },
   },
@@ -1384,6 +1409,25 @@ export async function executeTool(
   if (!tool || !grant) {
     await log("failed", { error: "Tool not enabled for this agent." });
     return { ok: false, output: { error: `Tool "${name}" is not enabled for this agent.` } };
+  }
+
+  if (ctx.allowedProviders !== undefined) {
+    const allowed = new Set(ctx.allowedProviders.map(normalizeProvider).filter(Boolean));
+    const provider = providerForTool(name, input);
+    const providerScoped =
+      name === "connected_service" ||
+      name === "connected_service_write" ||
+      name === "nango_action" ||
+      name === "nango_capabilities" ||
+      name === "github_write";
+    if (providerScoped && ((provider && !allowed.has(provider)) || (!provider && allowed.size === 0))) {
+      const label = provider || "any connected provider";
+      await log("failed", { error: `Provider ${label} is not assigned to this agent.` });
+      return {
+        ok: false,
+        output: { error: `Provider "${label}" is not assigned to this agent.` },
+      };
+    }
   }
 
   if (grant.allowedDomains.length && DOMAIN_SCOPED.has(name)) {

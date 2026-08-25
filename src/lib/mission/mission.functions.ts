@@ -71,6 +71,7 @@ export const getMissionOverview = createServerFn({ method: "POST" })
 
     const [
       agents,
+      integrations,
       tasks,
       approvals,
       activities,
@@ -85,6 +86,11 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       workforceRuns,
     ] = await Promise.all([
       sb.from("personal_agents").select("*").order("created_at", { ascending: false }),
+      sb
+        .from("integrations")
+        .select("provider,name,account_label,status,integration_type")
+        .eq("status", "connected")
+        .order("connected_at", { ascending: false }),
       sb.from("personal_tasks").select("*").order("created_at", { ascending: false }).limit(80),
       sb.from("approval_requests").select("*").order("created_at", { ascending: false }).limit(60),
       sb.from("agent_activities").select("*").order("created_at", { ascending: false }).limit(40),
@@ -118,6 +124,32 @@ export const getMissionOverview = createServerFn({ method: "POST" })
     const shoppingRows = shoppingResults.data ?? [];
     const workforceRows = workforces.data ?? [];
     const workforceRunRows = workforceRuns.data ?? [];
+    const connectedIntegrationRows = integrations.data ?? [];
+    const connectedIntegrationMap = new Map<
+      string,
+      {
+        provider: string;
+        name: string;
+        accountLabel: string | null;
+        integrationType: string | null;
+      }
+    >();
+    for (const integration of connectedIntegrationRows as any[]) {
+      const provider = String(integration.provider ?? "").replace(/^nango_/, "");
+      if (!provider || connectedIntegrationMap.has(provider)) continue;
+      connectedIntegrationMap.set(provider, {
+        provider,
+        name:
+          integration.name ||
+          provider.replace(
+            /(^|[-_])([a-z])/g,
+            (_match: string, _prefix: string, char: string) => char.toUpperCase(),
+          ),
+        accountLabel: integration.account_label ?? null,
+        integrationType: integration.integration_type ?? null,
+      });
+    }
+    const connectedIntegrations = [...connectedIntegrationMap.values()];
 
     const pendingApprovals = approvalRows.filter((a: any) => a.status === "pending");
     const running = taskRows.filter((t: any) => t.status === "running" || t.status === "queued");
@@ -218,6 +250,7 @@ export const getMissionOverview = createServerFn({ method: "POST" })
     return {
       briefing,
       agents: agentRows,
+      connectedIntegrations,
       personalAgents,
       professionalAgents,
       tasks: taskRows,
@@ -277,6 +310,7 @@ type AgentInput = {
   budget_limit?: number | null;
   currency?: string;
   allowed_tools?: string[];
+  allowed_providers?: string[];
   requires_approval?: boolean;
   autonomy?: string;
   schedule?: string;
@@ -298,7 +332,24 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
     )
       ? data.autonomy
       : "prepare";
-    const tools = data.allowed_tools ?? [];
+    const tools = [...new Set(data.allowed_tools ?? [])];
+    const requestedProviders = [...new Set(data.allowed_providers ?? [])]
+      .map((provider) => provider.trim().toLowerCase())
+      .filter((provider) => /^[a-z0-9][a-z0-9_-]{0,63}$/.test(provider));
+    let allowedProviders: string[] = [];
+    if (tools.includes("connected_service")) {
+      const { data: connected } = await sb
+        .from("integrations")
+        .select("provider")
+        .eq("user_id", userId)
+        .eq("status", "connected");
+      const connectedProviders = new Set(
+        (connected ?? []).map((integration: any) =>
+          String(integration.provider ?? "").replace(/^nango_/, "").toLowerCase(),
+        ),
+      );
+      allowedProviders = requestedProviders.filter((provider) => connectedProviders.has(provider));
+    }
     const row = {
       user_id: userId,
       name: data.name.trim(),
@@ -310,6 +361,7 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
       budget_limit: data.budget_limit ?? null,
       currency: data.currency ?? "GBP",
       allowed_tools: tools,
+      allowed_providers: allowedProviders,
       requires_approval:
         tools.includes("checkout") || tools.includes("booking") || autonomy === "approval_required"
           ? true

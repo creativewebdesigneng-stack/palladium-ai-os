@@ -204,6 +204,7 @@ async function runToolCalls(args: {
           taskId: args.run.taskId,
           sb: args.sb,
           signal: args.signal,
+          allowedProviders: args.run.agent.allowed_providers ?? [],
         },
         args.run.tools.grants,
       );

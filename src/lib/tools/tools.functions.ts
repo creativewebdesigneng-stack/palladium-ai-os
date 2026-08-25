@@ -153,7 +153,7 @@ export const runToolManually = createServerFn({ method: "POST" })
 
     const { data: agent } = await sb
       .from("personal_agents")
-      .select("id,name,allowed_tools,requires_approval,org_id,org_id_fk,status")
+      .select("id,name,allowed_tools,allowed_providers,requires_approval,org_id,org_id_fk,status")
       .eq("id", data.agentId)
       .maybeSingle();
     if (!agent) throw new Error("That agent is not available to you.");
@@ -199,6 +199,7 @@ export const runToolManually = createServerFn({ method: "POST" })
         agentId: agent.id,
         taskId: null,
         sb,
+        allowedProviders: agent.allowed_providers ?? [],
       },
       grants,
     );

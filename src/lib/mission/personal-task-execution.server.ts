@@ -53,6 +53,7 @@ export type PersonalAgentRow = {
   temperature?: number | null;
   max_tokens?: number | null;
   allowed_tools?: string[] | null;
+  allowed_providers?: string[] | null;
   requires_approval?: boolean | null;
 } | null;
 
@@ -286,6 +287,7 @@ async function rescueConnectedServiceRead(args: {
       agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
       taskId: args.runId,
       sb: args.sb,
+      ...(args.agent ? { allowedProviders: args.agent.allowed_providers ?? [] } : {}),
     },
     args.tools.grants,
   );
@@ -556,6 +558,7 @@ async function runConversation(args: {
                 agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
                 taskId: args.runId,
                 sb: args.sb,
+                ...(args.agent ? { allowedProviders: args.agent.allowed_providers ?? [] } : {}),
               },
               args.tools.grants,
             );
@@ -734,6 +737,7 @@ export async function resumePersonalTaskApproval(args: {
               agentId: agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
               taskId: String(run.id),
               sb: args.sb,
+              ...(agent ? { allowedProviders: agent.allowed_providers ?? [] } : {}),
             },
             approvedGrants,
           );
