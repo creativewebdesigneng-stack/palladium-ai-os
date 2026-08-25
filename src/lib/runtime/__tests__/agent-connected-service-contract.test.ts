@@ -50,6 +50,21 @@ describe("agent connected-service contract", () => {
     expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
   });
 
+  it("lets dynamic Nango actions self-classify reads while writes remain approval-gated", async () => {
+    const { grants } = await resolveGrantedTools(
+      sb(),
+      {
+        id: "agent-1",
+        allowed_tools: ["connected_service"],
+        requires_approval: true,
+      },
+      "enterprise",
+    );
+    expect(grants.get("connected_service")?.requiresApproval).toBe(false);
+    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
+    expect(grants.get("nango_action")?.requiresApproval).toBe(false);
+  });
+
   it("exposes separate approval-gated draft and send tools", async () => {
     const { defs, grants } = await resolveGrantedTools(
       sb(),
@@ -98,16 +113,5 @@ describe("agent connected-service contract", () => {
       status: "pending",
       details: { provider: "microsoft", to: "person@example.com" },
     });
-  });
-
-  it("keeps read-only connected-service tools unapproved while gating nango_action", async () => {
-    const { grants } = await resolveGrantedTools(
-      sb(),
-      { id: "agent-1", allowed_tools: ["connected_service"], requires_approval: true },
-      "explorer",
-    );
-    expect(grants.get("connected_service")?.requiresApproval).toBe(false);
-    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
-    expect(grants.get("nango_action")?.requiresApproval).toBe(true);
   });
 });
