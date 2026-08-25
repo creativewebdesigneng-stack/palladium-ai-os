@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, ShieldAlert, Wand2 } from 'lucide-react';
+import { X, Loader2, Plug, ShieldAlert, Wand2 } from 'lucide-react';
 import {
   PERSONAL_CATEGORIES, AUTONOMY_LEVELS, PERSONALITIES, TOOL_CATALOG,
   DEFAULT_ALLOWED_DOMAINS, ADVISORY_NOTICE,
@@ -16,6 +16,7 @@ const EMPTY = {
   budget_limit: '',
   currency: 'GBP',
   allowed_tools: ['web_search'],
+  allowed_providers: [],
   requires_approval: true,
   autonomy: 'prepare',
   schedule: '',
@@ -23,7 +24,7 @@ const EMPTY = {
   allowed_domains: DEFAULT_ALLOWED_DOMAINS.join(', '),
 };
 
-export default function AgentBuilder({ open, initial, saving, onClose, onSave }) {
+export default function AgentBuilder({ open, initial, connectedIntegrations = [], saving, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
@@ -33,17 +34,38 @@ export default function AgentBuilder({ open, initial, saving, onClose, onSave })
       ...(initial ?? {}),
       budget_limit: initial?.budget_limit ?? '',
       allowed_tools: initial?.allowed_tools?.length ? initial.allowed_tools : EMPTY.allowed_tools,
+      allowed_providers:
+        initial?.allowed_providers?.length
+          ? initial.allowed_providers
+          : initial?.allowed_tools?.includes('connected_service')
+            ? connectedIntegrations.map((integration) => integration.provider)
+            : [],
       preferencesText: initial?.preferences ? Object.entries(initial.preferences).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
       allowed_domains: initial?.allowed_domains?.join?.(', ') ?? EMPTY.allowed_domains,
     });
-  }, [open, initial]);
+  }, [open, initial, connectedIntegrations]);
 
   if (!open) return null;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-  const toggleTool = (id) => setForm((f) => ({
+  const toggleTool = (id) => setForm((f) => {
+    const enabling = !f.allowed_tools.includes(id);
+    return {
+      ...f,
+      allowed_tools: enabling ? [...f.allowed_tools, id] : f.allowed_tools.filter((t) => t !== id),
+      allowed_providers:
+        id === 'connected_service'
+          ? enabling
+            ? connectedIntegrations.map((integration) => integration.provider)
+            : []
+          : f.allowed_providers,
+    };
+  });
+  const toggleProvider = (provider) => setForm((f) => ({
     ...f,
-    allowed_tools: f.allowed_tools.includes(id) ? f.allowed_tools.filter((t) => t !== id) : [...f.allowed_tools, id],
+    allowed_providers: f.allowed_providers.includes(provider)
+      ? f.allowed_providers.filter((item) => item !== provider)
+      : [...f.allowed_providers, provider],
   }));
 
   const forcesApproval = form.allowed_tools.some((t) => ['checkout', 'booking', 'email_draft'].includes(t)) || form.autonomy === 'approval_required';
@@ -65,6 +87,7 @@ export default function AgentBuilder({ open, initial, saving, onClose, onSave })
       budget_limit: form.budget_limit === '' ? null : Number(form.budget_limit),
       currency: form.currency,
       allowed_tools: form.allowed_tools,
+      allowed_providers: form.allowed_providers,
       requires_approval: forcesApproval ? true : form.requires_approval,
       autonomy: form.autonomy,
       schedule: form.schedule,
@@ -165,6 +188,45 @@ export default function AgentBuilder({ open, initial, saving, onClose, onSave })
               })}
             </div>
           </div>
+
+          {form.allowed_tools.includes('connected_service') && (
+            <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/[.04] p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium text-cyan-200">
+                <Plug className="h-3.5 w-3.5" /> Connected providers
+              </p>
+              <p className="mt-1 text-[10px] leading-4 text-zinc-500">
+                Choose the operator-connected accounts this agent may use. Credentials remain server-side and writes still require approval.
+              </p>
+              {connectedIntegrations.length ? (
+                <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                  {connectedIntegrations.map((integration) => {
+                    const on = form.allowed_providers.includes(integration.provider);
+                    return (
+                      <button
+                        key={integration.provider}
+                        type="button"
+                        onClick={() => toggleProvider(integration.provider)}
+                        className={`flex items-start gap-2 rounded-xl border p-2.5 text-left transition ${on ? 'border-cyan-400/40 bg-cyan-500/10' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
+                      >
+                        <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border ${on ? 'border-cyan-400 bg-cyan-400 text-black' : 'border-white/20'}`}>{on ? '✓' : ''}</span>
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-medium text-white">{integration.name}</span>
+                          <span className="block truncate text-[10px] text-zinc-500">{integration.accountLabel || integration.provider}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl border border-amber-400/15 bg-amber-500/[.05] px-3 py-2 text-[10px] text-amber-200/80">
+                  No connected accounts are available. Connect one from Integrations first.
+                </p>
+              )}
+              {connectedIntegrations.length > 0 && form.allowed_providers.length === 0 && (
+                <p className="mt-2 text-[10px] text-amber-300">Select at least one provider or this agent will have no connected-account access.</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className={label} htmlFor="ag-domains">Allowed website domains (allowlist for the browser agent)</label>
