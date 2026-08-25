@@ -115,6 +115,55 @@ describe("tool execution guards", () => {
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result.output)).toContain("allow-list");
   });
+
+  it("blocks a connected provider that is not assigned to the agent", async () => {
+    const db = sb();
+    const grants = new Map([
+      [
+        "connected_service",
+        {
+          slug: "connected_service",
+          requiresApproval: false,
+          allowedDomains: [],
+          spendCap: null,
+        },
+      ],
+    ]);
+    const result = await executeTool(
+      "connected_service",
+      { provider: "github", action: "repositories_list" },
+      { ...ctx(db), allowedProviders: ["linear"] },
+      grants as any,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatchObject({
+      error: 'Provider "github" is not assigned to this agent.',
+    });
+    expect(db.tables["tool_executions"][0]).toMatchObject({ status: "failed" });
+  });
+
+  it("blocks provider-wide capability discovery when an agent has no assignments", async () => {
+    const db = sb();
+    const grants = new Map([
+      [
+        "nango_capabilities",
+        {
+          slug: "nango_capabilities",
+          requiresApproval: false,
+          allowedDomains: [],
+          spendCap: null,
+        },
+      ],
+    ]);
+    const result = await executeTool(
+      "nango_capabilities",
+      {},
+      { ...ctx(db), allowedProviders: [] },
+      grants as any,
+    );
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result.output)).toContain("not assigned");
+  });
 });
 
 describe("central approval enforcement", () => {
