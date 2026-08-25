@@ -1,10 +1,9 @@
 /**
  * Provider-neutral agent integration runtime.
  *
- * The agent runtime must not know which transport actually reaches a connected
- * provider. This module is the single abstraction the runtime talks to: it
- * classifies risk, prepares bounded action payloads, and executes them through
- * the transport that owns the credentials. Credentials never leave the server.
+ * The agent runtime does not know which transport reaches a connected provider.
+ * Native APIs are preferred when PalladiumAI owns a first-class adapter; connector
+ * transports such as Nango remain fallbacks. Credentials stay server-side.
  */
 import { isSafeNangoProviderId } from "./nango-providers";
 import {
@@ -13,12 +12,15 @@ import {
   prepareNangoAgentAction,
   type NangoActionRisk,
 } from "./nango-capabilities.server";
+import {
+  executeNativeShopifyAction,
+  hasNativeShopifyConnection,
+  listNativeShopifyCapabilities,
+  prepareNativeShopifyAction,
+} from "./shopify.server";
 
-/** Transports are server-side implementation details, recorded so an approved
- * action can be replayed through exactly the same path. */
-export const INTEGRATION_TRANSPORTS = ["nango"] as const;
+export const INTEGRATION_TRANSPORTS = ["native", "nango"] as const;
 export type IntegrationTransport = (typeof INTEGRATION_TRANSPORTS)[number];
-
 export type IntegrationActionRisk = NangoActionRisk;
 
 export type IntegrationCapability = {
@@ -42,9 +44,6 @@ export type PreparedIntegrationAction = {
   transport: IntegrationTransport;
 };
 
-const DEFAULT_TRANSPORT: IntegrationTransport = "nango";
-
-/** Accepts both neutral (`slack`) and legacy prefixed (`nango_slack`) IDs. */
 export function normalizeIntegrationProvider(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase().replace(/^nango_/, "") : "";
 }
@@ -53,28 +52,44 @@ export function isIntegrationTransport(value: unknown): value is IntegrationTran
   return typeof value === "string" && (INTEGRATION_TRANSPORTS as readonly string[]).includes(value);
 }
 
-/** Resolves which server-side transport can reach a provider for this user. */
+/** Static hint only. User-aware preparation below chooses native vs connector. */
 export function resolveIntegrationTransport(provider: string): IntegrationTransport {
   const normalized = normalizeIntegrationProvider(provider);
+  if (normalized === "shopify") return "native";
   if (isSafeNangoProviderId(normalized)) return "nango";
-  return DEFAULT_TRANSPORT;
+  return "nango";
 }
 
-/** Live, typed actions the authenticated user's connected providers expose. */
+function capabilityKey(capability: { provider: string; action: string }) {
+  return `${normalizeIntegrationProvider(capability.provider)}:${capability.action}`;
+}
+
+/** Live typed actions across every transport, de-duplicated with native first. */
 export async function listIntegrationCapabilities(
   userId: string,
   provider?: string,
 ): Promise<IntegrationCapability[]> {
   const normalized = normalizeIntegrationProvider(provider);
-  const capabilities = await listNangoAgentCapabilities(userId, normalized || undefined);
-  return capabilities.map((capability) => ({
-    ...capability,
-    provider: normalizeIntegrationProvider(capability.provider),
-    transport: "nango" as const,
-  }));
+  const native = !normalized || normalized === "shopify"
+    ? await listNativeShopifyCapabilities(userId)
+    : [];
+  const nango = await listNangoAgentCapabilities(userId, normalized || undefined).catch(() => []);
+  const merged = new Map<string, IntegrationCapability>();
+  for (const capability of native) merged.set(capabilityKey(capability), capability);
+  for (const capability of nango) {
+    const item: IntegrationCapability = {
+      ...capability,
+      provider: normalizeIntegrationProvider(capability.provider),
+      transport: "nango",
+    };
+    if (!merged.has(capabilityKey(item))) merged.set(capabilityKey(item), item);
+  }
+  return [...merged.values()].sort((a, b) =>
+    a.provider === b.provider ? a.action.localeCompare(b.action) : a.provider.localeCompare(b.provider),
+  );
 }
 
-/** Validates and classifies an action without touching the provider. */
+/** Validates/classifies without touching the provider. Native Shopify wins when connected. */
 export async function prepareIntegrationAction(input: {
   userId: string;
   provider: string;
@@ -82,7 +97,13 @@ export async function prepareIntegrationAction(input: {
   actionInput: Record<string, unknown>;
 }): Promise<PreparedIntegrationAction> {
   const provider = normalizeIntegrationProvider(input.provider);
-  const transport = resolveIntegrationTransport(provider);
+  if (provider === "shopify" && await hasNativeShopifyConnection(input.userId)) {
+    return prepareNativeShopifyAction({
+      userId: input.userId,
+      action: input.action,
+      actionInput: input.actionInput,
+    });
+  }
   const prepared = await prepareNangoAgentAction({
     userId: input.userId,
     provider,
@@ -96,11 +117,11 @@ export async function prepareIntegrationAction(input: {
     risk: prepared.risk,
     requiresApproval: prepared.requiresApproval,
     input: prepared.input,
-    transport,
+    transport: "nango",
   };
 }
 
-/** Executes a prepared action through the recorded transport. */
+/** Executes through the transport stored in the prepared/approved action. */
 export async function executeIntegrationAction(input: {
   userId: string;
   provider: string;
@@ -110,10 +131,22 @@ export async function executeIntegrationAction(input: {
   signal?: AbortSignal;
 }): Promise<{ ok: boolean; provider: string; transport: IntegrationTransport; result?: unknown; error?: string }> {
   const provider = normalizeIntegrationProvider(input.provider);
-  const requested = isIntegrationTransport(input.transport) ? input.transport : null;
-  const transport = requested ?? resolveIntegrationTransport(provider);
+  const transport = isIntegrationTransport(input.transport)
+    ? input.transport
+    : provider === "shopify" && await hasNativeShopifyConnection(input.userId)
+      ? "native"
+      : "nango";
   try {
-    if (transport !== "nango") throw new Error(`Unsupported integration transport "${transport}".`);
+    if (transport === "native") {
+      if (provider !== "shopify") throw new Error(`No native integration adapter is registered for "${provider}".`);
+      const outcome = await executeNativeShopifyAction({
+        userId: input.userId,
+        action: input.action,
+        actionInput: input.actionInput,
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return { ...outcome, provider, transport };
+    }
     const outcome = await executeNangoAgentAction({
       userId: input.userId,
       provider,
@@ -121,7 +154,7 @@ export async function executeIntegrationAction(input: {
       actionInput: input.actionInput,
       ...(input.signal ? { signal: input.signal } : {}),
     });
-    return { ...outcome, provider: normalizeIntegrationProvider(outcome.provider), transport };
+    return { ...outcome, provider: normalizeIntegrationProvider(outcome.provider), transport: "nango" };
   } catch (error) {
     return {
       ok: false,
