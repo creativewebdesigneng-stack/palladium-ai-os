@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { decryptToken } from "./oauth.server";
 
 export const SHOPIFY_API_VERSION = "2026-07";
@@ -19,6 +19,22 @@ export type ShopifyCapability = {
   deployed: true;
   inputSchema: Record<string, unknown>;
   transport: "native";
+};
+
+type BoundedShopifyInput = {
+  query?: string;
+  limit?: number;
+  product_id?: string;
+  title?: string;
+  vendor?: string;
+  product_type?: string;
+  status?: "ACTIVE" | "DRAFT" | "ARCHIVED";
+  tags?: string[];
+  inventory_item_id?: string;
+  location_id?: string;
+  quantity?: number;
+  current_quantity?: number;
+  reason?: string;
 };
 
 const PRODUCT_GID = /^gid:\/\/shopify\/Product\/\d+$/;
@@ -86,6 +102,10 @@ export async function exchangeShopifyCode(args: { shop: string; code: string }) 
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const granted = new Set(scopes);
+  const missing = SHOPIFY_SCOPES.filter((scope) => !granted.has(scope));
+  if (missing.length)
+    throw new Error(`Shopify did not grant required permissions: ${missing.join(", ")}.`);
   return { accessToken: payload["access_token"] as string, scopes };
 }
 
@@ -183,18 +203,18 @@ export async function prepareNativeShopifyAction(input: { userId: string; action
   const capability = capabilities.find((item) => item.action === input.action);
   if (!capability) throw new Error(`Native Shopify does not expose action "${input.action}".`);
   const raw = input.actionInput ?? {};
-  let bounded: Record<string, unknown> = {};
+  let bounded: BoundedShopifyInput = {};
   if (input.action === "product_update") {
     const id = text(raw["product_id"], 120);
     if (!PRODUCT_GID.test(id)) throw new Error("A valid Shopify product_id is required.");
     bounded.product_id = id;
-    for (const key of ["title", "vendor", "product_type"]) {
-      const v = text(raw[key], key === "title" ? 255 : 150);
-      if (v) bounded[key] = v;
+    for (const key of ["title", "vendor", "product_type"] as const) {
+      const value = text(raw[key], key === "title" ? 255 : 150);
+      if (value) bounded[key] = value;
     }
     const status = text(raw["status"], 20).toUpperCase();
-    if (status && ["ACTIVE", "DRAFT", "ARCHIVED"].includes(status)) bounded.status = status;
-    if (Array.isArray(raw["tags"])) bounded.tags = raw["tags"].slice(0, 100).map((v) => text(v, 100)).filter(Boolean);
+    if (status === "ACTIVE" || status === "DRAFT" || status === "ARCHIVED") bounded.status = status;
+    if (Array.isArray(raw["tags"])) bounded.tags = raw["tags"].slice(0, 100).map((value) => text(value, 100)).filter(Boolean);
   } else if (input.action === "inventory_set_on_hand") {
     const inventoryItemId = text(raw["inventory_item_id"], 120);
     const locationId = text(raw["location_id"], 120);
@@ -211,24 +231,25 @@ export async function prepareNativeShopifyAction(input: { userId: string; action
 
 export async function executeNativeShopifyAction(input: { userId: string; action: string; actionInput: Record<string, unknown>; signal?: AbortSignal }) {
   const prepared = await prepareNativeShopifyAction(input);
-  const v = prepared.input;
+  const v: BoundedShopifyInput = prepared.input;
   if (input.action === "shop_overview") {
     const data = await shopifyGraphql(input.userId, `query { shop { name myshopifyDomain primaryDomain { host url } plan { displayName } currencyCode timezoneAbbreviation } }`, {}, input.signal);
     return { ok: true as const, provider: "shopify", result: data.shop };
   }
   if (input.action === "products_list") {
-    const data = await shopifyGraphql(input.userId, `query Products($first:Int!,$query:String){ products(first:$first,query:$query,sortKey:UPDATED_AT,reverse:true){ nodes { id title handle vendor productType status updatedAt totalInventory variants(first:20){nodes{id title sku inventoryItem{id} inventoryQuantity}} } } }`, { first: v.limit, query: v.query || null }, input.signal);
+    const data = await shopifyGraphql(input.userId, `query Products($first:Int!,$query:String){ products(first:$first,query:$query,sortKey:UPDATED_AT,reverse:true){ nodes { id title handle vendor productType status updatedAt totalInventory variants(first:20){nodes{id title sku inventoryItem{id} inventoryQuantity}} } } }`, { first: v.limit ?? 20, query: v.query || null }, input.signal);
     return { ok: true as const, provider: "shopify", result: data.products };
   }
   if (input.action === "orders_list") {
-    const data = await shopifyGraphql(input.userId, `query Orders($first:Int!,$query:String){ orders(first:$first,query:$query,sortKey:CREATED_AT,reverse:true){ nodes { id name createdAt displayFinancialStatus displayFulfillmentStatus currentTotalPriceSet{shopMoney{amount currencyCode}} lineItems(first:30){nodes{name quantity sku}} } } }`, { first: v.limit, query: v.query || null }, input.signal);
+    const data = await shopifyGraphql(input.userId, `query Orders($first:Int!,$query:String){ orders(first:$first,query:$query,sortKey:CREATED_AT,reverse:true){ nodes { id name createdAt displayFinancialStatus displayFulfillmentStatus currentTotalPriceSet{shopMoney{amount currencyCode}} lineItems(first:30){nodes{name quantity sku}} } } }`, { first: v.limit ?? 20, query: v.query || null }, input.signal);
     return { ok: true as const, provider: "shopify", result: data.orders };
   }
   if (input.action === "inventory_list") {
-    const data = await shopifyGraphql(input.userId, `query Inventory($first:Int!,$query:String){ locations(first:20){nodes{id name isActive}} products(first:$first,query:$query){nodes{id title variants(first:20){nodes{id title sku inventoryItem{id inventoryLevels(first:20){nodes{location{id name} quantities(names:[\"available\",\"on_hand\"]){name quantity}}}}}}}} }`, { first: v.limit, query: v.query || null }, input.signal);
+    const data = await shopifyGraphql(input.userId, `query Inventory($first:Int!,$query:String){ locations(first:20){nodes{id name isActive}} products(first:$first,query:$query){nodes{id title variants(first:20){nodes{id title sku inventoryItem{id inventoryLevels(first:20){nodes{location{id name} quantities(names:[\"available\",\"on_hand\"]){name quantity}}}}}}}} }`, { first: v.limit ?? 20, query: v.query || null }, input.signal);
     return { ok: true as const, provider: "shopify", result: data };
   }
   if (input.action === "product_update") {
+    if (!v.product_id) throw new Error("Prepared Shopify product update is missing product_id.");
     const product: Record<string, unknown> = { id: v.product_id };
     if (v.title) product.title = v.title;
     if (v.vendor) product.vendor = v.vendor;
@@ -240,9 +261,11 @@ export async function executeNativeShopifyAction(input: { userId: string; action
     return errors.length ? { ok: false as const, provider: "shopify", error: String(errors[0]?.message ?? "Shopify rejected the product update.") } : { ok: true as const, provider: "shopify", result: data.productUpdate?.product };
   }
   if (input.action === "inventory_set_on_hand") {
+    if (!v.inventory_item_id || !v.location_id || v.quantity === undefined || v.current_quantity === undefined)
+      throw new Error("Prepared Shopify inventory update is incomplete.");
     const data = await shopifyGraphql(input.userId, `mutation SetInventory($input:InventorySetOnHandQuantitiesInput!,$key:String!){inventorySetOnHandQuantities(input:$input) @idempotent(key:$key){inventoryAdjustmentGroup{createdAt reason changes{name delta}} userErrors{field message}}}`, {
-      key: crypto.randomUUID(),
-      input: { reason: v.reason, setQuantities: [{ inventoryItemId: v.inventory_item_id, locationId: v.location_id, quantity: v.quantity, changeFromQuantity: v.current_quantity }] },
+      key: randomUUID(),
+      input: { reason: v.reason ?? "correction", setQuantities: [{ inventoryItemId: v.inventory_item_id, locationId: v.location_id, quantity: v.quantity, changeFromQuantity: v.current_quantity }] },
     }, input.signal);
     const errors = data.inventorySetOnHandQuantities?.userErrors ?? [];
     return errors.length ? { ok: false as const, provider: "shopify", error: String(errors[0]?.message ?? "Shopify rejected the inventory change.") } : { ok: true as const, provider: "shopify", result: data.inventorySetOnHandQuantities?.inventoryAdjustmentGroup };
