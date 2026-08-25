@@ -10,6 +10,12 @@ import {
   triggerOwnedNangoAction,
   type NangoActionFunction,
 } from "./nango.server";
+import {
+  executeEtsyNangoAction,
+  isEtsyNangoAction,
+  listEtsyNangoCapabilities,
+  prepareEtsyNangoAction,
+} from "./etsy-nango-actions.server";
 
 export type NangoActionRisk = "low" | "medium" | "high";
 
@@ -190,7 +196,7 @@ export async function listNangoAgentCapabilities(userId: string, provider?: stri
   const groups = await Promise.all(
     selected.map(async (connection) => {
       const actions = await discoverProviderActions(connection.providerId);
-      return actions.map(({ action, deployed }): NangoAgentCapability => {
+      const advertised = actions.map(({ action, deployed }): NangoAgentCapability => {
         const risk = classifyNangoActionRisk(action.name, action.description);
         return {
           provider: connection.providerId,
@@ -202,6 +208,11 @@ export async function listNangoAgentCapabilities(userId: string, provider?: stri
           inputSchema: safeInputSchema(action),
         };
       });
+      if (connection.providerId !== "etsy") return advertised;
+      const merged = new Map<string, NangoAgentCapability>();
+      for (const capability of listEtsyNangoCapabilities()) merged.set(capability.action, capability);
+      for (const capability of advertised) merged.set(capability.action, capability);
+      return [...merged.values()];
     }),
   );
   return groups
@@ -248,6 +259,27 @@ export async function executeNangoAgentAction(input: {
   signal?: AbortSignal;
 }) {
   assertSafeNangoActionInput(input.actionInput);
+  if (input.provider === "etsy" && isEtsyNangoAction(input.action)) {
+    try {
+      const outcome = await executeEtsyNangoAction({
+        userId: input.userId,
+        action: input.action,
+        actionInput: input.actionInput,
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return {
+        ok: true as const,
+        provider: "etsy",
+        result: sanitizeNangoActionOutput(outcome.result),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        provider: "etsy",
+        error: error instanceof Error ? error.message : "Etsy proxy action execution failed.",
+      };
+    }
+  }
   const resolved = await resolveOwnedAction(input.userId, input.provider, input.action);
   if (!resolved.deployed) await ensureActionDeployed(resolved.provider, resolved.action);
   try {
@@ -281,6 +313,13 @@ export async function prepareNangoAgentAction(input: {
   actionInput: Record<string, unknown>;
 }) {
   assertSafeNangoActionInput(input.actionInput);
+  if (input.provider === "etsy" && isEtsyNangoAction(input.action)) {
+    return prepareEtsyNangoAction({
+      userId: input.userId,
+      action: input.action,
+      actionInput: input.actionInput,
+    });
+  }
   const resolved = await resolveOwnedAction(input.userId, input.provider, input.action);
   const risk = classifyNangoActionRisk(resolved.action.name, resolved.action.description);
   return {
