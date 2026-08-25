@@ -36,7 +36,7 @@ function ShopifyConnectScreen() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
-        to="/Integrations"
+        to="/integrations"
         className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Integrations
