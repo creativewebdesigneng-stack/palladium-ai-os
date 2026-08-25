@@ -9,10 +9,11 @@ import type { ToolDef } from "./model-gateway.server";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
 import {
-  executeNangoAgentAction,
-  listNangoAgentCapabilities,
-  prepareNangoAgentAction,
-} from "@/lib/integrations/nango-capabilities.server";
+  executeIntegrationAction,
+  listIntegrationCapabilities,
+  normalizeIntegrationProvider,
+  prepareIntegrationAction,
+} from "@/lib/integrations/agent-integration-runtime.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
 import {
   createBrowserTool,
@@ -46,22 +47,136 @@ type ToolImpl = {
 
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 
-function normalizeProvider(value: unknown) {
-  return str(value).trim().toLowerCase().replace(/^nango_/, "");
-}
+const normalizeProvider = (value: unknown) => normalizeIntegrationProvider(value);
+
+/** Neutral tool names plus the legacy Nango aliases kept for existing agents. */
+const CAPABILITY_TOOLS = new Set(["integration_capabilities", "nango_capabilities"]);
+const DYNAMIC_ACTION_TOOLS = new Set(["integration_action", "nango_action"]);
 
 function providerForTool(name: string, input: Record<string, unknown>) {
   if (name === "github_write") return "github";
   if (
     name === "connected_service" ||
     name === "connected_service_write" ||
-    name === "nango_action" ||
-    name === "nango_capabilities"
+    CAPABILITY_TOOLS.has(name) ||
+    DYNAMIC_ACTION_TOOLS.has(name)
   ) {
     return normalizeProvider(input["provider"]);
   }
   return "";
 }
+
+function integrationCapabilitiesDef(name: string): ToolDef {
+  return {
+    name,
+    description:
+      "Discover the authenticated user's live connected-app actions. Returns typed input schemas and whether each action can run autonomously or needs operator approval.",
+    parameters: {
+      type: "object",
+      properties: {
+        provider: {
+          type: "string",
+          description: "Optional connected provider ID. Omit to inspect every connected provider.",
+        },
+      },
+      required: [],
+    },
+  };
+}
+
+function integrationActionDef(name: string): ToolDef {
+  return {
+    name,
+    description:
+      "Run a discovered connected-app action for the authenticated user. Read-only actions run under policy; writes and destructive actions queue the exact payload for operator approval.",
+    parameters: {
+      type: "object",
+      properties: {
+        provider: { type: "string", description: "Connected provider ID." },
+        action: { type: "string", description: "Exact action returned by integration_capabilities." },
+        input: {
+          type: "object",
+          description: "Action input matching the schema returned by integration_capabilities.",
+        },
+      },
+      required: ["provider", "action", "input"],
+    },
+  };
+}
+
+const runIntegrationCapabilities: ToolImpl["run"] = async (input, ctx) => {
+  const provider = normalizeProvider(input["provider"]);
+  const capabilities = await listIntegrationCapabilities(ctx.userId, provider || undefined);
+  const allowed = ctx.allowedProviders
+    ? new Set(ctx.allowedProviders.map(normalizeProvider).filter(Boolean))
+    : null;
+  const visibleCapabilities = allowed
+    ? capabilities.filter((item) => allowed.has(normalizeProvider(item.provider)))
+    : capabilities;
+  return {
+    capabilities: visibleCapabilities,
+    count: visibleCapabilities.length,
+    autonomous: visibleCapabilities.filter((item) => !item.requiresApproval).length,
+    approvalRequired: visibleCapabilities.filter((item) => item.requiresApproval).length,
+  };
+};
+
+const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
+  const provider = normalizeProvider(input["provider"]);
+  const action = str(input["action"]);
+  const actionInput =
+    input["input"] && typeof input["input"] === "object" && !Array.isArray(input["input"])
+      ? (input["input"] as Record<string, unknown>)
+      : {};
+  const prepared = await prepareIntegrationAction({
+    userId: ctx.userId,
+    provider,
+    action,
+    actionInput,
+  });
+  if (prepared.requiresApproval || ctx.requiresApproval) {
+    const { data, error } = await ctx.sb
+      .from("approval_requests")
+      .insert({
+        user_id: ctx.userId,
+        org_id: ctx.orgId,
+        agent_id: ctx.agentId,
+        task_id: ctx.taskId,
+        action_type: "nango_dynamic_action",
+        title: `${prepared.action.replace(/[-_.]/g, " ")}: ${prepared.provider}`.slice(0, 180),
+        summary:
+          "Approve this connected-app action. The provider, action name, transport and exact bounded input are immutable during execution and retry.",
+        details: {
+          provider: prepared.provider,
+          action: prepared.action,
+          input: prepared.input,
+          transport: prepared.transport,
+        },
+        risk_level: ctx.requiresApproval && prepared.risk === "low" ? "medium" : prepared.risk,
+        status: "pending",
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) return { error: "Could not queue the connected-app action for approval." };
+    return {
+      queued: true,
+      approval_request_id: data?.id,
+      status: "pending",
+      provider: prepared.provider,
+      action: prepared.action,
+      risk: prepared.risk,
+      transport: prepared.transport,
+    };
+  }
+  return executeIntegrationAction({
+    userId: ctx.userId,
+    provider: prepared.provider,
+    action: prepared.action,
+    actionInput: prepared.input,
+    transport: prepared.transport,
+    ...(ctx.signal ? { signal: ctx.signal } : {}),
+  });
+};
 
 const REGISTRY: Record<string, ToolImpl> = {
   current_time: {
@@ -468,111 +583,25 @@ const REGISTRY: Record<string, ToolImpl> = {
       ),
   },
 
+  integration_capabilities: {
+    def: integrationCapabilitiesDef("integration_capabilities"),
+    run: runIntegrationCapabilities,
+  },
+
+  integration_action: {
+    def: integrationActionDef("integration_action"),
+    run: runIntegrationAction,
+  },
+
+  // Legacy aliases: existing agents and tool_permissions rows reference these.
   nango_capabilities: {
-    def: {
-      name: "nango_capabilities",
-      description:
-        "Discover the authenticated user's live Nango actions. Returns typed input schemas and whether each action can run autonomously or needs operator approval.",
-      parameters: {
-        type: "object",
-        properties: {
-          provider: {
-            type: "string",
-            description: "Optional connected Nango provider ID. Omit to inspect every connected provider.",
-          },
-        },
-        required: [],
-      },
-    },
-    run: async (input, ctx) => {
-      const provider = normalizeProvider(input["provider"]);
-      const capabilities = await listNangoAgentCapabilities(ctx.userId, provider || undefined);
-      const allowed = ctx.allowedProviders
-        ? new Set(ctx.allowedProviders.map(normalizeProvider).filter(Boolean))
-        : null;
-      const visibleCapabilities = allowed
-        ? capabilities.filter((item) => allowed.has(normalizeProvider(item.provider)))
-        : capabilities;
-      return {
-        capabilities: visibleCapabilities,
-        count: visibleCapabilities.length,
-        autonomous: visibleCapabilities.filter((item) => !item.requiresApproval).length,
-        approvalRequired: visibleCapabilities.filter((item) => item.requiresApproval).length,
-      };
-    },
+    def: integrationCapabilitiesDef("nango_capabilities"),
+    run: runIntegrationCapabilities,
   },
 
   nango_action: {
-    def: {
-      name: "nango_action",
-      description:
-        "Run a discovered Nango action for the authenticated user. Read-only actions run under policy; writes and destructive actions queue the exact payload for operator approval.",
-      parameters: {
-        type: "object",
-        properties: {
-          provider: { type: "string", description: "Connected Nango provider ID." },
-          action: { type: "string", description: "Exact action returned by nango_capabilities." },
-          input: {
-            type: "object",
-            description: "Action input matching the schema returned by nango_capabilities.",
-          },
-        },
-        required: ["provider", "action", "input"],
-      },
-    },
-    run: async (input, ctx) => {
-      const provider = str(input["provider"]).toLowerCase();
-      const action = str(input["action"]);
-      const actionInput =
-        input["input"] && typeof input["input"] === "object" && !Array.isArray(input["input"])
-          ? (input["input"] as Record<string, unknown>)
-          : {};
-      const prepared = await prepareNangoAgentAction({
-        userId: ctx.userId,
-        provider,
-        action,
-        actionInput,
-      });
-      if (prepared.requiresApproval || ctx.requiresApproval) {
-        const { data, error } = await ctx.sb
-          .from("approval_requests")
-          .insert({
-            user_id: ctx.userId,
-            org_id: ctx.orgId,
-            agent_id: ctx.agentId,
-            task_id: ctx.taskId,
-            action_type: "nango_dynamic_action",
-            title: `${prepared.action.replace(/[-_.]/g, " ")}: ${prepared.provider}`.slice(0, 180),
-            summary:
-              "Approve this Nango action. The provider, action name and exact bounded input are immutable during execution and retry.",
-            details: {
-              provider: prepared.provider,
-              action: prepared.action,
-              input: prepared.input,
-            },
-            risk_level: ctx.requiresApproval && prepared.risk === "low" ? "medium" : prepared.risk,
-            status: "pending",
-          })
-          .select("id")
-          .maybeSingle();
-        if (error) return { error: "Could not queue the Nango action for approval." };
-        return {
-          queued: true,
-          approval_request_id: data?.id,
-          status: "pending",
-          provider: prepared.provider,
-          action: prepared.action,
-          risk: prepared.risk,
-        };
-      }
-      return executeNangoAgentAction({
-        userId: ctx.userId,
-        provider: prepared.provider,
-        action: prepared.action,
-        actionInput: prepared.input,
-        ...(ctx.signal ? { signal: ctx.signal } : {}),
-      });
-    },
+    def: integrationActionDef("nango_action"),
+    run: runIntegrationAction,
   },
 
   connected_service_write: {
@@ -1300,6 +1329,8 @@ export async function resolveGrantedTools(
   // Existing agents that were granted Connected Services automatically receive
   // the safe dynamic discovery/execution pair. Per-tool policy still applies.
   if (requestedSet.has("connected_service")) {
+    requestedSet.add("integration_capabilities");
+    requestedSet.add("integration_action");
     requestedSet.add("nango_capabilities");
     requestedSet.add("nango_action");
   }
@@ -1332,9 +1363,9 @@ export async function resolveGrantedTools(
     grants.set(slug, {
       slug,
       requiresApproval:
-        slug === "nango_capabilities" ||
+        CAPABILITY_TOOLS.has(slug) ||
         slug === "connected_service" ||
-        slug === "nango_action"
+        DYNAMIC_ACTION_TOOLS.has(slug)
           ? false
           : Boolean(REGISTRY[slug]?.sensitive) ||
             Boolean(entry?.requires_approval) ||
@@ -1419,8 +1450,8 @@ export async function executeTool(
     const providerScoped =
       name === "connected_service" ||
       name === "connected_service_write" ||
-      name === "nango_action" ||
-      name === "nango_capabilities" ||
+      DYNAMIC_ACTION_TOOLS.has(name) ||
+      CAPABILITY_TOOLS.has(name) ||
       name === "github_write";
     if (providerScoped && ((provider && !allowed.has(provider)) || (!provider && allowed.size === 0))) {
       const label = provider || "any connected provider";
@@ -1450,6 +1481,7 @@ export async function executeTool(
     "connected_service_write",
     "github_write",
     "nango_action",
+    "integration_action",
   ]);
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });
