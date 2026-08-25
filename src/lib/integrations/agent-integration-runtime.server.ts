@@ -14,7 +14,12 @@ import {
   type IntegrationAdapterId,
 } from "./integration-adapters.server";
 
-export const INTEGRATION_TRANSPORTS = ["direct_oauth", "nango"] as const;
+export const INTEGRATION_TRANSPORTS = [
+  "direct_oauth",
+  "github_app",
+  "salesforce_oauth",
+  "nango",
+] as const;
 export type IntegrationTransport = IntegrationAdapterId;
 
 export type IntegrationCapability = {
