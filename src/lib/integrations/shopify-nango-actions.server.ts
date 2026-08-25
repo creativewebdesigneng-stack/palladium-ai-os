@@ -242,10 +242,10 @@ const SHOPIFY_ACTIONS: readonly ShopifyActionDefinition[] = [
       const vendor = boundedString(input, "vendor", 255);
       const productType = boundedString(input, "product_type", 255);
       const tags = safeTags(input);
-      if (descriptionHtml !== undefined) product.descriptionHtml = descriptionHtml;
-      if (vendor !== undefined) product.vendor = vendor;
-      if (productType !== undefined) product.productType = productType;
-      if (tags !== undefined) product.tags = tags;
+      if (descriptionHtml !== undefined) product["descriptionHtml"] = descriptionHtml;
+      if (vendor !== undefined) product["vendor"] = vendor;
+      if (productType !== undefined) product["productType"] = productType;
+      if (tags !== undefined) product["tags"] = tags;
       return graphQLRequest(CREATE_PRODUCT, { product });
     },
   },
@@ -278,12 +278,12 @@ const SHOPIFY_ACTIONS: readonly ShopifyActionDefinition[] = [
       const status = boundedString(input, "status", 10);
       const tags = safeTags(input);
       if (status && !["DRAFT", "ACTIVE"].includes(status)) throw new Error("status must be DRAFT or ACTIVE.");
-      if (title !== undefined) product.title = title;
-      if (descriptionHtml !== undefined) product.descriptionHtml = descriptionHtml;
-      if (vendor !== undefined) product.vendor = vendor;
-      if (productType !== undefined) product.productType = productType;
-      if (status !== undefined) product.status = status;
-      if (tags !== undefined) product.tags = tags;
+      if (title !== undefined) product["title"] = title;
+      if (descriptionHtml !== undefined) product["descriptionHtml"] = descriptionHtml;
+      if (vendor !== undefined) product["vendor"] = vendor;
+      if (productType !== undefined) product["productType"] = productType;
+      if (status !== undefined) product["status"] = status;
+      if (tags !== undefined) product["tags"] = tags;
       if (Object.keys(product).length === 1) throw new Error("Provide at least one Shopify product field to update.");
       return graphQLRequest(UPDATE_PRODUCT, { product });
     },
