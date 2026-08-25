@@ -5,7 +5,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { EntitlementError } from "@/lib/platform/entitlements.server";
-import { failRun, prepareRun, RuntimeError } from "./runtime.server";
+import {
+  failRun,
+  prepareRun,
+  rescueRuntimeConnectedServiceRead,
+  RuntimeError,
+} from "./runtime.server";
 import { executePlannedRun } from "./planner-runtime.server";
 import { captureVerifiedAgentExperience } from "./agent-learning.server";
 import { TOOL_SLUGS } from "./tools.server";
@@ -90,7 +95,16 @@ export const runAgentTask = createServerFn({ method: "POST" })
       });
       return { task, output };
     } catch (error) {
-      if (run) await failRun({ userId: context.userId, run, error });
+      if (run) {
+        const rescued = await rescueRuntimeConnectedServiceRead({
+          sb,
+          userId: context.userId,
+          run,
+          error,
+        });
+        if (rescued) return { task: rescued.task, output: rescued.result.text };
+        await failRun({ userId: context.userId, run, error });
+      }
       surface(error);
     }
   });

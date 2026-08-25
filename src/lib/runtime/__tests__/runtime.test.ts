@@ -62,6 +62,7 @@ import {
   isSuccessState,
   isTerminalState,
   prepareRun,
+  runtimeConnectedServiceReadSpec,
   RuntimeError,
 } from "../runtime.server";
 import { executeWorkflowRun, runStep } from "../workforce.server";
@@ -226,6 +227,40 @@ describe("subscription and usage limits", () => {
 });
 
 describe("run lifecycle", () => {
+  it("matches only an assigned and granted GitHub repository read fallback", () => {
+    const run = {
+      agent: { ...AGENT, allowed_providers: ["github"] },
+      messages: [{ role: "user", content: "Use GitHub to list my five repositories." }],
+      tools: {
+        defs: [],
+        grants: new Map([
+          [
+            "connected_service",
+            { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null },
+          ],
+        ]),
+      },
+    } as any;
+
+    expect(runtimeConnectedServiceReadSpec(run)).toEqual({
+      provider: "github",
+      action: "repositories_list",
+      limit: 5,
+    });
+    expect(
+      runtimeConnectedServiceReadSpec({
+        ...run,
+        agent: { ...run.agent, allowed_providers: [] },
+      }),
+    ).toBeNull();
+    expect(
+      runtimeConnectedServiceReadSpec({
+        ...run,
+        messages: [{ role: "user", content: "Create a GitHub issue." }],
+      }),
+    ).toBeNull();
+  });
+
   it("opens the task as queued then moves it to running", async () => {
     const sb = db();
     gateway.runChat.mockResolvedValue(textResult());
@@ -746,5 +781,4 @@ describe("workflow approval gates", () => {
     expect(sb.tables.workflow_step_runs.some((row: any) => row.step_id === "delay-after")).toBe(false);
   });
 });
-
 
