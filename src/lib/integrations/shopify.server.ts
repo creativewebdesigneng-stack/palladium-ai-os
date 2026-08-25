@@ -251,11 +251,11 @@ export async function executeNativeShopifyAction(input: { userId: string; action
   if (input.action === "product_update") {
     if (!v.product_id) throw new Error("Prepared Shopify product update is missing product_id.");
     const product: Record<string, unknown> = { id: v.product_id };
-    if (v.title) product.title = v.title;
-    if (v.vendor) product.vendor = v.vendor;
-    if (v.product_type) product.productType = v.product_type;
-    if (v.status) product.status = v.status;
-    if (v.tags) product.tags = v.tags;
+    if (v.title) product["title"] = v.title;
+    if (v.vendor) product["vendor"] = v.vendor;
+    if (v.product_type) product["productType"] = v.product_type;
+    if (v.status) product["status"] = v.status;
+    if (v.tags) product["tags"] = v.tags;
     const data = await shopifyGraphql(input.userId, `mutation ProductUpdate($product:ProductUpdateInput!){productUpdate(product:$product){product{id title handle vendor productType status tags updatedAt} userErrors{field message}}}`, { product }, input.signal);
     const errors = data.productUpdate?.userErrors ?? [];
     return errors.length ? { ok: false as const, provider: "shopify", error: String(errors[0]?.message ?? "Shopify rejected the product update.") } : { ok: true as const, provider: "shopify", result: data.productUpdate?.product };
