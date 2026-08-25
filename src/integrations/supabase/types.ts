@@ -1874,6 +1874,7 @@ export type Database = {
       }
       personal_agents: {
         Row: {
+          allowed_providers: string[]
           allowed_tools: string[]
           autonomy: Database["public"]["Enums"]["autonomy_level"]
           budget_limit: number | null
@@ -1911,6 +1912,7 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          allowed_providers?: string[]
           allowed_tools?: string[]
           autonomy?: Database["public"]["Enums"]["autonomy_level"]
           budget_limit?: number | null
@@ -1948,6 +1950,7 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          allowed_providers?: string[]
           allowed_tools?: string[]
           autonomy?: Database["public"]["Enums"]["autonomy_level"]
           budget_limit?: number | null
