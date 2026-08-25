@@ -8,8 +8,8 @@ import {
   executeApprovedGitHubAction,
   type ApprovedGitHubActionType,
 } from "@/lib/integrations/github-approved-action.server";
+import { executeApprovedIntegrationAction } from "@/lib/integrations/approved-integration-action.server";
 import { notify } from "@/lib/notifications/notify.server";
-import { executeNangoAgentAction } from "@/lib/integrations/nango-capabilities.server";
 
 type Sb = { from: (t: string) => any };
 type ExternalActionType = ApprovedActionType | ApprovedGitHubActionType | "nango_dynamic_action";
@@ -52,21 +52,7 @@ async function executeExternalAction(
   details: Record<string, unknown>,
 ) {
   if (type === "nango_dynamic_action") {
-    const provider = typeof details["provider"] === "string" ? details["provider"] : "";
-    const action = typeof details["action"] === "string" ? details["action"] : "";
-    const actionInput =
-      details["input"] && typeof details["input"] === "object" && !Array.isArray(details["input"])
-        ? (details["input"] as Record<string, unknown>)
-        : {};
-    try {
-      return await executeNangoAgentAction({ userId, provider, action, actionInput });
-    } catch (error) {
-      return {
-        ok: false as const,
-        provider: provider || null,
-        error: error instanceof Error ? error.message : "Nango action execution failed.",
-      };
-    }
+    return executeApprovedIntegrationAction(userId, details);
   }
   if (GITHUB_EXECUTABLE.has(type as ApprovedGitHubActionType)) {
     return executeApprovedGitHubAction(userId, {
