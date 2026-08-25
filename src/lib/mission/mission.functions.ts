@@ -11,6 +11,7 @@ import {
 import { assertWithinLimits } from "@/lib/shopping/limits.server";
 import { executePersonalTask } from "./personal-task-execution.server";
 import { decidePersonalTaskToolApproval } from "./personal-task-approval-decision.server";
+import { resolveAgentShoppingDomains } from "./shopping-domain-policy.server";
 
 import { notify } from "@/lib/notifications/notify.server";
 
@@ -518,7 +519,12 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         throw new Error(shoppingTaskRes.error?.message ?? "Could not start shopping research");
       const shoppingTask = shoppingTaskRes.data;
 
-      const allowedDomains = DEFAULT_DOMAINS;
+      const allowedDomains = await resolveAgentShoppingDomains({
+        sb,
+        userId,
+        agentId: agent?.id ?? null,
+        fallbackDomains: DEFAULT_DOMAINS,
+      });
       const allowedTools = agent?.allowed_tools?.length
         ? agent.allowed_tools
         : ["browser", "shopping_search", "checkout"];
@@ -989,6 +995,12 @@ export const chooseAlternative = createServerFn({ method: "POST" })
     if (!result || result.shopping_task_id !== purchase.shopping_task_id)
       throw new Error("Product not available for this task");
 
+    const allowedDomains = await resolveAgentShoppingDomains({
+      sb,
+      userId,
+      agentId: approval.agent_id ?? null,
+      fallbackDomains: DEFAULT_DOMAINS,
+    });
     const draft = await prepareCheckoutDraft({
       offer: {
         product: result.product,
@@ -1003,7 +1015,7 @@ export const chooseAlternative = createServerFn({ method: "POST" })
         specs: result.specs ?? {},
         reason: result.reason ?? "",
       },
-      allowedDomains: DEFAULT_DOMAINS,
+      allowedDomains,
       allowedTools: ["browser", "shopping_search", "checkout"],
     });
 
