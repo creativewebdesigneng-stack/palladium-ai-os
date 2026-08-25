@@ -288,7 +288,7 @@ const SHOPIFY_ACTIONS: readonly ShopifyActionDefinition[] = [
       return graphQLRequest(UPDATE_PRODUCT, { product });
     },
   },
-] as const;
+];
 
 export function listShopifyNangoCapabilities(): ShopifyNangoCapability[] {
   return SHOPIFY_ACTIONS.map(({ buildRequest: _buildRequest, mutation: _mutation, ...capability }) => capability);
@@ -311,23 +311,35 @@ async function assertConnected(userId: string) {
   }
 }
 
+function errorMessage(value: unknown, fallback: string): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  const message = (value as Record<string, unknown>)["message"];
+  return typeof message === "string" && message.trim() ? message : fallback;
+}
+
 function assertGraphQLSuccess(result: unknown, mutation: boolean) {
   if (!result || typeof result !== "object" || Array.isArray(result)) return;
-  const row = result as Record<string, any>;
-  if (Array.isArray(row.errors) && row.errors.length) {
-    const message = row.errors.map((error: any) => String(error?.message ?? "Shopify GraphQL error")).join("; ");
+  const row = result as Record<string, unknown>;
+  const topLevelErrors = row["errors"];
+  if (Array.isArray(topLevelErrors) && topLevelErrors.length) {
+    const message = topLevelErrors
+      .map((error) => errorMessage(error, "Shopify GraphQL error"))
+      .join("; ");
     throw new Error(message.slice(0, 1_000));
   }
   if (!mutation) return;
-  const data = row.data && typeof row.data === "object" ? row.data as Record<string, any> : {};
+  const rawData = row["data"];
+  const data = rawData && typeof rawData === "object" && !Array.isArray(rawData)
+    ? (rawData as Record<string, unknown>)
+    : {};
   for (const payload of Object.values(data)) {
-    const errors = payload && typeof payload === "object" && Array.isArray(payload.userErrors)
-      ? payload.userErrors
-      : [];
-    if (errors.length) {
-      const message = errors.map((error: any) => String(error?.message ?? "Shopify mutation error")).join("; ");
-      throw new Error(message.slice(0, 1_000));
-    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
+    const userErrors = (payload as Record<string, unknown>)["userErrors"];
+    if (!Array.isArray(userErrors) || !userErrors.length) continue;
+    const message = userErrors
+      .map((error) => errorMessage(error, "Shopify mutation error"))
+      .join("; ");
+    throw new Error(message.slice(0, 1_000));
   }
 }
 
