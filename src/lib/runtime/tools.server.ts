@@ -1332,7 +1332,9 @@ export async function resolveGrantedTools(
     grants.set(slug, {
       slug,
       requiresApproval:
-        slug === "nango_capabilities" || slug === "connected_service"
+        slug === "nango_capabilities" ||
+        slug === "connected_service" ||
+        slug === "nango_action"
           ? false
           : Boolean(REGISTRY[slug]?.sensitive) ||
             Boolean(entry?.requires_approval) ||
