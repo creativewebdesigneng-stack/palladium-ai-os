@@ -1329,15 +1329,18 @@ export async function resolveGrantedTools(
       rows.find((p: any) => p.agent_id === agent.id) ?? rows.find((p: any) => !p.agent_id);
     if (row && row.enabled === false) continue;
 
+    // Fixed read-only discovery/read tools never require approval; every
+    // write-capable tool (including nango_action) stays approval-gated.
+    const alwaysReadOnly = slug === "nango_capabilities" || slug === "connected_service";
+
     grants.set(slug, {
       slug,
-      requiresApproval:
-        slug === "nango_capabilities" || slug === "connected_service"
-          ? false
-          : Boolean(REGISTRY[slug]?.sensitive) ||
-            Boolean(entry?.requires_approval) ||
-            Boolean(row?.requires_approval) ||
-            Boolean(agent.requires_approval),
+      requiresApproval: alwaysReadOnly
+        ? false
+        : Boolean(REGISTRY[slug]?.sensitive) ||
+          Boolean(entry?.requires_approval) ||
+          Boolean(row?.requires_approval) ||
+          Boolean(agent.requires_approval),
       allowedDomains: (row?.allowed_domains as string[] | null) ?? [],
       spendCap: row?.spend_cap == null ? null : Number(row.spend_cap),
     });
