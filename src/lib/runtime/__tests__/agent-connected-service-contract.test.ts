@@ -99,4 +99,15 @@ describe("agent connected-service contract", () => {
       details: { provider: "microsoft", to: "person@example.com" },
     });
   });
+
+  it("keeps read-only connected-service tools unapproved while gating nango_action", async () => {
+    const { grants } = await resolveGrantedTools(
+      sb(),
+      { id: "agent-1", allowed_tools: ["connected_service"], requires_approval: true },
+      "explorer",
+    );
+    expect(grants.get("connected_service")?.requiresApproval).toBe(false);
+    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
+    expect(grants.get("nango_action")?.requiresApproval).toBe(true);
+  });
 });
