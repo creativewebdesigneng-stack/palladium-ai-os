@@ -538,6 +538,7 @@ export default function MissionControl() {
       <AgentBuilder
         open={builder.open}
         initial={builder.initial}
+        connectedIntegrations={data?.connectedIntegrations ?? []}
         saving={agentMutation.isPending}
         onClose={() => setBuilder({ open: false, initial: null })}
         onSave={(payload) => agentMutation.mutate(payload)}
