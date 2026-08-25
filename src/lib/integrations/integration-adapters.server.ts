@@ -41,8 +41,8 @@ export type AdapterExecutionOutcome =
   | {
       ok: false;
       error: string;
-      /** pre_dispatch is the only failure class that is safe to fail over automatically. */
       failurePhase: "pre_dispatch" | "post_dispatch" | "ambiguous";
+      safeToFailover: boolean;
     };
 
 export type IntegrationAdapter = {
@@ -142,13 +142,13 @@ const directOAuthAdapter: IntegrationAdapter = {
       );
       return { ok: true, result };
     } catch (error) {
-      // Once fetch has been attempted we cannot prove that a remote write did
-      // not happen. This adapter is read-only today, but keeping the stronger
-      // classification makes the contract safe if direct write adapters arrive.
+      // Every action exposed by this adapter is read-only, so replay through a
+      // connector transport is safe even if the native request reached the API.
       return {
         ok: false,
         error: error instanceof Error ? error.message : "Direct API execution failed.",
-        failurePhase: "ambiguous",
+        failurePhase: "post_dispatch",
+        safeToFailover: true,
       };
     }
   },
@@ -178,19 +178,20 @@ const nangoAdapter: IntegrationAdapter = {
     try {
       const outcome = await executeNangoAgentAction(input);
       if (outcome.ok) return { ok: true, result: outcome.result };
-      // executeNangoAgentAction has already entered the execution function when
-      // it returns ok:false. Treat that result as ambiguous and do not replay a
-      // potentially destructive action through another transport.
+      // The Nango execution helper may already have dispatched the remote
+      // action when it returns ok:false. Never replay that automatically.
       return {
         ok: false,
         error: outcome.error ?? "Nango action execution failed.",
         failurePhase: "ambiguous",
+        safeToFailover: false,
       };
     } catch (error) {
       return {
         ok: false,
         error: error instanceof Error ? error.message : "Nango action execution failed.",
         failurePhase: "pre_dispatch",
+        safeToFailover: true,
       };
     }
   },
