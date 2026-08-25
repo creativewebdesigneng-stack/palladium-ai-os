@@ -16,6 +16,12 @@ import {
   listEtsyNangoCapabilities,
   prepareEtsyNangoAction,
 } from "./etsy-nango-actions.server";
+import {
+  executeShopifyNangoAction,
+  isShopifyNangoAction,
+  listShopifyNangoCapabilities,
+  prepareShopifyNangoAction,
+} from "./shopify-nango-actions.server";
 
 export type NangoActionRisk = "low" | "medium" | "high";
 
@@ -185,6 +191,23 @@ async function discoverProviderActions(providerId: NangoProviderId) {
   }));
 }
 
+function mergeBuiltInCapabilities(
+  providerId: string,
+  advertised: NangoAgentCapability[],
+): NangoAgentCapability[] {
+  const builtIn =
+    providerId === "etsy"
+      ? listEtsyNangoCapabilities()
+      : providerId === "shopify"
+        ? listShopifyNangoCapabilities()
+        : [];
+  if (!builtIn.length) return advertised;
+  const merged = new Map<string, NangoAgentCapability>();
+  for (const capability of builtIn) merged.set(capability.action, capability);
+  for (const capability of advertised) merged.set(capability.action, capability);
+  return [...merged.values()];
+}
+
 export async function listNangoAgentCapabilities(userId: string, provider?: string) {
   const connected = (await listPersistedNangoConnections(userId)).filter(
     (connection) => connection.status === "connected" && connection.config.connection_id,
@@ -208,11 +231,7 @@ export async function listNangoAgentCapabilities(userId: string, provider?: stri
           inputSchema: safeInputSchema(action),
         };
       });
-      if (connection.providerId !== "etsy") return advertised;
-      const merged = new Map<string, NangoAgentCapability>();
-      for (const capability of listEtsyNangoCapabilities()) merged.set(capability.action, capability);
-      for (const capability of advertised) merged.set(capability.action, capability);
-      return [...merged.values()];
+      return mergeBuiltInCapabilities(connection.providerId, advertised);
     }),
   );
   return groups
@@ -280,6 +299,27 @@ export async function executeNangoAgentAction(input: {
       };
     }
   }
+  if (input.provider === "shopify" && isShopifyNangoAction(input.action)) {
+    try {
+      const outcome = await executeShopifyNangoAction({
+        userId: input.userId,
+        action: input.action,
+        actionInput: input.actionInput,
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return {
+        ok: true as const,
+        provider: "shopify",
+        result: sanitizeNangoActionOutput(outcome.result),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        provider: "shopify",
+        error: error instanceof Error ? error.message : "Shopify proxy action execution failed.",
+      };
+    }
+  }
   const resolved = await resolveOwnedAction(input.userId, input.provider, input.action);
   if (!resolved.deployed) await ensureActionDeployed(resolved.provider, resolved.action);
   try {
@@ -315,6 +355,13 @@ export async function prepareNangoAgentAction(input: {
   assertSafeNangoActionInput(input.actionInput);
   if (input.provider === "etsy" && isEtsyNangoAction(input.action)) {
     return prepareEtsyNangoAction({
+      userId: input.userId,
+      action: input.action,
+      actionInput: input.actionInput,
+    });
+  }
+  if (input.provider === "shopify" && isShopifyNangoAction(input.action)) {
+    return prepareShopifyNangoAction({
       userId: input.userId,
       action: input.action,
       actionInput: input.actionInput,
