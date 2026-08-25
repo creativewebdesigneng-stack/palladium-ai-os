@@ -275,7 +275,14 @@ async function rescueConnectedServiceRead(args: {
   tools: Awaited<ReturnType<typeof resolvePersonalTools>>;
   error: unknown;
 }) {
-  if (!(args.error instanceof ProviderError) || !args.error.retryable) return null;
+  // A bounded, server-authorised connected-service read does not consume model
+  // credits. Keep that deterministic path available both during transient model
+  // outages and when the workspace has exhausted its AI-credit allowance.
+  if (
+    !(args.error instanceof ProviderError) ||
+    (!args.error.retryable && args.error.status !== 402)
+  )
+    return null;
   const spec = connectedServiceReadFallbackSpec(args.task);
   if (!spec || !args.tools.grants.has("connected_service")) return null;
   const execution = await executeTool(
