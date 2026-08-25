@@ -54,8 +54,9 @@ describe("bounded Shopify Nango capabilities", () => {
     const capability = listShopifyNangoCapabilities().find(
       (item) => item.action === "shopify_product_update",
     );
-    const properties = (capability?.inputSchema["properties"] ?? {}) as Record<string, any>;
-    expect(properties.status.enum).toEqual(["DRAFT", "ACTIVE"]);
+    const properties = (capability?.inputSchema["properties"] ?? {}) as Record<string, unknown>;
+    const status = properties["status"] as Record<string, unknown> | undefined;
+    expect(status?.["enum"]).toEqual(["DRAFT", "ACTIVE"]);
   });
 
   it("forces product creation through a draft-specific action", () => {
