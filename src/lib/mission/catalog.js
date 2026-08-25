@@ -154,6 +154,12 @@ export const TOOL_CATALOG = [
     sensitive: false,
   },
   {
+    id: "connected_service",
+    label: "Connected services",
+    desc: "Use only the provider accounts assigned to this agent",
+    sensitive: false,
+  },
+  {
     id: "shopping_search",
     label: "Shopping search",
     desc: "Search supported retailers and compare products",
