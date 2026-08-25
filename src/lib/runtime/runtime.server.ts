@@ -170,6 +170,93 @@ export type PreparedRun = {
   startedAt: number;
 };
 
+export function runtimeConnectedServiceReadSpec(run: Pick<PreparedRun, "agent" | "messages" | "tools">): {
+  provider: "github";
+  action: "repositories_list";
+  limit: number;
+} | null {
+  const input = String(
+    [...run.messages].reverse().find((message) => message.role === "user")?.content ?? "",
+  );
+  const providers = new Set(
+    (run.agent.allowed_providers ?? []).map((provider) => String(provider).toLowerCase()),
+  );
+  if (!providers.has("github") || !run.tools.grants.has("connected_service")) return null;
+  if (!/\bgithub\b/i.test(input)) return null;
+  if (!/\b(list|show|get|find)\b[\s\S]{0,80}\b(repositories|repository|repos?)\b/i.test(input))
+    return null;
+  const numeric = /\b([1-9]|1\d|2[0-5])\b/.exec(input)?.[1];
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+  const word = /\b(one|two|three|four|five)\b/i.exec(input)?.[1]?.toLowerCase();
+  return {
+    provider: "github",
+    action: "repositories_list",
+    limit: numeric ? Number(numeric) : words[word ?? ""] ?? 3,
+  };
+}
+
+function connectedGitHubRepositorySummary(output: unknown, limit: number): string | null {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return null;
+  const result = output as Record<string, any>;
+  if (result["error"] || !Array.isArray(result["data"])) return null;
+  const repositories = result["data"].slice(0, limit);
+  if (!repositories.length) return null;
+  const rows = repositories.map((repository: Record<string, unknown>, index: number) => {
+    const name = String(repository["full_name"] ?? repository["name"] ?? `Repository ${index + 1}`);
+    const url = typeof repository["html_url"] === "string" ? repository["html_url"] : null;
+    const updated = typeof repository["updated_at"] === "string" ? repository["updated_at"] : null;
+    return `${index + 1}. ${url ? `[${name}](${url})` : name}${updated ? ` — updated ${updated}` : ""}`;
+  });
+  const transport = result["transport"] === "nango" ? " through Nango" : "";
+  return `### Recently updated GitHub repositories\n\n${rows.join("\n")}\n\n_Read-only GitHub data retrieved${transport}; no repository was changed._`;
+}
+
+export async function rescueRuntimeConnectedServiceRead(args: {
+  sb: Sb;
+  userId: string;
+  run: PreparedRun;
+  error: unknown;
+}) {
+  if (
+    !(args.error instanceof ProviderError) ||
+    (!args.error.retryable && args.error.status !== 402)
+  )
+    return null;
+  const spec = runtimeConnectedServiceReadSpec(args.run);
+  if (!spec) return null;
+  const execution = await executeTool(
+    "connected_service",
+    spec,
+    {
+      userId: args.userId,
+      orgId: args.run.orgId,
+      agentId: args.run.agent.id,
+      taskId: args.run.taskId,
+      sb: args.sb,
+      allowedProviders: args.run.agent.allowed_providers ?? [],
+    },
+    args.run.tools.grants,
+  );
+  if (!execution.ok) return null;
+  const text = connectedGitHubRepositorySummary(execution.output, spec.limit);
+  if (!text) return null;
+  const result: ChatResult = {
+    text,
+    toolCalls: [],
+    usage: { input: 0, output: 0 },
+    provider: "compatible",
+    model: "deterministic-read-fallback",
+  };
+  const task = await completeRun({
+    sb: args.sb,
+    userId: args.userId,
+    run: args.run,
+    result,
+    toolCallCount: 1,
+  });
+  return { task, result };
+}
+
 /**
  * Runs every pre-flight gate and opens the task row. Throws before any model
  * spend if the caller is not entitled to run.
@@ -846,6 +933,18 @@ export async function* streamRun(args: {
       500,
     );
   } catch (error) {
+    const rescued = await rescueRuntimeConnectedServiceRead({
+      sb: args.sb,
+      userId: args.userId,
+      run: args.run,
+      error,
+    });
+    if (rescued) {
+      yield { type: "tool", name: "connected_service", ok: true };
+      yield { type: "delta", text: rescued.result.text };
+      yield { type: "complete", task: rescued.task };
+      return;
+    }
     const message = await failRun({ userId: args.userId, run: args.run, error });
     yield { type: "error", message };
   } finally {
