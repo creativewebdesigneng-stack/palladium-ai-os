@@ -226,6 +226,85 @@ describe("personal task execution", () => {
     expect(secondMessages.some((m: any) => m.role === "tool" && m.content.includes("Live item"))).toBe(true);
   });
 
+  it("uses the deterministic connected-service read when AI credits are exhausted", async () => {
+    const grants = new Map([
+      [
+        "connected_service",
+        {
+          slug: "connected_service",
+          requiresApproval: false,
+          allowedDomains: [],
+          spendCap: null,
+        },
+      ],
+    ]);
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [
+        {
+          name: "connected_service",
+          description: "Read a connected service",
+          parameters: { type: "object", properties: {}, required: [] },
+        },
+      ],
+      grants,
+    });
+    toolLayer.executeTool.mockResolvedValue({
+      ok: true,
+      output: {
+        data: [
+          {
+            full_name: "creativewebdesigneng-stack/palladium-ai-os",
+            html_url: "https://github.com/creativewebdesigneng-stack/palladium-ai-os",
+          },
+        ],
+        transport: "nango",
+      },
+    });
+    gateway.runChat.mockRejectedValue(
+      new ProviderError("AI credits are exhausted for this workspace.", 402, false),
+    );
+    const sb = fakeSb();
+    const githubTask = {
+      ...task,
+      request: "Use my connected GitHub account to list my repositories.",
+      required_tools: ["connected_service", "nango_capabilities", "nango_action"],
+    };
+
+    const result = await executePersonalTask({
+      sb: sb as any,
+      userId: "user-1",
+      task: githubTask,
+      agent: {
+        ...agent,
+        allowed_tools: ["connected_service"],
+        allowed_providers: ["github"],
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      model: "deterministic-read-fallback",
+      toolCalls: 1,
+      runId: "run-1",
+    });
+    expect(toolLayer.executeTool).toHaveBeenCalledWith(
+      "connected_service",
+      { provider: "github", action: "repositories_list", limit: 3 },
+      expect.objectContaining({
+        userId: "user-1",
+        agentId: "agent-1",
+        taskId: "run-1",
+        allowedProviders: ["github"],
+      }),
+      grants,
+    );
+    expect(
+      sb.updates.some(
+        (update) => update.table === "personal_tasks" && update.patch["status"] === "failed",
+      ),
+    ).toBe(false);
+  });
+
   it("exposes browser as read-only plus an approval-gated interaction sequence", async () => {
     const grants = new Map([
       ["connected_service", { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null }],
