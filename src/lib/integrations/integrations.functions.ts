@@ -88,6 +88,18 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
     const providerId = data.provider.trim().toLowerCase();
     const checkedAt = new Date().toISOString();
 
+    if (providerId === "shopify") {
+      const { executeNativeShopifyAction } = await import("./shopify.server");
+      const result = await executeNativeShopifyAction({
+        userId: context.userId,
+        action: "shop_overview",
+        actionInput: {},
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!result.ok) throw new Error(result.error ?? "Shopify did not respond successfully.");
+      return { ok: true, checkedAt, message: "Shopify store responded successfully through the native API." };
+    }
+
     if (providerId === "discord") {
       const provider = findProvider(providerId);
       if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
@@ -124,8 +136,8 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
 
 /**
  * Step 1 of OAuth: mint a signed state and hand back the provider consent URL.
- * Nothing is trusted from the browser except the return origin, which is
- * validated against the app's own origins.
+ * Shopify is store-specific, so its catalogue card routes to the authenticated
+ * store-domain setup page before the signed Shopify authorization starts.
  */
 export const startIntegrationOAuth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -143,6 +155,10 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     }
 
     const origin = safeOrigin(data.origin);
+    if (provider.connectMode === "shopify_store") {
+      return { authorizeUrl: `${origin}/shopify-connect` };
+    }
+
     const sb = context.supabase as unknown as Sb;
     await sb.from("integrations").upsert(
       {
