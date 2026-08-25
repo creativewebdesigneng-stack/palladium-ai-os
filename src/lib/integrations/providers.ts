@@ -11,30 +11,40 @@
  */
 
 export type IntegrationCategory =
-  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email";
+  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email" | "ecommerce";
 
 export type IntegrationProvider = {
   id: string;
   name: string;
   category: IntegrationCategory;
   summary: string;
-  /** Scopes requested at consent — the least needed for the listed tools. */
   scopes: string[];
-  /** Agent tools this connection feeds. Empty means account connection only. */
   tools: string[];
   authorizeUrl: string;
   tokenUrl: string;
-  /** Env var names holding the OAuth client credentials (server-side only). */
   clientIdEnv: string;
   clientSecretEnv: string;
-  /** Extra authorize params (offline access, consent prompts, provider-specific scope encoding, etc.). */
+  connectMode?: "standard_oauth" | "shopify_store";
   authorizeParams?: Record<string, string>;
-  /** Provider endpoint used once after consent to label the connected account. */
   identity?: { url: string; labelKeys: string[] };
   docsUrl: string;
 };
 
 export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
+  {
+    id: "shopify",
+    name: "Shopify",
+    category: "ecommerce",
+    summary: "Operate products, orders and inventory through Shopify's native Admin GraphQL API. Native access is preferred; connector providers can remain a fallback.",
+    scopes: ["write_products", "read_orders", "write_inventory", "read_locations"],
+    tools: ["integration_capabilities", "integration_action", "connected_service"],
+    authorizeUrl: "https://admin.shopify.com/",
+    tokenUrl: "https://shopify.dev/",
+    clientIdEnv: "SHOPIFY_CLIENT_ID",
+    clientSecretEnv: "SHOPIFY_CLIENT_SECRET",
+    connectMode: "shopify_store",
+    docsUrl: "https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant",
+  },
   {
     id: "google",
     name: "Google Workspace",
@@ -145,8 +155,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     tokenUrl: "https://login.salesforce.com/services/oauth2/token",
     clientIdEnv: "SALESFORCE_INTEGRATION_CLIENT_ID",
     clientSecretEnv: "SALESFORCE_INTEGRATION_CLIENT_SECRET",
-    docsUrl:
-      "https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm",
+    docsUrl: "https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm",
   },
   {
     id: "notion",
@@ -198,6 +207,7 @@ export const INTEGRATION_CATEGORY_LABELS: Record<IntegrationCategory, string> = 
   project_management: "Project management",
   calendar: "Calendar",
   email: "Email",
+  ecommerce: "E-commerce",
 };
 
 export function findProvider(id: string): IntegrationProvider | undefined {
