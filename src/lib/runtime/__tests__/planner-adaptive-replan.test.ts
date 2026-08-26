@@ -122,6 +122,14 @@ function lastPrompt(args: any) {
   return String(args.messages?.at(-1)?.content ?? "");
 }
 
+function isObservationReplanPrompt(prompt: string) {
+  return prompt.includes("current route is blocked");
+}
+
+function isInitialPlanPrompt(prompt: string) {
+  return prompt.includes("planning controller") && prompt.includes("Objective:");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -134,8 +142,7 @@ describe("adaptive replanning from tool observations", () => {
 
     gateway.runChat.mockImplementation(async (args: any) => {
       const prompt = lastPrompt(args);
-      if (prompt.includes("planning controller") && prompt.includes("Objective:")) return initialPlan;
-      if (prompt.includes("current route is blocked")) {
+      if (isObservationReplanPrompt(prompt)) {
         controllerPrompts.push(prompt);
         return {
           ...initialPlan,
@@ -152,6 +159,7 @@ describe("adaptive replanning from tool observations", () => {
           }),
         };
       }
+      if (isInitialPlanPrompt(prompt)) return initialPlan;
       return executionRound++ === 0 ? executionWithTool : finalAnswer;
     });
     tools.executeTool.mockResolvedValue({
@@ -180,11 +188,11 @@ describe("adaptive replanning from tool observations", () => {
     let executionRound = 0;
     gateway.runChat.mockImplementation(async (args: any) => {
       const prompt = lastPrompt(args);
-      if (prompt.includes("planning controller") && prompt.includes("Objective:")) return initialPlan;
-      if (prompt.includes("current route is blocked")) {
+      if (isObservationReplanPrompt(prompt)) {
         observationReplanCalls += 1;
         return initialPlan;
       }
+      if (isInitialPlanPrompt(prompt)) return initialPlan;
       return executionRound++ === 0 ? executionWithTool : finalAnswer;
     });
     tools.executeTool.mockResolvedValue({
@@ -204,8 +212,11 @@ describe("adaptive replanning from tool observations", () => {
     let executionRound = 0;
     gateway.runChat.mockImplementation(async (args: any) => {
       const prompt = lastPrompt(args);
-      if (prompt.includes("planning controller") && prompt.includes("Objective:")) return initialPlan;
-      if (prompt.includes("current route is blocked")) observationReplanCalls += 1;
+      if (isObservationReplanPrompt(prompt)) {
+        observationReplanCalls += 1;
+        return initialPlan;
+      }
+      if (isInitialPlanPrompt(prompt)) return initialPlan;
       return executionRound++ === 0 ? executionWithTool : finalAnswer;
     });
     tools.executeTool.mockResolvedValue({ ok: false, output: { error: "blocked" } });
