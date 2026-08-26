@@ -2,13 +2,12 @@ import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   failRun,
-  normaliseProvider,
-  resolveModel,
   RuntimeError,
   setRunState,
   type Agent,
   type PreparedRun,
 } from "./runtime.server";
+import { normaliseProvider, resolveModel } from "./model-gateway.server";
 import { resolveGrantedTools } from "./tools.server";
 import { executePlannedRun } from "./planner-runtime.server";
 import { invalidateDurableRunCheckpoint, parseDurableRunCheckpoint } from "./run-checkpoint.server";
@@ -80,7 +79,7 @@ export async function resumeOneStaleAgentRun(args: {
   sb?: Sb;
   now?: Date;
 } = {}): Promise<"none" | "resumed" | "retryable_failure" | "failed"> {
-  const sb = (args.sb ?? (supabaseAdmin as unknown as Sb));
+  const sb = args.sb ?? (supabaseAdmin as unknown as Sb);
   const now = args.now ?? new Date();
   const claim = await claimResumableRun({
     sb,
