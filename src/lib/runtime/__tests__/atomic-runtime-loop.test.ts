@@ -136,7 +136,6 @@ beforeEach(() => {
   toolsMod.grants = new Map([grant("web_search"), grant("current_time")]);
 });
 
-/** Records concurrency: how many tool executions overlapped in time. */
 function trackingExecutor(delay = 20) {
   let active = 0;
   let peak = 0;
@@ -211,18 +210,18 @@ describe("conservative parallel batching in the non-streaming loop", () => {
 });
 
 describe("guard behaviour inside the loop", () => {
-  it("vetoes a repeated no-progress call without invoking the tool again", async () => {
+  it("vetoes a repeated no-progress call before invoke and still reaches the final-answer turn", async () => {
     const sb = db();
     toolsMod.executeTool.mockResolvedValue({ ok: true, output: { rows: [] } });
     const repeat = () => toolResult([{ id: "a", name: "web_search", arguments: { q: "same" } }]);
-    for (let i = 0; i < 5; i += 1) gateway.runChat.mockResolvedValueOnce(repeat());
-    gateway.runChat.mockResolvedValue(finalResult());
+    for (let i = 0; i < 4; i += 1) gateway.runChat.mockResolvedValueOnce(repeat());
+    gateway.runChat.mockResolvedValueOnce(finalResult());
 
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
     await executeRun({ sb, userId: USER, run });
 
-    // Five identical rounds, but the fifth is blocked before execution.
-    expect(toolsMod.executeTool.mock.calls.length).toBe(4);
+    // Three identical calls execute; the fourth is blocked before invocation.
+    expect(toolsMod.executeTool.mock.calls.length).toBe(3);
     const lastMessages = gateway.runChat.mock.calls.at(-1)![0].messages;
     const toolMsgs = lastMessages.filter((m: any) => m.role === "tool");
     expect(toolMsgs.at(-1).content).toContain("repeated_no_progress_blocked");
