@@ -84,6 +84,23 @@ export function classifyPlannedToolFailure(args: {
   }
 
   const reason = failureReason(args.tool, args.output);
+  const current = args.plan.current_step_id;
+  const revised = args.plan.steps.map((step) =>
+    step.id === current
+      ? { ...step, status: "blocked" as const, evidence: [...step.evidence, reason].slice(-20) }
+      : step,
+  );
+  revised.push({
+    id: `recovery-${args.plan.replan_count + 1}`,
+    title: `Recover from ${args.tool} failure`,
+    objective:
+      `Find a different safe route to satisfy the objective after this failed ${args.tool} call. ` +
+      "Do not repeat the exact failed request unless new information or changed inputs justify it.",
+    success_criteria: ["Use new evidence or a materially different safe approach"],
+    status: "pending",
+    evidence: [reason],
+  });
+
   return {
     shouldReplan: true,
     reason,
@@ -93,7 +110,7 @@ export function classifyPlannedToolFailure(args: {
       issues: [reason],
       evidence: [reason],
       next_action: "replan",
-      revised_steps: [],
+      revised_steps: revised,
     }),
   };
 }
