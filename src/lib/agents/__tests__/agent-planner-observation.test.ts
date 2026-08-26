@@ -3,6 +3,7 @@ import {
   assessToolObservation,
   createInitialPlan,
   shouldReplanAfterObservation,
+  updatePlanAfterObservation,
 } from "../agent-planner";
 
 function plan(maxReplans = 3) {
@@ -53,5 +54,26 @@ describe("adaptive planner observation signals", () => {
     const blocked = assessToolObservation({ ok: false, output: { error: "failed" } });
     const exhausted = { ...plan(0), replan_count: 0 };
     expect(shouldReplanAfterObservation(exhausted, blocked)).toBe(false);
+  });
+
+  it("keeps a blocked step blocked when a sibling observation later succeeds", () => {
+    const original = plan();
+    const stepId = original.current_step_id!;
+    const afterFailure = updatePlanAfterObservation(original, {
+      stepId,
+      blocked: true,
+      evidence: ["first tool failed"],
+    });
+    const afterSiblingSuccess = updatePlanAfterObservation(afterFailure, {
+      stepId,
+      evidence: ["second tool returned useful evidence"],
+    });
+
+    expect(afterSiblingSuccess.current_step_id).toBe(stepId);
+    expect(afterSiblingSuccess.steps[0]?.status).toBe("blocked");
+    expect(afterSiblingSuccess.steps[0]?.evidence).toEqual([
+      "first tool failed",
+      "second tool returned useful evidence",
+    ]);
   });
 });
