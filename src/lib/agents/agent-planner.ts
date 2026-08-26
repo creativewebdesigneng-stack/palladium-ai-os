@@ -32,6 +32,12 @@ export type VerificationDecision = {
   revised_steps: AgentPlanStep[];
 };
 
+export type ObservationAssessment = {
+  blocked: boolean;
+  approvalPending: boolean;
+  reason: string | null;
+};
+
 const clean = (value: unknown, max: number) =>
   typeof value === "string" ? value.trim().slice(0, max) : "";
 
@@ -99,6 +105,61 @@ export function createInitialPlan(args: {
     verification_required: profile.verification_required !== false,
     quality_threshold: clamp(profile.quality_threshold, 0.8, 0, 1),
   };
+}
+
+/**
+ * Classifies only explicit runtime failure signals. Approval waits are kept
+ * separate so adaptive replanning can never route around operator approval.
+ */
+export function assessToolObservation(args: { ok: boolean; output: unknown }): ObservationAssessment {
+  const row = args.output && typeof args.output === "object" && !Array.isArray(args.output)
+    ? (args.output as Record<string, unknown>)
+    : null;
+  const approvalPending = Boolean(
+    row &&
+      (row["approval_request_id"] ||
+        row["status"] === "awaiting_approval" ||
+        row["status"] === "pending_approval" ||
+        row["requires_approval"] === true),
+  );
+  if (approvalPending) return { blocked: false, approvalPending: true, reason: null };
+
+  const error = clean(row?.["error"], 600);
+  const message = clean(row?.["message"], 600);
+  if (error === "repeated_no_progress_blocked") {
+    return {
+      blocked: true,
+      approvalPending: false,
+      reason: message || "The current approach repeated without making progress.",
+    };
+  }
+  if (!args.ok) {
+    return {
+      blocked: true,
+      approvalPending: false,
+      reason: error || message || "A required tool call failed.",
+    };
+  }
+  if (error) {
+    return { blocked: true, approvalPending: false, reason: error };
+  }
+  if (row?.["status"] === "failed" || row?.["status"] === "error") {
+    return {
+      blocked: true,
+      approvalPending: false,
+      reason: message || `Tool returned status ${String(row["status"])}.`,
+    };
+  }
+  return { blocked: false, approvalPending: false, reason: null };
+}
+
+export function shouldReplanAfterObservation(plan: AgentPlan, assessment: ObservationAssessment): boolean {
+  return (
+    assessment.blocked &&
+    !assessment.approvalPending &&
+    Boolean(plan.current_step_id) &&
+    plan.replan_count < plan.max_replans
+  );
 }
 
 export function updatePlanAfterObservation(
