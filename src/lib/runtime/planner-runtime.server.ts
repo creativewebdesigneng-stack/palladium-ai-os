@@ -24,7 +24,10 @@ import {
   compactToolResultForModel,
   RunLoopGuard,
 } from "./atomic-loop-guard.server";
-import { classifyPlannedToolFailure } from "./planner-tool-recovery.server";
+import {
+  classifyPlannedToolFailure,
+  type PlannedToolRecovery,
+} from "./planner-tool-recovery.server";
 import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
 
 type Sb = { from: (t: string) => any };
@@ -286,14 +289,14 @@ async function runToolCalls(args: {
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
 
-      const recovery = recoveryReason
+      const recovery: PlannedToolRecovery | null = recoveryReason
         ? null
         : classifyPlannedToolFailure({
             plan,
             tool: call.name,
             ok: outcome.ok,
             output: outcome.output,
-            grant: args.run.tools.grants.get(call.name),
+            grant: args.run.tools.grants.get(call.name) ?? null,
           });
       if (recovery?.shouldReplan && recovery.decision) {
         plan = applyReplan(plan, recovery.decision);
