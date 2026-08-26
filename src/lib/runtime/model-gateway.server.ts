@@ -1,6 +1,7 @@
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import * as base from "./model-gateway.base";
-import type { ChatMessage, ChatResult, Provider, RunArgs } from "./model-gateway.base";
+import type { ChatMessage, ChatResult, Provider, RunArgs, StreamEvent } from "./model-gateway.base";
+import { compactRunContextInPlace } from "./run-context-journal.server";
 
 export * from "./model-gateway.base";
 
@@ -189,6 +190,9 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
  * without bypassing tool authorisation or inventing facts.
  */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
+  // Keep the same messages array object so provider failover conversation state
+  // remains stable; only older completed tool rounds may be journalled in place.
+  compactRunContextInPlace(args.messages);
   const remembered = activeProviderByConversation.get(args.messages);
   const primaryProvider = remembered?.provider ?? args.provider;
   const primaryModel = remembered?.model ?? args.model;
@@ -216,4 +220,10 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   throw lastError instanceof Error
     ? lastError
     : new base.ProviderError("No configured AI provider could complete the request.", 503, false);
+}
+
+/** Streaming keeps its existing provider behaviour while sharing the same bounded context policy. */
+export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
+  compactRunContextInPlace(args.messages);
+  yield* base.streamChat(args);
 }
