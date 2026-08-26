@@ -56,18 +56,20 @@ export async function queueRunSteering(args: {
     throw new Error("That run is no longer accepting steering instructions.");
   }
 
+  // Existing Palladium runtime activities link agent_tasks through metadata.task_id;
+  // the legacy task_id column belongs to an older task table and is intentionally
+  // left null here for compatibility.
   const { data, error } = await args.sb
     .from("agent_activities")
     .insert({
       user_id: args.userId,
       org_id: task.org_id ?? null,
       agent_id: task.agent_id ?? null,
-      task_id: task.id,
       kind: STEERING_KIND,
       message,
-      metadata: { task_id: task.id, source: "operator", consumed_at: null },
+      metadata: { task_id: task.id, source: "operator" },
     })
-    .select("id,task_id,kind,message,created_at")
+    .select("id,kind,message,created_at,metadata")
     .maybeSingle();
   if (error || !data) throw new Error("Could not steer that run.");
   return data;
@@ -87,9 +89,9 @@ export async function consumeRunSteering(args: {
   const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
   const { data, error } = await args.sb
     .from("agent_activities")
-    .select("id,message,created_at")
-    .eq("task_id", args.taskId)
+    .select("id,message,created_at,metadata")
     .eq("kind", STEERING_KIND)
+    .contains("metadata", { task_id: args.taskId })
     .order("created_at", { ascending: true })
     .limit(limit);
   if (error) {
@@ -119,9 +121,7 @@ export async function applyRunSteering(args: {
 }): Promise<number> {
   const steering = await consumeRunSteering(args);
   if (!steering.length) return 0;
-  const content = steering
-    .map((event, index) => `${index + 1}. ${event.message}`)
-    .join("\n");
+  const content = steering.map((event, index) => `${index + 1}. ${event.message}`).join("\n");
   args.messages.push({
     role: "user",
     content:
