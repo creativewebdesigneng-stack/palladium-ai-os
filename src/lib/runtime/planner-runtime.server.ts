@@ -1,11 +1,13 @@
 import type { AgentOperatingProfile } from "@/lib/agents/agent-spec";
 import {
   applyReplan,
+  assessToolObservation,
   createInitialPlan,
   normaliseVerificationDecision,
   renderPlannerPrompt,
   shouldComplete,
   shouldReplan,
+  shouldReplanAfterObservation,
   updatePlanAfterObservation,
   type AgentPlan,
   type VerificationDecision,
@@ -84,6 +86,18 @@ function verifierInstruction(plan: AgentPlan, candidate: string) {
     "Return one JSON object only with this shape:",
     '{"passed":true,"score":0.9,"issues":[],"evidence":["..."],"next_action":"complete","revised_steps":[]}',
     "Set passed=false when completion claims are unsupported, required outputs are missing, tool evidence contradicts the answer, or success criteria are not met. Use next_action=replan when another bounded attempt can fix the issues; use escalate when operator input or approval is required.",
+  ].join("\n");
+}
+
+function observationReplanInstruction(plan: AgentPlan, reasons: string[]) {
+  return [
+    "You are the PalladiumAI planning controller. The executor has encountered explicit evidence that the current route is blocked. Re-plan only; do not execute tools or claim completion.",
+    "Current plan:",
+    renderPlannerPrompt(plan),
+    `Blocking evidence: ${reasons.join(" | ").slice(0, 3000)}`,
+    "Return one JSON object only with this shape:",
+    '{"steps":[{"id":"step-1","title":"...","objective":"...","success_criteria":["..."],"status":"pending"}]}',
+    "Keep completed steps completed when still valid. Replace or skip blocked work with a concrete alternative route. Use at most 10 steps and do not include hidden chain-of-thought.",
   ].join("\n");
 }
 
@@ -185,6 +199,46 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
   }
 }
 
+async function replanFromObservation(
+  run: PreparedRun,
+  plan: AgentPlan,
+  reasons: string[],
+  signal: AbortSignal,
+): Promise<VerificationDecision> {
+  try {
+    const result = await runChat({
+      provider: run.provider,
+      model: run.model,
+      messages: [
+        run.messages[0] ?? { role: "system", content: "" },
+        { role: "user", content: observationReplanInstruction(plan, reasons) },
+      ],
+      tools: [],
+      temperature: 0.1,
+      maxTokens: 1600,
+      signal,
+    });
+    const parsed = extractJsonObject(result.text);
+    return normaliseVerificationDecision({
+      passed: false,
+      score: 0,
+      issues: reasons,
+      next_action: "replan",
+      revised_steps: parsed?.["steps"] ?? [],
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    console.error("[planner] observation re-plan pass failed; using existing remaining steps", error);
+    return normaliseVerificationDecision({
+      passed: false,
+      score: 0,
+      issues: reasons,
+      next_action: "replan",
+      revised_steps: [],
+    });
+  }
+}
+
 type PlannedToolOutcome = {
   ok: boolean;
   output: unknown;
@@ -240,6 +294,7 @@ async function runToolCalls(args: {
   args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls });
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
+  const blockedReasons: string[] = [];
   let plan = args.plan;
   try {
     const parallel = canBatchInParallel(args.result.toolCalls, args.run.tools.grants);
@@ -270,11 +325,8 @@ async function runToolCalls(args: {
             guard: args.guard,
             call,
           });
-      const output = outcome.output as Record<string, unknown> | null;
-      awaitingApproval = awaitingApproval || Boolean(
-        output &&
-          (output["approval_request_id"] || output["status"] === "awaiting_approval" || output["requires_approval"] === true),
-      );
+      const assessment = assessToolObservation(outcome);
+      awaitingApproval = awaitingApproval || assessment.approvalPending;
       const content = compactToolResultForModel(outcome.output);
       args.messages.push({
         role: "tool",
@@ -282,11 +334,16 @@ async function runToolCalls(args: {
         name: call.name,
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
-      if (plan.current_step_id) {
+      const stepId = plan.current_step_id;
+      if (stepId) {
         plan = updatePlanAfterObservation(plan, {
-          stepId: plan.current_step_id,
+          stepId,
+          blocked: assessment.blocked,
           evidence: [`${call.name}: ${compactToolResultForModel(outcome.output, 1_000)}`],
         });
+        if (assessment.reason && shouldReplanAfterObservation(args.plan, assessment)) {
+          blockedReasons.push(`${call.name}: ${assessment.reason}`);
+        }
       }
     }
     await persistPlan(args.sb, args.run.taskId, plan);
@@ -304,7 +361,7 @@ async function runToolCalls(args: {
       metadata: { task_id: args.run.taskId, agent_id: args.run.agent.id },
     });
   }
-  return { plan, awaitingApproval };
+  return { plan, awaitingApproval, blockedReasons };
 }
 
 /**
@@ -391,6 +448,29 @@ export async function executePlannedRun(args: {
           guard,
         });
         plan = observed.plan;
+        if (
+          !observed.awaitingApproval &&
+          observed.blockedReasons.length &&
+          plan.replan_count < plan.max_replans
+        ) {
+          const decision = await replanFromObservation(
+            args.run,
+            plan,
+            observed.blockedReasons,
+            controller.signal,
+          );
+          plan = applyReplan(plan, decision);
+          await persistPlan(args.sb, args.run.taskId, plan);
+          messages.push({
+            role: "system",
+            content: [
+              "TOOL EVIDENCE — EARLY RE-PLAN APPLIED",
+              `Blocking evidence: ${observed.blockedReasons.join(" | ")}`,
+              renderPlannerPrompt(plan),
+              "Continue from the revised plan. Do not repeat the blocked approach unless new evidence makes it viable. Existing approval requirements remain authoritative.",
+            ].join("\n"),
+          });
+        }
         continue;
       }
 
