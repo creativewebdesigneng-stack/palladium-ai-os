@@ -8,10 +8,23 @@
 export type Row = Record<string, any>;
 
 type Filter = {
-  op: "eq" | "in" | "is" | "gte" | "lte" | "lt" | "ilike";
+  op: "eq" | "in" | "is" | "gte" | "lte" | "lt" | "ilike" | "contains";
   column: string;
   value: any;
 };
+
+function containsValue(cell: unknown, expected: unknown): boolean {
+  if (Array.isArray(expected)) {
+    return Array.isArray(cell) && expected.every((value) => cell.includes(value));
+  }
+  if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+    if (!cell || typeof cell !== "object" || Array.isArray(cell)) return false;
+    return Object.entries(expected as Row).every(
+      ([key, value]) => (cell as Row)[key] === value,
+    );
+  }
+  return cell === expected;
+}
 
 function matches(row: Row, filters: Filter[]) {
   return filters.every((f) => {
@@ -34,6 +47,8 @@ function matches(row: Row, filters: Filter[]) {
         const cellText = String(cell ?? "").toLowerCase();
         return pattern.every((part) => cellText.includes(part));
       }
+      case "contains":
+        return containsValue(cell, f.value);
     }
   });
 }
@@ -96,6 +111,10 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
       },
       ilike(column: string, value: string) {
         filters.push({ op: "ilike", column, value });
+        return api;
+      },
+      contains(column: string, value: any) {
+        filters.push({ op: "contains", column, value });
         return api;
       },
       order() {
