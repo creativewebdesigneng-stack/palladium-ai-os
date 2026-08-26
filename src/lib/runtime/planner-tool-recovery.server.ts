@@ -62,12 +62,13 @@ function failureReason(tool: string, output: unknown): string {
  * side-effect-free reads with an approval-free grant qualify.
  */
 export function classifyPlannedToolFailure(args: {
-  plan: AgentPlan;
+  plan: unknown;
   tool: string;
   ok: boolean;
   output: unknown;
   grant?: ToolGrant | null | undefined;
 }): PlannedToolRecovery {
+  const plan = args.plan as AgentPlan;
   if (args.ok) return { shouldReplan: false, decision: null, reason: null };
   if (isApprovalWait(args.output)) return { shouldReplan: false, decision: null, reason: null };
   if (isAmbiguousExternalFailure(args.output)) {
@@ -79,19 +80,19 @@ export function classifyPlannedToolFailure(args: {
   if (!args.grant || args.grant.requiresApproval !== false) {
     return { shouldReplan: false, decision: null, reason: "tool_not_approval_free" };
   }
-  if (args.plan.replan_count >= args.plan.max_replans) {
+  if (plan.replan_count >= plan.max_replans) {
     return { shouldReplan: false, decision: null, reason: "replan_budget_exhausted" };
   }
 
   const reason = failureReason(args.tool, args.output);
-  const current = args.plan.current_step_id;
-  const revised = args.plan.steps.map((step) =>
+  const current = plan.current_step_id;
+  const revised = plan.steps.map((step) =>
     step.id === current
       ? { ...step, status: "blocked" as const, evidence: [...step.evidence, reason].slice(-20) }
       : step,
   );
   revised.push({
-    id: `recovery-${args.plan.replan_count + 1}`,
+    id: `recovery-${plan.replan_count + 1}`,
     title: `Recover from ${args.tool} failure`,
     objective:
       `Find a different safe route to satisfy the objective after this failed ${args.tool} call. ` +
