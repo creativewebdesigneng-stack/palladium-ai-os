@@ -47,6 +47,11 @@ export function parseClaimedRunResume(value: unknown): ClaimedRunResume | null {
   };
 }
 
+/**
+ * Claims at most one stale run through the service-role-only database RPC.
+ * The SQL side owns row locking/lease issuance; this helper only validates
+ * the returned checkpoint before any worker is allowed to resume it.
+ */
 export async function claimResumableRun(args: {
   sb: Sb;
   staleBefore: Date;
