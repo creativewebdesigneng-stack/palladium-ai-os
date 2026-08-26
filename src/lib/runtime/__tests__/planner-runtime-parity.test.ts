@@ -54,6 +54,15 @@ vi.mock("@/lib/agents/agent-planner", () => ({
     next_action: value?.next_action ?? "complete",
     revised_steps: value?.revised_steps ?? [],
   }),
+  assessToolObservation: ({ ok, output }: any) => {
+    const approvalPending = Boolean(
+      output?.approval_request_id || output?.status === "awaiting_approval" || output?.requires_approval === true,
+    );
+    const blocked = !approvalPending && (!ok || Boolean(output?.error) || output?.status === "failed");
+    return { blocked, approvalPending, reason: blocked ? String(output?.message ?? output?.error ?? "tool failed") : null };
+  },
+  shouldReplanAfterObservation: (plan: any, assessment: any) =>
+    assessment.blocked && !assessment.approvalPending && Boolean(plan.current_step_id) && plan.replan_count < plan.max_replans,
   shouldComplete: (_plan: any, decision: any) => Boolean(decision.passed),
   shouldReplan: () => false,
   applyReplan: (plan: any) => plan,
