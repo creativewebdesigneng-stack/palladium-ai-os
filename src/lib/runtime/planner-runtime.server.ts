@@ -19,6 +19,12 @@ import {
 } from "./runtime.server";
 import { runChat, type ChatMessage, type ChatResult } from "./model-gateway.server";
 import { executeTool } from "./tools.server";
+import {
+  canBatchInParallel,
+  compactToolResultForModel,
+  RunLoopGuard,
+} from "./atomic-loop-guard.server";
+import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -179,6 +185,48 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
   }
 }
 
+type PlannedToolOutcome = {
+  ok: boolean;
+  output: unknown;
+  notice?: string;
+};
+
+async function invokePlannedTool(args: {
+  sb: Sb;
+  userId: string;
+  run: PreparedRun;
+  signal: AbortSignal;
+  guard: RunLoopGuard;
+  call: { name: string; arguments: Record<string, unknown> };
+}): Promise<PlannedToolOutcome> {
+  const decision = args.guard.inspect(args.call);
+  if (decision.action === "veto") {
+    args.guard.record(args.call, decision.output);
+    return { ok: false, output: decision.output };
+  }
+
+  const exec = await executeTool(
+    args.call.name,
+    args.call.arguments,
+    {
+      userId: args.userId,
+      orgId: args.run.orgId,
+      agentId: args.run.agent.id,
+      taskId: args.run.taskId,
+      sb: args.sb,
+      signal: args.signal,
+      allowedProviders: args.run.agent.allowed_providers ?? [],
+    },
+    args.run.tools.grants,
+  );
+  args.guard.record(args.call, exec.output);
+  return {
+    ok: exec.ok,
+    output: exec.output,
+    ...(decision.action === "warn" ? { notice: decision.notice } : {}),
+  };
+}
+
 async function runToolCalls(args: {
   sb: Sb;
   userId: string;
@@ -187,42 +235,57 @@ async function runToolCalls(args: {
   messages: ChatMessage[];
   plan: AgentPlan;
   signal: AbortSignal;
+  guard: RunLoopGuard;
 }) {
   args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls });
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   let plan = args.plan;
   try {
-    for (const call of args.result.toolCalls) {
-      const exec = await executeTool(
-        call.name,
-        call.arguments,
-        {
-          userId: args.userId,
-          orgId: args.run.orgId,
-          agentId: args.run.agent.id,
-          taskId: args.run.taskId,
-          sb: args.sb,
-          signal: args.signal,
-          allowedProviders: args.run.agent.allowed_providers ?? [],
-        },
-        args.run.tools.grants,
-      );
-      const output = exec.output as Record<string, unknown> | null;
+    const parallel = canBatchInParallel(args.result.toolCalls, args.run.tools.grants);
+    const outcomes: PlannedToolOutcome[] = parallel
+      ? await Promise.all(
+          args.result.toolCalls.map((call) =>
+            invokePlannedTool({
+              sb: args.sb,
+              userId: args.userId,
+              run: args.run,
+              signal: args.signal,
+              guard: args.guard,
+              call,
+            }),
+          ),
+        )
+      : [];
+
+    for (let index = 0; index < args.result.toolCalls.length; index += 1) {
+      const call = args.result.toolCalls[index]!;
+      const outcome = parallel
+        ? outcomes[index]!
+        : await invokePlannedTool({
+            sb: args.sb,
+            userId: args.userId,
+            run: args.run,
+            signal: args.signal,
+            guard: args.guard,
+            call,
+          });
+      const output = outcome.output as Record<string, unknown> | null;
       awaitingApproval = awaitingApproval || Boolean(
         output &&
           (output["approval_request_id"] || output["status"] === "awaiting_approval" || output["requires_approval"] === true),
       );
+      const content = compactToolResultForModel(outcome.output);
       args.messages.push({
         role: "tool",
         tool_call_id: call.id,
         name: call.name,
-        content: JSON.stringify(exec.output).slice(0, 8000),
+        content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
       if (plan.current_step_id) {
         plan = updatePlanAfterObservation(plan, {
           stepId: plan.current_step_id,
-          evidence: [`${call.name}: ${JSON.stringify(exec.output).slice(0, 900)}`],
+          evidence: [`${call.name}: ${compactToolResultForModel(outcome.output, 1_000)}`],
         });
       }
     }
@@ -281,6 +344,8 @@ export async function executePlannedRun(args: {
   const usage = { input: 0, output: 0 };
   let toolCallCount = 0;
   let toolRounds = 0;
+  const guard = new RunLoopGuard();
+  const steeringCursor = createSteeringCursor();
 
   try {
     for (let round = 0; round < MAX_TOTAL_MODEL_ROUNDS; round += 1) {
@@ -289,6 +354,12 @@ export async function executePlannedRun(args: {
       if (await cancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
+      await applyRunSteering({
+        sb: args.sb,
+        taskId: args.run.taskId,
+        cursor: steeringCursor,
+        messages,
+      });
       await heartbeat(args.sb, args.run.taskId);
 
       const result = await runChat({
@@ -317,6 +388,7 @@ export async function executePlannedRun(args: {
           messages,
           plan,
           signal: controller.signal,
+          guard,
         });
         plan = observed.plan;
         continue;
