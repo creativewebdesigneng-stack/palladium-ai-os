@@ -166,7 +166,9 @@ describe("conservative parallel batching in the non-streaming loop", () => {
     await executeRun({ sb, userId: USER, run });
 
     expect(peak()).toBe(2);
-    const messages = gateway.runChat.mock.calls[1][0].messages;
+    const secondCall = gateway.runChat.mock.calls[1];
+    expect(secondCall).toBeDefined();
+    const messages = secondCall![0].messages;
     const toolMsgs = messages.filter((m: any) => m.role === "tool");
     expect(toolMsgs.map((m: any) => m.tool_call_id)).toEqual(["a", "b"]);
     expect(toolMsgs.map((m: any) => m.name)).toEqual(["web_search", "current_time"]);
@@ -241,10 +243,13 @@ describe("guard behaviour inside the loop", () => {
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
     await executeRun({ sb, userId: USER, run });
 
-    const toolMsg = gateway.runChat.mock.calls[1][0].messages.find((m: any) => m.role === "tool");
-    expect(toolMsg.content).toContain("PALLADIUM_TRUNCATED");
-    expect(toolMsg.content).toContain("PARTIAL_RESULT");
-    expect(toolMsg.content.length).toBeLessThan(7_000);
+    const secondCall = gateway.runChat.mock.calls[1];
+    expect(secondCall).toBeDefined();
+    const toolMsg = secondCall![0].messages.find((m: any) => m.role === "tool");
+    expect(toolMsg).toBeDefined();
+    expect(toolMsg!.content).toContain("PALLADIUM_TRUNCATED");
+    expect(toolMsg!.content).toContain("PARTIAL_RESULT");
+    expect(toolMsg!.content.length).toBeLessThan(7_000);
   });
 
   it("still moves the run to waiting_for_approval when a tool defers", async () => {
