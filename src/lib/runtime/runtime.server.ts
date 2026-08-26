@@ -32,6 +32,11 @@ import {
   type ChatResult,
 } from "./model-gateway.server";
 import { executeTool, resolveGrantedTools, type ToolGrant } from "./tools.server";
+import {
+  canBatchInParallel,
+  compactToolResultForModel,
+  RunLoopGuard,
+} from "./atomic-loop-guard.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -812,6 +817,7 @@ export async function executeRun(args: {
   const messages = [...args.run.messages];
   let toolCallCount = 0;
   const usage = { input: 0, output: 0 };
+  const guard = new RunLoopGuard();
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -863,6 +869,7 @@ export async function executeRun(args: {
           run: args.run,
           grants: args.run.tools.grants,
           signal: controller.signal,
+          guard,
         },
         result,
         messages,
@@ -895,6 +902,7 @@ export async function* streamRun(args: {
   const pending: RunEvent[] = [];
   const usage = { input: 0, output: 0 };
   let toolCallCount = 0;
+  const guard = new RunLoopGuard();
 
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
@@ -950,6 +958,7 @@ export async function* streamRun(args: {
           run: args.run,
           grants: args.run.tools.grants,
           signal: controller.signal,
+          guard,
           onEvent: (e) => void pending.push(e),
         },
         final,
