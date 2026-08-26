@@ -12,6 +12,7 @@ export type ClaimedRunResume = {
   provider: string | null;
   model: string | null;
   leaseToken: string;
+  resumeCount: number;
   checkpoint: DurableRunCheckpoint;
 };
 
@@ -35,6 +36,10 @@ export function parseClaimedRunResume(value: unknown): ClaimedRunResume | null {
   const agentId = nonEmptyString(row["agent_id"]);
   const leaseToken = nonEmptyString(row["resume_lease_token"]);
   if (!checkpoint || !taskId || !userId || !agentId || !leaseToken) return null;
+  const rawResumeCount = Number(row["resume_count"] ?? 0);
+  const resumeCount = Number.isFinite(rawResumeCount)
+    ? Math.max(0, Math.min(3, Math.floor(rawResumeCount)))
+    : 0;
   return {
     taskId,
     userId,
@@ -43,6 +48,7 @@ export function parseClaimedRunResume(value: unknown): ClaimedRunResume | null {
     provider: nonEmptyString(row["provider"]),
     model: nonEmptyString(row["model"]),
     leaseToken,
+    resumeCount,
     checkpoint,
   };
 }
