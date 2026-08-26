@@ -82,6 +82,8 @@ describe("durable run checkpoints", () => {
   });
 
   it("invalidates resumability before external tool execution", async () => {
+    // A crash after this invalidation must not leave a stale pre-tool snapshot
+    // that could cause a possibly completed real-world action to be replayed.
     let update: Record<string, unknown> | null = null;
     const sb = {
       from: () => ({
