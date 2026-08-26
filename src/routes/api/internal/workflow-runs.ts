@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { processDuePersonalReminders } from "@/lib/mission/personal-reminders.server";
 import { processQueuedWorkflowRuns } from "@/lib/runtime/workflow-queue.server";
+import { processResumableAgentRuns } from "@/lib/runtime/run-resume-worker.server";
 import { isValidRuntimeWorkerToken } from "@/lib/runtime/runtime-worker-auth.server";
 
 /**
- * Scheduler endpoint for durable workflow and personal reminder execution.
+ * Scheduler endpoint for durable workflow, agent-resume and reminder execution.
  *
  * Configure a deployment scheduler to POST here with:
  *   Authorization: Bearer <WORKFLOW_RUNNER_CRON_SECRET>
@@ -27,11 +28,12 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         const limit = Number.isFinite(requested)
           ? Math.max(1, Math.min(4, Math.trunc(requested)))
           : 2;
-        const [workflows, reminders] = await Promise.all([
+        const [workflows, reminders, agentResumes] = await Promise.all([
           processQueuedWorkflowRuns(limit),
           processDuePersonalReminders(Math.max(10, limit * 5)),
+          processResumableAgentRuns(limit),
         ]);
-        return json({ ok: true, ...workflows, reminders }, 200);
+        return json({ ok: true, ...workflows, reminders, agent_resumes: agentResumes }, 200);
       },
     },
   },
