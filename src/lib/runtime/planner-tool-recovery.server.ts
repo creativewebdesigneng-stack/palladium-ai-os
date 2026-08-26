@@ -10,9 +10,10 @@
 import type { AgentPlan, VerificationDecision } from "@/lib/agents/agent-planner";
 import { normaliseVerificationDecision } from "@/lib/agents/agent-planner";
 import { SAFE_PARALLEL_READ_TOOLS } from "./atomic-loop-guard.server";
-import type { ToolGrant } from "./tools.server";
 
 const SAFE_READS = new Set(SAFE_PARALLEL_READ_TOOLS);
+
+type RecoveryGrant = { requiresApproval: boolean };
 
 export type PlannedToolRecovery = {
   shouldReplan: boolean;
@@ -66,7 +67,7 @@ export function classifyPlannedToolFailure(args: {
   tool: string;
   ok: boolean;
   output: unknown;
-  grant?: ToolGrant | null | undefined;
+  grant?: RecoveryGrant | null;
 }): PlannedToolRecovery {
   const plan = args.plan as AgentPlan;
   if (args.ok) return { shouldReplan: false, decision: null, reason: null };
