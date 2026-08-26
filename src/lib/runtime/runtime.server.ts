@@ -32,6 +32,11 @@ import {
   type ChatResult,
 } from "./model-gateway.server";
 import { executeTool, resolveGrantedTools, type ToolGrant } from "./tools.server";
+import {
+  canBatchInParallel,
+  compactToolResultForModel,
+  RunLoopGuard,
+} from "./atomic-loop-guard.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -669,6 +674,8 @@ type ToolLoopDeps = {
   grants: Map<string, ToolGrant>;
   onEvent?: (event: RunEvent) => void | Promise<void>;
   signal: AbortSignal;
+  /** Per-run repeated-call / no-progress protection. */
+  guard: RunLoopGuard;
 };
 
 export type RunEvent =
@@ -678,42 +685,75 @@ export type RunEvent =
   | { type: "error"; message: string }
   | { type: "complete"; task: unknown };
 
+type ToolOutcome = { ok: boolean; output: unknown; notice?: string };
+
+async function invokeGuardedTool(
+  deps: ToolLoopDeps,
+  call: { name: string; arguments: Record<string, unknown> },
+): Promise<ToolOutcome> {
+  const decision = deps.guard.inspect(call);
+  if (decision.action === "veto") {
+    // Blocked before execution: no underlying tool call, no external action.
+    deps.guard.record(call, decision.output);
+    return { ok: false, output: decision.output };
+  }
+  const exec = await executeTool(
+    call.name,
+    call.arguments,
+    {
+      userId: deps.userId,
+      orgId: deps.run.orgId,
+      agentId: deps.run.agent.id,
+      taskId: deps.run.taskId,
+      sb: deps.sb,
+      signal: deps.signal,
+      allowedProviders: deps.run.agent.allowed_providers ?? [],
+    },
+    deps.grants,
+  );
+  deps.guard.record(call, exec.output);
+  return {
+    ok: exec.ok,
+    output: exec.output,
+    ...(decision.action === "warn" ? { notice: decision.notice } : {}),
+  };
+}
+
+function awaitsApproval(output: unknown): boolean {
+  const value = output as Record<string, unknown> | null;
+  return Boolean(
+    value &&
+      (value["approval_request_id"] ||
+        value["status"] === "awaiting_approval" ||
+        value["requires_approval"] === true),
+  );
+}
+
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
   messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
   // The run is visibly parked on tool work rather than silently "running".
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   try {
-    for (const call of result.toolCalls) {
-      const exec = await executeTool(
-        call.name,
-        call.arguments,
-        {
-          userId: deps.userId,
-          orgId: deps.run.orgId,
-          agentId: deps.run.agent.id,
-          taskId: deps.run.taskId,
-          sb: deps.sb,
-          signal: deps.signal,
-          allowedProviders: deps.run.agent.allowed_providers ?? [],
-        },
-        deps.grants,
-      );
-      await deps.onEvent?.({ type: "tool", name: call.name, ok: exec.ok });
-      const output = exec.output as Record<string, unknown> | null;
-      if (
-        output &&
-        (output["approval_request_id"] ||
-          output["status"] === "awaiting_approval" ||
-          output["requires_approval"] === true)
-      ) {
-        awaitingApproval = true;
-      }
+    // Conservative batching: only an all-safe, all-granted, approval-free batch
+    // of reads runs concurrently. Anything else keeps the sequential path.
+    const parallel = canBatchInParallel(result.toolCalls, deps.grants);
+    const outcomes: ToolOutcome[] = parallel
+      ? await Promise.all(result.toolCalls.map((call) => invokeGuardedTool(deps, call)))
+      : [];
+
+    // Message order always follows the model's tool-call order.
+    for (let index = 0; index < result.toolCalls.length; index += 1) {
+      const call = result.toolCalls[index]!;
+      const outcome = parallel ? outcomes[index]! : await invokeGuardedTool(deps, call);
+      await deps.onEvent?.({ type: "tool", name: call.name, ok: outcome.ok });
+      if (awaitsApproval(outcome.output)) awaitingApproval = true;
+      const content = compactToolResultForModel(outcome.output);
       messages.push({
         role: "tool",
         tool_call_id: call.id,
         name: call.name,
-        content: JSON.stringify(exec.output).slice(0, 8000),
+        content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
     }
   } finally {
@@ -726,6 +766,7 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   }
   return { awaitingApproval };
 }
+
 
 /** Tells the operator a run has paused and is waiting on them. */
 async function notifyInputRequired(
@@ -776,6 +817,7 @@ export async function executeRun(args: {
   const messages = [...args.run.messages];
   let toolCallCount = 0;
   const usage = { input: 0, output: 0 };
+  const guard = new RunLoopGuard();
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -827,6 +869,7 @@ export async function executeRun(args: {
           run: args.run,
           grants: args.run.tools.grants,
           signal: controller.signal,
+          guard,
         },
         result,
         messages,
@@ -859,6 +902,7 @@ export async function* streamRun(args: {
   const pending: RunEvent[] = [];
   const usage = { input: 0, output: 0 };
   let toolCallCount = 0;
+  const guard = new RunLoopGuard();
 
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
@@ -914,6 +958,7 @@ export async function* streamRun(args: {
           run: args.run,
           grants: args.run.tools.grants,
           signal: controller.signal,
+          guard,
           onEvent: (e) => void pending.push(e),
         },
         final,
