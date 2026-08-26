@@ -20,6 +20,7 @@ import {
   type MemoryPreferences,
 } from "./preferences.server";
 import { getVectorStore, resolveVectorProvider, type VectorFilter } from "./vector-store.server";
+import { rankHybridMemoryHits } from "./hybrid-memory-ranking";
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -297,8 +298,10 @@ export type MemorySearchHit = {
 };
 
 /**
- * Semantic search with a keyword fallback, so memory still works when embeddings
- * are unavailable (missing credits, provider outage, not yet indexed).
+ * Hybrid memory retrieval: semantic/vector recall and exact lexical recall are
+ * complementary signals. Either path may fail independently; successful hits
+ * from the other path are still returned. Ranking bonuses never overwrite the
+ * public semantic `similarity` value on a hit.
  */
 export async function searchMemory(args: {
   sb: Sb;
@@ -313,10 +316,20 @@ export async function searchMemory(args: {
   if (!query) return [];
   const limit = Math.min(Math.max(args.limit ?? 8, 1), 25);
 
+  const keywordPromise = keywordSearch(
+    args.sb,
+    query,
+    limit,
+    args.agentId ?? null,
+    args.types ?? null,
+  ).catch((error) => {
+    console.error("[memory] keyword search unavailable", error);
+    return [] as MemorySearchHit[];
+  });
+
+  const semanticHits: MemorySearchHit[] = [];
   try {
     const { vector } = await embedOne(query);
-    const hits: MemorySearchHit[] = [];
-
     const { data: rows, error } = await args.sb.rpc("search_agent_memories", {
       _embedding: vector as unknown as string,
       _match_count: limit,
@@ -325,7 +338,7 @@ export async function searchMemory(args: {
     });
     if (error) throw new Error(error.message);
     for (const row of rows ?? []) {
-      hits.push({
+      semanticHits.push({
         id: row.id,
         content: row.content,
         title: row.title,
@@ -338,13 +351,14 @@ export async function searchMemory(args: {
     }
 
     if (args.includeDocuments !== false) {
-      const { data: chunks } = await args.sb.rpc("search_memory_chunks", {
+      const { data: chunks, error: chunkError } = await args.sb.rpc("search_memory_chunks", {
         _embedding: vector as unknown as string,
         _match_count: Math.min(limit, 6),
         _agent: args.agentId ?? null,
       });
+      if (chunkError) throw new Error(chunkError.message);
       for (const chunk of chunks ?? []) {
-        hits.push({
+        semanticHits.push({
           id: chunk.id,
           content: chunk.content,
           similarity: Number(chunk.similarity ?? 0),
@@ -353,13 +367,17 @@ export async function searchMemory(args: {
         });
       }
     }
-
-    if (hits.length) return hits.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
   } catch (error) {
-    console.error("[memory] semantic search unavailable, falling back to keywords", error);
+    console.error("[memory] semantic search unavailable", error);
   }
 
-  return keywordSearch(args.sb, query, limit, args.agentId ?? null, args.types ?? null);
+  const keywordHits = await keywordPromise;
+  return rankHybridMemoryHits({
+    semantic: semanticHits,
+    keyword: keywordHits,
+    query,
+    limit,
+  });
 }
 
 async function keywordSearch(
@@ -379,7 +397,8 @@ async function keywordSearch(
   if (safe) q = q.or(`content.ilike.%${safe}%,title.ilike.%${safe}%`);
   if (agentId) q = q.or(`agent_id.is.null,agent_id.eq.${agentId}`);
   if (types?.length) q = q.in("memory_type", types);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
   return (data ?? []).map((row: any) => ({
     id: row.id,
     content: row.content,
