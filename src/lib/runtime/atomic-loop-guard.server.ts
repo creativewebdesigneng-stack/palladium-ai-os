@@ -102,8 +102,13 @@ export function compactToolResultForModel(output: unknown, target = COMPACT_TARG
 
 /** Third prospective identical call gets a warning appended to its result. */
 const WARN_AFTER_PRIOR_CALLS = 2;
-/** Beyond this many prior identical calls a repeated no-progress call is vetoed. */
-const VETO_AFTER_PRIOR_CALLS = 4;
+/**
+ * Palladium has four tool rounds, so after three identical no-progress
+ * executions the fourth identical request is vetoed. That leaves the final
+ * model turn available to use the existing results instead of exhausting the
+ * run budget.
+ */
+const VETO_AFTER_PRIOR_CALLS = 3;
 /** ...but only when the outcome has already repeated this many times. */
 const VETO_AFTER_SAME_OUTCOMES = 3;
 
