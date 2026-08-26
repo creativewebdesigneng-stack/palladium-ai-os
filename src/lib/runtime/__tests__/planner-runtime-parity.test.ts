@@ -279,4 +279,71 @@ describe("planned runtime parity", () => {
     expect(firstSteering).toBeUndefined();
     expect(secondSteering?.content).toContain("verified UK suppliers");
   });
+
+  it("invalidates resumability before a planned tool executes and restores it only afterward", async () => {
+    const sb = db();
+    let executionRound = 0;
+    gateway.runChat.mockImplementation(async (args: any) => {
+      if (isPlanningCall(args)) return planningResult;
+      return executionRound++ === 0
+        ? toolResult([{ id: "a", name: "web_search", arguments: { q: "safe" } }])
+        : finalResult;
+    });
+    toolsMod.executeTool.mockImplementation(async () => {
+      expect(sb.tables.agent_tasks[0]?.checkpoint_state).toBeNull();
+      return { ok: true, output: { results: [{ title: "ok" }] } };
+    });
+
+    await executePlannedRun({ sb, userId: "user-1", run: run(sb) });
+
+    const task = sb.tables.agent_tasks[0];
+    expect(task.checkpoint_state?.safe_to_resume).toBe(true);
+    expect(["tool_boundary", "model_boundary"]).toContain(task.checkpoint_state?.phase);
+  });
+
+  it("resumes from a durable checkpoint without rebuilding the plan", async () => {
+    const sb = db();
+    const resumePlan = {
+      objective: "finish task",
+      assumptions: ["already planned"],
+      steps: [{ id: "step-1", title: "Execute", objective: "finish task", status: "active", success_criteria: ["done"], evidence: ["saved"] }],
+      current_step_id: "step-1",
+      quality_threshold: 0.8,
+      verification_required: false,
+      replan_count: 1,
+      max_replans: 2,
+    };
+    const resumeCheckpoint = {
+      schema: 1 as const,
+      phase: "model_boundary" as const,
+      safe_to_resume: true as const,
+      saved_at: "2026-08-26T22:00:00.000Z",
+      messages: [
+        { role: "system" as const, content: "You are Atlas." },
+        { role: "user" as const, content: "finish task" },
+        { role: "system" as const, content: "RESUMED EVIDENCE" },
+      ],
+      plan: resumePlan as any,
+      tool_rounds: 2,
+      tool_call_count: 3,
+      usage: { input: 100, output: 25 },
+    };
+    gateway.runChat.mockResolvedValue(finalResult);
+
+    await executePlannedRun({
+      sb,
+      userId: "user-1",
+      run: run(sb),
+      resumeCheckpoint,
+    });
+
+    expect(gateway.runChat).toHaveBeenCalledTimes(1);
+    expect(isPlanningCall(gateway.runChat.mock.calls[0]?.[0])).toBe(false);
+    expect(gateway.runChat.mock.calls[0]?.[0].messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ content: "RESUMED EVIDENCE" }),
+    ]));
+    const completion = runtime.completeRun.mock.calls[0]?.[0];
+    expect(completion.result.usage).toEqual({ input: 102, output: 27 });
+    expect(completion.toolCallCount).toBe(3);
+  });
 });
