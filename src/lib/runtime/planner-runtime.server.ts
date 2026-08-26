@@ -378,7 +378,7 @@ export async function executePlannedRun(args: {
   try {
     for (let round = 0; round < MAX_TOTAL_MODEL_ROUNDS; round += 1) {
       if (ownerAbort) throw ownerAbort;
-      if (timOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await cancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
