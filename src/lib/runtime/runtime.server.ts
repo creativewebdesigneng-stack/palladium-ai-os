@@ -37,6 +37,7 @@ import {
   compactToolResultForModel,
   RunLoopGuard,
 } from "./atomic-loop-guard.server";
+import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -767,7 +768,6 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   return { awaitingApproval };
 }
 
-
 /** Tells the operator a run has paused and is waiting on them. */
 async function notifyInputRequired(
   userId: string,
@@ -818,6 +818,7 @@ export async function executeRun(args: {
   let toolCallCount = 0;
   const usage = { input: 0, output: 0 };
   const guard = new RunLoopGuard();
+  const steeringCursor = createSteeringCursor();
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -826,6 +827,12 @@ export async function executeRun(args: {
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
+      await applyRunSteering({
+        sb: args.sb,
+        taskId: args.run.taskId,
+        cursor: steeringCursor,
+        messages,
+      });
       await heartbeat(args.sb, args.run.taskId);
       let result: ChatResult;
       try {
@@ -903,6 +910,7 @@ export async function* streamRun(args: {
   const usage = { input: 0, output: 0 };
   let toolCallCount = 0;
   const guard = new RunLoopGuard();
+  const steeringCursor = createSteeringCursor();
 
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
@@ -912,6 +920,12 @@ export async function* streamRun(args: {
       if (await isCancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
+      await applyRunSteering({
+        sb: args.sb,
+        taskId: args.run.taskId,
+        cursor: steeringCursor,
+        messages,
+      });
       await heartbeat(args.sb, args.run.taskId);
 
       let final: ChatResult | null = null;
