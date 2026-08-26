@@ -66,7 +66,7 @@ export function classifyPlannedToolFailure(args: {
   tool: string;
   ok: boolean;
   output: unknown;
-  grant?: ToolGrant | null;
+  grant?: ToolGrant | null | undefined;
 }): PlannedToolRecovery {
   if (args.ok) return { shouldReplan: false, decision: null, reason: null };
   if (isApprovalWait(args.output)) return { shouldReplan: false, decision: null, reason: null };
