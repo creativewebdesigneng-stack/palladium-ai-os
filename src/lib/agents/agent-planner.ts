@@ -173,9 +173,18 @@ export function updatePlanAfterObservation(
       ? "blocked"
       : args.completed
         ? "completed"
-        : "in_progress";
+        : step.status === "blocked"
+          ? "blocked"
+          : "in_progress";
     return { ...step, status, evidence: [...step.evidence, ...evidence].slice(-20) };
   });
+  const observed = steps.find((step) => step.id === args.stepId);
+  if (observed?.status === "blocked") {
+    // A sibling result from the same model-emitted tool batch may add evidence,
+    // but it cannot silently clear an explicit blocked signal. Only replanning
+    // (or explicit completion) replaces that blocked route.
+    return { ...plan, steps, current_step_id: observed.id };
+  }
   const next = steps.find((step) => step.status === "pending" || step.status === "in_progress");
   return { ...plan, steps, current_step_id: next?.id ?? null };
 }
