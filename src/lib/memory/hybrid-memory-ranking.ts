@@ -1,3 +1,4 @@
+// Atomic-derived pattern: fuse semantic recall with bounded lexical evidence.
 export type HybridMemoryHit = {
   id: string;
   content: string;
