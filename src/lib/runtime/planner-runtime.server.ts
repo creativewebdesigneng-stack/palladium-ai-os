@@ -24,6 +24,7 @@ import {
   compactToolResultForModel,
   RunLoopGuard,
 } from "./atomic-loop-guard.server";
+import { classifyPlannedToolFailure } from "./planner-tool-recovery.server";
 import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
 
 type Sb = { from: (t: string) => any };
@@ -241,6 +242,7 @@ async function runToolCalls(args: {
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   let plan = args.plan;
+  let recoveryReason: string | null = null;
   try {
     const parallel = canBatchInParallel(args.result.toolCalls, args.run.tools.grants);
     const outcomes: PlannedToolOutcome[] = parallel
@@ -271,10 +273,11 @@ async function runToolCalls(args: {
             call,
           });
       const output = outcome.output as Record<string, unknown> | null;
-      awaitingApproval = awaitingApproval || Boolean(
+      const approvalWait = Boolean(
         output &&
           (output["approval_request_id"] || output["status"] === "awaiting_approval" || output["requires_approval"] === true),
       );
+      awaitingApproval = awaitingApproval || approvalWait;
       const content = compactToolResultForModel(outcome.output);
       args.messages.push({
         role: "tool",
@@ -282,12 +285,37 @@ async function runToolCalls(args: {
         name: call.name,
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
-      if (plan.current_step_id) {
+
+      const recovery = recoveryReason
+        ? null
+        : classifyPlannedToolFailure({
+            plan,
+            tool: call.name,
+            ok: outcome.ok,
+            output: outcome.output,
+            grant: args.run.tools.grants.get(call.name),
+          });
+      if (recovery?.shouldReplan && recovery.decision) {
+        plan = applyReplan(plan, recovery.decision);
+        recoveryReason = recovery.reason ?? `${call.name} failed`;
+      } else if (plan.current_step_id) {
         plan = updatePlanAfterObservation(plan, {
           stepId: plan.current_step_id,
           evidence: [`${call.name}: ${compactToolResultForModel(outcome.output, 1_000)}`],
         });
       }
+    }
+
+    if (recoveryReason) {
+      args.messages.push({
+        role: "system",
+        content: [
+          "TOOL FAILURE — RE-PLAN REQUIRED",
+          `Failure: ${recoveryReason}`,
+          renderPlannerPrompt(plan),
+          "The failed call was a safe read and no external action was confirmed. Continue from the recovery step using a materially different safe approach. Do not repeat the exact failed request unless new information or changed inputs justify it.",
+        ].join("\n"),
+      });
     }
     await persistPlan(args.sb, args.run.taskId, plan);
   } finally {
@@ -350,7 +378,7 @@ export async function executePlannedRun(args: {
   try {
     for (let round = 0; round < MAX_TOTAL_MODEL_ROUNDS; round += 1) {
       if (ownerAbort) throw ownerAbort;
-      if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
+      if (timOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await cancelled(args.sb, args.run.taskId)) {
         throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
       }
