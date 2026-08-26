@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialPlan } from "@/lib/agents/agent-planner";
 import {
   createDurableRunCheckpoint,
+  invalidateDurableRunCheckpoint,
   parseDurableRunCheckpoint,
 } from "../run-checkpoint.server";
 
@@ -78,5 +79,26 @@ describe("durable run checkpoints", () => {
     expect(checkpoint.tool_rounds).toBe(0);
     expect(checkpoint.tool_call_count).toBe(0);
     expect(checkpoint.usage).toEqual({ input: 0, output: 8 });
+  });
+
+  it("invalidates resumability before external tool execution", async () => {
+    // A crash after this invalidation must not leave a stale pre-tool snapshot
+    // that could cause a possibly completed real-world action to be replayed.
+    let update: Record<string, unknown> | null = null;
+    const sb = {
+      from: () => ({
+        update: (value: Record<string, unknown>) => {
+          update = value;
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    };
+
+    await invalidateDurableRunCheckpoint({ sb, taskId: "task-1" });
+
+    expect(update?.["checkpoint_state"]).toBeNull();
+    expect(update?.["checkpoint_version"]).toBe(0);
+    expect(update?.["checkpointed_at"]).toBeNull();
+    expect(typeof update?.["heartbeat_at"]).toBe("string");
   });
 });

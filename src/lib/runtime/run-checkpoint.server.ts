@@ -99,3 +99,25 @@ export async function persistDurableRunCheckpoint(args: {
     .eq("id", args.taskId);
   if (error) throw error;
 }
+
+/**
+ * Removes resumability immediately before external tool execution begins.
+ * If the worker dies after this point, the stale run is intentionally not
+ * auto-resumable because the side effect may have been dispatched already.
+ */
+export async function invalidateDurableRunCheckpoint(args: {
+  sb: { from: (table: string) => any };
+  taskId: string;
+}) {
+  const now = new Date().toISOString();
+  const { error } = await args.sb
+    .from("agent_tasks")
+    .update({
+      checkpoint_state: null,
+      checkpoint_version: 0,
+      checkpointed_at: null,
+      heartbeat_at: now,
+    })
+    .eq("id", args.taskId);
+  if (error) throw error;
+}

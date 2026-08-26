@@ -29,6 +29,13 @@ import {
   type PlannedToolRecovery,
 } from "./planner-tool-recovery.server";
 import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
+import {
+  createDurableRunCheckpoint,
+  invalidateDurableRunCheckpoint,
+  persistDurableRunCheckpoint,
+  type DurableRunCheckpoint,
+  type RunCheckpointPhase,
+} from "./run-checkpoint.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -156,6 +163,30 @@ async function cancelled(sb: Sb, taskId: string) {
     .eq("id", taskId)
     .maybeSingle();
   return data?.status === "cancelled" || data?.cancel_requested === true;
+}
+
+async function saveCheckpoint(args: {
+  sb: Sb;
+  taskId: string;
+  phase: RunCheckpointPhase;
+  messages: ChatMessage[];
+  plan: AgentPlan;
+  toolRounds: number;
+  toolCallCount: number;
+  usage: { input: number; output: number };
+}) {
+  await persistDurableRunCheckpoint({
+    sb: args.sb,
+    taskId: args.taskId,
+    checkpoint: createDurableRunCheckpoint({
+      phase: args.phase,
+      messages: args.messages,
+      plan: args.plan,
+      toolRounds: args.toolRounds,
+      toolCallCount: args.toolCallCount,
+      usage: args.usage,
+    }),
+  });
 }
 
 async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: string, signal: AbortSignal) {
@@ -349,6 +380,7 @@ export async function executePlannedRun(args: {
   run: PreparedRun;
   signal?: AbortSignal;
   timeoutMs?: number;
+  resumeCheckpoint?: DurableRunCheckpoint | null;
 }) {
   const controller = new AbortController();
   let ownerAbort: RuntimeError | null = null;
@@ -365,16 +397,21 @@ export async function executePlannedRun(args: {
     controller.abort();
   }, Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS));
 
-  let plan = await buildPlan(args.run);
+  const resumed = args.resumeCheckpoint ?? null;
+  let plan = resumed ? resumed.plan : await buildPlan(args.run);
   await persistPlan(args.sb, args.run.taskId, plan);
-  const messages: ChatMessage[] = [
-    args.run.messages[0] ?? { role: "system", content: "" },
-    { role: "system", content: renderPlannerPrompt(plan) },
-    ...args.run.messages.slice(1),
-  ];
-  const usage = { input: 0, output: 0 };
-  let toolCallCount = 0;
-  let toolRounds = 0;
+  const messages: ChatMessage[] = resumed
+    ? resumed.messages.map((message) => ({ ...message }))
+    : [
+        args.run.messages[0] ?? { role: "system", content: "" },
+        { role: "system", content: renderPlannerPrompt(plan) },
+        ...args.run.messages.slice(1),
+      ];
+  const usage = resumed
+    ? { input: resumed.usage.input, output: resumed.usage.output }
+    : { input: 0, output: 0 };
+  let toolCallCount = resumed?.tool_call_count ?? 0;
+  let toolRounds = resumed?.tool_rounds ?? 0;
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
 
@@ -392,6 +429,16 @@ export async function executePlannedRun(args: {
         messages,
       });
       await heartbeat(args.sb, args.run.taskId);
+      await saveCheckpoint({
+        sb: args.sb,
+        taskId: args.run.taskId,
+        phase: "model_boundary",
+        messages,
+        plan,
+        toolRounds,
+        toolCallCount,
+        usage,
+      });
 
       const result = await runChat({
         provider: args.run.provider,
@@ -411,6 +458,7 @@ export async function executePlannedRun(args: {
         if (toolRounds > MAX_TOOL_ROUNDS) {
           throw new RuntimeError("The agent used too many tool rounds without producing a verifiable answer.", "TOOL_LOOP_EXHAUSTED", 500);
         }
+        await invalidateDurableRunCheckpoint({ sb: args.sb, taskId: args.run.taskId });
         const observed = await runToolCalls({
           sb: args.sb,
           userId: args.userId,
@@ -422,6 +470,18 @@ export async function executePlannedRun(args: {
           guard,
         });
         plan = observed.plan;
+        if (!observed.awaitingApproval) {
+          await saveCheckpoint({
+            sb: args.sb,
+            taskId: args.run.taskId,
+            phase: "tool_boundary",
+            messages,
+            plan,
+            toolRounds,
+            toolCallCount,
+            usage,
+          });
+        }
         continue;
       }
 
@@ -474,6 +534,16 @@ export async function executePlannedRun(args: {
           renderPlannerPrompt(plan),
           "Continue execution from the revised plan. Use additional tools only when needed to resolve the verifier issues.",
         ].join("\n"),
+      });
+      await saveCheckpoint({
+        sb: args.sb,
+        taskId: args.run.taskId,
+        phase: "verification_boundary",
+        messages,
+        plan,
+        toolRounds,
+        toolCallCount,
+        usage,
       });
     }
 
