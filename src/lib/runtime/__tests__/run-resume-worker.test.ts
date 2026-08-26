@@ -132,6 +132,8 @@ describe("durable run resume worker", () => {
   });
 
   it("fails closed when the checkpoint disappeared during tool execution", async () => {
+    // Missing checkpoint means the crash could have happened after an external
+    // dispatch, so this path must never be auto-retried.
     const sb = db(null);
     resume.claim.mockResolvedValue(claim(1));
     planner.execute.mockRejectedValue(new Error("worker died after dispatch"));
