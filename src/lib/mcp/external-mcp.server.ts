@@ -20,10 +20,13 @@ export type ExternalMcpServer = {
   allowed_tool_names: string[] | null;
 };
 
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonObject = { [key: string]: JsonValue };
+
 export type ExternalMcpTool = {
   name: string;
   description: string;
-  inputSchema: Record<string, unknown>;
+  inputSchema: JsonObject;
 };
 
 type Db = { from: (table: string) => any };
@@ -237,9 +240,29 @@ async function initialise(server: ExternalMcpServer, options?: RuntimeOptions): 
       clientInfo: { name: "PalladiumAI", version: "1.0" },
     },
     requestId: 1,
-    options,
+    ...(options ? { options } : {}),
   });
   return response.sessionId;
+}
+
+function toJsonValue(value: unknown): JsonValue | undefined {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      const json = toJsonValue(item);
+      return json === undefined ? [] : [json];
+    });
+  }
+  if (typeof value === "object") {
+    const result: JsonObject = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const json = toJsonValue(item);
+      if (json !== undefined) result[key] = json;
+    }
+    return result;
+  }
+  return undefined;
 }
 
 function normaliseTool(value: unknown): ExternalMcpTool | null {
@@ -248,9 +271,9 @@ function normaliseTool(value: unknown): ExternalMcpTool | null {
   const name = typeof row["name"] === "string" ? row["name"].trim() : "";
   if (!name || name.length > 160) return null;
   const description = typeof row["description"] === "string" ? row["description"].slice(0, 2000) : "";
-  const schema = row["inputSchema"];
-  const inputSchema = schema && typeof schema === "object" && !Array.isArray(schema)
-    ? (schema as Record<string, unknown>)
+  const schema = toJsonValue(row["inputSchema"]);
+  const inputSchema: JsonObject = schema && typeof schema === "object" && !Array.isArray(schema)
+    ? schema
     : { type: "object", properties: {} };
   return { name, description, inputSchema };
 }
@@ -269,7 +292,7 @@ export async function listExternalMcpTools(args: {
     params: {},
     sessionId,
     requestId: 2,
-    options: args.options,
+    ...(args.options ? { options: args.options } : {}),
   });
   const result = response.envelope.result as Record<string, unknown> | undefined;
   const discovered = Array.isArray(result?.["tools"])
@@ -314,7 +337,7 @@ export async function callExternalMcpTool(args: {
     params: { name: args.toolName.slice(0, 160), arguments: args.input },
     sessionId,
     requestId: 2,
-    options: args.options,
+    ...(args.options ? { options: args.options } : {}),
   });
   return response.envelope.result ?? null;
 }
