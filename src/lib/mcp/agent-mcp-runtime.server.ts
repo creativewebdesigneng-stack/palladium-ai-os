@@ -1,7 +1,7 @@
 import {
   callExternalMcpTool,
   listExternalMcpTools,
-  type ExternalMcpJsonValue,
+  type JsonObject,
 } from "@/lib/mcp/external-mcp.server";
 
 export type AgentExternalMcpCapability = {
@@ -12,7 +12,7 @@ export type AgentExternalMcpCapability = {
   toolName: string;
   displayName: string;
   description: string;
-  inputSchema: ExternalMcpJsonValue;
+  inputSchema: JsonObject;
   approval: "confirm";
   mutates: true;
 };
