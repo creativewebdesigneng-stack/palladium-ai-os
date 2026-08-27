@@ -29,12 +29,12 @@ beforeEach(() => {
 });
 
 describe("agent external MCP capability adapter", () => {
-  it("discovers enabled server tools as bounded agent capabilities", async () => {
+  it("discovers enabled server tools as bounded approval-required agent capabilities", async () => {
     const sb = serversDb([
-      { id: "server-1", name: "Store MCP", slug: "store", requires_approval: true },
+      { id: "server-1", name: "Store MCP", slug: "store", requires_approval: false },
     ]);
     listExternalMcpTools.mockResolvedValue({
-      server: { id: "server-1", name: "Store MCP", slug: "store", requires_approval: true },
+      server: { id: "server-1", name: "Store MCP", slug: "store", requires_approval: false },
       tools: [
         {
           name: "orders_update",
@@ -79,12 +79,31 @@ describe("agent external MCP capability adapter", () => {
 
     expect(capabilities).toHaveLength(1);
     expect(capabilities[0]?.serverId).toBe("good");
+    expect(capabilities[0]?.approval).toBe("confirm");
+  });
+
+  it("rejects agent MCP execution before discovery when approval has not been granted", async () => {
+    const sb = { from: vi.fn() };
+
+    await expect(
+      executeAgentExternalMcpCapability({
+        sb,
+        userId: "user-1",
+        serverId: "server-1",
+        toolName: "orders_update",
+        input: { order_id: "123" },
+        approved: false,
+      }),
+    ).rejects.toThrow("require explicit operator approval");
+
+    expect(listExternalMcpTools).not.toHaveBeenCalled();
+    expect(callExternalMcpTool).not.toHaveBeenCalled();
   });
 
   it("re-resolves the live tool before approved execution", async () => {
     const sb = { from: vi.fn() };
     listExternalMcpTools.mockResolvedValue({
-      server: { id: "server-1", name: "Store MCP", slug: "store", requires_approval: true },
+      server: { id: "server-1", name: "Store MCP", slug: "store", requires_approval: false },
       tools: [{ name: "orders_update", description: "Update", inputSchema: { type: "object" } }],
     });
     callExternalMcpTool.mockResolvedValue({ ok: true });
