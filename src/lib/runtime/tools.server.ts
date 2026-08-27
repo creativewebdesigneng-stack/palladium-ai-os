@@ -14,6 +14,10 @@ import {
   normalizeIntegrationProvider,
   prepareIntegrationAction,
 } from "@/lib/integrations/agent-integration-runtime.server";
+import {
+  listAgentMcpIntegrationCapabilities,
+  prepareAgentMcpIntegrationAction,
+} from "@/lib/mcp/agent-mcp-integration-bridge.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
 import {
   createBrowserTool,
@@ -106,7 +110,13 @@ function integrationActionDef(name: string): ToolDef {
 
 const runIntegrationCapabilities: ToolImpl["run"] = async (input, ctx) => {
   const provider = normalizeProvider(input["provider"]);
-  const capabilities = await listIntegrationCapabilities(ctx.userId, provider || undefined);
+  const [connectedCapabilities, mcpCapabilities] = await Promise.all([
+    provider === "mcp" ? Promise.resolve([]) : listIntegrationCapabilities(ctx.userId, provider || undefined),
+    !provider || provider === "mcp"
+      ? listAgentMcpIntegrationCapabilities({ sb: ctx.sb, userId: ctx.userId })
+      : Promise.resolve([]),
+  ]);
+  const capabilities = [...connectedCapabilities, ...mcpCapabilities];
   const allowed = ctx.allowedProviders
     ? new Set(ctx.allowedProviders.map(normalizeProvider).filter(Boolean))
     : null;
@@ -128,6 +138,43 @@ const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
     input["input"] && typeof input["input"] === "object" && !Array.isArray(input["input"])
       ? (input["input"] as Record<string, unknown>)
       : {};
+
+  if (provider === "mcp") {
+    const prepared = await prepareAgentMcpIntegrationAction({
+      sb: ctx.sb,
+      userId: ctx.userId,
+      action,
+      actionInput,
+    });
+    const { data, error } = await ctx.sb
+      .from("approval_requests")
+      .insert({
+        user_id: ctx.userId,
+        org_id: ctx.orgId,
+        agent_id: ctx.agentId,
+        task_id: ctx.taskId,
+        action_type: "external_mcp_action",
+        title: `${prepared.toolName.replace(/[-_.]/g, " ")}: MCP`.slice(0, 180),
+        summary:
+          "Approve this external MCP action. The server, tool and exact bounded input are immutable during execution and retry.",
+        details: prepared.approvalDetails,
+        risk_level: "high",
+        status: "pending",
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) return { error: "Could not queue the external MCP action for approval." };
+    return {
+      queued: true,
+      approval_request_id: data?.id,
+      status: "pending",
+      provider: prepared.provider,
+      action: prepared.action,
+      risk: prepared.risk,
+      transport: prepared.transport,
+    };
+  }
+
   const prepared = await prepareIntegrationAction({
     userId: ctx.userId,
     provider,
