@@ -112,7 +112,7 @@ export function evaluateSubagentSpawn(input: SubagentSpawnInput): HarnessPolicyR
 }
 
 export function assertHarnessToolInput(tool: string, input: Record<string, unknown>, allowedDomains: string[] = []): HarnessPolicyResult {
-  const requestedUrl = typeof input.url === "string" ? input.url : "";
+  const requestedUrl = typeof input["url"] === "string" ? input["url"] : "";
   let requestedDomains: string[] = [];
   if (/^https?:\/\//i.test(requestedUrl)) {
     try { requestedDomains = [new URL(requestedUrl).hostname]; } catch { requestedDomains = []; }
