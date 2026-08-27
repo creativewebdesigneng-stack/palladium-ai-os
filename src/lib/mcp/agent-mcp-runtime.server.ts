@@ -13,7 +13,7 @@ export type AgentExternalMcpCapability = {
   displayName: string;
   description: string;
   inputSchema: ExternalMcpJsonValue;
-  approval: "auto" | "confirm";
+  approval: "confirm";
   mutates: true;
 };
 
@@ -71,7 +71,10 @@ export async function listAgentExternalMcpCapabilities(args: {
         displayName: displayName(server.name, tool.name),
         description: tool.description || `Run ${tool.name} on ${server.name}.`,
         inputSchema: tool.inputSchema,
-        approval: server.requires_approval ? "confirm" : "auto",
+        // External MCP metadata does not provide a trustworthy read/write
+        // classification. Agent-side execution is therefore fail-closed: every
+        // external MCP tool is treated as mutating and requires approval.
+        approval: "confirm",
         mutates: true,
       }));
     }),
@@ -110,7 +113,7 @@ export async function findAgentExternalMcpCapability(args: {
     displayName: displayName(discovered.server.name, tool.name),
     description: tool.description || `Run ${tool.name} on ${discovered.server.name}.`,
     inputSchema: tool.inputSchema,
-    approval: discovered.server.requires_approval ? "confirm" : "auto",
+    approval: "confirm",
     mutates: true,
   };
 }
@@ -123,6 +126,10 @@ export async function executeAgentExternalMcpCapability(args: {
   input: Record<string, unknown>;
   approved: boolean;
 }): Promise<unknown> {
+  if (!args.approved) {
+    throw new Error("External MCP agent actions require explicit operator approval before execution.");
+  }
+
   const capability = await findAgentExternalMcpCapability({
     sb: args.sb,
     userId: args.userId,
@@ -137,6 +144,6 @@ export async function executeAgentExternalMcpCapability(args: {
     serverId: capability.serverId,
     toolName: capability.toolName,
     input: args.input,
-    approved: args.approved,
+    approved: true,
   });
 }
