@@ -9,10 +9,15 @@ import {
   type ApprovedGitHubActionType,
 } from "@/lib/integrations/github-approved-action.server";
 import { executeApprovedIntegrationAction } from "@/lib/integrations/approved-integration-action.server";
+import { executeApprovedAgentMcpAction } from "@/lib/mcp/approved-agent-mcp-action.server";
 import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any };
-type ExternalActionType = ApprovedActionType | ApprovedGitHubActionType | "nango_dynamic_action";
+type ExternalActionType =
+  | ApprovedActionType
+  | ApprovedGitHubActionType
+  | "nango_dynamic_action"
+  | "external_mcp_action";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
   "github_branch_create",
@@ -31,6 +36,7 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "linear_issue_update",
   "notion_page_create",
   "nango_dynamic_action",
+  "external_mcp_action",
   ...GITHUB_EXECUTABLE,
 ]);
 
@@ -47,10 +53,14 @@ function actionType(value: unknown): ExternalActionType {
 }
 
 async function executeExternalAction(
+  sb: Sb,
   userId: string,
   type: ExternalActionType,
   details: Record<string, unknown>,
 ) {
+  if (type === "external_mcp_action") {
+    return executeApprovedAgentMcpAction({ sb, userId, details });
+  }
   if (type === "nango_dynamic_action") {
     return executeApprovedIntegrationAction(userId, details);
   }
@@ -171,6 +181,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (!claim.data) throw new Error("This request has already been decided");
 
     const execution = await executeExternalAction(
+      sb,
       userId,
       type,
       safeDetails(claim.data.details),
@@ -270,6 +281,7 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (!claim.data) throw new Error("This action is already being retried");
 
     const execution = await executeExternalAction(
+      sb,
       userId,
       type,
       safeDetails(claim.data.details),
