@@ -30,7 +30,7 @@ describe("approved external MCP execution", () => {
     expect(result).toEqual({
       ok: true,
       provider: "mcp",
-      result: { content: [{ type: "text", text: "done" }] },
+      result: { mcp_result: { content: [{ type: "text", text: "done" }] } },
     });
     expect(executeAgentExternalMcpCapability).toHaveBeenCalledWith({
       sb,
