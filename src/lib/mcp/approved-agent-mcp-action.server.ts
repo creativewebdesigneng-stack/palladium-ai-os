@@ -3,8 +3,8 @@ import { executeAgentExternalMcpCapability } from "./agent-mcp-runtime.server";
 type Db = { from: (table: string) => any };
 
 export type ApprovedAgentMcpExecutionResult =
-  | { ok: true; provider: "mcp"; result: Record<string, unknown> }
-  | { ok: false; provider: "mcp"; error: string };
+  | { ok: true; provider: "mcp"; result: Record<string, unknown>; error?: undefined }
+  | { ok: false; provider: "mcp"; error: string; result?: undefined };
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
