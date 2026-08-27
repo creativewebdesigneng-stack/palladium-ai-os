@@ -1,4 +1,4 @@
-import type { BrowserTool } from "@/lib/mission/browser-agent";
+import type { BrowserStep, BrowserTool } from "@/lib/mission/browser-agent";
 import { isDomainAllowed } from "@/lib/mission/browser-agent";
 
 export const BROWSER_TASK_ACTIONS = [
@@ -15,6 +15,12 @@ export const BROWSER_TASK_ACTIONS = [
 
 export type BrowserTaskAction = (typeof BROWSER_TASK_ACTIONS)[number];
 
+type BrowserExtractionField = {
+  name: string;
+  selector: string;
+  required: boolean;
+};
+
 type BrowserTaskStep = {
   action: BrowserTaskAction;
   label?: string;
@@ -26,6 +32,7 @@ type BrowserTaskStep = {
   direction?: "up" | "down";
   amount?: number;
   ms?: number;
+  fields?: BrowserExtractionField[];
 };
 
 export type BrowserTaskResult = {
@@ -33,6 +40,7 @@ export type BrowserTaskResult = {
   completed_steps: number;
   current_url: string | null;
   outputs: Array<Record<string, unknown>>;
+  trace?: BrowserStep[];
   error?: string;
   failed_step?: number;
 };
@@ -42,6 +50,29 @@ const SENSITIVE_BROWSER_TARGET =
 
 const text = (value: unknown, max = 4000) =>
   (typeof value === "string" ? value.trim() : "").slice(0, max);
+
+function normalizeFields(value: unknown): BrowserExtractionField[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 20) {
+    throw new Error("extract fields must contain between 1 and 20 field definitions.");
+  }
+  const seen = new Set<string>();
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`fields[${index}] must be an object.`);
+    }
+    const row = item as Record<string, unknown>;
+    const name = text(row["name"], 80);
+    const selector = text(row["selector"], 500);
+    if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,79}$/.test(name)) {
+      throw new Error(`fields[${index}].name must be a stable identifier.`);
+    }
+    if (seen.has(name)) throw new Error(`Duplicate extraction field: ${name}.`);
+    seen.add(name);
+    if (!selector) throw new Error(`fields[${index}].selector is required.`);
+    return { name, selector, required: row["required"] === true };
+  });
+}
 
 function normalizeStep(value: unknown): BrowserTaskStep {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -59,6 +90,7 @@ function normalizeStep(value: unknown): BrowserTaskStep {
   const fallbackSelector = text(row["fallback_selector"], 500);
   const label = text(row["label"], 120);
   const valueText = text(row["text"], 8000);
+  const fields = action === "extract" ? normalizeFields(row["fields"]) : undefined;
 
   if (
     action === "type" &&
@@ -83,12 +115,17 @@ function normalizeStep(value: unknown): BrowserTaskStep {
     ...(direction ? { direction } : {}),
     ...(Number.isFinite(amount) ? { amount } : {}),
     ...(Number.isFinite(ms) ? { ms } : {}),
+    ...(fields ? { fields } : {}),
   };
 }
 
 function allowedUrl(url: string, allowedDomains: string[]) {
   if (!/^https?:\/\//i.test(url)) return false;
   return isDomainAllowed(url, allowedDomains);
+}
+
+function boundedTrace(tool: BrowserTool): BrowserStep[] {
+  return tool.steps().slice(-50);
 }
 
 async function clickWithFallback(tool: BrowserTool, step: BrowserTaskStep) {
@@ -120,6 +157,23 @@ async function typeWithFallback(tool: BrowserTool, step: BrowserTaskStep) {
   return { result, selector: step.fallback_selector, fallback_used: true };
 }
 
+async function extractStructuredFields(
+  tool: BrowserTool,
+  url: string,
+  fields: BrowserExtractionField[],
+) {
+  const data: Record<string, string> = {};
+  for (const field of fields) {
+    const extracted = await tool.extract(url, field.selector);
+    const value = extracted.text.trim().slice(0, 20_000);
+    if (field.required && !value) {
+      throw new Error(`Required extraction field "${field.name}" was empty.`);
+    }
+    data[field.name] = value;
+  }
+  return { url, fields: data };
+}
+
 /**
  * Executes a bounded sequence inside one BrowserTool instance. This gives the
  * model a cohesive browser session without exposing provider credentials or
@@ -142,6 +196,7 @@ export async function runBoundedBrowserTask(
       completed_steps: 0,
       current_url: null,
       outputs: [],
+      trace: boundedTrace(tool),
       error: "Browser task requires at least one step.",
     };
   }
@@ -151,6 +206,7 @@ export async function runBoundedBrowserTask(
       completed_steps: 0,
       current_url: null,
       outputs: [],
+      trace: boundedTrace(tool),
       error: `Browser task contains ${rawSteps.length} steps but the budget is ${maxSteps}.`,
     };
   }
@@ -162,6 +218,7 @@ export async function runBoundedBrowserTask(
       completed_steps: 0,
       current_url: currentUrl,
       outputs: [],
+      trace: boundedTrace(tool),
       error: "The starting URL is outside this agent's domain allow-list.",
     };
   }
@@ -210,7 +267,9 @@ export async function runBoundedBrowserTask(
           if (!allowedUrl(stepUrl, allowedDomains)) {
             throw new Error("Browser task extraction is outside this agent's domain allow-list.");
           }
-          result = await tool.extract(stepUrl, step.selector);
+          result = step.fields?.length
+            ? await extractStructuredFields(tool, stepUrl, step.fields)
+            : await tool.extract(stepUrl, step.selector);
           currentUrl = stepUrl;
           break;
         }
@@ -258,13 +317,20 @@ export async function runBoundedBrowserTask(
       });
     }
 
-    return { ok: true, completed_steps: completed, current_url: currentUrl, outputs };
+    return {
+      ok: true,
+      completed_steps: completed,
+      current_url: currentUrl,
+      outputs,
+      trace: boundedTrace(tool),
+    };
   } catch (error) {
     return {
       ok: false,
       completed_steps: completed,
       current_url: currentUrl,
       outputs,
+      trace: boundedTrace(tool),
       error: error instanceof Error ? error.message : "Browser task failed.",
       failed_step: completed + 1,
     };

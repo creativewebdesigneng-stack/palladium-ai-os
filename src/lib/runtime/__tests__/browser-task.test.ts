@@ -201,4 +201,94 @@ describe("bounded browser task", () => {
     expect(result.error).toContain("trusted server-side credential integration");
     expect(calls).toEqual([]);
   });
+
+  it("extracts named structured fields without synthesising missing values", async () => {
+    const { tool, calls } = fakeBrowser({
+      async extract(url, selector) {
+        calls.push(`extract:${url}:${selector ?? ""}`);
+        const values: Record<string, string> = {
+          ".order-number": "ORD-1042",
+          ".status": "Shipped",
+        };
+        return { url, text: values[selector ?? ""] ?? "", items: [], simulated: false };
+      },
+    });
+
+    const result = await runBoundedBrowserTask(
+      tool,
+      {
+        url: "https://example.com/order",
+        steps: [
+          {
+            action: "extract",
+            fields: [
+              { name: "order_number", selector: ".order-number", required: true },
+              { name: "status", selector: ".status", required: true },
+              { name: "optional_note", selector: ".note" },
+            ],
+          },
+        ],
+      },
+      ["example.com"],
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.outputs[1]).toMatchObject({
+      action: "extract",
+      result: {
+        fields: {
+          order_number: "ORD-1042",
+          status: "Shipped",
+          optional_note: "",
+        },
+      },
+    });
+    expect(calls).toContain("extract:https://example.com/order:.order-number");
+  });
+
+  it("fails structured extraction when a required field is empty", async () => {
+    const { tool } = fakeBrowser({
+      async extract(url) {
+        return { url, text: "", items: [], simulated: false };
+      },
+    });
+    const result = await runBoundedBrowserTask(
+      tool,
+      {
+        url: "https://example.com/order",
+        steps: [
+          {
+            action: "extract",
+            fields: [{ name: "order_number", selector: ".missing", required: true }],
+          },
+        ],
+      },
+      ["example.com"],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Required extraction field "order_number" was empty');
+  });
+
+  it("returns a bounded browser trace for runtime observability", async () => {
+    const { tool } = fakeBrowser({
+      steps: () => [
+        {
+          kind: "navigate",
+          target: "https://example.com",
+          at: "2026-08-28T00:00:00.000Z",
+          simulated: false,
+        },
+      ],
+    });
+    const result = await runBoundedBrowserTask(
+      tool,
+      { url: "https://example.com", steps: [{ action: "read" }] },
+      ["example.com"],
+    );
+
+    expect(result.trace).toEqual([
+      expect.objectContaining({ kind: "navigate", target: "https://example.com" }),
+    ]);
+  });
 });
