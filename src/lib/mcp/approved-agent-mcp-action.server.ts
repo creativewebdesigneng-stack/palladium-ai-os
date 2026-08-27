@@ -3,7 +3,7 @@ import { executeAgentExternalMcpCapability } from "./agent-mcp-runtime.server";
 type Db = { from: (table: string) => any };
 
 export type ApprovedAgentMcpExecutionResult =
-  | { ok: true; provider: "mcp"; result: unknown }
+  | { ok: true; provider: "mcp"; result: Record<string, unknown> }
   | { ok: false; provider: "mcp"; error: string };
 
 function record(value: unknown): Record<string, unknown> {
@@ -47,7 +47,7 @@ export async function executeApprovedAgentMcpAction(args: {
       input,
       approved: true,
     });
-    return { ok: true, provider: "mcp", result };
+    return { ok: true, provider: "mcp", result: { mcp_result: result } };
   } catch (error) {
     return {
       ok: false,
