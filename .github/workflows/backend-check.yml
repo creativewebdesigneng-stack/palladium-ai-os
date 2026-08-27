@@ -35,6 +35,15 @@ jobs:
       - name: Production build and route generation
         run: bun run build
 
+      - name: Diagnose generated autonomy source
+        run: |
+          echo "Generated agent files:"
+          find src/lib/agents -maxdepth 2 -type f -print | sort || true
+          if [ -f src/lib/agents/agent-autonomy.server.ts ]; then
+            echo "--- agent-autonomy.server.ts 150-210 ---"
+            nl -ba src/lib/agents/agent-autonomy.server.ts | sed -n '150,210p'
+          fi
+
       - name: Typecheck
         run: bun run typecheck
 
