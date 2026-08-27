@@ -1255,6 +1255,70 @@ const REGISTRY: Record<string, ToolImpl> = {
   },
 };
 
+REGISTRY["browser_task"] = {
+  def: {
+    name: "browser_task",
+    description:
+      "Run a bounded multi-step browser task inside one browser session. Supports navigation, reading, extraction, click/type with deterministic fallback selectors, scrolling, screenshots and page-state validation. Every URL remains constrained by the agent domain allow-list; payment actions and model-supplied credentials are forbidden.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Optional starting URL." },
+        max_steps: { type: "number", description: "Hard task budget from 1 to 20 steps." },
+        steps: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              action: {
+                type: "string",
+                enum: ["navigate", "read", "extract", "click", "type", "scroll", "wait", "screenshot", "validate"],
+              },
+              label: { type: "string" },
+              url: { type: "string" },
+              selector: { type: "string" },
+              fallback_selector: { type: "string" },
+              text: { type: "string" },
+              expected_text: { type: "string" },
+              direction: { type: "string", enum: ["up", "down"] },
+              amount: { type: "number" },
+              ms: { type: "number" },
+            },
+            required: ["action"],
+          },
+        },
+      },
+      required: ["steps"],
+    },
+  },
+  run: async (input, ctx) => {
+    let tool;
+    try {
+      tool = createBrowserTool(resolveBrowserProvider(), {
+        allowedDomains: ctx.allowedDomains ?? [],
+        allowedTools: ["browser", "browser_task"],
+        spendCap: ctx.spendCap ?? null,
+      });
+    } catch (error) {
+      return { error: (error as Error).message };
+    }
+    try {
+      const { runBoundedBrowserTask } = await import("./browser-task.server");
+      const result = await runBoundedBrowserTask(tool, input, ctx.allowedDomains ?? []);
+      return {
+        provider: tool.provider,
+        simulated: tool.kind === "development",
+        ...(tool.kind === "development"
+          ? { warning: "Development simulation — this did not happen in a real browser." }
+          : {}),
+        result,
+      };
+    } finally {
+      await tool.close();
+    }
+  },
+};
+
 function round(n: number) {
   return Math.round(n * 100) / 100;
 }
