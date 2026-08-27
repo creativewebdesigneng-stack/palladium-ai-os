@@ -2,6 +2,10 @@ import { executeAgentExternalMcpCapability } from "./agent-mcp-runtime.server";
 
 type Db = { from: (table: string) => any };
 
+export type ApprovedAgentMcpExecutionResult =
+  | { ok: true; provider: "mcp"; result: unknown }
+  | { ok: false; provider: "mcp"; error: string };
+
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -26,20 +30,29 @@ export async function executeApprovedAgentMcpAction(args: {
   sb: Db;
   userId: string;
   details: Record<string, unknown>;
-}): Promise<unknown> {
+}): Promise<ApprovedAgentMcpExecutionResult> {
   const serverId = boundedString(args.details["server_id"], 128);
   const toolName = boundedString(args.details["tool_name"], 160);
   const input = record(args.details["input"]);
 
-  if (!serverId) throw new Error("Approved MCP server is missing.");
-  if (!toolName) throw new Error("Approved MCP tool is missing.");
+  if (!serverId) return { ok: false, provider: "mcp", error: "Approved MCP server is missing." };
+  if (!toolName) return { ok: false, provider: "mcp", error: "Approved MCP tool is missing." };
 
-  return executeAgentExternalMcpCapability({
-    sb: args.sb,
-    userId: args.userId,
-    serverId,
-    toolName,
-    input,
-    approved: true,
-  });
+  try {
+    const result = await executeAgentExternalMcpCapability({
+      sb: args.sb,
+      userId: args.userId,
+      serverId,
+      toolName,
+      input,
+      approved: true,
+    });
+    return { ok: true, provider: "mcp", result };
+  } catch (error) {
+    return {
+      ok: false,
+      provider: "mcp",
+      error: error instanceof Error ? error.message.slice(0, 1000) : "External MCP action failed.",
+    };
+  }
 }
