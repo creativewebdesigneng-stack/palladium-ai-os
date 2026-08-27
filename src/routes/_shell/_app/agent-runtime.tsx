@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/AgentRuntime";
 
-// The Vite router plugin adds this file to routeTree.gen.ts during build. The
-// cast keeps a direct `tsc --noEmit` valid before that generated file refreshes.
-export const Route = createFileRoute("/_shell/_app/agent-runtime" as never)({
+export const Route = createFileRoute("/_shell/_app/agent-runtime")({
   head: () => ({
     meta: [
       { title: "Agent Runtime — PalladiumAI" },
