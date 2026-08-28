@@ -71,3 +71,28 @@ drop policy if exists "seo_snapshots_owner_update" on public.seo_snapshots;
 create policy "seo_snapshots_owner_update" on public.seo_snapshots for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "seo_snapshots_owner_delete" on public.seo_snapshots;
 create policy "seo_snapshots_owner_delete" on public.seo_snapshots for delete using (auth.uid() = user_id);
+
+-- Reuse the existing Tools Framework catalogue and permissions system so SEO can
+-- be granted to agents like every other native capability.
+insert into public.tools (
+  slug, name, category, description, kind, requires_approval, risk_level, config_schema, min_plan, is_active
+) values (
+  'seo_ops',
+  'SEO Operations',
+  'marketing',
+  'Inspect and record provider-neutral SEO projects, keyword/rank/backlink observations and technical audit findings.',
+  'builtin',
+  false,
+  'low',
+  '{"type":"object","properties":{"action":{"type":"string"},"project_id":{"type":"string"},"name":{"type":"string"},"domain":{"type":"string"},"kind":{"type":"string"},"subject":{"type":"string"},"metrics":{"type":"object"},"notes":{"type":"string"},"source":{"type":"string"}}}'::jsonb,
+  'builder',
+  true
+)
+on conflict (slug) do update set
+  name = excluded.name,
+  category = excluded.category,
+  description = excluded.description,
+  kind = excluded.kind,
+  config_schema = excluded.config_schema,
+  min_plan = excluded.min_plan,
+  is_active = true;
