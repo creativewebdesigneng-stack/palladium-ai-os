@@ -15,6 +15,19 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function assertGraphqlReadOnlyDocument(document: string): string {
+  const clean = document.trim();
+  if (!clean) throw new Error("A GraphQL query document is required.");
+  const withoutComments = clean.replace(/#[^\n\r]*/g, " ").trim();
+  if (/\bmutation\b/i.test(withoutComments) || /\bsubscription\b/i.test(withoutComments)) {
+    throw new Error("Direct GraphQL datasources are read-only. Mutations and subscriptions must use a connected integration or MCP tool so PalladiumAI approval controls apply.");
+  }
+  if (!/^(?:query\b|\{)/i.test(withoutComments)) {
+    throw new Error("Direct GraphQL datasources only accept query operations.");
+  }
+  return clean;
+}
+
 async function readBoundedJson(response: Response): Promise<unknown> {
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (declared > MAX_RESULT_BYTES) throw new Error("Datasource response exceeded the 1 MB limit.");
@@ -66,6 +79,9 @@ async function executePublicQuery(source: any, query: any, input: Record<string,
     throw new Error("Direct REST datasources are read-only. Use a connected integration or MCP tool for writes so PalladiumAI approval controls apply.");
   }
   const method = source.provider === "graphql" ? "POST" : "GET";
+  const graphqlDocument = source.provider === "graphql"
+    ? assertGraphqlReadOnlyDocument(String(queryConfig["document"] ?? ""))
+    : "";
   if (method === "GET") {
     for (const [key, value] of Object.entries(input)) {
       if (["string","number","boolean"].includes(typeof value)) url.searchParams.set(key, String(value));
@@ -75,7 +91,7 @@ async function executePublicQuery(source: any, query: any, input: Record<string,
     method,
     redirect: "manual",
     headers: { Accept: "application/json", "Content-Type": "application/json", "User-Agent": "PalladiumAI-AppStudio/1.0" },
-    ...(method === "POST" ? { body: JSON.stringify({ query: String(queryConfig["document"] ?? ""), variables: input }) } : {}),
+    ...(method === "POST" ? { body: JSON.stringify({ query: graphqlDocument, variables: input }) } : {}),
     signal: AbortSignal.timeout(Math.min(60_000, Number(query.timeout_ms) || 15_000)),
   });
   if (response.status >= 300 && response.status < 400) throw new Error("Datasource redirects are not followed for network safety.");
