@@ -15,6 +15,7 @@ import {
   prepareIntegrationAction,
 } from "@/lib/integrations/agent-integration-runtime.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
+import { BROWSER_TASK_TOOL_DEF, runBrowserTaskTool } from "./browser-task-tool.server";
 import {
   createBrowserTool,
   isDomainAllowed,
@@ -1256,67 +1257,8 @@ const REGISTRY: Record<string, ToolImpl> = {
 };
 
 REGISTRY["browser_task"] = {
-  def: {
-    name: "browser_task",
-    description:
-      "Run a bounded multi-step browser task inside one browser session. Supports navigation, reading, extraction, click/type with deterministic fallback selectors, scrolling, screenshots and page-state validation. Every URL remains constrained by the agent domain allow-list; payment actions and model-supplied credentials are forbidden.",
-    parameters: {
-      type: "object",
-      properties: {
-        url: { type: "string", description: "Optional starting URL." },
-        max_steps: { type: "number", description: "Hard task budget from 1 to 20 steps." },
-        steps: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              action: {
-                type: "string",
-                enum: ["navigate", "read", "extract", "click", "type", "scroll", "wait", "screenshot", "validate"],
-              },
-              label: { type: "string" },
-              url: { type: "string" },
-              selector: { type: "string" },
-              fallback_selector: { type: "string" },
-              text: { type: "string" },
-              expected_text: { type: "string" },
-              direction: { type: "string", enum: ["up", "down"] },
-              amount: { type: "number" },
-              ms: { type: "number" },
-            },
-            required: ["action"],
-          },
-        },
-      },
-      required: ["steps"],
-    },
-  },
-  run: async (input, ctx) => {
-    let tool;
-    try {
-      tool = createBrowserTool(resolveBrowserProvider(), {
-        allowedDomains: ctx.allowedDomains ?? [],
-        allowedTools: ["browser", "browser_task"],
-        spendCap: ctx.spendCap ?? null,
-      });
-    } catch (error) {
-      return { error: (error as Error).message };
-    }
-    try {
-      const { runBoundedBrowserTask } = await import("./browser-task.server");
-      const result = await runBoundedBrowserTask(tool, input, ctx.allowedDomains ?? []);
-      return {
-        provider: tool.provider,
-        simulated: tool.kind === "development",
-        ...(tool.kind === "development"
-          ? { warning: "Development simulation — this did not happen in a real browser." }
-          : {}),
-        result,
-      };
-    } finally {
-      await tool.close();
-    }
-  },
+  def: BROWSER_TASK_TOOL_DEF,
+  run: runBrowserTaskTool,
 };
 
 function round(n: number) {
@@ -1376,6 +1318,7 @@ const DOMAIN_SCOPED = new Set([
   "web_fetch",
   "web_search",
   "browser",
+  "browser_task",
   "http_request",
   "shopping_search",
   "prepare_purchase",
@@ -1403,6 +1346,9 @@ export async function resolveGrantedTools(
     requestedSet.add("nango_capabilities");
     requestedSet.add("nango_action");
   }
+  // Existing browser-enabled agents receive the resilient task layer and inherit
+  // the browser policy row when no browser_task-specific override exists.
+  if (requestedSet.has("browser")) requestedSet.add("browser_task");
   const requested = [...requestedSet];
   const grants = new Map<string, ToolGrant>();
   if (!requested.length) return { defs: [], grants };
@@ -1423,7 +1369,11 @@ export async function resolveGrantedTools(
     if (entry && entry.is_active === false) continue;
     if (entry?.min_plan && planRank < (PLAN_RANK[entry.min_plan as string] ?? 0)) continue;
 
-    const rows = (perms ?? []).filter((p: any) => p.tool === slug);
+    const ownRows = (perms ?? []).filter((p: any) => p.tool === slug);
+    const inheritedRows = slug === "browser_task"
+      ? (perms ?? []).filter((p: any) => p.tool === "browser")
+      : [];
+    const rows = ownRows.length ? ownRows : inheritedRows;
     // An agent-specific row wins over the account-wide default.
     const row =
       rows.find((p: any) => p.agent_id === agent.id) ?? rows.find((p: any) => !p.agent_id);

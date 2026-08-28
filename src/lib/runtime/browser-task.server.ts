@@ -67,6 +67,7 @@ export type BrowserDownloadCapture = {
   mimeType?: string | null;
   sizeBytes: number;
   data: Uint8Array;
+  sourceUrl?: string | null;
 };
 
 export type BrowserTaskRuntimeOptions = {
@@ -76,6 +77,7 @@ export type BrowserTaskRuntimeOptions = {
   }) => Promise<BrowserTaskCredential>;
   captureDownload?: (args: {
     tool: BrowserTool;
+    currentUrl: string;
     selector: string;
     filenameHint?: string;
   }) => Promise<BrowserDownloadCapture>;
@@ -326,6 +328,7 @@ async function trustedDownload(
   if (!selector) throw new Error("download requires a selector or element label.");
   const download = await options.captureDownload({
     tool,
+    currentUrl,
     selector,
     ...(step.filename_hint ? { filenameHint: step.filename_hint } : {}),
   });
