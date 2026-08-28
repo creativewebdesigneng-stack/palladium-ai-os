@@ -25,7 +25,7 @@ describe("browser credential vault", () => {
   });
 
   it("resolves only the owner's credential and binds it to the requested domain", async () => {
-    process.env.BROWSER_CREDENTIALS_MASTER_KEY = KEY;
+    process.env["BROWSER_CREDENTIALS_MASTER_KEY"] = KEY;
     const db = createFakeSupabase({
       browser_credentials: [
         {
