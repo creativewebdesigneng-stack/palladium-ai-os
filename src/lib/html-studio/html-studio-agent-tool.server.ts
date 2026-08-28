@@ -50,7 +50,7 @@ function dto(row: any) {
 }
 
 export async function runHtmlStudioTool(input: Record<string, unknown>, ctx: ToolContext) {
-  const selected = action(input.action);
+  const selected = action(input["action"]);
   const sb = ctx.sb;
 
   if (selected === "list_documents") {
@@ -62,23 +62,23 @@ export async function runHtmlStudioTool(input: Record<string, unknown>, ctx: Too
   }
 
   if (selected === "get_document") {
-    const { data, error } = await sb.from("html_studio_documents").select("*").eq("id", uuid(input.document_id)).eq("user_id", ctx.userId).single();
+    const { data, error } = await sb.from("html_studio_documents").select("*").eq("id", uuid(input["document_id"])).eq("user_id", ctx.userId).single();
     if (error || !data) throw new Error(error?.message ?? "HTML Studio document not found.");
     return { document: dto(data) };
   }
 
-  const sourceKind = clean(input.source_kind, 20) || "text";
-  const surface = clean(input.surface, 20) || "document";
-  const status = clean(input.status, 20) || "draft";
+  const sourceKind = clean(input["source_kind"], 20) || "text";
+  const surface = clean(input["surface"], 20) || "document";
+  const status = clean(input["status"], 20) || "draft";
   if (!["text","markdown","csv","json","sql","note","file"].includes(sourceKind)) throw new Error("Unsupported source kind.");
   if (!["document","report","poster","deck","social","prototype","resume","frame"].includes(surface)) throw new Error("Unsupported surface.");
   if (!["draft","ready","archived"].includes(status)) throw new Error("Unsupported document status.");
 
   const row = {
-    title: clean(input.title, 200) || "Untitled HTML",
+    title: clean(input["title"], 200) || "Untitled HTML",
     source_kind: sourceKind,
-    source_text: typeof input.source_text === "string" ? input.source_text.slice(0, 500_000) : "",
-    html: typeof input.html === "string" ? input.html.slice(0, 1_000_000) : "",
+    source_text: typeof input["source_text"] === "string" ? input["source_text"].slice(0, 500_000) : "",
+    html: typeof input["html"] === "string" ? input["html"].slice(0, 1_000_000) : "",
     surface,
     status,
     updated_at: new Date().toISOString(),
@@ -86,7 +86,7 @@ export async function runHtmlStudioTool(input: Record<string, unknown>, ctx: Too
 
   const result = selected === "create_document"
     ? await sb.from("html_studio_documents").insert({ ...row, user_id: ctx.userId, org_id: ctx.orgId ?? null }).select("*").single()
-    : await sb.from("html_studio_documents").update(row).eq("id", uuid(input.document_id)).eq("user_id", ctx.userId).select("*").single();
+    : await sb.from("html_studio_documents").update(row).eq("id", uuid(input["document_id"])).eq("user_id", ctx.userId).select("*").single();
   if (result.error || !result.data) throw new Error(result.error?.message ?? "Could not save HTML Studio document.");
   return { document: dto(result.data) };
 }
