@@ -3,6 +3,7 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import type { BrowserTool } from "@/lib/mission/browser-agent";
 import { isDomainAllowed } from "@/lib/mission/browser-agent";
+import { asBrowserDatabase } from "./browser-database.types";
 
 const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 
@@ -59,7 +60,7 @@ export async function captureBrowserDownloadFromPage(args: {
 }) {
   const page = await args.tool.extract(args.currentUrl);
   const items = Array.isArray(page.items) ? page.items : [];
-  const match = items.find((item) => item && typeof item === "object" && (item as any).selector === args.selector) as any;
+  const match = items.find((item) => item && typeof item === "object" && (item as { selector?: unknown }).selector === args.selector) as { href?: unknown } | undefined;
   const href = typeof match?.href === "string" ? match.href : "";
   if (!href) throw new Error("The selected browser control does not expose a downloadable link.");
   const url = await assertDownloadUrl(href, args.allowedDomains);
@@ -90,11 +91,12 @@ export async function storeBrowserArtifact(args: {
   agentId: string;
   taskId: string | null;
   filename: string;
-  mimeType?: string | null;
+  mimeType?: string | null | undefined;
   data: Uint8Array;
-  sourceUrl?: string | null;
+  sourceUrl?: string | null | undefined;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = asBrowserDatabase(supabaseAdmin);
   const sha256 = crypto.createHash("sha256").update(args.data).digest("hex");
   const filename = safeName(args.filename);
   const path = `${args.userId}/browser/${Date.now()}-${crypto.randomUUID()}-${filename}`;
@@ -106,7 +108,7 @@ export async function storeBrowserArtifact(args: {
     });
   if (uploadError) throw new Error(`Browser artifact could not be stored: ${uploadError.message}`);
 
-  const { data: artifact, error } = await supabaseAdmin
+  const { data: artifact, error } = await db
     .from("browser_artifacts")
     .insert({
       user_id: args.userId,
