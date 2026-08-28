@@ -53,18 +53,23 @@ export async function runSeoTool(input: Record<string, unknown>, ctx: ToolContex
   if (selected === "list_snapshots") {
     const projectId = input["project_id"] ? uuid(input["project_id"]) : null;
     let query = sb.from("seo_snapshots").select("id,project_id,kind,subject,metrics,notes,source,observed_at").eq("user_id", ctx.userId).order("observed_at", { ascending: false }).limit(250);
-    if (projectId) query = query.eq("project_id", projectId);
+    if (projectId) {
+      const { data: ownedProject, error: projectError } = await sb.from("seo_projects").select("id").eq("id", projectId).eq("user_id", ctx.userId).maybeSingle();
+      if (projectError || !ownedProject) throw new Error(projectError?.message ?? "SEO project not found.");
+      query = query.eq("project_id", projectId);
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return { snapshots: data ?? [] };
   }
 
   if (selected === "create_project") {
+    const projectDomain = domain(input["domain"]);
     const { data, error } = await sb.from("seo_projects").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId ?? null,
-      name: clean(input["name"], 160) || domain(input["domain"]),
-      domain: domain(input["domain"]),
+      name: clean(input["name"], 160) || projectDomain,
+      domain: projectDomain,
       provider: "provider-neutral",
     }).select("id,name,domain,provider,updated_at").single();
     if (error || !data) throw new Error(error?.message ?? "Could not create SEO project.");
@@ -72,6 +77,9 @@ export async function runSeoTool(input: Record<string, unknown>, ctx: ToolContex
   }
 
   const projectId = uuid(input["project_id"]);
+  const { data: ownedProject, error: projectError } = await sb.from("seo_projects").select("id").eq("id", projectId).eq("user_id", ctx.userId).maybeSingle();
+  if (projectError || !ownedProject) throw new Error(projectError?.message ?? "SEO project not found.");
+
   const kind = clean(input["kind"], 20);
   if (!["keyword", "rank", "backlink", "audit"].includes(kind)) throw new Error("Unsupported SEO snapshot kind.");
   const subject = clean(input["subject"], 500);
