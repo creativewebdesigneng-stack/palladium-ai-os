@@ -27,7 +27,7 @@ function taskStats(body) {
   return { all: all.length, done: done.length };
 }
 
-export default function ZenNotes() {
+export default function RecallNotes() {
   const [lifecycle, setLifecycle] = useState('active');
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState([]);
@@ -110,13 +110,13 @@ export default function ZenNotes() {
   const currentTags = tagsFrom(draft.body, draft.tags ?? []);
 
   return <>
-    <PageHeader eyebrow="Knowledge workspace" title="Zen Notes" description="Keyboard-friendly Markdown notes with daily/weekly capture, tags, tasks and lifecycle controls. Promote finished notes into PalladiumAI Knowledge so agents retrieve them through the existing vector-memory layer." action={<div className="flex flex-wrap gap-2"><button onClick={() => start('daily')} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300">Daily note</button><button onClick={() => start('weekly')} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300">Weekly note</button><button onClick={() => start('note')} className="flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white"><Plus className="h-3.5 w-3.5" />New note</button></div>} />
+    <PageHeader eyebrow="Knowledge workspace" title="Recall Notes" description="Capture notes, tasks, ideas and daily or weekly context in one recall workspace. Promote finished notes into PalladiumAI Knowledge so agents can retrieve them through the existing vector-memory layer." action={<div className="flex flex-wrap gap-2"><button onClick={() => start('daily')} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300">Daily note</button><button onClick={() => start('weekly')} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300">Weekly note</button><button onClick={() => start('note')} className="flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white"><Plus className="h-3.5 w-3.5" />New note</button></div>} />
     {(error || notice) && <div className={`mb-4 rounded-xl border p-3 text-sm ${error ? 'border-red-400/20 bg-red-500/[.06] text-red-200' : 'border-emerald-400/20 bg-emerald-500/[.06] text-emerald-200'}`}>{error || notice}</div>}
     <div className="mb-4 grid gap-3 sm:grid-cols-3"><Mini icon={FileText} label="Visible notes" value={notes.length} /><Mini icon={CheckSquare} label="Tasks" value={`${stats.done}/${stats.tasks}`} /><Mini icon={Hash} label="Tags" value={stats.tags} /></div>
     <div className="grid min-h-[650px] gap-4 xl:grid-cols-[320px_1fr]">
       <aside className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
         <div className="flex gap-2">{['active','archived','trash'].map((item) => <button key={item} onClick={() => setLifecycle(item)} className={`rounded-lg px-2.5 py-1.5 text-xs ${lifecycle === item ? 'bg-violet-500/15 text-violet-200' : 'text-zinc-500 hover:bg-white/5'}`}>{item}</button>)}</div>
-        <div className="mt-3 flex gap-2"><div className="relative flex-1"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-600" /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && refresh()} placeholder="Search notes" className="w-full rounded-xl border border-white/10 bg-black/20 py-2 pl-8 pr-2 text-xs text-white" /></div><button onClick={refresh} className="rounded-xl border border-white/10 px-2.5 text-zinc-500"><RefreshCw className="h-3.5 w-3.5" /></button></div>
+        <div className="mt-3 flex gap-2"><div className="relative flex-1"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-600" /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && refresh()} placeholder="Search Recall Notes" className="w-full rounded-xl border border-white/10 bg-black/20 py-2 pl-8 pr-2 text-xs text-white" /></div><button onClick={refresh} className="rounded-xl border border-white/10 px-2.5 text-zinc-500"><RefreshCw className="h-3.5 w-3.5" /></button></div>
         <div className="mt-3 space-y-2">{notes.map((note) => <button key={note.id} onClick={() => open(note)} className={`w-full rounded-xl border p-3 text-left ${selected === note.id ? 'border-violet-400/30 bg-violet-500/[.08]' : 'border-white/10 bg-black/15 hover:bg-white/[.04]'}`}><div className="flex items-center gap-2"><p className="min-w-0 flex-1 truncate text-sm text-white">{note.title}</p>{note.knowledge_document_id && <Sparkles className="h-3.5 w-3.5 text-emerald-300" />}</div><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-zinc-500">{note.body || 'Empty note'}</p></button>)}{!loading && !notes.length && <p className="py-8 text-center text-xs text-zinc-600">No notes here.</p>}</div>
       </aside>
       <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">

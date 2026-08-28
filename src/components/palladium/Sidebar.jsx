@@ -25,7 +25,7 @@ const WORKFORCE = [
   ['Workflows', '/workflows', Workflow],
   ['Memory', '/memory', Brain],
   ['Knowledge', '/knowledge', BookOpen],
-  ['Zen Notes', '/zen-notes', FileText],
+  ['Recall Notes', '/recall-notes', FileText],
   ['Files', '/files', Files],
   ['Tools Framework', '/tools-framework', Blocks],
   ['HTML Studio', '/html-studio', Code2],

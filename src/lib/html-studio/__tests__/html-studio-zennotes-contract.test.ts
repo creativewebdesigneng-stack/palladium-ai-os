@@ -7,11 +7,11 @@ const htmlTool = readFileSync("src/lib/html-studio/html-studio-agent-tool.server
 const tools = readFileSync("src/lib/runtime/tools.server.ts", "utf8");
 const notesScreen = readFileSync("src/screens/ZenNotes.jsx", "utf8");
 const htmlScreen = readFileSync("src/screens/HTMLStudio.jsx", "utf8");
-const notesRoute = readFileSync("src/routes/_shell/_app/zen-notes.tsx", "utf8");
+const notesRoute = readFileSync("src/routes/_shell/_app/recall-notes.tsx", "utf8");
 const htmlRoute = readFileSync("src/routes/_shell/_app/html-studio.tsx", "utf8");
 const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
 
-describe("HTML Studio + Zen Notes native integration", () => {
+describe("HTML Studio + Recall Notes native integration", () => {
   it("adds only owner-scoped working and artifact stores", () => {
     expect(migration).toContain("create table if not exists public.zen_notes");
     expect(migration).toContain("create table if not exists public.html_studio_documents");
@@ -41,9 +41,9 @@ describe("HTML Studio + Zen Notes native integration", () => {
   });
 
   it("exposes first-class routes/navigation and a script-disabled HTML preview", () => {
-    expect(notesRoute).toContain('createFileRoute("/_shell/_app/zen-notes")');
+    expect(notesRoute).toContain('createFileRoute("/_shell/_app/recall-notes")');
     expect(htmlRoute).toContain('createFileRoute("/_shell/_app/html-studio")');
-    expect(sidebar).toContain("['Zen Notes', '/zen-notes', FileText]");
+    expect(sidebar).toContain("['Recall Notes', '/recall-notes', FileText]");
     expect(sidebar).toContain("['HTML Studio', '/html-studio', Code2]");
     expect(htmlScreen).toContain('sandbox=""');
     expect(htmlScreen).toContain("scripts disabled");
