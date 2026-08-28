@@ -37,7 +37,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     category: "ecommerce",
     summary: "Operate products, orders and inventory through Shopify's native Admin GraphQL API. Native access is preferred; connector providers can remain a fallback.",
     scopes: ["write_products", "read_orders", "write_inventory", "read_locations"],
-    tools: ["integration_capabilities", "integration_action", "connected_service"],
+    tools: ["integration_capabilities", "integration_action"],
     authorizeUrl: "https://admin.shopify.com/",
     tokenUrl: "https://shopify.dev/",
     clientIdEnv: "SHOPIFY_CLIENT_ID",
