@@ -7,7 +7,7 @@ type Action = (typeof actions)[number];
 export const HTML_STUDIO_TOOL_DEF: ToolDef = {
   name: "html_studio",
   description: "Create and maintain standalone HTML Studio artifacts from source material. Use this when an agent needs to turn text, Markdown, CSV/JSON/SQL or notes into polished HTML. HTML is persisted for operator preview/export; this tool does not deploy or publish externally.",
-  input_schema: {
+  parameters: {
     type: "object",
     properties: {
       action: { type: "string", enum: [...actions] },
