@@ -3,7 +3,7 @@ import {
   Home, FolderKanban, Users, Bot, ListChecks, Workflow, Files, BookOpen, Rocket,
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
-  Brain, Hammer, Banknote, Contact, Megaphone, LineChart,
+  Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -39,6 +39,7 @@ const BUSINESS = [
   ['Finance', '/finance', Banknote],
   ['CRM', '/crm', Contact],
   ['Marketing', '/marketing', Megaphone],
+  ['Social Operations', '/social-operations', CalendarClock],
 ];
 
 const BOTTOM = [
@@ -145,7 +146,6 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
         )}
       </nav>
 
-      {/* Plan + usage card (live entitlement data) */}
       <Link
         to="/billing"
         onClick={closeMobile}
