@@ -5,6 +5,7 @@ import {
   MAX_BODY_BYTES, MAX_SESSIONS, MAX_TEXT_CHARS, SESSION_TTL_MS,
   assertPublicHttpUrl, bearerAuthorised, cleanAllowedDomains, safeSelector, safeText,
 } from "./policy.mjs";
+import { normaliseInteractiveItems } from "./dom-snapshot.mjs";
 import {
   isLikelyProductUrl, normaliseProductCandidates, retailerSearchUrl, sellerLabel, supportedRetailerDomains,
 } from "./shopping.mjs";
@@ -78,7 +79,58 @@ async function extract(session, params) {
   const selector = params.selector ? safeSelector(params.selector) : "body";
   const loc = session.page.locator(selector).first();
   const text = safeText(await loc.innerText({ timeout: 10_000 }), MAX_TEXT_CHARS);
-  return { text, items: [] };
+  const rawItems = await session.page.evaluate(() => {
+    const isVisible = (element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.visibility !== "hidden" && style.display !== "none" && rect.width > 0 && rect.height > 0;
+    };
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const selectorFor = (element) => {
+      if (element.id) return `#${CSS.escape(element.id)}`;
+      const testId = element.getAttribute("data-testid");
+      if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
+      const name = element.getAttribute("name");
+      if (name) return `${element.tagName.toLowerCase()}[name="${CSS.escape(name)}"]`;
+      const parts = [];
+      let current = element;
+      while (current && current.nodeType === Node.ELEMENT_NODE && parts.length < 5) {
+        const tag = current.tagName.toLowerCase();
+        const siblings = current.parentElement
+          ? [...current.parentElement.children].filter((child) => child.tagName === current.tagName)
+          : [];
+        const position = siblings.length > 1 ? `:nth-of-type(${siblings.indexOf(current) + 1})` : "";
+        parts.unshift(`${tag}${position}`);
+        current = current.parentElement;
+      }
+      return parts.join(" > ");
+    };
+    const labelFor = (element) => {
+      const aria = element.getAttribute("aria-label");
+      if (aria) return clean(aria);
+      if (element.id) {
+        const explicit = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+        if (explicit?.textContent) return clean(explicit.textContent);
+      }
+      const wrapped = element.closest("label");
+      if (wrapped?.textContent) return clean(wrapped.textContent);
+      return clean(element.getAttribute("placeholder") || element.getAttribute("name") || "");
+    };
+    const elements = [...document.querySelectorAll(
+      "a[href],button,input,textarea,select,[role='button'],[role='link'],[role='checkbox'],[role='radio'],[role='combobox']",
+    )];
+    return elements.filter(isVisible).slice(0, 240).map((element) => ({
+      selector: selectorFor(element),
+      tag: element.tagName.toLowerCase(),
+      role: element.getAttribute("role") || "",
+      type: element.getAttribute("type") || "",
+      text: clean(element.innerText || element.textContent || "").slice(0, 500),
+      label: labelFor(element).slice(0, 500),
+      href: element instanceof HTMLAnchorElement ? element.href : "",
+      disabled: "disabled" in element ? Boolean(element.disabled) : element.getAttribute("aria-disabled") === "true",
+    }));
+  });
+  return { text, items: normaliseInteractiveItems(rawItems) };
 }
 
 async function searchRetailerPage(session, domain, query, currency) {
