@@ -7,7 +7,8 @@ const api = readFileSync(fileURLToPath(new URL("../app-studio.functions.ts", imp
 const panel = readFileSync(fileURLToPath(new URL("../../../components/tools-framework/AppStudioPanel.jsx", import.meta.url)), "utf8");
 const framework = readFileSync(fileURLToPath(new URL("../../../screens/ToolsFramework.jsx", import.meta.url)), "utf8");
 const queryRuntime = readFileSync(fileURLToPath(new URL("../app-studio-query.server.ts", import.meta.url)), "utf8");
-const runtimeTools = readFileSync(fileURLToPath(new URL("../../runtime/tools-core.server.ts", import.meta.url)), "utf8");
+const runtimeTools = readFileSync(fileURLToPath(new URL("../../runtime/tools.server.ts", import.meta.url)), "utf8");
+const agentTool = readFileSync(fileURLToPath(new URL("../app-studio-agent-tool.server.ts", import.meta.url)), "utf8");
 const published = readFileSync(fileURLToPath(new URL("../../../screens/PublishedStudioApp.jsx", import.meta.url)), "utf8");
 const publicRpc = migration.slice(migration.indexOf("create or replace function public.get_published_app_studio_release"));
 
@@ -43,13 +44,15 @@ describe("App Studio production contract", () => {
     expect(published).toContain("safePublicUrl");
   });
 
-  it("reuses MCP, integration approvals and agent runtime tools", () => {
+  it("reuses MCP, integration approvals and the expanded Harness-controlled agent runtime tool", () => {
     expect(queryRuntime).toContain("prepareAgentMcpIntegrationAction");
     expect(queryRuntime).toContain("prepareIntegrationAction");
     expect(queryRuntime).toContain('action_type: "external_mcp_action"');
     expect(queryRuntime).toContain('action_type: "nango_dynamic_action"');
     expect(queryRuntime).toContain("assertPublicMcpEndpoint");
-    expect(runtimeTools).toContain("app_studio: {");
-    expect(runtimeTools).toContain('enum: ["list_apps", "create_app", "add_page", "add_widget"]');
+    expect(runtimeTools).toContain("APP_STUDIO_TOOL_DEF");
+    expect(runtimeTools).toContain("runAppStudioTool");
+    expect(runtimeTools).toContain('name !== "skill_script" && name !== "app_studio"');
+    expect(agentTool).toContain('enum: ["list_apps","get_app","create_app","add_page","add_widget","add_datasource","add_query","run_query"]');
   });
 });
