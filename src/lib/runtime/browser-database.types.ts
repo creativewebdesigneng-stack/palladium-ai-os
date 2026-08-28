@@ -96,11 +96,52 @@ type BrowserArtifactTable = {
   Relationships: [];
 };
 
+type BrowserProfileTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    org_id: string | null;
+    agent_id: string;
+    scope_key: string;
+    domain_scope: string[];
+    state_ciphertext: string;
+    created_at: string;
+    updated_at: string;
+    last_used_at: string | null;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    org_id?: string | null;
+    agent_id: string;
+    scope_key: string;
+    domain_scope?: string[];
+    state_ciphertext: string;
+    created_at?: string;
+    updated_at?: string;
+    last_used_at?: string | null;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    org_id?: string | null;
+    agent_id?: string;
+    scope_key?: string;
+    domain_scope?: string[];
+    state_ciphertext?: string;
+    created_at?: string;
+    updated_at?: string;
+    last_used_at?: string | null;
+  };
+  Relationships: [];
+};
+
 export type BrowserDatabase = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Tables"> & {
     Tables: Database["public"]["Tables"] & {
       browser_credentials: BrowserCredentialTable;
       browser_artifacts: BrowserArtifactTable;
+      browser_profiles: BrowserProfileTable;
     };
   };
 };
