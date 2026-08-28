@@ -6,6 +6,9 @@ const migration = readFileSync(fileURLToPath(new URL("../../../../supabase/migra
 const api = readFileSync(fileURLToPath(new URL("../app-studio.functions.ts", import.meta.url)), "utf8");
 const panel = readFileSync(fileURLToPath(new URL("../../../components/tools-framework/AppStudioPanel.jsx", import.meta.url)), "utf8");
 const framework = readFileSync(fileURLToPath(new URL("../../../screens/ToolsFramework.jsx", import.meta.url)), "utf8");
+const queryRuntime = readFileSync(fileURLToPath(new URL("../app-studio-query.server.ts", import.meta.url)), "utf8");
+const runtimeTools = readFileSync(fileURLToPath(new URL("../../runtime/tools-core.server.ts", import.meta.url)), "utf8");
+const published = readFileSync(fileURLToPath(new URL("../../../screens/PublishedStudioApp.jsx", import.meta.url)), "utf8");
 
 describe("App Studio production contract", () => {
   it("uses owner-scoped persisted documents instead of mock application state", () => {
@@ -33,5 +36,19 @@ describe("App Studio production contract", () => {
     expect(panel).toContain("createStudioRelease");
     expect(api).toContain("schemaVersion: 1");
     expect(api).toContain("app_studio_published");
+    expect(migration).toContain("get_published_app_studio_release");
+    expect(migration).toContain("r.snapshot->'app'");
+    expect(migration).not.toContain("r.snapshot->'datasources'");
+    expect(published).toContain("safePublicUrl");
+  });
+
+  it("reuses MCP, integration approvals and agent runtime tools", () => {
+    expect(queryRuntime).toContain("prepareAgentMcpIntegrationAction");
+    expect(queryRuntime).toContain("prepareIntegrationAction");
+    expect(queryRuntime).toContain('action_type: "external_mcp_action"');
+    expect(queryRuntime).toContain('action_type: "nango_dynamic_action"');
+    expect(queryRuntime).toContain("assertPublicMcpEndpoint");
+    expect(runtimeTools).toContain("app_studio: {");
+    expect(runtimeTools).toContain('enum: ["list_apps", "create_app", "add_page", "add_widget"]');
   });
 });
