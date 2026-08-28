@@ -2,10 +2,7 @@ import {
   executeIntegrationAction,
   prepareIntegrationAction,
 } from "@/lib/integrations/agent-integration-runtime.server";
-import {
-  listAgentMcpIntegrationCapabilities,
-  prepareAgentMcpIntegrationAction,
-} from "@/lib/mcp/agent-mcp-integration-bridge.server";
+import { prepareAgentMcpIntegrationAction } from "@/lib/mcp/agent-mcp-integration-bridge.server";
 import {
   assertPublicMcpEndpoint,
   validateExternalMcpEndpoint,
@@ -97,10 +94,9 @@ export async function executeStudioQuery(args: {
 
   if (source.provider === "mcp") {
     const serverId = String(source.connection_ref ?? "").replace(/^mcp:/, "");
-    const capabilities = await listAgentMcpIntegrationCapabilities({ sb: args.sb, userId: args.userId });
-    const capability = capabilities.find((item) => item.serverId === serverId && item.toolName === query.operation);
-    if (!capability) throw new Error("The configured MCP capability is no longer available.");
-    const prepared = await prepareAgentMcpIntegrationAction({ sb: args.sb, userId: args.userId, action: capability.key, actionInput: { ...record(query.configuration), ...input } });
+    if (!serverId || !query.operation) throw new Error("The MCP datasource reference is invalid.");
+    const action = `external_mcp:${serverId}:${String(query.operation)}`;
+    const prepared = await prepareAgentMcpIntegrationAction({ sb: args.sb, userId: args.userId, action, actionInput: { ...record(query.configuration), ...input } });
     return queueApproval(args.sb, args.userId, {
       action_type: "external_mcp_action",
       title: `${query.name}: MCP`.slice(0, 180),
