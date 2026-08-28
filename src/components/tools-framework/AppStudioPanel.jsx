@@ -149,6 +149,7 @@ export default function AppStudioPanel({ toast }) {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
                 <div><h3 className="text-lg font-semibold text-white">{document.app.name}</h3><p className="text-xs text-zinc-500">/{document.app.slug} · {document.pages.length} pages · {document.widgets.length} components</p></div>
                 <div className="flex gap-2">
+                  {document.app.status === "published" && <a href={`/studio-app/${document.app.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-lg border border-emerald-400/30 px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-500/10">Open live app</a>}
                   <button onClick={() => release(false)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"><Save className="h-3.5 w-3.5" />Save version</button>
                   <button onClick={() => release(true)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-black hover:bg-emerald-400"><Rocket className="h-3.5 w-3.5" />Publish</button>
                 </div>
