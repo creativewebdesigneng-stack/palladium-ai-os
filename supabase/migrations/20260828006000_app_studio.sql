@@ -144,3 +144,17 @@ begin
     );
   end loop;
 end $$;
+
+
+insert into public.tools
+  (slug, name, category, description, kind, requires_approval, risk_level, min_plan, is_active, config_schema)
+values
+  ('app_studio', 'App Studio', 'development',
+   'Create and edit persisted low-code applications, pages and components. Publishing remains an operator-controlled Studio action.',
+   'builtin', false, 'medium', 'builder', true,
+   '{"actions":["list_apps","create_app","add_page","add_widget"],"publishes":false,"credentials_server_side":true}'::jsonb)
+on conflict (slug) do update set
+  name = excluded.name, category = excluded.category, description = excluded.description,
+  kind = excluded.kind, requires_approval = excluded.requires_approval,
+  risk_level = excluded.risk_level, min_plan = excluded.min_plan,
+  is_active = excluded.is_active, config_schema = excluded.config_schema, updated_at = now();
