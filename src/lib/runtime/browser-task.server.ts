@@ -1,5 +1,6 @@
 import type { BrowserStep, BrowserTool } from "@/lib/mission/browser-agent";
 import { isDomainAllowed } from "@/lib/mission/browser-agent";
+import { resolveBrowserElementSelector } from "./browser-element-resolver.server";
 
 export const BROWSER_TASK_ACTIONS = [
   "navigate",
@@ -128,33 +129,67 @@ function boundedTrace(tool: BrowserTool): BrowserStep[] {
   return tool.steps().slice(-50);
 }
 
-async function clickWithFallback(tool: BrowserTool, step: BrowserTaskStep) {
-  if (!step.selector) throw new Error("click requires a selector.");
-  try {
-    const result = await tool.click(step.selector);
-    if (result.ok || !step.fallback_selector) {
-      return { result, selector: step.selector, fallback_used: false };
-    }
-  } catch (error) {
-    if (!step.fallback_selector) throw error;
-  }
-  const result = await tool.click(step.fallback_selector!);
-  return { result, selector: step.fallback_selector, fallback_used: true };
+async function selectorFromLabel(
+  tool: BrowserTool,
+  step: BrowserTaskStep,
+  currentUrl: string,
+  action: "click" | "type",
+) {
+  if (!step.label) throw new Error(`${action} requires a selector or element label.`);
+  if (!currentUrl) throw new Error(`${action} by element label requires a current URL.`);
+  const page = await tool.extract(currentUrl);
+  return resolveBrowserElementSelector(page.items, step.label, action).selector;
 }
 
-async function typeWithFallback(tool: BrowserTool, step: BrowserTaskStep) {
-  if (!step.selector) throw new Error("type requires a selector.");
-  if (step.text === undefined) throw new Error("type requires text.");
-  try {
-    const result = await tool.type(step.selector, step.text);
-    if (result.ok || !step.fallback_selector) {
-      return { result, selector: step.selector, fallback_used: false };
+async function clickWithFallback(tool: BrowserTool, step: BrowserTaskStep, currentUrl: string) {
+  const candidates = [step.selector, step.fallback_selector].filter(Boolean) as string[];
+  let lastError: unknown = null;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const selector = candidates[index]!;
+    try {
+      const result = await tool.click(selector);
+      if (result.ok) {
+        return { result, selector, fallback_used: index > 0, resolved_from_label: false };
+      }
+      lastError = new Error(`Browser click failed for selector ${selector}.`);
+    } catch (error) {
+      lastError = error;
     }
-  } catch (error) {
-    if (!step.fallback_selector) throw error;
   }
-  const result = await tool.type(step.fallback_selector!, step.text);
-  return { result, selector: step.fallback_selector, fallback_used: true };
+  if (step.label) {
+    const selector = await selectorFromLabel(tool, step, currentUrl, "click");
+    const result = await tool.click(selector);
+    if (!result.ok) throw new Error(`Browser click failed for resolved label "${step.label}".`);
+    return { result, selector, fallback_used: candidates.length > 0, resolved_from_label: true };
+  }
+  if (lastError) throw lastError;
+  throw new Error("click requires a selector, fallback_selector or element label.");
+}
+
+async function typeWithFallback(tool: BrowserTool, step: BrowserTaskStep, currentUrl: string) {
+  if (step.text === undefined) throw new Error("type requires text.");
+  const candidates = [step.selector, step.fallback_selector].filter(Boolean) as string[];
+  let lastError: unknown = null;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const selector = candidates[index]!;
+    try {
+      const result = await tool.type(selector, step.text);
+      if (result.ok) {
+        return { result, selector, fallback_used: index > 0, resolved_from_label: false };
+      }
+      lastError = new Error(`Browser typing failed for selector ${selector}.`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (step.label) {
+    const selector = await selectorFromLabel(tool, step, currentUrl, "type");
+    const result = await tool.type(selector, step.text);
+    if (!result.ok) throw new Error(`Browser typing failed for resolved label "${step.label}".`);
+    return { result, selector, fallback_used: candidates.length > 0, resolved_from_label: true };
+  }
+  if (lastError) throw lastError;
+  throw new Error("type requires a selector, fallback_selector or element label.");
 }
 
 async function extractStructuredFields(
@@ -274,10 +309,10 @@ export async function runBoundedBrowserTask(
           break;
         }
         case "click":
-          result = await clickWithFallback(tool, step);
+          result = await clickWithFallback(tool, step, stepUrl);
           break;
         case "type":
-          result = await typeWithFallback(tool, step);
+          result = await typeWithFallback(tool, step, stepUrl);
           break;
         case "scroll":
           result = await tool.scroll(
