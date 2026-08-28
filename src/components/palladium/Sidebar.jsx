@@ -4,6 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -24,8 +25,10 @@ const WORKFORCE = [
   ['Workflows', '/workflows', Workflow],
   ['Memory', '/memory', Brain],
   ['Knowledge', '/knowledge', BookOpen],
+  ['Zen Notes', '/zen-notes', FileText],
   ['Files', '/files', Files],
   ['Tools Framework', '/tools-framework', Blocks],
+  ['HTML Studio', '/html-studio', Code2],
   ['Integrations', '/integrations', Plug],
   ['Marketplace', '/marketplace', Store],
   ['Creator Hub', '/creator-hub', Rocket],
