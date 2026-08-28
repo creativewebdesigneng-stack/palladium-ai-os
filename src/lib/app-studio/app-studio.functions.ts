@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -231,4 +232,27 @@ export const createStudioRelease = createServerFn({ method: "POST" })
     }
     await sb.from("mission_audit_logs").insert({ user_id: context.userId, action: data.publish ? "app_studio_published" : "app_studio_release_created", target_type: "app_studio_app", target_id: data.appId, status: "success", metadata: { release_id: release.data.id, version } });
     return release.data;
+  });
+
+
+export const runStudioQuery = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ queryId: uuid, input: z.record(z.string(), z.unknown()).default({}) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const startedAt = Date.now();
+    try {
+      const result = await executeStudioQuery({ sb, userId: context.userId, queryId: data.queryId, input: data.input });
+      await sb.from("mission_audit_logs").insert({
+        user_id: context.userId, action: "app_studio_query_executed", target_type: "app_studio_query",
+        target_id: data.queryId, status: "success", metadata: { duration_ms: Date.now() - startedAt },
+      });
+      return result;
+    } catch (error) {
+      await sb.from("mission_audit_logs").insert({
+        user_id: context.userId, action: "app_studio_query_failed", target_type: "app_studio_query",
+        target_id: data.queryId, status: "failed", metadata: { duration_ms: Date.now() - startedAt },
+      });
+      throw error;
+    }
   });
