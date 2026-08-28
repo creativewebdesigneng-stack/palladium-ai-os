@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppWindow, Boxes, Database, FilePlus2, Loader2, Plus, Rocket, Save, Workflow } from "lucide-react";
 import PageHeader from "@/components/palladium/PageHeader";
+import AppStudioThemePanel from "@/components/tools-framework/AppStudioThemePanel";
 import {
   createStudioApp,
   createStudioRelease,
@@ -240,6 +241,7 @@ export default function AppStudioPanel({ toast }) {
             <div className="mt-3 space-y-1">{document?.queries?.map((query) => <button key={query.id} onClick={() => testQuery(query)} className="flex w-full items-center justify-between rounded-lg bg-white/[.03] px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-white/[.06]"><span>{query.name} · {query.operation}</span><span>Run</span></button>)}</div>
             {queryResult && <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-black/40 p-2 text-[10px] text-emerald-300">{JSON.stringify(queryResult, null, 2)}</pre>}
           </div>
+          <AppStudioThemePanel app={document?.app} toast={toast} onSaved={() => selectedId ? loadDocument(selectedId) : undefined} />
           <div className="pglass rounded-2xl p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">Versions</p>
             <div className="space-y-1.5">{document?.releases?.slice(0, 8).map((item) => {
