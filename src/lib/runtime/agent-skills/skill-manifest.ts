@@ -80,15 +80,16 @@ export function parseAgentSkillMarkdown(markdown: string): ParsedAgentSkill {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(markdown);
   if (!match) throw new Error("SKILL.md must start with YAML-style frontmatter.");
   const raw = parseFrontmatter(match[1]!);
-  const name = asString(raw.name, "name");
+  const name = asString(raw["name"], "name");
   if (!NAME_RE.test(name)) throw new Error("Skill name must be lowercase kebab-case and 1-63 characters.");
-  const description = asString(raw.description, "description");
+  const description = asString(raw["description"], "description");
   if (description.length > MAX_DESCRIPTION) throw new Error(`Skill description must be ${MAX_DESCRIPTION} characters or fewer.`);
-  const version = asString(raw.version, "version");
-  const dangerous = raw.dangerous === undefined ? false : raw.dangerous;
+  const version = asString(raw["version"], "version");
+  const dangerousValue = raw["dangerous"];
+  const dangerous = dangerousValue === undefined ? false : dangerousValue;
   if (typeof dangerous !== "boolean") throw new Error("Skill dangerous must be a boolean.");
-  const requiresTools = asStringList(raw.requires_tools, "requires_tools");
-  const requiresScripts = asStringList(raw.requires_scripts, "requires_scripts");
+  const requiresTools = asStringList(raw["requires_tools"], "requires_tools");
+  const requiresScripts = asStringList(raw["requires_scripts"], "requires_scripts");
   for (const script of requiresScripts) {
     if (script.includes("/") || script.includes("\\") || script === "." || script === "..") {
       throw new Error("Skill script allowlist entries must be file names, not paths.");
