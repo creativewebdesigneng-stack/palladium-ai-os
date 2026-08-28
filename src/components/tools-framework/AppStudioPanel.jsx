@@ -23,6 +23,7 @@ function slugify(value) {
 export default function AppStudioPanel({ toast }) {
   const [apps, setApps] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [selectedPageId, setSelectedPageId] = useState("");
   const [document, setDocument] = useState(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
@@ -44,16 +45,19 @@ export default function AppStudioPanel({ toast }) {
   }, []);
 
   const loadDocument = useCallback(async (id) => {
-    if (!id) { setDocument(null); return; }
+    if (!id) { setDocument(null); setSelectedPageId(""); return; }
     const next = await getStudioApp({ data: { appId: id } });
     setDocument(next);
+    setSelectedPageId((current) => next.pages?.some((item) => item.id === current)
+      ? current
+      : next.pages?.find((item) => item.is_home)?.id || next.pages?.[0]?.id || "");
     setSelectedDatasourceId((current) => next.datasources?.some((item) => item.id === current) ? current : next.datasources?.[0]?.id || "");
   }, []);
 
   useEffect(() => { loadApps().catch((e) => toast({ title: "App Studio failed to load", description: e.message, variant: "destructive" })); }, [loadApps, toast]);
   useEffect(() => { loadDocument(selectedId).catch((e) => toast({ title: "Application failed to load", description: e.message, variant: "destructive" })); }, [selectedId, loadDocument, toast]);
 
-  const activePage = useMemo(() => document?.pages?.find((page) => page.is_home) || document?.pages?.[0] || null, [document]);
+  const activePage = useMemo(() => document?.pages?.find((page) => page.id === selectedPageId) || document?.pages?.find((page) => page.is_home) || document?.pages?.[0] || null, [document, selectedPageId]);
   const selectedDatasource = useMemo(() => document?.datasources?.find((source) => source.id === selectedDatasourceId) || null, [document, selectedDatasourceId]);
 
   useEffect(() => {
@@ -81,13 +85,15 @@ export default function AppStudioPanel({ toast }) {
     act(async () => {
       const created = await createStudioApp({ data: { name: cleanName, slug: slugify(cleanName), description: "", applicationType: "web" } });
       setSelectedId(created.app.id);
+      setSelectedPageId(created.page.id);
       setName("");
     }, "Application created");
   };
 
   const addPage = () => act(async () => {
     const index = (document?.pages?.length || 0) + 1;
-    await saveStudioPage({ data: { appId: selectedId, name: `Page ${index}`, slug: `page-${index}`, isHome: false, layout: { type: "canvas", version: 1 }, position: index } });
+    const page = await saveStudioPage({ data: { appId: selectedId, name: `Page ${index}`, slug: `page-${index}`, isHome: false, layout: { type: "canvas", version: 1 }, position: index } });
+    setSelectedPageId(page.id);
   }, "Page added");
 
   const addWidget = () => act(async () => {
@@ -161,7 +167,7 @@ export default function AppStudioPanel({ toast }) {
           </div>
           <div className="mt-3 space-y-1.5">
             {apps.map((app) => (
-              <button key={app.id} onClick={() => setSelectedId(app.id)} className={`w-full rounded-xl border p-3 text-left ${selectedId === app.id ? "border-violet-400/40 bg-violet-500/10" : "border-white/5 bg-white/[.02] hover:bg-white/5"}`}>
+              <button key={app.id} onClick={() => { setSelectedId(app.id); setSelectedPageId(""); }} className={`w-full rounded-xl border p-3 text-left ${selectedId === app.id ? "border-violet-400/40 bg-violet-500/10" : "border-white/5 bg-white/[.02] hover:bg-white/5"}`}>
                 <p className="truncate text-sm font-medium text-white">{app.name}</p>
                 <p className="mt-1 text-[10px] text-zinc-500">{app.application_type} · {app.status}</p>
               </button>
@@ -184,7 +190,7 @@ export default function AppStudioPanel({ toast }) {
                 </div>
               </div>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-                {document.pages.map((page) => <span key={page.id} className={`rounded-lg border px-3 py-1.5 text-xs ${page.id === activePage?.id ? "border-violet-400/40 bg-violet-500/10 text-violet-200" : "border-white/10 text-zinc-400"}`}>{page.name}{page.is_home ? " · Home" : ""}</span>)}
+                {document.pages.map((page) => <button key={page.id} onClick={() => setSelectedPageId(page.id)} className={`rounded-lg border px-3 py-1.5 text-xs ${page.id === activePage?.id ? "border-violet-400/40 bg-violet-500/10 text-violet-200" : "border-white/10 text-zinc-400 hover:bg-white/5"}`}>{page.name}{page.is_home ? " · Home" : ""}</button>)}
                 <button onClick={addPage} disabled={busy} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-white/20 px-3 py-1.5 text-xs text-zinc-400"><FilePlus2 className="h-3.5 w-3.5" />Page</button>
               </div>
               <div className="mt-3 grid min-h-[380px] grid-cols-12 auto-rows-[54px] gap-2 rounded-xl border border-white/10 bg-black/30 p-3">
@@ -194,7 +200,7 @@ export default function AppStudioPanel({ toast }) {
                     <p className="truncate text-[10px] uppercase tracking-wider text-violet-300">{widget.widget_type}</p><p className="truncate text-xs text-white">{widget.name}</p>
                   </div>;
                 })}
-                {!document.widgets?.length && <div className="col-span-12 row-span-4 grid place-items-center text-center text-xs text-zinc-600"><div><Boxes className="mx-auto mb-2 h-7 w-7" />Add components from the panel.</div></div>}
+                {!(document.widgets || []).some((widget) => widget.page_id === activePage?.id) && <div className="col-span-12 row-span-4 grid place-items-center text-center text-xs text-zinc-600"><div><Boxes className="mx-auto mb-2 h-7 w-7" />Add components to {activePage?.name || "this page"}.</div></div>}
               </div>
             </>
           )}
@@ -204,7 +210,7 @@ export default function AppStudioPanel({ toast }) {
           <div className="pglass rounded-2xl p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400"><Boxes className="h-4 w-4" />Components</p>
             <select value={widgetType} onChange={(e) => setWidgetType(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white">{WIDGETS.map((type) => <option key={type}>{type}</option>)}</select>
-            <button onClick={addWidget} disabled={busy || !document} className="mt-2 w-full rounded-lg bg-violet-500 px-3 py-2 text-xs text-white disabled:opacity-40">Add to canvas</button>
+            <button onClick={addWidget} disabled={busy || !document} className="mt-2 w-full rounded-lg bg-violet-500 px-3 py-2 text-xs text-white disabled:opacity-40">Add to {activePage?.name || "canvas"}</button>
           </div>
           <div className="pglass rounded-2xl p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400"><Database className="h-4 w-4" />Data</p>
