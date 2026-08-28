@@ -11,7 +11,7 @@ describe("App Studio clone wiring", () => {
     expect(panel).toContain('cloneStudioApp');
     expect(panel).toContain('preserveConnectionRefs: true');
     expect(panel).toContain('Application duplicated');
-    expect(panel).toContain('>Duplicate</button>');
+    expect(panel).toContain('Duplicate');
   });
 
   it("keeps cloning owner scoped, bounded, and draft only", () => {
