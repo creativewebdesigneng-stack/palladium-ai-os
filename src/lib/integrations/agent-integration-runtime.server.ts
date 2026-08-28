@@ -18,6 +18,7 @@ export const INTEGRATION_TRANSPORTS = [
   "direct_oauth",
   "github_app",
   "salesforce_oauth",
+  "native_shopify",
   "nango",
 ] as const;
 export type IntegrationTransport = IntegrationAdapterId;
