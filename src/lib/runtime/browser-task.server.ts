@@ -12,6 +12,8 @@ export const BROWSER_TASK_ACTIONS = [
   "wait",
   "screenshot",
   "validate",
+  "login",
+  "download",
 ] as const;
 
 export type BrowserTaskAction = (typeof BROWSER_TASK_ACTIONS)[number];
@@ -34,6 +36,12 @@ type BrowserTaskStep = {
   amount?: number;
   ms?: number;
   fields?: BrowserExtractionField[];
+  credential_id?: string;
+  username_label?: string;
+  password_label?: string;
+  totp_label?: string;
+  submit_label?: string;
+  filename_hint?: string;
 };
 
 export type BrowserTaskResult = {
@@ -44,6 +52,34 @@ export type BrowserTaskResult = {
   trace?: BrowserStep[];
   error?: string;
   failed_step?: number;
+};
+
+export type BrowserTaskCredential = {
+  id: string;
+  domain: string;
+  username: string | null;
+  password: string | null;
+  totpCode: string | null;
+};
+
+export type BrowserDownloadCapture = {
+  filename: string;
+  mimeType?: string | null;
+  sizeBytes: number;
+  data: Uint8Array;
+};
+
+export type BrowserTaskRuntimeOptions = {
+  resolveCredential?: (args: {
+    credentialId: string;
+    requestedDomain: string;
+  }) => Promise<BrowserTaskCredential>;
+  captureDownload?: (args: {
+    tool: BrowserTool;
+    selector: string;
+    filenameHint?: string;
+  }) => Promise<BrowserDownloadCapture>;
+  storeDownload?: (download: BrowserDownloadCapture) => Promise<Record<string, unknown>>;
 };
 
 const SENSITIVE_BROWSER_TARGET =
@@ -117,6 +153,12 @@ function normalizeStep(value: unknown): BrowserTaskStep {
     ...(Number.isFinite(amount) ? { amount } : {}),
     ...(Number.isFinite(ms) ? { ms } : {}),
     ...(fields ? { fields } : {}),
+    ...(text(row["credential_id"], 120) ? { credential_id: text(row["credential_id"], 120) } : {}),
+    ...(text(row["username_label"], 120) ? { username_label: text(row["username_label"], 120) } : {}),
+    ...(text(row["password_label"], 120) ? { password_label: text(row["password_label"], 120) } : {}),
+    ...(text(row["totp_label"], 120) ? { totp_label: text(row["totp_label"], 120) } : {}),
+    ...(text(row["submit_label"], 120) ? { submit_label: text(row["submit_label"], 120) } : {}),
+    ...(text(row["filename_hint"], 160) ? { filename_hint: text(row["filename_hint"], 160) } : {}),
   };
 }
 
@@ -129,6 +171,10 @@ function boundedTrace(tool: BrowserTool): BrowserStep[] {
   return tool.steps().slice(-50);
 }
 
+function domainOf(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
+}
+
 async function selectorFromLabel(
   tool: BrowserTool,
   step: BrowserTaskStep,
@@ -139,6 +185,16 @@ async function selectorFromLabel(
   if (!currentUrl) throw new Error(`${action} by element label requires a current URL.`);
   const page = await tool.extract(currentUrl);
   return resolveBrowserElementSelector(page.items, step.label, action).selector;
+}
+
+async function selectorForExplicitLabel(
+  tool: BrowserTool,
+  currentUrl: string,
+  label: string,
+  action: "click" | "type",
+) {
+  const page = await tool.extract(currentUrl);
+  return resolveBrowserElementSelector(page.items, label, action).selector;
 }
 
 async function clickWithFallback(tool: BrowserTool, step: BrowserTaskStep, currentUrl: string) {
@@ -209,6 +265,80 @@ async function extractStructuredFields(
   return { url, fields: data };
 }
 
+async function trustedLogin(
+  tool: BrowserTool,
+  step: BrowserTaskStep,
+  currentUrl: string,
+  options: BrowserTaskRuntimeOptions,
+) {
+  if (!step.credential_id) throw new Error("login requires credential_id.");
+  if (!currentUrl) throw new Error("login requires a current URL.");
+  if (!options.resolveCredential) throw new Error("Trusted browser credential resolution is not configured.");
+  const credential = await options.resolveCredential({
+    credentialId: step.credential_id,
+    requestedDomain: domainOf(currentUrl),
+  });
+
+  const typed: string[] = [];
+  if (credential.username) {
+    const selector = await selectorForExplicitLabel(tool, currentUrl, step.username_label || "Email", "type")
+      .catch(() => selectorForExplicitLabel(tool, currentUrl, step.username_label || "Username", "type"));
+    await tool.type(selector, credential.username);
+    typed.push("username");
+  }
+  if (credential.password) {
+    const selector = await selectorForExplicitLabel(tool, currentUrl, step.password_label || "Password", "type");
+    await tool.type(selector, credential.password);
+    typed.push("password");
+  }
+  if (credential.totpCode) {
+    const selector = await selectorForExplicitLabel(tool, currentUrl, step.totp_label || "Verification code", "type")
+      .catch(() => selectorForExplicitLabel(tool, currentUrl, step.totp_label || "Authenticator code", "type"));
+    await tool.type(selector, credential.totpCode);
+    typed.push("totp");
+  }
+  if (step.submit_label !== "") {
+    const label = step.submit_label || "Sign in";
+    const selector = await selectorForExplicitLabel(tool, currentUrl, label, "click")
+      .catch(() => selectorForExplicitLabel(tool, currentUrl, "Log in", "click"));
+    await tool.click(selector);
+  }
+  return {
+    authenticated_with_credential: credential.id,
+    fields_supplied: typed,
+    secrets_exposed_to_model: false,
+  };
+}
+
+async function trustedDownload(
+  tool: BrowserTool,
+  step: BrowserTaskStep,
+  currentUrl: string,
+  options: BrowserTaskRuntimeOptions,
+) {
+  if (!options.captureDownload || !options.storeDownload) {
+    throw new Error("Trusted browser download capture is not configured.");
+  }
+  let selector = step.selector || step.fallback_selector || "";
+  if (!selector && step.label) {
+    selector = await selectorForExplicitLabel(tool, currentUrl, step.label, "click");
+  }
+  if (!selector) throw new Error("download requires a selector or element label.");
+  const download = await options.captureDownload({
+    tool,
+    selector,
+    ...(step.filename_hint ? { filenameHint: step.filename_hint } : {}),
+  });
+  const stored = await options.storeDownload(download);
+  return {
+    ...stored,
+    filename: download.filename,
+    size_bytes: download.sizeBytes,
+    mime_type: download.mimeType ?? null,
+    bytes_exposed_to_model: false,
+  };
+}
+
 /**
  * Executes a bounded sequence inside one BrowserTool instance. This gives the
  * model a cohesive browser session without exposing provider credentials or
@@ -218,6 +348,7 @@ export async function runBoundedBrowserTask(
   tool: BrowserTool,
   input: Record<string, unknown>,
   allowedDomains: string[],
+  options: BrowserTaskRuntimeOptions = {},
 ): Promise<BrowserTaskResult> {
   const rawSteps = Array.isArray(input["steps"]) ? input["steps"] : [];
   const requestedMax = Number(input["max_steps"] ?? 12);
@@ -341,6 +472,12 @@ export async function runBoundedBrowserTask(
           currentUrl = stepUrl;
           break;
         }
+        case "login":
+          result = await trustedLogin(tool, step, stepUrl, options);
+          break;
+        case "download":
+          result = await trustedDownload(tool, step, stepUrl, options);
+          break;
       }
 
       completed += 1;
