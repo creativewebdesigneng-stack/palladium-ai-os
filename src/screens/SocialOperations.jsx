@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarClock, Link2, Megaphone, Plus, RefreshCw, Send } from "lucide-react";
 import PageHeader from "@/components/palladium/PageHeader";
+import SocialConnectorPanel from "@/components/social/SocialConnectorPanel";
 import {
   addSocialPostTarget,
   createSocialPost,
@@ -126,7 +127,7 @@ export default function SocialOperations() {
       <PageHeader
         eyebrow="Marketing operations"
         title="Social Operations"
-        description="Plan multi-platform content, schedule posts and bind each destination to live PalladiumAI integration capabilities without exposing credentials to agents or the browser."
+        description="Connect social accounts, plan multi-platform content, schedule posts and bind each destination to live PalladiumAI integration capabilities without exposing credentials to agents or the browser."
         action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><RefreshCw className="h-4 w-4" />Refresh</button>}
       />
 
@@ -138,6 +139,8 @@ export default function SocialOperations() {
         <Metric icon={Send} label="Published" value={metrics.published} />
         <Metric icon={Link2} label="Live targets" value={metrics.targets} />
       </div>
+
+      <SocialConnectorPanel onConnectionsChanged={refresh} />
 
       <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
@@ -166,7 +169,7 @@ export default function SocialOperations() {
             <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
             <button disabled={busy || !capabilities.length} className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40">Attach destination</button>
           </form>
-          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Add the provider from Integrations; PalladiumAI will discover its typed actions automatically.</p>}
+          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; PalladiumAI will discover its typed actions automatically.</p>}
         </section>
       </div>
 
