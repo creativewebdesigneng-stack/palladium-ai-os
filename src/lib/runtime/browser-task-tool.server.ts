@@ -1,22 +1,29 @@
 import type { ToolDef } from "./model-gateway.server";
 import type { ToolContext } from "./tools.server";
-import { createBrowserTool, resolveBrowserProvider } from "@/lib/mission/browser-agent";
+import { createBrowserTool, resolveBrowserProvider, type BrowserTool } from "@/lib/mission/browser-agent";
 import { resolveBrowserCredential } from "./browser-credentials.server";
 import {
   captureBrowserDownloadFromPage,
   storeBrowserArtifact,
 } from "./browser-artifacts.server";
 import { runBoundedBrowserTask } from "./browser-task.server";
+import { asBrowserDatabase } from "./browser-database.types";
+import { loadBrowserProfile, saveBrowserProfile } from "./browser-profiles.server";
+import { createStatefulBrowserTool, type StatefulBrowserTool } from "./stateful-browser-tool.server";
 
 export const BROWSER_TASK_TOOL_DEF: ToolDef = {
   name: "browser_task",
   description:
-    "Run a bounded resilient browser task inside one session. Supports navigation, structured extraction, label-based element recovery, page validation, trusted stored-credential/TOTP login, private downloads, screenshots and trace output. Every URL is domain-scoped; secrets and download bytes never enter model-visible output.",
+    "Run a bounded resilient browser task inside one session. Supports navigation, structured extraction, label-based element recovery, page validation, trusted stored-credential/TOTP login, private downloads, screenshots, trace output and opt-in encrypted cross-run session persistence. Every URL is domain-scoped; secrets, cookies, local storage and download bytes never enter model-visible output.",
   parameters: {
     type: "object",
     properties: {
       url: { type: "string", description: "Optional starting URL on the agent allow-list." },
       max_steps: { type: "number", description: "Hard task budget from 1 to 20 steps." },
+      persist_session: {
+        type: "boolean",
+        description: "When true, securely reuse and persist this agent's cookies/local storage for the exact current domain allow-list. Requires a production browser provider.",
+      },
       steps: {
         type: "array",
         items: {
@@ -89,13 +96,28 @@ export async function runBrowserTaskTool(
   ctx: ToolContext,
 ): Promise<unknown> {
   const allowedDomains = ctx.allowedDomains ?? [];
-  let tool;
+  const persistSession = input["persist_session"] === true;
+  const browserConfig = {
+    allowedDomains,
+    allowedTools: ["browser", "browser_task"],
+    spendCap: ctx.spendCap ?? null,
+  };
+  let tool: BrowserTool;
+  let statefulTool: StatefulBrowserTool | null = null;
+  const browserDb = asBrowserDatabase(ctx.sb);
   try {
-    tool = createBrowserTool(resolveBrowserProvider(), {
-      allowedDomains,
-      allowedTools: ["browser", "browser_task"],
-      spendCap: ctx.spendCap ?? null,
-    });
+    if (persistSession) {
+      const initialState = await loadBrowserProfile({
+        db: browserDb,
+        userId: ctx.userId,
+        agentId: ctx.agentId,
+        allowedDomains,
+      });
+      statefulTool = createStatefulBrowserTool({ config: browserConfig, initialState });
+      tool = statefulTool;
+    } else {
+      tool = createBrowserTool(resolveBrowserProvider(), browserConfig);
+    }
   } catch (error) {
     return { error: (error as Error).message };
   }
@@ -145,12 +167,27 @@ export async function runBrowserTaskTool(
           sourceUrl: download.sourceUrl,
         }),
     });
+
+    let profile: Record<string, unknown> | null = null;
+    if (persistSession && statefulTool) {
+      const state = await statefulTool.exportStorageState();
+      profile = await saveBrowserProfile({
+        db: browserDb,
+        userId: ctx.userId,
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        allowedDomains,
+        state,
+      });
+    }
+
     return {
       provider: tool.provider,
       simulated: tool.kind === "development",
       ...(tool.kind === "development"
         ? { warning: "Development simulation — this did not happen in a real browser." }
         : {}),
+      ...(profile ? { session_profile: profile } : { profile_persisted: false }),
       result,
     };
   } finally {
