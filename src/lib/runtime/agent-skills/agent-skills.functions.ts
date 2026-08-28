@@ -45,7 +45,10 @@ export const installAgentSkill = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
-    const prepared = prepareAgentSkillPackage(data.files, { acknowledgeRisk: data.acknowledgeRisk });
+    const prepared = prepareAgentSkillPackage(
+      data.files,
+      data.acknowledgeRisk === undefined ? {} : { acknowledgeRisk: data.acknowledgeRisk },
+    );
 
     const row = {
       user_id: userId,
