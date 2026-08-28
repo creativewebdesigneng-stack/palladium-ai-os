@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { prepareAgentSkillPackage } from "./skill-package";
+import { createSkillCandidateFromVerifiedExperience } from "./skill-reflection.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -97,6 +98,18 @@ export const installAgentSkill = createServerFn({ method: "POST" })
     });
 
     return { skill: result.data };
+  });
+
+export const reflectVerifiedExperienceToSkill = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { taskId: string }) => input)
+  .handler(async ({ data, context }) => {
+    const skill = await createSkillCandidateFromVerifiedExperience({
+      sb: context.supabase as unknown as Sb,
+      userId: context.userId,
+      taskId: data.taskId,
+    });
+    return { skill };
   });
 
 export const setAgentSkillEnabled = createServerFn({ method: "POST" })
