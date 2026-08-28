@@ -10,7 +10,7 @@ export function validateStudioBindings(value: unknown): Record<string, unknown> 
   if (Object.keys(bindings).length > 50) throw new Error("A component can have at most 50 bindings.");
   for (const [property, expression] of Object.entries(bindings)) {
     if (!/^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(property)) throw new Error("A component binding property is invalid.");
-    if (typeof expression !== "string" || expression.length > 500 || !BINDING.test(expression)) {
+    if (typeof expression !== "string" || expression.length > 500 || !BINDING.test(expression) || /(?:^|\.|\[)(?:constructor|prototype|__proto__)(?:\.|\]|\s|})/.test(expression)) {
       throw new Error("Bindings must be bounded App Studio references; arbitrary JavaScript is not allowed.");
     }
   }
