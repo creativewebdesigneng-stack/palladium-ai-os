@@ -12,7 +12,7 @@ function safePublicUrl(value, fallback = "#") {
   } catch { return fallback; }
 }
 
-function Widget({ widget, properties, value, onValueChange, onEvent, modalOpen }) {
+function Widget({ widget, properties, value, onValueChange, onEvent, modalOpen, accent }) {
   const props = properties || {};
   const style = {
     gridColumn: `${Math.max(1, Number(widget.position?.x || 0) + 1)} / span ${Math.min(12, Math.max(1, Number(widget.position?.w || 4)))}`,
@@ -28,17 +28,17 @@ function Widget({ widget, properties, value, onValueChange, onEvent, modalOpen }
   let node;
   switch (widget.widget_type) {
     case "text": node = <p className="whitespace-pre-wrap text-slate-800">{text}</p>; break;
-    case "button": node = <button type="button" onClick={() => fire("onClick")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">{label || "Continue"}</button>; break;
+    case "button": node = <button type="button" onClick={() => fire("onClick")} style={{ backgroundColor: accent }} className="rounded-lg px-4 py-2 text-sm font-medium text-white">{label || "Continue"}</button>; break;
     case "input": node = <input className={common} value={value ?? String(props.value ?? "")} onChange={(event) => { onValueChange(event.target.value); fire("onChange"); }} placeholder={String(props.placeholder || label)} />; break;
     case "textarea": node = <textarea className={common} value={value ?? String(props.value ?? "")} onChange={(event) => { onValueChange(event.target.value); fire("onChange"); }} placeholder={String(props.placeholder || label)} />; break;
     case "select": {
       const options = Array.isArray(props.options) ? props.options : [];
       node = <select className={common} value={value ?? String(props.value ?? "")} onChange={(event) => { onValueChange(event.target.value); fire("onChange"); }}><option value="">{String(props.placeholder || "Select an option")}</option>{options.slice(0, 100).map((option, index) => { const item = option && typeof option === "object" ? option : { label: String(option), value: String(option) }; return <option key={`${String(item.value ?? index)}-${index}`} value={String(item.value ?? item.label ?? "")}>{String(item.label ?? item.value ?? "")}</option>; })}</select>; break;
     }
-    case "checkbox": node = <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={Boolean(value ?? props.checked)} onChange={(event) => { onValueChange(event.target.checked); fire("onChange"); }} />{label}</label>; break;
+    case "checkbox": node = <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" style={{ accentColor: accent }} checked={Boolean(value ?? props.checked)} onChange={(event) => { onValueChange(event.target.checked); fire("onChange"); }} />{label}</label>; break;
     case "image": node = props.src ? <img src={safePublicUrl(props.src, "")} alt={String(props.alt || widget.name)} className="h-full w-full rounded-lg object-cover" /> : <div className="grid h-full place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">Image</div>; break;
     case "divider": node = <hr className="border-slate-200" />; break;
-    case "link": node = <a href={safePublicUrl(props.href)} onClick={(event) => { if (widget.events?.onClick) { event.preventDefault(); fire("onClick"); } }} className="text-sm text-indigo-600 underline">{label || text}</a>; break;
+    case "link": node = <a href={safePublicUrl(props.href)} style={{ color: accent }} onClick={(event) => { if (widget.events?.onClick) { event.preventDefault(); fire("onClick"); } }} className="text-sm underline">{label || text}</a>; break;
     case "stat": node = <div><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="text-3xl font-semibold text-slate-900">{String(props.value ?? "—")}</p></div>; break;
     case "table": {
       const rows = Array.isArray(props.data) ? props.data.slice(0, 100) : [];
@@ -99,24 +99,25 @@ export default function PublishedStudioApp({ appId }) {
   if (!document) return <main className="grid min-h-screen place-items-center bg-slate-950 text-sm text-slate-400">Loading application…</main>;
 
   const theme = document.app?.theme || {};
+  const accent = theme.accent || "#4f46e5";
   const bindingContext = {
     app: { user: null, environment: "published" },
     page: { name: page?.name, params: pageParams },
     queries: {},
   };
   return (
-    <main className="min-h-screen bg-slate-50" style={{ backgroundColor: theme.background || undefined, color: theme.foreground || undefined }}>
+    <main className="min-h-screen bg-slate-50" style={{ backgroundColor: theme.background || undefined, color: theme.foreground || undefined, fontFamily: theme.fontFamily || undefined }}>
       <header className="border-b border-slate-200 bg-white/90 px-5 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <h1 className="font-semibold text-slate-900">{document.app?.name}</h1>
-          <nav className="flex gap-1">{document.pages?.map((item) => <button key={item.id} onClick={() => setPageId(item.id)} className={`rounded-lg px-3 py-1.5 text-sm ${item.id === page?.id ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-100"}`}>{item.name}</button>)}</nav>
+          <h1 className="font-semibold" style={{ color: theme.foreground || undefined }}>{document.app?.name}</h1>
+          <nav className="flex gap-1">{document.pages?.map((item) => <button key={item.id} onClick={() => setPageId(item.id)} style={item.id === page?.id ? { color: accent, backgroundColor: `${accent}14` } : undefined} className={`rounded-lg px-3 py-1.5 text-sm ${item.id === page?.id ? "" : "text-slate-500 hover:bg-slate-100"}`}>{item.name}</button>)}</nav>
         </div>
       </header>
       <section className="mx-auto grid max-w-7xl grid-cols-12 gap-3 p-5">{widgets.map((widget) => {
         const properties = resolvePublicWidgetProperties(widget.properties, widget.bindings, bindingContext);
         const localValue = values[widget.id] ?? values[widget.name];
         const modalOpen = openModals.includes(widget.id) || openModals.includes(widget.name);
-        return <Widget key={widget.id} widget={widget} properties={properties} value={localValue} modalOpen={modalOpen} onValueChange={(value) => setValues((current) => ({ ...current, [widget.id]: value, [widget.name]: value }))} onEvent={handleEvent} />;
+        return <Widget key={widget.id} widget={widget} properties={properties} value={localValue} modalOpen={modalOpen} accent={accent} onValueChange={(value) => setValues((current) => ({ ...current, [widget.id]: value, [widget.name]: value }))} onEvent={handleEvent} />;
       })}{!widgets.length && <div className="col-span-12 py-20 text-center text-sm text-slate-400">This page has no components yet.</div>}</section>
       <footer className="mx-auto max-w-7xl px-5 py-8 text-center text-[11px] text-slate-400">Built with PalladiumAI App Studio · v{document.version}</footer>
     </main>
