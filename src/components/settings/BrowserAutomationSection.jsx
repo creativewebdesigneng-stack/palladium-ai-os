@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bot, Download, KeyRound, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Bot, Cookie, Download, KeyRound, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { Panel } from './shared';
 import {
   createBrowserCredential,
@@ -8,6 +8,7 @@ import {
   listBrowserArtifacts,
   listBrowserCredentials,
 } from '@/lib/runtime/browser-automation.functions';
+import { deleteBrowserProfile, listBrowserProfiles } from '@/lib/runtime/browser-profile.functions';
 
 const EMPTY = { name: '', domain: '', username: '', password: '', totp_secret: '', totp_identifier: '' };
 
@@ -24,6 +25,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, autoComplet
 export default function BrowserAutomationSection() {
   const [credentials, setCredentials] = useState([]);
   const [artifacts, setArtifacts] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,12 +35,14 @@ export default function BrowserAutomationSection() {
   const reload = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [credentialResult, artifactResult] = await Promise.all([
+      const [credentialResult, artifactResult, profileResult] = await Promise.all([
         listBrowserCredentials({ data: {} }),
         listBrowserArtifacts({ data: { limit: 50 } }),
+        listBrowserProfiles(),
       ]);
       setCredentials(credentialResult?.credentials ?? []);
       setArtifacts(artifactResult?.artifacts ?? []);
+      setProfiles(profileResult?.profiles ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load browser automation settings.');
     } finally { setLoading(false); }
@@ -70,6 +74,15 @@ export default function BrowserAutomationSection() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not delete browser credential.'); }
   };
 
+  const removeProfile = async (id) => {
+    setError(''); setNotice('');
+    try {
+      await deleteBrowserProfile({ data: { id } });
+      setNotice('Persisted browser session reset. The agent will start with a fresh session next time.');
+      await reload();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not reset browser session.'); }
+  };
+
   const downloadArtifact = async (id) => {
     setError('');
     try {
@@ -81,10 +94,10 @@ export default function BrowserAutomationSection() {
 
   return (
     <div className="space-y-4">
-      <Panel icon={Bot} title="Browser Automation" grad="from-violet-500 to-fuchsia-500" desc="Secure logins, TOTP and private browser artifacts for resilient AI-agent web tasks.">
+      <Panel icon={Bot} title="Browser Automation" grad="from-violet-500 to-fuchsia-500" desc="Secure logins, TOTP, encrypted sessions and private browser artifacts for resilient AI-agent web tasks.">
         <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[.06] p-4 text-xs leading-5 text-zinc-300">
           <div className="flex items-center gap-2 font-medium text-emerald-300"><ShieldCheck className="h-4 w-4" /> Secrets stay outside the model</div>
-          <p className="mt-1 text-zinc-400">Passwords and authenticator secrets are encrypted server-side. Agents receive only an opaque credential id; decrypted values are injected directly into the trusted browser session.</p>
+          <p className="mt-1 text-zinc-400">Passwords, authenticator secrets, cookies and local storage are encrypted server-side. Agents receive only safe metadata; decrypted values are injected directly into the trusted browser session.</p>
         </div>
 
         {error && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-500/[.06] px-3 py-2 text-xs text-red-300">{error}</div>}
@@ -121,6 +134,20 @@ export default function BrowserAutomationSection() {
                   {credential.has_totp && <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-2 py-1 text-violet-300">TOTP</span>}
                   <button onClick={() => void removeCredential(credential.id)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-300" aria-label={`Delete ${credential.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
+              </div>
+            ))}
+          </div>}
+      </Panel>
+
+      <Panel icon={Cookie} title="Persisted Browser Sessions" grad="from-amber-500 to-violet-500" desc="Opt-in browser_task sessions can securely reuse cookies and local storage across separate runs.">
+        <p className="mb-3 text-[11px] leading-5 text-zinc-500">Session contents are encrypted and never displayed. Reset a session to force the agent to sign in again on its next persistent task.</p>
+        {loading ? <div className="flex items-center gap-2 py-5 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div> : profiles.length === 0 ?
+          <p className="py-4 text-sm text-zinc-500">No persisted browser sessions yet.</p> :
+          <div className="space-y-2">
+            {profiles.map((profile) => (
+              <div key={profile.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="min-w-0"><p className="text-sm font-medium text-white">Agent session</p><p className="mt-0.5 truncate text-[11px] text-zinc-500">{(profile.domain_scope || []).join(', ') || 'domain-scoped'} · updated {new Date(profile.updated_at).toLocaleString()}</p></div>
+                <button onClick={() => void removeProfile(profile.id)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-zinc-300 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Reset</button>
               </div>
             ))}
           </div>}
