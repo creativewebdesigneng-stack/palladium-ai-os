@@ -158,3 +158,29 @@ on conflict (slug) do update set
   kind = excluded.kind, requires_approval = excluded.requires_approval,
   risk_level = excluded.risk_level, min_plan = excluded.min_plan,
   is_active = excluded.is_active, config_schema = excluded.config_schema, updated_at = now();
+
+
+create or replace function public.get_published_app_studio_release(p_app_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'app', r.snapshot->'app',
+    'pages', coalesce(r.snapshot->'pages', '[]'::jsonb),
+    'widgets', coalesce(r.snapshot->'widgets', '[]'::jsonb),
+    'version', r.version,
+    'publishedAt', r.published_at
+  )
+  from public.app_studio_apps a
+  join public.app_studio_releases r on r.id = a.published_release_id
+  where a.id = p_app_id
+    and a.status = 'published'
+    and r.status = 'published'
+  limit 1
+$$;
+
+revoke all on function public.get_published_app_studio_release(uuid) from public;
+grant execute on function public.get_published_app_studio_release(uuid) to anon, authenticated;
