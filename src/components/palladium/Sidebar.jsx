@@ -17,6 +17,7 @@ const MAIN = [
 
 const WORKFORCE = [
   ['AI Workforce', '/workforce', Users],
+  ['Agent Runtime', '/agent-runtime', Cpu],
   ['Agents', '/agents', Bot],
   ['Agent Builder', '/agent-builder', Hammer],
   ['Tasks', '/tasks', ListChecks],

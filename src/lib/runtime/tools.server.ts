@@ -20,6 +20,11 @@ import {
   isDomainAllowed,
   resolveBrowserProvider,
 } from "@/lib/mission/browser-agent";
+import {
+  assertHarnessToolInput,
+  evaluateHarnessPolicy,
+  type SandboxProfile,
+} from "./agent-harness";
 
 export type ToolContext = {
   userId: string;
@@ -1382,6 +1387,13 @@ export async function resolveGrantedTools(
 const SENSITIVE_KEY =
   /(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i;
 
+function sandboxProfileFromInput(input: Record<string, unknown>): SandboxProfile | undefined {
+  const value = input["sandbox_profile"];
+  return value === "read_only" || value === "workspace_write" || value === "networked" || value === "privileged"
+    ? value
+    : undefined;
+}
+
 /**
  * Execution records keep metadata, not payloads: enough to audit what a tool was
  * asked to do, without persisting credentials or long free text that the model
@@ -1442,6 +1454,33 @@ export async function executeTool(
   if (!tool || !grant) {
     await log("failed", { error: "Tool not enabled for this agent." });
     return { ok: false, output: { error: `Tool "${name}" is not enabled for this agent.` } };
+  }
+
+  const harnessInputPolicy = assertHarnessToolInput(name, input, grant.allowedDomains);
+  if (harnessInputPolicy.decision === "deny") {
+    await log("failed", { error: harnessInputPolicy.reason, policy_code: harnessInputPolicy.code });
+    return {
+      ok: false,
+      output: {
+        error: harnessInputPolicy.reason,
+        policy_code: harnessInputPolicy.code,
+      },
+    };
+  }
+
+  const sandboxProfile = sandboxProfileFromInput(input);
+  if (sandboxProfile) {
+    const sandboxPolicy = evaluateHarnessPolicy({ tool: name, input, sandboxProfile });
+    if (sandboxPolicy.decision === "deny") {
+      await log("failed", { error: sandboxPolicy.reason, policy_code: sandboxPolicy.code });
+      return {
+        ok: false,
+        output: {
+          error: sandboxPolicy.reason,
+          policy_code: sandboxPolicy.code,
+        },
+      };
+    }
   }
 
   if (ctx.allowedProviders !== undefined) {
