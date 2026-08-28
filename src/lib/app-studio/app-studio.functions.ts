@@ -5,6 +5,13 @@ import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
 import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
 
 type Sb = { from: (table: string) => any };
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+function serializable(value: unknown): JsonValue {
+  const encoded = JSON.stringify(value ?? null);
+  if (encoded.length > 1_000_000) throw new Error("App Studio query result exceeded the response limit.");
+  return JSON.parse(encoded) as JsonValue;
+}
 
 const slug = z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const uuid = z.string().uuid();
@@ -248,7 +255,7 @@ export const runStudioQuery = createServerFn({ method: "POST" })
         user_id: context.userId, action: "app_studio_query_executed", target_type: "app_studio_query",
         target_id: data.queryId, status: "success", metadata: { duration_ms: Date.now() - startedAt },
       });
-      return result;
+      return serializable(result);
     } catch (error) {
       await sb.from("mission_audit_logs").insert({
         user_id: context.userId, action: "app_studio_query_failed", target_type: "app_studio_query",
