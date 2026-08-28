@@ -1,5 +1,16 @@
 type AnyRecord = Record<string, any>;
 
+type ImportedStep = {
+  kind: "delay" | "approval" | "notification" | "agent";
+  name: string;
+  mode: "sequential";
+  position: number;
+  agent_id?: string | null;
+  config: Record<string, unknown>;
+};
+
+const SECRET_KEY = /(token|secret|password|passwd|api[_-]?key|authorization|cookie|client[_-]?secret)/i;
+
 function isObject(value: unknown): value is AnyRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -31,7 +42,7 @@ function jsonSafe(value: unknown, depth = 0): Record<string, unknown> {
   if (!isObject(value) || depth > 4) return {};
   const output: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(value).slice(0, 40)) {
-    if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(key)) continue;
+    if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(key) || SECRET_KEY.test(key)) continue;
     if (raw == null || typeof raw === "boolean" || typeof raw === "number") output[key] = raw;
     else if (typeof raw === "string") output[key] = raw.slice(0, 2000);
     else if (Array.isArray(raw)) output[key] = raw.slice(0, 20).filter((item) => typeof item === "string").map(String);
@@ -59,36 +70,39 @@ export function adaptN8nWorkflowDefinition(value: unknown) {
   const schedule = triggerType === "schedule" && triggerNode ? scheduleFrom(triggerNode) : null;
 
   const unsupported: string[] = [];
-  const steps = nodes
-    .filter((node) => node !== triggerNode && !/manualtrigger|scheduletrigger|cron|webhook/.test(typeName(node)))
-    .map((node, index) => {
-      const type = typeName(node);
-      const name = cleanString(node.name, 120) || `Imported node ${index + 1}`;
-      if (/wait|delay/.test(type)) {
-        return { kind: "delay", name, mode: "sequential", position: index, config: { duration_ms: delayMs(node) } };
-      }
-      if (/approval/.test(type)) {
-        return { kind: "approval", name, mode: "sequential", position: index, config: { source: "n8n-import", parameters: jsonSafe(node.parameters) } };
-      }
-      if (/slack|email|gmail|notification|discord|teams/.test(type)) {
-        return { kind: "notification", name, mode: "sequential", position: index, config: { message: `Imported notification node: ${name}`, source_type: type, parameters: jsonSafe(node.parameters) } };
-      }
-      if (/agent|openai|anthropic|gemini|langchain/.test(type)) {
-        const parameters = isObject(node.parameters) ? node.parameters : {};
-        const agentId = cleanString(parameters.agentId ?? parameters.agent_id, 60);
-        return {
-          kind: "agent",
-          name,
-          mode: "sequential",
-          position: index,
-          agent_id: /^[0-9a-f-]{36}$/i.test(agentId) ? agentId : null,
-          config: { source: "n8n-import", node_type: type, parameters: jsonSafe(parameters) },
-        };
-      }
-      unsupported.push(`${name} (${type || "unknown"})`);
-      return null;
-    })
-    .filter(Boolean);
+  const steps: ImportedStep[] = [];
+  const executableNodes = nodes.filter((node) => node !== triggerNode && !/manualtrigger|scheduletrigger|cron|webhook/.test(typeName(node)));
+
+  for (const [index, node] of executableNodes.entries()) {
+    const type = typeName(node);
+    const name = cleanString(node.name, 120) || `Imported node ${index + 1}`;
+    if (/wait|delay/.test(type)) {
+      steps.push({ kind: "delay", name, mode: "sequential", position: index, config: { duration_ms: delayMs(node) } });
+      continue;
+    }
+    if (/approval/.test(type)) {
+      steps.push({ kind: "approval", name, mode: "sequential", position: index, config: { source: "n8n-import", parameters: jsonSafe(node.parameters) } });
+      continue;
+    }
+    if (/slack|email|gmail|notification|discord|teams/.test(type)) {
+      steps.push({ kind: "notification", name, mode: "sequential", position: index, config: { message: `Imported notification node: ${name}`, source_type: type, parameters: jsonSafe(node.parameters) } });
+      continue;
+    }
+    if (/agent|openai|anthropic|gemini|langchain/.test(type)) {
+      const parameters = isObject(node.parameters) ? node.parameters : {};
+      const agentId = cleanString(parameters.agentId ?? parameters.agent_id, 60);
+      steps.push({
+        kind: "agent",
+        name,
+        mode: "sequential",
+        position: index,
+        agent_id: /^[0-9a-f-]{36}$/i.test(agentId) ? agentId : null,
+        config: { source: "n8n-import", node_type: type, parameters: jsonSafe(parameters) },
+      });
+      continue;
+    }
+    unsupported.push(`${name} (${type || "unknown"})`);
+  }
 
   if (unsupported.length) {
     throw new Error(`This n8n workflow contains nodes that PalladiumAI cannot safely translate yet: ${unsupported.slice(0, 8).join(", ")}${unsupported.length > 8 ? "…" : ""}. Remove or replace those nodes, then import again.`);
