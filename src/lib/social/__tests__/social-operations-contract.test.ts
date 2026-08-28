@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync("supabase/migrations/20260828183000_social_operations.sql", "utf8");
 const functions = readFileSync("src/lib/social/social-operations.functions.ts", "utf8");
 const screen = readFileSync("src/screens/SocialOperations.jsx", "utf8");
+const route = readFileSync("src/routes/_shell/_app/social-operations.tsx", "utf8");
 const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
 
 describe("Social Operations native contract", () => {
@@ -27,9 +28,13 @@ describe("Social Operations native contract", () => {
     expect(functions).toContain('status: prepared.requiresApproval ? "approval_required" : "pending"');
   });
 
-  it("exposes the workspace without credential-entry UI", () => {
+  it("keeps Social Operations as its own first-class page and navigation destination", () => {
+    expect(route).toContain('createFileRoute("/_shell/_app/social-operations")');
+    expect(route).toContain('import Screen from "@/screens/SocialOperations"');
+    expect(route).toContain('title: "Social Operations — PalladiumAI"');
     expect(screen).toContain('title="Social Operations"');
     expect(screen).toContain("Bind a live destination");
+    expect(screen).toContain("Content calendar");
     expect(screen).toContain("listLiveSocialCapabilities");
     expect(screen).toContain("addSocialPostTarget");
     expect(screen).not.toMatch(/placeholder=["'][^"']*(token|secret|api key|password)/i);
