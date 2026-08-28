@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync("supabase/migrations/20260828183000_social_operations.sql", "utf8");
 const functions = readFileSync("src/lib/social/social-operations.functions.ts", "utf8");
 const screen = readFileSync("src/screens/SocialOperations.jsx", "utf8");
+const connectors = readFileSync("src/components/social/SocialConnectorPanel.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/social-operations.tsx", "utf8");
 const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
 
@@ -33,11 +34,27 @@ describe("Social Operations native contract", () => {
     expect(route).toContain('import Screen from "@/screens/SocialOperations"');
     expect(route).toContain('title: "Social Operations — PalladiumAI"');
     expect(screen).toContain('title="Social Operations"');
+    expect(screen).toContain("SocialConnectorPanel");
     expect(screen).toContain("Bind a live destination");
     expect(screen).toContain("Content calendar");
     expect(screen).toContain("listLiveSocialCapabilities");
     expect(screen).toContain("addSocialPostTarget");
     expect(screen).not.toMatch(/placeholder=["'][^"']*(token|secret|api key|password)/i);
     expect(sidebar).toContain("['Social Operations', '/social-operations', CalendarClock]");
+  });
+
+  it("connects social accounts through existing OAuth and Nango systems without browser credentials", () => {
+    expect(connectors).toContain("listIntegrations");
+    expect(connectors).toContain("startIntegrationOAuth");
+    expect(connectors).toContain("testIntegrationConnection");
+    expect(connectors).toContain("disconnectIntegration");
+    expect(connectors).toContain("listNangoConnections");
+    expect(connectors).toContain("startNangoConnection");
+    expect(connectors).toContain("testNangoConnection");
+    expect(connectors).toContain("disconnectNangoConnection");
+    expect(connectors).toContain("Connect account");
+    expect(connectors).toContain("Test connection");
+    expect(connectors).toContain("Credentials remain server-side");
+    expect(connectors).not.toMatch(/placeholder=["'][^"']*(token|secret|api key|password)/i);
   });
 });
