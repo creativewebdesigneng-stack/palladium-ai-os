@@ -6,6 +6,10 @@ import {
   type SkillScriptExecutor,
   type SkillScriptRecipe,
 } from "./skill-script-runner.server";
+import {
+  assertSkillScriptToolsSafe,
+  inheritedAgentToolNames,
+} from "./skill-script-policy";
 
 type Sb = { from: (table: string) => any };
 
@@ -78,6 +82,32 @@ function parseDetails(value: unknown): SkillScriptApprovalDetails | null {
   return { kind: "agent_skill_script", skill_id, skill_name, skill_version, script, params, fingerprint };
 }
 
+async function assertAgentCanQueueRecipe(args: {
+  sb: Sb;
+  userId: string;
+  agentId: string;
+  tools: readonly string[];
+}) {
+  assertSkillScriptToolsSafe(args.tools);
+  const { data, error } = await args.sb
+    .from("personal_agents")
+    .select("id,allowed_tools")
+    .eq("id", args.agentId)
+    .eq("user_id", args.userId)
+    .maybeSingle();
+  if (error || !data) throw new Error("The agent for this skill script is not available.");
+  const allowed = inheritedAgentToolNames(
+    Array.isArray(data.allowed_tools)
+      ? data.allowed_tools.filter((tool: unknown): tool is string => typeof tool === "string")
+      : [],
+  );
+  for (const tool of args.tools) {
+    if (!allowed.has(tool)) {
+      throw new Error(`Skill script tool "${tool}" is not granted to this agent.`);
+    }
+  }
+}
+
 export async function queueSkillScriptApproval(args: {
   sb: Sb;
   userId: string;
@@ -93,6 +123,13 @@ export async function queueSkillScriptApproval(args: {
     userId: args.userId,
     skillId: args.skillId,
     script: args.script,
+  });
+  const recipeTools = [...new Set(loaded.recipe.steps.map((step) => step.tool))];
+  await assertAgentCanQueueRecipe({
+    sb: args.sb,
+    userId: args.userId,
+    agentId: args.agentId,
+    tools: recipeTools,
   });
   const params = normalizeSkillScriptParams(args.params);
   const fingerprint = skillScriptFingerprint({
@@ -175,9 +212,11 @@ export async function replayApprovedSkillScript(args: {
   });
   if (fingerprint !== details.fingerprint) throw new Error("The approved skill recipe has changed since approval.");
 
-  for (const step of loaded.recipe.steps) {
-    if (!args.allowedTools.has(step.tool)) {
-      throw new Error(`Skill script tool "${step.tool}" is no longer granted to this agent.`);
+  const recipeTools = [...new Set(loaded.recipe.steps.map((step) => step.tool))];
+  assertSkillScriptToolsSafe(recipeTools);
+  for (const tool of recipeTools) {
+    if (!args.allowedTools.has(tool)) {
+      throw new Error(`Skill script tool "${tool}" is no longer granted to this agent.`);
     }
   }
 
