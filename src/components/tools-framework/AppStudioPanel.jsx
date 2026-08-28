@@ -14,6 +14,7 @@ import {
 } from "@/lib/app-studio/app-studio.functions";
 
 const WIDGETS = ["container","text","button","input","textarea","select","checkbox","table","list","image","form","chart","stat","tabs","modal","divider","link"];
+const DATASOURCE_PROVIDERS = ["rest", "graphql", "mcp", "integration"];
 
 function slugify(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
@@ -28,8 +29,12 @@ export default function AppStudioPanel({ toast }) {
   const [widgetType, setWidgetType] = useState("text");
   const [datasourceName, setDatasourceName] = useState("");
   const [datasourceProvider, setDatasourceProvider] = useState("rest");
+  const [datasourceConnectionRef, setDatasourceConnectionRef] = useState("");
+  const [selectedDatasourceId, setSelectedDatasourceId] = useState("");
   const [queryName, setQueryName] = useState("");
+  const [queryOperation, setQueryOperation] = useState("get");
   const [queryUrl, setQueryUrl] = useState("");
+  const [queryDocument, setQueryDocument] = useState("");
   const [queryResult, setQueryResult] = useState(null);
 
   const loadApps = useCallback(async () => {
@@ -40,13 +45,23 @@ export default function AppStudioPanel({ toast }) {
 
   const loadDocument = useCallback(async (id) => {
     if (!id) { setDocument(null); return; }
-    setDocument(await getStudioApp({ data: { appId: id } }));
+    const next = await getStudioApp({ data: { appId: id } });
+    setDocument(next);
+    setSelectedDatasourceId((current) => next.datasources?.some((item) => item.id === current) ? current : next.datasources?.[0]?.id || "");
   }, []);
 
   useEffect(() => { loadApps().catch((e) => toast({ title: "App Studio failed to load", description: e.message, variant: "destructive" })); }, [loadApps, toast]);
   useEffect(() => { loadDocument(selectedId).catch((e) => toast({ title: "Application failed to load", description: e.message, variant: "destructive" })); }, [selectedId, loadDocument, toast]);
 
   const activePage = useMemo(() => document?.pages?.find((page) => page.is_home) || document?.pages?.[0] || null, [document]);
+  const selectedDatasource = useMemo(() => document?.datasources?.find((source) => source.id === selectedDatasourceId) || null, [document, selectedDatasourceId]);
+
+  useEffect(() => {
+    if (!selectedDatasource) return;
+    if (selectedDatasource.provider === "rest") setQueryOperation("get");
+    else if (selectedDatasource.provider === "graphql") setQueryOperation("query");
+    else setQueryOperation("");
+  }, [selectedDatasource]);
 
   const act = async (fn, success) => {
     setBusy(true);
@@ -89,24 +104,38 @@ export default function AppStudioPanel({ toast }) {
   const addDatasource = () => act(async () => {
     const cleanName = datasourceName.trim();
     if (!cleanName) throw new Error("Enter a datasource name.");
-    await saveStudioDatasource({ data: {
+    const connected = datasourceProvider === "mcp" || datasourceProvider === "integration";
+    const connectionRef = datasourceConnectionRef.trim();
+    if (connected && !connectionRef) throw new Error("Enter the existing secure connection reference for this datasource.");
+    if (datasourceProvider === "mcp" && !connectionRef.startsWith("mcp:")) throw new Error("MCP references must use mcp:<server-id>.");
+    if (datasourceProvider === "integration" && !connectionRef.startsWith("integration:")) throw new Error("Integration references must use integration:<provider>.");
+    const created = await saveStudioDatasource({ data: {
       appId: selectedId, name: cleanName, provider: datasourceProvider,
-      connectionRef: null,
+      connectionRef: connected ? connectionRef : null,
       config: {}, environment: "development", enabled: true,
     } });
+    setSelectedDatasourceId(created.id);
     setDatasourceName("");
+    setDatasourceConnectionRef("");
   }, "Datasource added");
 
   const addQuery = () => act(async () => {
-    const source = document?.datasources?.[0];
-    if (!source) throw new Error("Add a datasource first.");
-    if (!queryName.trim() || !queryUrl.trim()) throw new Error("Enter a query name and public HTTPS URL.");
+    const source = selectedDatasource;
+    if (!source) throw new Error("Select a datasource first.");
+    if (!queryName.trim() || !queryOperation.trim()) throw new Error("Enter a query name and operation.");
+    if ((source.provider === "rest" || source.provider === "graphql") && !queryUrl.trim()) throw new Error("Enter a public HTTPS URL.");
+    if (source.provider === "graphql" && !queryDocument.trim()) throw new Error("Enter a read-only GraphQL query document.");
+    const configuration = source.provider === "graphql"
+      ? { url: queryUrl.trim(), document: queryDocument.trim() }
+      : source.provider === "rest"
+        ? { url: queryUrl.trim() }
+        : {};
     await saveStudioQuery({ data: {
       appId: selectedId, pageId: activePage?.id || null, datasourceId: source.id,
-      name: queryName.trim(), operation: source.provider === "graphql" ? "query" : "get",
-      configuration: { url: queryUrl.trim() }, runOnLoad: false, requiresApproval: false, timeoutMs: 15000,
+      name: queryName.trim(), operation: queryOperation.trim(), configuration,
+      runOnLoad: false, requiresApproval: source.provider === "mcp", timeoutMs: 15000,
     } });
-    setQueryName(""); setQueryUrl("");
+    setQueryName(""); setQueryUrl(""); setQueryDocument("");
   }, "Query added");
 
   const testQuery = (query) => act(async () => {
@@ -180,18 +209,22 @@ export default function AppStudioPanel({ toast }) {
           <div className="pglass rounded-2xl p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400"><Database className="h-4 w-4" />Data</p>
             <input value={datasourceName} onChange={(e) => setDatasourceName(e.target.value)} placeholder="Datasource name" className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />
-            <select value={datasourceProvider} onChange={(e) => setDatasourceProvider(e.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white">
-              {["rest","graphql"].map((type) => <option key={type}>{type}</option>)}
+            <select value={datasourceProvider} onChange={(e) => { setDatasourceProvider(e.target.value); setDatasourceConnectionRef(""); }} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white">
+              {DATASOURCE_PROVIDERS.map((type) => <option key={type}>{type}</option>)}
             </select>
+            {(datasourceProvider === "mcp" || datasourceProvider === "integration") && <input value={datasourceConnectionRef} onChange={(e) => setDatasourceConnectionRef(e.target.value)} placeholder={datasourceProvider === "mcp" ? "mcp:<server-id>" : "integration:<provider>"} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />}
             <button onClick={addDatasource} disabled={busy || !document} className="mt-2 w-full rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 disabled:opacity-40">Add datasource</button>
-            <div className="mt-3 space-y-1">{document?.datasources?.map((source) => <p key={source.id} className="rounded-lg bg-white/[.03] px-2 py-1.5 text-[11px] text-zinc-400">{source.name} · {source.provider} · {source.environment}</p>)}</div>
-            <p className="mt-2 text-[10px] leading-4 text-zinc-600">For databases, integrations and MCP, connect the provider first; App Studio stores only its secure connection reference.</p>
+            <div className="mt-3 space-y-1">{document?.datasources?.map((source) => <button key={source.id} onClick={() => setSelectedDatasourceId(source.id)} className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] ${selectedDatasourceId === source.id ? "bg-violet-500/10 text-violet-200" : "bg-white/[.03] text-zinc-400"}`}>{source.name} · {source.provider} · {source.environment}</button>)}</div>
+            <p className="mt-2 text-[10px] leading-4 text-zinc-600">Connected integrations and MCP use secure references only. Credentials never enter editable App Studio JSON.</p>
           </div>
           <div className="pglass rounded-2xl p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400"><Workflow className="h-4 w-4" />Queries</p>
-            <input value={queryName} onChange={(e) => setQueryName(e.target.value)} placeholder="Query name" className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />
-            <input value={queryUrl} onChange={(e) => setQueryUrl(e.target.value)} placeholder="https://api.example.com/data" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />
-            <button onClick={addQuery} disabled={busy || !document?.datasources?.length} className="mt-2 w-full rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 disabled:opacity-40">Add query</button>
+            <select value={selectedDatasourceId} onChange={(e) => setSelectedDatasourceId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white"><option value="">Select datasource</option>{document?.datasources?.map((source) => <option key={source.id} value={source.id}>{source.name} · {source.provider}</option>)}</select>
+            <input value={queryName} onChange={(e) => setQueryName(e.target.value)} placeholder="Query name" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />
+            <input value={queryOperation} onChange={(e) => setQueryOperation(e.target.value)} disabled={selectedDatasource?.provider === "rest" || selectedDatasource?.provider === "graphql"} placeholder={selectedDatasource?.provider === "mcp" ? "MCP tool name" : selectedDatasource?.provider === "integration" ? "Connected action" : "Operation"} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none disabled:opacity-60" />
+            {(selectedDatasource?.provider === "rest" || selectedDatasource?.provider === "graphql") && <input value={queryUrl} onChange={(e) => setQueryUrl(e.target.value)} placeholder="https://api.example.com/data" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none" />}
+            {selectedDatasource?.provider === "graphql" && <textarea value={queryDocument} onChange={(e) => setQueryDocument(e.target.value)} placeholder="query { ... }" rows={4} className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 font-mono text-[11px] text-white outline-none" />}
+            <button onClick={addQuery} disabled={busy || !selectedDatasource} className="mt-2 w-full rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 disabled:opacity-40">Add query</button>
             <div className="mt-3 space-y-1">{document?.queries?.map((query) => <button key={query.id} onClick={() => testQuery(query)} className="flex w-full items-center justify-between rounded-lg bg-white/[.03] px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-white/[.06]"><span>{query.name} · {query.operation}</span><span>Run</span></button>)}</div>
             {queryResult && <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-black/40 p-2 text-[10px] text-emerald-300">{JSON.stringify(queryResult, null, 2)}</pre>}
           </div>
