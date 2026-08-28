@@ -1,5 +1,5 @@
 import type { ToolDef } from "@/lib/runtime/model-gateway.server";
-import type { ToolContext } from "@/lib/runtime/tools.server";
+import type { ToolContext } from "@/lib/runtime/tools-core.server";
 import {
   listIntegrationCapabilities,
   normalizeIntegrationProvider,
