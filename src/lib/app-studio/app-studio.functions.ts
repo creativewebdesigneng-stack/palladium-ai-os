@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
+import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
 
 type Sb = { from: (table: string) => any };
 
@@ -161,7 +162,7 @@ export const saveStudioWidget = createServerFn({ method: "POST" })
     await requireApp(sb, context.userId, data.appId);
     const page = await sb.from("app_studio_pages").select("id").eq("id", data.pageId).eq("app_id", data.appId).eq("user_id", context.userId).maybeSingle();
     if (!page.data) throw new Error("Page not found.");
-    const row = { app_id: data.appId, page_id: data.pageId, user_id: context.userId, parent_id: data.parentId ?? null, widget_type: data.widgetType, name: data.name, position: data.position, properties: data.properties, bindings: data.bindings, events: data.events };
+    const row = { app_id: data.appId, page_id: data.pageId, user_id: context.userId, parent_id: data.parentId ?? null, widget_type: data.widgetType, name: data.name, position: data.position, properties: data.properties, bindings: validateStudioBindings(data.bindings), events: validateStudioEvents(data.events) };
     const result = data.id
       ? await sb.from("app_studio_widgets").update(row).eq("id", data.id).eq("app_id", data.appId).eq("user_id", context.userId).select("*").maybeSingle()
       : await sb.from("app_studio_widgets").insert(row).select("*").single();
