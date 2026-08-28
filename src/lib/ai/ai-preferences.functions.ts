@@ -12,7 +12,7 @@ import { normaliseProvider } from "@/lib/runtime/model-gateway.server";
 type Sb = { from: (table: string) => any };
 
 const updateInput = z.object({
-  provider: z.enum(["lovable", "openai", "anthropic", "compatible"]),
+  provider: z.enum(["lovable", "openai", "anthropic", "groq", "deepseek", "compatible"]),
   model: z.string().trim().min(1).max(160),
 });
 

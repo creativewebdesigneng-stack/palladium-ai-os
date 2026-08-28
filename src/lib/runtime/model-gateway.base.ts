@@ -13,7 +13,7 @@
  * the caller and never leave this module.
  */
 
-export type Provider = "lovable" | "openai" | "anthropic" | "groq" | "compatible";
+export type Provider = "lovable" | "openai" | "anthropic" | "groq" | "deepseek" | "compatible";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -59,6 +59,7 @@ const DEFAULT_MODEL: Record<Provider, string> = {
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
+  deepseek: "deepseek-chat",
   compatible: "local-model",
 };
 
@@ -67,12 +68,14 @@ export function normaliseProvider(value?: string | null): Provider {
   if (v === "openai") return "openai";
   if (v === "anthropic" || v === "claude") return "anthropic";
   if (v === "groq") return "groq";
+  if (v === "deepseek" || v === "deepseek-v3" || v === "deepseek-v3.1") return "deepseek";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
   // No explicit choice: prefer a directly configured vendor key over the gateway.
   if (!v) {
     if (process.env["GROQ_API_KEY"]) return "groq";
     if (process.env["OPENAI_API_KEY"]) return "openai";
+    if (process.env["DEEPSEEK_API_KEY"]) return "deepseek";
     if (process.env["ANTHROPIC_API_KEY"]) return "anthropic";
   }
   return "lovable";
@@ -117,6 +120,16 @@ function endpointFor(provider: Provider): Endpoint {
     if (!key) throw new ProviderError("Groq is not configured for this workspace.", 503, false);
     return {
       url: "https://api.groq.com/openai/v1/chat/completions",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      kind: "chat",
+    };
+  }
+  if (provider === "deepseek") {
+    const key = process.env["DEEPSEEK_API_KEY"];
+    if (!key) throw new ProviderError("DeepSeek is not configured for this workspace.", 503, false);
+    const base = (process.env["DEEPSEEK_BASE_URL"] || "https://api.deepseek.com/v1").replace(/\/+$/, "");
+    return {
+      url: `${base}/chat/completions`,
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       kind: "chat",
     };

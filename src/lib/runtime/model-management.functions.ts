@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
-type ProviderId = "lovable" | "openai" | "anthropic" | "compatible";
+type ProviderId = "lovable" | "openai" | "anthropic" | "deepseek" | "compatible";
 type ProviderDefinition = {
   id: ProviderId;
   name: string;
@@ -12,6 +12,7 @@ type ProviderDefinition = {
 const PROVIDERS: ProviderDefinition[] = [
   { id: "lovable", name: "Lovable AI Gateway", defaultModel: "google/gemini-3-flash-preview" },
   { id: "openai", name: "OpenAI", defaultModel: "gpt-5-mini" },
+  { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
   { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-5-20250929" },
   { id: "compatible", name: "OpenAI-compatible endpoint", defaultModel: "local-model" },
 ];
@@ -20,6 +21,7 @@ function configured(provider: ProviderId): boolean {
   if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
   if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);
   if (provider === "anthropic") return Boolean(process.env["ANTHROPIC_API_KEY"]);
+  if (provider === "deepseek") return Boolean(process.env["DEEPSEEK_API_KEY"]);
   return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);
 }
 

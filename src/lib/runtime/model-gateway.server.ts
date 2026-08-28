@@ -18,6 +18,7 @@ function providerConfigured(provider: Provider): boolean {
   if (provider === "groq") return Boolean(process.env["GROQ_API_KEY"]);
   if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);
   if (provider === "anthropic") return Boolean(process.env["ANTHROPIC_API_KEY"]);
+  if (provider === "deepseek") return Boolean(process.env["DEEPSEEK_API_KEY"]);
   if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
   return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);
 }
@@ -39,7 +40,7 @@ function markRateLimited(provider: Provider) {
 }
 
 function fallbackOrder(primary: Provider): Provider[] {
-  const all: Provider[] = [primary, "groq", "openai", "lovable", "anthropic", "compatible"];
+  const all: Provider[] = [primary, "deepseek", "groq", "openai", "lovable", "anthropic", "compatible"];
   const configured = all.filter(
     (provider, index) => all.indexOf(provider) === index && (provider === primary || providerConfigured(provider)),
   );
