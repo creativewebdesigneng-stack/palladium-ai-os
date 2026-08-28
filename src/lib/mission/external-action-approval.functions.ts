@@ -9,6 +9,7 @@ import {
   type ApprovedGitHubActionType,
 } from "@/lib/integrations/github-approved-action.server";
 import { executeApprovedIntegrationAction } from "@/lib/integrations/approved-integration-action.server";
+import { executeApprovedAgentMcpAction } from "@/lib/mcp/approved-agent-mcp-action.server";
 import { executeApprovedSkillScriptAction } from "@/lib/runtime/agent-skills/approved-skill-script-action.server";
 import { notify } from "@/lib/notifications/notify.server";
 
@@ -17,6 +18,7 @@ type ExternalActionType =
   | ApprovedActionType
   | ApprovedGitHubActionType
   | "nango_dynamic_action"
+  | "external_mcp_action"
   | "agent_skill_script";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
@@ -36,6 +38,7 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "linear_issue_update",
   "notion_page_create",
   "nango_dynamic_action",
+  "external_mcp_action",
   "agent_skill_script",
   ...GITHUB_EXECUTABLE,
 ]);
@@ -59,6 +62,9 @@ async function executeExternalAction(
   details: Record<string, unknown>,
   approval: { id: string; agent_id?: string | null; org_id?: string | null },
 ) {
+  if (type === "external_mcp_action") {
+    return executeApprovedAgentMcpAction({ sb, userId, details });
+  }
   if (type === "agent_skill_script") {
     if (!approval.agent_id) {
       return { ok: false, provider: "palladium", error: "This skill approval is missing its agent identity." };
