@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText,
+  FileText, Layers3,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -19,6 +19,7 @@ const MAIN = [
 const WORKFORCE = [
   ['AI Workforce', '/workforce', Users],
   ['Agent Runtime', '/agent-runtime', Cpu],
+  ['Agent Workspaces', '/agent-workspaces', Layers3],
   ['Agents', '/agents', Bot],
   ['Agent Builder', '/agent-builder', Hammer],
   ['Tasks', '/tasks', ListChecks],
