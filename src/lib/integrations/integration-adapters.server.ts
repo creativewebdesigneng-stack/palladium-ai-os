@@ -23,6 +23,12 @@ import {
 } from "./nango-capabilities.server";
 import { isSafeNangoProviderId } from "./nango-providers";
 import {
+  executeNativeShopifyAction,
+  hasNativeShopifyConnection,
+  listNativeShopifyCapabilities,
+  prepareNativeShopifyAction,
+} from "./shopify.server";
+import {
   getIntegrationAccessToken,
   getIntegrationProviderConfig,
   normaliseSalesforceInstanceUrl,
@@ -33,7 +39,7 @@ import {
 } from "./salesforce.server";
 
 export type IntegrationActionRisk = NangoActionRisk;
-export type IntegrationAdapterId = "direct_oauth" | "github_app" | "salesforce_oauth" | "nango";
+export type IntegrationAdapterId = "direct_oauth" | "github_app" | "salesforce_oauth" | "native_shopify" | "nango";
 
 export type AdapterCapability = {
   provider: string;
@@ -375,6 +381,46 @@ const salesforceOAuthAdapter: IntegrationAdapter = {
   },
 };
 
+const nativeShopifyAdapter: IntegrationAdapter = {
+  id: "native_shopify",
+  lane: "direct_api",
+  supportsProvider: (provider) => provider === "shopify",
+  async listCapabilities(userId, provider) {
+    if (provider && provider !== "shopify") return [];
+    return listNativeShopifyCapabilities(userId);
+  },
+  async isAvailable(userId, provider, action) {
+    if (provider !== "shopify" || !(await hasNativeShopifyConnection(userId))) return false;
+    const capabilities = await listNativeShopifyCapabilities(userId);
+    return capabilities.some((item) => item.action === action);
+  },
+  async prepare(input) {
+    if (input.provider !== "shopify") {
+      throw new Error(`No native Shopify adapter is registered for ${input.provider}.`);
+    }
+    return prepareNativeShopifyAction(input);
+  },
+  async execute(input) {
+    try {
+      const outcome = await executeNativeShopifyAction(input);
+      if (outcome.ok) return { ok: true, result: outcome.result };
+      return {
+        ok: false,
+        error: outcome.error ?? "Native Shopify execution failed.",
+        failurePhase: "post_dispatch",
+        safeToFailover: false,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Native Shopify execution failed.",
+        failurePhase: "pre_dispatch",
+        safeToFailover: true,
+      };
+    }
+  },
+};
+
 const nangoAdapter: IntegrationAdapter = {
   id: "nango",
   lane: "connector_transport",
@@ -420,6 +466,7 @@ const ADAPTERS: readonly IntegrationAdapter[] = [
   directOAuthAdapter,
   githubAppAdapter,
   salesforceOAuthAdapter,
+  nativeShopifyAdapter,
   nangoAdapter,
 ];
 
