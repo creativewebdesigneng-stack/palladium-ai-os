@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+function safePublicUrl(value, fallback = "#") {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : fallback;
+  } catch { return fallback; }
+}
+
 function resolveValue(value) {
   if (typeof value !== "string") return value;
   return value.startsWith("{{") ? "" : value;
@@ -23,9 +30,9 @@ function Widget({ widget }) {
     case "textarea": node = <textarea className={common} placeholder={String(props.placeholder || label)} />; break;
     case "select": node = <select className={common}><option>{String(props.placeholder || "Select an option")}</option></select>; break;
     case "checkbox": node = <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" />{label}</label>; break;
-    case "image": node = props.src ? <img src={String(props.src)} alt={String(props.alt || widget.name)} className="h-full w-full rounded-lg object-cover" /> : <div className="grid h-full place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">Image</div>; break;
+    case "image": node = props.src ? <img src={safePublicUrl(props.src, "")} alt={String(props.alt || widget.name)} className="h-full w-full rounded-lg object-cover" /> : <div className="grid h-full place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">Image</div>; break;
     case "divider": node = <hr className="border-slate-200" />; break;
-    case "link": node = <a href={String(props.href || "#")} className="text-sm text-indigo-600 underline">{label || text}</a>; break;
+    case "link": node = <a href={safePublicUrl(props.href)} className="text-sm text-indigo-600 underline">{label || text}</a>; break;
     case "stat": node = <div><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="text-3xl font-semibold text-slate-900">{String(resolveValue(props.value) || "—")}</p></div>; break;
     case "table": node = <div className="overflow-hidden rounded-lg border border-slate-200"><div className="bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">{label || "Table"}</div><div className="p-4 text-center text-sm text-slate-400">No data loaded</div></div>; break;
     case "container":
