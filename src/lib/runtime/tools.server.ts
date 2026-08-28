@@ -11,13 +11,21 @@ import {
   SKILL_SCRIPT_TOOL_DEF,
   runSkillScriptTool,
 } from "./agent-skills/skill-script-tool.server";
+import {
+  APP_STUDIO_TOOL_DEF,
+  runAppStudioTool,
+} from "@/lib/app-studio/app-studio-agent-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
 export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script"];
 export const TOOL_MANIFEST = [
-  ...CORE_TOOL_MANIFEST,
+  ...CORE_TOOL_MANIFEST.map((tool) =>
+    tool.slug === "app_studio"
+      ? { ...tool, description: APP_STUDIO_TOOL_DEF.description }
+      : tool,
+  ),
   {
     slug: "skill_script",
     description: SKILL_SCRIPT_TOOL_DEF.description,
@@ -44,7 +52,14 @@ export async function resolveGrantedTools(
 ): Promise<{ defs: ToolDef[]; grants: Map<string, ToolGrant> }> {
   const core = await resolveCoreGrantedTools(sb, agent, plan);
   const allowedTools = new Set(agent.allowed_tools ?? []);
-  if (!allowedTools.has("skill_script")) return core;
+  if (!allowedTools.has("skill_script")) {
+    return {
+      defs: core.defs.map((definition) =>
+        definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition,
+      ),
+      grants: core.grants,
+    };
+  }
 
   const [{ data: permissions }, { data: catalogue }] = await Promise.all([
     sb
@@ -58,16 +73,35 @@ export async function resolveGrantedTools(
   ]);
 
   const entry = (catalogue ?? []).find((row: any) => row.slug === "skill_script");
-  if (entry?.is_active === false) return core;
+  if (entry?.is_active === false) {
+    return {
+      defs: core.defs.map((definition) =>
+        definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition,
+      ),
+      grants: core.grants,
+    };
+  }
   if (entry?.min_plan && (PLAN_RANK[plan] ?? 0) < (PLAN_RANK[String(entry.min_plan)] ?? 0)) {
-    return core;
+    return {
+      defs: core.defs.map((definition) =>
+        definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition,
+      ),
+      grants: core.grants,
+    };
   }
 
   const rows = (permissions ?? []).filter((row: any) => row.tool === "skill_script");
   const permission =
     rows.find((row: any) => row.agent_id === agent.id) ??
     rows.find((row: any) => !row.agent_id);
-  if (permission?.enabled === false) return core;
+  if (permission?.enabled === false) {
+    return {
+      defs: core.defs.map((definition) =>
+        definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition,
+      ),
+      grants: core.grants,
+    };
+  }
 
   const grants = new Map(core.grants);
   grants.set("skill_script", {
@@ -79,7 +113,15 @@ export async function resolveGrantedTools(
     allowedDomains: [],
     spendCap: null,
   });
-  return { defs: [...core.defs, SKILL_SCRIPT_TOOL_DEF], grants };
+  return {
+    defs: [
+      ...core.defs.map((definition) =>
+        definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition,
+      ),
+      SKILL_SCRIPT_TOOL_DEF,
+    ],
+    grants,
+  };
 }
 
 function inputMetadata(input: Record<string, unknown>): Record<string, unknown> {
@@ -106,8 +148,8 @@ function outputMetadata(output: unknown): unknown {
 }
 
 /**
- * Skill execution has one narrow wrapper entry point; every recipe step is sent
- * back through this function and therefore through the unchanged core executor.
+ * Skill execution and App Studio's expanded draft builder use narrow wrapper
+ * entry points. Every other tool is sent through the unchanged core executor.
  */
 export async function executeTool(
   name: string,
@@ -115,9 +157,11 @@ export async function executeTool(
   ctx: ToolContext,
   grants: Map<string, ToolGrant>,
 ): Promise<{ ok: boolean; output: unknown }> {
-  if (name !== "skill_script") return executeCoreTool(name, input, ctx, grants);
+  if (name !== "skill_script" && name !== "app_studio") {
+    return executeCoreTool(name, input, ctx, grants);
+  }
 
-  const grant = grants.get("skill_script");
+  const grant = grants.get(name);
   const started = Date.now();
   const log = async (
     status: "succeeded" | "failed" | "cancelled",
@@ -128,7 +172,7 @@ export async function executeTool(
       org_id: ctx.orgId,
       agent_id: ctx.agentId,
       agent_task_id: ctx.taskId || null,
-      tool: "skill_script",
+      tool: name,
       input: inputMetadata(input),
       status,
       duration_ms: Date.now() - started,
@@ -138,10 +182,10 @@ export async function executeTool(
 
   if (!grant) {
     await log("failed", { error: "Tool not enabled for this agent." });
-    return { ok: false, output: { error: 'Tool "skill_script" is not enabled for this agent.' } };
+    return { ok: false, output: { error: `Tool "${name}" is not enabled for this agent.` } };
   }
 
-  const harness = assertHarnessToolInput("skill_script", input, grant.allowedDomains);
+  const harness = assertHarnessToolInput(name, input, grant.allowedDomains);
   if (harness.decision === "deny") {
     await log("failed", { error: harness.reason, policy_code: harness.code });
     return {
@@ -150,17 +194,35 @@ export async function executeTool(
     };
   }
 
+  if (name === "app_studio" && grant.requiresApproval) {
+    await log("failed", { error: "App Studio draft editing requires explicit approval under this agent policy." });
+    return {
+      ok: false,
+      output: {
+        error: "App Studio is configured to require explicit operator approval for this agent.",
+        requires_approval: true,
+        suggested_tool: "request_approval",
+      },
+    };
+  }
+
   try {
-    const output = await runSkillScriptTool(input, {
-      ...ctx,
-      allowedDomains: [],
-      spendCap: null,
-      requiresApproval: false,
-    });
+    const output = name === "skill_script"
+      ? await runSkillScriptTool(input, {
+          ...ctx,
+          allowedDomains: [],
+          spendCap: null,
+          requiresApproval: false,
+        })
+      : await runAppStudioTool(input, {
+          userId: ctx.userId,
+          orgId: ctx.orgId,
+          sb: ctx.sb,
+        });
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Skill tool execution failed.";
+    const message = error instanceof Error ? error.message : `${name} tool execution failed.`;
     await log("failed", { error: message.slice(0, 500) });
     return { ok: false, output: { error: message.slice(0, 300) } };
   }
