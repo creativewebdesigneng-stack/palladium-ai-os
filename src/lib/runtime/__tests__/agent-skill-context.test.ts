@@ -13,6 +13,7 @@ describe("progressive agent skill context", () => {
           description: "Review Shopify orders and daily store operations",
           version: "1.0.0",
           requires_tools: ["integration_action"],
+          requires_scripts: ["daily-report.json"],
           dangerous: false,
           body: "Review open Shopify orders, then prepare the daily operations report.",
           enabled: true,
@@ -26,6 +27,7 @@ describe("progressive agent skill context", () => {
           description: "Triage GitHub repositories and issues",
           version: "1.0.0",
           requires_tools: ["connected_service"],
+          requires_scripts: [],
           dangerous: false,
           body: "Read repository status and prioritize issues.",
           enabled: true,
@@ -44,9 +46,12 @@ describe("progressive agent skill context", () => {
 
     expect(context.index.map((skill) => skill.name)).toEqual(["shopify-daily-ops", "github-triage"]);
     expect(context.selected.map((skill) => skill.name)).toEqual(["shopify-daily-ops"]);
+    expect(context.selected[0]?.requiresScripts).toEqual(["daily-report.json"]);
     const prompt = renderProgressiveSkillPrompt(context);
     expect(prompt).toContain("Available reusable skills");
     expect(prompt).toContain("Review open Shopify orders");
+    expect(prompt).toContain("daily-report.json");
+    expect(prompt).toContain("Use skill_script");
     expect(prompt).not.toContain("Read repository status");
   });
 
@@ -60,6 +65,7 @@ describe("progressive agent skill context", () => {
           description: "Dangerous helper",
           version: "1",
           requires_tools: [],
+          requires_scripts: [],
           dangerous: true,
           body: "Do unsafe things",
           enabled: true,
@@ -73,6 +79,7 @@ describe("progressive agent skill context", () => {
           description: "Browser automation helper",
           version: "1",
           requires_tools: ["browser_task"],
+          requires_scripts: [],
           dangerous: false,
           body: "Use browser automation.",
           enabled: true,
