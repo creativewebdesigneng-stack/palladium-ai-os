@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Blocks, Globe, ScrollText, Plug } from 'lucide-react';
+import { Blocks, Globe, ScrollText, Plug, AppWindow } from 'lucide-react';
 import { listIntegrations, startIntegrationOAuth, disconnectIntegration as disconnectIntegrationFn } from '@/lib/integrations/integrations.functions';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/AuthContext';
@@ -9,12 +9,14 @@ import ToolsTab from '@/components/tools-framework/ToolsTab';
 import IntegrationsTab from '@/components/tools-framework/IntegrationsTab';
 import BrowserPolicyPanel, { ExecutionLog } from '@/components/tools-framework/BrowserPolicyPanel';
 import { getToolFramework, saveToolPermission, runToolManually } from '@/lib/tools/tools.functions';
+import AppStudioPanel from '@/components/tools-framework/AppStudioPanel';
 
 const TABS = [
   { id: 'tools', label: 'Tools', icon: Blocks },
   { id: 'policy', label: 'Browser & domains', icon: Globe },
   { id: 'executions', label: 'Execution log', icon: ScrollText },
   { id: 'integrations', label: 'Integrations', icon: Plug },
+  { id: 'app-studio', label: 'App Studio', icon: AppWindow },
 ];
 
 const PLAN_LABEL = { explorer: 'free', builder: 'pro', business: 'business', enterprise: 'enterprise' };
@@ -157,6 +159,7 @@ export default function ToolsFramework() {
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
       {tab === 'integrations' && <IntegrationsTab catalogue={integrationCatalogue} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}
+      {tab === 'app-studio' && <AppStudioPanel toast={toast} />}
     </div>
   );
 }
