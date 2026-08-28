@@ -12,6 +12,7 @@ import {
   saveStudioWidget,
   runStudioQuery,
 } from "@/lib/app-studio/app-studio.functions";
+import { publishExistingStudioRelease } from "@/lib/app-studio/app-studio-release.functions";
 
 const WIDGETS = ["container","text","button","input","textarea","select","checkbox","table","list","image","form","chart","stat","tabs","modal","divider","link"];
 const DATASOURCE_PROVIDERS = ["rest", "graphql", "mcp", "integration"];
@@ -154,6 +155,11 @@ export default function AppStudioPanel({ toast }) {
     publish ? "Application published" : "Version saved",
   );
 
+  const activateRelease = (item) => act(
+    () => publishExistingStudioRelease({ data: { appId: selectedId, releaseId: item.id } }),
+    `Version ${item.version} is now live`,
+  );
+
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="Tool Framework" title="App Studio" description="Build real data-connected websites, internal tools and dashboards with pages, components, bindings, queries, environments and versioned releases." />
@@ -233,6 +239,14 @@ export default function AppStudioPanel({ toast }) {
             <button onClick={addQuery} disabled={busy || !selectedDatasource} className="mt-2 w-full rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 disabled:opacity-40">Add query</button>
             <div className="mt-3 space-y-1">{document?.queries?.map((query) => <button key={query.id} onClick={() => testQuery(query)} className="flex w-full items-center justify-between rounded-lg bg-white/[.03] px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-white/[.06]"><span>{query.name} · {query.operation}</span><span>Run</span></button>)}</div>
             {queryResult && <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-black/40 p-2 text-[10px] text-emerald-300">{JSON.stringify(queryResult, null, 2)}</pre>}
+          </div>
+          <div className="pglass rounded-2xl p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">Versions</p>
+            <div className="space-y-1.5">{document?.releases?.slice(0, 8).map((item) => {
+              const live = document.app.published_release_id === item.id;
+              return <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[.03] px-2.5 py-2 text-[11px]"><div className="min-w-0"><p className="text-zinc-300">v{item.version} · {item.status}</p><p className="truncate text-[10px] text-zinc-600">{item.notes || "No release note"}</p></div>{live ? <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300">Live</span> : <button onClick={() => activateRelease(item)} disabled={busy} className="shrink-0 rounded-md border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5 disabled:opacity-40">Make live</button>}</div>;
+            })}{!document?.releases?.length && <p className="text-[11px] text-zinc-600">Save a version to start release history.</p>}</div>
+            <p className="mt-2 text-[10px] leading-4 text-zinc-600">Making an older version live repoints the public route to its immutable snapshot; it does not copy credentials or rewrite the current draft.</p>
           </div>
           <div className="pglass rounded-2xl p-4 text-xs text-zinc-500">
             <p className="flex items-center gap-2 font-medium text-zinc-300"><Workflow className="h-4 w-4" />Safe execution</p>
