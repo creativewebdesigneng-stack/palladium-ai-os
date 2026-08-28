@@ -3,7 +3,7 @@ import {
   Home, FolderKanban, Users, Bot, ListChecks, Workflow, Files, BookOpen, Rocket,
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
-  Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock,
+  Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -38,6 +38,7 @@ const BUSINESS = [
   ['Business Intelligence', '/business-intelligence', LineChart],
   ['Finance', '/finance', Banknote],
   ['CRM', '/crm', Contact],
+  ['WhatsApp CRM', '/whatsapp-crm', MessageCircle],
   ['Marketing', '/marketing', Megaphone],
   ['Social Operations', '/social-operations', CalendarClock],
 ];
