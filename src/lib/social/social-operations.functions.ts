@@ -164,7 +164,18 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
   .inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const capabilities = await listIntegrationCapabilities(context.userId);
-    return capabilities.filter((item) => SOCIAL_PROVIDERS.has(normalizeIntegrationProvider(item.provider)));
+    return capabilities
+      .filter((item) => SOCIAL_PROVIDERS.has(normalizeIntegrationProvider(item.provider)))
+      .map((item) => ({
+        provider: normalizeIntegrationProvider(item.provider),
+        action: item.action,
+        description: item.description,
+        risk: item.risk,
+        requiresApproval: item.requiresApproval,
+        deployed: item.deployed,
+        transport: item.transport,
+        lane: item.lane,
+      }));
   });
 
 export const addSocialPostTarget = createServerFn({ method: "POST" })
@@ -214,8 +225,19 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
         },
         { onConflict: "post_id,provider,action" },
       )
-      .select("*")
+      .select("id,post_id,provider,action,transport,status,published_at,published_url,last_error,metrics,created_at,updated_at")
       .single();
     if (error) throw error;
-    return { target, capability: prepared };
+    return {
+      target,
+      capability: {
+        provider: prepared.provider,
+        action: prepared.action,
+        description: prepared.description,
+        risk: prepared.risk,
+        requiresApproval: prepared.requiresApproval,
+        transport: prepared.transport,
+        lane: prepared.lane,
+      },
+    };
   });
