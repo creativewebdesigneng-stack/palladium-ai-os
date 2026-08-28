@@ -9,6 +9,7 @@ const framework = readFileSync(fileURLToPath(new URL("../../../screens/ToolsFram
 const queryRuntime = readFileSync(fileURLToPath(new URL("../app-studio-query.server.ts", import.meta.url)), "utf8");
 const runtimeTools = readFileSync(fileURLToPath(new URL("../../runtime/tools-core.server.ts", import.meta.url)), "utf8");
 const published = readFileSync(fileURLToPath(new URL("../../../screens/PublishedStudioApp.jsx", import.meta.url)), "utf8");
+const publicRpc = migration.slice(migration.indexOf("create or replace function public.get_published_app_studio_release"));
 
 describe("App Studio production contract", () => {
   it("uses owner-scoped persisted documents instead of mock application state", () => {
