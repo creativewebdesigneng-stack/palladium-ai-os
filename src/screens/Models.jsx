@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Link } from 'react-router-dom';
 import { Bot, CheckCircle2, Cpu, KeyRound, Loader2, Search, Server, ShieldCheck, XCircle } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import DeepSeekRuntimePanel from '@/components/models/DeepSeekRuntimePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
@@ -68,6 +69,8 @@ export default function Models() {
         <Metric icon={Cpu} label="Recent runs" value={totals.recentRuns} />
         <Metric icon={KeyRound} label="Recent model cost" value={moneyFromPence(totals.recentCostPence)} />
       </div>
+
+      <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
 
       <section className="mb-6">
         <div className="mb-3">
