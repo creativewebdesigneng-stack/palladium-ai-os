@@ -20,6 +20,7 @@ import {
 } from "@/lib/mcp/agent-mcp-integration-bridge.server";
 import { GITHUB_WRITE_TOOL_DEF, runGitHubWriteTool } from "./github-write-tool.server";
 import { BROWSER_TASK_TOOL_DEF, runBrowserTaskTool } from "./browser-task-tool.server";
+import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
 import {
   createBrowserTool,
   isDomainAllowed,
@@ -1380,7 +1381,7 @@ const REGISTRY: Record<string, ToolImpl> = {
           app_id: appId, page_id: pageId, user_id: ctx.userId, widget_type: widgetType,
           name: str(input["name"], widgetType).slice(0, 120),
           position: object(input["position"]), properties: object(input["properties"]),
-          bindings: object(input["bindings"]), events: object(input["events"]),
+          bindings: validateStudioBindings(object(input["bindings"])), events: validateStudioEvents(object(input["events"])),
         }).select("id,name,widget_type,position").maybeSingle();
         return widget.error || !widget.data ? { error: "The component could not be created." } : { widget: widget.data };
       }
