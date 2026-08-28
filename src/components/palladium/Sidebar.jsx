@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3,
+  FileText, Layers3, Search,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -44,6 +44,7 @@ const BUSINESS = [
   ['CRM', '/crm', Contact],
   ['WhatsApp CRM', '/whatsapp-crm', MessageCircle],
   ['Marketing', '/marketing', Megaphone],
+  ['SEO Studio', '/seo-studio', Search],
   ['Social Operations', '/social-operations', CalendarClock],
 ];
 
