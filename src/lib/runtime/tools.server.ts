@@ -13,14 +13,15 @@ import {
 } from "./agent-skills/skill-script-tool.server";
 import { SOCIAL_OPS_TOOL_DEF, runSocialOpsTool } from "@/lib/social/social-agent-tool.server";
 import { HTML_STUDIO_TOOL_DEF, runHtmlStudioTool } from "@/lib/html-studio/html-studio-agent-tool.server";
+import { AGENT_WORKSPACE_TOOL_DEF, runAgentWorkspaceTool } from "@/lib/workspaces/agent-workspace-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
-const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF] as const;
+const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF] as const;
 const LOCAL_TOOL_NAMES = new Set<string>(LOCAL_TOOL_DEFS.map((item) => item.name));
 
-export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio"];
+export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace"];
 export const TOOL_MANIFEST = [
   ...CORE_TOOL_MANIFEST,
   {
@@ -36,6 +37,11 @@ export const TOOL_MANIFEST = [
   {
     slug: "html_studio",
     description: HTML_STUDIO_TOOL_DEF.description,
+    sensitive: false,
+  },
+  {
+    slug: "agent_workspace",
+    description: AGENT_WORKSPACE_TOOL_DEF.description,
     sensitive: false,
   },
 ];
@@ -160,7 +166,9 @@ export async function executeTool(
       ? await runSkillScriptTool(input, localCtx)
       : name === "social_ops"
         ? await runSocialOpsTool(input, localCtx)
-        : await runHtmlStudioTool(input, localCtx);
+        : name === "html_studio"
+          ? await runHtmlStudioTool(input, localCtx)
+          : await runAgentWorkspaceTool(input, localCtx);
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
