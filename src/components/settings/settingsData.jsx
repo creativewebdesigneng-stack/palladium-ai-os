@@ -9,6 +9,7 @@ export const SECTIONS = [
   { id: 'notifications', label: 'Notifications', icon: 'Bell' },
   { id: 'privacy', label: 'Privacy', icon: 'Lock' },
   { id: 'security', label: 'Security', icon: 'ShieldCheck' },
+  { id: 'browser', label: 'Browser Automation', icon: 'Bot' },
   { id: 'connected', label: 'Connected Accounts', icon: 'Link2' },
   { id: 'apikeys', label: 'API Keys', icon: 'KeyRound' },
   { id: 'developer', label: 'Developer Settings', icon: 'Code2' },

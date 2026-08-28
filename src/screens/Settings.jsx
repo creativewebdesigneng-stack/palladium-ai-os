@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2, Search } from 'lucide-react';
+import { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2, Search, Bot } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ProfileSection from '@/components/settings/ProfileSection';
 import AccountSection from '@/components/settings/AccountSection';
@@ -8,12 +8,13 @@ import AIPreferencesSection from '@/components/settings/AIPreferencesSection';
 import NotificationsSection from '@/components/settings/NotificationsSection';
 import PrivacySection from '@/components/settings/PrivacySection';
 import SecuritySection from '@/components/settings/SecuritySection';
+import BrowserAutomationSection from '@/components/settings/BrowserAutomationSection';
 import ConnectedAccountsSection from '@/components/settings/ConnectedAccountsSection';
 import APIKeysSection from '@/components/settings/APIKeysSection';
 import DeveloperSection from '@/components/settings/DeveloperSection';
 import { SECTIONS } from '@/components/settings/settingsData';
 
-const ICONS = { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2 };
+const ICONS = { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2, Bot };
 
 export default function Settings() {
   const [active, setActive] = useState('profile');
@@ -34,6 +35,7 @@ export default function Settings() {
       case 'notifications': return <NotificationsSection />;
       case 'privacy': return <PrivacySection />;
       case 'security': return <SecuritySection />;
+      case 'browser': return <BrowserAutomationSection />;
       case 'connected': return <ConnectedAccountsSection />;
       case 'apikeys': return <APIKeysSection />;
       case 'developer': return <DeveloperSection />;
