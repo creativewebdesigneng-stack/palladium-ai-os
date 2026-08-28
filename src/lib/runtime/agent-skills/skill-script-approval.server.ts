@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   loadOwnedSkillScript,
+  normalizeSkillScriptParams,
   runLoadedSkillScript,
   type SkillScriptExecutor,
   type SkillScriptRecipe,
@@ -14,7 +15,7 @@ export type SkillScriptApprovalDetails = {
   skill_name: string;
   skill_version: string;
   script: string;
-  params: Record<string, unknown>;
+  params: Record<string, string | number | boolean | null>;
   fingerprint: string;
 };
 
@@ -63,9 +64,16 @@ function parseDetails(value: unknown): SkillScriptApprovalDetails | null {
   const fingerprint = typeof row["fingerprint"] === "string" && HEX_64.test(row["fingerprint"])
     ? row["fingerprint"]
     : "";
-  const params = row["params"] && typeof row["params"] === "object" && !Array.isArray(row["params"])
-    ? (row["params"] as Record<string, unknown>)
-    : {};
+  let params: Record<string, string | number | boolean | null>;
+  try {
+    params = normalizeSkillScriptParams(
+      row["params"] && typeof row["params"] === "object" && !Array.isArray(row["params"])
+        ? (row["params"] as Record<string, unknown>)
+        : {},
+    );
+  } catch {
+    return null;
+  }
   if (!skill_id || !skill_name || !skill_version || !script || !fingerprint) return null;
   return { kind: "agent_skill_script", skill_id, skill_name, skill_version, script, params, fingerprint };
 }
@@ -86,10 +94,7 @@ export async function queueSkillScriptApproval(args: {
     skillId: args.skillId,
     script: args.script,
   });
-  // runLoadedSkillScript performs the same strict parameter validation before
-  // execution. We validate without invoking any tool here by using an empty
-  // recipe, preserving one validation implementation without side effects.
-  const params = args.params ?? {};
+  const params = normalizeSkillScriptParams(args.params);
   const fingerprint = skillScriptFingerprint({
     skillId: loaded.skill.id,
     skillVersion: loaded.skill.version,
