@@ -9,7 +9,7 @@ describe("App Studio binding policy", () => {
 
   it("rejects arbitrary JavaScript and unsupported side effects", () => {
     expect(() => validateStudioBindings({ text: "{{ globalThis.fetch('https://bad.test') }}" })).toThrow(/arbitrary JavaScript/);
-    expect(() => validateStudioBindings({ text: "{{ queries.x.data.constructor }}" })).not.toThrow();
+    expect(() => validateStudioBindings({ text: "{{ queries.x.data.constructor }}" })).toThrow(/arbitrary JavaScript/);
     expect(() => validateStudioEvents({ onClick: { type: "eval", value: "alert(1)" } })).toThrow(/not supported/);
     expect(() => validateStudioEvents({ onclick: { type: "navigate" } })).toThrow(/event name/);
   });
