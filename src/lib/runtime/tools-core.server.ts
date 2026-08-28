@@ -1301,6 +1301,92 @@ const REGISTRY: Record<string, ToolImpl> = {
       }
     },
   },
+  app_studio: {
+    def: {
+      name: "app_studio",
+      description:
+        "Create and edit draft low-code applications in PalladiumAI App Studio. Supports listing apps, creating apps, adding pages and adding components. Publishing is operator-controlled in Tool Framework.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["list_apps", "create_app", "add_page", "add_widget"] },
+          app_id: { type: "string" },
+          page_id: { type: "string" },
+          name: { type: "string" },
+          slug: { type: "string" },
+          widget_type: {
+            type: "string",
+            enum: ["container","text","button","input","textarea","select","checkbox","table","list","image","form","chart","stat","tabs","modal","divider","link"],
+          },
+          properties: { type: "object" },
+          bindings: { type: "object" },
+          events: { type: "object" },
+          position: { type: "object" },
+        },
+        required: ["action"],
+      },
+    },
+    run: async (input, ctx) => {
+      const action = str(input["action"]);
+      const cleanSlug = (value: unknown) =>
+        str(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+      if (action === "list_apps") {
+        const result = await ctx.sb.from("app_studio_apps")
+          .select("id,name,slug,application_type,status,updated_at")
+          .eq("user_id", ctx.userId).order("updated_at", { ascending: false }).limit(50);
+        return result.error ? { error: "App Studio applications could not be loaded." } : { apps: result.data ?? [] };
+      }
+      if (action === "create_app") {
+        const name = str(input["name"]).trim().slice(0, 120);
+        const slug = cleanSlug(input["slug"] || name);
+        if (!name || !slug) return { error: "A valid application name is required." };
+        const app = await ctx.sb.from("app_studio_apps").insert({
+          user_id: ctx.userId, org_id: ctx.orgId, name, slug, application_type: "web", status: "draft",
+        }).select("id,name,slug,status").maybeSingle();
+        if (app.error || !app.data) return { error: "The draft application could not be created." };
+        const page = await ctx.sb.from("app_studio_pages").insert({
+          app_id: app.data.id, user_id: ctx.userId, name: "Home", slug: "home", is_home: true, position: 0,
+        }).select("id,name,slug").maybeSingle();
+        if (page.error || !page.data) {
+          await ctx.sb.from("app_studio_apps").delete().eq("id", app.data.id).eq("user_id", ctx.userId);
+          return { error: "The application home page could not be created." };
+        }
+        return { app: app.data, page: page.data, draft: true };
+      }
+      const appId = str(input["app_id"]);
+      if (!appId) return { error: "app_id is required." };
+      const app = await ctx.sb.from("app_studio_apps").select("id").eq("id", appId).eq("user_id", ctx.userId).maybeSingle();
+      if (!app.data) return { error: "That App Studio application is unavailable." };
+      if (action === "add_page") {
+        const name = str(input["name"]).trim().slice(0, 120);
+        const slug = cleanSlug(input["slug"] || name);
+        if (!name || !slug) return { error: "A valid page name is required." };
+        const count = await ctx.sb.from("app_studio_pages").select("id", { count: "exact", head: true }).eq("app_id", appId).eq("user_id", ctx.userId);
+        const page = await ctx.sb.from("app_studio_pages").insert({
+          app_id: appId, user_id: ctx.userId, name, slug, is_home: false,
+          layout: { type: "canvas", version: 1 }, position: count.count ?? 0,
+        }).select("id,name,slug,position").maybeSingle();
+        return page.error || !page.data ? { error: "The page could not be created." } : { page: page.data };
+      }
+      if (action === "add_widget") {
+        const pageId = str(input["page_id"]);
+        const widgetType = str(input["widget_type"]);
+        const supported = ["container","text","button","input","textarea","select","checkbox","table","list","image","form","chart","stat","tabs","modal","divider","link"];
+        if (!pageId || !supported.includes(widgetType)) return { error: "A valid page_id and widget_type are required." };
+        const page = await ctx.sb.from("app_studio_pages").select("id").eq("id", pageId).eq("app_id", appId).eq("user_id", ctx.userId).maybeSingle();
+        if (!page.data) return { error: "That App Studio page is unavailable." };
+        const object = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        const widget = await ctx.sb.from("app_studio_widgets").insert({
+          app_id: appId, page_id: pageId, user_id: ctx.userId, widget_type: widgetType,
+          name: str(input["name"], widgetType).slice(0, 120),
+          position: object(input["position"]), properties: object(input["properties"]),
+          bindings: object(input["bindings"]), events: object(input["events"]),
+        }).select("id,name,widget_type,position").maybeSingle();
+        return widget.error || !widget.data ? { error: "The component could not be created." } : { widget: widget.data };
+      }
+      return { error: "Unsupported App Studio action." };
+    },
+  },
 };
 
 REGISTRY["browser_task"] = {
