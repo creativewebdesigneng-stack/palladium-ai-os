@@ -46,7 +46,7 @@ function cleanScriptName(value: unknown): string {
   return value;
 }
 
-function safeParams(raw: Record<string, unknown> | undefined): Record<string, string | number | boolean | null> {
+export function normalizeSkillScriptParams(raw: Record<string, unknown> | undefined): Record<string, string | number | boolean | null> {
   const entries = Object.entries(raw ?? {});
   if (entries.length > MAX_PARAMS) throw new Error(`Skill script accepts at most ${MAX_PARAMS} parameters.`);
   const out: Record<string, string | number | boolean | null> = {};
@@ -143,7 +143,7 @@ export async function runLoadedSkillScript(args: {
   params?: Record<string, unknown>;
   execute: SkillScriptExecutor;
 }) {
-  const params = safeParams(args.params);
+  const params = normalizeSkillScriptParams(args.params);
   const results: Array<{ tool: string; ok: boolean; output: unknown }> = [];
   for (const step of args.recipe.steps) {
     const input = materialize(step.input, params) as Record<string, unknown>;
