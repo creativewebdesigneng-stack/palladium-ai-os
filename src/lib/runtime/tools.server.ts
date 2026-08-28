@@ -43,6 +43,8 @@ export async function resolveGrantedTools(
   plan: string = "explorer",
 ): Promise<{ defs: ToolDef[]; grants: Map<string, ToolGrant> }> {
   const core = await resolveCoreGrantedTools(sb, agent, plan);
+  const allowedTools = new Set(agent.allowed_tools ?? []);
+  if (!allowedTools.has("skill_script")) return core;
 
   const [{ data: permissions }, { data: catalogue }] = await Promise.all([
     sb
