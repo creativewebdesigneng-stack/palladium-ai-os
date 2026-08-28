@@ -3,7 +3,10 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ingestDocument } from "@/lib/memory/memory.server";
 
-type Sb = { from: (table: string) => any };
+type Sb = {
+  from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
+};
 
 const workspaceInput = z.object({
   id: z.string().uuid().optional(),
