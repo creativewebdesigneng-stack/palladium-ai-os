@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sealBrowserSecret } from "./browser-credentials.server";
+import { asBrowserDatabase } from "./browser-database.types";
 
 const text = (value: unknown, max = 500) =>
   (typeof value === "string" ? value.trim() : "").slice(0, max);
@@ -25,7 +26,8 @@ export const listBrowserCredentials = createServerFn({ method: "POST" })
     domain: input?.domain ? cleanDomain(input.domain) : null,
   }))
   .handler(async ({ data, context }) => {
-    let query = context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    let query = db
       .from("browser_credentials")
       .select("id,name,domain,totp_identifier,created_at,updated_at,last_used_at,username_ciphertext,password_ciphertext,totp_secret_ciphertext")
       .eq("user_id", context.userId)
@@ -35,7 +37,7 @@ export const listBrowserCredentials = createServerFn({ method: "POST" })
     const { data: rows, error } = await query;
     if (error) throw new Error("Could not load browser credentials.");
     return {
-      credentials: (rows ?? []).map((row: any) => ({
+      credentials: (rows ?? []).map((row) => ({
         id: row.id,
         name: row.name,
         domain: row.domain,
@@ -64,7 +66,8 @@ export const createBrowserCredential = createServerFn({ method: "POST" })
     return { name, domain, username, password, totpSecret, totpIdentifier };
   })
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    const { data: row, error } = await db
       .from("browser_credentials")
       .insert({
         user_id: context.userId,
@@ -90,7 +93,7 @@ export const updateBrowserCredential = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, unknown>) => {
     const id = cleanId(input?.["id"], "Credential id");
-    const patch: Record<string, unknown> = {};
+    const patch: Record<string, string | null> = {};
     if (input?.["name"] !== undefined) {
       const name = text(input["name"], 120);
       if (!name) throw new Error("Credential name cannot be empty.");
@@ -115,7 +118,8 @@ export const updateBrowserCredential = createServerFn({ method: "POST" })
     return { id, patch };
   })
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    const { data: row, error } = await db
       .from("browser_credentials")
       .update(data.patch)
       .eq("id", data.id)
@@ -143,7 +147,8 @@ export const deleteBrowserCredential = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => ({ id: cleanId(input?.id, "Credential id") }))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    const { error } = await db
       .from("browser_credentials")
       .delete()
       .eq("id", data.id)
@@ -159,7 +164,8 @@ export const listBrowserArtifacts = createServerFn({ method: "POST" })
     limit: Math.min(Math.max(Number(input?.limit ?? 100), 1), 200),
   }))
   .handler(async ({ data, context }) => {
-    let query = context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    let query = db
       .from("browser_artifacts")
       .select("id,agent_id,task_id,kind,filename,mime_type,size_bytes,sha256,source_url,created_at")
       .eq("user_id", context.userId)
@@ -175,7 +181,8 @@ export const getBrowserArtifactUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => ({ id: cleanId(input?.id, "Artifact id") }))
   .handler(async ({ data, context }) => {
-    const { data: artifact, error } = await context.supabase
+    const db = asBrowserDatabase(context.supabase);
+    const { data: artifact, error } = await db
       .from("browser_artifacts")
       .select("id,filename,mime_type,size_bytes,storage_path")
       .eq("id", data.id)
