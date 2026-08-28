@@ -3,6 +3,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sealBrowserSecret } from "./browser-credentials.server";
 import { asBrowserDatabase } from "./browser-database.types";
 
+type BrowserCredentialPatch = {
+  name?: string;
+  domain?: string;
+  username_ciphertext?: string | null;
+  password_ciphertext?: string | null;
+  totp_secret_ciphertext?: string | null;
+  totp_identifier?: string | null;
+  updated_at?: string;
+};
+
 const text = (value: unknown, max = 500) =>
   (typeof value === "string" ? value.trim() : "").slice(0, max);
 
@@ -93,28 +103,28 @@ export const updateBrowserCredential = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, unknown>) => {
     const id = cleanId(input?.["id"], "Credential id");
-    const patch: Record<string, string | null> = {};
+    const patch: BrowserCredentialPatch = {};
     if (input?.["name"] !== undefined) {
       const name = text(input["name"], 120);
       if (!name) throw new Error("Credential name cannot be empty.");
-      patch["name"] = name;
+      patch.name = name;
     }
-    if (input?.["domain"] !== undefined) patch["domain"] = cleanDomain(input["domain"]);
+    if (input?.["domain"] !== undefined) patch.domain = cleanDomain(input["domain"]);
     if (input?.["username"] !== undefined) {
       const value = text(input["username"], 1000);
-      patch["username_ciphertext"] = value ? sealBrowserSecret(value) : null;
+      patch.username_ciphertext = value ? sealBrowserSecret(value) : null;
     }
     if (input?.["password"] !== undefined) {
       const value = text(input["password"], 4000);
-      patch["password_ciphertext"] = value ? sealBrowserSecret(value) : null;
+      patch.password_ciphertext = value ? sealBrowserSecret(value) : null;
     }
     if (input?.["totp_secret"] !== undefined) {
       const value = text(input["totp_secret"], 1000).replace(/\s+/g, "").toUpperCase();
-      patch["totp_secret_ciphertext"] = value ? sealBrowserSecret(value) : null;
+      patch.totp_secret_ciphertext = value ? sealBrowserSecret(value) : null;
     }
-    if (input?.["totp_identifier"] !== undefined) patch["totp_identifier"] = text(input["totp_identifier"], 300) || null;
+    if (input?.["totp_identifier"] !== undefined) patch.totp_identifier = text(input["totp_identifier"], 300) || null;
     if (!Object.keys(patch).length) throw new Error("No browser credential changes were provided.");
-    patch["updated_at"] = new Date().toISOString();
+    patch.updated_at = new Date().toISOString();
     return { id, patch };
   })
   .handler(async ({ data, context }) => {
