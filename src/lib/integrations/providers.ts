@@ -11,7 +11,7 @@
  */
 
 export type IntegrationCategory =
-  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email";
+  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email" | "ecommerce";
 
 export type IntegrationProvider = {
   id: string;
@@ -28,6 +28,7 @@ export type IntegrationProvider = {
   clientIdEnv: string;
   clientSecretEnv: string;
   /** Extra authorize params (offline access, consent prompts, provider-specific scope encoding, etc.). */
+  connectMode?: "standard_oauth" | "shopify_store";
   authorizeParams?: Record<string, string>;
   /** Provider endpoint used once after consent to label the connected account. */
   identity?: { url: string; labelKeys: string[] };
@@ -35,6 +36,20 @@ export type IntegrationProvider = {
 };
 
 export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
+  {
+    id: "shopify",
+    name: "Shopify",
+    category: "ecommerce",
+    summary: "Operate products, orders and inventory through Shopify's native Admin API, with connector transports available as fallbacks.",
+    scopes: ["write_products", "read_orders", "write_inventory", "read_locations"],
+    tools: ["integration_capabilities", "integration_action"],
+    authorizeUrl: "https://admin.shopify.com/",
+    tokenUrl: "https://shopify.dev/",
+    clientIdEnv: "SHOPIFY_CLIENT_ID",
+    clientSecretEnv: "SHOPIFY_CLIENT_SECRET",
+    connectMode: "shopify_store",
+    docsUrl: "https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant",
+  },
   {
     id: "google",
     name: "Google Workspace",
@@ -198,6 +213,7 @@ export const INTEGRATION_CATEGORY_LABELS: Record<IntegrationCategory, string> = 
   project_management: "Project management",
   calendar: "Calendar",
   email: "Email",
+  ecommerce: "E-commerce",
 };
 
 export function findProvider(id: string): IntegrationProvider | undefined {
