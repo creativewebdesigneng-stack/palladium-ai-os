@@ -66,12 +66,22 @@ function boundedCursor(input: Record<string, unknown>): string | undefined {
   return cursor;
 }
 
-function shopifyGid(value: unknown, type: "Product" | "Order"): string {
+function boundedBoolean(input: Record<string, unknown>, key: string, fallback = false): boolean {
+  const raw = input[key];
+  if (raw === undefined || raw === null) return fallback;
+  if (typeof raw !== "boolean") throw new Error(`${key} must be a boolean.`);
+  return raw;
+}
+
+type ShopifyGidType = "Product" | "Order" | "FulfillmentOrder" | "FulfillmentOrderLineItem";
+
+function shopifyGid(value: unknown, type: ShopifyGidType): string {
   const raw = typeof value === "string" ? value.trim() : String(value ?? "").trim();
   if (/^\d{1,24}$/.test(raw)) return `gid://shopify/${type}/${raw}`;
   const pattern = new RegExp(`^gid://shopify/${type}/\\d{1,24}$`);
   if (pattern.test(raw)) return raw;
-  throw new Error(`${type.toLowerCase()}_id must be a numeric ID or Shopify ${type} GID.`);
+  const key = type.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+  throw new Error(`${key}_id must be a numeric ID or Shopify ${type} GID.`);
 }
 
 function safeTags(input: Record<string, unknown>): string[] | undefined {
@@ -84,6 +94,53 @@ function safeTags(input: Record<string, unknown>): string[] | undefined {
     if (!tag || tag.length > 255) throw new Error(`tags[${index}] must be 1-255 characters.`);
     return tag;
   });
+}
+
+function safeFulfillmentLineItems(input: Record<string, unknown>) {
+  const raw = input["line_items"];
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 50) {
+    throw new Error("line_items must contain between 1 and 50 fulfillment-order line items.");
+  }
+  return raw.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`line_items[${index}] must be an object.`);
+    }
+    const row = item as Record<string, unknown>;
+    const allowed = new Set(["id", "quantity"]);
+    if (Object.keys(row).some((key) => !allowed.has(key))) {
+      throw new Error(`line_items[${index}] contains an unsupported field.`);
+    }
+    const quantity = Number(row["quantity"]);
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10_000) {
+      throw new Error(`line_items[${index}].quantity must be an integer between 1 and 10000.`);
+    }
+    return {
+      id: shopifyGid(row["id"], "FulfillmentOrderLineItem"),
+      quantity,
+    };
+  });
+}
+
+function safeTrackingInfo(input: Record<string, unknown>) {
+  const company = boundedString(input, "tracking_company", 100);
+  const number = boundedString(input, "tracking_number", 200);
+  const url = boundedString(input, "tracking_url", 2_000);
+  if (url) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error("tracking_url must be an absolute HTTPS URL.");
+    }
+    if (parsed.protocol !== "https:") throw new Error("tracking_url must use HTTPS.");
+  }
+  if (!company && !number && !url) return undefined;
+  return {
+    ...(company ? { company } : {}),
+    ...(number ? { number } : {}),
+    ...(url ? { url } : {}),
+  };
 }
 
 function assertNoCredentials(value: unknown) {
@@ -139,6 +196,29 @@ const PRODUCT_QUERY = `query PalladiumProduct($id: ID!) {
     variants(first: 50) { nodes { id title sku price inventoryQuantity inventoryItem { id tracked } } }
   }
 }`;
+const LOCATIONS_QUERY = `query PalladiumLocations($first: Int!, $after: String, $query: String, $includeInactive: Boolean!) {
+  locations(first: $first, after: $after, query: $query, includeInactive: $includeInactive) {
+    nodes {
+      id name isActive fulfillsOnlineOrders hasActiveInventory
+      address { address1 address2 city provinceCode countryCode zip }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+const FULFILLMENT_ORDERS_QUERY = `query PalladiumFulfillmentOrders($first: Int!, $after: String, $query: String, $includeClosed: Boolean!) {
+  fulfillmentOrders(first: $first, after: $after, query: $query, includeClosed: $includeClosed, sortKey: UPDATED_AT, reverse: true) {
+    nodes {
+      id status requestStatus createdAt updatedAt
+      assignedLocation { location { id name } }
+      order { id name }
+      destination { firstName lastName company city province countryCode zip }
+      lineItems(first: 50) {
+        nodes { id totalQuantity remainingQuantity lineItem { id name sku quantity } }
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
 const CREATE_PRODUCT = `mutation PalladiumCreateProduct($product: ProductCreateInput!) {
   productCreate(product: $product) {
     product { id title handle status vendor productType tags }
@@ -148,6 +228,12 @@ const CREATE_PRODUCT = `mutation PalladiumCreateProduct($product: ProductCreateI
 const UPDATE_PRODUCT = `mutation PalladiumUpdateProduct($product: ProductUpdateInput!) {
   productUpdate(product: $product) {
     product { id title handle status vendor productType tags updatedAt }
+    userErrors { field message }
+  }
+}`;
+const CREATE_FULFILLMENT = `mutation PalladiumCreateFulfillment($fulfillment: FulfillmentInput!, $message: String) {
+  fulfillmentCreate(fulfillment: $fulfillment, message: $message) {
+    fulfillment { id status createdAt updatedAt trackingInfo { company number url } }
     userErrors { field message }
   }
 }`;
@@ -212,6 +298,50 @@ const SHOPIFY_ACTIONS: readonly ShopifyActionDefinition[] = [
         first: boundedLimit(input),
         after: boundedCursor(input) ?? null,
         query: boundedString(input, "query", 300) ?? null,
+      });
+    },
+  },
+  {
+    provider: "shopify",
+    action: "shopify_locations_list",
+    description: "List Shopify inventory and fulfillment locations with bounded pagination and filtering.",
+    risk: "low",
+    requiresApproval: false,
+    deployed: true,
+    inputSchema: objectSchema({
+      limit: { type: "integer", minimum: 1, maximum: 50 },
+      after: { type: "string", maxLength: 2_000 },
+      query: { type: "string", maxLength: 300 },
+      include_inactive: { type: "boolean" },
+    }),
+    buildRequest(input) {
+      return graphQLRequest(LOCATIONS_QUERY, {
+        first: boundedLimit(input),
+        after: boundedCursor(input) ?? null,
+        query: boundedString(input, "query", 300) ?? null,
+        includeInactive: boundedBoolean(input, "include_inactive"),
+      });
+    },
+  },
+  {
+    provider: "shopify",
+    action: "shopify_fulfillment_orders_list",
+    description: "List Shopify fulfillment orders available to the connected app's granted fulfillment scopes.",
+    risk: "low",
+    requiresApproval: false,
+    deployed: true,
+    inputSchema: objectSchema({
+      limit: { type: "integer", minimum: 1, maximum: 50 },
+      after: { type: "string", maxLength: 2_000 },
+      query: { type: "string", maxLength: 300 },
+      include_closed: { type: "boolean" },
+    }),
+    buildRequest(input) {
+      return graphQLRequest(FULFILLMENT_ORDERS_QUERY, {
+        first: boundedLimit(input),
+        after: boundedCursor(input) ?? null,
+        query: boundedString(input, "query", 300) ?? null,
+        includeClosed: boundedBoolean(input, "include_closed"),
       });
     },
   },
@@ -286,6 +416,58 @@ const SHOPIFY_ACTIONS: readonly ShopifyActionDefinition[] = [
       if (tags !== undefined) product["tags"] = tags;
       if (Object.keys(product).length === 1) throw new Error("Provide at least one Shopify product field to update.");
       return graphQLRequest(UPDATE_PRODUCT, { product });
+    },
+  },
+  {
+    provider: "shopify",
+    action: "shopify_fulfillment_create",
+    description: "Create a Shopify fulfillment for one fulfillment order, optionally with bounded line items and tracking information.",
+    risk: "high",
+    requiresApproval: true,
+    deployed: true,
+    mutation: true,
+    inputSchema: objectSchema(
+      {
+        fulfillment_order_id: { type: "string", minLength: 1, maxLength: 100 },
+        line_items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 50,
+          items: objectSchema(
+            {
+              id: { type: "string", minLength: 1, maxLength: 120 },
+              quantity: { type: "integer", minimum: 1, maximum: 10_000 },
+            },
+            ["id", "quantity"],
+          ),
+        },
+        notify_customer: { type: "boolean" },
+        tracking_company: { type: "string", maxLength: 100 },
+        tracking_number: { type: "string", maxLength: 200 },
+        tracking_url: { type: "string", maxLength: 2_000 },
+        message: { type: "string", maxLength: 1_000 },
+      },
+      ["fulfillment_order_id"],
+    ),
+    buildRequest(input) {
+      const fulfillmentOrderId = shopifyGid(input["fulfillment_order_id"], "FulfillmentOrder");
+      const lineItems = safeFulfillmentLineItems(input);
+      const trackingInfo = safeTrackingInfo(input);
+      const message = boundedString(input, "message", 1_000);
+      const fulfillment: Record<string, unknown> = {
+        lineItemsByFulfillmentOrder: [
+          {
+            fulfillmentOrderId,
+            ...(lineItems ? { fulfillmentOrderLineItems: lineItems } : {}),
+          },
+        ],
+        notifyCustomer: boundedBoolean(input, "notify_customer"),
+      };
+      if (trackingInfo) fulfillment["trackingInfo"] = trackingInfo;
+      return graphQLRequest(CREATE_FULFILLMENT, {
+        fulfillment,
+        message: message ?? null,
+      });
     },
   },
 ];
