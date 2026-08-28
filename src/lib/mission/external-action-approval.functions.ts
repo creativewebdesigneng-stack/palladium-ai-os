@@ -9,10 +9,15 @@ import {
   type ApprovedGitHubActionType,
 } from "@/lib/integrations/github-approved-action.server";
 import { executeApprovedIntegrationAction } from "@/lib/integrations/approved-integration-action.server";
+import { executeApprovedSkillScriptAction } from "@/lib/runtime/agent-skills/approved-skill-script-action.server";
 import { notify } from "@/lib/notifications/notify.server";
 
 type Sb = { from: (t: string) => any };
-type ExternalActionType = ApprovedActionType | ApprovedGitHubActionType | "nango_dynamic_action";
+type ExternalActionType =
+  | ApprovedActionType
+  | ApprovedGitHubActionType
+  | "nango_dynamic_action"
+  | "agent_skill_script";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
   "github_branch_create",
@@ -31,6 +36,7 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "linear_issue_update",
   "notion_page_create",
   "nango_dynamic_action",
+  "agent_skill_script",
   ...GITHUB_EXECUTABLE,
 ]);
 
@@ -47,10 +53,24 @@ function actionType(value: unknown): ExternalActionType {
 }
 
 async function executeExternalAction(
+  sb: Sb,
   userId: string,
   type: ExternalActionType,
   details: Record<string, unknown>,
+  approval: { id: string; agent_id?: string | null; org_id?: string | null },
 ) {
+  if (type === "agent_skill_script") {
+    if (!approval.agent_id) {
+      return { ok: false, provider: "palladium", error: "This skill approval is missing its agent identity." };
+    }
+    return executeApprovedSkillScriptAction({
+      sb,
+      userId,
+      approvalRequestId: approval.id,
+      agentId: approval.agent_id,
+      orgId: approval.org_id ?? null,
+    });
+  }
   if (type === "nango_dynamic_action") {
     return executeApprovedIntegrationAction(userId, details);
   }
@@ -171,9 +191,11 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (!claim.data) throw new Error("This request has already been decided");
 
     const execution = await executeExternalAction(
+      sb,
       userId,
       type,
       safeDetails(claim.data.details),
+      claim.data,
     );
 
     await sb
@@ -254,6 +276,9 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       throw new Error("This approved action is not eligible for retry");
     }
     const type = actionType(approval.action_type);
+    if (type === "agent_skill_script") {
+      throw new Error("Approved skill scripts are single-use. Request a new approval instead of retrying a failed recipe.");
+    }
 
     // Retry claims only the already-approved immutable request payload. The UI
     // cannot supply changed provider action details here.
@@ -270,9 +295,11 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (!claim.data) throw new Error("This action is already being retried");
 
     const execution = await executeExternalAction(
+      sb,
       userId,
       type,
       safeDetails(claim.data.details),
+      claim.data,
     );
 
     await sb

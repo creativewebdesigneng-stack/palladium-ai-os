@@ -7,6 +7,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import SkillsToolbar from '@/components/skills/SkillsToolbar';
 import ToolCard from '@/components/skills/ToolCard';
 import ToolDetailDrawer from '@/components/skills/ToolDetailDrawer';
+import AgentPlaybooksPanel from '@/components/skills/AgentPlaybooksPanel';
 import { CATEGORIES } from '@/components/skills/skillsData';
 import { getToolFramework, saveToolPermission } from '@/lib/tools/tools.functions';
 import { friendlyMessage } from '@/lib/errors';
@@ -101,7 +102,7 @@ export default function Skills() {
       <PageHeader
         eyebrow="Capabilities"
         title="Skills & Tools"
-        description="The live tool registry your agents can call. Permissions are stored and enforced server-side."
+        description="Live executable tools plus security-scanned reusable playbooks your agents can discover and follow."
         action={
           framework.isSuccess ? (
             <div className="flex flex-wrap gap-1.5">
@@ -113,7 +114,8 @@ export default function Skills() {
         }
       />
 
-      {session === 'no' && <Failed message="Sign in to manage your tool registry." />}
+      {session === 'no' && <Failed message="Sign in to manage your skills and tool registry." />}
+      {session === 'yes' && <AgentPlaybooksPanel enabled />}
       {session === 'yes' && framework.isLoading && <Loading label="Loading your tool registry…" />}
       {framework.isError && (
         <Failed message={friendlyMessage(framework.error)} onRetry={() => framework.refetch()} />
