@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Mic2, Settings2, Clapperboard,
+  FileText, Layers3, Search, FlaskConical, Mic2, Settings2, Clapperboard, Table2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -14,6 +14,7 @@ const MAIN = [
   ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
   ['Work OS', '/work-os', Layers3],
+  ['Smart Tables', '/smart-tables', Table2],
   ['Organisations', '/organisation', Building2],
 ];
 
