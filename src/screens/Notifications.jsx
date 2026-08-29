@@ -9,6 +9,7 @@ import NotificationsCategoryNav from '@/components/notifications/NotificationsCa
 import NotificationsFilters from '@/components/notifications/NotificationsFilters';
 import NotificationsList from '@/components/notifications/NotificationsList';
 import NotificationPreferencesPanel from '@/components/notifications/NotificationPreferencesPanel';
+import NtfyPushPanel from '@/components/notifications/NtfyPushPanel';
 import { CATEGORIES, metaForKind, tagsForKind, priorityForKind } from '@/components/notifications/notificationsData';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -153,6 +154,8 @@ export default function Notifications() {
           <button onClick={() => refetch()} className="ml-auto rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-white/10">Try again</button>
         </div>
       )}
+
+      {session === 'yes' && <NtfyPushPanel />}
 
       {session === 'yes' && isLoading ? (
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
