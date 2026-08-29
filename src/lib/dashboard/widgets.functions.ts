@@ -47,10 +47,10 @@ export const saveDashboardWidget = createServerFn({ method: 'POST' })
       enabled: true,
       updated_at: new Date().toISOString(),
     };
-    let query;
-    if (data.id) query = sb.from('dashboard_widgets').update(payload).eq('id', data.id).eq('user_id', context.userId);
-    else query = sb.from('dashboard_widgets').insert(payload);
-    const { data: row, error } = await query.select('id,title,kind,target_url,config,sort_order,enabled,created_at,updated_at').single();
+    const write = data.id
+      ? sb.from('dashboard_widgets').update(payload).eq('id', data.id).eq('user_id', context.userId)
+      : sb.from('dashboard_widgets').insert(payload);
+    const { data: row, error } = await write.select('id,title,kind,target_url,config,sort_order,enabled,created_at,updated_at').single();
     if (error) throw new Error(error.message);
     await writeAudit({ userId: context.userId, orgId: null, action: data.id ? 'dashboard_widget.updated' : 'dashboard_widget.created', targetType: 'dashboard_widget', targetId: row.id, status: 'success' });
     return row;
