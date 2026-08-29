@@ -184,23 +184,23 @@ export const updateProjectWorkItem = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const project = await requireProjectAccess(sb, data.projectId, context.userId);
     const patch: Record<string, unknown> = {};
-    if (data.title !== undefined) patch.title = data.title;
-    if (data.description !== undefined) patch.description = data.description;
-    if (data.cycleId !== undefined) patch.cycle_id = data.cycleId;
-    if (data.moduleId !== undefined) patch.module_id = data.moduleId;
-    if (data.parentId !== undefined) patch.parent_id = data.parentId;
+    if (data.title !== undefined) patch["title"] = data.title;
+    if (data.description !== undefined) patch["description"] = data.description;
+    if (data.cycleId !== undefined) patch["cycle_id"] = data.cycleId;
+    if (data.moduleId !== undefined) patch["module_id"] = data.moduleId;
+    if (data.parentId !== undefined) patch["parent_id"] = data.parentId;
     if (data.status !== undefined) {
-      patch.status = data.status;
-      patch.completed_at = data.status === "done" ? new Date().toISOString() : null;
+      patch["status"] = data.status;
+      patch["completed_at"] = data.status === "done" ? new Date().toISOString() : null;
     }
-    if (data.priority !== undefined) patch.priority = data.priority;
-    if (data.estimate !== undefined) patch.estimate = data.estimate;
-    if (data.assigneeType !== undefined) patch.assignee_type = data.assigneeType;
-    if (data.assigneeId !== undefined) patch.assignee_id = data.assigneeId;
-    if (data.sortOrder !== undefined) patch.sort_order = data.sortOrder;
-    if (data.startsAt !== undefined) patch.starts_at = data.startsAt;
-    if (data.dueAt !== undefined) patch.due_at = data.dueAt;
-    if (data.labels !== undefined) patch.labels = data.labels;
+    if (data.priority !== undefined) patch["priority"] = data.priority;
+    if (data.estimate !== undefined) patch["estimate"] = data.estimate;
+    if (data.assigneeType !== undefined) patch["assignee_type"] = data.assigneeType;
+    if (data.assigneeId !== undefined) patch["assignee_id"] = data.assigneeId;
+    if (data.sortOrder !== undefined) patch["sort_order"] = data.sortOrder;
+    if (data.startsAt !== undefined) patch["starts_at"] = data.startsAt;
+    if (data.dueAt !== undefined) patch["due_at"] = data.dueAt;
+    if (data.labels !== undefined) patch["labels"] = data.labels;
     if (Object.keys(patch).length === 0) return { id: data.id };
     const { data: item, error } = await sb.from("project_work_items")
       .update(patch)
