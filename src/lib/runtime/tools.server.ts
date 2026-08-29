@@ -16,14 +16,15 @@ import { HTML_STUDIO_TOOL_DEF, runHtmlStudioTool } from "@/lib/html-studio/html-
 import { AGENT_WORKSPACE_TOOL_DEF, runAgentWorkspaceTool } from "@/lib/workspaces/agent-workspace-tool.server";
 import { SEO_TOOL_DEF, runSeoTool } from "@/lib/seo/seo-agent-tool.server";
 import { APP_STUDIO_TOOL_DEF, runAppStudioTool } from "@/lib/app-studio/app-studio-agent-tool.server";
+import { VOXEL_STUDIO_TOOL_DEF, runVoxelStudioTool } from "@/lib/voxel/voxel-agent-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
-const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF] as const;
+const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF, VOXEL_STUDIO_TOOL_DEF] as const;
 const LOCAL_TOOL_NAMES = new Set<string>(LOCAL_TOOL_DEFS.map((item) => item.name));
 
-export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio"];
+export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio", "voxel_studio"];
 export const TOOL_MANIFEST = [
   ...CORE_TOOL_MANIFEST,
   { slug: "skill_script", description: SKILL_SCRIPT_TOOL_DEF.description, sensitive: false },
@@ -32,6 +33,7 @@ export const TOOL_MANIFEST = [
   { slug: "agent_workspace", description: AGENT_WORKSPACE_TOOL_DEF.description, sensitive: false },
   { slug: "seo_ops", description: SEO_TOOL_DEF.description, sensitive: false },
   { slug: "app_studio", description: APP_STUDIO_TOOL_DEF.description, sensitive: false },
+  { slug: "voxel_studio", description: VOXEL_STUDIO_TOOL_DEF.description, sensitive: false },
 ];
 
 const PLAN_RANK: Record<string, number> = {
@@ -159,11 +161,13 @@ export async function executeTool(
             ? await runAgentWorkspaceTool(input, localCtx)
             : name === "seo_ops"
               ? await runSeoTool(input, localCtx)
-              : await runAppStudioTool(input, {
-                  userId: ctx.userId,
-                  orgId: ctx.orgId,
-                  sb: ctx.sb,
-                });
+              : name === "app_studio"
+                ? await runAppStudioTool(input, {
+                    userId: ctx.userId,
+                    orgId: ctx.orgId,
+                    sb: ctx.sb,
+                  })
+                : await runVoxelStudioTool(input);
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
