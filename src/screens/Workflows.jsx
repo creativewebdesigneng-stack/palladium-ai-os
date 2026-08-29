@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listWorkflows, importWorkflow } from '@/lib/tasks/tasks.functions';
 import { adaptN8nWorkflowDefinition, isN8nWorkflowDefinition } from '@/lib/workflows/n8n-interoperability';
+import { adaptLangflowWorkflowDefinition, isLangflowWorkflowDefinition } from '@/lib/workflows/langflow-interoperability';
 import ImportWorkflowModal from '@/components/workflows/ImportWorkflowModal';
 import { useNavigate } from 'react-router-dom';
 
@@ -48,12 +49,15 @@ export default function Workflows() {
   }, [session, load]);
 
   const handleImport = useCallback(async (definition) => {
-    const fromN8n = isN8nWorkflowDefinition(definition);
-    const normalized = adaptN8nWorkflowDefinition(definition);
+    const fromLangflow = isLangflowWorkflowDefinition(definition);
+    const fromN8n = !fromLangflow && isN8nWorkflowDefinition(definition);
+    const normalized = fromLangflow
+      ? adaptLangflowWorkflowDefinition(definition)
+      : adaptN8nWorkflowDefinition(definition);
     const res = await importWorkflow({ data: { definition: normalized } });
     toast({
-      title: fromN8n ? 'n8n workflow translated' : 'Workflow imported',
-      description: `${res.name} · ${res.steps} step${res.steps === 1 ? '' : 's'} · saved as a draft${fromN8n ? ' for review before activation' : ''}.`,
+      title: fromLangflow ? 'Langflow graph translated' : fromN8n ? 'n8n workflow translated' : 'Workflow imported',
+      description: `${res.name} · ${res.steps} step${res.steps === 1 ? '' : 's'} · saved as a draft${fromLangflow || fromN8n ? ' for review before activation' : ''}.`,
     });
     await load();
   }, [toast, load]);
@@ -68,7 +72,7 @@ export default function Workflows() {
 
   return (
     <>
-      <PageHeader eyebrow="Automation" title="Workflows" description="A visual, node-based automation builder for humans and AI agents, with safe import interoperability for supported n8n-style workflow JSON." />
+      <PageHeader eyebrow="Automation" title="Workflows" description="Native PalladiumAI automation with safe JSON interoperability for Langflow graphs and supported n8n workflows. Imported graphs become reviewable drafts and continue to use PalladiumAI agents, approvals, MCP, tools and runtime policies." />
       <div aria-hidden className="mb-4"><DataPulse active duration={2.2} /></div>
 
       <WorkflowsToolbar
@@ -89,7 +93,7 @@ export default function Workflows() {
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">
           <WorkflowIcon className="mx-auto mb-3 h-6 w-6 text-zinc-600" />
-          {workflows.length === 0 ? 'No workflows yet. Build one in the Automation Studio to see it here.' : 'No workflows in this status.'}
+          {workflows.length === 0 ? 'No workflows yet. Build one in the Automation Studio or import a Langflow/n8n definition.' : 'No workflows in this status.'}
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
