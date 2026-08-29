@@ -87,6 +87,8 @@ export default function Models() {
               </div>
               <p className="mt-3 text-[11px] text-zinc-400">Runtime default</p>
               <code className="mt-1 block truncate rounded-lg bg-black/30 px-2 py-1.5 text-[11px] text-violet-200">{provider.defaultModel}</code>
+              {provider.integrations?.length ? <p className="mt-2 text-[10px] text-zinc-400">Compatible integrations: <span className="text-violet-200">{provider.integrations.join(' · ')}</span></p> : null}
+              {provider.routingNote ? <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">{provider.routingNote}</p> : null}
               <p className={`mt-2 text-[10px] font-medium ${provider.configured ? 'text-emerald-300' : 'text-zinc-500'}`}>{provider.configured ? 'Configured for runtime' : 'Not configured on this deployment'}</p>
             </article>
           ))}
