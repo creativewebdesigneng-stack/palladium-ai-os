@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import PlatformAnnouncement from "@/components/palladium/PlatformAnnouncement";
+import DashboardWidgets from "@/components/dashboard/DashboardWidgets";
+import { useAuth } from "@/lib/AuthContext";
 import Screen from "@/screens/Dashboard";
 
 function DashboardRoute() {
+  const { isAuthenticated } = useAuth();
   return (
     <>
       <PlatformAnnouncement />
       <Screen />
+      <DashboardWidgets enabled={isAuthenticated} />
     </>
   );
 }

@@ -60,12 +60,13 @@ export default defineConfig({
   },
   vite: {
     // @lovable.dev/mcp-js currently compares a slash-normalised Vite root with
-    // Windows-native route paths and rejects the generated route directory. The
-    // generated MCP routes are committed; keep generation enabled everywhere
-    // except this local Windows path.
+    // Windows-native route paths and can also attempt to regenerate committed
+    // MCP route files during CI route generation. Those generated MCP routes are
+    // committed and remain part of the build, so generation is only needed in
+    // normal local development where it cannot race TanStack's route scanner.
     plugins: [
       runtimeSupabasePublicConfigPlugin(),
-      ...(process.platform === "win32" ? [] : [mcpPlugin()]),
+      ...(process.platform === "win32" || process.env["CI"] ? [] : [mcpPlugin()]),
     ],
 
     resolve: {

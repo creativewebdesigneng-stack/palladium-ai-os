@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Mic2, Settings2,
+  FileText, Layers3, Search, FlaskConical, Mic2, Settings2, Clapperboard,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -22,6 +22,7 @@ const WORKFORCE = [
   ['Agent Runtime', '/agent-runtime', Cpu],
   ['Model Arena', '/model-arena', FlaskConical],
   ['Voice Studio', '/voice-studio', Mic2],
+  ['Media Studio', '/media-studio', Clapperboard],
   ['Agent Workspaces', '/agent-workspaces', Layers3],
   ['Agents', '/agents', Bot],
   ['Agent Builder', '/agent-builder', Hammer],
@@ -42,6 +43,7 @@ const WORKFORCE = [
 
 const BUSINESS = [
   ['Analytics', '/analytics', BarChart3],
+  ['Product Analytics', '/product-analytics', LineChart],
   ['Business Intelligence', '/business-intelligence', LineChart],
   ['Finance', '/finance', Banknote],
   ['CRM', '/crm', Contact],
