@@ -77,15 +77,14 @@ function asJson(value: unknown, depth = 0): Json {
 async function request(path: string, init?: RequestInit): Promise<any> {
   const { base, token } = workerConfig();
   if (!base) throw new Error("3D Studio is not configured. Set MODLY_API_URL to a Modly-compatible worker.");
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${base}${path}`, {
     ...init,
     redirect: "error",
     signal: AbortSignal.timeout(120_000),
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`3D worker error (${response.status}): ${text.slice(0, 300)}`);
