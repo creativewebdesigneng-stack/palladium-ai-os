@@ -34,11 +34,12 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const started = Date.now();
+    const model = data.model ?? process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts";
     const { data: job, error: jobError } = await sb.from("voice_studio_jobs").insert({
       user_id: context.userId,
       kind: "tts",
       provider: data.provider,
-      model: data.model ?? process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
+      model,
       voice: data.voice,
       status: "running",
       input_text: data.text,
@@ -47,7 +48,14 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     }).select("id").single();
     if (jobError) throw new Error(jobError.message);
     try {
-      const generated = await synthesizeOpenAiSpeech(data);
+      const generated = await synthesizeOpenAiSpeech({
+        text: data.text,
+        model,
+        voice: data.voice,
+        instructions: data.instructions ?? null,
+        format: data.format,
+        speed: data.speed,
+      });
       const durationMs = Date.now() - started;
       const { error } = await sb.from("voice_studio_jobs").update({ status: "completed", duration_ms: durationMs, completed_at: new Date().toISOString(), metadata: { speed: data.speed, instructions: data.instructions ?? null, bytes: generated.bytes, contentType: generated.contentType } }).eq("id", job.id);
       if (error) throw new Error(error.message);
@@ -73,7 +81,7 @@ export const transcribeVoice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const started = Date.now();
-    const model = data.model ?? process.env.OPENAI_STT_MODEL ?? "gpt-4o-mini-transcribe";
+    const model = data.model ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe";
     const { data: job, error: jobError } = await sb.from("voice_studio_jobs").insert({
       user_id: context.userId,
       kind: "stt",
@@ -85,7 +93,14 @@ export const transcribeVoice = createServerFn({ method: "POST" })
     }).select("id").single();
     if (jobError) throw new Error(jobError.message);
     try {
-      const result = await transcribeOpenAiSpeech({ base64: data.audioBase64, filename: data.filename, mimeType: data.mimeType, model: data.model, language: data.language, prompt: data.prompt });
+      const result = await transcribeOpenAiSpeech({
+        base64: data.audioBase64,
+        filename: data.filename,
+        mimeType: data.mimeType,
+        model,
+        language: data.language ?? null,
+        prompt: data.prompt ?? null,
+      });
       const durationMs = Date.now() - started;
       const { error } = await sb.from("voice_studio_jobs").update({ status: "completed", output_text: result.text, duration_ms: durationMs, completed_at: new Date().toISOString() }).eq("id", job.id);
       if (error) throw new Error(error.message);
