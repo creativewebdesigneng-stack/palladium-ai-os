@@ -44,15 +44,17 @@ describe("App Studio production contract", () => {
     expect(published).toContain("safePublicUrl");
   });
 
-  it("reuses MCP, integration approvals and the expanded Harness-controlled agent runtime tool", () => {
+  it("reuses MCP, integration approvals and the Harness-controlled local agent runtime tool", () => {
     expect(queryRuntime).toContain("prepareAgentMcpIntegrationAction");
     expect(queryRuntime).toContain("prepareIntegrationAction");
     expect(queryRuntime).toContain('action_type: "external_mcp_action"');
     expect(queryRuntime).toContain('action_type: "nango_dynamic_action"');
     expect(queryRuntime).toContain("assertPublicMcpEndpoint");
     expect(runtimeTools).toContain("APP_STUDIO_TOOL_DEF");
+    expect(runtimeTools).toContain("LOCAL_TOOL_DEFS");
+    expect(runtimeTools).toContain("LOCAL_TOOL_NAMES");
+    expect(runtimeTools).toContain("assertHarnessToolInput(name, input, grant.allowedDomains)");
     expect(runtimeTools).toContain("runAppStudioTool");
-    expect(runtimeTools).toContain('name !== "skill_script" && name !== "app_studio"');
     expect(agentTool).toContain('enum: ["list_apps","get_app","create_app","add_page","add_widget","add_datasource","add_query","run_query"]');
   });
 });
