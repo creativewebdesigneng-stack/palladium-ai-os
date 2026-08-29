@@ -1,4 +1,4 @@
-type AnyRecord = Record<string, any>;
+type AnyRecord = Record<string, unknown>;
 
 type ImportedStep = {
   kind: "delay" | "approval" | "notification" | "agent";
@@ -20,20 +20,20 @@ function cleanString(value: unknown, max = 500) {
 }
 
 function typeName(node: AnyRecord) {
-  return cleanString(node.type, 200).toLowerCase();
+  return cleanString(node["type"], 200).toLowerCase();
 }
 
 function scheduleFrom(node: AnyRecord) {
-  const parameters = isObject(node.parameters) ? node.parameters : {};
-  if (typeof parameters.cronExpression === "string") return parameters.cronExpression.slice(0, 200);
-  if (typeof parameters.rule === "string") return parameters.rule.slice(0, 200);
+  const parameters = isObject(node["parameters"]) ? node["parameters"] : {};
+  if (typeof parameters["cronExpression"] === "string") return parameters["cronExpression"].slice(0, 200);
+  if (typeof parameters["rule"] === "string") return parameters["rule"].slice(0, 200);
   return null;
 }
 
 function delayMs(node: AnyRecord) {
-  const parameters = isObject(node.parameters) ? node.parameters : {};
-  const raw = Number(parameters.amount ?? parameters.waitAmount ?? 1);
-  const unit = cleanString(parameters.unit ?? parameters.waitUnit ?? "seconds", 30).toLowerCase();
+  const parameters = isObject(node["parameters"]) ? node["parameters"] : {};
+  const raw = Number(parameters["amount"] ?? parameters["waitAmount"] ?? 1);
+  const unit = cleanString(parameters["unit"] ?? parameters["waitUnit"] ?? "seconds", 30).toLowerCase();
   const multiplier = unit.startsWith("minute") ? 60_000 : unit.startsWith("hour") ? 3_600_000 : 1_000;
   return Math.min(Math.max(Math.round((Number.isFinite(raw) ? raw : 1) * multiplier), 0), 300_000);
 }
@@ -52,13 +52,14 @@ function jsonSafe(value: unknown, depth = 0): Record<string, unknown> {
 }
 
 export function isN8nWorkflowDefinition(value: unknown) {
-  return isObject(value) && Array.isArray(value.nodes) && !Array.isArray(value.steps);
+  return isObject(value) && Array.isArray(value["nodes"]) && !Array.isArray(value["steps"]);
 }
 
 export function adaptN8nWorkflowDefinition(value: unknown) {
   if (!isN8nWorkflowDefinition(value)) return value;
   const definition = value as AnyRecord;
-  const nodes = definition.nodes.filter(isObject).slice(0, 100);
+  const rawNodes = definition["nodes"];
+  const nodes: AnyRecord[] = Array.isArray(rawNodes) ? rawNodes.filter(isObject).slice(0, 100) : [];
   if (!nodes.length) throw new Error("The n8n workflow contains no nodes.");
 
   const triggerNode = nodes.find((node) => /manualtrigger|scheduletrigger|cron|webhook/.test(typeName(node)));
@@ -75,22 +76,22 @@ export function adaptN8nWorkflowDefinition(value: unknown) {
 
   for (const [index, node] of executableNodes.entries()) {
     const type = typeName(node);
-    const name = cleanString(node.name, 120) || `Imported node ${index + 1}`;
+    const name = cleanString(node["name"], 120) || `Imported node ${index + 1}`;
     if (/wait|delay/.test(type)) {
       steps.push({ kind: "delay", name, mode: "sequential", position: index, config: { duration_ms: delayMs(node) } });
       continue;
     }
     if (/approval/.test(type)) {
-      steps.push({ kind: "approval", name, mode: "sequential", position: index, config: { source: "n8n-import", parameters: jsonSafe(node.parameters) } });
+      steps.push({ kind: "approval", name, mode: "sequential", position: index, config: { source: "n8n-import", parameters: jsonSafe(node["parameters"]) } });
       continue;
     }
     if (/slack|email|gmail|notification|discord|teams/.test(type)) {
-      steps.push({ kind: "notification", name, mode: "sequential", position: index, config: { message: `Imported notification node: ${name}`, source_type: type, parameters: jsonSafe(node.parameters) } });
+      steps.push({ kind: "notification", name, mode: "sequential", position: index, config: { message: `Imported notification node: ${name}`, source_type: type, parameters: jsonSafe(node["parameters"]) } });
       continue;
     }
     if (/agent|openai|anthropic|gemini|langchain/.test(type)) {
-      const parameters = isObject(node.parameters) ? node.parameters : {};
-      const agentId = cleanString(parameters.agentId ?? parameters.agent_id, 60);
+      const parameters = isObject(node["parameters"]) ? node["parameters"] : {};
+      const agentId = cleanString(parameters["agentId"] ?? parameters["agent_id"], 60);
       steps.push({
         kind: "agent",
         name,
@@ -109,9 +110,10 @@ export function adaptN8nWorkflowDefinition(value: unknown) {
   }
   if (!steps.length) throw new Error("The n8n workflow has no executable nodes that map safely to PalladiumAI.");
 
+  const meta = isObject(definition["meta"]) ? definition["meta"] : {};
   return {
-    name: cleanString(definition.name, 120) || "Imported n8n workflow",
-    description: cleanString(definition.description ?? definition.meta?.description, 1000),
+    name: cleanString(definition["name"], 120) || "Imported n8n workflow",
+    description: cleanString(definition["description"] ?? meta["description"], 1000),
     trigger_type: triggerType,
     schedule,
     steps,
