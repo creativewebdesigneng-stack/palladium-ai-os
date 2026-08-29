@@ -20,7 +20,7 @@ export const getArenaPolicy = createServerFn({ method: "POST" })
     return data ?? null;
   });
 
-export const saveArenaPolicy = createServerFn({ method: "POST" })
+export const saveArenaPolicy = createServerFn({ method: "POST"" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
@@ -56,10 +56,10 @@ export const recommendArenaRoute = createServerFn({ method: "POST" })
     if (responseError) throw new Error(responseError.message);
     const { data: scores, error: scoreError } = await sb.from("model_eval_scores").select("response_id,score").in("run_id", runIds).eq("evaluator_type", "llm_judge");
     if (scoreError) throw new Error(scoreError.message);
-    const scoreByResponse = new Map((scores ?? []).map((score: any) => [score.response_id, Number(score.score)]));
+    const scoreByResponse = new Map<string, number>((scores ?? []).map((score: any): [string, number] => [String(score.response_id), Number(score.score)]));
     const buckets = new Map<string, { provider: string; model: string; total: number; runs: number }>();
     for (const response of responses ?? []) {
-      const score = scoreByResponse.get(response.id);
+      const score = scoreByResponse.get(String(response.id));
       if (score == null) continue;
       const key = `${response.provider}\u0000${response.model}`;
       const current = buckets.get(key) ?? { provider: response.provider, model: response.model, total: 0, runs: 0 };
@@ -80,17 +80,17 @@ export const exportArenaDistillation = createServerFn({ method: "POST" })
     if (runError) throw new Error(runError.message);
     const runIds = (runs ?? []).map((run: any) => run.id);
     if (!runIds.length) return { filename: "palladium-arena-distillation.jsonl", jsonl: "", examples: 0 };
-    const promptByRun = new Map((runs ?? []).map((run: any) => [run.id, run.prompt]));
+    const promptByRun = new Map<string, string>((runs ?? []).map((run: any): [string, string] => [String(run.id), String(run.prompt)]));
     const { data: responses, error: responseError } = await sb.from("model_eval_responses").select("id,run_id,provider,model,response_text").in("run_id", runIds);
     if (responseError) throw new Error(responseError.message);
     const { data: scores, error: scoreError } = await sb.from("model_eval_scores").select("response_id,score,verdict").in("run_id", runIds).eq("evaluator_type", "llm_judge").gte("score", data.minimumScore);
     if (scoreError) throw new Error(scoreError.message);
-    const responseById = new Map((responses ?? []).map((response: any) => [response.id, response]));
+    const responseById = new Map<string, any>((responses ?? []).map((response: any): [string, any] => [String(response.id), response]));
     const lines: string[] = [];
     for (const score of scores ?? []) {
-      const response = responseById.get(score.response_id);
+      const response = responseById.get(String(score.response_id));
       if (!response) continue;
-      const prompt = promptByRun.get(response.run_id);
+      const prompt = promptByRun.get(String(response.run_id));
       if (!prompt) continue;
       lines.push(JSON.stringify({ messages: [{ role: "user", content: prompt }, { role: "assistant", content: response.response_text }], metadata: { provider: response.provider, model: response.model, arenaScore: Number(score.score), verdict: score.verdict ?? null } }));
       if (lines.length >= data.limit) break;
