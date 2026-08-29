@@ -20,7 +20,7 @@ export const THREE_D_STUDIO_TOOL_DEF: ToolDef = {
 };
 
 export async function runThreeDStudioTool(input: Record<string, unknown>, ctx: ToolContext): Promise<unknown> {
-  const action = typeof input.action === "string" ? input.action : "";
+  const action = typeof input["action"] === "string" ? input["action"] : "";
   if (action === "capabilities") return getThreeDRuntimeCapabilities();
   if (action === "list") {
     const result = await ctx.sb.from("three_d_jobs").select("id,input_name,workflow,requested_format,status,output_url,preview_url,error_message,created_at,updated_at,completed_at").eq("user_id", ctx.userId).order("created_at", { ascending: false }).limit(25);
@@ -28,9 +28,9 @@ export async function runThreeDStudioTool(input: Record<string, unknown>, ctx: T
     return { jobs: result.data ?? [] };
   }
   if (action === "create") {
-    const inputName = typeof input.input_name === "string" ? input.input_name.trim().slice(0, 240) : "3D asset";
-    const sourceUrl = typeof input.source_url === "string" ? input.source_url.trim() : "";
-    const outputFormat = typeof input.output_format === "string" ? input.output_format.toLowerCase() : "glb";
+    const inputName = typeof input["input_name"] === "string" ? input["input_name"].trim().slice(0, 240) : "3D asset";
+    const sourceUrl = typeof input["source_url"] === "string" ? input["source_url"].trim() : "";
+    const outputFormat = typeof input["output_format"] === "string" ? input["output_format"].toLowerCase() : "glb";
     if (!sourceUrl || sourceUrl.length > 4000) throw new Error("A bounded public source_url is required.");
     if (!["glb","gltf","obj","ply","stl","vox"].includes(outputFormat)) throw new Error("Unsupported 3D output format.");
     const created = await ctx.sb.from("three_d_jobs").insert({ user_id: ctx.userId, input_name: inputName || "3D asset", source_url: sourceUrl, workflow: "image-to-mesh", requested_format: outputFormat, status: "queued" }).select("id").single();
@@ -48,7 +48,7 @@ export async function runThreeDStudioTool(input: Record<string, unknown>, ctx: T
     }
   }
   if (action === "status") {
-    const id = typeof input.job_id === "string" ? input.job_id.trim() : "";
+    const id = typeof input["job_id"] === "string" ? input["job_id"].trim() : "";
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("A valid 3D job id is required.");
     const job = await ctx.sb.from("three_d_jobs").select("id,worker_job_id,status,output_url,preview_url,error_message").eq("id", id).eq("user_id", ctx.userId).maybeSingle();
     if (job.error) throw new Error(job.error.message);
