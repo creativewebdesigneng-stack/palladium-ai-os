@@ -1,9 +1,9 @@
 import { Buffer } from "node:buffer";
 
-const OPENAI_AUDIO_BASE_URL = (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+const OPENAI_AUDIO_BASE_URL = (process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com/v1").replace(/\/$/, "");
 
 function openAiHeaders() {
-  const key = process.env.OPENAI_API_KEY;
+  const key = process.env["OPENAI_API_KEY"];
   if (!key) throw new Error("OpenAI audio is not configured on this deployment.");
   return { key, authorization: `Bearer ${key}` };
 }
@@ -11,13 +11,13 @@ function openAiHeaders() {
 export function getVoiceRuntimeCapabilities() {
   return {
     openai: {
-      configured: Boolean(process.env.OPENAI_API_KEY),
+      configured: Boolean(process.env["OPENAI_API_KEY"]),
       tts: true,
       stt: true,
       customVoices: true,
       customVoiceNote: "Custom voice IDs require an eligible OpenAI account and prior consent-backed voice creation.",
-      ttsDefaultModel: process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
-      sttDefaultModel: process.env.OPENAI_STT_MODEL ?? "gpt-4o-mini-transcribe",
+      ttsDefaultModel: process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts",
+      sttDefaultModel: process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe",
       voices: ["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"],
       formats: ["mp3", "opus", "aac", "flac", "wav", "pcm"],
     },
@@ -37,7 +37,7 @@ export async function synthesizeOpenAiSpeech(input: {
     method: "POST",
     headers: { Authorization: auth.authorization, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: input.model ?? process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
+      model: input.model ?? process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts",
       input: input.text,
       voice: input.voice,
       ...(input.instructions ? { instructions: input.instructions } : {}),
@@ -54,7 +54,7 @@ export async function synthesizeOpenAiSpeech(input: {
     base64: bytes.toString("base64"),
     contentType: response.headers.get("content-type") ?? mimeForFormat(input.format ?? "mp3"),
     bytes: bytes.length,
-    model: input.model ?? process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
+    model: input.model ?? process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts",
   };
 }
 
@@ -70,7 +70,7 @@ export async function transcribeOpenAiSpeech(input: {
   const fileBytes = Uint8Array.from(Buffer.from(input.base64, "base64")).buffer;
   const form = new FormData();
   form.set("file", new Blob([fileBytes], { type: input.mimeType }), input.filename);
-  form.set("model", input.model ?? process.env.OPENAI_STT_MODEL ?? "gpt-4o-mini-transcribe");
+  form.set("model", input.model ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe");
   if (input.language) form.set("language", input.language);
   if (input.prompt) form.set("prompt", input.prompt);
   const response = await fetch(`${OPENAI_AUDIO_BASE_URL}/audio/transcriptions`, {
@@ -84,7 +84,7 @@ export async function transcribeOpenAiSpeech(input: {
   try { parsed = JSON.parse(raw); } catch { parsed = { text: raw }; }
   const text = typeof parsed?.text === "string" ? parsed.text : "";
   if (!text) throw new Error("The transcription provider returned no text.");
-  return { text, model: input.model ?? process.env.OPENAI_STT_MODEL ?? "gpt-4o-mini-transcribe", raw: parsed };
+  return { text, model: input.model ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe", raw: parsed };
 }
 
 function mimeForFormat(format: string) {
