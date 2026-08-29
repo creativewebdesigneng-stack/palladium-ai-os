@@ -8,6 +8,7 @@ import TaskKanbanView from '@/components/tasks/TaskKanbanView';
 import TaskCalendarView from '@/components/tasks/TaskCalendarView';
 import TaskTimelineView from '@/components/tasks/TaskTimelineView';
 import TaskDetailDrawer from '@/components/tasks/TaskDetailDrawer';
+import TaskFocusPanel from '@/components/tasks/TaskFocusPanel';
 import { STATUSES } from '@/components/tasks/jobsData';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -63,7 +64,7 @@ export default function Tasks() {
 
   return (
     <>
-      <PageHeader eyebrow="AI" title="Tasks & Jobs" description="Manage every task given to humans and AI agents." action={
+      <PageHeader eyebrow="AI" title="Tasks & Jobs" description="Manage every task given to humans and AI agents, including focus sessions and tracked work time." action={
         <div className="flex flex-wrap items-center gap-1.5">
           {STATUSES.map((s) => (
             <span key={s} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300">{s} <span className="text-zinc-600">{counts[s]}</span></span>
@@ -71,6 +72,7 @@ export default function Tasks() {
         </div>
       } />
 
+      <TaskFocusPanel />
       <JobsToolbar view={view} onView={setView} query={query} onQuery={setQuery} status={status} onStatus={setStatus} onNew={() => toast({ title: 'Create a task from Mission Control', description: 'New tasks are submitted from your agent workspace.' })} />
 
       {loading ? (

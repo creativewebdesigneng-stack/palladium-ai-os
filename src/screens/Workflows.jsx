@@ -13,9 +13,9 @@ import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listWorkflows, importWorkflow } from '@/lib/tasks/tasks.functions';
+import { adaptN8nWorkflowDefinition, isN8nWorkflowDefinition } from '@/lib/workflows/n8n-interoperability';
 import ImportWorkflowModal from '@/components/workflows/ImportWorkflowModal';
 import { useNavigate } from 'react-router-dom';
-
 
 export default function Workflows() {
   const { gate } = useUpgrade();
@@ -25,7 +25,6 @@ export default function Workflows() {
   const [status, setStatus] = useState('All');
   const [open, setOpen] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [workflows, setWorkflows] = useState([]);
@@ -40,9 +39,7 @@ export default function Workflows() {
       console.error('[workflows]', e);
       setError('We could not load your workflows right now.');
       toast({ title: 'Could not load workflows', description: 'Please try again in a moment.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [toast]);
 
   useEffect(() => {
@@ -51,8 +48,13 @@ export default function Workflows() {
   }, [session, load]);
 
   const handleImport = useCallback(async (definition) => {
-    const res = await importWorkflow({ data: { definition } });
-    toast({ title: 'Workflow imported', description: `${res.name} · ${res.steps} step${res.steps === 1 ? '' : 's'} · saved as a draft.` });
+    const fromN8n = isN8nWorkflowDefinition(definition);
+    const normalized = adaptN8nWorkflowDefinition(definition);
+    const res = await importWorkflow({ data: { definition: normalized } });
+    toast({
+      title: fromN8n ? 'n8n workflow translated' : 'Workflow imported',
+      description: `${res.name} · ${res.steps} step${res.steps === 1 ? '' : 's'} · saved as a draft${fromN8n ? ' for review before activation' : ''}.`,
+    });
     await load();
   }, [toast, load]);
 
@@ -66,7 +68,7 @@ export default function Workflows() {
 
   return (
     <>
-      <PageHeader eyebrow="Automation" title="Workflows" description="A visual, node-based automation builder for humans and AI agents." />
+      <PageHeader eyebrow="Automation" title="Workflows" description="A visual, node-based automation builder for humans and AI agents, with safe import interoperability for supported n8n-style workflow JSON." />
       <div aria-hidden className="mb-4"><DataPulse active duration={2.2} /></div>
 
       <WorkflowsToolbar
@@ -76,8 +78,6 @@ export default function Workflows() {
       />
 
       <ImportWorkflowModal open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
-
-
       <WorkflowsStatusTabs status={status} onStatus={setStatus} counts={counts} />
 
       {loading ? (
@@ -97,9 +97,7 @@ export default function Workflows() {
         </div>
       )}
 
-      <div id="wf-templates" className="mt-10 scroll-mt-6">
-        <WorkflowTemplates />
-      </div>
+      <div id="wf-templates" className="mt-10 scroll-mt-6"><WorkflowTemplates /></div>
 
       <AnimatePresence>
         {open && <WorkflowDetailDrawer workflow={open} onClose={() => setOpen(null)} onChanged={load} />}

@@ -14,36 +14,22 @@ import {
 import { SOCIAL_OPS_TOOL_DEF, runSocialOpsTool } from "@/lib/social/social-agent-tool.server";
 import { HTML_STUDIO_TOOL_DEF, runHtmlStudioTool } from "@/lib/html-studio/html-studio-agent-tool.server";
 import { AGENT_WORKSPACE_TOOL_DEF, runAgentWorkspaceTool } from "@/lib/workspaces/agent-workspace-tool.server";
+import { SEO_TOOL_DEF, runSeoTool } from "@/lib/seo/seo-agent-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
-const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF] as const;
+const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF] as const;
 const LOCAL_TOOL_NAMES = new Set<string>(LOCAL_TOOL_DEFS.map((item) => item.name));
 
-export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace"];
+export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops"];
 export const TOOL_MANIFEST = [
   ...CORE_TOOL_MANIFEST,
-  {
-    slug: "skill_script",
-    description: SKILL_SCRIPT_TOOL_DEF.description,
-    sensitive: false,
-  },
-  {
-    slug: "social_ops",
-    description: SOCIAL_OPS_TOOL_DEF.description,
-    sensitive: false,
-  },
-  {
-    slug: "html_studio",
-    description: HTML_STUDIO_TOOL_DEF.description,
-    sensitive: false,
-  },
-  {
-    slug: "agent_workspace",
-    description: AGENT_WORKSPACE_TOOL_DEF.description,
-    sensitive: false,
-  },
+  { slug: "skill_script", description: SKILL_SCRIPT_TOOL_DEF.description, sensitive: false },
+  { slug: "social_ops", description: SOCIAL_OPS_TOOL_DEF.description, sensitive: false },
+  { slug: "html_studio", description: HTML_STUDIO_TOOL_DEF.description, sensitive: false },
+  { slug: "agent_workspace", description: AGENT_WORKSPACE_TOOL_DEF.description, sensitive: false },
+  { slug: "seo_ops", description: SEO_TOOL_DEF.description, sensitive: false },
 ];
 
 const PLAN_RANK: Record<string, number> = {
@@ -66,14 +52,8 @@ export async function resolveGrantedTools(
 
   const names = requested.map((def) => def.name);
   const [{ data: permissions }, { data: catalogue }] = await Promise.all([
-    sb
-      .from("tool_permissions")
-      .select("tool,enabled,requires_approval,allowed_domains,spend_cap,agent_id")
-      .in("tool", names),
-    sb
-      .from("tools")
-      .select("slug,is_active,min_plan,requires_approval")
-      .in("slug", names),
+    sb.from("tool_permissions").select("tool,enabled,requires_approval,allowed_domains,spend_cap,agent_id").in("tool", names),
+    sb.from("tools").select("slug,is_active,min_plan,requires_approval").in("slug", names),
   ]);
 
   const grants = new Map(core.grants);
@@ -87,12 +67,7 @@ export async function resolveGrantedTools(
     const permission = rows.find((row: any) => row.agent_id === agent.id) ?? rows.find((row: any) => !row.agent_id);
     if (permission?.enabled === false) continue;
 
-    grants.set(def.name, {
-      slug: def.name,
-      requiresApproval: false,
-      allowedDomains: [],
-      spendCap: null,
-    });
+    grants.set(def.name, { slug: def.name, requiresApproval: false, allowedDomains: [], spendCap: null });
     defs.push(def);
   }
   return { defs, grants };
@@ -101,17 +76,11 @@ export async function resolveGrantedTools(
 function inputMetadata(input: Record<string, unknown>): Record<string, unknown> {
   const metadata: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (/(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i.test(key)) {
-      metadata[key] = "[redacted]";
-    } else if (typeof value === "string") {
-      metadata[key] = value.length > 200 ? `${value.slice(0, 200)}…(${value.length} chars)` : value;
-    } else if (Array.isArray(value)) {
-      metadata[key] = { type: "array", length: value.length };
-    } else if (value && typeof value === "object") {
-      metadata[key] = { type: "object", keys: Object.keys(value as object).slice(0, 12) };
-    } else {
-      metadata[key] = value;
-    }
+    if (/(token|secret|password|passwd|api[_-]?key|authorization|cookie|card|cvv|iban|ssn)/i.test(key)) metadata[key] = "[redacted]";
+    else if (typeof value === "string") metadata[key] = value.length > 200 ? `${value.slice(0, 200)}…(${value.length} chars)` : value;
+    else if (Array.isArray(value)) metadata[key] = { type: "array", length: value.length };
+    else if (value && typeof value === "object") metadata[key] = { type: "object", keys: Object.keys(value as object).slice(0, 12) };
+    else metadata[key] = value;
   }
   return metadata;
 }
@@ -132,10 +101,7 @@ export async function executeTool(
 
   const grant = grants.get(name);
   const started = Date.now();
-  const log = async (
-    status: "succeeded" | "failed" | "cancelled",
-    extra: Record<string, unknown>,
-  ) => {
+  const log = async (status: "succeeded" | "failed" | "cancelled", extra: Record<string, unknown>) => {
     await ctx.sb.from("tool_executions").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId,
@@ -168,7 +134,9 @@ export async function executeTool(
         ? await runSocialOpsTool(input, localCtx)
         : name === "html_studio"
           ? await runHtmlStudioTool(input, localCtx)
-          : await runAgentWorkspaceTool(input, localCtx);
+          : name === "agent_workspace"
+            ? await runAgentWorkspaceTool(input, localCtx)
+            : await runSeoTool(input, localCtx);
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
