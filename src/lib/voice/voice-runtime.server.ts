@@ -67,9 +67,9 @@ export async function transcribeOpenAiSpeech(input: {
   prompt?: string | null;
 }) {
   const auth = openAiHeaders();
-  const buffer = Buffer.from(input.base64, "base64");
+  const fileBytes = Uint8Array.from(Buffer.from(input.base64, "base64")).buffer;
   const form = new FormData();
-  form.set("file", new Blob([buffer], { type: input.mimeType }), input.filename);
+  form.set("file", new Blob([fileBytes], { type: input.mimeType }), input.filename);
   form.set("model", input.model ?? process.env.OPENAI_STT_MODEL ?? "gpt-4o-mini-transcribe");
   if (input.language) form.set("language", input.language);
   if (input.prompt) form.set("prompt", input.prompt);
