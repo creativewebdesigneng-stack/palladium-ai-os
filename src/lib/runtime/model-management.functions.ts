@@ -14,7 +14,7 @@ const PROVIDERS: ProviderDefinition[] = [
   { id: "openai", name: "OpenAI", defaultModel: "gpt-5-mini" },
   { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
   { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-5-20250929" },
-  { id: "compatible", name: "OpenAI-compatible endpoint", defaultModel: "local-model" },
+  { id: "compatible", name: "Local / OpenAI-compatible (Jan supported)", defaultModel: "local-model" },
 ];
 
 function configured(provider: ProviderId): boolean {
