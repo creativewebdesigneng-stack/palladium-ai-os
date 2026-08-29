@@ -24,6 +24,7 @@ const WORKFORCE = [
   ['Model Arena', '/model-arena', FlaskConical],
   ['Voice Studio', '/voice-studio', Mic2],
   ['Media Studio', '/media-studio', Clapperboard],
+  ['3D Studio', '/three-d-studio', Blocks],
   ['Agent Workspaces', '/agent-workspaces', Layers3],
   ['Agents', '/agents', Bot],
   ['Agent Builder', '/agent-builder', Hammer],
