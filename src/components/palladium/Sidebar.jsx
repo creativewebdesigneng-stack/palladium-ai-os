@@ -13,6 +13,7 @@ const MAIN = [
   ['Home', '/dashboard', Home],
   ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
+  ['Work OS', '/work-os', Layers3],
   ['Organisations', '/organisation', Building2],
 ];
 
