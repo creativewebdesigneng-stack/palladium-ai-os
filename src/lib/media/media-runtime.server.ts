@@ -1,3 +1,5 @@
+import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
+
 const WORKER_URL = (process.env['AUTO_EDITOR_WORKER_URL'] ?? '').replace(/\/$/, '');
 
 function headers() {
@@ -35,7 +37,7 @@ export async function submitAutoEditorJob(input: {
   const result = parsed as Record<string, unknown>;
   const id = typeof result['id'] === 'string' ? result['id'] : typeof result['jobId'] === 'string' ? result['jobId'] : null;
   if (!id) throw new Error('Media worker did not return a job ID.');
-  return { workerJobId: id, status: normalizeStatus(result['status']), outputUrl: typeof result['outputUrl'] === 'string' ? result['outputUrl'] : null };
+  return { workerJobId: id, status: normalizeMediaJobStatus(result['status']), outputUrl: typeof result['outputUrl'] === 'string' ? result['outputUrl'] : null };
 }
 
 export async function getAutoEditorJob(workerJobId: string) {
@@ -48,17 +50,9 @@ export async function getAutoEditorJob(workerJobId: string) {
   if (!parsed || typeof parsed !== 'object') throw new Error('Media worker returned an invalid status response.');
   const result = parsed as Record<string, unknown>;
   return {
-    status: normalizeStatus(result['status']),
+    status: normalizeMediaJobStatus(result['status']),
     outputUrl: typeof result['outputUrl'] === 'string' ? result['outputUrl'] : null,
     errorMessage: typeof result['error'] === 'string' ? result['error'] : null,
     metadata: result,
   };
-}
-
-function normalizeStatus(value: unknown): 'queued' | 'running' | 'completed' | 'failed' {
-  const status = String(value ?? '').toLowerCase();
-  if (status === 'completed' || status === 'complete' || status === 'ready' || status === 'success') return 'completed';
-  if (status === 'failed' || status === 'error' || status === 'cancelled') return 'failed';
-  if (status === 'running' || status === 'processing' || status === 'active') return 'running';
-  return 'queued';
 }
