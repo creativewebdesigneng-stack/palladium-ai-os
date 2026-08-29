@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { FilePlus2, Loader2, Save, Sparkles, Trash2 } from 'lucide-react';
+import { Eye, FilePlus2, Loader2, Save, Sparkles, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import PageHeader from '@/components/palladium/PageHeader';
 import DocumentsToolbar from '@/components/documents/DocumentsToolbar';
 import DocumentTypes from '@/components/documents/DocumentTypes';
 import AIDocumentsPanel from '@/components/documents/AIDocumentsPanel';
 import { DocumentsGrid, StarterPromptsView } from '@/components/documents/DocumentsViews';
 import { TYPES } from '@/components/documents/documentsConfig';
+import { transformMarkdocPreview } from '@/lib/documents/markdoc-lite';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
 import { useToast } from '@/components/ui/use-toast';
@@ -49,6 +51,7 @@ export default function Documents() {
   const [generationType, setGenerationType] = useState('document');
   const [translationLanguage, setTranslationLanguage] = useState('English');
   const [runningTransform, setRunningTransform] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const workspace = useQuery({
     queryKey: ['documents-workspace'],
@@ -61,6 +64,7 @@ export default function Documents() {
   const metrics = workspace.data?.metrics ?? { total: 0, aiGenerated: 0, derived: 0, updatedThisWeek: 0, words: 0 };
   const selectedDocument = useMemo(() => documents.find((document) => document.id === selectedId) ?? null, [documents, selectedId]);
   const visibleDocuments = view === 'ai' ? documents.filter((document) => String(document.source || '').startsWith('ai_')) : documents;
+  const structuredPreview = useMemo(() => transformMarkdocPreview(draft.body || ''), [draft.body]);
 
   useEffect(() => {
     if (selectedId && selectedDocument) setDraft(toDraft(selectedDocument));
@@ -150,7 +154,7 @@ export default function Documents() {
       <PageHeader
         eyebrow="Workspace"
         title="Documents & Reports"
-        description="Create, save and transform real documents in your private workspace. AI actions run through your configured PalladiumAI model provider."
+        description="Create, save and transform real documents in your private workspace. Markdown documents now support a safe Markdoc-style structured preview without introducing another document store."
         action={<button onClick={() => beginNew('document')} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-zinc-200 hover:bg-white/[.07]"><FilePlus2 className="h-3.5 w-3.5" />New document</button>}
       />
 
@@ -201,7 +205,10 @@ export default function Documents() {
               <h3 className="text-sm font-semibold text-white">{draft.id ? 'Document editor' : 'New document'}</h3>
               <p className="text-[11px] text-zinc-500">Changes are saved to your private workspace only when you press Save.</p>
             </div>
-            {draft.id && <button onClick={() => remove.mutate()} disabled={remove.isPending} className="rounded-lg border border-rose-400/20 p-2 text-rose-300 hover:bg-rose-400/10 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>}
+            <div className="flex items-center gap-1.5">
+              {draft.format === 'md' && <button onClick={() => setPreviewOpen((value) => !value)} className={`rounded-lg border p-2 ${previewOpen ? 'border-violet-400/30 bg-violet-400/10 text-violet-200' : 'border-white/10 text-zinc-400 hover:bg-white/5'}`} title="Structured Markdown preview"><Eye className="h-4 w-4" /></button>}
+              {draft.id && <button onClick={() => remove.mutate()} disabled={remove.isPending} className="rounded-lg border border-rose-400/20 p-2 text-rose-300 hover:bg-rose-400/10 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>}
+            </div>
           </div>
           <div className="space-y-3">
             <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Document title" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-violet-400/50" />
@@ -214,6 +221,7 @@ export default function Documents() {
               </select>
             </div>
             <textarea value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder="Write your document here…" rows={18} className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-3 py-3 font-mono text-xs leading-5 text-zinc-200 outline-none focus:border-violet-400/50" />
+            {previewOpen && draft.format === 'md' && <div className="rounded-xl border border-violet-400/15 bg-[#0d0f15] p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-medium text-white">Structured Markdown preview</p><p className="mt-0.5 text-[10px] text-zinc-500">Supports ordinary Markdown plus safe Markdoc-style callout and badge tags. Unsupported tags remain text and never execute code.</p></div>{structuredPreview.tags.length > 0 && <div className="flex gap-1">{structuredPreview.tags.map((tag) => <span key={tag} className="rounded-full border border-violet-400/20 px-2 py-0.5 text-[9px] uppercase text-violet-300">{tag}</span>)}</div>}</div><div className="prose prose-invert prose-sm max-w-none text-zinc-300"><ReactMarkdown>{structuredPreview.markdown}</ReactMarkdown></div><div className="mt-3 rounded-lg border border-white/5 bg-black/20 p-2 font-mono text-[10px] leading-4 text-zinc-600">Example: {'{% callout type="warning" %}'} Important text {'{% /callout %}'} · {'{% badge text="Beta" %}'}</div></div>}
             <button onClick={() => save.mutate()} disabled={save.isPending || !draft.title.trim()} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white hover:bg-violet-500 disabled:opacity-50">
               {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save document
             </button>
