@@ -143,17 +143,19 @@ export const runModelArena = createServerFn({ method: "POST" })
         maxTokens: 1400,
       });
       const judged = parseJudgeJson(judgeResult.text);
-      const scores = judged
-        .filter((score) => score.index < responseRows.length)
-        .map((score) => ({
+      const scores = judged.map((score) => {
+        const response = responseRows[score.index];
+        if (!response) throw new Error(`The judge returned an invalid candidate index: ${score.index}.`);
+        return {
           run_id: run.id,
-          response_id: responseRows[score.index].id,
+          response_id: response.id,
           evaluator_type: "llm_judge",
           score: score.score,
           verdict: score.verdict ?? null,
           reasoning: score.reasoning ?? null,
           criteria: { names: criteria, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model },
-        }));
+        };
+      });
       if (scores.length !== responseRows.length) throw new Error("The judge did not score every candidate response.");
       const { error: scoreError } = await sb.from("model_eval_scores").insert(scores);
       if (scoreError) throw new Error(scoreError.message);
