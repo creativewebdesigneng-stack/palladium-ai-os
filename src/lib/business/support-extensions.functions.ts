@@ -29,13 +29,16 @@ export const getSupportExtensions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [inboxes, articles, responses, capabilities] = await Promise.all([
-      sb.from("support_inboxes").select("id,name,channel,integration_provider,integration_connection_id,business_hours,auto_assignment,status,created_at,updated_at").order("created_at", { ascending: false }).limit(100),
-      sb.from("support_help_articles").select("id,title,slug,summary,locale,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(100),
-      sb.from("support_canned_responses").select("id,name,shortcut,content,created_at,updated_at").order("name").limit(100),
-      listIntegrationCapabilities(context.userId),
-    ]);
-    for (const result of [inboxes, articles, responses]) if (result.error) throw new Error(result.error.message);
+    const inboxes = await sb.from("support_inboxes").select("id,name,channel,integration_provider,integration_connection_id,business_hours,auto_assignment,status,created_at,updated_at").order("created_at", { ascending: false }).limit(100);
+    if (inboxes.error) throw new Error(inboxes.error.message);
+
+    const articles = await sb.from("support_help_articles").select("id,title,slug,summary,locale,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(100);
+    if (articles.error) throw new Error(articles.error.message);
+
+    const responses = await sb.from("support_canned_responses").select("id,name,shortcut,content,created_at,updated_at").order("name").limit(100);
+    if (responses.error) throw new Error(responses.error.message);
+
+    const capabilities = await listIntegrationCapabilities(context.userId);
     return {
       inboxes: inboxes.data ?? [],
       articles: articles.data ?? [],
