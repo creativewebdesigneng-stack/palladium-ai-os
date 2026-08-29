@@ -5,6 +5,14 @@ import { writeAudit } from "@/lib/platform/audit.server";
 import { runChat, type Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
+type ArenaPolicy = {
+  redact_email?: boolean | null;
+  redact_phone?: boolean | null;
+  redact_secrets?: boolean | null;
+  blocked_terms?: unknown;
+  apply_to_requests?: boolean | null;
+  apply_to_responses?: boolean | null;
+};
 
 const providerSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible"]);
 const contestantSchema = z.object({
@@ -17,6 +25,42 @@ async function requireOrgMember(sb: Sb, orgId: string, userId: string) {
   const { data, error } = await sb.from("organisation_members").select("role").eq("org_id", orgId).eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("You do not have access to this workspace.");
+}
+
+async function loadArenaPolicy(sb: Sb, userId: string): Promise<ArenaPolicy | null> {
+  const { data, error } = await sb.from("model_eval_policies")
+    .select("redact_email,redact_phone,redact_secrets,blocked_terms,apply_to_requests,apply_to_responses")
+    .eq("user_id", userId)
+    .eq("enabled", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ?? null;
+}
+
+function applyArenaPolicy(text: string, policy: ArenaPolicy | null, direction: "request" | "response") {
+  if (!policy) return text;
+  const shouldApply = direction === "request" ? policy.apply_to_requests !== false : policy.apply_to_responses !== false;
+  if (!shouldApply) return text;
+
+  const blockedTerms = Array.isArray(policy.blocked_terms)
+    ? policy.blocked_terms.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  const lowered = text.toLowerCase();
+  const blocked = blockedTerms.find((term) => lowered.includes(term.toLowerCase()));
+  if (blocked) throw new Error(`Arena compliance policy blocked ${direction} content containing a restricted term.`);
+
+  let safe = text;
+  if (policy.redact_email !== false) safe = safe.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]");
+  if (policy.redact_phone !== false) safe = safe.replace(/(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)/g, "[REDACTED_PHONE]");
+  if (policy.redact_secrets !== false) {
+    safe = safe
+      .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, "[REDACTED_SECRET]")
+      .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/gi, "Bearer [REDACTED_SECRET]")
+      .replace(/\b(api[_-]?key|access[_-]?token|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED_SECRET]");
+  }
+  return safe;
 }
 
 function parseJudgeJson(raw: string): Array<{ index: number; score: number; verdict?: string; reasoning?: string }> {
@@ -82,16 +126,19 @@ export const runModelArena = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     if (data.orgId) await requireOrgMember(sb, data.orgId, context.userId);
+    const policy = await loadArenaPolicy(sb, context.userId);
+    const safePrompt = applyArenaPolicy(data.prompt, policy, "request");
+    const safeSystemPrompt = data.systemPrompt ? applyArenaPolicy(data.systemPrompt, policy, "request") : null;
     const { data: run, error: runError } = await sb.from("model_eval_runs").insert({
       user_id: context.userId,
       org_id: data.orgId ?? null,
       name: data.name,
-      prompt: data.prompt,
+      prompt: safePrompt,
       evaluation_mode: "llm_judge",
       status: "running",
       judge_provider: data.judge.provider,
       judge_model: data.judge.model,
-      metadata: { criteria: data.criteria ?? ["correctness", "helpfulness", "clarity"] },
+      metadata: { criteria: data.criteria ?? ["correctness", "helpfulness", "clarity"], complianceApplied: Boolean(policy) },
     }).select("id,name").single();
     if (runError) throw new Error(runError.message);
 
@@ -103,21 +150,22 @@ export const runModelArena = createServerFn({ method: "POST" })
           provider: contestant.provider as Provider,
           model: contestant.model,
           messages: [
-            ...(data.systemPrompt ? [{ role: "system" as const, content: data.systemPrompt }] : []),
-            { role: "user", content: data.prompt },
+            ...(safeSystemPrompt ? [{ role: "system" as const, content: safeSystemPrompt }] : []),
+            { role: "user", content: safePrompt },
           ],
           maxTokens: 1600,
         });
+        const safeResponse = applyArenaPolicy(result.text, policy, "response");
         const row = {
           run_id: run.id,
           provider: result.provider,
           model: result.model,
           label: contestant.label ?? `${contestant.provider}/${contestant.model}`,
-          response_text: result.text,
+          response_text: safeResponse,
           latency_ms: Math.max(0, Date.now() - started),
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
-          metadata: {},
+          metadata: { complianceApplied: Boolean(policy) },
         };
         const { data: saved, error } = await sb.from("model_eval_responses").insert(row)
           .select("id,provider,model,label,response_text,latency_ms,input_tokens,output_tokens").single();
@@ -137,7 +185,7 @@ export const runModelArena = createServerFn({ method: "POST" })
           },
           {
             role: "user",
-            content: `PROMPT\n${data.prompt}\n\nCRITERIA\n${criteria.join("; ")}\n\nCANDIDATES\n${anonymized}`,
+            content: `PROMPT\n${safePrompt}\n\nCRITERIA\n${criteria.join("; ")}\n\nCANDIDATES\n${anonymized}`,
           },
         ],
         maxTokens: 1400,
@@ -168,11 +216,11 @@ export const runModelArena = createServerFn({ method: "POST" })
         targetType: "model_eval_run",
         targetId: run.id,
         status: "success",
-        metadata: { contestants: data.contestants.length, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model },
+        metadata: { contestants: data.contestants.length, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model, complianceApplied: Boolean(policy) },
       });
       return { runId: run.id, responses: responseRows, scores };
     } catch (error) {
-      await sb.from("model_eval_runs").update({ status: "failed", completed_at: new Date().toISOString(), metadata: { failure: error instanceof Error ? error.message : "Evaluation failed" } }).eq("id", run.id);
+      await sb.from("model_eval_runs").update({ status: "failed", completed_at: new Date().toISOString(), metadata: { failure: error instanceof Error ? error.message : "Evaluation failed", complianceApplied: Boolean(policy) } }).eq("id", run.id);
       await writeAudit({ userId: context.userId, orgId: data.orgId ?? null, action: "model_eval.failed", targetType: "model_eval_run", targetId: run.id, status: "failed" });
       throw error;
     }
