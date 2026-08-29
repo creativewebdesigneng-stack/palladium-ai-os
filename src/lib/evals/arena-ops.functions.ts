@@ -20,7 +20,7 @@ export const getArenaPolicy = createServerFn({ method: "POST" })
     return data ?? null;
   });
 
-export const saveArenaPolicy = createServerFn({ method: "POST"" })
+export const saveArenaPolicy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
