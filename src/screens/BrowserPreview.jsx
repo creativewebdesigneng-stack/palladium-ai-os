@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { getBrowserControl } from '@/lib/browser/browser.functions';
+import { getAutomationProviderStatus } from '@/lib/integrations/automation-providers.functions';
 import { friendlyMessage } from '@/lib/errors';
 
 function stateClasses(state) {
@@ -37,14 +38,21 @@ function formatDate(value) {
 export default function BrowserPreview() {
   const navigate = useNavigate();
   const controlFn = useServerFn(getBrowserControl);
+  const providerFn = useServerFn(getAutomationProviderStatus);
   const control = useQuery({
     queryKey: ['browser-control'],
     queryFn: () => controlFn({ data: {} }),
     retry: false,
   });
+  const providers = useQuery({
+    queryKey: ['automation-provider-status'],
+    queryFn: () => providerFn({ data: undefined }),
+    retry: false,
+  });
 
   const data = control.data;
   const browser = data?.browser;
+  const browserUse = providers.data?.browserUse;
   const sessions = data?.sessions ?? [];
   const executions = data?.executions ?? [];
   const counts = data?.counts ?? { sessions: 0, active: 0, steps: 0, domains: 0 };
@@ -54,7 +62,7 @@ export default function BrowserPreview() {
       <PageHeader
         eyebrow="Workspace"
         title="Browser Preview"
-        description="Live browser-provider health, recorded sessions and browser tool activity. No fixture sessions or fake telemetry are shown here."
+        description="Live browser-provider health, recorded sessions and browser tool activity. Browser Use is an optional provider behind PalladiumAI's existing browser safety and audit layer."
       />
 
       {control.isLoading ? (
@@ -80,8 +88,20 @@ export default function BrowserPreview() {
                 </div>
                 <p className="mt-2 max-w-3xl text-xs leading-5 opacity-75">{browser?.detail ?? 'Browser provider status is unavailable.'}</p>
               </div>
-              <button onClick={() => control.refetch()} className="rounded-xl border border-current/20 px-3 py-2 text-xs font-medium hover:bg-white/[.05]">Refresh status</button>
+              <button onClick={() => { control.refetch(); providers.refetch(); }} className="rounded-xl border border-current/20 px-3 py-2 text-xs font-medium hover:bg-white/[.05]">Refresh status</button>
             </div>
+          </section>
+
+          <section className="mt-4 rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Globe2 className="h-4 w-4 text-violet-300" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-white">Browser Use provider</p>
+                <p className="mt-1 text-[11px] leading-5 text-zinc-500">{browserUse?.detail ?? 'Optional browser-agent provider status is unavailable.'}</p>
+              </div>
+              <span className={`rounded-full border px-2 py-1 text-[10px] ${browserUse?.configured ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300'}`}>{browserUse?.configured ? 'Configured' : 'Needs env'}</span>
+            </div>
+            <p className="mt-3 text-[10px] text-zinc-600">Browser Use does not bypass PalladiumAI: sessions, domain restrictions, tool permissions and audit telemetry remain authoritative here.</p>
           </section>
 
           <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
