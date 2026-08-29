@@ -13,6 +13,16 @@ type ArenaPolicy = {
   apply_to_requests?: boolean | null;
   apply_to_responses?: boolean | null;
 };
+type ModelEvalResponse = {
+  id: string;
+  provider: string;
+  model: string;
+  label: string | null;
+  response_text: string;
+  latency_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+};
 
 const providerSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible"]);
 const contestantSchema = z.object({
@@ -56,14 +66,14 @@ function applyArenaPolicy(text: string, policy: ArenaPolicy | null, direction: "
   if (policy.redact_phone !== false) safe = safe.replace(/(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)/g, "[REDACTED_PHONE]");
   if (policy.redact_secrets !== false) {
     safe = safe
-      .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, "[REDACTED_SECRET]")
+      .replace(/\bs[kK]-[A-Za-z0-9_-]{16,}\b/g, "[REDACTED_SECRET]")
       .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{16,}\b/gi, "Bearer [REDACTED_SECRET]")
       .replace(/\b(api[_-]?key|access[_-]?token|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED_SECRET]");
   }
   return safe;
 }
 
-function parseJudgeJson(raw: string): Array<{ index: number; score: number; verdict?: string; reasoning?: string }> {
+function parseJudgeJson(raw: string): Array<{ index: number; score: number; verdict?: string | undefined; reasoning?: string | undefined }> {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? raw;
   const first = fenced.indexOf("[");
   const last = fenced.lastIndexOf("]");
@@ -143,7 +153,7 @@ export const runModelArena = createServerFn({ method: "POST" })
     if (runError) throw new Error(runError.message);
 
     try {
-      const responseRows = [];
+      const responseRows: ModelEvalResponse[] = [];
       for (const contestant of data.contestants) {
         const started = Date.now();
         const result = await runChat({
@@ -170,7 +180,7 @@ export const runModelArena = createServerFn({ method: "POST" })
         const { data: saved, error } = await sb.from("model_eval_responses").insert(row)
           .select("id,provider,model,label,response_text,latency_ms,input_tokens,output_tokens").single();
         if (error) throw new Error(error.message);
-        responseRows.push(saved);
+        responseRows.push(saved as ModelEvalResponse);
       }
 
       const criteria = data.criteria ?? ["correctness", "helpfulness", "clarity"];
