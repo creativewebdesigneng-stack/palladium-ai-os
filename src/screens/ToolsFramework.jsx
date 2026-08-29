@@ -8,6 +8,7 @@ import { useUpgrade } from '@/lib/upgradeContext';
 import ToolsTab from '@/components/tools-framework/ToolsTab';
 import IntegrationsTab from '@/components/tools-framework/IntegrationsTab';
 import BrowserPolicyPanel, { ExecutionLog } from '@/components/tools-framework/BrowserPolicyPanel';
+import AppStudioPanel from '@/components/tools-framework/AppStudioPanel';
 import { getToolFramework, saveToolPermission, runToolManually } from '@/lib/tools/tools.functions';
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'policy', label: 'Browser & domains', icon: Globe },
   { id: 'executions', label: 'Execution log', icon: ScrollText },
   { id: 'integrations', label: 'Integrations', icon: Plug },
+  { id: 'app-studio', label: 'App Studio' },
 ];
 
 const PLAN_LABEL = { explorer: 'free', builder: 'pro', business: 'business', enterprise: 'enterprise' };
@@ -157,6 +159,7 @@ export default function ToolsFramework() {
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
       {tab === 'integrations' && <IntegrationsTab catalogue={integrationCatalogue} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}
+      {tab === 'app-studio' && <AppStudioPanel toast={toast} />}
     </div>
   );
 }
