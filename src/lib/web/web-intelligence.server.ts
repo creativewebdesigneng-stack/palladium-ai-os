@@ -7,7 +7,7 @@ type RunInput = {
   provider: WebProvider;
   operation: WebOperation;
   source: string;
-  limit?: number;
+  limit?: number | undefined;
 };
 
 function env(name: string) {
