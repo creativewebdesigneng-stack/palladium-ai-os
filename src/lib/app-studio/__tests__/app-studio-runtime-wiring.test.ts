@@ -8,13 +8,15 @@ const tools = readFileSync(
 );
 
 describe("App Studio runtime wiring", () => {
-  it("replaces the legacy core definition with the expanded App Studio definition", () => {
+  it("registers App Studio through the current local extension registry", () => {
     expect(tools).toContain("APP_STUDIO_TOOL_DEF");
-    expect(tools).toContain('definition.name === "app_studio" ? APP_STUDIO_TOOL_DEF : definition');
+    expect(tools).toContain("LOCAL_TOOL_DEFS");
+    expect(tools).toContain('"app_studio"');
+    expect(tools).toContain("...CORE_TOOL_MANIFEST");
   });
 
   it("executes App Studio through the bounded dedicated runtime and Harness", () => {
-    expect(tools).toContain('name !== "skill_script" && name !== "app_studio"');
+    expect(tools).toContain("if (!LOCAL_TOOL_NAMES.has(name)) return executeCoreTool(name, input, ctx, grants)");
     expect(tools).toContain("assertHarnessToolInput(name, input, grant.allowedDomains)");
     expect(tools).toContain("runAppStudioTool");
     expect(tools).toContain('tool: name');
