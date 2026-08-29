@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { FREELLMAPI_PROFILE } from "./freellmapi-profile";
 
 type Sb = { from: (t: string) => any };
 type ProviderId = "lovable" | "openai" | "anthropic" | "deepseek" | "compatible";
@@ -7,6 +8,8 @@ type ProviderDefinition = {
   id: ProviderId;
   name: string;
   defaultModel: string;
+  integrations?: string[];
+  routingNote?: string;
 };
 
 const PROVIDERS: ProviderDefinition[] = [
@@ -14,7 +17,14 @@ const PROVIDERS: ProviderDefinition[] = [
   { id: "openai", name: "OpenAI", defaultModel: "gpt-5-mini" },
   { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
   { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-5-20250929" },
-  { id: "compatible", name: "Local / OpenAI-compatible (Jan supported)", defaultModel: "local-model" },
+  {
+    id: "compatible",
+    name: "Local / OpenAI-compatible",
+    defaultModel: "local-model",
+    integrations: ["Jan", FREELLMAPI_PROFILE.name],
+    routingNote:
+      "FreeLLMAPI can own its upstream provider pool, quota-aware routing and fallback while PalladiumAI keeps agent routing and outer provider failover.",
+  },
 ];
 
 function configured(provider: ProviderId): boolean {
@@ -104,11 +114,15 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       name: string;
       defaultModel: string;
       configured: boolean;
+      integrations?: string[];
+      routingNote?: string;
     }> = PROVIDERS.map((provider) => ({
       id: provider.id,
       name: provider.name,
       defaultModel: provider.defaultModel,
       configured: configured(provider.id),
+      ...(provider.integrations ? { integrations: provider.integrations } : {}),
+      ...(provider.routingNote ? { routingNote: provider.routingNote } : {}),
     }));
 
     return {
