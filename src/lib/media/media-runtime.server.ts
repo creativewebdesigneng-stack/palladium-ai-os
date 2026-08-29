@@ -2,9 +2,28 @@ import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
 
 const WORKER_URL = (process.env['AUTO_EDITOR_WORKER_URL'] ?? '').replace(/\/$/, '');
 
-function headers() {
+type SerializableValue = string | number | boolean | null | SerializableValue[] | { [key: string]: SerializableValue };
+type SerializableObject = { [key: string]: SerializableValue };
+
+function headers(): Record<string, string> {
   const token = process.env['AUTO_EDITOR_WORKER_TOKEN'];
   return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+function toSerializable(value: unknown): SerializableValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) return value.map(toSerializable);
+  if (value && typeof value === 'object') {
+    const output: SerializableObject = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol' && typeof entry !== 'bigint') {
+        output[key] = toSerializable(entry);
+      }
+    }
+    return output;
+  }
+  return null;
 }
 
 export function getMediaRuntimeCapabilities() {
@@ -53,6 +72,6 @@ export async function getAutoEditorJob(workerJobId: string) {
     status: normalizeMediaJobStatus(result['status']),
     outputUrl: typeof result['outputUrl'] === 'string' ? result['outputUrl'] : null,
     errorMessage: typeof result['error'] === 'string' ? result['error'] : null,
-    metadata: result,
+    metadata: toSerializable(result) as SerializableObject,
   };
 }
