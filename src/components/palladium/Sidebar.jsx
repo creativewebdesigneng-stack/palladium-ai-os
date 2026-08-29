@@ -33,6 +33,7 @@ const WORKFORCE = [
   ['Knowledge', '/knowledge', BookOpen],
   ['Recall Notes', '/recall-notes', FileText],
   ['Files', '/files', Files],
+  ['Sync Center', '/sync-center', Files],
   ['Tools Framework', '/tools-framework', Blocks],
   ['HTML Studio', '/html-studio', Code2],
   ['Integrations', '/integrations', Plug],
@@ -48,6 +49,8 @@ const BUSINESS = [
   ['Product Analytics', '/product-analytics', LineChart],
   ['Business Intelligence', '/business-intelligence', LineChart],
   ['Finance', '/finance', Banknote],
+  ['Quant Studio', '/quant-studio', LineChart],
+  ['Commerce Studio', '/commerce-studio', Store],
   ['CRM', '/crm', Contact],
   ['CRM Studio', '/crm-studio', Settings2],
   ['WhatsApp CRM', '/whatsapp-crm', MessageCircle],
@@ -105,85 +108,28 @@ function Item({ label, path, Icon, collapsed, closeMobile, end }) {
 export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
   const { user, entitlements } = useAuth();
   const isAdmin = user?.role === 'admin';
-
   const taskLimit = Number(entitlements?.limits?.tasks_per_month ?? 0);
   const tasksUsed = Number(entitlements?.usage?.tasksThisMonth ?? 0);
   const unlimited = taskLimit < 0;
   const pct = unlimited || taskLimit === 0 ? 0 : Math.min(100, Math.round((tasksUsed / taskLimit) * 100));
 
   return (
-    <aside
-      className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#090a0f]/95 backdrop-blur-xl transition-all duration-300 md:translate-x-0 ${collapsed ? 'md:w-20' : 'md:w-64'} w-64`}
-      aria-label="Primary navigation"
-    >
-      <div className="flex h-16 items-center px-5">
-        <Brand compact={collapsed} />
-      </div>
-
+    <aside className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#090a0f]/95 backdrop-blur-xl transition-all duration-300 md:translate-x-0 ${collapsed ? 'md:w-20' : 'md:w-64'} w-64`} aria-label="Primary navigation">
+      <div className="flex h-16 items-center px-5"><Brand compact={collapsed} /></div>
       <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Main">
         {!collapsed && <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Workspace</p>}
-        <ul className="space-y-1">
-          {MAIN.map(([label, path, Icon]) => (
-            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} end={path === '/dashboard'} /></li>
-          ))}
-        </ul>
-
+        <ul className="space-y-1">{MAIN.map(([label, path, Icon]) => <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} end={path === '/dashboard'} /></li>)}</ul>
         {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">AI Workforce</p>}
-        <ul className="space-y-1">
-          {WORKFORCE.map(([label, path, Icon]) => (
-            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
-          ))}
-        </ul>
-
+        <ul className="space-y-1">{WORKFORCE.map(([label, path, Icon]) => <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>)}</ul>
         {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Business</p>}
-        <ul className="space-y-1">
-          {BUSINESS.map(([label, path, Icon]) => (
-            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
-          ))}
-        </ul>
-
+        <ul className="space-y-1">{BUSINESS.map(([label, path, Icon]) => <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>)}</ul>
         {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Account</p>}
-        <ul className="space-y-1">
-          {BOTTOM.map(([label, path, Icon]) => (
-            <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
-          ))}
-        </ul>
-
-        {isAdmin && (
-          <>
-            {!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500/70">Administration</p>}
-            <ul className="space-y-1">
-              {ADMIN.map(([label, path, Icon]) => (
-                <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>
-              ))}
-            </ul>
-          </>
-        )}
+        <ul className="space-y-1">{BOTTOM.map(([label, path, Icon]) => <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>)}</ul>
+        {isAdmin && <>{!collapsed && <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500/70">Administration</p>}<ul className="space-y-1">{ADMIN.map(([label, path, Icon]) => <li key={path}><Item label={label} path={path} Icon={Icon} collapsed={collapsed} closeMobile={closeMobile} /></li>)}</ul></>}
       </nav>
-
-      <Link
-        to="/billing"
-        onClick={closeMobile}
-        className="m-3 block rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs text-zinc-400 transition hover:border-violet-400/30 hover:bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-        aria-label="Plan and usage — open billing"
-      >
-        {collapsed ? (
-          <div className="flex justify-center"><CreditCard className="h-4 w-4 text-violet-400" /></div>
-        ) : (
-          <>
-            <p className="font-medium text-white">{entitlements?.planName ?? 'Explorer'} workspace</p>
-            <p className="mt-1">
-              {unlimited
-                ? `${tasksUsed.toLocaleString()} tasks this month · unlimited`
-                : `${tasksUsed.toLocaleString()} / ${taskLimit.toLocaleString()} monthly tasks`}
-            </p>
-            <div className="mt-2 h-1 rounded-full bg-white/10">
-              <div className="h-1 rounded-full bg-violet-500 transition-all" style={{ width: `${unlimited ? 8 : pct}%` }} />
-            </div>
-          </>
-        )}
+      <Link to="/billing" onClick={closeMobile} className="m-3 block rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs text-zinc-400 transition hover:border-violet-400/30 hover:bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40" aria-label="Plan and usage — open billing">
+        {collapsed ? <div className="flex justify-center"><CreditCard className="h-4 w-4 text-violet-400" /></div> : <><p className="font-medium text-white">{entitlements?.planName ?? 'Explorer'} workspace</p><p className="mt-1">{unlimited ? `${tasksUsed.toLocaleString()} tasks this month · unlimited` : `${tasksUsed.toLocaleString()} / ${taskLimit.toLocaleString()} monthly tasks`}</p><div className="mt-2 h-1 rounded-full bg-white/10"><div className="h-1 rounded-full bg-violet-500 transition-all" style={{ width: `${unlimited ? 8 : pct}%` }} /></div></>}
       </Link>
-
     </aside>
   );
 }
