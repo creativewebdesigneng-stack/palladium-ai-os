@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Mic2,
+  FileText, Layers3, Search, FlaskConical, Mic2, Settings2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -45,6 +45,7 @@ const BUSINESS = [
   ['Business Intelligence', '/business-intelligence', LineChart],
   ['Finance', '/finance', Banknote],
   ['CRM', '/crm', Contact],
+  ['CRM Studio', '/crm-studio', Settings2],
   ['WhatsApp CRM', '/whatsapp-crm', MessageCircle],
   ['Marketing', '/marketing', Megaphone],
   ['SEO Studio', '/seo-studio', Search],
