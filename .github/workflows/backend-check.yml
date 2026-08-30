@@ -39,7 +39,15 @@ jobs:
         run: bun run typecheck
 
       - name: Tests
-        run: bun run test
+        run: bun run test 2>&1 | tee /tmp/tests.log
+
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          path: /tmp/tests.log
+          if-no-files-found: ignore
 
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
