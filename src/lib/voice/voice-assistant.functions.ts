@@ -21,7 +21,7 @@ export const DEFAULT_VOICE_ASSISTANT_PREFERENCES: VoiceAssistantPreferences = {
   rate: 1,
   pitch: 1,
   announce_notifications: true,
-  wake_word_enabled: true,
+  wake_word_enabled: false,
 };
 
 const preferenceSchema = z.object({
@@ -52,7 +52,7 @@ export const getVoiceAssistantPreferences = createServerFn({ method: "POST" })
       rate: Number(data.rate ?? 1),
       pitch: Number(data.pitch ?? 1),
       announce_notifications: data.announce_notifications ?? true,
-      wake_word_enabled: data.wake_word_enabled ?? true,
+      wake_word_enabled: data.wake_word_enabled ?? false,
     };
   });
 
