@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 
-const OPENAI_AUDIO_BASE_URL = (process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com/v1").replace(/\/$/, "");
+const OPENAI_AUDIO_BASE_URL = (process.env["OPENAI_AUDIO_BASE_URL"] ?? "https://api.openai.com/v1").replace(/\/$/, "");
+const DEFAULT_STT_MODEL = process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe";
 
 function openAiHeaders() {
   const key = process.env["OPENAI_API_KEY"];
@@ -17,7 +18,7 @@ export function getVoiceRuntimeCapabilities() {
       customVoices: true,
       customVoiceNote: "Custom voice IDs require an eligible OpenAI account and prior consent-backed voice creation.",
       ttsDefaultModel: process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts",
-      sttDefaultModel: process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe",
+      sttDefaultModel: DEFAULT_STT_MODEL,
       voices: ["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"],
       formats: ["mp3", "opus", "aac", "flac", "wav", "pcm"],
     },
@@ -58,6 +59,49 @@ export async function synthesizeOpenAiSpeech(input: {
   };
 }
 
+export function shouldRetryTranscriptionModel(status: number, raw: string) {
+  if (status === 404) return true;
+  if (status !== 400 && status !== 422) return false;
+  return /model|unsupported|does not exist|not found|unknown/i.test(raw);
+}
+
+export function transcriptionFailureMessage(status: number) {
+  if (status === 401 || status === 403) return "Cloud speech credentials were rejected by the transcription provider.";
+  if (status === 429) return "Cloud speech transcription is rate limited or out of quota.";
+  if (status === 413) return "Cloud speech audio segment was too large.";
+  if (status === 400 || status === 415 || status === 422) return "Cloud speech provider rejected the recorded audio segment.";
+  if (status >= 500) return "Cloud speech provider is temporarily unavailable.";
+  return `Cloud speech transcription failed (${status}).`;
+}
+
+function transcriptionModels(inputModel?: string) {
+  const primary = inputModel ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe";
+  return Array.from(new Set([primary, "whisper-1"]));
+}
+
+async function requestTranscription(input: {
+  auth: string;
+  fileBytes: ArrayBuffer;
+  filename: string;
+  mimeType: string;
+  model: string;
+  language?: string | null | undefined;
+  prompt?: string | null | undefined;
+}) {
+  const form = new FormData();
+  form.set("file", new Blob([input.fileBytes], { type: input.mimeType }), input.filename);
+  form.set("model", input.model);
+  if (input.language) form.set("language", input.language);
+  if (input.prompt) form.set("prompt", input.prompt);
+  const response = await fetch(`${OPENAI_AUDIO_BASE_URL}/audio/transcriptions`, {
+    method: "POST",
+    headers: { Authorization: input.auth },
+    body: form,
+  });
+  const raw = await response.text();
+  return { response, raw };
+}
+
 export async function transcribeOpenAiSpeech(input: {
   base64: string;
   filename: string;
@@ -68,23 +112,41 @@ export async function transcribeOpenAiSpeech(input: {
 }) {
   const auth = openAiHeaders();
   const fileBytes = Uint8Array.from(Buffer.from(input.base64, "base64")).buffer;
-  const form = new FormData();
-  form.set("file", new Blob([fileBytes], { type: input.mimeType }), input.filename);
-  form.set("model", input.model ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe");
-  if (input.language) form.set("language", input.language);
-  if (input.prompt) form.set("prompt", input.prompt);
-  const response = await fetch(`${OPENAI_AUDIO_BASE_URL}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: auth.authorization },
-    body: form,
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`Transcription failed (${response.status})${raw ? `: ${raw.slice(0, 500)}` : ""}`);
-  let parsed: any;
-  try { parsed = JSON.parse(raw); } catch { parsed = { text: raw }; }
-  const text = typeof parsed?.text === "string" ? parsed.text : "";
-  if (!text) throw new Error("The transcription provider returned no text.");
-  return { text, model: input.model ?? process.env["OPENAI_STT_MODEL"] ?? "gpt-4o-mini-transcribe", raw: parsed };
+  const models = transcriptionModels(input.model);
+  let lastStatus = 500;
+  let lastRaw = "";
+
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index]!;
+    const { response, raw } = await requestTranscription({
+      auth: auth.authorization,
+      fileBytes,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      model,
+      language: input.language,
+      prompt: input.prompt,
+    });
+    lastStatus = response.status;
+    lastRaw = raw;
+
+    if (!response.ok) {
+      const hasFallback = index < models.length - 1;
+      if (hasFallback && shouldRetryTranscriptionModel(response.status, raw)) continue;
+      throw new Error(transcriptionFailureMessage(response.status));
+    }
+
+    let parsed: any;
+    try { parsed = JSON.parse(raw); } catch { parsed = { text: raw }; }
+    const text = typeof parsed?.text === "string" ? parsed.text.trim() : "";
+
+    // Short ambient chunks frequently contain only silence. Treat that as a
+    // normal no-op rather than surfacing a false transcription failure every
+    // few seconds while the assistant is simply listening.
+    return { text, model, raw: parsed };
+  }
+
+  throw new Error(transcriptionFailureMessage(lastStatus || 500) + (lastRaw ? "" : ""));
 }
 
 function mimeForFormat(format: string) {
