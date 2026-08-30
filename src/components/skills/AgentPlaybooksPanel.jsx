@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BookOpenCheck, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
+import { BookOpenCheck, Download, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Empty, Failed, Loading } from '@/components/business/live';
@@ -12,6 +12,7 @@ import {
   listAgentSkills,
   setAgentSkillEnabled,
 } from '@/lib/runtime/agent-skills/agent-skills.functions';
+import { installIntegrationPlaybookPack } from '@/lib/runtime/agent-skills/builtin-integration-playbooks.functions';
 
 function riskLabel(skill) {
   if (skill.scan_verdict === 'dangerous') return 'Dangerous';
@@ -25,6 +26,7 @@ export default function AgentPlaybooksPanel({ enabled }) {
   const listFn = useServerFn(listAgentSkills);
   const toggleFn = useServerFn(setAgentSkillEnabled);
   const deleteFn = useServerFn(deleteAgentSkill);
+  const installPackFn = useServerFn(installIntegrationPlaybookPack);
 
   const skills = useQuery({
     queryKey: ['agent-skills'],
@@ -58,8 +60,22 @@ export default function AgentPlaybooksPanel({ enabled }) {
       toast({ variant: 'destructive', title: 'Could not delete playbook', description: friendlyMessage(error) }),
   });
 
+  const installPack = useMutation({
+    mutationFn: () => installPackFn({ data: {} }),
+    onSuccess: async (result) => {
+      toast({
+        title: 'Integration playbooks installed',
+        description: `${result.count} audited playbooks are now available to eligible agents.`,
+      });
+      await qc.invalidateQueries({ queryKey: ['agent-skills'] });
+    },
+    onError: (error) =>
+      toast({ variant: 'destructive', title: 'Could not install playbooks', description: friendlyMessage(error) }),
+  });
+
   const rows = useMemo(() => skills.data?.skills ?? [], [skills.data]);
   const reviewCount = rows.filter((skill) => skill.source_kind === 'reflection' && !skill.enabled).length;
+  const builtinCount = rows.filter((skill) => skill.source_kind === 'builtin').length;
 
   return (
     <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
@@ -70,12 +86,17 @@ export default function AgentPlaybooksPanel({ enabled }) {
             Reusable agent playbooks
           </div>
           <p className="max-w-3xl text-xs leading-5 text-zinc-400">
-            Security-scanned SKILL.md procedures inspired by Atomic Agent. Agents receive only eligible metadata and relevant playbooks; package files never become executable tools by themselves.
+            Security-scanned SKILL.md procedures. The audited built-in pack consolidates Taste Skill, Ornith, Raven, SuperPlane and Scout patterns into PalladiumAI's existing Skills, Harness, workflow, research, CRM, Knowledge and integration controls rather than adding duplicate runtimes.
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary">{rows.length} installed</Badge>
+          {builtinCount > 0 && <Badge variant="outline">{builtinCount} built-in</Badge>}
           {reviewCount > 0 && <Badge variant="outline">{reviewCount} awaiting review</Badge>}
+          <Button size="sm" variant="outline" disabled={installPack.isPending} onClick={() => installPack.mutate()}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            {installPack.isPending ? 'Installing…' : 'Install integration pack'}
+          </Button>
         </div>
       </div>
 
@@ -85,7 +106,7 @@ export default function AgentPlaybooksPanel({ enabled }) {
         <Empty
           icon={Sparkles}
           title="No reusable playbooks yet"
-          desc="Verified successful agent procedures can be promoted into disabled review candidates before they are enabled for reuse."
+          desc="Install the audited integration pack or promote verified successful agent procedures into review candidates."
         />
       )}
 
@@ -93,6 +114,7 @@ export default function AgentPlaybooksPanel({ enabled }) {
         <div className="grid gap-3 lg:grid-cols-2">
           {rows.map((skill) => {
             const reflected = skill.source_kind === 'reflection';
+            const builtin = skill.source_kind === 'builtin';
             const blocked = skill.scan_verdict === 'dangerous';
             return (
               <article key={skill.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -102,6 +124,7 @@ export default function AgentPlaybooksPanel({ enabled }) {
                       <h3 className="truncate text-sm font-semibold text-white">{skill.name}</h3>
                       <Badge variant="secondary">v{skill.version}</Badge>
                       {reflected && <Badge variant="outline">Learned candidate</Badge>}
+                      {builtin && <Badge variant="outline">Audited built-in</Badge>}
                     </div>
                     <p className="mt-1.5 text-xs leading-5 text-zinc-400">{skill.description}</p>
                   </div>
