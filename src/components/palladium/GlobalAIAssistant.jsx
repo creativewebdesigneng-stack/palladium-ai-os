@@ -4,7 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Send, X, Plus, Bot, FolderKanban, ListChecks, Workflow,
-  Mic, MicOff, Volume2, VolumeX, Settings2, Power, Bell,
+  Mic, Volume2, VolumeX, Settings2, Power, Bell,
 } from 'lucide-react';
 import { assistantChat } from '@/lib/ai/assistant.functions';
 import {
@@ -29,7 +29,6 @@ const INTENTS = [
 ];
 
 const STATUS_PATTERN = /what('?s| is) (running|happening|going on)|workspace status|status update|my notifications|anything failed|brief me|give me a brief|what are my agents doing/i;
-const WAKE_PATTERN = /\b(palladium|jarvis|assistant)\b[,:]?\s*/i;
 const SUGGESTIONS = ['Brief me', 'What is running?', 'Open agents', 'Create a project'];
 
 function buildBrief(data) {
@@ -60,7 +59,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const setOpen = (v) => onOpenChange?.(v);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your PalladiumAI voice assistant. Ask me anything, say “Palladium” or “Jarvis” before a command, or ask me to brief you on what is running." },
+    { role: 'assistant', text: "Hi, I'm your PalladiumAI voice assistant. I'm hands-free: once browser microphone permission is allowed, just speak naturally and I'll answer or act." },
   ]);
   const [pending, setPending] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_VOICE_ASSISTANT_PREFERENCES);
@@ -74,6 +73,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const recognitionRunningRef = useRef(false);
   const restartTimerRef = useRef(null);
   const shouldListenRef = useRef(false);
+  const speechActiveRef = useRef(false);
+  const permissionRequestedRef = useRef(false);
   const prefsRef = useRef(prefs);
   const sendRef = useRef(null);
 
@@ -83,11 +84,19 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   useEffect(() => {
     let alive = true;
     prefsFn({ data: {} })
-      .then((value) => { if (alive) setPrefs(value); })
+      .then((value) => {
+        if (!alive) return;
+        const next = { ...value, wake_word_enabled: false };
+        prefsRef.current = next;
+        setPrefs(next);
+        if (value.wake_word_enabled) {
+          savePrefsFn({ data: next }).catch((e) => console.error('[voice-assistant] disable wake-word preference', e));
+        }
+      })
       .catch((e) => console.error('[voice-assistant] preferences', e))
       .finally(() => { if (alive) setPrefsLoaded(true); });
     return () => { alive = false; };
-  }, [prefsFn]);
+  }, [prefsFn, savePrefsFn]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined;
@@ -99,20 +108,40 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   const selectedVoice = useMemo(() => voices.find((v) => v.name === prefs.voice_name) ?? voices.find((v) => /^en-GB/i.test(v.lang)) ?? voices.find((v) => /^en/i.test(v.lang)) ?? voices[0] ?? null, [voices, prefs.voice_name]);
 
+  const resumeRecognition = useCallback((delay = 120) => {
+    if (typeof window === 'undefined') return;
+    if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = window.setTimeout(() => {
+      const recognition = recognitionRef.current;
+      if (!recognition || recognitionRunningRef.current || speechActiveRef.current || !shouldListenRef.current || !prefsRef.current.enabled) return;
+      try { recognition.start(); } catch {}
+    }, delay);
+  }, []);
+
   const speak = useCallback((text) => {
     const p = prefsRef.current;
     if (!p.enabled || p.muted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
+    speechActiveRef.current = true;
+    if (recognitionRunningRef.current) {
+      try { recognitionRef.current?.stop(); } catch {}
+    }
     const utterance = new SpeechSynthesisUtterance(String(text).replace(/[*_#`]/g, '').slice(0, 1600));
     const voice = window.speechSynthesis.getVoices().find((v) => v.name === p.voice_name) ?? selectedVoice;
     if (voice) utterance.voice = voice;
     utterance.rate = p.rate;
     utterance.pitch = p.pitch;
+    const finish = () => {
+      speechActiveRef.current = false;
+      if (shouldListenRef.current && prefsRef.current.enabled) resumeRecognition(140);
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
     window.speechSynthesis.speak(utterance);
-  }, [selectedVoice]);
+  }, [resumeRecognition, selectedVoice]);
 
   const persistPrefs = useCallback(async (patch) => {
-    const next = { ...prefsRef.current, ...patch };
+    const next = { ...prefsRef.current, ...patch, wake_word_enabled: false };
     prefsRef.current = next;
     setPrefs(next);
     try { await savePrefsFn({ data: next }); }
@@ -175,22 +204,6 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     recognition.interimResults = false;
     recognition.lang = 'en-GB';
 
-    const scheduleRestart = () => {
-      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
-      if (!shouldListenRef.current || !prefsRef.current.enabled) {
-        setListening(false);
-        return;
-      }
-      // Keep the user-facing state stable while Chromium rotates Web Speech
-      // recognition sessions under the hood. This prevents the floating icon
-      // from flashing between microphone and chat states every few seconds.
-      setListening(true);
-      restartTimerRef.current = window.setTimeout(() => {
-        if (!shouldListenRef.current || !prefsRef.current.enabled || recognitionRunningRef.current) return;
-        try { recognition.start(); } catch {}
-      }, 500);
-    };
-
     recognition.onstart = () => {
       recognitionRunningRef.current = true;
       setListening(true);
@@ -201,24 +214,30 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         shouldListenRef.current = false;
         setListening(false);
-        setMicError('Microphone permission is needed once before PalladiumAI can stay always listening.');
+        setMicError('Allow microphone access for this site in your browser once. After that PalladiumAI listens automatically; there is no microphone button to press.');
         return;
       }
-      // Transient errors such as no-speech/network are handled by onend and
-      // the restart loop. Do not visually drop out of listening mode.
-      if (shouldListenRef.current && prefsRef.current.enabled) setListening(true);
+      if (event.error === 'audio-capture') {
+        setListening(false);
+        setMicError('No usable microphone was detected. Check your browser or operating-system microphone input.');
+        return;
+      }
+      if (shouldListenRef.current && prefsRef.current.enabled && !speechActiveRef.current) resumeRecognition(500);
     };
     recognition.onend = () => {
       recognitionRunningRef.current = false;
-      scheduleRestart();
+      if (speechActiveRef.current) return;
+      if (shouldListenRef.current && prefsRef.current.enabled) resumeRecognition(350);
+      else setListening(false);
     };
     recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).slice(event.resultIndex).map((r) => r[0]?.transcript ?? '').join(' ').trim();
-      if (!transcript) return;
-      const p = prefsRef.current;
-      if (p.wake_word_enabled && !WAKE_PATTERN.test(transcript)) return;
-      const command = transcript.replace(WAKE_PATTERN, '').trim();
-      if (command) sendRef.current?.(command, { fromVoice: true });
+      const transcript = Array.from(event.results)
+        .slice(event.resultIndex)
+        .filter((result) => result.isFinal)
+        .map((result) => result[0]?.transcript ?? '')
+        .join(' ')
+        .trim();
+      if (transcript) sendRef.current?.(transcript, { fromVoice: true });
     };
     recognitionRef.current = recognition;
 
@@ -230,14 +249,14 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       try { recognition.stop(); } catch {}
       recognitionRef.current = null;
     };
-  }, []);
+  }, [resumeRecognition]);
 
   useEffect(() => {
-    if (!prefsLoaded) return;
+    if (!prefsLoaded || typeof window === 'undefined') return undefined;
     const recognition = recognitionRef.current;
     if (!recognition) {
-      if (prefs.enabled) setMicError('Voice recognition is not supported by this browser. You can still type and hear spoken replies.');
-      return;
+      if (prefs.enabled) setMicError('Voice recognition is not supported by this browser. Chrome or Edge provides the best hands-free support.');
+      return undefined;
     }
     if (!prefs.enabled) {
       shouldListenRef.current = false;
@@ -247,31 +266,39 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       if (recognitionRunningRef.current) {
         try { recognition.stop(); } catch {}
       }
-      return;
+      return undefined;
     }
-    shouldListenRef.current = true;
-    setListening(true);
-    if (!recognitionRunningRef.current) {
-      try { recognition.start(); }
-      catch {
-        // A browser may require a one-time user gesture before microphone capture.
-        // The permission/resume button below can satisfy that browser boundary.
-      }
-    }
-  }, [prefs.enabled, prefsLoaded]);
 
-  const ensureListening = () => {
-    const recognition = recognitionRef.current;
-    if (!recognition) {
-      setMicError('Voice recognition is not supported by this browser. You can still type and hear spoken replies.');
-      return;
-    }
     shouldListenRef.current = true;
-    setListening(true);
-    if (!recognitionRunningRef.current) {
-      try { recognition.start(); } catch {}
-    }
-  };
+    let cancelled = false;
+
+    const begin = async () => {
+      if (!permissionRequestedRef.current && navigator.mediaDevices?.getUserMedia) {
+        permissionRequestedRef.current = true;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (error) {
+          if (cancelled) return;
+          const name = error?.name;
+          if (name === 'NotAllowedError' || name === 'SecurityError') {
+            shouldListenRef.current = false;
+            setListening(false);
+            setMicError('Microphone access is blocked. Allow microphone access for PalladiumAI in the browser site permissions, then refresh. No in-app microphone click is required.');
+            return;
+          }
+        }
+      }
+      if (!cancelled && shouldListenRef.current && !recognitionRunningRef.current && !speechActiveRef.current) {
+        try { recognition.start(); } catch { resumeRecognition(250); }
+      }
+    };
+
+    begin();
+    return () => { cancelled = true; };
+  }, [prefs.enabled, prefsLoaded, resumeRecognition]);
 
   useEffect(() => {
     const handleNotification = (event) => {
@@ -304,7 +331,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles className="h-4 w-4 text-white" /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Palladium Voice Assistant</p>
-                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? (listening ? 'text-emerald-400' : 'text-amber-300') : 'text-zinc-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? (listening ? 'bg-emerald-400' : 'bg-amber-300') : 'bg-zinc-600'}`} />{prefs.enabled ? (listening ? 'Always listening · say “Palladium” or “Jarvis”' : 'Waiting for microphone permission') : 'Voice assistant off'}</p>
+                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? (listening ? 'text-emerald-400' : 'text-amber-300') : 'text-zinc-500'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? (listening ? 'bg-emerald-400' : 'bg-amber-300') : 'bg-zinc-600'}`} />
+                    {prefs.enabled ? (listening ? 'Always listening · just speak' : 'Waiting for browser microphone access') : 'Voice assistant off'}
+                  </p>
                 </div>
                 <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
                 <button onClick={() => persistPrefs({ muted: !prefs.muted })} title={prefs.muted ? 'Unmute voice' : 'Mute voice'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white">{prefs.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
@@ -322,9 +352,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                     <label>Speed <input type="range" min="0.7" max="1.4" step="0.1" value={prefs.rate} onChange={(e) => persistPrefs({ rate: Number(e.target.value) })} className="w-full" /></label>
                     <label>Pitch <input type="range" min="0.7" max="1.3" step="0.1" value={prefs.pitch} onChange={(e) => persistPrefs({ pitch: Number(e.target.value) })} className="w-full" /></label>
                   </div>
-                  <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.wake_word_enabled} onChange={(e) => persistPrefs({ wake_word_enabled: e.target.checked })} /> Require “Palladium” / “Jarvis” wake word</label>
-                  <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
-                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">PalladiumAI keeps the voice listener active while the assistant is enabled. Chromium may internally rotate speech-recognition sessions, but the assistant now maintains one stable listener state instead of flashing between voice and chat modes.</p>
+                  <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
+                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free mode is open by default: no wake word and no in-app microphone button. The browser still controls the one-time microphone permission prompt. PalladiumAI does not persist microphone audio or speech transcripts.</p>
                 </div>
               )}
 
@@ -349,8 +378,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
               </div>
 
               <div className="flex items-center gap-2 border-t border-white/10 px-4 py-3">
-                <button onClick={ensureListening} disabled={!prefs.enabled || listening} aria-label={listening ? 'Always listening' : 'Enable microphone listening'} title={listening ? 'Always listening' : 'Grant microphone permission / resume listening'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${listening ? 'border-cyan-300/50 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[.03] text-zinc-300'} disabled:opacity-70`}>{listening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}</button>
-                <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Ask anything or request a live workspace brief…" aria-label="Ask the AI assistant" className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400/40 focus:outline-none" />
+                <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Just speak, or type here…" aria-label="Ask the AI assistant" className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400/40 focus:outline-none" />
                 <button onClick={() => send()} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white transition hover:opacity-90"><Send className="h-4 w-4" /></button>
               </div>
             </motion.div>
