@@ -195,10 +195,12 @@ async function geocodeWeatherLocation(name: string, signal?: AbortSignal): Promi
     const body = await response.json() as { results?: Array<Record<string, unknown>> };
     const item = body.results?.[0];
     if (!item) return null;
-    const latitude = finiteCoordinate(item.latitude, -90, 90);
-    const longitude = finiteCoordinate(item.longitude, -180, 180);
+    const latitude = finiteCoordinate(item["latitude"], -90, 90);
+    const longitude = finiteCoordinate(item["longitude"], -180, 180);
     if (latitude === null || longitude === null) return null;
-    const parts = [item.name, item.admin1, item.country].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+    const parts = [item["name"], item["admin1"], item["country"]].filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    );
     return { latitude, longitude, label: parts.join(", ") || name };
   } catch {
     return null;
@@ -247,21 +249,22 @@ async function tryLiveWeather(query: string, location?: LiveLocation, signal?: A
     };
     const current = body.current ?? {};
     const daily = body.daily ?? {};
-    const temperature = Number(current.temperature_2m);
-    const apparent = Number(current.apparent_temperature);
-    const wind = Number(current.wind_speed_10m);
-    const gust = Number(current.wind_gusts_10m);
-    const precipitation = Number(current.precipitation);
-    const code = weatherCodeLabel(current.weather_code);
-    const todayMax = Number(daily.temperature_2m_max?.[0]);
-    const todayMin = Number(daily.temperature_2m_min?.[0]);
-    const rainChance = Number(daily.precipitation_probability_max?.[0]);
-    const tomorrowMax = Number(daily.temperature_2m_max?.[1]);
-    const tomorrowMin = Number(daily.temperature_2m_min?.[1]);
-    const tomorrowRain = Number(daily.precipitation_probability_max?.[1]);
+    const temperature = Number(current["temperature_2m"]);
+    const apparent = Number(current["apparent_temperature"]);
+    const wind = Number(current["wind_speed_10m"]);
+    const gust = Number(current["wind_gusts_10m"]);
+    const precipitation = Number(current["precipitation"]);
+    const code = weatherCodeLabel(current["weather_code"]);
+    const todayMax = Number(daily["temperature_2m_max"]?.[0]);
+    const todayMin = Number(daily["temperature_2m_min"]?.[0]);
+    const rainChance = Number(daily["precipitation_probability_max"]?.[0]);
+    const tomorrowMax = Number(daily["temperature_2m_max"]?.[1]);
+    const tomorrowMin = Number(daily["temperature_2m_min"]?.[1]);
+    const tomorrowRain = Number(daily["precipitation_probability_max"]?.[1]);
+    const observationTime = current["time"];
     const parts = [
       `Live weather for ${label || "the requested location"}.`,
-      typeof current.time === "string" ? `Observation time: ${current.time}${body.timezone ? ` (${body.timezone})` : ""}.` : "",
+      typeof observationTime === "string" ? `Observation time: ${observationTime}${body.timezone ? ` (${body.timezone})` : ""}.` : "",
       Number.isFinite(temperature) ? `Current temperature: ${temperature.toFixed(1)}°C.` : "",
       Number.isFinite(apparent) ? `Feels like: ${apparent.toFixed(1)}°C.` : "",
       `Conditions: ${code}.`,
@@ -289,11 +292,11 @@ export async function searchPublicWeb(
   const query = queryInput.trim().slice(0, 300);
   if (!query) return { query: "", results: [] };
   const limit = Math.max(1, Math.min(Number(limitInput) || 5, 8));
-  const results: WebSource[] = [];
 
   const weather = await tryLiveWeather(query, location, signal);
-  if (weather) pushUnique(results, weather, limit);
+  if (weather) return { query, results: [weather] };
 
+  const results: WebSource[] = [];
   for (const searchQuery of buildPublicSearchQueries(query)) {
     const batch = await runProviderSet(searchQuery, limit, signal);
     for (const item of batch) pushUnique(results, item, limit);
