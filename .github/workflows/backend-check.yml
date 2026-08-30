@@ -39,7 +39,9 @@ jobs:
         run: bun run typecheck
 
       - name: Tests
-        run: bun run test 2>&1 | tee /tmp/tests.log
+        run: |
+          set -o pipefail
+          bun run test 2>&1 | tee /tmp/tests.log
 
       - name: Upload test diagnostics
         if: failure()
