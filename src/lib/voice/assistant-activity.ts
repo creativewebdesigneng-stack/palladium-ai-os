@@ -29,13 +29,18 @@ const allowedStates = new Set<string>(ASSISTANT_ACTIVITY_STATES);
 export function sanitizeAssistantActivity(input: Partial<AssistantActivity>): AssistantActivity {
   const state = allowedStates.has(String(input.state)) ? input.state as AssistantActivityState : "idle";
   const clean = (value: unknown, max: number) => typeof value === "string" ? value.replace(/[\r\n\t]+/g, " ").trim().slice(0, max) : undefined;
+  const label = clean(input.label, 80);
+  const detail = clean(input.detail, 180);
+  const provider = clean(input.provider, 80);
+  const model = clean(input.model, 120);
+
   return {
     state,
     ...(input.source ? { source: input.source } : {}),
-    ...(clean(input.label, 80) ? { label: clean(input.label, 80) } : {}),
-    ...(clean(input.detail, 180) ? { detail: clean(input.detail, 180) } : {}),
-    ...(clean(input.provider, 80) ? { provider: clean(input.provider, 80) } : {}),
-    ...(clean(input.model, 120) ? { model: clean(input.model, 120) } : {}),
+    ...(label ? { label } : {}),
+    ...(detail ? { detail } : {}),
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
     updatedAt: new Date().toISOString(),
   };
 }
