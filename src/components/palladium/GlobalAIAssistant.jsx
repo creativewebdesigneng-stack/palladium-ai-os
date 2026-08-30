@@ -75,6 +75,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const shouldListenRef = useRef(false);
   const speechActiveRef = useRef(false);
   const permissionRequestedRef = useRef(false);
+  const micStreamRef = useRef(null);
+  const micRetryTimerRef = useRef(null);
   const prefsRef = useRef(prefs);
   const sendRef = useRef(null);
 
