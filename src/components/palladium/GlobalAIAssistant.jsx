@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useServerFn } from '@tanstack/react-start';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles, Send, X, Plus, Bot, FolderKanban, ListChecks, Workflow,
-  Mic, Volume2, VolumeX, Settings2, Power, Bell,
+  Sparkles, Send, X, Mic, Volume2, VolumeX, Settings2, Power, Bell,
 } from 'lucide-react';
 import { assistantChat } from '@/lib/ai/assistant.functions';
 import {
@@ -12,24 +11,19 @@ import {
   getVoiceAssistantPreferences,
   getVoiceWorkspaceBrief,
   saveVoiceAssistantPreferences,
+  transcribeVoiceAssistantAudio,
 } from '@/lib/voice/voice-assistant.functions';
+import {
+  isDuplicateVoiceTranscript,
+  normalizeVoiceTranscript,
+  resolveVoiceNavigationIntent,
+} from '@/lib/voice/voice-navigation';
 import { VOICE_NOTIFICATION_EVENT } from '@/hooks/useRealtimeNotifications';
 
-const INTENTS = [
-  { test: /project/i, reply: 'Opening Projects…', to: '/projects', icon: FolderKanban },
-  { test: /running agent/i, reply: 'Opening Agents. Use the status controls there to view running agents.', to: '/agents', icon: Bot },
-  { test: /agent/i, reply: 'Opening Agents…', to: '/agents', icon: Bot },
-  { test: /failed workflow/i, reply: 'Opening Workflows. Use the run/status controls there to inspect failures.', to: '/workflows', icon: Workflow },
-  { test: /workflow/i, reply: 'Opening Workflows…', to: '/workflows', icon: Workflow },
-  { test: /task/i, reply: 'Opening Tasks…', to: '/tasks', icon: ListChecks },
-  { test: /create.*project|new project/i, reply: 'Opening Projects so you can create one…', to: '/projects', icon: Plus },
-  { test: /create.*agent|new agent/i, reply: 'Opening the Agent Builder…', to: '/agent-builder', icon: Plus },
-  { test: /file/i, reply: 'Opening Files…', to: '/files', icon: FolderKanban },
-  { test: /setting/i, reply: 'Opening Settings…', to: '/settings', icon: Sparkles },
-];
-
 const STATUS_PATTERN = /what('?s| is) (running|happening|going on)|workspace status|status update|my notifications|anything failed|brief me|give me a brief|what are my agents doing/i;
-const SUGGESTIONS = ['Brief me', 'What is running?', 'Open agents', 'Create a project'];
+const SUGGESTIONS = ['Brief me', 'What is running?', 'Open projects', 'Open agents'];
+const CLOUD_CHUNK_MS = 3200;
+const BROWSER_FRESH_MS = 4200;
 
 function buildBrief(data) {
   const active = data.activeAgents?.length ?? 0;
@@ -51,21 +45,48 @@ function buildBrief(data) {
   return parts.filter(Boolean).join(' ');
 }
 
+function blobToBase64(blob) {
+  return blob.arrayBuffer().then((buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const block = 0x8000;
+    for (let i = 0; i < bytes.length; i += block) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + block));
+    }
+    return window.btoa(binary);
+  });
+}
+
+function recorderMimeType() {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const choices = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
+  return choices.find((value) => MediaRecorder.isTypeSupported?.(value)) ?? '';
+}
+
+function serverMimeType(value) {
+  const base = String(value || '').split(';')[0];
+  return ['audio/webm', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/m4a', 'audio/mpeg', 'audio/mp3'].includes(base)
+    ? base
+    : 'audio/webm';
+}
+
 export default function GlobalAIAssistant({ open, onOpenChange }) {
   const navigate = useNavigate();
   const prefsFn = useServerFn(getVoiceAssistantPreferences);
   const savePrefsFn = useServerFn(saveVoiceAssistantPreferences);
   const briefFn = useServerFn(getVoiceWorkspaceBrief);
+  const transcribeFn = useServerFn(transcribeVoiceAssistantAudio);
   const setOpen = (v) => onOpenChange?.(v);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your PalladiumAI voice assistant. I'm hands-free: once browser microphone permission is allowed, just speak naturally and I'll answer or act." },
+    { role: 'assistant', text: "Hi, I'm your PalladiumAI voice assistant. I'm hands-free: allow microphone access once, then just speak naturally and I'll answer or navigate for you." },
   ]);
   const [pending, setPending] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_VOICE_ASSISTANT_PREFERENCES);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [voices, setVoices] = useState([]);
   const [listening, setListening] = useState(false);
+  const [listeningMode, setListeningMode] = useState('reconnecting');
   const [voiceSettings, setVoiceSettings] = useState(false);
   const [micError, setMicError] = useState('');
   const endRef = useRef(null);
@@ -74,9 +95,15 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const restartTimerRef = useRef(null);
   const shouldListenRef = useRef(false);
   const speechActiveRef = useRef(false);
-  const permissionRequestedRef = useRef(false);
   const micStreamRef = useRef(null);
   const micRetryTimerRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const mediaRecorderTimerRef = useRef(null);
+  const cloudRestartRef = useRef(null);
+  const discardRecorderChunkRef = useRef(false);
+  const lastBrowserTranscriptAtRef = useRef(0);
+  const lastVoiceTranscriptRef = useRef(null);
+  const cloudTranscriptionPendingRef = useRef(false);
   const prefsRef = useRef(prefs);
   const sendRef = useRef(null);
 
@@ -108,7 +135,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     return () => window.speechSynthesis.removeEventListener?.('voiceschanged', load);
   }, []);
 
-  const selectedVoice = useMemo(() => voices.find((v) => v.name === prefs.voice_name) ?? voices.find((v) => /^en-GB/i.test(v.lang)) ?? voices.find((v) => /^en/i.test(v.lang)) ?? voices[0] ?? null, [voices, prefs.voice_name]);
+  const selectedVoice = useMemo(
+    () => voices.find((v) => v.name === prefs.voice_name) ?? voices.find((v) => /^en-GB/i.test(v.lang)) ?? voices.find((v) => /^en/i.test(v.lang)) ?? voices[0] ?? null,
+    [voices, prefs.voice_name],
+  );
 
   const resumeRecognition = useCallback((delay = 120) => {
     if (typeof window === 'undefined') return;
@@ -125,8 +155,12 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     if (!p.enabled || p.muted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     speechActiveRef.current = true;
+    discardRecorderChunkRef.current = true;
     if (recognitionRunningRef.current) {
       try { recognitionRef.current?.stop(); } catch {}
+    }
+    if (mediaRecorderRef.current?.state === 'recording') {
+      try { mediaRecorderRef.current.stop(); } catch {}
     }
     const utterance = new SpeechSynthesisUtterance(String(text).replace(/[*_#`]/g, '').slice(0, 1600));
     const voice = window.speechSynthesis.getVoices().find((v) => v.name === p.voice_name) ?? selectedVoice;
@@ -135,7 +169,11 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     utterance.pitch = p.pitch;
     const finish = () => {
       speechActiveRef.current = false;
-      if (shouldListenRef.current && prefsRef.current.enabled) resumeRecognition(140);
+      discardRecorderChunkRef.current = false;
+      if (shouldListenRef.current && prefsRef.current.enabled) {
+        resumeRecognition(140);
+        cloudRestartRef.current?.(220);
+      }
     };
     utterance.onend = finish;
     utterance.onerror = finish;
@@ -173,11 +211,11 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       return;
     }
 
-    const intent = INTENTS.find((i) => i.test.test(content));
+    const intent = resolveVoiceNavigationIntent(content);
     if (intent) {
       setMessages((m) => [...m, { role: 'assistant', text: intent.reply, action: intent.to }]);
-      speak(intent.reply);
       navigate(intent.to);
+      speak(intent.reply);
       if (!fromVoice) setOpen(false);
       return;
     }
@@ -197,10 +235,30 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   useEffect(() => { sendRef.current = send; }, [send]);
 
+  const acceptVoiceTranscript = useCallback((raw, source) => {
+    const normalized = normalizeVoiceTranscript(raw);
+    if (!normalized) return false;
+    const now = Date.now();
+    if (isDuplicateVoiceTranscript(normalized, lastVoiceTranscriptRef.current, now)) return false;
+    lastVoiceTranscriptRef.current = { text: normalized, at: now };
+    if (source === 'browser') {
+      lastBrowserTranscriptAtRef.current = now;
+      setListeningMode('browser');
+    } else {
+      setListeningMode('cloud');
+    }
+    setMicError('');
+    sendRef.current?.(String(raw).trim(), { fromVoice: true });
+    return true;
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) return undefined;
+    if (!Recognition) {
+      setListeningMode('cloud');
+      return undefined;
+    }
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = false;
@@ -209,22 +267,19 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     recognition.onstart = () => {
       recognitionRunningRef.current = true;
       setListening(true);
-      setMicError('');
+      setListeningMode('browser');
     };
     recognition.onerror = (event) => {
       recognitionRunningRef.current = false;
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        shouldListenRef.current = false;
-        setListening(false);
-        setMicError('Allow microphone access for this site in your browser once. After that PalladiumAI listens automatically; there is no microphone button to press.');
-        return;
-      }
       if (event.error === 'audio-capture') {
         setListening(false);
-        setMicError('No usable microphone was detected. Check your browser or operating-system microphone input.');
-        return;
+        setListeningMode('reconnecting');
+        setMicError('Browser speech recognition lost the microphone. Cloud voice fallback will continue while PalladiumAI reconnects.');
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setListeningMode('cloud');
+        setMicError('Browser speech recognition is unavailable, so PalladiumAI is using the automatic cloud speech fallback.');
       }
-      if (shouldListenRef.current && prefsRef.current.enabled && !speechActiveRef.current) resumeRecognition(500);
+      if (shouldListenRef.current && prefsRef.current.enabled && !speechActiveRef.current) resumeRecognition(650);
     };
     recognition.onend = () => {
       recognitionRunningRef.current = false;
@@ -239,48 +294,48 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         .map((result) => result[0]?.transcript ?? '')
         .join(' ')
         .trim();
-      if (transcript) sendRef.current?.(transcript, { fromVoice: true });
+      if (transcript) acceptVoiceTranscript(transcript, 'browser');
     };
     recognitionRef.current = recognition;
 
     return () => {
-      shouldListenRef.current = false;
       recognitionRunningRef.current = false;
       if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
-      if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
-      micRetryTimerRef.current = null;
-      const micStream = micStreamRef.current;
-      micStreamRef.current = null;
-      if (micStream) micStream.getTracks().forEach((track) => track.stop());
       try { recognition.stop(); } catch {}
       recognitionRef.current = null;
     };
-  }, [resumeRecognition]);
+  }, [acceptVoiceTranscript, resumeRecognition]);
+
+  const stopCloudRecorder = useCallback(() => {
+    if (mediaRecorderTimerRef.current) window.clearTimeout(mediaRecorderTimerRef.current);
+    mediaRecorderTimerRef.current = null;
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    if (recorder?.state === 'recording') {
+      discardRecorderChunkRef.current = true;
+      try { recorder.stop(); } catch {}
+    }
+  }, []);
 
   const releaseMicStream = useCallback(() => {
     if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
     micRetryTimerRef.current = null;
+    stopCloudRecorder();
     const stream = micStreamRef.current;
     micStreamRef.current = null;
     if (stream) stream.getTracks().forEach((track) => track.stop());
-  }, []);
+  }, [stopCloudRecorder]);
 
   useEffect(() => {
     if (!prefsLoaded || typeof window === 'undefined') return undefined;
-    const recognition = recognitionRef.current;
-    if (!recognition) {
-      if (prefs.enabled) setMicError('Voice recognition is not supported by this browser. Chrome or Edge provides the best hands-free support.');
-      return undefined;
-    }
     if (!prefs.enabled) {
       shouldListenRef.current = false;
-      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
-      restartTimerRef.current = null;
       releaseMicStream();
       setListening(false);
+      setListeningMode('reconnecting');
       if (recognitionRunningRef.current) {
-        try { recognition.stop(); } catch {}
+        try { recognitionRef.current?.stop(); } catch {}
       }
       return undefined;
     }
@@ -288,11 +343,87 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     shouldListenRef.current = true;
     let cancelled = false;
 
+    const transcribeChunk = async (blob, mimeType) => {
+      if (cancelled || blob.size < 1400 || speechActiveRef.current || cloudTranscriptionPendingRef.current) return;
+      if (Date.now() - lastBrowserTranscriptAtRef.current < BROWSER_FRESH_MS) return;
+      cloudTranscriptionPendingRef.current = true;
+      try {
+        const audioBase64 = await blobToBase64(blob);
+        if (cancelled || speechActiveRef.current) return;
+        const result = await transcribeFn({ data: {
+          audioBase64,
+          filename: mimeType.includes('ogg') ? 'assistant.ogg' : 'assistant.webm',
+          mimeType: serverMimeType(mimeType),
+          language: 'en',
+        } });
+        if (result?.text) acceptVoiceTranscript(result.text, 'cloud');
+      } catch (error) {
+        console.error('[voice-assistant] cloud transcription', error);
+        const message = error?.message || 'Cloud speech transcription failed.';
+        setListeningMode(recognitionRunningRef.current ? 'browser' : 'reconnecting');
+        setMicError(message.includes('not configured')
+          ? 'Cloud voice fallback is not configured on this deployment. Add the OpenAI API key for speech transcription.'
+          : 'Cloud voice fallback could not transcribe this audio. PalladiumAI will keep retrying automatically.');
+      } finally {
+        cloudTranscriptionPendingRef.current = false;
+      }
+    };
+
+    const scheduleCloudRecorder = (delay = 0) => {
+      if (mediaRecorderTimerRef.current) window.clearTimeout(mediaRecorderTimerRef.current);
+      mediaRecorderTimerRef.current = window.setTimeout(() => {
+        mediaRecorderTimerRef.current = null;
+        if (cancelled || !shouldListenRef.current || !prefsRef.current.enabled || speechActiveRef.current) return;
+        const stream = micStreamRef.current;
+        if (!stream?.active || typeof MediaRecorder === 'undefined' || mediaRecorderRef.current?.state === 'recording') return;
+        const mimeType = recorderMimeType();
+        try {
+          const chunks = [];
+          const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          discardRecorderChunkRef.current = false;
+          mediaRecorderRef.current = recorder;
+          recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+          recorder.onerror = () => {
+            setMicError('The automatic cloud voice recorder hit a browser error. PalladiumAI will retry.');
+          };
+          recorder.onstop = () => {
+            if (mediaRecorderRef.current === recorder) mediaRecorderRef.current = null;
+            const discard = discardRecorderChunkRef.current || speechActiveRef.current || cancelled;
+            discardRecorderChunkRef.current = false;
+            if (!discard && chunks.length) {
+              const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
+              void transcribeChunk(blob, recorder.mimeType || mimeType || 'audio/webm');
+            }
+            if (!cancelled && shouldListenRef.current && prefsRef.current.enabled && !speechActiveRef.current) scheduleCloudRecorder(180);
+          };
+          recorder.start();
+          mediaRecorderTimerRef.current = window.setTimeout(() => {
+            mediaRecorderTimerRef.current = null;
+            if (recorder.state === 'recording') {
+              try { recorder.stop(); } catch {}
+            }
+          }, CLOUD_CHUNK_MS);
+          if (!recognitionRunningRef.current) {
+            setListening(true);
+            setListeningMode('cloud');
+          }
+        } catch (error) {
+          console.error('[voice-assistant] MediaRecorder', error);
+          setMicError('This browser could not start the automatic cloud voice recorder. Retrying.');
+          scheduleCloudRecorder(1500);
+        }
+      }, delay);
+    };
+    cloudRestartRef.current = scheduleCloudRecorder;
+
     const begin = async () => {
-      // Keep the granted microphone stream open for the lifetime of the
-      // enabled assistant so SpeechRecognition starts from a live input.
-      if (!micStreamRef.current && navigator.mediaDevices?.getUserMedia) {
-        permissionRequestedRef.current = true;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setListening(false);
+        setListeningMode('reconnecting');
+        setMicError('This browser does not expose microphone capture to PalladiumAI.');
+        return;
+      }
+      if (!micStreamRef.current) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -302,52 +433,66 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
             return;
           }
           const track = stream.getAudioTracks()[0];
-          if (track) {
-            track.onended = () => {
-              micStreamRef.current = null;
-              recognitionRunningRef.current = false;
-              setListening(false);
-              if (!shouldListenRef.current || !prefsRef.current.enabled) return;
-              setMicError('The microphone input ended unexpectedly. Attempting to reconnect automatically.');
-              if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
-              micRetryTimerRef.current = window.setTimeout(() => {
-                micRetryTimerRef.current = null;
-                begin();
-              }, 1200);
-            };
-          }
-          micStreamRef.current = stream;
-        } catch (error) {
-          if (cancelled) return;
-          const name = error?.name;
-          if (name === 'NotAllowedError' || name === 'SecurityError') {
-            shouldListenRef.current = false;
+          if (!track) throw new Error('No audio input track was returned by the browser.');
+          track.onended = () => {
+            micStreamRef.current = null;
+            recognitionRunningRef.current = false;
+            stopCloudRecorder();
             setListening(false);
-            setMicError('Microphone access is blocked. Allow microphone access for PalladiumAI in the browser site permissions, then refresh. No in-app microphone click is required.');
-            return;
-          }
-          // Transient acquisition failure (device busy/unavailable): retry
-          // while the assistant remains enabled instead of dying silently.
-          if (shouldListenRef.current && prefsRef.current.enabled) {
-            setMicError('The microphone is temporarily unavailable. Retrying automatically.');
+            setListeningMode('reconnecting');
+            if (!shouldListenRef.current || !prefsRef.current.enabled) return;
+            setMicError('The microphone input ended. PalladiumAI is reconnecting automatically.');
             if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
             micRetryTimerRef.current = window.setTimeout(() => {
               micRetryTimerRef.current = null;
-              if (!cancelled && shouldListenRef.current && prefsRef.current.enabled && !micStreamRef.current) begin();
-            }, 2500);
+              void begin();
+            }, 1200);
+          };
+          micStreamRef.current = stream;
+          setListening(true);
+          setMicError('');
+        } catch (error) {
+          if (cancelled) return;
+          const name = error?.name;
+          setListening(false);
+          setListeningMode('reconnecting');
+          if (name === 'NotAllowedError' || name === 'SecurityError') {
+            shouldListenRef.current = false;
+            setMicError('Microphone access is blocked. Allow microphone access for PalladiumAI in browser site permissions, then refresh.');
+            return;
           }
+          setMicError('The microphone is temporarily unavailable. PalladiumAI is retrying automatically.');
+          if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
+          micRetryTimerRef.current = window.setTimeout(() => {
+            micRetryTimerRef.current = null;
+            if (!cancelled && shouldListenRef.current && prefsRef.current.enabled && !micStreamRef.current) void begin();
+          }, 2500);
           return;
         }
       }
-      // Start recognition only once the microphone stream is active.
-      if (!cancelled && micStreamRef.current && shouldListenRef.current && !recognitionRunningRef.current && !speechActiveRef.current) {
+
+      const recognition = recognitionRef.current;
+      if (recognition && !recognitionRunningRef.current && !speechActiveRef.current) {
         try { recognition.start(); } catch { resumeRecognition(250); }
+      } else if (!recognition) {
+        setListeningMode('cloud');
       }
+      scheduleCloudRecorder(250);
     };
 
-    begin();
-    return () => { cancelled = true; };
-  }, [prefs.enabled, prefsLoaded, resumeRecognition, releaseMicStream]);
+    void begin();
+    return () => {
+      cancelled = true;
+      cloudRestartRef.current = null;
+      if (mediaRecorderTimerRef.current) window.clearTimeout(mediaRecorderTimerRef.current);
+      mediaRecorderTimerRef.current = null;
+    };
+  }, [acceptVoiceTranscript, prefs.enabled, prefsLoaded, releaseMicStream, resumeRecognition, stopCloudRecorder, transcribeFn]);
+
+  useEffect(() => () => {
+    shouldListenRef.current = false;
+    releaseMicStream();
+  }, [releaseMicStream]);
 
   useEffect(() => {
     const handleNotification = (event) => {
@@ -359,6 +504,16 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     window.addEventListener(VOICE_NOTIFICATION_EVENT, handleNotification);
     return () => window.removeEventListener(VOICE_NOTIFICATION_EVENT, handleNotification);
   }, [speak]);
+
+  const voiceStatus = !prefs.enabled
+    ? 'Voice assistant off'
+    : !listening
+      ? 'Reconnecting microphone…'
+      : listeningMode === 'cloud'
+        ? 'Always listening · cloud speech fallback'
+        : listeningMode === 'browser'
+          ? 'Always listening · browser + cloud fallback'
+          : 'Always listening · just speak';
 
   return (
     <>
@@ -382,7 +537,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                   <p className="text-sm font-semibold text-white">Palladium Voice Assistant</p>
                   <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? (listening ? 'text-emerald-400' : 'text-amber-300') : 'text-zinc-500'}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? (listening ? 'bg-emerald-400' : 'bg-amber-300') : 'bg-zinc-600'}`} />
-                    {prefs.enabled ? (listening ? 'Always listening · just speak' : 'Waiting for browser microphone access') : 'Voice assistant off'}
+                    {voiceStatus}
                   </p>
                 </div>
                 <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
@@ -402,7 +557,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                     <label>Pitch <input type="range" min="0.7" max="1.3" step="0.1" value={prefs.pitch} onChange={(e) => persistPrefs({ pitch: Number(e.target.value) })} className="w-full" /></label>
                   </div>
                   <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
-                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free mode is open by default: no wake word and no in-app microphone button. The browser still controls the one-time microphone permission prompt. PalladiumAI does not persist microphone audio or speech transcripts.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free mode uses browser speech recognition first and an automatic server-side transcription fallback if the browser misses you. No wake word or in-app microphone click is required. Audio and transcripts are not persisted.</p>
                 </div>
               )}
 
