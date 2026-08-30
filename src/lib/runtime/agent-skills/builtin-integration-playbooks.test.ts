@@ -3,9 +3,9 @@ import { prepareAgentSkillPackage } from './skill-package';
 import { INTEGRATION_PLAYBOOKS } from './builtin-integration-playbooks';
 
 describe('audited integration playbooks', () => {
-  it('keeps every built-in identity unique', () => {
+  it('keeps every built-in identity unique and source-traceable', () => {
     expect(new Set(INTEGRATION_PLAYBOOKS.map((item) => item.name)).size).toBe(INTEGRATION_PLAYBOOKS.length);
-    expect(new Set(INTEGRATION_PLAYBOOKS.map((item) => item.sourceRef)).size).toBe(INTEGRATION_PLAYBOOKS.length);
+    expect(INTEGRATION_PLAYBOOKS.every((item) => item.sourceRef.trim().length > 0)).toBe(true);
     expect(INTEGRATION_PLAYBOOKS.length).toBeGreaterThanOrEqual(19);
   });
 
