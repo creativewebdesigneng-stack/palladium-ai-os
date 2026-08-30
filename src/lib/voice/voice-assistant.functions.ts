@@ -99,14 +99,26 @@ export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
     language: z.string().trim().min(2).max(20).default("en"),
   }).parse(input))
   .handler(async ({ data }) => {
-    const result = await transcribeOpenAiSpeech({
-      base64: data.audioBase64,
-      filename: data.filename,
-      mimeType: data.mimeType,
-      language: data.language,
-      prompt: "Short hands-free command or conversational request to the PalladiumAI assistant.",
-    });
-    return { text: result.text.trim(), model: result.model };
+    try {
+      const result = await transcribeOpenAiSpeech({
+        base64: data.audioBase64,
+        filename: data.filename,
+        mimeType: data.mimeType,
+        language: data.language,
+        prompt: "Short hands-free command or conversational request to the PalladiumAI assistant.",
+      });
+      return { text: result.text.trim(), model: result.model };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      // Always-listening recorders naturally produce short silence/noise-only
+      // chunks. Providers may reject those as invalid audio rather than return
+      // an empty transcript. Treat that case as a normal no-op so silence does
+      // not surface as a persistent fallback failure banner.
+      if (message.includes("rejected the recorded audio segment")) {
+        return { text: "", model: null };
+      }
+      throw error;
+    }
   });
 
 export const getVoiceWorkspaceBrief = createServerFn({ method: "POST" })
