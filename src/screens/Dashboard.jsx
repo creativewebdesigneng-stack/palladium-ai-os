@@ -4,6 +4,7 @@ import { Bot, Cpu, Workflow, Zap, Bell, Activity, ArrowRight, ShieldAlert, Messa
 import PageHeader from '@/components/palladium/PageHeader';
 import Panel from '@/components/palladium/Panel';
 import MetricCard from '@/components/palladium/MetricCard';
+import AssistantPulse from '@/components/dashboard/AssistantPulse';
 import { Link } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -112,6 +113,8 @@ export default function Dashboard() {
           <button onClick={() => refetch()} className="ml-auto rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-white/10">Try again</button>
         </div>
       )}
+
+      {isAuthenticated && <div className="mt-4"><AssistantPulse enabled={isAuthenticated} /></div>}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {loading ? (
