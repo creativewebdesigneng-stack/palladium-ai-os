@@ -1,5 +1,6 @@
 import MediaStudio from './MediaStudio';
 import GenerativeMediaPanel from '@/components/media/GenerativeMediaPanel';
+import ShortVideoAutomationPanel from '@/components/media/ShortVideoAutomationPanel';
 import { useSessionReady } from '@/lib/useSessionReady';
 
 export default function MediaStudioWorkspace() {
@@ -8,6 +9,7 @@ export default function MediaStudioWorkspace() {
     <>
       <MediaStudio />
       <GenerativeMediaPanel enabled={session === 'yes'} />
+      <ShortVideoAutomationPanel enabled={session === 'yes'} />
     </>
   );
 }

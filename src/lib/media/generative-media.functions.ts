@@ -15,6 +15,7 @@ export const getGenerativeMediaOverview = createServerFn({ method: 'POST' })
       .from('media_generation_jobs')
       .select('id,provider,kind,prompt,aspect_ratio,source_url,duration_seconds,status,worker_job_id,output_url,error_message,metadata,created_at,updated_at,completed_at')
       .eq('user_id', context.userId)
+      .in('provider', ['seedream', 'ltx'])
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
@@ -93,6 +94,7 @@ export const refreshGenerativeMediaJob = createServerFn({ method: 'POST' })
       .select('id,provider,worker_job_id')
       .eq('id', data.id)
       .eq('user_id', context.userId)
+      .in('provider', ['seedream', 'ltx'])
       .maybeSingle();
     if (lookup.error) throw new Error(lookup.error.message);
     if (!lookup.data) throw new Error('Generation job not found or access denied.');
