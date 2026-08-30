@@ -4,6 +4,12 @@ export type WebSource = {
   snippet?: string;
 };
 
+export type LiveLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+};
+
 const stripHtml = (html: string) =>
   html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
@@ -149,15 +155,144 @@ async function runProviderSet(query: string, limit: number, signal?: AbortSignal
   return [];
 }
 
+const WEATHER_PATTERN = /\b(weather|forecast|temperature|rain|raining|snow|snowing|sunny|wind|windy|heat|cold)\b/i;
+
+export function isWeatherQuery(query: string): boolean {
+  return WEATHER_PATTERN.test(query);
+}
+
+export function extractWeatherLocation(query: string): string | null {
+  if (!isWeatherQuery(query)) return null;
+  const explicit = /\b(?:in|for|at|near)\s+([a-z0-9][a-z0-9 .,'-]{1,70}?)(?=\?|$|\b(?:today|tonight|tomorrow|this morning|this afternoon|this evening|right now|now)\b)/i.exec(query)?.[1]?.trim();
+  if (!explicit) return null;
+  if (/^(my city|my town|my area|me|here|home|where i am|where i'm at)$/i.test(explicit)) return null;
+  return explicit.replace(/[?.!,]+$/, "").trim() || null;
+}
+
+function weatherCodeLabel(codeInput: unknown): string {
+  const code = Number(codeInput);
+  if (code === 0) return "clear sky";
+  if ([1, 2].includes(code)) return "mainly clear to partly cloudy";
+  if (code === 3) return "overcast";
+  if ([45, 48].includes(code)) return "fog";
+  if ([51, 53, 55, 56, 57].includes(code)) return "drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "snow";
+  if ([95, 96, 99].includes(code)) return "thunderstorms";
+  return "mixed conditions";
+}
+
+function finiteCoordinate(value: unknown, min: number, max: number): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
+async function geocodeWeatherLocation(name: string, signal?: AbortSignal): Promise<{ latitude: number; longitude: number; label: string } | null> {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`;
+  try {
+    const response = await fetch(url, { signal: signal ?? AbortSignal.timeout(8_000) });
+    if (!response.ok) return null;
+    const body = await response.json() as { results?: Array<Record<string, unknown>> };
+    const item = body.results?.[0];
+    if (!item) return null;
+    const latitude = finiteCoordinate(item.latitude, -90, 90);
+    const longitude = finiteCoordinate(item.longitude, -180, 180);
+    if (latitude === null || longitude === null) return null;
+    const parts = [item.name, item.admin1, item.country].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+    return { latitude, longitude, label: parts.join(", ") || name };
+  } catch {
+    return null;
+  }
+}
+
+async function tryLiveWeather(query: string, location?: LiveLocation, signal?: AbortSignal): Promise<WebSource | null> {
+  if (!isWeatherQuery(query)) return null;
+
+  const suppliedLatitude = finiteCoordinate(location?.latitude, -90, 90);
+  const suppliedLongitude = finiteCoordinate(location?.longitude, -180, 180);
+  const explicitLocation = extractWeatherLocation(query);
+
+  let latitude = suppliedLatitude;
+  let longitude = suppliedLongitude;
+  let label = suppliedLatitude !== null && suppliedLongitude !== null ? "your current location" : "";
+
+  if (explicitLocation) {
+    const geocoded = await geocodeWeatherLocation(explicitLocation, signal);
+    if (geocoded) {
+      latitude = geocoded.latitude;
+      longitude = geocoded.longitude;
+      label = geocoded.label;
+    }
+  }
+
+  if (latitude === null || longitude === null) return null;
+
+  const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
+  forecastUrl.searchParams.set("latitude", String(latitude));
+  forecastUrl.searchParams.set("longitude", String(longitude));
+  forecastUrl.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m");
+  forecastUrl.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max");
+  forecastUrl.searchParams.set("temperature_unit", "celsius");
+  forecastUrl.searchParams.set("wind_speed_unit", "mph");
+  forecastUrl.searchParams.set("timezone", "auto");
+  forecastUrl.searchParams.set("forecast_days", "3");
+
+  try {
+    const response = await fetch(forecastUrl, { signal: signal ?? AbortSignal.timeout(8_000) });
+    if (!response.ok) return null;
+    const body = await response.json() as {
+      timezone?: string;
+      current?: Record<string, unknown>;
+      daily?: Record<string, unknown[]>;
+    };
+    const current = body.current ?? {};
+    const daily = body.daily ?? {};
+    const temperature = Number(current.temperature_2m);
+    const apparent = Number(current.apparent_temperature);
+    const wind = Number(current.wind_speed_10m);
+    const gust = Number(current.wind_gusts_10m);
+    const precipitation = Number(current.precipitation);
+    const code = weatherCodeLabel(current.weather_code);
+    const todayMax = Number(daily.temperature_2m_max?.[0]);
+    const todayMin = Number(daily.temperature_2m_min?.[0]);
+    const rainChance = Number(daily.precipitation_probability_max?.[0]);
+    const tomorrowMax = Number(daily.temperature_2m_max?.[1]);
+    const tomorrowMin = Number(daily.temperature_2m_min?.[1]);
+    const tomorrowRain = Number(daily.precipitation_probability_max?.[1]);
+    const parts = [
+      `Live weather for ${label || "the requested location"}.`,
+      typeof current.time === "string" ? `Observation time: ${current.time}${body.timezone ? ` (${body.timezone})` : ""}.` : "",
+      Number.isFinite(temperature) ? `Current temperature: ${temperature.toFixed(1)}°C.` : "",
+      Number.isFinite(apparent) ? `Feels like: ${apparent.toFixed(1)}°C.` : "",
+      `Conditions: ${code}.`,
+      Number.isFinite(precipitation) ? `Current precipitation: ${precipitation.toFixed(1)} mm.` : "",
+      Number.isFinite(wind) ? `Wind: ${wind.toFixed(1)} mph${Number.isFinite(gust) ? `, gusting ${gust.toFixed(1)} mph` : ""}.` : "",
+      Number.isFinite(todayMax) && Number.isFinite(todayMin) ? `Today: ${todayMin.toFixed(1)}–${todayMax.toFixed(1)}°C${Number.isFinite(rainChance) ? `, max precipitation chance ${Math.round(rainChance)}%` : ""}.` : "",
+      Number.isFinite(tomorrowMax) && Number.isFinite(tomorrowMin) ? `Tomorrow: ${tomorrowMin.toFixed(1)}–${tomorrowMax.toFixed(1)}°C${Number.isFinite(tomorrowRain) ? `, max precipitation chance ${Math.round(tomorrowRain)}%` : ""}.` : "",
+    ].filter(Boolean);
+    return {
+      title: `Live weather · ${label || "current location"}`,
+      url: forecastUrl.toString(),
+      snippet: parts.join(" ").slice(0, 1200),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function searchPublicWeb(
   queryInput: string,
   limitInput = 5,
   signal?: AbortSignal,
+  location?: LiveLocation,
 ): Promise<{ query: string; results: WebSource[] }> {
   const query = queryInput.trim().slice(0, 300);
   if (!query) return { query: "", results: [] };
   const limit = Math.max(1, Math.min(Number(limitInput) || 5, 8));
   const results: WebSource[] = [];
+
+  const weather = await tryLiveWeather(query, location, signal);
+  if (weather) pushUnique(results, weather, limit);
 
   for (const searchQuery of buildPublicSearchQueries(query)) {
     const batch = await runProviderSet(searchQuery, limit, signal);
