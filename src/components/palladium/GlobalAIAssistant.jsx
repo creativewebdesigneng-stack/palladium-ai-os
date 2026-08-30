@@ -253,6 +253,14 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     };
   }, [resumeRecognition]);
 
+  const releaseMicStream = useCallback(() => {
+    if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
+    micRetryTimerRef.current = null;
+    const stream = micStreamRef.current;
+    micStreamRef.current = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+  }, []);
+
   useEffect(() => {
     if (!prefsLoaded || typeof window === 'undefined') return undefined;
     const recognition = recognitionRef.current;
@@ -264,6 +272,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       shouldListenRef.current = false;
       if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
+      releaseMicStream();
       setListening(false);
       if (recognitionRunningRef.current) {
         try { recognition.stop(); } catch {}
@@ -275,13 +284,34 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     let cancelled = false;
 
     const begin = async () => {
-      if (!permissionRequestedRef.current && navigator.mediaDevices?.getUserMedia) {
+      // Keep the granted microphone stream open for the lifetime of the
+      // enabled assistant so SpeechRecognition starts from a live input.
+      if (!micStreamRef.current && navigator.mediaDevices?.getUserMedia) {
         permissionRequestedRef.current = true;
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
-          stream.getTracks().forEach((track) => track.stop());
+          if (cancelled || !shouldListenRef.current || !prefsRef.current.enabled) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          const track = stream.getAudioTracks()[0];
+          if (track) {
+            track.onended = () => {
+              micStreamRef.current = null;
+              recognitionRunningRef.current = false;
+              setListening(false);
+              if (!shouldListenRef.current || !prefsRef.current.enabled) return;
+              setMicError('The microphone input ended unexpectedly. Attempting to reconnect automatically.');
+              if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
+              micRetryTimerRef.current = window.setTimeout(() => {
+                micRetryTimerRef.current = null;
+                begin();
+              }, 1200);
+            };
+          }
+          micStreamRef.current = stream;
         } catch (error) {
           if (cancelled) return;
           const name = error?.name;
@@ -291,16 +321,28 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
             setMicError('Microphone access is blocked. Allow microphone access for PalladiumAI in the browser site permissions, then refresh. No in-app microphone click is required.');
             return;
           }
+          // Transient acquisition failure (device busy/unavailable): retry
+          // while the assistant remains enabled instead of dying silently.
+          if (shouldListenRef.current && prefsRef.current.enabled) {
+            setMicError('The microphone is temporarily unavailable. Retrying automatically.');
+            if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
+            micRetryTimerRef.current = window.setTimeout(() => {
+              micRetryTimerRef.current = null;
+              if (!cancelled && shouldListenRef.current && prefsRef.current.enabled && !micStreamRef.current) begin();
+            }, 2500);
+          }
+          return;
         }
       }
-      if (!cancelled && shouldListenRef.current && !recognitionRunningRef.current && !speechActiveRef.current) {
+      // Start recognition only once the microphone stream is active.
+      if (!cancelled && micStreamRef.current && shouldListenRef.current && !recognitionRunningRef.current && !speechActiveRef.current) {
         try { recognition.start(); } catch { resumeRecognition(250); }
       }
     };
 
     begin();
     return () => { cancelled = true; };
-  }, [prefs.enabled, prefsLoaded, resumeRecognition]);
+  }, [prefs.enabled, prefsLoaded, resumeRecognition, releaseMicStream]);
 
   useEffect(() => {
     const handleNotification = (event) => {
