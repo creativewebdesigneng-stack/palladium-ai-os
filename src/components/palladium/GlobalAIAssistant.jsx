@@ -64,6 +64,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   ]);
   const [pending, setPending] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_VOICE_ASSISTANT_PREFERENCES);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [voices, setVoices] = useState([]);
   const [listening, setListening] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState(false);
@@ -78,7 +79,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   useEffect(() => {
     let alive = true;
-    prefsFn({ data: {} }).then((value) => alive && setPrefs(value)).catch((e) => console.error('[voice-assistant] preferences', e));
+    prefsFn({ data: {} })
+      .then((value) => { if (alive) setPrefs(value); })
+      .catch((e) => console.error('[voice-assistant] preferences', e))
+      .finally(() => { if (alive) setPrefsLoaded(true); });
     return () => { alive = false; };
   }, [prefsFn]);
 
@@ -167,7 +171,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     recognition.onstart = () => { setListening(true); setMicError(''); };
     recognition.onerror = (event) => {
       setListening(false);
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') setMicError('Microphone permission is needed for hands-free voice.');
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        shouldListenRef.current = false;
+        setMicError('Microphone permission is needed once before PalladiumAI can stay always listening.');
+      }
     };
     recognition.onend = () => {
       setListening(false);
@@ -187,19 +194,36 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     return () => { shouldListenRef.current = false; try { recognition.stop(); } catch {} recognitionRef.current = null; };
   }, [send]);
 
-  const toggleListening = () => {
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      if (prefs.enabled) setMicError('Voice recognition is not supported by this browser. You can still type and hear spoken replies.');
+      return;
+    }
+    if (!prefs.enabled) {
+      shouldListenRef.current = false;
+      try { recognition.stop(); } catch {}
+      return;
+    }
+    shouldListenRef.current = true;
+    if (!listening) {
+      try { recognition.start(); }
+      catch {
+        // A browser may require a one-time user gesture before microphone capture.
+        // Keep the desired always-listening state so normal recognition endings restart automatically.
+      }
+    }
+  }, [prefs.enabled, prefsLoaded, listening]);
+
+  const ensureListening = () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
       setMicError('Voice recognition is not supported by this browser. You can still type and hear spoken replies.');
       return;
     }
-    if (listening) {
-      shouldListenRef.current = false;
-      try { recognition.stop(); } catch {}
-    } else {
-      shouldListenRef.current = true;
-      try { recognition.start(); } catch {}
-    }
+    shouldListenRef.current = true;
+    try { recognition.start(); } catch {}
   };
 
   useEffect(() => {
@@ -233,7 +257,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles className="h-4 w-4 text-white" /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Palladium Voice Assistant</p>
-                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? 'text-emerald-400' : 'text-zinc-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? 'bg-emerald-400' : 'bg-zinc-600'}`} />{prefs.enabled ? (listening ? 'Listening · say “Palladium” or “Jarvis”' : 'Ready · voice + live workspace awareness') : 'Voice assistant off'}</p>
+                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? 'text-emerald-400' : 'text-zinc-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? 'bg-emerald-400' : 'bg-zinc-600'}`} />{prefs.enabled ? (listening ? 'Always listening · say “Palladium” or “Jarvis”' : 'Waiting for microphone permission') : 'Voice assistant off'}</p>
                 </div>
                 <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
                 <button onClick={() => persistPrefs({ muted: !prefs.muted })} title={prefs.muted ? 'Unmute voice' : 'Mute voice'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white">{prefs.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
@@ -253,7 +277,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                   </div>
                   <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.wake_word_enabled} onChange={(e) => persistPrefs({ wake_word_enabled: e.target.checked })} /> Require “Palladium” / “Jarvis” wake word</label>
                   <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
-                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free listening works while PalladiumAI is open and your browser permits microphone access. Browsers may require one click on the microphone before continuous listening can begin.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">PalladiumAI now automatically keeps the microphone recognition loop active while the assistant is enabled and the app is open. Your browser may still require one permission grant before listening can begin.</p>
                 </div>
               )}
 
@@ -278,7 +302,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
               </div>
 
               <div className="flex items-center gap-2 border-t border-white/10 px-4 py-3">
-                <button onClick={toggleListening} disabled={!prefs.enabled} aria-label={listening ? 'Stop listening' : 'Start listening'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${listening ? 'border-cyan-300/50 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[.03] text-zinc-300'} disabled:opacity-40`}>{listening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}</button>
+                <button onClick={ensureListening} disabled={!prefs.enabled || listening} aria-label={listening ? 'Always listening' : 'Enable microphone listening'} title={listening ? 'Always listening' : 'Grant microphone permission / resume listening'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${listening ? 'border-cyan-300/50 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[.03] text-zinc-300'} disabled:opacity-70`}>{listening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}</button>
                 <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Ask anything or request a live workspace brief…" aria-label="Ask the AI assistant" className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400/40 focus:outline-none" />
                 <button onClick={() => send()} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white transition hover:opacity-90"><Send className="h-4 w-4" /></button>
               </div>
