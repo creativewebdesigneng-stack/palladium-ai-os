@@ -25,6 +25,22 @@ const STATUS_PATTERN = /what('?s| is) (running|happening|going on)|workspace sta
 const SUGGESTIONS = ['Brief me', 'What is running?', 'Open projects', 'Open agents'];
 const CLOUD_CHUNK_MS = 3200;
 const BROWSER_FRESH_MS = 4200;
+const LOCATION_QUERY_PATTERN = /\b(weather|forecast|temperature|rain|snow|wind|near me|nearby|my city|my town|my area|where i am|where i'm at|around me)\b/i;
+
+function browserLocationFor(content) {
+  if (typeof navigator === 'undefined' || !navigator.geolocation || !LOCATION_QUERY_PATTERN.test(content)) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 10 * 60 * 1000 },
+    );
+  });
+}
 
 function buildBrief(data) {
   const active = data.activeAgents?.length ?? 0;
@@ -105,6 +121,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const lastBrowserTranscriptAtRef = useRef(0);
   const lastVoiceTranscriptRef = useRef(null);
   const cloudTranscriptionPendingRef = useRef(false);
+  const liveLocationRef = useRef(null);
   const prefsRef = useRef(prefs);
   const sendRef = useRef(null);
 
@@ -223,7 +240,16 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
     setPending(true);
     try {
-      const res = await assistantChat({ data: { message: content, history } });
+      let location = liveLocationRef.current;
+      if (!location && LOCATION_QUERY_PATTERN.test(content)) {
+        location = await browserLocationFor(content);
+        if (location) liveLocationRef.current = location;
+      }
+      const res = await assistantChat({ data: {
+        message: content,
+        history,
+        ...(location ? { location } : {}),
+      } });
       setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
       speak(res.text);
     } catch (e) {
@@ -565,7 +591,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                     <label>Pitch <input type="range" min="0.7" max="1.3" step="0.1" value={prefs.pitch} onChange={(e) => persistPrefs({ pitch: Number(e.target.value) })} className="w-full" /></label>
                   </div>
                   <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
-                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free mode uses browser speech recognition first and an automatic server-side transcription fallback if the browser misses you. No wake word or in-app microphone click is required. Audio and transcripts are not persisted.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Hands-free mode uses browser speech recognition first and an automatic server-side transcription fallback if the browser misses you. Location-aware live questions such as weather can use browser location with permission. Audio, transcripts and location are not persisted by the assistant.</p>
                 </div>
               )}
 
