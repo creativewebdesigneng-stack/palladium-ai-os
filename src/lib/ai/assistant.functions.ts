@@ -16,7 +16,7 @@ import {
   isProviderConfigured,
   resolveAssistantModelPreference,
 } from "@/lib/ai/ai-preferences.server";
-import { searchPublicWeb, type WebSource } from "@/lib/ai/web-access.server";
+import { searchPublicWeb, type LiveLocation, type WebSource } from "@/lib/ai/web-access.server";
 import { ProviderError, runChat, type ChatMessage, type Provider } from "@/lib/runtime/model-gateway.server";
 
 const SYSTEM_PROMPT = [
@@ -24,8 +24,10 @@ const SYSTEM_PROMPT = [
   "Answer the user's question directly and helpfully across general knowledge, science, technology, coding, writing, maths, business, planning, brainstorming, education and everyday questions.",
   "You can also help with the user's PalladiumAI workspace, including agents, tasks, workflows, memory, billing and integrations.",
   "Do not refuse or redirect a question merely because it is unrelated to PalladiumAI.",
-  "When LIVE WEB CONTEXT is supplied, use it for claims that could have changed and cite supporting sources with Markdown links using only URLs present in that context.",
-  "Do not invent citations or claim you searched the web when no live web context is supplied.",
+  "PalladiumAI has live external-information capability. For questions about weather, news, prices, sports, politics, laws, releases, current office-holders or anything else that can change, use supplied LIVE WEB CONTEXT as the source of truth.",
+  "When LIVE WEB CONTEXT is supplied, never say that you lack live information, internet access, browsing access, real-time data or current information. Answer from the supplied live evidence and cite supporting sources with Markdown links using only URLs present in that context.",
+  "If a live lookup was requested but no live evidence is supplied, say that the live lookup is temporarily unavailable; do not imply that PalladiumAI is fundamentally unable to access live information.",
+  "Do not invent citations or claim a live lookup succeeded when no live evidence is supplied.",
   "For private workspace data that has not been provided to you, clearly say what you do not know rather than inventing facts.",
   "Be accurate, useful and concise by default, while giving more detail when the user asks for it.",
   "Never invent workspace metrics, results or record counts.",
@@ -41,23 +43,46 @@ type AssistantRun = {
   fallbackFrom?: Provider;
 };
 
-const LIVE_WEB_PATTERN = /\b(latest|current|currently|today|tonight|yesterday|tomorrow|recent|recently|right now|at the moment|breaking|news|update|updated|price|prices|cost today|weather|forecast|score|scores|result|results|fixture|fixtures|schedule|standings|stock|share price|crypto|bitcoin|exchange rate|election|poll|president|prime minister|ceo|law|laws|regulation|regulations|release date|latest version|newest version|search the web|search online|look up|lookup|browse|verify online|check online|find online|on the internet)\b/i;
+const LIVE_WEB_PATTERN = /\b(latest|current|currently|today|tonight|yesterday|tomorrow|recent|recently|right now|at the moment|breaking|news|update|updated|price|prices|cost today|weather|forecast|temperature|rain|snow|wind|score|scores|result|results|fixture|fixtures|schedule|standings|stock|share price|crypto|bitcoin|exchange rate|election|poll|president|prime minister|ceo|law|laws|regulation|regulations|release date|latest version|newest version|search the web|search online|look up|lookup|browse|verify online|check online|find online|on the internet)\b/i;
 
 export function shouldUseLiveWeb(message: string): boolean {
   return LIVE_WEB_PATTERN.test(message);
 }
 
-function webContextBlock(query: string, sources: WebSource[]): string {
-  if (!sources.length) return "";
+function webContextBlock(query: string, sources: WebSource[], attempted: boolean): string {
+  if (!sources.length) {
+    return attempted
+      ? [
+          "LIVE WEB STATUS",
+          `Search query: ${query}`,
+          "A live lookup was attempted for this request but no current external evidence was returned. Explain that the live lookup is temporarily unavailable if current facts are required. Do not say PalladiumAI permanently lacks internet or live-data capability.",
+        ].join("\n\n")
+      : "";
+  }
   const lines = sources.map((source, index) =>
     `[${index + 1}] ${source.title}\nURL: ${source.url}\nSnippet: ${source.snippet ?? ""}`,
   );
   return [
     "LIVE WEB CONTEXT",
     `Search query: ${query}`,
-    "Use these results as current external evidence. Treat snippets as partial and do not infer unsupported details.",
+    "This is current external evidence obtained for this turn. Use it for time-sensitive claims. Treat snippets as partial and do not infer unsupported details.",
     ...lines,
   ].join("\n\n");
+}
+
+function parseLocation(input: unknown): LiveLocation | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  const latitude = Number(raw.latitude);
+  const longitude = Number(raw.longitude);
+  const accuracy = Number(raw.accuracy);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  return {
+    latitude,
+    longitude,
+    ...(Number.isFinite(accuracy) && accuracy >= 0 ? { accuracy } : {}),
+  };
 }
 
 async function runAssistantWithFallback(args: {
@@ -105,15 +130,17 @@ async function runAssistantWithFallback(args: {
 /** Runs one real assistant turn. Throws with a safe message on provider failure. */
 export const assistantChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { message: string; history?: Turn[] }) => {
+  .inputValidator((input: { message: string; history?: Turn[]; location?: unknown }) => {
     const message = String(input?.message ?? "").trim();
     if (!message) throw new Error("A message is required.");
     const history = Array.isArray(input?.history) ? input.history.slice(-8) : [];
+    const location = parseLocation(input?.location);
     return {
       message: message.slice(0, 4000),
       history: history
         .filter((t) => t && (t.role === "user" || t.role === "assistant") && t.content)
         .map((t) => ({ role: t.role, content: String(t.content).slice(0, 4000) })),
+      ...(location ? { location } : {}),
     };
   })
   .handler(async ({ data, context }) => {
@@ -154,14 +181,14 @@ export const assistantChat = createServerFn({ method: "POST" })
     if (shouldUseLiveWeb(data.message)) {
       webSearchAttempted = true;
       try {
-        const web = await searchPublicWeb(data.message, 6);
+        const web = await searchPublicWeb(data.message, 6, undefined, data.location);
         webSources = web.results;
       } catch (error) {
         console.warn("[assistant] live web search unavailable", error);
       }
     }
 
-    const webContext = webContextBlock(data.message, webSources);
+    const webContext = webContextBlock(data.message, webSources, webSearchAttempted);
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
       ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
@@ -182,6 +209,7 @@ export const assistantChat = createServerFn({ method: "POST" })
           fallback_from: result.fallbackFrom ?? null,
           live_web_attempted: webSearchAttempted,
           live_web_sources: webSources.length,
+          live_location_used: Boolean(data.location),
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
         },
@@ -198,6 +226,7 @@ export const assistantChat = createServerFn({ method: "POST" })
           fallbackFrom: result.fallbackFrom ?? null,
           liveWebAttempted: webSearchAttempted,
           liveWebSources: webSources.length,
+          liveLocationUsed: Boolean(data.location),
         },
       });
       return {
@@ -206,6 +235,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         model: result.model,
         sources: webSources.map(({ title, url }) => ({ title, url })),
         webSearchAttempted,
+        liveLocationUsed: Boolean(data.location),
       };
     } catch (error) {
       const status = error instanceof ProviderError ? error.status : 500;
@@ -221,6 +251,7 @@ export const assistantChat = createServerFn({ method: "POST" })
           preferenceSource,
           status,
           liveWebAttempted: webSearchAttempted,
+          liveLocationUsed: Boolean(data.location),
           error: error instanceof Error ? error.message : String(error),
         },
       });
