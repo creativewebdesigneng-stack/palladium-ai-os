@@ -1,0 +1,2 @@
+revoke all on function public.enforce_marketplace_listing_integrity() from anon, authenticated, public;
+revoke all on function public.enforce_builder_production_promotion() from anon, authenticated, public;
