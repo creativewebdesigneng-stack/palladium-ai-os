@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { transcribeOpenAiSpeech } from "@/lib/voice/voice-runtime.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -33,6 +34,17 @@ const preferenceSchema = z.object({
   announce_notifications: z.boolean(),
   wake_word_enabled: z.boolean(),
 });
+
+const assistantAudioMime = z.enum([
+  "audio/webm",
+  "audio/ogg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/mpeg",
+  "audio/mp3",
+]);
 
 export const getVoiceAssistantPreferences = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -71,6 +83,30 @@ export const saveVoiceAssistantPreferences = createServerFn({ method: "POST" })
       .upsert(row, { onConflict: "user_id" });
     if (error) throw new Error(error.message);
     return data;
+  });
+
+/**
+ * Low-latency STT lane used only by the ambient assistant. The audio is sent
+ * directly to the configured OpenAI-compatible transcription endpoint and is
+ * never inserted into Voice Studio jobs or persisted by PalladiumAI.
+ */
+export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    audioBase64: z.string().min(100).max(8_000_000),
+    filename: z.string().trim().min(1).max(120).default("assistant.webm"),
+    mimeType: assistantAudioMime,
+    language: z.string().trim().min(2).max(20).default("en"),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const result = await transcribeOpenAiSpeech({
+      base64: data.audioBase64,
+      filename: data.filename,
+      mimeType: data.mimeType,
+      language: data.language,
+      prompt: "Short hands-free command or conversational request to the PalladiumAI assistant.",
+    });
+    return { text: result.text.trim(), model: result.model };
   });
 
 export const getVoiceWorkspaceBrief = createServerFn({ method: "POST" })
