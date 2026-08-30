@@ -248,6 +248,11 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       recognitionRunningRef.current = false;
       if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
+      if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
+      micRetryTimerRef.current = null;
+      const micStream = micStreamRef.current;
+      micStreamRef.current = null;
+      if (micStream) micStream.getTracks().forEach((track) => track.stop());
       try { recognition.stop(); } catch {}
       recognitionRef.current = null;
     };
