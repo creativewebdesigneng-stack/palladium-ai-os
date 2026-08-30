@@ -19,6 +19,7 @@ PalladiumAI remains authoritative for:
 - job history through the existing `media_generation_jobs` table;
 - audit events;
 - Media Studio UI;
+- governed agent execution through the existing Harness, Tools Framework, tool grants and `tool_executions` audit path;
 - downstream publishing and scheduling through Social Operations;
 - platform integrations, credentials, approvals and policy boundaries.
 
@@ -35,9 +36,13 @@ The worker exposes the bounded contract `POST /jobs` and `GET /jobs/:id`. Pallad
 
 If no worker is configured, the UI reports that rendering is unavailable. PalladiumAI does not simulate a completed video or fabricate an output URL.
 
+## Agent access
+
+The existing Tools Framework gains one bounded `short_video` catalogue capability rather than a separate agent runtime. Agents may request only `capabilities`, `list`, `create` and `status`; the tool accepts no credentials, arbitrary filesystem paths or shell commands. Access still depends on the agent's existing allowed-tool set, catalogue state, plan entitlement and Harness policy, and execution is recorded through the existing tool execution audit path.
+
 ## Database and navigation
 
-No new job table is required. `media_generation_jobs` already provides owner identity, RLS, status, worker job ID, output URL, error state, timestamps and flexible metadata. A backwards-compatible migration only widens its existing provider constraint to include `short_video`.
+No new job table is required. `media_generation_jobs` already provides owner identity, RLS, status, worker job ID, output URL, error state, timestamps and flexible metadata. A backwards-compatible migration only widens its existing provider constraint to include `short_video` and registers the bounded `short_video` Tools Framework catalogue entry.
 
 No new top-level page is required. The feature is mounted in the existing Media Studio workspace alongside the Seedream/LTX generation panel. Social publishing remains in Social Operations rather than duplicating MoneyPrinterTurbo's upload/post layer.
 
@@ -49,6 +54,7 @@ No new top-level page is required. The feature is mounted in the existing Media 
 - The browser never receives the worker token.
 - Existing Supabase owner RLS remains the authority for stored jobs.
 - Model generation uses the existing PalladiumAI model preference/gateway path instead of provider keys supplied to this feature.
+- Agent access remains governed by existing tool permissions and Harness input policy.
 - Publishing credentials and approval/policy enforcement remain in the existing integration/Social Operations path.
 
 ## Duplication avoided
