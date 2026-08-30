@@ -4,7 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Send, X, Plus, Bot, FolderKanban, ListChecks, Workflow,
-  Mic, MicOff, Volume2, VolumeX, Settings2, Power, Activity, Bell,
+  Mic, MicOff, Volume2, VolumeX, Settings2, Power, Bell,
 } from 'lucide-react';
 import { assistantChat } from '@/lib/ai/assistant.functions';
 import {
@@ -71,8 +71,11 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const [micError, setMicError] = useState('');
   const endRef = useRef(null);
   const recognitionRef = useRef(null);
+  const recognitionRunningRef = useRef(false);
+  const restartTimerRef = useRef(null);
   const shouldListenRef = useRef(false);
   const prefsRef = useRef(prefs);
+  const sendRef = useRef(null);
 
   useEffect(() => { prefsRef.current = prefs; }, [prefs]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open]);
@@ -110,6 +113,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   const persistPrefs = useCallback(async (patch) => {
     const next = { ...prefsRef.current, ...patch };
+    prefsRef.current = next;
     setPrefs(next);
     try { await savePrefsFn({ data: next }); }
     catch (e) { console.error('[voice-assistant] save preferences', e); }
@@ -160,6 +164,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     } finally { setPending(false); }
   }, [briefFn, input, messages, navigate, pending, setOpen, speak]);
 
+  useEffect(() => { sendRef.current = send; }, [send]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -168,19 +174,43 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = 'en-GB';
-    recognition.onstart = () => { setListening(true); setMicError(''); };
+
+    const scheduleRestart = () => {
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      if (!shouldListenRef.current || !prefsRef.current.enabled) {
+        setListening(false);
+        return;
+      }
+      // Keep the user-facing state stable while Chromium rotates Web Speech
+      // recognition sessions under the hood. This prevents the floating icon
+      // from flashing between microphone and chat states every few seconds.
+      setListening(true);
+      restartTimerRef.current = window.setTimeout(() => {
+        if (!shouldListenRef.current || !prefsRef.current.enabled || recognitionRunningRef.current) return;
+        try { recognition.start(); } catch {}
+      }, 500);
+    };
+
+    recognition.onstart = () => {
+      recognitionRunningRef.current = true;
+      setListening(true);
+      setMicError('');
+    };
     recognition.onerror = (event) => {
-      setListening(false);
+      recognitionRunningRef.current = false;
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         shouldListenRef.current = false;
+        setListening(false);
         setMicError('Microphone permission is needed once before PalladiumAI can stay always listening.');
+        return;
       }
+      // Transient errors such as no-speech/network are handled by onend and
+      // the restart loop. Do not visually drop out of listening mode.
+      if (shouldListenRef.current && prefsRef.current.enabled) setListening(true);
     };
     recognition.onend = () => {
-      setListening(false);
-      if (shouldListenRef.current && prefsRef.current.enabled) {
-        setTimeout(() => { try { recognition.start(); } catch {} }, 350);
-      }
+      recognitionRunningRef.current = false;
+      scheduleRestart();
     };
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results).slice(event.resultIndex).map((r) => r[0]?.transcript ?? '').join(' ').trim();
@@ -188,11 +218,19 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       const p = prefsRef.current;
       if (p.wake_word_enabled && !WAKE_PATTERN.test(transcript)) return;
       const command = transcript.replace(WAKE_PATTERN, '').trim();
-      if (command) send(command, { fromVoice: true });
+      if (command) sendRef.current?.(command, { fromVoice: true });
     };
     recognitionRef.current = recognition;
-    return () => { shouldListenRef.current = false; try { recognition.stop(); } catch {} recognitionRef.current = null; };
-  }, [send]);
+
+    return () => {
+      shouldListenRef.current = false;
+      recognitionRunningRef.current = false;
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+      try { recognition.stop(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!prefsLoaded) return;
@@ -203,18 +241,24 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
     }
     if (!prefs.enabled) {
       shouldListenRef.current = false;
-      try { recognition.stop(); } catch {}
+      if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+      setListening(false);
+      if (recognitionRunningRef.current) {
+        try { recognition.stop(); } catch {}
+      }
       return;
     }
     shouldListenRef.current = true;
-    if (!listening) {
+    setListening(true);
+    if (!recognitionRunningRef.current) {
       try { recognition.start(); }
       catch {
         // A browser may require a one-time user gesture before microphone capture.
-        // Keep the desired always-listening state so normal recognition endings restart automatically.
+        // The permission/resume button below can satisfy that browser boundary.
       }
     }
-  }, [prefs.enabled, prefsLoaded, listening]);
+  }, [prefs.enabled, prefsLoaded]);
 
   const ensureListening = () => {
     const recognition = recognitionRef.current;
@@ -223,7 +267,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       return;
     }
     shouldListenRef.current = true;
-    try { recognition.start(); } catch {}
+    setListening(true);
+    if (!recognitionRunningRef.current) {
+      try { recognition.start(); } catch {}
+    }
   };
 
   useEffect(() => {
@@ -244,8 +291,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         onClick={() => setOpen(true)} aria-label="Open Palladium voice assistant"
         className="fixed bottom-6 right-6 z-[70] grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-2xl shadow-violet-500/30 transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
       >
-        {listening ? <Mic className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-        <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full ring-2 ring-[#090a0f] ${prefs.enabled ? (listening ? 'animate-pulse bg-cyan-300' : 'bg-emerald-400') : 'bg-zinc-600'}`} />
+        {prefs.enabled ? <Mic className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+        <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full ring-2 ring-[#090a0f] ${prefs.enabled ? (listening ? 'animate-pulse bg-cyan-300' : 'bg-amber-300') : 'bg-zinc-600'}`} />
       </motion.button>
 
       <AnimatePresence>
@@ -257,7 +304,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles className="h-4 w-4 text-white" /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Palladium Voice Assistant</p>
-                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? 'text-emerald-400' : 'text-zinc-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? 'bg-emerald-400' : 'bg-zinc-600'}`} />{prefs.enabled ? (listening ? 'Always listening · say “Palladium” or “Jarvis”' : 'Waiting for microphone permission') : 'Voice assistant off'}</p>
+                  <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? (listening ? 'text-emerald-400' : 'text-amber-300') : 'text-zinc-500'}`}><span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? (listening ? 'bg-emerald-400' : 'bg-amber-300') : 'bg-zinc-600'}`} />{prefs.enabled ? (listening ? 'Always listening · say “Palladium” or “Jarvis”' : 'Waiting for microphone permission') : 'Voice assistant off'}</p>
                 </div>
                 <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
                 <button onClick={() => persistPrefs({ muted: !prefs.muted })} title={prefs.muted ? 'Unmute voice' : 'Mute voice'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white">{prefs.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
@@ -277,7 +324,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                   </div>
                   <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={prefs.wake_word_enabled} onChange={(e) => persistPrefs({ wake_word_enabled: e.target.checked })} /> Require “Palladium” / “Jarvis” wake word</label>
                   <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={prefs.announce_notifications} onChange={(e) => persistPrefs({ announce_notifications: e.target.checked })} /> Speak new notifications</label>
-                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">PalladiumAI now automatically keeps the microphone recognition loop active while the assistant is enabled and the app is open. Your browser may still require one permission grant before listening can begin.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">PalladiumAI keeps the voice listener active while the assistant is enabled. Chromium may internally rotate speech-recognition sessions, but the assistant now maintains one stable listener state instead of flashing between voice and chat modes.</p>
                 </div>
               )}
 
