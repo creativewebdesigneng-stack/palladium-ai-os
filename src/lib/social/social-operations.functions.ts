@@ -20,6 +20,7 @@ const SOCIAL_PROVIDERS = new Set([
   "mastodon",
   "discord",
   "telegram",
+  "postiz",
 ]);
 const SECRET_KEY = /(token|secret|password|passwd|api[_-]?key|authorization|cookie|credential|private[_-]?key)/i;
 
