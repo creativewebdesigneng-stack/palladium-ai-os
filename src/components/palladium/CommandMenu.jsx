@@ -6,12 +6,13 @@ import {
   Search, CornerDownLeft, ArrowUp, ArrowDown, Command, Home, FolderKanban,
   Users, Bot, ListChecks, Workflow, Files, BookOpen, Plug, Store, Globe,
   Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, ShieldCheck, CreditCard,
-  Cpu, Lock, Loader2,
+  Cpu, Lock, Loader2, Zap,
 } from 'lucide-react';
 import { searchWorkspace } from '@/lib/search/search.functions';
 
 const PAGES = [
   ['Home', '/dashboard', Home],
+  ['Fast Track', '/fast-track', Zap],
   ['Projects', '/projects', FolderKanban],
   ['AI Workforce', '/workforce', Users],
   ['Agents', '/agents', Bot],
@@ -36,6 +37,7 @@ const PAGES = [
 ];
 
 const QUICK_ACTIONS = [
+  { title: 'Open Fast Track', href: '/fast-track', icon: Zap },
   { title: 'Create new project', href: '/projects', icon: FolderKanban },
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
