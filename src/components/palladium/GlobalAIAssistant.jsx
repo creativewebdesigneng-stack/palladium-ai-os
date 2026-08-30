@@ -19,6 +19,7 @@ import {
   resolveVoiceNavigationIntent,
 } from '@/lib/voice/voice-navigation';
 import { VOICE_NOTIFICATION_EVENT } from '@/hooks/useRealtimeNotifications';
+import AssistantLifecycleBridge from './AssistantLifecycleBridge';
 
 const STATUS_PATTERN = /what('?s| is) (running|happening|going on)|workspace status|status update|my notifications|anything failed|brief me|give me a brief|what are my agents doing/i;
 const SUGGESTIONS = ['Brief me', 'What is running?', 'Open projects', 'Open agents'];
@@ -517,6 +518,13 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   return (
     <>
+      <AssistantLifecycleBridge
+        enabled={prefs.enabled}
+        listening={listening}
+        pending={pending}
+        listeningMode={listeningMode}
+        micError={micError}
+      />
       <motion.button
         initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         onClick={() => setOpen(true)} aria-label="Open Palladium voice assistant"
