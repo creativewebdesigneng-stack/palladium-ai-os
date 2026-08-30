@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { getNotificationPreferences } from "@/lib/notifications/notifications.functions";
 
-// Queries that are affected by backend activity and must refresh live.
 const LIVE_QUERY_KEYS = [
   ["notifications"],
   ["dashboard-summary"],
@@ -13,13 +12,13 @@ const LIVE_QUERY_KEYS = [
   ["usage-overview"],
 ];
 
+export const VOICE_NOTIFICATION_EVENT = "palladium:voice-notification";
+
 /**
  * Subscribes the signed-in user to their own notification stream.
- *
- * Privacy: browser notifications are only ever requested when the user has
- * explicitly enabled them, and the body is withheld unless they have also
- * opted in to seeing details outside the app. Titles are generic by design —
- * no amounts, outputs or personal data are pushed through the browser channel.
+ * Browser notifications remain opt-in. A same-tab custom event is also emitted
+ * so the authenticated global voice assistant can optionally speak the alert;
+ * that event never leaves the current browser context.
  */
 export default function useRealtimeNotifications() {
   const qc = useQueryClient();
@@ -93,13 +92,17 @@ export default function useRealtimeNotifications() {
             description: row.body ?? undefined,
             variant: row.severity === "critical" ? "destructive" : undefined,
           });
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent(VOICE_NOTIFICATION_EVENT, {
+              detail: { id: row.id, title: row.title, severity: row.severity, link: row.link ?? null },
+            }));
+          }
           if (
             prefs?.browser_push &&
             typeof window !== "undefined" &&
             "Notification" in window &&
             window.Notification.permission === "granted"
           ) {
-            // Details stay inside the app unless explicitly allowed.
             new window.Notification("PalladiumAI", {
               body: prefs.browser_push_details ? row.title : "You have a new notification.",
               tag: row.id,
