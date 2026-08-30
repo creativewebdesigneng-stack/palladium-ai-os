@@ -73,9 +73,9 @@ function webContextBlock(query: string, sources: WebSource[], attempted: boolean
 function parseLocation(input: unknown): LiveLocation | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
   const raw = input as Record<string, unknown>;
-  const latitude = Number(raw.latitude);
-  const longitude = Number(raw.longitude);
-  const accuracy = Number(raw.accuracy);
+  const latitude = Number(raw["latitude"]);
+  const longitude = Number(raw["longitude"]);
+  const accuracy = Number(raw["accuracy"]);
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
   return {
@@ -140,7 +140,7 @@ export const assistantChat = createServerFn({ method: "POST" })
       history: history
         .filter((t) => t && (t.role === "user" || t.role === "assistant") && t.content)
         .map((t) => ({ role: t.role, content: String(t.content).slice(0, 4000) })),
-      ...(location ? { location } : {}),
+      location,
     };
   })
   .handler(async ({ data, context }) => {
@@ -181,7 +181,7 @@ export const assistantChat = createServerFn({ method: "POST" })
     if (shouldUseLiveWeb(data.message)) {
       webSearchAttempted = true;
       try {
-        const web = await searchPublicWeb(data.message, 6, undefined, data.location);
+        const web = await searchPublicWeb(data.message, 6, undefined, data.location ?? undefined);
         webSources = web.results;
       } catch (error) {
         console.warn("[assistant] live web search unavailable", error);
