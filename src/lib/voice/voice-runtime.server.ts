@@ -85,8 +85,8 @@ async function requestTranscription(input: {
   filename: string;
   mimeType: string;
   model: string;
-  language?: string | null;
-  prompt?: string | null;
+  language?: string | null | undefined;
+  prompt?: string | null | undefined;
 }) {
   const form = new FormData();
   form.set("file", new Blob([input.fileBytes], { type: input.mimeType }), input.filename);
