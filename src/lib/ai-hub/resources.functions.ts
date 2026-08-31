@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
@@ -65,6 +66,12 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
+
+    // agent_skills was added after the checked-in generated Supabase types. Keep the
+    // authenticated/RLS-bound client, but use the library's untyped client surface for
+    // this one table until the next schema type regeneration.
+    const skillsClient = context.supabase as unknown as SupabaseClient
+
     const [agentsRes, workflowsRes, skillsRes] = await Promise.all([
       context.supabase
         .from('personal_agents')
@@ -76,7 +83,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
         .limit(limit),
-      context.supabase
+      skillsClient
         .from('agent_skills')
         .select('id,name,description,version,requires_tools,requires_scripts,dangerous,scan_verdict,source_kind,enabled,updated_at')
         .order('updated_at', { ascending: false })
