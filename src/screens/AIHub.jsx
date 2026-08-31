@@ -39,7 +39,7 @@ function statusClasses(status) {
   if (status === 'available' || status === 'active' || status === 'enabled') {
     return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
   }
-  if (status === 'unconfigured' || status === 'paused') {
+  if (status === 'unconfigured' || status === 'paused' || status === 'disabled') {
     return 'border-amber-400/20 bg-amber-400/[.08] text-amber-300';
   }
   return 'border-white/10 bg-white/[.04] text-zinc-400';
@@ -150,6 +150,8 @@ export default function AIHub() {
         resource.metadata?.access,
         resource.metadata?.description,
         resource.metadata?.auth,
+        resource.metadata?.server,
+        resource.metadata?.slug,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -177,7 +179,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, native and connected MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -190,7 +192,7 @@ export default function AIHub() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Live Hub inventory</h2>
-              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime, MCP and Workflows remain the systems of record.</p>
+              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime, MCP Runtime and Workflows remain the systems of record.</p>
             </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
