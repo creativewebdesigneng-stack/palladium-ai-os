@@ -31,7 +31,7 @@ describe('workspace chat live-only contract', () => {
     const web = read('lib/ai/web-access.server.ts');
     const bubble = read('components/chat/MessageBubble.jsx');
 
-    expect(assistant).toContain('searchPublicWeb(data.message, 6)');
+    expect(assistant).toContain('searchPublicWeb(data.message, 6, undefined, data.location ?? undefined)');
     expect(assistant).toContain('shouldUseLiveWeb');
     expect(assistant).toContain('LIVE WEB CONTEXT');
     expect(assistant).toContain('sources: webSources.map');
