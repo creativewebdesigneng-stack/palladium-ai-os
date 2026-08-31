@@ -43,6 +43,7 @@ import { Route as ShellAppAgentMarketplaceRouteImport } from './routes/_shell/_a
 import { Route as ShellAppAgentRuntimeRouteImport } from './routes/_shell/_app/agent-runtime'
 import { Route as ShellAppAgentWorkspacesRouteImport } from './routes/_shell/_app/agent-workspaces'
 import { Route as ShellAppAiBuilderRouteImport } from './routes/_shell/_app/ai-builder'
+import { Route as ShellAppAiHubRouteImport } from './routes/_shell/_app/ai-hub'
 import { Route as ShellAppAiMarketplaceRouteImport } from './routes/_shell/_app/ai-marketplace'
 import { Route as ShellAppAiModelHubRouteImport } from './routes/_shell/_app/ai-model-hub'
 import { Route as ShellAppAiToolsRouteImport } from './routes/_shell/_app/ai-tools'
@@ -323,6 +324,11 @@ const ShellAppAgentWorkspacesRoute = ShellAppAgentWorkspacesRouteImport.update({
 const ShellAppAiBuilderRoute = ShellAppAiBuilderRouteImport.update({
   id: '/ai-builder',
   path: '/ai-builder',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAiHubRoute = ShellAppAiHubRouteImport.update({
+  id: '/ai-hub',
+  path: '/ai-hub',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppAiMarketplaceRoute = ShellAppAiMarketplaceRouteImport.update({
@@ -923,6 +929,7 @@ export interface FileRoutesByFullPath {
   '/agent-runtime': typeof ShellAppAgentRuntimeRoute
   '/agent-workspaces': typeof ShellAppAgentWorkspacesRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
+  '/ai-hub': typeof ShellAppAiHubRoute
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
@@ -1066,6 +1073,7 @@ export interface FileRoutesByTo {
   '/agent-runtime': typeof ShellAppAgentRuntimeRoute
   '/agent-workspaces': typeof ShellAppAgentWorkspacesRoute
   '/ai-builder': typeof ShellAppAiBuilderRoute
+  '/ai-hub': typeof ShellAppAiHubRoute
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
@@ -1212,6 +1220,7 @@ export interface FileRoutesById {
   '/_shell/_app/agent-runtime': typeof ShellAppAgentRuntimeRoute
   '/_shell/_app/agent-workspaces': typeof ShellAppAgentWorkspacesRoute
   '/_shell/_app/ai-builder': typeof ShellAppAiBuilderRoute
+  '/_shell/_app/ai-hub': typeof ShellAppAiHubRoute
   '/_shell/_app/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/_shell/_app/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/_shell/_app/ai-tools': typeof ShellAppAiToolsRoute
@@ -1357,6 +1366,7 @@ export interface FileRouteTypes {
     | '/agent-runtime'
     | '/agent-workspaces'
     | '/ai-builder'
+    | '/ai-hub'
     | '/ai-marketplace'
     | '/ai-model-hub'
     | '/ai-tools'
@@ -1500,6 +1510,7 @@ export interface FileRouteTypes {
     | '/agent-runtime'
     | '/agent-workspaces'
     | '/ai-builder'
+    | '/ai-hub'
     | '/ai-marketplace'
     | '/ai-model-hub'
     | '/ai-tools'
@@ -1645,6 +1656,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/agent-runtime'
     | '/_shell/_app/agent-workspaces'
     | '/_shell/_app/ai-builder'
+    | '/_shell/_app/ai-hub'
     | '/_shell/_app/ai-marketplace'
     | '/_shell/_app/ai-model-hub'
     | '/_shell/_app/ai-tools'
@@ -2040,6 +2052,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-builder'
       fullPath: '/ai-builder'
       preLoaderRoute: typeof ShellAppAiBuilderRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/ai-hub': {
+      id: '/_shell/_app/ai-hub'
+      path: '/ai-hub'
+      fullPath: '/ai-hub'
+      preLoaderRoute: typeof ShellAppAiHubRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/ai-marketplace': {
@@ -2814,6 +2833,7 @@ interface ShellAppRouteChildren {
   ShellAppAgentRuntimeRoute: typeof ShellAppAgentRuntimeRoute
   ShellAppAgentWorkspacesRoute: typeof ShellAppAgentWorkspacesRoute
   ShellAppAiBuilderRoute: typeof ShellAppAiBuilderRoute
+  ShellAppAiHubRoute: typeof ShellAppAiHubRoute
   ShellAppAiMarketplaceRoute: typeof ShellAppAiMarketplaceRoute
   ShellAppAiModelHubRoute: typeof ShellAppAiModelHubRoute
   ShellAppAiToolsRoute: typeof ShellAppAiToolsRoute
@@ -2913,6 +2933,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppAgentRuntimeRoute: ShellAppAgentRuntimeRoute,
   ShellAppAgentWorkspacesRoute: ShellAppAgentWorkspacesRoute,
   ShellAppAiBuilderRoute: ShellAppAiBuilderRoute,
+  ShellAppAiHubRoute: ShellAppAiHubRoute,
   ShellAppAiMarketplaceRoute: ShellAppAiMarketplaceRoute,
   ShellAppAiModelHubRoute: ShellAppAiModelHubRoute,
   ShellAppAiToolsRoute: ShellAppAiToolsRoute,

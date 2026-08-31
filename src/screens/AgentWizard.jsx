@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createAgent } from '@/lib/agents/agents.functions';
+import { createAgent as createAgentFn } from '@/lib/agents/agents.functions';
+import { describeError, persistedAgentId, singleFlight } from '@/lib/agents/agent-create-submit';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Brain, Wrench, Shield, User, MessageSquare, MemoryStick } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { WIZARD_MODELS, WIZARD_TOOLS, AVATAR_COLORS, DEPARTMENTS } from '@/components/agents/agentsData';
+
 
 const STEPS = [
   ['identity', 'Identity', User],
@@ -58,32 +60,53 @@ export default function AgentWizard() {
   // Persists the configured agent as a real Agent record (org-scoped, plan-
   // gated). The workforce list on /agents reads the same backend, so the new
   // agent appears immediately. Users without a workspace get a clear error.
-  const createAgent = async () => {
+  //
+  // Guards: an immediate in-flight ref plus a shared single-flight promise mean
+  // one click can only ever produce one insert, regardless of render/state lag.
+  // Success is only reported once the server returns a persisted row id.
+  const submitRef = useRef(false);
+  const submitCreate = useMemo(
+    () => singleFlight((payload) => createAgentFn({ data: payload })),
+    [],
+  );
+
+  const handleCreate = async () => {
+    if (submitRef.current) return;
     if (!gate('createAgents')) return;
     if (!d.name.trim()) { toast({ title: 'Agent name is required', variant: 'destructive' }); return; }
+    submitRef.current = true;
     setCreating(true);
     try {
       const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'gpt-4o-mini';
-      await createAgent({
-        data: {
-          name: d.name.trim(),
-          description: d.desc,
-          category: d.dept,
-          model: modelName,
-          instructions: d.rules || d.behaviour || '',
-          allowed_tools: d.tools,
-          status: 'draft',
-          preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
-        },
+      const result = await submitCreate({
+        name: d.name.trim(),
+        description: d.desc,
+        category: d.dept,
+        model: modelName,
+        instructions: d.rules || d.behaviour || '',
+        allowed_tools: d.tools,
+        status: 'draft',
+        preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
       });
-      toast({ title: 'Agent created', description: `${d.name} is now in your workforce.` });
+      const id = persistedAgentId(result);
+      if (!id) {
+        toast({ title: 'Could not create agent', description: 'The server did not confirm a saved agent. Please try again.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Agent created', description: `${d.name.trim()} is now in your workforce.` });
       navigate('/agents');
     } catch (e) {
-      toast({ title: 'Could not create agent', description: e?.message || 'Create a workspace first, then try again.', variant: 'destructive' });
+      toast({
+        title: 'Could not create agent',
+        description: describeError(e, 'Create a workspace first, then try again.'),
+        variant: 'destructive',
+      });
     } finally {
+      submitRef.current = false;
       setCreating(false);
     }
   };
+
 
   return (
     <>
@@ -207,7 +230,7 @@ export default function AgentWizard() {
             {step < STEPS.length - 1 ? (
               <button onClick={next} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500">Continue <ArrowRight className="h-4 w-4" /></button>
             ) : (
-              <button onClick={createAgent} disabled={creating} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"><Bot className="h-4 w-4" />{creating ? 'Creating…' : 'Create agent'}</button>
+              <button onClick={handleCreate} disabled={creating} type="button" className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"><Bot className="h-4 w-4" />{creating ? 'Creating…' : 'Create agent'}</button>
             )}
           </div>
         </div>
