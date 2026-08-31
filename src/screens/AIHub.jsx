@@ -21,6 +21,8 @@ const icons = {
 const resourceIcons = {
   model: Cpu,
   agent: Bot,
+  mcp: Network,
+  tool: Boxes,
   workflow: Workflow,
 };
 
@@ -28,6 +30,8 @@ const FILTERS = [
   ['all', 'All resources'],
   ['model', 'Models'],
   ['agent', 'Agents'],
+  ['mcp', 'MCP servers'],
+  ['tool', 'MCP tools'],
   ['workflow', 'Workflows'],
 ];
 
@@ -35,7 +39,7 @@ function statusClasses(status) {
   if (status === 'available' || status === 'active' || status === 'enabled') {
     return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
   }
-  if (status === 'unconfigured' || status === 'paused') {
+  if (status === 'unconfigured' || status === 'paused' || status === 'disabled') {
     return 'border-amber-400/20 bg-amber-400/[.08] text-amber-300';
   }
   return 'border-white/10 bg-white/[.04] text-zinc-400';
@@ -45,6 +49,8 @@ function ResourceCard({ resource }) {
   const Icon = resourceIcons[resource.kind] ?? Boxes;
   const model = resource.metadata?.model;
   const modelProvider = resource.metadata?.modelProvider;
+  const mcpServerName = resource.metadata?.mcpServerName;
+  const toolCount = resource.metadata?.toolCount;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -74,6 +80,18 @@ function ResourceCard({ resource }) {
             <span className="truncate text-right text-zinc-300">
               {[modelProvider, model].filter(Boolean).join(' / ')}
             </span>
+          </div>
+        )}
+        {mcpServerName && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">MCP server</span>
+            <span className="truncate text-right text-zinc-300">{mcpServerName}</span>
+          </div>
+        )}
+        {toolCount !== undefined && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Discovered tools</span>
+            <span className="truncate text-right text-zinc-300">{toolCount}</span>
           </div>
         )}
       </div>
@@ -127,6 +145,9 @@ export default function AIHub() {
         resource.metadata?.model,
         resource.metadata?.modelProvider,
         resource.metadata?.integrations,
+        resource.metadata?.mcpServerName,
+        resource.metadata?.mcpServerSlug,
+        resource.metadata?.slug,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -154,7 +175,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models plus tenant-visible agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models plus tenant-visible agents, MCP servers, MCP tools and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -167,7 +188,7 @@ export default function AIHub() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Live Hub inventory</h2>
-              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime and Workflows remain the systems of record.</p>
+              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime, MCP Runtime and Workflows remain the systems of record.</p>
             </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -195,6 +216,8 @@ export default function AIHub() {
                 {label}
                 {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
                 {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
+                {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
+                {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
               </button>
             ))}
