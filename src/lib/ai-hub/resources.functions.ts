@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
 import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
@@ -7,6 +8,7 @@ import {
 import {
   countAiHubResources,
   toAiHubLiveResource,
+  toAiHubMcpResources,
   type AiHubLiveResource,
   type AiHubResourceRecord,
 } from './resources'
@@ -55,7 +57,8 @@ function listModelResources(): AiHubLiveResource[] {
  * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
  * Supabase RLS remains the source of truth for which tenant resources the caller can see.
  * Deployment model availability is sourced from Palladium's existing model gateway config;
- * secret values are never returned to the browser.
+ * secret values are never returned to the browser. MCP metadata is projected from the
+ * existing credential-free MCP catalogue rather than duplicated in a Hub store.
  */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -80,6 +83,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
+      ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
       ...(agentsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
       ),
