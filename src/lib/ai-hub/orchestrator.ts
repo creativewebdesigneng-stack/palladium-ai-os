@@ -16,6 +16,15 @@ export interface AiHubOrchestrationPlan {
   executionBoundary: 'palladium-policy-gateway'
 }
 
+function discoveryFromWorkload(workload: AiHubWorkload): AiHubDiscoveryQuery {
+  const requirements = workload.requirements
+  const query: AiHubDiscoveryQuery = { capabilities: requirements.capabilities }
+  if (requirements.preferredKinds) query.kinds = requirements.preferredKinds
+  if (requirements.requiredDeploymentTargets) query.deploymentTargets = requirements.requiredDeploymentTargets
+  if (requirements.requiredRegions) query.regions = requirements.requiredRegions
+  return query
+}
+
 export class AiHubOrchestrator {
   constructor(private readonly capabilities: () => AiHubCapabilityRef[]) {}
 
@@ -24,12 +33,7 @@ export class AiHubOrchestrator {
   }
 
   plan(request: AiHubOrchestrationRequest): AiHubOrchestrationPlan | null {
-    const discovery = this.discover(request.discovery ?? {
-      capabilities: request.workload.requirements.capabilities,
-      kinds: request.workload.requirements.preferredKinds,
-      deploymentTargets: request.workload.requirements.requiredDeploymentTargets,
-      regions: request.workload.requirements.requiredRegions,
-    })
+    const discovery = this.discover(request.discovery ?? discoveryFromWorkload(request.workload))
 
     const route = routeAiHubWorkload(
       request.workload,
