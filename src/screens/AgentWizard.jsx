@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createAgent } from '@/lib/agents/agents.functions';
+import { createAgent as createAgentFn } from '@/lib/agents/agents.functions';
+import { describeError, persistedAgentId, singleFlight } from '@/lib/agents/agent-create-submit';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Brain, Wrench, Shield, User, MessageSquare, MemoryStick } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { WIZARD_MODELS, WIZARD_TOOLS, AVATAR_COLORS, DEPARTMENTS } from '@/components/agents/agentsData';
+
 
 const STEPS = [
   ['identity', 'Identity', User],
