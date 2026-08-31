@@ -230,7 +230,7 @@ export default function AgentWizard() {
             {step < STEPS.length - 1 ? (
               <button onClick={next} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500">Continue <ArrowRight className="h-4 w-4" /></button>
             ) : (
-              <button onClick={createAgent} disabled={creating} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"><Bot className="h-4 w-4" />{creating ? 'Creating…' : 'Create agent'}</button>
+              <button onClick={handleCreate} disabled={creating} type="button" className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"><Bot className="h-4 w-4" />{creating ? 'Creating…' : 'Create agent'}</button>
             )}
           </div>
         </div>
