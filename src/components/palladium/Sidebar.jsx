@@ -11,6 +11,7 @@ import Brand from '@/components/palladium/Brand';
 
 const MAIN = [
   ['Home', '/dashboard', Home],
+  ['AI Hub', '/ai-hub', Blocks],
   ['Fast Track', '/fast-track', Zap],
   ['Mission Control', '/mission-control', Radar],
   ['Projects', '/projects', FolderKanban],
