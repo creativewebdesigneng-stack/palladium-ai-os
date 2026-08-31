@@ -21,15 +21,30 @@ type SupabaseLike = {
   from: (table: string) => QueryBuilder
 }
 
+type AiHubResourceInput = {
+  limit: number
+}
+
+function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
+  const rawLimit =
+    input && typeof input === 'object' && 'limit' in input
+      ? (input as { limit?: unknown }).limit
+      : undefined
+  const parsedLimit = Number(rawLimit ?? 100)
+  const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 100
+
+  return {
+    limit: Math.min(Math.max(Math.trunc(safeLimit), 1), 250),
+  }
+}
+
 /**
  * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
  * Supabase RLS remains the source of truth for which resources the caller can see.
  */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { limit?: number } | undefined) => ({
-    limit: Math.min(Math.max(Number(input?.limit ?? 100), 1), 250),
-  }))
+  .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as SupabaseLike
     const [agentsRes, workflowsRes] = await Promise.all([
