@@ -18,6 +18,7 @@ import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listAgents } from '@/lib/agents/agents.functions';
+import { describeError } from '@/lib/agents/agent-create-submit';
 import { getUsageSummary } from '@/lib/platform/platform.functions';
 import {
   listDepartments,
@@ -76,7 +77,7 @@ export default function Workforce() {
       setTeams(dept.departments || []);
       setMessages(msg.messages || []);
     } catch (e) {
-      toast({ title: 'Could not load your workforce', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not load your workforce', description: describeError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
