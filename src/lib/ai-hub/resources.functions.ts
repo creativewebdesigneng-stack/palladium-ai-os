@@ -7,6 +7,7 @@ import {
 } from '@/lib/runtime/model-providers.server'
 import {
   countAiHubResources,
+  toAiHubExternalMcpResources,
   toAiHubLiveResource,
   toAiHubMcpResources,
   type AiHubLiveResource,
@@ -55,17 +56,17 @@ function listModelResources(): AiHubLiveResource[] {
 
 /**
  * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
- * Supabase RLS remains the source of truth for which tenant resources the caller can see.
- * Deployment model availability is sourced from Palladium's existing model gateway config;
- * secret values are never returned to the browser. MCP metadata is projected from the
- * existing credential-free MCP catalogue rather than duplicated in a Hub store.
+ * Supabase RLS remains the source of truth for tenant-visible records. Runtime
+ * model availability comes from Palladium's model gateway. Native MCP metadata
+ * comes from the credential-free catalogue, while external MCP records are read
+ * through their existing RLS table without exposing auth ciphertext or secrets.
  */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
-    const [agentsRes, workflowsRes] = await Promise.all([
+    const [agentsRes, workflowsRes, externalMcpRes] = await Promise.all([
       context.supabase
         .from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
@@ -76,14 +77,23 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
         .limit(limit),
+      context.supabase
+        .from('external_mcp_servers')
+        .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
+    if (externalMcpRes.error) throw new Error(externalMcpRes.error.message)
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
+      ...(externalMcpRes.data ?? []).flatMap((row) =>
+        toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord),
+      ),
       ...(agentsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
       ),
