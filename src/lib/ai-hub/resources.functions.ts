@@ -6,21 +6,6 @@ import {
   type AiHubResourceRecord,
 } from './resources'
 
-type QueryResult = {
-  data: AiHubResourceRecord[] | null
-  error: { message: string } | null
-}
-
-type QueryBuilder = {
-  select: (columns: string) => QueryBuilder
-  order: (column: string, options: { ascending: boolean }) => QueryBuilder
-  limit: (value: number) => Promise<QueryResult>
-}
-
-type SupabaseLike = {
-  from: (table: string) => QueryBuilder
-}
-
 type AiHubResourceInput = {
   limit: number
 }
@@ -46,15 +31,14 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as SupabaseLike
     const limit = data?.limit ?? 100
     const [agentsRes, workflowsRes] = await Promise.all([
-      sb
+      context.supabase
         .from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false })
         .limit(limit),
-      sb
+      context.supabase
         .from('workflows')
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
@@ -66,10 +50,10 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
 
     const resources = [
       ...(agentsRes.data ?? []).map((row) =>
-        toAiHubLiveResource(row, 'agent', 'palladium-agent-runtime'),
+        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
       ),
       ...(workflowsRes.data ?? []).map((row) =>
-        toAiHubLiveResource(row, 'workflow', 'palladium-workflows'),
+        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows'),
       ),
     ]
 
