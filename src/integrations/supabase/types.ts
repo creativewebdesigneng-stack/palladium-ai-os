@@ -3468,6 +3468,45 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_assistant_preferences: {
+        Row: {
+          announce_notifications: boolean
+          created_at: string
+          enabled: boolean
+          muted: boolean
+          pitch: number
+          rate: number
+          updated_at: string
+          user_id: string
+          voice_name: string | null
+          wake_word_enabled: boolean
+        }
+        Insert: {
+          announce_notifications?: boolean
+          created_at?: string
+          enabled?: boolean
+          muted?: boolean
+          pitch?: number
+          rate?: number
+          updated_at?: string
+          user_id: string
+          voice_name?: string | null
+          wake_word_enabled?: boolean
+        }
+        Update: {
+          announce_notifications?: boolean
+          created_at?: string
+          enabled?: boolean
+          muted?: boolean
+          pitch?: number
+          rate?: number
+          updated_at?: string
+          user_id?: string
+          voice_name?: string | null
+          wake_word_enabled?: boolean
+        }
+        Relationships: []
+      }
       webhook_deliveries: {
         Row: {
           attempts: number
