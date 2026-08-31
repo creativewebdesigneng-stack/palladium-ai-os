@@ -60,32 +60,53 @@ export default function AgentWizard() {
   // Persists the configured agent as a real Agent record (org-scoped, plan-
   // gated). The workforce list on /agents reads the same backend, so the new
   // agent appears immediately. Users without a workspace get a clear error.
-  const createAgent = async () => {
+  //
+  // Guards: an immediate in-flight ref plus a shared single-flight promise mean
+  // one click can only ever produce one insert, regardless of render/state lag.
+  // Success is only reported once the server returns a persisted row id.
+  const submitRef = useRef(false);
+  const submitCreate = useMemo(
+    () => singleFlight((payload) => createAgentFn({ data: payload })),
+    [],
+  );
+
+  const handleCreate = async () => {
+    if (submitRef.current) return;
     if (!gate('createAgents')) return;
     if (!d.name.trim()) { toast({ title: 'Agent name is required', variant: 'destructive' }); return; }
+    submitRef.current = true;
     setCreating(true);
     try {
       const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'gpt-4o-mini';
-      await createAgent({
-        data: {
-          name: d.name.trim(),
-          description: d.desc,
-          category: d.dept,
-          model: modelName,
-          instructions: d.rules || d.behaviour || '',
-          allowed_tools: d.tools,
-          status: 'draft',
-          preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
-        },
+      const result = await submitCreate({
+        name: d.name.trim(),
+        description: d.desc,
+        category: d.dept,
+        model: modelName,
+        instructions: d.rules || d.behaviour || '',
+        allowed_tools: d.tools,
+        status: 'draft',
+        preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
       });
-      toast({ title: 'Agent created', description: `${d.name} is now in your workforce.` });
+      const id = persistedAgentId(result);
+      if (!id) {
+        toast({ title: 'Could not create agent', description: 'The server did not confirm a saved agent. Please try again.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Agent created', description: `${d.name.trim()} is now in your workforce.` });
       navigate('/agents');
     } catch (e) {
-      toast({ title: 'Could not create agent', description: e?.message || 'Create a workspace first, then try again.', variant: 'destructive' });
+      toast({
+        title: 'Could not create agent',
+        description: describeError(e, 'Create a workspace first, then try again.'),
+        variant: 'destructive',
+      });
     } finally {
+      submitRef.current = false;
       setCreating(false);
     }
   };
+
 
   return (
     <>
