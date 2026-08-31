@@ -29,6 +29,11 @@ export type AiHubMcpToolDefinition = {
   access: string
 }
 
+type CachedExternalMcpTool = {
+  name: string
+  description: string
+}
+
 export function toAiHubLiveResource(
   row: AiHubResourceRecord,
   kind: AiHubCapabilityKind,
@@ -97,6 +102,79 @@ export function toAiHubMcpResources(
   }))
 
   return [serverResource, ...toolResources]
+}
+
+function normaliseExternalMcpTools(value: unknown): CachedExternalMcpTool[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+    const row = item as Record<string, unknown>
+    const name = typeof row['name'] === 'string' ? row['name'].trim() : ''
+    if (!name) return []
+    const description = typeof row['description'] === 'string'
+      ? row['description'].trim().slice(0, 500)
+      : ''
+    return [{ name, description }]
+  })
+}
+
+/**
+ * Projects a caller-visible external_mcp_servers row and its already-discovered
+ * tool cache into the Hub. Connection endpoints, auth header configuration and
+ * encrypted credentials are deliberately not accepted into returned metadata.
+ */
+export function toAiHubExternalMcpResources(row: AiHubResourceRecord): AiHubLiveResource[] {
+  const id = String(row['id'] ?? '')
+  if (!id) return []
+
+  const name = String(row['name'] ?? row['slug'] ?? id)
+  const slug = typeof row['slug'] === 'string' ? row['slug'] : ''
+  const enabled = row['enabled'] !== false
+  const requiresApproval = row['requires_approval'] !== false
+  const allowedNames = Array.isArray(row['allowed_tool_names'])
+    ? row['allowed_tool_names'].map(String).filter(Boolean)
+    : []
+  const allowed = new Set(allowedNames)
+  const cachedTools = normaliseExternalMcpTools(row['cached_tools'])
+  const tools = allowed.size
+    ? cachedTools.filter((tool) => allowed.has(tool.name))
+    : cachedTools
+  const providerId = 'palladium-external-mcp'
+
+  const server: AiHubLiveResource = {
+    id: `external:${id}`,
+    kind: 'mcp',
+    name,
+    status: enabled ? 'enabled' : 'disabled',
+    providerId,
+    capabilities: tools.map((tool) => tool.name),
+    metadata: {
+      ...(slug ? { slug } : {}),
+      area: 'external',
+      access: requiresApproval ? 'approval required' : 'runtime policy',
+      toolCount: String(tools.length),
+      ...(row['last_discovered_at'] ? { lastDiscoveredAt: String(row['last_discovered_at']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+
+  const toolResources = tools.map<AiHubLiveResource>((tool) => ({
+    id: `external:${id}:${tool.name}`,
+    kind: 'tool',
+    name: tool.name,
+    status: enabled ? 'available' : 'disabled',
+    providerId,
+    capabilities: [tool.name],
+    metadata: {
+      server: name,
+      area: 'external',
+      access: requiresApproval ? 'approval required' : 'runtime policy',
+      ...(tool.description ? { description: tool.description } : {}),
+    },
+  }))
+
+  return [server, ...toolResources]
 }
 
 export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
