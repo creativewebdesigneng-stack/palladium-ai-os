@@ -17,23 +17,24 @@ export function toAiHubLiveResource(
   kind: AiHubCapabilityKind,
   providerId: string,
 ): AiHubLiveResource {
-  const capabilities = Array.isArray(row.allowed_tools)
-    ? row.allowed_tools.map(String)
+  const allowedTools = row['allowed_tools']
+  const capabilities = Array.isArray(allowedTools)
+    ? allowedTools.map(String)
     : []
 
-  const id = String(row.id ?? '')
+  const id = String(row['id'] ?? '')
 
   return {
     id,
     kind,
-    name: String(row.name ?? row.title ?? id),
-    status: String(row.status ?? 'available'),
+    name: String(row['name'] ?? row['title'] ?? id),
+    status: String(row['status'] ?? 'available'),
     providerId,
     capabilities,
     metadata: {
-      ...(row.model ? { model: String(row.model) } : {}),
-      ...(row.model_provider ? { modelProvider: String(row.model_provider) } : {}),
-      ...(row.updated_at ? { updatedAt: String(row.updated_at) } : {}),
+      ...(row['model'] ? { model: String(row['model']) } : {}),
+      ...(row['model_provider'] ? { modelProvider: String(row['model_provider']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
     },
   }
 }
