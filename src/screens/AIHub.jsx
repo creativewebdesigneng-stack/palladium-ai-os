@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppWindow, Bot, Boxes, Cpu, Network, Search, Workflow } from 'lucide-react';
+import { AppWindow, Bot, Boxes, Cpu, Network, Search, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
@@ -21,6 +21,8 @@ const icons = {
 const resourceIcons = {
   model: Cpu,
   agent: Bot,
+  tool: Wrench,
+  mcp: Network,
   workflow: Workflow,
 };
 
@@ -28,6 +30,8 @@ const FILTERS = [
   ['all', 'All resources'],
   ['model', 'Models'],
   ['agent', 'Agents'],
+  ['tool', 'Tools'],
+  ['mcp', 'MCP'],
   ['workflow', 'Workflows'],
 ];
 
@@ -45,6 +49,9 @@ function ResourceCard({ resource }) {
   const Icon = resourceIcons[resource.kind] ?? Boxes;
   const model = resource.metadata?.model;
   const modelProvider = resource.metadata?.modelProvider;
+  const access = resource.metadata?.access;
+  const area = resource.metadata?.area;
+  const version = resource.metadata?.version;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -74,6 +81,18 @@ function ResourceCard({ resource }) {
             <span className="truncate text-right text-zinc-300">
               {[modelProvider, model].filter(Boolean).join(' / ')}
             </span>
+          </div>
+        )}
+        {(area || access) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">MCP access</span>
+            <span className="truncate text-right text-zinc-300">{[area, access].filter(Boolean).join(' / ')}</span>
+          </div>
+        )}
+        {version && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Version</span>
+            <span className="truncate text-right text-zinc-300">{version}</span>
           </div>
         )}
       </div>
@@ -127,6 +146,10 @@ export default function AIHub() {
         resource.metadata?.model,
         resource.metadata?.modelProvider,
         resource.metadata?.integrations,
+        resource.metadata?.area,
+        resource.metadata?.access,
+        resource.metadata?.description,
+        resource.metadata?.auth,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -154,7 +177,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models plus tenant-visible agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -167,7 +190,7 @@ export default function AIHub() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Live Hub inventory</h2>
-              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime and Workflows remain the systems of record.</p>
+              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime, MCP and Workflows remain the systems of record.</p>
             </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -195,6 +218,8 @@ export default function AIHub() {
                 {label}
                 {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
                 {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
+                {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
+                {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
               </button>
             ))}
