@@ -1,8 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import {
+  isModelProviderConfigured,
+  listModelProviderDefinitions,
+} from '@/lib/runtime/model-providers.server'
+import {
   countAiHubResources,
   toAiHubLiveResource,
+  type AiHubLiveResource,
   type AiHubResourceRecord,
 } from './resources'
 
@@ -23,9 +28,34 @@ function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
   }
 }
 
+function listModelResources(): AiHubLiveResource[] {
+  return listModelProviderDefinitions().map((provider) => {
+    const configured = isModelProviderConfigured(provider.id)
+
+    return {
+      id: `${provider.id}:${provider.defaultModel}`,
+      kind: 'model',
+      name: `${provider.name} · ${provider.defaultModel}`,
+      status: configured ? 'available' : 'unconfigured',
+      providerId: 'palladium-model-gateway',
+      capabilities: ['model-inference'],
+      metadata: {
+        modelProvider: provider.id,
+        model: provider.defaultModel,
+        configured: String(configured),
+        ...(provider.integrations?.length
+          ? { integrations: provider.integrations.join(', ') }
+          : {}),
+      },
+    }
+  })
+}
+
 /**
  * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
- * Supabase RLS remains the source of truth for which resources the caller can see.
+ * Supabase RLS remains the source of truth for which tenant resources the caller can see.
+ * Deployment model availability is sourced from Palladium's existing model gateway config;
+ * secret values are never returned to the browser.
  */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -48,7 +78,8 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
 
-    const resources = [
+    const resources: AiHubLiveResource[] = [
+      ...listModelResources(),
       ...(agentsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
       ),

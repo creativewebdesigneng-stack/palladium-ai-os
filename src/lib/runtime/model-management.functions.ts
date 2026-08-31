@@ -1,39 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { FREELLMAPI_PROFILE } from "./freellmapi-profile";
+import {
+  isModelProviderConfigured,
+  listModelProviderDefinitions,
+} from "./model-providers.server";
 
 type Sb = { from: (t: string) => any };
-type ProviderId = "lovable" | "openai" | "anthropic" | "deepseek" | "compatible";
-type ProviderDefinition = {
-  id: ProviderId;
-  name: string;
-  defaultModel: string;
-  integrations?: string[];
-  routingNote?: string;
-};
-
-const PROVIDERS: ProviderDefinition[] = [
-  { id: "lovable", name: "Lovable AI Gateway", defaultModel: "google/gemini-3-flash-preview" },
-  { id: "openai", name: "OpenAI", defaultModel: "gpt-5-mini" },
-  { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
-  { id: "anthropic", name: "Anthropic", defaultModel: "claude-sonnet-4-5-20250929" },
-  {
-    id: "compatible",
-    name: "Local / OpenAI-compatible",
-    defaultModel: "local-model",
-    integrations: ["Jan", FREELLMAPI_PROFILE.name],
-    routingNote:
-      "FreeLLMAPI can own its upstream provider pool, quota-aware routing and fallback while PalladiumAI keeps agent routing and outer provider failover.",
-  },
-];
-
-function configured(provider: ProviderId): boolean {
-  if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
-  if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);
-  if (provider === "anthropic") return Boolean(process.env["ANTHROPIC_API_KEY"]);
-  if (provider === "deepseek") return Boolean(process.env["DEEPSEEK_API_KEY"]);
-  return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);
-}
 
 export const getModelRuntimeOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -116,12 +88,12 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       configured: boolean;
       integrations?: string[];
       routingNote?: string;
-    }> = PROVIDERS.map((provider) => ({
+    }> = listModelProviderDefinitions().map((provider) => ({
       id: provider.id,
       name: provider.name,
       defaultModel: provider.defaultModel,
-      configured: configured(provider.id),
-      ...(provider.integrations ? { integrations: provider.integrations } : {}),
+      configured: isModelProviderConfigured(provider.id),
+      ...(provider.integrations ? { integrations: [...provider.integrations] } : {}),
       ...(provider.routingNote ? { routingNote: provider.routingNote } : {}),
     }));
 

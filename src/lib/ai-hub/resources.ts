@@ -40,10 +40,12 @@ export function toAiHubLiveResource(
 }
 
 export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
+  const models = resources.filter((resource) => resource.kind === 'model').length
   const agents = resources.filter((resource) => resource.kind === 'agent').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
 
   return {
+    models,
     agents,
     workflows,
     total: resources.length,

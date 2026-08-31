@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countAiHubResources, toAiHubLiveResource } from '../resources'
+import { countAiHubResources, toAiHubLiveResource, type AiHubLiveResource } from '../resources'
 
 describe('AI Hub live resource mapping', () => {
   it('normalizes an existing agent without duplicating its source of truth', () => {
@@ -50,17 +50,28 @@ describe('AI Hub live resource mapping', () => {
     })
   })
 
-  it('counts canonical resources deterministically', () => {
+  it('counts canonical resources deterministically across supported kinds', () => {
+    const model: AiHubLiveResource = {
+      id: 'openai:gpt-5-mini',
+      kind: 'model',
+      name: 'OpenAI · gpt-5-mini',
+      status: 'available',
+      providerId: 'palladium-model-gateway',
+      capabilities: ['model-inference'],
+      metadata: { modelProvider: 'openai', model: 'gpt-5-mini' },
+    }
     const resources = [
+      model,
       toAiHubLiveResource({ id: 'a' }, 'agent', 'palladium-agent-runtime'),
       toAiHubLiveResource({ id: 'b' }, 'agent', 'palladium-agent-runtime'),
       toAiHubLiveResource({ id: 'w' }, 'workflow', 'palladium-workflows'),
     ]
 
     expect(countAiHubResources(resources)).toEqual({
+      models: 1,
       agents: 2,
       workflows: 1,
-      total: 3,
+      total: 4,
     })
   })
 })
