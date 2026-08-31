@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
@@ -9,6 +10,7 @@ import {
   countAiHubResources,
   toAiHubLiveResource,
   toAiHubMcpResources,
+  toAiHubSkillResource,
   type AiHubLiveResource,
   type AiHubResourceRecord,
 } from './resources'
@@ -56,16 +58,21 @@ function listModelResources(): AiHubLiveResource[] {
 /**
  * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
  * Supabase RLS remains the source of truth for which tenant resources the caller can see.
- * Deployment model availability is sourced from Palladium's existing model gateway config;
- * secret values are never returned to the browser. MCP metadata is projected from the
- * existing credential-free MCP catalogue rather than duplicated in a Hub store.
+ * Models, MCP and Skills are projected from their existing authoritative systems; secret
+ * values and executable Skill package bodies are never returned to the browser.
  */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
-    const [agentsRes, workflowsRes] = await Promise.all([
+
+    // agent_skills was added after the checked-in generated Supabase types. Keep the
+    // authenticated/RLS-bound client, but use the library's untyped client surface for
+    // this one table until the next schema type regeneration.
+    const skillsClient = context.supabase as unknown as SupabaseClient
+
+    const [agentsRes, workflowsRes, skillsRes] = await Promise.all([
       context.supabase
         .from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
@@ -76,16 +83,25 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
         .limit(limit),
+      skillsClient
+        .from('agent_skills')
+        .select('id,name,description,version,requires_tools,requires_scripts,dangerous,scan_verdict,source_kind,enabled,updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
+    if (skillsRes.error) throw new Error(skillsRes.error.message)
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
       ...(agentsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
+      ),
+      ...(skillsRes.data ?? []).map((row) =>
+        toAiHubSkillResource(row as unknown as AiHubResourceRecord),
       ),
       ...(workflowsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows'),

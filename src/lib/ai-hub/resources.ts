@@ -56,6 +56,33 @@ export function toAiHubLiveResource(
   }
 }
 
+/** Projects an existing tenant-visible Skill into the Hub tool contract. */
+export function toAiHubSkillResource(row: AiHubResourceRecord): AiHubLiveResource {
+  const id = String(row['id'] ?? '')
+  const requiredTools = Array.isArray(row['requires_tools']) ? row['requires_tools'].map(String) : []
+  const requiredScripts = Array.isArray(row['requires_scripts']) ? row['requires_scripts'].map(String) : []
+
+  return {
+    id,
+    kind: 'tool',
+    name: String(row['name'] ?? id),
+    status: row['enabled'] === false ? 'disabled' : 'enabled',
+    providerId: 'palladium-skills',
+    capabilities: requiredTools,
+    metadata: {
+      resourceType: 'skill',
+      ...(row['description'] ? { description: String(row['description']) } : {}),
+      ...(row['version'] ? { version: String(row['version']) } : {}),
+      ...(row['source_kind'] ? { sourceKind: String(row['source_kind']) } : {}),
+      ...(row['scan_verdict'] ? { scanVerdict: String(row['scan_verdict']) } : {}),
+      dangerous: String(Boolean(row['dangerous'])),
+      requiresScripts: String(requiredScripts.length > 0),
+      scriptCount: String(requiredScripts.length),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+}
+
 /**
  * Projects the existing Palladium MCP catalogue into the Hub contract. The MCP
  * catalogue remains authoritative; the Hub only provides a discoverable view.
@@ -105,12 +132,14 @@ export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
   const tools = resources.filter((resource) => resource.kind === 'tool').length
   const mcp = resources.filter((resource) => resource.kind === 'mcp').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
+  const skills = resources.filter((resource) => resource.providerId === 'palladium-skills').length
 
   return {
     models,
     agents,
     tools,
     mcp,
+    skills,
     workflows,
     total: resources.length,
   }
