@@ -47,17 +47,18 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as SupabaseLike
+    const limit = data?.limit ?? 100
     const [agentsRes, workflowsRes] = await Promise.all([
       sb
         .from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false })
-        .limit(data.limit),
+        .limit(limit),
       sb
         .from('workflows')
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
-        .limit(data.limit),
+        .limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
