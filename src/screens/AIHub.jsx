@@ -19,15 +19,27 @@ const icons = {
 };
 
 const resourceIcons = {
+  model: Cpu,
   agent: Bot,
   workflow: Workflow,
 };
 
 const FILTERS = [
   ['all', 'All resources'],
+  ['model', 'Models'],
   ['agent', 'Agents'],
   ['workflow', 'Workflows'],
 ];
+
+function statusClasses(status) {
+  if (status === 'available' || status === 'active' || status === 'enabled') {
+    return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
+  }
+  if (status === 'unconfigured' || status === 'paused') {
+    return 'border-amber-400/20 bg-amber-400/[.08] text-amber-300';
+  }
+  return 'border-white/10 bg-white/[.04] text-zinc-400';
+}
 
 function ResourceCard({ resource }) {
   const Icon = resourceIcons[resource.kind] ?? Boxes;
@@ -46,7 +58,7 @@ function ResourceCard({ resource }) {
             <p className="mt-0.5 truncate text-[11px] uppercase tracking-[0.12em] text-zinc-500">{resource.kind}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/[.08] px-2 py-1 text-[11px] font-medium text-emerald-300">
+        <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${statusClasses(resource.status)}`}>
           {resource.status}
         </span>
       </div>
@@ -114,6 +126,7 @@ export default function AIHub() {
         resource.providerId,
         resource.metadata?.model,
         resource.metadata?.modelProvider,
+        resource.metadata?.integrations,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -141,7 +154,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Tenant-visible agents and workflows from their authoritative runtime stores.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models plus tenant-visible agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -154,7 +167,7 @@ export default function AIHub() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Live Hub inventory</h2>
-              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Agent Runtime and Workflows remain the systems of record.</p>
+              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime and Workflows remain the systems of record.</p>
             </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -180,6 +193,7 @@ export default function AIHub() {
                 }`}
               >
                 {label}
+                {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
                 {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
               </button>
@@ -198,7 +212,7 @@ export default function AIHub() {
             {inventory.isSuccess && filteredResources.length === 0 && (
               <div className="rounded-xl border border-dashed border-white/10 bg-black/10 px-4 py-8 text-center text-sm text-zinc-500">
                 {inventory.data.resources.length === 0
-                  ? 'No tenant-visible Hub resources yet. Create an agent or workflow and it will appear here automatically.'
+                  ? 'No Hub resources are available yet.'
                   : 'No resources match the current search and filter.'}
               </div>
             )}
