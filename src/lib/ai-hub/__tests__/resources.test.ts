@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   countAiHubResources,
+  toAiHubExternalMcpResources,
   toAiHubLiveResource,
   toAiHubMcpResources,
   type AiHubLiveResource,
@@ -128,6 +129,64 @@ describe('AI Hub live resource mapping', () => {
         },
       },
     ])
+  })
+
+  it('projects tenant external MCP servers without exposing credentials', () => {
+    const resources = toAiHubExternalMcpResources({
+      id: 'server-1',
+      name: 'Store MCP',
+      slug: 'store-mcp',
+      endpoint_url: 'https://private.example/mcp',
+      auth_header_name: 'Authorization',
+      auth_header_ciphertext: 'must-never-leak',
+      enabled: true,
+      requires_approval: true,
+      allowed_tool_names: ['orders.list'],
+      cached_tools: [
+        { name: 'orders.list', description: 'List orders.' },
+        { name: 'orders.delete', description: 'Delete an order.' },
+      ],
+      last_discovered_at: '2026-09-01T10:00:00Z',
+      updated_at: '2026-09-01T10:01:00Z',
+    })
+
+    expect(resources).toEqual([
+      {
+        id: 'server-1',
+        kind: 'mcp',
+        name: 'Store MCP',
+        status: 'enabled',
+        providerId: 'external-mcp:server-1',
+        capabilities: ['orders.list'],
+        metadata: {
+          source: 'external',
+          slug: 'store-mcp',
+          requiresApproval: 'true',
+          toolCount: '1',
+          lastDiscoveredAt: '2026-09-01T10:00:00Z',
+          updatedAt: '2026-09-01T10:01:00Z',
+        },
+      },
+      {
+        id: 'server-1:orders.list',
+        kind: 'tool',
+        name: 'orders.list',
+        status: 'available',
+        providerId: 'external-mcp:server-1',
+        capabilities: ['orders.list'],
+        metadata: {
+          source: 'external-mcp',
+          server: 'store-mcp',
+          access: 'external',
+          requiresApproval: 'true',
+          description: 'List orders.',
+        },
+      },
+    ])
+    expect(JSON.stringify(resources)).not.toContain('must-never-leak')
+    expect(JSON.stringify(resources)).not.toContain('Authorization')
+    expect(JSON.stringify(resources)).not.toContain('private.example')
+    expect(JSON.stringify(resources)).not.toContain('orders.delete')
   })
 
   it('counts canonical resources deterministically across supported kinds', () => {
