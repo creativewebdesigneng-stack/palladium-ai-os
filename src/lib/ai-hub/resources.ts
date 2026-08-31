@@ -7,7 +7,7 @@ export interface AiHubLiveResource {
   status: string
   providerId: string
   capabilities: string[]
-  metadata: Record<string, unknown>
+  metadata: Record<string, string>
 }
 
 export type AiHubResourceRecord = Record<string, unknown>
@@ -31,9 +31,9 @@ export function toAiHubLiveResource(
     providerId,
     capabilities,
     metadata: {
-      ...(row.model ? { model: row.model } : {}),
-      ...(row.model_provider ? { modelProvider: row.model_provider } : {}),
-      ...(row.updated_at ? { updatedAt: row.updated_at } : {}),
+      ...(row.model ? { model: String(row.model) } : {}),
+      ...(row.model_provider ? { modelProvider: String(row.model_provider) } : {}),
+      ...(row.updated_at ? { updatedAt: String(row.updated_at) } : {}),
     },
   }
 }
