@@ -39,7 +39,7 @@ function statusClasses(status) {
   if (status === 'available' || status === 'active' || status === 'enabled') {
     return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
   }
-  if (status === 'unconfigured' || status === 'paused') {
+  if (status === 'unconfigured' || status === 'paused' || status === 'disabled') {
     return 'border-amber-400/20 bg-amber-400/[.08] text-amber-300';
   }
   return 'border-white/10 bg-white/[.04] text-zinc-400';
@@ -52,6 +52,8 @@ function ResourceCard({ resource }) {
   const access = resource.metadata?.access;
   const area = resource.metadata?.area;
   const version = resource.metadata?.version;
+  const source = resource.metadata?.source;
+  const approval = resource.metadata?.requiresApproval;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -75,6 +77,12 @@ function ResourceCard({ resource }) {
           <span className="text-zinc-500">Hub provider</span>
           <span className="truncate text-right text-zinc-300">{resource.providerId}</span>
         </div>
+        {source && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Source</span>
+            <span className="truncate text-right text-zinc-300">{source}</span>
+          </div>
+        )}
         {(model || modelProvider) && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Model</span>
@@ -87,6 +95,12 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">MCP access</span>
             <span className="truncate text-right text-zinc-300">{[area, access].filter(Boolean).join(' / ')}</span>
+          </div>
+        )}
+        {approval && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Approval required</span>
+            <span className="truncate text-right text-zinc-300">{approval === 'true' ? 'Yes' : 'No'}</span>
           </div>
         )}
         {version && (
@@ -150,6 +164,8 @@ export default function AIHub() {
         resource.metadata?.access,
         resource.metadata?.description,
         resource.metadata?.auth,
+        resource.metadata?.source,
+        resource.metadata?.slug,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -177,7 +193,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, native and connected MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
