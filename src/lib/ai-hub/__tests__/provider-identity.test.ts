@@ -19,7 +19,7 @@ describe('AI Hub provider identity', () => {
   it('marks discovery-only providers explicitly instead of implying an execution adapter exists', () => {
     const registry = createPalladiumAiHubRegistry()
     for (const id of ['palladium-marketplace', 'palladium-smart-tables', 'palladium-compute']) {
-      expect(registry.getProvider(id)?.metadata?.execution).toBe('discovery-only')
+      expect(registry.getProvider(id)?.metadata?.['execution']).toBe('discovery-only')
     }
   })
 })
