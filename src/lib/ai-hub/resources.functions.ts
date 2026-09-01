@@ -6,6 +6,7 @@ import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
 } from '@/lib/runtime/model-providers.server'
+import { aggregateAiHubModelUsage, withAiHubModelUsage } from './model-telemetry'
 import {
   countAiHubResources,
   toAiHubAppResource,
@@ -31,10 +32,10 @@ function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
   return { limit: Math.min(Math.max(Math.trunc(safeLimit), 1), 250) }
 }
 
-function listModelResources(): AiHubLiveResource[] {
+function listModelResources(usageByModel: ReturnType<typeof aggregateAiHubModelUsage>): AiHubLiveResource[] {
   return listModelProviderDefinitions().map((provider) => {
     const configured = isModelProviderConfigured(provider.id)
-    return {
+    const resource: AiHubLiveResource = {
       id: `${provider.id}:${provider.defaultModel}`,
       kind: 'model',
       name: `${provider.name} · ${provider.defaultModel}`,
@@ -48,6 +49,7 @@ function listModelResources(): AiHubLiveResource[] {
         ...(provider.integrations?.length ? { integrations: provider.integrations.join(', ') } : {}),
       },
     }
+    return withAiHubModelUsage(resource, usageByModel.get(`${provider.id}:${provider.defaultModel}`))
   })
 }
 
@@ -60,7 +62,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     // These tables post-date the checked-in generated schema. Reuse the same
     // authenticated client so existing RLS remains authoritative.
     const untypedClient = context.supabase as unknown as SupabaseClient
-    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes, smartTablesRes, deploymentTargetsRes] = await Promise.all([
+    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes, smartTablesRes, deploymentTargetsRes, modelTasksRes] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
@@ -89,6 +91,9 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('deployment_targets')
         .select('id,provider,name,resource_kind,created_at,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('agent_tasks')
+        .select('provider,model,status,tokens_in,tokens_out,cost_pence,created_at')
+        .order('created_at', { ascending: false }).limit(500),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
@@ -100,6 +105,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     if (builderDeploymentsRes.error) throw new Error(builderDeploymentsRes.error.message)
     if (smartTablesRes.error) throw new Error(smartTablesRes.error.message)
     if (deploymentTargetsRes.error) throw new Error(deploymentTargetsRes.error.message)
+    if (modelTasksRes.error) throw new Error(modelTasksRes.error.message)
 
     const latestDeploymentByJob = new Map<string, AiHubResourceRecord>()
     for (const deployment of builderDeploymentsRes.data ?? []) {
@@ -107,9 +113,10 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       const builderJobId = String(row['builder_job_id'] ?? '')
       if (builderJobId && !latestDeploymentByJob.has(builderJobId)) latestDeploymentByJob.set(builderJobId, row)
     }
+    const modelUsage = aggregateAiHubModelUsage((modelTasksRes.data ?? []) as unknown as AiHubResourceRecord[])
 
     const resources: AiHubLiveResource[] = [
-      ...listModelResources(),
+      ...listModelResources(modelUsage),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
       ...(externalMcpRes.data ?? []).flatMap((row) =>
         toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord)),
