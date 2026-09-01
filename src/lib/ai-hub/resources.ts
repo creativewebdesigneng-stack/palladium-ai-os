@@ -48,6 +48,43 @@ export function toAiHubSkillResource(row: AiHubResourceRecord): AiHubLiveResourc
   }
 }
 
+/** Projects a Builder job as an App resource without prompts, source, repository or credential material. */
+export function toAiHubAppResource(row: AiHubResourceRecord): AiHubLiveResource {
+  const id = String(row['id'] ?? '')
+  const sourceStatus = String(row['source_status'] ?? 'not_started')
+  const repositoryStatus = String(row['repository_status'] ?? 'not_started')
+  const sandboxStatus = String(row['sandbox_status'] ?? 'not_started')
+  const deploymentStatus = row['deployment_status'] ? String(row['deployment_status']) : null
+  const productionStatus = row['production_status'] ? String(row['production_status']) : null
+  const capabilities = ['app-build']
+  if (sourceStatus === 'generated') capabilities.push('source-generated')
+  if (repositoryStatus === 'files_applied') capabilities.push('repository-synced')
+  if (sandboxStatus === 'passed') capabilities.push('sandbox-validated')
+  if (deploymentStatus === 'ready') capabilities.push('preview-deployed')
+  if (productionStatus === 'promoted') capabilities.push('production-deployed')
+
+  return {
+    id,
+    kind: 'app',
+    name: String(row['title'] ?? id),
+    status: productionStatus === 'promoted' ? 'production' : deploymentStatus === 'ready' ? 'preview-ready' : String(row['status'] ?? 'requested'),
+    providerId: 'palladium-app-studio',
+    capabilities,
+    metadata: {
+      resourceType: 'builder-app',
+      source: 'app-studio',
+      sourceStatus,
+      repositoryStatus,
+      sandboxStatus,
+      ...(deploymentStatus ? { deploymentStatus } : {}),
+      ...(row['deployment_provider'] ? { deploymentProvider: String(row['deployment_provider']) } : {}),
+      ...(productionStatus ? { productionStatus } : {}),
+      ...(row['created_at'] ? { createdAt: String(row['created_at']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+}
+
 /** Projects a published Marketplace agent listing without exposing its executable config. */
 export function toAiHubMarketplaceAgentResource(row: AiHubResourceRecord): AiHubLiveResource {
   const id = String(row['id'] ?? '')
@@ -136,8 +173,9 @@ export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
   const agents = resources.filter((resource) => resource.kind === 'agent').length
   const tools = resources.filter((resource) => resource.kind === 'tool').length
   const mcp = resources.filter((resource) => resource.kind === 'mcp').length
+  const apps = resources.filter((resource) => resource.kind === 'app').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
   const skills = resources.filter((resource) => resource.providerId === 'palladium-skills').length
   const marketplace = resources.filter((resource) => resource.providerId === 'palladium-marketplace').length
-  return { models, agents, tools, mcp, skills, marketplace, workflows, total: resources.length }
+  return { models, agents, tools, mcp, apps, skills, marketplace, workflows, total: resources.length }
 }
