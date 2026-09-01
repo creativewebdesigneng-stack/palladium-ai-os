@@ -69,6 +69,7 @@ describe('AI Hub App Studio resource mapping', () => {
       mcp: 0,
       apps: 1,
       datasets: 0,
+      compute: 0,
       skills: 0,
       marketplace: 0,
       workflows: 0,
