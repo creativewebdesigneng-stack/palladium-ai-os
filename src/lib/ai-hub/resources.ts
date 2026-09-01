@@ -80,6 +80,30 @@ export function toAiHubDatasetResource(row: AiHubResourceRecord): AiHubLiveResou
   }
 }
 
+/** Projects an existing deployment target as compute without exposing provider resource identifiers. */
+export function toAiHubComputeResource(row: AiHubResourceRecord): AiHubLiveResource {
+  const id = String(row['id'] ?? '')
+  const provider = String(row['provider'] ?? 'unknown')
+  const resourceKind = String(row['resource_kind'] ?? 'service')
+  const capabilities = ['managed-compute', `${resourceKind}-deployment`]
+  return {
+    id,
+    kind: 'compute',
+    name: String(row['name'] ?? id),
+    status: 'available',
+    providerId: `palladium-deployments:${provider}`,
+    capabilities,
+    metadata: {
+      resourceType: 'deployment-target',
+      source: 'deployments',
+      provider,
+      resourceKind,
+      ...(row['created_at'] ? { createdAt: String(row['created_at']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+}
+
 /** Projects a Builder job as an App resource without prompts, source, repository or credential material. */
 export function toAiHubAppResource(row: AiHubResourceRecord): AiHubLiveResource {
   const id = String(row['id'] ?? '')
@@ -207,8 +231,9 @@ export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
   const mcp = resources.filter((resource) => resource.kind === 'mcp').length
   const apps = resources.filter((resource) => resource.kind === 'app').length
   const datasets = resources.filter((resource) => resource.kind === 'dataset').length
+  const compute = resources.filter((resource) => resource.kind === 'compute').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
   const skills = resources.filter((resource) => resource.providerId === 'palladium-skills').length
   const marketplace = resources.filter((resource) => resource.providerId === 'palladium-marketplace').length
-  return { models, agents, tools, mcp, apps, datasets, skills, marketplace, workflows, total: resources.length }
+  return { models, agents, tools, mcp, apps, datasets, compute, skills, marketplace, workflows, total: resources.length }
 }
