@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { executeWorkflow } from '@/lib/runtime/workforce.server'
+import { executeAgentTask } from '@/lib/runtime/agent-task-execution.server'
 import { createAiHubApprovalGate } from './approval.server'
 import { AiHubExecutionGateway } from './execution'
 import type { AiHubOrchestrationPlan } from './orchestrator'
@@ -83,5 +84,47 @@ export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
     if (result.status === 'failed') {
       return { status: result.status, adapter: result.adapter, error: result.error ?? 'AI Hub execution failed' }
     }
+    return { status: result.status, adapter: result.adapter }
+  })
+
+export const executeAiHubAgent = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validate)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb
+    const { data: agent, error } = await sb
+      .from('personal_agents')
+      .select('id,name,org_id,status')
+      .eq('id', data.resourceId)
+      .eq('user_id', context.userId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!agent) throw new Error('Agent not found or you do not have access to it.')
+    if (agent.status !== 'active') throw new Error('Activate this agent before running it from the Hub.')
+
+    const plan: AiHubOrchestrationPlan = {
+      workloadId: `agent:${agent.id}`,
+      discovery: [], requiresApproval: true, executionBoundary: 'palladium-policy-gateway',
+      route: {
+        workloadId: `agent:${agent.id}`,
+        capability: { id: agent.id, kind: 'agent', providerId: 'palladium-agent-runtime', name: agent.name, capabilities: ['agent-execution'], deploymentTargets: ['palladium-cloud'] },
+        reason: 'The operator selected this agent from the authenticated AI Hub inventory.',
+        policyChecks: ['tenant-isolation', 'approval-required'],
+      },
+    }
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), createAiHubApprovalGate(sb))
+    gateway.registerAdapter('agent-runtime', async () => {
+      await executeAgentTask({ sb, userId: context.userId, agentId: agent.id, input: data.goal })
+      return { status: 'completed', adapter: 'agent-runtime' }
+    })
+    const result = await gateway.execute(plan, {
+      tenantId: agent.org_id ?? context.userId,
+      approvalOrgId: agent.org_id ?? null,
+      actorId: context.userId,
+      input: data.goal,
+      ...(data.approvalRequestId ? { approvalRequestId: data.approvalRequestId } : {}),
+    })
+    if (result.status === 'waiting_for_approval') return { status: result.status, adapter: result.adapter, approvalRequestId: result.approvalRequestId ?? '' }
+    if (result.status === 'failed') return { status: result.status, adapter: result.adapter, error: result.error ?? 'AI Hub execution failed' }
     return { status: result.status, adapter: result.adapter }
   })
