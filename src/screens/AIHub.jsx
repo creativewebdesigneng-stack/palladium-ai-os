@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppWindow, Bot, Boxes, Cpu, Database, Network, Search, Store, Workflow, Wrench } from 'lucide-react';
+import { AppWindow, Bot, Boxes, Cpu, Database, Network, Search, ServerCog, Store, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
@@ -26,6 +26,7 @@ const resourceIcons = {
   workflow: Workflow,
   app: AppWindow,
   dataset: Database,
+  compute: ServerCog,
 };
 
 const FILTERS = [
@@ -35,6 +36,7 @@ const FILTERS = [
   ['marketplace', 'Marketplace'],
   ['app', 'Apps'],
   ['dataset', 'Datasets'],
+  ['compute', 'Compute'],
   ['tool', 'Tools'],
   ['mcp', 'MCP'],
   ['workflow', 'Workflows'],
@@ -74,6 +76,8 @@ function ResourceCard({ resource }) {
   const fieldCount = resource.metadata?.fieldCount;
   const fieldTypes = resource.metadata?.fieldTypes;
   const defaultView = resource.metadata?.defaultView;
+  const computeProvider = resource.metadata?.provider;
+  const resourceKind = resource.metadata?.resourceKind;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -145,6 +149,12 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Field types</span>
             <span className="truncate text-right text-zinc-300">{fieldTypes}</span>
+          </div>
+        )}
+        {(computeProvider || resourceKind) && resource.kind === 'compute' && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Compute target</span>
+            <span className="truncate text-right text-zinc-300">{[computeProvider, resourceKind].filter(Boolean).join(' / ')}</span>
           </div>
         )}
         {category && (
@@ -240,6 +250,8 @@ export default function AIHub() {
         resource.metadata?.productionStatus,
         resource.metadata?.fieldTypes,
         resource.metadata?.defaultView,
+        resource.metadata?.provider,
+        resource.metadata?.resourceKind,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -267,7 +279,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, tenant agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -287,7 +299,7 @@ export default function AIHub() {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search resources, models, data or tools…"
+                placeholder="Search resources, models, data, compute or tools…"
                 className="w-full rounded-xl border border-white/10 bg-black/25 py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
               />
             </div>
@@ -311,6 +323,7 @@ export default function AIHub() {
                 {value === 'marketplace' && inventory.data ? ` (${inventory.data.counts.marketplace})` : ''}
                 {value === 'app' && inventory.data ? ` (${inventory.data.counts.apps})` : ''}
                 {value === 'dataset' && inventory.data ? ` (${inventory.data.counts.datasets})` : ''}
+                {value === 'compute' && inventory.data ? ` (${inventory.data.counts.compute})` : ''}
                 {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
                 {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
@@ -340,7 +353,7 @@ export default function AIHub() {
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-white">Connected Palladium systems</h2>
-            <p className="mt-1 text-sm text-zinc-400">This is the canonical Hub registry, not a duplicate model, agent, MCP, workflow, app or data catalogue.</p>
+            <p className="mt-1 text-sm text-zinc-400">This is the canonical Hub registry, not a duplicate model, agent, MCP, workflow, app, data or compute catalogue.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {providers.map((provider) => {
