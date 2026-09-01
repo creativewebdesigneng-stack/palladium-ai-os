@@ -8,6 +8,7 @@ import {
 } from '@/lib/runtime/model-providers.server'
 import {
   countAiHubResources,
+  toAiHubAppResource,
   toAiHubExternalMcpResources,
   toAiHubLiveResource,
   toAiHubMarketplaceAgentResource,
@@ -57,7 +58,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     // These tables post-date the checked-in generated schema. Reuse the same
     // authenticated client so existing RLS remains authoritative.
     const untypedClient = context.supabase as unknown as SupabaseClient
-    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes] = await Promise.all([
+    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
@@ -74,6 +75,12 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         .select('id,title,summary,description,category,tags,price_pence,currency,version,required_plan,install_count,rating_avg,rating_count,published_at,updated_at')
         .eq('status', 'published')
         .order('install_count', { ascending: false }).limit(limit),
+      untypedClient.from('builder_jobs')
+        .select('id,title,status,source_status,repository_status,sandbox_status,created_at,updated_at')
+        .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('builder_deployments')
+        .select('builder_job_id,provider,status,production_status,updated_at')
+        .order('updated_at', { ascending: false }).limit(250),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
@@ -81,6 +88,15 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     if (skillsRes.error) throw new Error(skillsRes.error.message)
     if (externalMcpRes.error) throw new Error(externalMcpRes.error.message)
     if (marketplaceRes.error) throw new Error(marketplaceRes.error.message)
+    if (builderJobsRes.error) throw new Error(builderJobsRes.error.message)
+    if (builderDeploymentsRes.error) throw new Error(builderDeploymentsRes.error.message)
+
+    const latestDeploymentByJob = new Map<string, AiHubResourceRecord>()
+    for (const deployment of builderDeploymentsRes.data ?? []) {
+      const row = deployment as unknown as AiHubResourceRecord
+      const builderJobId = String(row['builder_job_id'] ?? '')
+      if (builderJobId && !latestDeploymentByJob.has(builderJobId)) latestDeploymentByJob.set(builderJobId, row)
+    }
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
@@ -93,6 +109,18 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         toAiHubSkillResource(row as unknown as AiHubResourceRecord)),
       ...(marketplaceRes.data ?? []).map((row) =>
         toAiHubMarketplaceAgentResource(row as unknown as AiHubResourceRecord)),
+      ...(builderJobsRes.data ?? []).map((row) => {
+        const job = row as unknown as AiHubResourceRecord
+        const deployment = latestDeploymentByJob.get(String(job['id'] ?? ''))
+        return toAiHubAppResource({
+          ...job,
+          ...(deployment ? {
+            deployment_provider: deployment['provider'],
+            deployment_status: deployment['status'],
+            production_status: deployment['production_status'],
+          } : {}),
+        })
+      }),
       ...(workflowsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows')),
     ]
