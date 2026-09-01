@@ -40,7 +40,8 @@ describe('AiHubExecutionGateway', () => {
   it('stops at the approval boundary before provider execution', async () => {
     const approvalGate = {
       request: vi.fn(async () => 'approval-1'),
-      isApproved: vi.fn(async () => false),
+      claim: vi.fn(async () => false),
+      complete: vi.fn(async () => undefined),
     }
     const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
     const execute = vi.fn(async () => ({ status: 'completed' as const, adapter: 'model-gateway' as const }))
@@ -57,7 +58,8 @@ describe('AiHubExecutionGateway', () => {
   it('resumes provider execution only after the same approval request is approved', async () => {
     const approvalGate = {
       request: vi.fn(async () => 'approval-1'),
-      isApproved: vi.fn(async () => true),
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => undefined),
     }
     const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
     const execute = vi.fn(async () => ({ status: 'completed' as const, adapter: 'model-gateway' as const }))
@@ -70,8 +72,9 @@ describe('AiHubExecutionGateway', () => {
     })
 
     expect(result.status).toBe('completed')
-    expect(approvalGate.isApproved).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'approval-1')
+    expect(approvalGate.claim).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'approval-1')
     expect(execute).toHaveBeenCalledOnce()
+    expect(approvalGate.complete).toHaveBeenCalledWith('approval-1', expect.anything(), expect.objectContaining({ status: 'completed' }))
   })
 
   it('rejects execution without tenant and actor identity', async () => {
