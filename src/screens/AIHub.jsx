@@ -24,6 +24,7 @@ const resourceIcons = {
   tool: Wrench,
   mcp: Network,
   workflow: Workflow,
+  app: AppWindow,
 };
 
 const FILTERS = [
@@ -31,13 +32,14 @@ const FILTERS = [
   ['model', 'Models'],
   ['agent', 'Agents'],
   ['marketplace', 'Marketplace'],
+  ['app', 'Apps'],
   ['tool', 'Tools'],
   ['mcp', 'MCP'],
   ['workflow', 'Workflows'],
 ];
 
 function statusClasses(status) {
-  if (status === 'available' || status === 'active' || status === 'enabled' || status === 'published') {
+  if (status === 'available' || status === 'active' || status === 'enabled' || status === 'published' || status === 'preview-ready' || status === 'production') {
     return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
   }
   if (status === 'unconfigured' || status === 'paused' || status === 'disabled') {
@@ -62,6 +64,11 @@ function ResourceCard({ resource }) {
   const currency = resource.metadata?.currency;
   const rating = resource.metadata?.rating;
   const installCount = resource.metadata?.installCount;
+  const sourceStatus = resource.metadata?.sourceStatus;
+  const repositoryStatus = resource.metadata?.repositoryStatus;
+  const sandboxStatus = resource.metadata?.sandboxStatus;
+  const deploymentStatus = resource.metadata?.deploymentStatus;
+  const productionStatus = resource.metadata?.productionStatus;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -96,9 +103,7 @@ function ResourceCard({ resource }) {
         {(model || modelProvider) && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Model</span>
-            <span className="truncate text-right text-zinc-300">
-              {[modelProvider, model].filter(Boolean).join(' / ')}
-            </span>
+            <span className="truncate text-right text-zinc-300">{[modelProvider, model].filter(Boolean).join(' / ')}</span>
           </div>
         )}
         {(area || access) && (
@@ -111,6 +116,18 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Approval required</span>
             <span className="truncate text-right text-zinc-300">{approval === 'true' ? 'Yes' : 'No'}</span>
+          </div>
+        )}
+        {sourceStatus && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">App lifecycle</span>
+            <span className="truncate text-right text-zinc-300">{sourceStatus} / {repositoryStatus} / {sandboxStatus}</span>
+          </div>
+        )}
+        {(deploymentStatus || productionStatus) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Deployment</span>
+            <span className="truncate text-right text-zinc-300">{[deploymentStatus, productionStatus].filter(Boolean).join(' / ')}</span>
           </div>
         )}
         {category && (
@@ -151,9 +168,7 @@ function ResourceCard({ resource }) {
             </span>
           ))}
           {resource.capabilities.length > 6 && (
-            <span className="rounded-md border border-white/10 bg-white/[.03] px-2 py-1 text-[11px] text-zinc-500">
-              +{resource.capabilities.length - 6}
-            </span>
+            <span className="rounded-md border border-white/10 bg-white/[.03] px-2 py-1 text-[11px] text-zinc-500">+{resource.capabilities.length - 6}</span>
           )}
         </div>
       )}
@@ -201,6 +216,11 @@ export default function AIHub() {
         resource.metadata?.slug,
         resource.metadata?.category,
         resource.metadata?.requiredPlan,
+        resource.metadata?.sourceStatus,
+        resource.metadata?.repositoryStatus,
+        resource.metadata?.sandboxStatus,
+        resource.metadata?.deploymentStatus,
+        resource.metadata?.productionStatus,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -228,7 +248,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, native and connected MCP, Skills, Marketplace listings, tenant agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP, Skills, Marketplace, App Studio, tenant agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -270,6 +290,7 @@ export default function AIHub() {
                 {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
                 {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
                 {value === 'marketplace' && inventory.data ? ` (${inventory.data.counts.marketplace})` : ''}
+                {value === 'app' && inventory.data ? ` (${inventory.data.counts.apps})` : ''}
                 {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
                 {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
