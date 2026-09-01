@@ -9,6 +9,7 @@ import {
 import {
   countAiHubResources,
   toAiHubAppResource,
+  toAiHubComputeResource,
   toAiHubDatasetResource,
   toAiHubExternalMcpResources,
   toAiHubLiveResource,
@@ -59,7 +60,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     // These tables post-date the checked-in generated schema. Reuse the same
     // authenticated client so existing RLS remains authoritative.
     const untypedClient = context.supabase as unknown as SupabaseClient
-    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes, smartTablesRes] = await Promise.all([
+    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes, smartTablesRes, deploymentTargetsRes] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
@@ -85,6 +86,9 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('smart_tables')
         .select('id,name,description,fields,default_view,created_at,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('deployment_targets')
+        .select('id,provider,name,resource_kind,created_at,updated_at')
+        .order('updated_at', { ascending: false }).limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
@@ -95,6 +99,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     if (builderJobsRes.error) throw new Error(builderJobsRes.error.message)
     if (builderDeploymentsRes.error) throw new Error(builderDeploymentsRes.error.message)
     if (smartTablesRes.error) throw new Error(smartTablesRes.error.message)
+    if (deploymentTargetsRes.error) throw new Error(deploymentTargetsRes.error.message)
 
     const latestDeploymentByJob = new Map<string, AiHubResourceRecord>()
     for (const deployment of builderDeploymentsRes.data ?? []) {
@@ -128,6 +133,8 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       }),
       ...(smartTablesRes.data ?? []).map((row) =>
         toAiHubDatasetResource(row as unknown as AiHubResourceRecord)),
+      ...(deploymentTargetsRes.data ?? []).map((row) =>
+        toAiHubComputeResource(row as unknown as AiHubResourceRecord)),
       ...(workflowsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows')),
     ]
