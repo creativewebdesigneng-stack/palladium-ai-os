@@ -143,6 +143,7 @@ describe('AI Hub live resource mapping', () => {
       tools: 2,
       mcp: 1,
       skills: 1,
+      marketplace: 0,
       workflows: 1,
       total: 7,
     })

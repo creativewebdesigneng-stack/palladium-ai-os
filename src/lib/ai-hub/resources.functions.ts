@@ -10,6 +10,7 @@ import {
   countAiHubResources,
   toAiHubExternalMcpResources,
   toAiHubLiveResource,
+  toAiHubMarketplaceAgentResource,
   toAiHubMcpResources,
   toAiHubSkillResource,
   type AiHubLiveResource,
@@ -56,7 +57,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     // These tables post-date the checked-in generated schema. Reuse the same
     // authenticated client so existing RLS remains authoritative.
     const untypedClient = context.supabase as unknown as SupabaseClient
-    const [agentsRes, workflowsRes, skillsRes, externalMcpRes] = await Promise.all([
+    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
@@ -69,12 +70,17 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('external_mcp_servers')
         .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('marketplace_agents')
+        .select('id,title,summary,description,category,tags,price_pence,currency,version,required_plan,install_count,rating_avg,rating_count,published_at,updated_at')
+        .eq('status', 'published')
+        .order('install_count', { ascending: false }).limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
     if (skillsRes.error) throw new Error(skillsRes.error.message)
     if (externalMcpRes.error) throw new Error(externalMcpRes.error.message)
+    if (marketplaceRes.error) throw new Error(marketplaceRes.error.message)
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
@@ -85,6 +91,8 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime')),
       ...(skillsRes.data ?? []).map((row) =>
         toAiHubSkillResource(row as unknown as AiHubResourceRecord)),
+      ...(marketplaceRes.data ?? []).map((row) =>
+        toAiHubMarketplaceAgentResource(row as unknown as AiHubResourceRecord)),
       ...(workflowsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows')),
     ]

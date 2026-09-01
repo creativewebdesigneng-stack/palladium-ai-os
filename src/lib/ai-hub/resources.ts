@@ -48,6 +48,35 @@ export function toAiHubSkillResource(row: AiHubResourceRecord): AiHubLiveResourc
   }
 }
 
+/** Projects a published Marketplace agent listing without exposing its executable config. */
+export function toAiHubMarketplaceAgentResource(row: AiHubResourceRecord): AiHubLiveResource {
+  const id = String(row['id'] ?? '')
+  const tags = Array.isArray(row['tags']) ? row['tags'].map(String).filter(Boolean) : []
+  return {
+    id,
+    kind: 'agent',
+    name: String(row['title'] ?? id),
+    status: 'published',
+    providerId: 'palladium-marketplace',
+    capabilities: tags,
+    metadata: {
+      resourceType: 'marketplace-listing',
+      source: 'marketplace',
+      ...(row['summary'] ? { description: String(row['summary']) } : row['description'] ? { description: String(row['description']) } : {}),
+      ...(row['category'] ? { category: String(row['category']) } : {}),
+      ...(row['version'] ? { version: String(row['version']) } : {}),
+      ...(row['required_plan'] ? { requiredPlan: String(row['required_plan']) } : {}),
+      ...(row['price_pence'] != null ? { pricePence: String(row['price_pence']) } : {}),
+      ...(row['currency'] ? { currency: String(row['currency']) } : {}),
+      ...(row['install_count'] != null ? { installCount: String(row['install_count']) } : {}),
+      ...(row['rating_avg'] != null ? { rating: String(row['rating_avg']) } : {}),
+      ...(row['rating_count'] != null ? { ratingCount: String(row['rating_count']) } : {}),
+      ...(row['published_at'] ? { publishedAt: String(row['published_at']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+}
+
 export function toAiHubMcpResources(server: AiHubMcpServerDefinition, tools: readonly AiHubMcpToolDefinition[]): AiHubLiveResource[] {
   const providerId = 'palladium-mcp'
   const serverResource: AiHubLiveResource = {
@@ -109,5 +138,6 @@ export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
   const mcp = resources.filter((resource) => resource.kind === 'mcp').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
   const skills = resources.filter((resource) => resource.providerId === 'palladium-skills').length
-  return { models, agents, tools, mcp, skills, workflows, total: resources.length }
+  const marketplace = resources.filter((resource) => resource.providerId === 'palladium-marketplace').length
+  return { models, agents, tools, mcp, skills, marketplace, workflows, total: resources.length }
 }
