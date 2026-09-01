@@ -53,6 +53,7 @@ describe('AI Hub Smart Tables dataset mapping', () => {
       mcp: 0,
       apps: 0,
       datasets: 1,
+      compute: 0,
       skills: 0,
       marketplace: 0,
       workflows: 0,
