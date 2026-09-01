@@ -60,6 +60,16 @@ function statusClasses(status) {
   return 'border-white/10 bg-white/[.04] text-zinc-400';
 }
 
+function resourceWorkspace(resource) {
+  if (resource.providerId === 'palladium-skills') return { href: '/skills', label: 'Open Skills' };
+  if (resource.providerId === 'palladium-app-studio' || resource.providerId === 'palladium-compute') return { href: '/builder', label: resource.kind === 'compute' ? 'Open deployment compute' : 'Open App Studio' };
+  if (resource.providerId === 'palladium-model-gateway') return { href: '/models', label: 'Open Runtime Models' };
+  if (resource.providerId === 'palladium-mcp' || resource.kind === 'mcp') return { href: '/mcp-hub', label: 'Open MCP Hub' };
+  if (resource.kind === 'voice') return { href: '/voice-studio', label: 'Open Voice Studio' };
+  if (resource.kind === 'image' || resource.kind === 'video') return { href: '/media-studio', label: 'Open Media Studio' };
+  return null;
+}
+
 function ResourceCard({ resource, onRun, running, onInstall, installing, onMcp, mcpRunning }) {
   const Icon = resource.providerId === 'palladium-marketplace'
     ? Store
@@ -107,6 +117,7 @@ function ResourceCard({ resource, onRun, running, onInstall, installing, onMcp, 
   const durationSeconds = resource.metadata?.durationSeconds;
   const mediaModes = resource.metadata?.modes;
   const mediaExports = resource.metadata?.exports;
+  const workspace = resourceWorkspace(resource);
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -319,6 +330,11 @@ function ResourceCard({ resource, onRun, running, onInstall, installing, onMcp, 
       {resource.providerId === 'palladium-smart-tables' && (
         <a href="/smart-tables" className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/15">
           <Database className="h-3.5 w-3.5" /> Open Smart Tables
+        </a>
+      )}
+      {workspace && (
+        <a href={workspace.href} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/15">
+          <Play className="h-3.5 w-3.5" /> {workspace.label}
         </a>
       )}
       {resource.kind === 'tool' && resource.providerId.startsWith('external-mcp:') && (
