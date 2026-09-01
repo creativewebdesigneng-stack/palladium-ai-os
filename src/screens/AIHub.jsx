@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppWindow, Bot, Boxes, Cpu, Database, Network, Search, ServerCog, Store, Workflow, Wrench } from 'lucide-react';
+import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Search, ServerCog, Store, Video, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
@@ -27,6 +27,9 @@ const resourceIcons = {
   app: AppWindow,
   dataset: Database,
   compute: ServerCog,
+  voice: Mic,
+  image: Image,
+  video: Video,
 };
 
 const FILTERS = [
@@ -37,6 +40,9 @@ const FILTERS = [
   ['app', 'Apps'],
   ['dataset', 'Datasets'],
   ['compute', 'Compute'],
+  ['voice', 'Voice'],
+  ['image', 'Images'],
+  ['video', 'Video'],
   ['tool', 'Tools'],
   ['mcp', 'MCP'],
   ['workflow', 'Workflows'],
@@ -88,6 +94,17 @@ function ResourceCard({ resource }) {
   const evalCount = resource.metadata?.evalCount;
   const evalAverageScore = resource.metadata?.evalAverageScore;
   const lastEvaluatedAt = resource.metadata?.lastEvaluatedAt;
+  const ttsModel = resource.metadata?.ttsModel;
+  const sttModel = resource.metadata?.sttModel;
+  const voiceCount = resource.metadata?.voiceCount;
+  const formats = resource.metadata?.formats;
+  const outputSampleRateHz = resource.metadata?.outputSampleRateHz;
+  const localFirst = resource.metadata?.localFirst;
+  const mediaWorkflows = resource.metadata?.workflows;
+  const aspectRatios = resource.metadata?.aspectRatios;
+  const durationSeconds = resource.metadata?.durationSeconds;
+  const mediaModes = resource.metadata?.modes;
+  const mediaExports = resource.metadata?.exports;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -147,6 +164,48 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Recent cost</span>
             <span className="truncate text-right text-zinc-300">£{(Number(modelCostPence) / 100).toFixed(2)}{lastUsedAt ? ` · last used ${new Date(lastUsedAt).toLocaleDateString()}` : ''}</span>
+          </div>
+        )}
+        {resource.kind === 'voice' && (ttsModel || sttModel) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Voice models</span>
+            <span className="truncate text-right text-zinc-300">{[ttsModel, sttModel].filter(Boolean).join(' / ')}</span>
+          </div>
+        )}
+        {resource.kind === 'voice' && (voiceCount || formats) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Voice output</span>
+            <span className="truncate text-right text-zinc-300">{voiceCount ? `${voiceCount} voices` : ''}{voiceCount && formats ? ' · ' : ''}{formats || ''}</span>
+          </div>
+        )}
+        {resource.kind === 'voice' && (outputSampleRateHz || localFirst) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Voice runtime</span>
+            <span className="truncate text-right text-zinc-300">{outputSampleRateHz ? `${outputSampleRateHz} Hz` : ''}{outputSampleRateHz && localFirst ? ' · ' : ''}{localFirst === 'true' ? 'local-first' : ''}</span>
+          </div>
+        )}
+        {(resource.kind === 'image' || resource.kind === 'video') && mediaWorkflows && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Media workflows</span>
+            <span className="truncate text-right text-zinc-300">{mediaWorkflows}</span>
+          </div>
+        )}
+        {(resource.kind === 'image' || resource.kind === 'video') && aspectRatios && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Aspect ratios</span>
+            <span className="truncate text-right text-zinc-300">{aspectRatios}</span>
+          </div>
+        )}
+        {resource.kind === 'video' && durationSeconds && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Durations</span>
+            <span className="truncate text-right text-zinc-300">{durationSeconds}s</span>
+          </div>
+        )}
+        {resource.kind === 'video' && (mediaModes || mediaExports) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Editing</span>
+            <span className="truncate text-right text-zinc-300">{[mediaModes, mediaExports].filter(Boolean).join(' / ')}</span>
           </div>
         )}
         {(area || access) && (
@@ -296,6 +355,16 @@ export default function AIHub() {
         resource.metadata?.evalCount,
         resource.metadata?.evalAverageScore,
         resource.metadata?.lastEvaluatedAt,
+        resource.metadata?.ttsModel,
+        resource.metadata?.sttModel,
+        resource.metadata?.formats,
+        resource.metadata?.outputSampleRateHz,
+        resource.metadata?.localFirst,
+        resource.metadata?.workflows,
+        resource.metadata?.aspectRatios,
+        resource.metadata?.durationSeconds,
+        resource.metadata?.modes,
+        resource.metadata?.exports,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -305,6 +374,16 @@ export default function AIHub() {
       return searchable.includes(needle);
     });
   }, [inventory.data?.resources, kind, query]);
+
+  const liveKindCount = (value) => {
+    if (!inventory.data) return '';
+    if (value === 'marketplace') return ` (${inventory.data.counts.marketplace})`;
+    if (['voice', 'image', 'video'].includes(value)) {
+      return ` (${inventory.data.resources.filter((resource) => resource.kind === value).length})`;
+    }
+    const countKey = { model: 'models', agent: 'agents', app: 'apps', dataset: 'datasets', compute: 'compute', tool: 'tools', mcp: 'mcp', workflow: 'workflows' }[value];
+    return countKey ? ` (${inventory.data.counts[countKey]})` : '';
+  };
 
   return (
     <>
@@ -323,7 +402,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models with live usage and Arena evaluation signals, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows.</p>
+            <p className="mt-2 text-sm text-zinc-400">Models, voice, image and video runtimes, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -343,7 +422,7 @@ export default function AIHub() {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search resources, models, data, compute or tools…"
+                placeholder="Search models, media, data, compute or tools…"
                 className="w-full rounded-xl border border-white/10 bg-black/25 py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
               />
             </div>
@@ -361,16 +440,7 @@ export default function AIHub() {
                     : 'border-white/10 bg-white/[.025] text-zinc-400 hover:bg-white/[.05] hover:text-zinc-200'
                 }`}
               >
-                {label}
-                {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
-                {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
-                {value === 'marketplace' && inventory.data ? ` (${inventory.data.counts.marketplace})` : ''}
-                {value === 'app' && inventory.data ? ` (${inventory.data.counts.apps})` : ''}
-                {value === 'dataset' && inventory.data ? ` (${inventory.data.counts.datasets})` : ''}
-                {value === 'compute' && inventory.data ? ` (${inventory.data.counts.compute})` : ''}
-                {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
-                {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
-                {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
+                {label}{value !== 'all' ? liveKindCount(value) : ''}
               </button>
             ))}
           </div>
@@ -397,7 +467,7 @@ export default function AIHub() {
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-white">Connected Palladium systems</h2>
-            <p className="mt-1 text-sm text-zinc-400">This is the canonical Hub registry, not a duplicate model, agent, MCP, workflow, app, data or compute catalogue.</p>
+            <p className="mt-1 text-sm text-zinc-400">This is the canonical Hub registry, not a duplicate model, agent, MCP, workflow, app, data, compute or media catalogue.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {providers.map((provider) => {
