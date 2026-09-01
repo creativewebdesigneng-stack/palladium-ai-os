@@ -51,6 +51,9 @@ export function createPalladiumAiHubRegistry() {
     { id: 'palladium-skills', name: 'Palladium Skills', capabilityKinds: ['tool'], deploymentTargets: ['palladium-cloud', 'customer-cloud', 'on-prem', 'edge'], adapter: 'skills', enabled: true },
     { id: 'palladium-workflows', name: 'Palladium Workflows', capabilityKinds: ['workflow'], deploymentTargets: ['palladium-cloud', 'customer-cloud', 'on-prem'], adapter: 'workflows', enabled: true },
     { id: 'palladium-app-studio', name: 'Palladium App Studio', capabilityKinds: ['app'], deploymentTargets: ['palladium-cloud', 'customer-cloud'], adapter: 'app-studio', enabled: true },
+    { id: 'palladium-marketplace', name: 'Palladium Marketplace', capabilityKinds: ['agent'], deploymentTargets: ['palladium-cloud'], adapter: 'marketplace', enabled: true, metadata: { execution: 'discovery-only' } },
+    { id: 'palladium-smart-tables', name: 'Palladium Smart Tables', capabilityKinds: ['dataset'], deploymentTargets: ['palladium-cloud'], adapter: 'data', enabled: true, metadata: { execution: 'discovery-only' } },
+    { id: 'palladium-compute', name: 'Palladium Deployment Compute', capabilityKinds: ['compute'], deploymentTargets: ['provider-cloud'], adapter: 'compute', enabled: true, metadata: { execution: 'discovery-only' } },
   ]
 
   providers.forEach((provider) => registry.registerProvider(provider))

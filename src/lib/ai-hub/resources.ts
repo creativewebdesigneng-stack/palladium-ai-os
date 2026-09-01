@@ -91,7 +91,7 @@ export function toAiHubComputeResource(row: AiHubResourceRecord): AiHubLiveResou
     kind: 'compute',
     name: String(row['name'] ?? id),
     status: 'available',
-    providerId: `palladium-deployments:${provider}`,
+    providerId: 'palladium-compute',
     capabilities,
     metadata: {
       resourceType: 'deployment-target',
