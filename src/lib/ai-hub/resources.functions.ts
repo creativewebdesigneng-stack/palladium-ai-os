@@ -1,13 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { getGenerativeMediaCapabilities } from '@/lib/media/generative-media.server'
+import { getMediaRuntimeCapabilities } from '@/lib/media/media-runtime.server'
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
 import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
 } from '@/lib/runtime/model-providers.server'
+import { getLuxTtsCapabilities } from '@/lib/voice/lux-tts.server'
+import { getVoiceRuntimeCapabilities } from '@/lib/voice/voice-runtime.server'
 import { aggregateAiHubModelEvalTrust, withAiHubModelEvalTrust } from './eval-trust'
 import { aggregateAiHubModelUsage, withAiHubModelUsage } from './model-telemetry'
+import { toAiHubMultimodalResources } from './multimodal'
 import {
   countAiHubResources,
   toAiHubAppResource,
@@ -147,9 +152,16 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       (evalResponsesRes.data ?? []) as unknown as AiHubResourceRecord[],
       (evalScoresRes.data ?? []) as unknown as AiHubResourceRecord[],
     )
+    const multimodalResources = toAiHubMultimodalResources({
+      voice: getVoiceRuntimeCapabilities(),
+      luxTts: getLuxTtsCapabilities(),
+      generativeMedia: getGenerativeMediaCapabilities(),
+      mediaRuntime: getMediaRuntimeCapabilities(),
+    })
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(modelUsage, modelEvalTrust),
+      ...multimodalResources,
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
       ...(externalMcpRes.data ?? []).flatMap((row) =>
         toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord)),
