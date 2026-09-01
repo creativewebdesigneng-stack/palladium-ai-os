@@ -38,14 +38,40 @@ describe('AiHubExecutionGateway', () => {
   })
 
   it('stops at the approval boundary before provider execution', async () => {
-    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry())
+    const approvalGate = {
+      request: vi.fn(async () => 'approval-1'),
+      isApproved: vi.fn(async () => false),
+    }
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
     const execute = vi.fn(async () => ({ status: 'completed' as const, adapter: 'model-gateway' as const }))
     gateway.registerAdapter('model-gateway', execute)
 
     const result = await gateway.execute(createPlan(true), { tenantId: 'tenant-1', actorId: 'actor-1' })
 
     expect(result.status).toBe('waiting_for_approval')
+    expect(result.approvalRequestId).toBe('approval-1')
+    expect(approvalGate.request).toHaveBeenCalledOnce()
     expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('resumes provider execution only after the same approval request is approved', async () => {
+    const approvalGate = {
+      request: vi.fn(async () => 'approval-1'),
+      isApproved: vi.fn(async () => true),
+    }
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
+    const execute = vi.fn(async () => ({ status: 'completed' as const, adapter: 'model-gateway' as const }))
+    gateway.registerAdapter('model-gateway', execute)
+
+    const result = await gateway.execute(createPlan(true), {
+      tenantId: 'tenant-1',
+      actorId: 'actor-1',
+      approvalRequestId: 'approval-1',
+    })
+
+    expect(result.status).toBe('completed')
+    expect(approvalGate.isApproved).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'approval-1')
+    expect(execute).toHaveBeenCalledOnce()
   })
 
   it('rejects execution without tenant and actor identity', async () => {

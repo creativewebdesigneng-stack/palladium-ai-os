@@ -5,6 +5,7 @@ export interface AiHubExecutionContext {
   tenantId: string
   actorId: string
   input?: unknown
+  approvalRequestId?: string
 }
 
 export interface AiHubExecutionResult {
@@ -20,10 +21,18 @@ export type AiHubExecutionAdapter = (
   context: AiHubExecutionContext,
 ) => Promise<AiHubExecutionResult>
 
+export interface AiHubApprovalGate {
+  request(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext): Promise<string>
+  isApproved(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext, approvalRequestId: string): Promise<boolean>
+}
+
 export class AiHubExecutionGateway {
   private readonly adapters = new Map<AiHubProviderDefinition['adapter'], AiHubExecutionAdapter>()
 
-  constructor(private readonly registry: AiHubRegistry) {}
+  constructor(
+    private readonly registry: AiHubRegistry,
+    private readonly approvalGate?: AiHubApprovalGate,
+  ) {}
 
   registerAdapter(adapter: AiHubProviderDefinition['adapter'], execute: AiHubExecutionAdapter) {
     this.adapters.set(adapter, execute)
@@ -35,9 +44,19 @@ export class AiHubExecutionGateway {
     }
 
     if (plan.requiresApproval) {
-      return {
-        status: 'waiting_for_approval',
-        adapter: this.resolveProvider(plan).adapter,
+      const provider = this.resolveProvider(plan)
+      if (!this.approvalGate) throw new Error('AI Hub approval gate is not configured')
+      if (!context.approvalRequestId) {
+        const approvalRequestId = await this.approvalGate.request(plan, context)
+        return { status: 'waiting_for_approval', adapter: provider.adapter, approvalRequestId }
+      }
+      const approved = await this.approvalGate.isApproved(plan, context, context.approvalRequestId)
+      if (!approved) {
+        return {
+          status: 'waiting_for_approval',
+          adapter: provider.adapter,
+          approvalRequestId: context.approvalRequestId,
+        }
       }
     }
 
