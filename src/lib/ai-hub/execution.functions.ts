@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { executeWorkflow } from '@/lib/runtime/workforce.server'
 import { executeAgentTask } from '@/lib/runtime/agent-task-execution.server'
+import { callExternalMcpTool, listExternalMcpTools } from '@/lib/mcp/external-mcp.server'
 import { createAiHubApprovalGate } from './approval.server'
 import { AiHubExecutionGateway } from './execution'
 import type { AiHubOrchestrationPlan } from './orchestrator'
@@ -126,5 +127,74 @@ export const executeAiHubAgent = createServerFn({ method: 'POST' })
     })
     if (result.status === 'waiting_for_approval') return { status: result.status, adapter: result.adapter, approvalRequestId: result.approvalRequestId ?? '' }
     if (result.status === 'failed') return { status: result.status, adapter: result.adapter, error: result.error ?? 'AI Hub execution failed' }
+    return { status: result.status, adapter: result.adapter }
+  })
+
+type McpInput = { resourceId: string; inputJson: string; approvalRequestId?: string }
+
+function validateMcp(input: unknown): McpInput {
+  const row = input && typeof input === 'object' ? input as Record<string, unknown> : {}
+  const resourceId = String(row['resourceId'] ?? '').trim()
+  const inputJson = String(row['inputJson'] ?? '{}').trim()
+  const approvalRequestId = String(row['approvalRequestId'] ?? '').trim()
+  if (!resourceId.includes(':')) throw new Error('Choose an external MCP tool.')
+  if (inputJson.length > 20_000) throw new Error('MCP tool input is too large.')
+  return { resourceId, inputJson, ...(approvalRequestId ? { approvalRequestId } : {}) }
+}
+
+export const executeAiHubExternalMcp = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateMcp)
+  .handler(async ({ data, context }) => {
+    const separator = data.resourceId.indexOf(':')
+    const serverId = data.resourceId.slice(0, separator)
+    const toolName = data.resourceId.slice(separator + 1)
+    let toolInput: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(data.inputJson)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error()
+      toolInput = parsed as Record<string, unknown>
+    } catch {
+      throw new Error('MCP tool input must be a JSON object.')
+    }
+
+    const sb = context.supabase as unknown as Sb
+    const { data: server, error } = await sb
+      .from('external_mcp_servers')
+      .select('id,name,org_id,enabled,requires_approval')
+      .eq('id', serverId)
+      .eq('user_id', context.userId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!server || !server.enabled) throw new Error('External MCP server is not available.')
+    const discovered = await listExternalMcpTools({ sb, userId: context.userId, serverId })
+    if (!discovered.tools.some((tool) => tool.name === toolName)) throw new Error('That MCP tool is not available.')
+
+    const providerId = `external-mcp:${server.id}`
+    const plan: AiHubOrchestrationPlan = {
+      workloadId: `external-mcp:${server.id}:${toolName}`,
+      discovery: [], requiresApproval: true, executionBoundary: 'palladium-policy-gateway',
+      route: {
+        workloadId: `external-mcp:${server.id}:${toolName}`,
+        capability: { id: `${server.id}:${toolName}`, kind: 'tool', providerId, name: `${server.name}: ${toolName}`, capabilities: [toolName], deploymentTargets: ['provider-cloud'] },
+        reason: 'The operator selected this configured external MCP tool from the authenticated AI Hub inventory.',
+        policyChecks: ['tenant-isolation', 'external-mcp-allowlist', 'approval-required'],
+      },
+    }
+    const registry = createPalladiumAiHubRegistry()
+    registry.registerProvider({ id: providerId, name: server.name, capabilityKinds: ['tool'], deploymentTargets: ['provider-cloud'], adapter: 'mcp', enabled: true })
+    const gateway = new AiHubExecutionGateway(registry, createAiHubApprovalGate(sb))
+    gateway.registerAdapter('mcp', async () => {
+      await callExternalMcpTool({ sb, userId: context.userId, serverId, toolName, input: toolInput, approved: true })
+      return { status: 'completed', adapter: 'mcp' }
+    })
+    const result = await gateway.execute(plan, {
+      tenantId: server.org_id ?? context.userId,
+      approvalOrgId: server.org_id ?? null,
+      actorId: context.userId,
+      ...(data.approvalRequestId ? { approvalRequestId: data.approvalRequestId } : {}),
+    })
+    if (result.status === 'waiting_for_approval') return { status: result.status, adapter: result.adapter, approvalRequestId: result.approvalRequestId ?? '' }
+    if (result.status === 'failed') return { status: result.status, adapter: result.adapter, error: result.error ?? 'MCP tool execution failed' }
     return { status: result.status, adapter: result.adapter }
   })
