@@ -4,12 +4,14 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { getGenerativeMediaCapabilities } from '@/lib/media/generative-media.server'
 import { getMediaRuntimeCapabilities } from '@/lib/media/media-runtime.server'
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
+import { getEntitlements } from '@/lib/platform/entitlements.server'
 import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
 } from '@/lib/runtime/model-providers.server'
 import { getLuxTtsCapabilities } from '@/lib/voice/lux-tts.server'
 import { getVoiceRuntimeCapabilities } from '@/lib/voice/voice-runtime.server'
+import { toAiHubCommercialSummary } from './commercial'
 import { aggregateAiHubModelEvalTrust, withAiHubModelEvalTrust } from './eval-trust'
 import { aggregateAiHubModelUsage, withAiHubModelUsage } from './model-telemetry'
 import { toAiHubMultimodalResources } from './multimodal'
@@ -88,6 +90,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       modelTasksRes,
       evalResponsesRes,
       evalScoresRes,
+      entitlements,
     ] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
@@ -126,6 +129,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('model_eval_scores')
         .select('response_id,score,created_at')
         .order('created_at', { ascending: false }).limit(500),
+      getEntitlements(untypedClient as never, context.userId, null),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
@@ -191,5 +195,9 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows')),
     ]
 
-    return { resources, counts: countAiHubResources(resources) }
+    return {
+      resources,
+      counts: countAiHubResources(resources),
+      commercial: toAiHubCommercialSummary(entitlements),
+    }
   })
