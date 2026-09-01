@@ -142,6 +142,7 @@ describe('AI Hub live resource mapping', () => {
       agents: 2,
       tools: 2,
       mcp: 1,
+      apps: 0,
       skills: 1,
       marketplace: 0,
       workflows: 1,
