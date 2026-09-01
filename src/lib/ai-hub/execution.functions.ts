@@ -59,23 +59,29 @@ export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
       createPalladiumAiHubRegistry(),
       createAiHubApprovalGate(sb),
     )
-    gateway.registerAdapter('workflows', async () => ({
-      status: 'completed',
-      adapter: 'workflows',
-      output: await executeWorkflow({
+    gateway.registerAdapter('workflows', async () => {
+      await executeWorkflow({
         sb,
         userId: context.userId,
         workflowId: workflow.id,
         input: data.goal,
         trigger: 'ai-hub',
-      }),
-    }))
+      })
+      return { status: 'completed', adapter: 'workflows' }
+    })
 
-    return gateway.execute(plan, {
+    const result = await gateway.execute(plan, {
       tenantId: workflow.org_id ?? context.userId,
       approvalOrgId: workflow.org_id ?? null,
       actorId: context.userId,
       input: data.goal,
       ...(data.approvalRequestId ? { approvalRequestId: data.approvalRequestId } : {}),
     })
+    if (result.status === 'waiting_for_approval') {
+      return { status: result.status, adapter: result.adapter, approvalRequestId: result.approvalRequestId ?? '' }
+    }
+    if (result.status === 'failed') {
+      return { status: result.status, adapter: result.adapter, error: result.error ?? 'AI Hub execution failed' }
+    }
+    return { status: result.status, adapter: result.adapter }
   })
