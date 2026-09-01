@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppWindow, Bot, Boxes, Cpu, Network, Search, Workflow, Wrench } from 'lucide-react';
+import { AppWindow, Bot, Boxes, Cpu, Network, Search, Store, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
@@ -30,13 +30,14 @@ const FILTERS = [
   ['all', 'All resources'],
   ['model', 'Models'],
   ['agent', 'Agents'],
+  ['marketplace', 'Marketplace'],
   ['tool', 'Tools'],
   ['mcp', 'MCP'],
   ['workflow', 'Workflows'],
 ];
 
 function statusClasses(status) {
-  if (status === 'available' || status === 'active' || status === 'enabled') {
+  if (status === 'available' || status === 'active' || status === 'enabled' || status === 'published') {
     return 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300';
   }
   if (status === 'unconfigured' || status === 'paused' || status === 'disabled') {
@@ -46,7 +47,9 @@ function statusClasses(status) {
 }
 
 function ResourceCard({ resource }) {
-  const Icon = resourceIcons[resource.kind] ?? Boxes;
+  const Icon = resource.providerId === 'palladium-marketplace'
+    ? Store
+    : resourceIcons[resource.kind] ?? Boxes;
   const model = resource.metadata?.model;
   const modelProvider = resource.metadata?.modelProvider;
   const access = resource.metadata?.access;
@@ -54,6 +57,11 @@ function ResourceCard({ resource }) {
   const version = resource.metadata?.version;
   const source = resource.metadata?.source;
   const approval = resource.metadata?.requiresApproval;
+  const category = resource.metadata?.category;
+  const pricePence = resource.metadata?.pricePence;
+  const currency = resource.metadata?.currency;
+  const rating = resource.metadata?.rating;
+  const installCount = resource.metadata?.installCount;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -64,7 +72,9 @@ function ResourceCard({ resource }) {
           </div>
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold text-white">{resource.name}</h3>
-            <p className="mt-0.5 truncate text-[11px] uppercase tracking-[0.12em] text-zinc-500">{resource.kind}</p>
+            <p className="mt-0.5 truncate text-[11px] uppercase tracking-[0.12em] text-zinc-500">
+              {resource.providerId === 'palladium-marketplace' ? 'marketplace agent' : resource.kind}
+            </p>
           </div>
         </div>
         <span className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${statusClasses(resource.status)}`}>
@@ -101,6 +111,28 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Approval required</span>
             <span className="truncate text-right text-zinc-300">{approval === 'true' ? 'Yes' : 'No'}</span>
+          </div>
+        )}
+        {category && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Category</span>
+            <span className="truncate text-right text-zinc-300">{category}</span>
+          </div>
+        )}
+        {pricePence != null && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Marketplace price</span>
+            <span className="truncate text-right text-zinc-300">
+              {currency === 'GBP' ? '£' : `${currency || ''} `}{(Number(pricePence) / 100).toFixed(2)}
+            </span>
+          </div>
+        )}
+        {(rating != null || installCount != null) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Marketplace activity</span>
+            <span className="truncate text-right text-zinc-300">
+              {[rating != null ? `${rating}★` : null, installCount != null ? `${installCount} installs` : null].filter(Boolean).join(' · ')}
+            </span>
           </div>
         )}
         {version && (
@@ -149,7 +181,8 @@ export default function AIHub() {
     const needle = query.trim().toLowerCase();
 
     return resources.filter((resource) => {
-      if (kind !== 'all' && resource.kind !== kind) return false;
+      if (kind === 'marketplace' && resource.providerId !== 'palladium-marketplace') return false;
+      if (kind !== 'all' && kind !== 'marketplace' && resource.kind !== kind) return false;
       if (!needle) return true;
 
       const searchable = [
@@ -166,6 +199,8 @@ export default function AIHub() {
         resource.metadata?.auth,
         resource.metadata?.source,
         resource.metadata?.slug,
+        resource.metadata?.category,
+        resource.metadata?.requiredPlan,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -193,7 +228,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, native and connected MCP capabilities, tenant-visible agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models, native and connected MCP, Skills, Marketplace listings, tenant agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
@@ -206,7 +241,7 @@ export default function AIHub() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-white">Live Hub inventory</h2>
-              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary. Model Gateway, Agent Runtime, MCP and Workflows remain the systems of record.</p>
+              <p className="mt-1 text-sm text-zinc-400">Authenticated resources discovered through the canonical Hub boundary while each Palladium subsystem remains its system of record.</p>
             </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -234,6 +269,7 @@ export default function AIHub() {
                 {label}
                 {value === 'model' && inventory.data ? ` (${inventory.data.counts.models})` : ''}
                 {value === 'agent' && inventory.data ? ` (${inventory.data.counts.agents})` : ''}
+                {value === 'marketplace' && inventory.data ? ` (${inventory.data.counts.marketplace})` : ''}
                 {value === 'tool' && inventory.data ? ` (${inventory.data.counts.tools})` : ''}
                 {value === 'mcp' && inventory.data ? ` (${inventory.data.counts.mcp})` : ''}
                 {value === 'workflow' && inventory.data ? ` (${inventory.data.counts.workflows})` : ''}
@@ -247,7 +283,7 @@ export default function AIHub() {
             {inventory.isError && <Failed message={friendlyMessage(inventory.error)} onRetry={() => inventory.refetch()} />}
             {inventory.isSuccess && filteredResources.length > 0 && (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.id}`} resource={resource} />)}
+                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} />)}
               </div>
             )}
             {inventory.isSuccess && filteredResources.length === 0 && (
