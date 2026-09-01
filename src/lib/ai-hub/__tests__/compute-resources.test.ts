@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { countAiHubResources, toAiHubComputeResource } from '../resources'
 
 describe('AI Hub compute resource mapping', () => {
-  it('projects deployment targets without exposing provider resource identifiers or credentials', () => {
+  it('projects deployment targets behind the canonical compute provider without exposing provider resource identifiers or credentials', () => {
     const resource = toAiHubComputeResource({
       id: 'target-1',
       provider: 'coolify',
@@ -20,7 +20,7 @@ describe('AI Hub compute resource mapping', () => {
       kind: 'compute',
       name: 'Production API',
       status: 'available',
-      providerId: 'palladium-deployments:coolify',
+      providerId: 'palladium-compute',
       capabilities: ['managed-compute', 'application-deployment'],
       metadata: {
         resourceType: 'deployment-target',
