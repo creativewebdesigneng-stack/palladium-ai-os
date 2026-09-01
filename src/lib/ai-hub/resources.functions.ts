@@ -18,6 +18,23 @@ type AiHubResourceInput = {
   limit: number
 }
 
+type ExternalMcpQueryResult = {
+  data: AiHubResourceRecord[] | null
+  error: { message: string } | null
+}
+
+type ExternalMcpQuery = {
+  select: (columns: string) => {
+    order: (column: string, options: { ascending: boolean }) => {
+      limit: (limit: number) => PromiseLike<ExternalMcpQueryResult>
+    }
+  }
+}
+
+type ExternalMcpDb = {
+  from: (table: 'external_mcp_servers') => ExternalMcpQuery
+}
+
 function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
   const rawLimit =
     input && typeof input === 'object' && 'limit' in input
@@ -66,6 +83,10 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
+    // external_mcp_servers predates the generated Supabase Database type used by
+    // this client. Keep the authenticated/RLS-scoped client and narrow only the
+    // query surface until the generated schema is refreshed.
+    const externalMcpDb = context.supabase as unknown as ExternalMcpDb
     const [agentsRes, workflowsRes, externalMcpRes] = await Promise.all([
       context.supabase
         .from('personal_agents')
@@ -77,7 +98,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
         .select('id,name,status,updated_at')
         .order('updated_at', { ascending: false })
         .limit(limit),
-      context.supabase
+      externalMcpDb
         .from('external_mcp_servers')
         .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,updated_at')
         .order('updated_at', { ascending: false })
@@ -91,9 +112,7 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
-      ...(externalMcpRes.data ?? []).flatMap((row) =>
-        toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord),
-      ),
+      ...(externalMcpRes.data ?? []).flatMap((row) => toAiHubExternalMcpResources(row)),
       ...(agentsRes.data ?? []).map((row) =>
         toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
       ),
