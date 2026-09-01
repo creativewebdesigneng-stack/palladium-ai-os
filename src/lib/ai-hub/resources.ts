@@ -48,6 +48,38 @@ export function toAiHubSkillResource(row: AiHubResourceRecord): AiHubLiveResourc
   }
 }
 
+/** Projects a Smart Table as a dataset without exposing record contents. */
+export function toAiHubDatasetResource(row: AiHubResourceRecord): AiHubLiveResource {
+  const id = String(row['id'] ?? '')
+  const fields = Array.isArray(row['fields']) ? row['fields'] : []
+  const fieldTypes = fields.flatMap((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+    const type = (value as Record<string, unknown>)['type']
+    return typeof type === 'string' && type ? [type] : []
+  })
+  const capabilities = ['structured-data']
+  if (fieldTypes.length) capabilities.push('schema-defined')
+
+  return {
+    id,
+    kind: 'dataset',
+    name: String(row['name'] ?? id),
+    status: 'available',
+    providerId: 'palladium-smart-tables',
+    capabilities,
+    metadata: {
+      resourceType: 'smart-table',
+      source: 'smart-tables',
+      ...(row['description'] ? { description: String(row['description']) } : {}),
+      fieldCount: String(fields.length),
+      ...(fieldTypes.length ? { fieldTypes: Array.from(new Set(fieldTypes)).join(', ') } : {}),
+      ...(row['default_view'] ? { defaultView: String(row['default_view']) } : {}),
+      ...(row['created_at'] ? { createdAt: String(row['created_at']) } : {}),
+      ...(row['updated_at'] ? { updatedAt: String(row['updated_at']) } : {}),
+    },
+  }
+}
+
 /** Projects a Builder job as an App resource without prompts, source, repository or credential material. */
 export function toAiHubAppResource(row: AiHubResourceRecord): AiHubLiveResource {
   const id = String(row['id'] ?? '')
@@ -174,8 +206,9 @@ export function countAiHubResources(resources: readonly AiHubLiveResource[]) {
   const tools = resources.filter((resource) => resource.kind === 'tool').length
   const mcp = resources.filter((resource) => resource.kind === 'mcp').length
   const apps = resources.filter((resource) => resource.kind === 'app').length
+  const datasets = resources.filter((resource) => resource.kind === 'dataset').length
   const workflows = resources.filter((resource) => resource.kind === 'workflow').length
   const skills = resources.filter((resource) => resource.providerId === 'palladium-skills').length
   const marketplace = resources.filter((resource) => resource.providerId === 'palladium-marketplace').length
-  return { models, agents, tools, mcp, apps, skills, marketplace, workflows, total: resources.length }
+  return { models, agents, tools, mcp, apps, datasets, skills, marketplace, workflows, total: resources.length }
 }

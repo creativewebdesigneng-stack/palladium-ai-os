@@ -63,6 +63,7 @@ describe('AI Hub marketplace resource mapping', () => {
       tools: 0,
       mcp: 0,
       apps: 0,
+      datasets: 0,
       skills: 0,
       marketplace: 1,
       workflows: 0,
