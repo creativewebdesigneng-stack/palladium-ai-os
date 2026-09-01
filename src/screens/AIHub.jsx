@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Search, ServerCog, Store, Video, Workflow, Wrench } from 'lucide-react';
+import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Play, Search, ServerCog, Store, Video, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
 import { listAiHubResources } from '@/lib/ai-hub/resources.functions';
+import { executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
 import { useSessionReady } from '@/lib/useSessionReady';
 
 const icons = {
@@ -58,7 +59,7 @@ function statusClasses(status) {
   return 'border-white/10 bg-white/[.04] text-zinc-400';
 }
 
-function ResourceCard({ resource }) {
+function ResourceCard({ resource, onRun, running }) {
   const Icon = resource.providerId === 'palladium-marketplace'
     ? Store
     : resourceIcons[resource.kind] ?? Boxes;
@@ -292,6 +293,17 @@ function ResourceCard({ resource }) {
           )}
         </div>
       )}
+      {resource.kind === 'workflow' && (
+        <button
+          type="button"
+          onClick={() => onRun(resource)}
+          disabled={running || resource.status !== 'active'}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/25 bg-violet-400/10 px-3 py-2 text-xs font-medium text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Play className="h-3.5 w-3.5" />
+          {running ? 'Running…' : 'Run with approval'}
+        </button>
+      )}
     </div>
   );
 }
@@ -300,8 +312,29 @@ export default function AIHub() {
   const providers = createPalladiumAiHubRegistry().listProviders();
   const session = useSessionReady();
   const listResources = useServerFn(listAiHubResources);
+  const runHubWorkflow = useServerFn(executeAiHubWorkflow);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
+  const [goal, setGoal] = useState('');
+  const [approval, setApproval] = useState(null);
+
+  const execution = useMutation({
+    mutationFn: ({ resource, approvalRequestId }) => runHubWorkflow({
+      data: { resourceId: resource.id, goal, ...(approvalRequestId ? { approvalRequestId } : {}) },
+    }),
+    onSuccess: (result, variables) => {
+      if (result.status === 'waiting_for_approval') {
+        setApproval({ resource: variables.resource, approvalRequestId: result.approvalRequestId });
+      } else {
+        setApproval(null);
+      }
+    },
+  });
+
+  const startWorkflow = (resource) => {
+    if (!goal.trim()) return;
+    execution.mutate({ resource });
+  };
 
   const inventory = useQuery({
     queryKey: ['ai-hub-live-resources'],
@@ -445,13 +478,46 @@ export default function AIHub() {
             ))}
           </div>
 
+          <div className="mt-4 rounded-xl border border-violet-400/15 bg-violet-400/[.04] p-4">
+            <label className="text-xs font-medium uppercase tracking-[0.14em] text-violet-200">Workflow objective</label>
+            <textarea
+              value={goal}
+              onChange={(event) => setGoal(event.target.value)}
+              rows={3}
+              maxLength={8000}
+              placeholder="Describe what the selected workflow should accomplish…"
+              className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
+            />
+            <p className="mt-2 text-xs text-zinc-500">Hub workflow execution always creates an approval request before the existing workflow runtime can start.</p>
+          </div>
+
+          {approval && (
+            <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[.07] p-4 text-sm text-amber-100">
+              <p className="font-medium">Approval required for {approval.resource.name}</p>
+              <p className="mt-1 text-xs text-amber-200/70">Approve request {approval.approvalRequestId} in Mission Control, then resume it here.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a href="/mission-control" className="rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-medium hover:bg-amber-300/10">Open Mission Control</a>
+                <button
+                  type="button"
+                  disabled={execution.isPending}
+                  onClick={() => execution.mutate(approval)}
+                  className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-50"
+                >Resume approved run</button>
+              </div>
+            </div>
+          )}
+          {execution.isError && <div className="mt-4"><Failed message={friendlyMessage(execution.error)} /></div>}
+          {execution.isSuccess && execution.data?.status === 'completed' && (
+            <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Workflow completed through the existing Palladium runtime.</div>
+          )}
+
           <div className="mt-5">
             {session === 'no' && <Failed message="Sign in to inspect your live AI Hub resources." />}
             {session === 'yes' && inventory.isLoading && <Loading label="Loading Hub resources…" />}
             {inventory.isError && <Failed message={friendlyMessage(inventory.error)} onRetry={() => inventory.refetch()} />}
             {inventory.isSuccess && filteredResources.length > 0 && (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} />)}
+                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} onRun={startWorkflow} running={execution.isPending && execution.variables?.resource?.id === resource.id} />)}
               </div>
             )}
             {inventory.isSuccess && filteredResources.length === 0 && (

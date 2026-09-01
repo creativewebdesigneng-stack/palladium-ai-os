@@ -6,6 +6,7 @@ export interface AiHubExecutionContext {
   actorId: string
   input?: unknown
   approvalRequestId?: string
+  approvalOrgId?: string | null
 }
 
 export interface AiHubExecutionResult {
@@ -23,7 +24,8 @@ export type AiHubExecutionAdapter = (
 
 export interface AiHubApprovalGate {
   request(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext): Promise<string>
-  isApproved(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext, approvalRequestId: string): Promise<boolean>
+  claim(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext, approvalRequestId: string): Promise<boolean>
+  complete(approvalRequestId: string, context: AiHubExecutionContext, result: AiHubExecutionResult): Promise<void>
 }
 
 export class AiHubExecutionGateway {
@@ -50,8 +52,8 @@ export class AiHubExecutionGateway {
         const approvalRequestId = await this.approvalGate.request(plan, context)
         return { status: 'waiting_for_approval', adapter: provider.adapter, approvalRequestId }
       }
-      const approved = await this.approvalGate.isApproved(plan, context, context.approvalRequestId)
-      if (!approved) {
+      const claimed = await this.approvalGate.claim(plan, context, context.approvalRequestId)
+      if (!claimed) {
         return {
           status: 'waiting_for_approval',
           adapter: provider.adapter,
@@ -70,7 +72,22 @@ export class AiHubExecutionGateway {
       throw new Error(`No AI Hub execution adapter registered for: ${provider.adapter}`)
     }
 
-    return execute(plan, context)
+    try {
+      const result = await execute(plan, context)
+      if (plan.requiresApproval && context.approvalRequestId) {
+        await this.approvalGate?.complete(context.approvalRequestId, context, result)
+      }
+      return result
+    } catch (error) {
+      if (plan.requiresApproval && context.approvalRequestId) {
+        await this.approvalGate?.complete(context.approvalRequestId, context, {
+          status: 'failed',
+          adapter: provider.adapter,
+          error: error instanceof Error ? error.message : 'AI Hub execution failed',
+        })
+      }
+      throw error
+    }
   }
 
   private resolveProvider(plan: AiHubOrchestrationPlan) {

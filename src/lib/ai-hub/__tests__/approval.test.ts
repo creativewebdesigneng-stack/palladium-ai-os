@@ -29,7 +29,10 @@ describe('AI Hub durable approval gate', () => {
       from: () => ({
         insert(row: Record<string, unknown>) { inserted = row; return this },
         select() { return this },
-        async maybeSingle() { return { data: { id: 'approval-1' }, error: null } },
+        eq() { return this },
+        in() { return this },
+        is() { return this },
+        async maybeSingle() { return { data: inserted ? { id: 'approval-1' } : null, error: null } },
       }),
     }
 
@@ -39,7 +42,7 @@ describe('AI Hub durable approval gate', () => {
 
     expect(id).toBe('approval-1')
     expect(inserted).toMatchObject({
-      user_id: 'actor-1', org_id: 'tenant-1', action_type: 'ai_hub_execution', status: 'pending',
+      user_id: 'actor-1', org_id: null, action_type: 'ai_hub_execution', status: 'pending',
       details: {
         ai_hub_workload_id: 'workload-1',
         ai_hub_provider_id: 'palladium-model-gateway',
@@ -49,23 +52,26 @@ describe('AI Hub durable approval gate', () => {
     expect(JSON.stringify(inserted)).not.toContain('do-not-store')
   })
 
-  it('authorizes resume only through the matching actor, tenant, workload, provider and capability', async () => {
+  it('atomically claims resume only through the matching actor, scope, workload, provider and capability', async () => {
     const filters: Array<[string, unknown]> = []
     const db = {
       from: () => ({
+        update() { return this },
         select() { return this },
         eq(column: string, value: unknown) { filters.push([column, value]); return this },
-        async maybeSingle() { return { data: { id: 'approval-1', status: 'approved' }, error: null } },
+        is(column: string, value: unknown) { filters.push([column, value]); return this },
+        async maybeSingle() { return { data: { id: 'approval-1' }, error: null } },
       }),
     }
 
-    const approved = await createAiHubApprovalGate(db).isApproved(
+    const approved = await createAiHubApprovalGate(db).claim(
       plan, { tenantId: 'tenant-1', actorId: 'actor-1' }, 'approval-1',
     )
 
     expect(approved).toBe(true)
     expect(filters).toEqual(expect.arrayContaining([
-      ['id', 'approval-1'], ['user_id', 'actor-1'], ['org_id', 'tenant-1'],
+      ['id', 'approval-1'], ['user_id', 'actor-1'], ['org_id', null],
+      ['status', 'approved'], ['execution_status', null],
       ['details->>ai_hub_workload_id', 'workload-1'],
       ['details->>ai_hub_provider_id', 'palladium-model-gateway'],
       ['details->>ai_hub_capability_id', 'reasoner'],
