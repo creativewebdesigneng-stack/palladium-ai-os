@@ -8,6 +8,7 @@ import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
 import { listAiHubResources } from '@/lib/ai-hub/resources.functions';
 import { executeAiHubAgent, executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
+import { installMarketplaceAgent } from '@/lib/marketplace/marketplace.functions';
 import { useSessionReady } from '@/lib/useSessionReady';
 
 const icons = {
@@ -59,7 +60,7 @@ function statusClasses(status) {
   return 'border-white/10 bg-white/[.04] text-zinc-400';
 }
 
-function ResourceCard({ resource, onRun, running }) {
+function ResourceCard({ resource, onRun, running, onInstall, installing }) {
   const Icon = resource.providerId === 'palladium-marketplace'
     ? Store
     : resourceIcons[resource.kind] ?? Boxes;
@@ -304,6 +305,22 @@ function ResourceCard({ resource, onRun, running }) {
           {running ? 'Running…' : resource.kind === 'agent' ? 'Run agent with approval' : 'Run workflow with approval'}
         </button>
       )}
+      {resource.providerId === 'palladium-marketplace' && (
+        <button
+          type="button"
+          onClick={() => onInstall(resource)}
+          disabled={installing || resource.status !== 'published'}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Bot className="h-3.5 w-3.5" />
+          {installing ? 'Installing…' : 'Install to my agents'}
+        </button>
+      )}
+      {resource.providerId === 'palladium-smart-tables' && (
+        <a href="/smart-tables" className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/15">
+          <Database className="h-3.5 w-3.5" /> Open Smart Tables
+        </a>
+      )}
     </div>
   );
 }
@@ -314,6 +331,7 @@ export default function AIHub() {
   const listResources = useServerFn(listAiHubResources);
   const runHubWorkflow = useServerFn(executeAiHubWorkflow);
   const runHubAgent = useServerFn(executeAiHubAgent);
+  const installAgent = useServerFn(installMarketplaceAgent);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
   const [goal, setGoal] = useState('');
@@ -337,6 +355,11 @@ export default function AIHub() {
     if (!goal.trim()) return;
     execution.mutate({ resource });
   };
+
+  const installation = useMutation({
+    mutationFn: (resource) => installAgent({ data: { item_id: resource.id } }),
+    onSuccess: () => inventory.refetch(),
+  });
 
   const inventory = useQuery({
     queryKey: ['ai-hub-live-resources'],
@@ -512,6 +535,8 @@ export default function AIHub() {
           {execution.isSuccess && execution.data?.status === 'completed' && (
             <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Hub action completed through the existing Palladium runtime.</div>
           )}
+          {installation.isError && <div className="mt-4"><Failed message={friendlyMessage(installation.error)} /></div>}
+          {installation.isSuccess && <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Marketplace agent installed to your agent library.</div>}
 
           <div className="mt-5">
             {session === 'no' && <Failed message="Sign in to inspect your live AI Hub resources." />}
@@ -519,7 +544,7 @@ export default function AIHub() {
             {inventory.isError && <Failed message={friendlyMessage(inventory.error)} onRetry={() => inventory.refetch()} />}
             {inventory.isSuccess && filteredResources.length > 0 && (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} onRun={startWorkflow} running={execution.isPending && execution.variables?.resource?.id === resource.id} />)}
+                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} onRun={startWorkflow} running={execution.isPending && execution.variables?.resource?.id === resource.id} onInstall={(item) => installation.mutate(item)} installing={installation.isPending && installation.variables?.id === resource.id} />)}
               </div>
             )}
             {inventory.isSuccess && filteredResources.length === 0 && (
