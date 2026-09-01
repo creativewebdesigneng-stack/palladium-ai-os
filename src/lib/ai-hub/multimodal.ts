@@ -25,13 +25,11 @@ type LuxTtsCapabilities = {
 type GenerativeMediaCapabilities = {
   seedream: {
     configured: boolean
-    kind: 'image'
     workflows: readonly string[]
     aspectRatios: readonly string[]
   }
   ltx: {
     configured: boolean
-    kind: 'video'
     workflows: readonly string[]
     aspectRatios: readonly string[]
     durationSeconds: readonly number[]
@@ -99,7 +97,7 @@ export function toAiHubMultimodalResources(input: {
     },
     {
       id: 'seedream',
-      kind: seedream.kind,
+      kind: 'image',
       name: 'Seedream Image Runtime',
       status: availability(seedream.configured),
       providerId: 'palladium-media:seedream',
@@ -112,7 +110,7 @@ export function toAiHubMultimodalResources(input: {
     },
     {
       id: 'ltx',
-      kind: ltx.kind,
+      kind: 'video',
       name: 'LTX Video Runtime',
       status: availability(ltx.configured),
       providerId: 'palladium-media:ltx',
