@@ -7,7 +7,7 @@ import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
 import { listAiHubResources } from '@/lib/ai-hub/resources.functions';
-import { executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
+import { executeAiHubAgent, executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
 import { useSessionReady } from '@/lib/useSessionReady';
 
 const icons = {
@@ -293,7 +293,7 @@ function ResourceCard({ resource, onRun, running }) {
           )}
         </div>
       )}
-      {resource.kind === 'workflow' && (
+      {(resource.kind === 'workflow' || resource.kind === 'agent') && (
         <button
           type="button"
           onClick={() => onRun(resource)}
@@ -301,7 +301,7 @@ function ResourceCard({ resource, onRun, running }) {
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/25 bg-violet-400/10 px-3 py-2 text-xs font-medium text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Play className="h-3.5 w-3.5" />
-          {running ? 'Running…' : 'Run with approval'}
+          {running ? 'Running…' : resource.kind === 'agent' ? 'Run agent with approval' : 'Run workflow with approval'}
         </button>
       )}
     </div>
@@ -313,15 +313,17 @@ export default function AIHub() {
   const session = useSessionReady();
   const listResources = useServerFn(listAiHubResources);
   const runHubWorkflow = useServerFn(executeAiHubWorkflow);
+  const runHubAgent = useServerFn(executeAiHubAgent);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
   const [goal, setGoal] = useState('');
   const [approval, setApproval] = useState(null);
 
   const execution = useMutation({
-    mutationFn: ({ resource, approvalRequestId }) => runHubWorkflow({
-      data: { resourceId: resource.id, goal, ...(approvalRequestId ? { approvalRequestId } : {}) },
-    }),
+    mutationFn: ({ resource, approvalRequestId }) => {
+      const invoke = resource.kind === 'agent' ? runHubAgent : runHubWorkflow;
+      return invoke({ data: { resourceId: resource.id, goal, ...(approvalRequestId ? { approvalRequestId } : {}) } });
+    },
     onSuccess: (result, variables) => {
       if (result.status === 'waiting_for_approval') {
         setApproval({ resource: variables.resource, approvalRequestId: result.approvalRequestId });
@@ -479,16 +481,16 @@ export default function AIHub() {
           </div>
 
           <div className="mt-4 rounded-xl border border-violet-400/15 bg-violet-400/[.04] p-4">
-            <label className="text-xs font-medium uppercase tracking-[0.14em] text-violet-200">Workflow objective</label>
+            <label className="text-xs font-medium uppercase tracking-[0.14em] text-violet-200">Agent or workflow objective</label>
             <textarea
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
               rows={3}
               maxLength={8000}
-              placeholder="Describe what the selected workflow should accomplish…"
+              placeholder="Describe what the selected agent or workflow should accomplish…"
               className="mt-2 w-full resize-y rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40"
             />
-            <p className="mt-2 text-xs text-zinc-500">Hub workflow execution always creates an approval request before the existing workflow runtime can start.</p>
+            <p className="mt-2 text-xs text-zinc-500">Hub agent and workflow execution always create an approval request before the existing Palladium runtime can start.</p>
           </div>
 
           {approval && (
@@ -508,7 +510,7 @@ export default function AIHub() {
           )}
           {execution.isError && <div className="mt-4"><Failed message={friendlyMessage(execution.error)} /></div>}
           {execution.isSuccess && execution.data?.status === 'completed' && (
-            <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Workflow completed through the existing Palladium runtime.</div>
+            <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Hub action completed through the existing Palladium runtime.</div>
           )}
 
           <div className="mt-5">
