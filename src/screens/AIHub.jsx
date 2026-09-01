@@ -85,6 +85,9 @@ function ResourceCard({ resource }) {
   const tokensOut = resource.metadata?.tokensOut;
   const modelCostPence = resource.metadata?.costPence;
   const lastUsedAt = resource.metadata?.lastUsedAt;
+  const evalCount = resource.metadata?.evalCount;
+  const evalAverageScore = resource.metadata?.evalAverageScore;
+  const lastEvaluatedAt = resource.metadata?.lastEvaluatedAt;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -120,6 +123,12 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Model</span>
             <span className="truncate text-right text-zinc-300">{[modelProvider, model].filter(Boolean).join(' / ')}</span>
+          </div>
+        )}
+        {resource.kind === 'model' && evalCount != null && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Arena evaluation</span>
+            <span className="truncate text-right text-zinc-300">{evalAverageScore ?? '—'}/100 · {evalCount} scored{lastEvaluatedAt ? ` · ${new Date(lastEvaluatedAt).toLocaleDateString()}` : ''}</span>
           </div>
         )}
         {resource.kind === 'model' && recentRuns != null && (
@@ -284,6 +293,9 @@ export default function AIHub() {
         resource.metadata?.tokensOut,
         resource.metadata?.costPence,
         resource.metadata?.lastUsedAt,
+        resource.metadata?.evalCount,
+        resource.metadata?.evalAverageScore,
+        resource.metadata?.lastEvaluatedAt,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -311,7 +323,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models with usage telemetry, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models with live usage and Arena evaluation signals, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
