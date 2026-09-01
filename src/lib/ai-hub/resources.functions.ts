@@ -6,6 +6,7 @@ import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
 } from '@/lib/runtime/model-providers.server'
+import { aggregateAiHubModelEvalTrust, withAiHubModelEvalTrust } from './eval-trust'
 import { aggregateAiHubModelUsage, withAiHubModelUsage } from './model-telemetry'
 import {
   countAiHubResources,
@@ -32,7 +33,10 @@ function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
   return { limit: Math.min(Math.max(Math.trunc(safeLimit), 1), 250) }
 }
 
-function listModelResources(usageByModel: ReturnType<typeof aggregateAiHubModelUsage>): AiHubLiveResource[] {
+function listModelResources(
+  usageByModel: ReturnType<typeof aggregateAiHubModelUsage>,
+  evalByModel: ReturnType<typeof aggregateAiHubModelEvalTrust>,
+): AiHubLiveResource[] {
   return listModelProviderDefinitions().map((provider) => {
     const configured = isModelProviderConfigured(provider.id)
     const resource: AiHubLiveResource = {
@@ -49,7 +53,11 @@ function listModelResources(usageByModel: ReturnType<typeof aggregateAiHubModelU
         ...(provider.integrations?.length ? { integrations: provider.integrations.join(', ') } : {}),
       },
     }
-    return withAiHubModelUsage(resource, usageByModel.get(`${provider.id}:${provider.defaultModel}`))
+    const key = `${provider.id}:${provider.defaultModel}`
+    return withAiHubModelEvalTrust(
+      withAiHubModelUsage(resource, usageByModel.get(key)),
+      evalByModel.get(key),
+    )
   })
 }
 
@@ -62,7 +70,20 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     // These tables post-date the checked-in generated schema. Reuse the same
     // authenticated client so existing RLS remains authoritative.
     const untypedClient = context.supabase as unknown as SupabaseClient
-    const [agentsRes, workflowsRes, skillsRes, externalMcpRes, marketplaceRes, builderJobsRes, builderDeploymentsRes, smartTablesRes, deploymentTargetsRes, modelTasksRes] = await Promise.all([
+    const [
+      agentsRes,
+      workflowsRes,
+      skillsRes,
+      externalMcpRes,
+      marketplaceRes,
+      builderJobsRes,
+      builderDeploymentsRes,
+      smartTablesRes,
+      deploymentTargetsRes,
+      modelTasksRes,
+      evalResponsesRes,
+      evalScoresRes,
+    ] = await Promise.all([
       context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
@@ -94,6 +115,12 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('agent_tasks')
         .select('provider,model,status,tokens_in,tokens_out,cost_pence,created_at')
         .order('created_at', { ascending: false }).limit(500),
+      untypedClient.from('model_eval_responses')
+        .select('id,provider,model,created_at')
+        .order('created_at', { ascending: false }).limit(500),
+      untypedClient.from('model_eval_scores')
+        .select('response_id,score,created_at')
+        .order('created_at', { ascending: false }).limit(500),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
@@ -106,6 +133,8 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
     if (smartTablesRes.error) throw new Error(smartTablesRes.error.message)
     if (deploymentTargetsRes.error) throw new Error(deploymentTargetsRes.error.message)
     if (modelTasksRes.error) throw new Error(modelTasksRes.error.message)
+    if (evalResponsesRes.error) throw new Error(evalResponsesRes.error.message)
+    if (evalScoresRes.error) throw new Error(evalScoresRes.error.message)
 
     const latestDeploymentByJob = new Map<string, AiHubResourceRecord>()
     for (const deployment of builderDeploymentsRes.data ?? []) {
@@ -114,9 +143,13 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       if (builderJobId && !latestDeploymentByJob.has(builderJobId)) latestDeploymentByJob.set(builderJobId, row)
     }
     const modelUsage = aggregateAiHubModelUsage((modelTasksRes.data ?? []) as unknown as AiHubResourceRecord[])
+    const modelEvalTrust = aggregateAiHubModelEvalTrust(
+      (evalResponsesRes.data ?? []) as unknown as AiHubResourceRecord[],
+      (evalScoresRes.data ?? []) as unknown as AiHubResourceRecord[],
+    )
 
     const resources: AiHubLiveResource[] = [
-      ...listModelResources(modelUsage),
+      ...listModelResources(modelUsage, modelEvalTrust),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
       ...(externalMcpRes.data ?? []).flatMap((row) =>
         toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord)),
