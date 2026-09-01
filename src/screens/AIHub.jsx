@@ -78,6 +78,13 @@ function ResourceCard({ resource }) {
   const defaultView = resource.metadata?.defaultView;
   const computeProvider = resource.metadata?.provider;
   const resourceKind = resource.metadata?.resourceKind;
+  const recentRuns = resource.metadata?.recentRuns;
+  const succeededRuns = resource.metadata?.succeededRuns;
+  const failedRuns = resource.metadata?.failedRuns;
+  const tokensIn = resource.metadata?.tokensIn;
+  const tokensOut = resource.metadata?.tokensOut;
+  const modelCostPence = resource.metadata?.costPence;
+  const lastUsedAt = resource.metadata?.lastUsedAt;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -113,6 +120,24 @@ function ResourceCard({ resource }) {
           <div className="flex items-center justify-between gap-3">
             <span className="text-zinc-500">Model</span>
             <span className="truncate text-right text-zinc-300">{[modelProvider, model].filter(Boolean).join(' / ')}</span>
+          </div>
+        )}
+        {resource.kind === 'model' && recentRuns != null && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Recent usage</span>
+            <span className="truncate text-right text-zinc-300">{recentRuns} runs · {succeededRuns ?? '0'} ok · {failedRuns ?? '0'} failed</span>
+          </div>
+        )}
+        {resource.kind === 'model' && (tokensIn != null || tokensOut != null) && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Tokens</span>
+            <span className="truncate text-right text-zinc-300">{Number(tokensIn ?? 0).toLocaleString()} in · {Number(tokensOut ?? 0).toLocaleString()} out</span>
+          </div>
+        )}
+        {resource.kind === 'model' && modelCostPence != null && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-zinc-500">Recent cost</span>
+            <span className="truncate text-right text-zinc-300">£{(Number(modelCostPence) / 100).toFixed(2)}{lastUsedAt ? ` · last used ${new Date(lastUsedAt).toLocaleDateString()}` : ''}</span>
           </div>
         )}
         {(area || access) && (
@@ -252,6 +277,13 @@ export default function AIHub() {
         resource.metadata?.defaultView,
         resource.metadata?.provider,
         resource.metadata?.resourceKind,
+        resource.metadata?.recentRuns,
+        resource.metadata?.succeededRuns,
+        resource.metadata?.failedRuns,
+        resource.metadata?.tokensIn,
+        resource.metadata?.tokensOut,
+        resource.metadata?.costPence,
+        resource.metadata?.lastUsedAt,
         ...(resource.capabilities ?? []),
       ]
         .filter(Boolean)
@@ -279,7 +311,7 @@ export default function AIHub() {
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Live resources</p>
             <p className="mt-2 text-3xl font-semibold text-white">{inventory.data?.counts.total ?? '—'}</p>
-            <p className="mt-2 text-sm text-zinc-400">Runtime models, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows from their authoritative systems.</p>
+            <p className="mt-2 text-sm text-zinc-400">Runtime models with usage telemetry, MCP, Skills, Marketplace, App Studio, Smart Tables datasets, deployment compute, tenant agents and workflows from their authoritative systems.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
             <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Routing + policy</p>
