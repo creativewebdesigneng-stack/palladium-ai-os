@@ -8,6 +8,7 @@ import {
 } from '@/lib/runtime/model-providers.server'
 import {
   countAiHubResources,
+  toAiHubExternalMcpResources,
   toAiHubLiveResource,
   toAiHubMcpResources,
   toAiHubSkillResource,
@@ -15,27 +16,20 @@ import {
   type AiHubResourceRecord,
 } from './resources'
 
-type AiHubResourceInput = {
-  limit: number
-}
+type AiHubResourceInput = { limit: number }
 
 function validateAiHubResourceInput(input: unknown): AiHubResourceInput {
-  const rawLimit =
-    input && typeof input === 'object' && 'limit' in input
-      ? (input as { limit?: unknown }).limit
-      : undefined
+  const rawLimit = input && typeof input === 'object' && 'limit' in input
+    ? (input as { limit?: unknown }).limit
+    : undefined
   const parsedLimit = Number(rawLimit ?? 100)
   const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 100
-
-  return {
-    limit: Math.min(Math.max(Math.trunc(safeLimit), 1), 250),
-  }
+  return { limit: Math.min(Math.max(Math.trunc(safeLimit), 1), 250) }
 }
 
 function listModelResources(): AiHubLiveResource[] {
   return listModelProviderDefinitions().map((provider) => {
     const configured = isModelProviderConfigured(provider.id)
-
     return {
       id: `${provider.id}:${provider.defaultModel}`,
       kind: 'model',
@@ -47,69 +41,53 @@ function listModelResources(): AiHubLiveResource[] {
         modelProvider: provider.id,
         model: provider.defaultModel,
         configured: String(configured),
-        ...(provider.integrations?.length
-          ? { integrations: provider.integrations.join(', ') }
-          : {}),
+        ...(provider.integrations?.length ? { integrations: provider.integrations.join(', ') } : {}),
       },
     }
   })
 }
 
-/**
- * Tenant-safe live Hub inventory. Identity comes from the verified bearer token;
- * Supabase RLS remains the source of truth for which tenant resources the caller can see.
- * Models, MCP and Skills are projected from their existing authoritative systems; secret
- * values and executable Skill package bodies are never returned to the browser.
- */
+/** Tenant-safe live Hub inventory projected from existing authoritative systems. */
 export const listAiHubResources = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100
-
-    // agent_skills was added after the checked-in generated Supabase types. Keep the
-    // authenticated/RLS-bound client, but use the library's untyped client surface for
-    // this one table until the next schema type regeneration.
-    const skillsClient = context.supabase as unknown as SupabaseClient
-
-    const [agentsRes, workflowsRes, skillsRes] = await Promise.all([
-      context.supabase
-        .from('personal_agents')
+    // These tables post-date the checked-in generated schema. Reuse the same
+    // authenticated client so existing RLS remains authoritative.
+    const untypedClient = context.supabase as unknown as SupabaseClient
+    const [agentsRes, workflowsRes, skillsRes, externalMcpRes] = await Promise.all([
+      context.supabase.from('personal_agents')
         .select('id,name,status,model,model_provider,allowed_tools,updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(limit),
-      context.supabase
-        .from('workflows')
+        .order('updated_at', { ascending: false }).limit(limit),
+      context.supabase.from('workflows')
         .select('id,name,status,updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(limit),
-      skillsClient
-        .from('agent_skills')
+        .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('agent_skills')
         .select('id,name,description,version,requires_tools,requires_scripts,dangerous,scan_verdict,source_kind,enabled,updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(limit),
+        .order('updated_at', { ascending: false }).limit(limit),
+      untypedClient.from('external_mcp_servers')
+        .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,updated_at')
+        .order('updated_at', { ascending: false }).limit(limit),
     ])
 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
     if (skillsRes.error) throw new Error(skillsRes.error.message)
+    if (externalMcpRes.error) throw new Error(externalMcpRes.error.message)
 
     const resources: AiHubLiveResource[] = [
       ...listModelResources(),
       ...toAiHubMcpResources(PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS),
+      ...(externalMcpRes.data ?? []).flatMap((row) =>
+        toAiHubExternalMcpResources(row as unknown as AiHubResourceRecord)),
       ...(agentsRes.data ?? []).map((row) =>
-        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime'),
-      ),
+        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'agent', 'palladium-agent-runtime')),
       ...(skillsRes.data ?? []).map((row) =>
-        toAiHubSkillResource(row as unknown as AiHubResourceRecord),
-      ),
+        toAiHubSkillResource(row as unknown as AiHubResourceRecord)),
       ...(workflowsRes.data ?? []).map((row) =>
-        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows'),
-      ),
+        toAiHubLiveResource(row as unknown as AiHubResourceRecord, 'workflow', 'palladium-workflows')),
     ]
 
-    return {
-      resources,
-      counts: countAiHubResources(resources),
-    }
+    return { resources, counts: countAiHubResources(resources) }
   })
