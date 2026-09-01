@@ -25,11 +25,13 @@ type LuxTtsCapabilities = {
 type GenerativeMediaCapabilities = {
   seedream: {
     configured: boolean
+    kind?: string
     workflows: readonly string[]
     aspectRatios: readonly string[]
   }
   ltx: {
     configured: boolean
+    kind?: string
     workflows: readonly string[]
     aspectRatios: readonly string[]
     durationSeconds: readonly number[]
