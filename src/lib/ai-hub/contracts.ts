@@ -28,6 +28,9 @@ export interface AiHubCapabilityRef {
   capabilities: string[]
   deploymentTargets: AiHubDeploymentTarget[]
   regions?: string[]
+  estimatedLatencyMs?: number
+  estimatedCostMinorUnits?: number
+  currency?: string
   metadata?: Record<string, unknown>
 }
 
