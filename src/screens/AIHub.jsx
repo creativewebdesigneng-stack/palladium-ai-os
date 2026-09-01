@@ -7,7 +7,7 @@ import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
 import { listAiHubResources } from '@/lib/ai-hub/resources.functions';
-import { executeAiHubAgent, executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
+import { executeAiHubAgent, executeAiHubExternalMcp, executeAiHubWorkflow } from '@/lib/ai-hub/execution.functions';
 import { installMarketplaceAgent } from '@/lib/marketplace/marketplace.functions';
 import { useSessionReady } from '@/lib/useSessionReady';
 
@@ -60,7 +60,7 @@ function statusClasses(status) {
   return 'border-white/10 bg-white/[.04] text-zinc-400';
 }
 
-function ResourceCard({ resource, onRun, running, onInstall, installing }) {
+function ResourceCard({ resource, onRun, running, onInstall, installing, onMcp, mcpRunning }) {
   const Icon = resource.providerId === 'palladium-marketplace'
     ? Store
     : resourceIcons[resource.kind] ?? Boxes;
@@ -321,6 +321,11 @@ function ResourceCard({ resource, onRun, running, onInstall, installing }) {
           <Database className="h-3.5 w-3.5" /> Open Smart Tables
         </a>
       )}
+      {resource.kind === 'tool' && resource.providerId.startsWith('external-mcp:') && (
+        <button type="button" onClick={() => onMcp(resource)} disabled={mcpRunning || resource.status !== 'available'} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50">
+          <Network className="h-3.5 w-3.5" /> {mcpRunning ? 'Preparing…' : 'Run MCP tool'}
+        </button>
+      )}
     </div>
   );
 }
@@ -331,11 +336,15 @@ export default function AIHub() {
   const listResources = useServerFn(listAiHubResources);
   const runHubWorkflow = useServerFn(executeAiHubWorkflow);
   const runHubAgent = useServerFn(executeAiHubAgent);
+  const runHubMcp = useServerFn(executeAiHubExternalMcp);
   const installAgent = useServerFn(installMarketplaceAgent);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('all');
   const [goal, setGoal] = useState('');
   const [approval, setApproval] = useState(null);
+  const [selectedMcp, setSelectedMcp] = useState(null);
+  const [mcpInput, setMcpInput] = useState('{}');
+  const [mcpApproval, setMcpApproval] = useState(null);
 
   const execution = useMutation({
     mutationFn: ({ resource, approvalRequestId }) => {
@@ -359,6 +368,14 @@ export default function AIHub() {
   const installation = useMutation({
     mutationFn: (resource) => installAgent({ data: { item_id: resource.id } }),
     onSuccess: () => inventory.refetch(),
+  });
+
+  const mcpExecution = useMutation({
+    mutationFn: ({ resource, approvalRequestId }) => runHubMcp({ data: { resourceId: resource.id, inputJson: mcpInput, ...(approvalRequestId ? { approvalRequestId } : {}) } }),
+    onSuccess: (result, variables) => {
+      if (result.status === 'waiting_for_approval') setMcpApproval({ resource: variables.resource, approvalRequestId: result.approvalRequestId });
+      else setMcpApproval(null);
+    },
   });
 
   const inventory = useQuery({
@@ -537,6 +554,19 @@ export default function AIHub() {
           )}
           {installation.isError && <div className="mt-4"><Failed message={friendlyMessage(installation.error)} /></div>}
           {installation.isSuccess && <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">Marketplace agent installed to your agent library.</div>}
+          {selectedMcp && (
+            <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[.07] p-4">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-amber-100">MCP tool: {selectedMcp.name}</p><button type="button" onClick={() => { setSelectedMcp(null); setMcpApproval(null); }} className="text-xs text-amber-200/70">Close</button></div>
+              <p className="mt-1 text-xs text-amber-200/70">Provide the tool arguments as a JSON object. This action always requires approval.</p>
+              <textarea value={mcpInput} onChange={(event) => setMcpInput(event.target.value)} rows={5} maxLength={20000} className="mt-3 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 font-mono text-xs text-white outline-none focus:border-amber-400/40" />
+              <button type="button" disabled={mcpExecution.isPending} onClick={() => mcpExecution.mutate({ resource: selectedMcp })} className="mt-3 rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs font-medium text-amber-100 disabled:opacity-50">Request approval</button>
+            </div>
+          )}
+          {mcpApproval && (
+            <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[.07] p-4 text-sm text-amber-100"><p className="font-medium">Approval required for {mcpApproval.resource.name}</p><p className="mt-1 text-xs text-amber-200/70">Approve request {mcpApproval.approvalRequestId} in Mission Control, then resume it here.</p><div className="mt-3 flex gap-2"><a href="/mission-control" className="rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-medium hover:bg-amber-300/10">Open Mission Control</a><button type="button" disabled={mcpExecution.isPending} onClick={() => mcpExecution.mutate(mcpApproval)} className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-50">Run approved tool</button></div></div>
+          )}
+          {mcpExecution.isError && <div className="mt-4"><Failed message={friendlyMessage(mcpExecution.error)} /></div>}
+          {mcpExecution.isSuccess && mcpExecution.data?.status === 'completed' && <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-4 text-sm text-emerald-200">MCP tool completed through its configured protected bridge.</div>}
 
           <div className="mt-5">
             {session === 'no' && <Failed message="Sign in to inspect your live AI Hub resources." />}
@@ -544,7 +574,7 @@ export default function AIHub() {
             {inventory.isError && <Failed message={friendlyMessage(inventory.error)} onRetry={() => inventory.refetch()} />}
             {inventory.isSuccess && filteredResources.length > 0 && (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} onRun={startWorkflow} running={execution.isPending && execution.variables?.resource?.id === resource.id} onInstall={(item) => installation.mutate(item)} installing={installation.isPending && installation.variables?.id === resource.id} />)}
+                {filteredResources.map((resource) => <ResourceCard key={`${resource.kind}:${resource.providerId}:${resource.id}`} resource={resource} onRun={startWorkflow} running={execution.isPending && execution.variables?.resource?.id === resource.id} onInstall={(item) => installation.mutate(item)} installing={installation.isPending && installation.variables?.id === resource.id} onMcp={(tool) => { setSelectedMcp(tool); setMcpInput('{}'); setMcpApproval(null); }} mcpRunning={mcpExecution.isPending && mcpExecution.variables?.resource?.id === resource.id} />)}
               </div>
             )}
             {inventory.isSuccess && filteredResources.length === 0 && (
