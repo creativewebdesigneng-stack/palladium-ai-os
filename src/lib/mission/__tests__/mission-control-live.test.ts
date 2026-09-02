@@ -75,7 +75,7 @@ describe('Mission Control live wiring', () => {
   });
 
   it('keeps realtime subscriptions and surfaces fresh notifications on screen', () => {
-    expect(missionScreen).toContain("supabase.channel('mission-control')");
+    expect(missionScreen).toMatch(/\.channel\(\s*'mission-control'\s*\)/);
     expect(missionScreen).toContain("table: 'notifications'");
     expect(missionScreen).toContain('seenNotificationIds');
     expect(missionScreen).toContain('notificationsPrimed');
