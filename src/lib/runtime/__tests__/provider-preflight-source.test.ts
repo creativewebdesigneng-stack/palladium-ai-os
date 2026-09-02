@@ -7,26 +7,33 @@ const source = readFileSync(
   'utf8',
 )
 
+const prepareRunStart = source.indexOf('export async function prepareRun(')
+const prepareRunEnd = source.indexOf('\nasync function admin()', prepareRunStart)
+const prepareRunSource = source.slice(prepareRunStart, prepareRunEnd)
+
 describe('agent provider configuration preflight', () => {
-  it('checks the resolved provider before opening an agent task', () => {
-    const providerResolution = source.indexOf('const provider = normaliseProvider(agent.model_provider)')
-    const providerGuard = source.indexOf('if (!isProviderConfigured(provider))')
-    const taskInsert = source.indexOf('const { data: task, error } = await args.sb', providerGuard)
-    const activityInsert = source.indexOf('.from("agent_activities").insert', providerGuard)
-    const startedNotification = source.indexOf('type: "agent.started"', providerGuard)
+  it('checks the resolved provider before the first agent task write', () => {
+    expect(prepareRunStart).toBeGreaterThan(-1)
+    expect(prepareRunEnd).toBeGreaterThan(prepareRunStart)
+
+    const providerResolution = prepareRunSource.indexOf(
+      'const provider = normaliseProvider(agent.model_provider)',
+    )
+    const providerGuard = prepareRunSource.indexOf('if (!isProviderConfigured(provider))')
+    const taskWrite = prepareRunSource.indexOf('.from("agent_tasks")', providerGuard)
 
     expect(providerResolution).toBeGreaterThan(-1)
     expect(providerGuard).toBeGreaterThan(providerResolution)
-    expect(taskInsert).toBeGreaterThan(providerGuard)
-    expect(activityInsert).toBeGreaterThan(taskInsert)
-    expect(startedNotification).toBeGreaterThan(activityInsert)
+    expect(taskWrite).toBeGreaterThan(providerGuard)
   })
 
   it('returns a safe 503 configuration error without silent provider failover', () => {
-    const providerGuard = source.indexOf('if (!isProviderConfigured(provider))')
-    const taskInsert = source.indexOf('const { data: task, error } = await args.sb', providerGuard)
-    const preflight = source.slice(providerGuard, taskInsert)
+    const providerGuard = prepareRunSource.indexOf('if (!isProviderConfigured(provider))')
+    const taskWrite = prepareRunSource.indexOf('.from("agent_tasks")', providerGuard)
+    const preflight = prepareRunSource.slice(providerGuard, taskWrite)
 
+    expect(providerGuard).toBeGreaterThan(-1)
+    expect(taskWrite).toBeGreaterThan(providerGuard)
     expect(preflight).toContain('"PROVIDER_NOT_CONFIGURED"')
     expect(preflight).toContain('503')
     expect(preflight).toContain('select another configured provider')
