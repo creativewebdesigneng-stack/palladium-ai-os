@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const missionServer = readFileSync(new URL('../mission.server.ts', import.meta.url), 'utf8');
 const missionDiscovery = readFileSync(new URL('../mission.discovery.functions.ts', import.meta.url), 'utf8');
 const missionScreen = readFileSync(new URL('../../../screens/MissionControl.jsx', import.meta.url), 'utf8');
-const metrics = readFileSync(new URL('../../../components/mission/MissionMetrics.jsx', import.meta.url), 'utf8');
+const commandDeck = readFileSync(new URL('../../../components/mission/BlackstarCommandDeck.jsx', import.meta.url), 'utf8');
 
 describe('Mission Control live wiring', () => {
   it('uses the shared model gateway and Groq fallback for the daily briefing', () => {
@@ -22,12 +22,14 @@ describe('Mission Control live wiring', () => {
     expect(missionScreen).not.toContain('supabase.auth.getSession');
   });
 
-  it('reports real active-agent state and task outcomes', () => {
-    expect(missionScreen).toContain('activeAgentCount');
-    expect(missionScreen).toContain('active agents');
-    expect(missionScreen).not.toContain('agents online');
+  it('keeps real task outcomes and live mission data wired into the command deck', () => {
     expect(missionScreen).toMatch(/execution\?\.status\s*===\s*'failed'/);
     expect(missionScreen).toMatch(/execution\?\.status\s*===\s*'completed'/);
+    expect(missionScreen).toContain('metrics={data?.metrics ?? {}}');
+    expect(missionScreen).toContain('approvals={approvals}');
+    expect(missionScreen).toContain('notifications={data?.notifications ?? []}');
+    expect(missionScreen).toContain('tasks={data?.tasks ?? []}');
+    expect(missionScreen).toContain('activities={data?.activities ?? []}');
   });
 
   it('routes read-only product discovery to Live Explorer before the approval executor', () => {
@@ -38,7 +40,7 @@ describe('Mission Control live wiring', () => {
     expect(missionDiscovery).not.toContain('approval_requests');
     expect(missionDiscovery).not.toContain('purchase_requests');
     expect(missionScreen).toContain('submitMissionDiscovery');
-    expect(missionScreen).toMatch(/discovery\?\.handled\s*\?\s*discovery\s*:\s*submitTaskFn/);
+    expect(missionScreen).toMatch(/if\s*\(discovery\?\.handled\)\s*return\s+discovery/);
     expect(missionScreen).toMatch(/setTab\(\s*'shopping'\s*\)/);
     expect(missionScreen).toMatch(/\[\s*'shopping'\s*,\s*'Live Explorer'\s*,\s*ShoppingBag\s*\]/);
   });
@@ -47,23 +49,37 @@ describe('Mission Control live wiring', () => {
     expect(missionServer).toContain('COMMITMENT_WORDS');
     expect(missionServer).toContain('if (commitmentRequested) tools = [...tools, "checkout"]');
     expect(missionDiscovery).toContain('decision.commitmentRequested');
-    expect(missionScreen).toMatch(/setTab\(\s*d\?\.requiresApproval\s*\?\s*'approvals'\s*:\s*'shopping'\s*\)/);
+    expect(missionScreen).toMatch(/setTab\(decision\?\.requiresApproval\s*\?\s*'approvals'\s*:\s*'shopping'\)/);
   });
 
-  it('labels mission telemetry according to what the metrics actually count', () => {
-    expect(metrics).toContain("label: 'Personal missions'");
-    expect(metrics).toContain("label: 'Business missions'");
-    expect(metrics).toContain("key: 'runningWorkforceRuns'");
-    expect(metrics).toContain("label: 'Intelligence signals'");
+  it('renders the approved full Blackstar command-centre overview', () => {
+    expect(missionScreen).toContain("BlackstarCommandDeck from '@/components/mission/BlackstarCommandDeck'");
+    expect(missionScreen).toContain('<BlackstarCommandDeck');
+    expect(commandDeck).toContain('function HolographicCore');
+    expect(commandDeck).toContain('function Heartbeat');
+    expect(commandDeck).toContain('function LiveTicker');
+    expect(commandDeck).toContain('Live alerts & notifications');
+    expect(commandDeck).toContain('System telemetry');
+    expect(commandDeck).toContain('Mission execution queue');
+    expect(commandDeck).toContain('Live mission feed');
+    expect(commandDeck).toContain('Pending approvals');
+    expect(commandDeck).toContain('Global infrastructure');
+    expect(commandDeck).toContain('System health monitor');
   });
 
-  it('wires the live Blackstar command-centre surfaces to the overview', () => {
-    expect(missionScreen).toContain('MissionStatusDeck');
-    expect(missionScreen).toContain('MissionOperationsCore');
-    expect(missionScreen).toContain('AlertsDecisionsRail');
-    expect(missionScreen).toContain('ExecutionQueue');
-    expect(missionScreen).toContain('ActivityStream');
+  it('keeps command-centre motion accessible and status-driven', () => {
+    expect(commandDeck).toContain('useReducedMotion');
+    expect(commandDeck).toContain('rotate: 360');
+    expect(commandDeck).toContain("['running', 'in_progress'].includes(task.status)");
+    expect(commandDeck).not.toContain('75%');
+  });
+
+  it('keeps realtime subscriptions and surfaces fresh notifications on screen', () => {
     expect(missionScreen).toContain("supabase.channel('mission-control')");
+    expect(missionScreen).toContain("table: 'notifications'");
+    expect(missionScreen).toContain('seenNotificationIds');
+    expect(missionScreen).toContain('notificationsPrimed');
+    expect(missionScreen).toContain("notification.title || 'Blackstar notification'");
     expect(missionScreen).toContain('lastSync');
   });
 });
