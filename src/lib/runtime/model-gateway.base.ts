@@ -274,12 +274,29 @@ const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
 function providerError(status: number, body: string) {
   const trimmed = body.slice(0, 400);
-  if (status === 429)
+  if (status === 429) {
+    let type = "";
+    let code = "";
+    try {
+      const parsed = JSON.parse(body) as { error?: { type?: unknown; code?: unknown } };
+      type = typeof parsed.error?.type === "string" ? parsed.error.type.toLowerCase() : "";
+      code = typeof parsed.error?.code === "string" ? parsed.error.code.toLowerCase() : "";
+    } catch {
+      // Non-JSON provider errors remain ordinary retryable 429s.
+    }
+    if (
+      type === "insufficient_quota" ||
+      code === "insufficient_quota" ||
+      code === "credit_balance_exhausted"
+    ) {
+      return new ProviderError("AI credits or quota are exhausted for this workspace.", 402, false);
+    }
     return new ProviderError(
       "The model provider is rate limiting this workspace. Try again shortly.",
       429,
       true,
     );
+  }
   if (status === 402)
     return new ProviderError("AI credits are exhausted for this workspace.", 402, false);
   if (status === 401 || status === 403)
