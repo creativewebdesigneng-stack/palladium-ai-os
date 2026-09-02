@@ -3,6 +3,7 @@
 
 export const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: 'User' },
+  { id: 'assistant', label: 'Personal Assistant', icon: 'Bot' },
   { id: 'account', label: 'Account', icon: 'Globe' },
   { id: 'appearance', label: 'Appearance', icon: 'Palette' },
   { id: 'ai', label: 'AI Preferences', icon: 'Sparkles' },
