@@ -1,4 +1,5 @@
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
+import { runGeminiNative, streamGeminiNative } from "./gemini-provider.server";
 import * as base from "./model-gateway.base";
 import type { ChatMessage, ChatResult, Provider, RunArgs, StreamEvent } from "./model-gateway.base";
 import { compactRunContextInPlace } from "./run-context-journal.server";
@@ -9,7 +10,7 @@ type ActiveProvider = { provider: Provider; model: string };
 
 const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
 const OPENAI_MODEL_FALLBACK = "gpt-4.1-mini";
-const GEMINI_MODEL_FALLBACK = "gemini-2.5-flash";
+const GEMINI_MODEL_FALLBACK = "gemini-3.6-flash";
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
 const activeProviderByConversation = new WeakMap<ChatMessage[], ActiveProvider>();
@@ -107,17 +108,19 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
   let lastError: unknown;
   for (const candidate of modelCandidates(provider, model)) {
     try {
-      return await base.runChat({ ...args, provider, model: candidate });
+      const callArgs = { ...args, provider, model: candidate };
+      return provider === "gemini" ? await runGeminiNative(callArgs) : await base.runChat(callArgs);
     } catch (error) {
       if (error instanceof base.ProviderError && error.status === 499) throw error;
       lastError = error;
       if (error instanceof base.ProviderError && error.status === 429) markRateLimited(provider);
       const canTryAnotherModel =
         error instanceof base.ProviderError &&
-        error.retryable &&
-        (error.status >= 500 ||
-          (provider === "openai" && error.status === 429) ||
-          (provider === "gemini" && error.status === 429));
+        ((error.retryable &&
+          (error.status >= 500 ||
+            (provider === "openai" && error.status === 429) ||
+            (provider === "gemini" && error.status === 429))) ||
+          (provider === "gemini" && error.status === 404));
       if (!canTryAnotherModel) break;
     }
   }
@@ -203,8 +206,13 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
     : new base.ProviderError("No configured AI provider could complete the request.", 503, false);
 }
 
-/** Streaming keeps its existing provider behaviour while sharing the same bounded context policy. */
+/** Streaming shares the same bounded context policy. Gemini uses its native
+ * transport and emits the same runtime event contract. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   compactRunContextInPlace(args.messages);
+  if (args.provider === "gemini") {
+    yield* streamGeminiNative(args);
+    return;
+  }
   yield* base.streamChat(args);
 }
