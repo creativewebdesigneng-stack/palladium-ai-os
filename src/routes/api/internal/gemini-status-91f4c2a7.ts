@@ -8,10 +8,10 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
         if (!key) return json({ configured: false, ready: false, status: 503 });
         try {
           const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(key)}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
               body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply only with OK." }] }] }),
               signal: AbortSignal.timeout(20000),
             },
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
             ?.map((part) => (typeof part.text === "string" ? part.text : ""))
             .join("")
             .trim();
-          return json({ configured: true, ready: Boolean(text), status: 200, model: "gemini-3.6-flash" });
+          return json({ configured: true, ready: Boolean(text), status: 200, model: "gemini-3.7-flash" });
         } catch {
           return json({ configured: true, ready: false, status: 504 });
         }
