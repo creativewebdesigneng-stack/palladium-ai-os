@@ -8,7 +8,7 @@ export type ProviderOption = {
 };
 
 const DEFINITIONS: Array<Omit<ProviderOption, "configured">> = [
-  { id: "gemini", name: "Google Gemini", defaultModel: "gemini-3.7-flash" },
+  { id: "gemini", name: "Google Gemini", defaultModel: "gemini-3.6-flash" },
   { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
   { id: "groq", name: "Groq", defaultModel: "openai/gpt-oss-120b" },
   { id: "lovable", name: "Lovable AI Gateway", defaultModel: "google/gemini-3-flash-preview" },
