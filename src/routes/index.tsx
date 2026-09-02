@@ -4,17 +4,17 @@ import Screen from "@/screens/Landing";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PalladiumAI — The AI Operating System" },
+      { title: "Blackstar — Intelligence Hub & Infrastructure" },
       {
         name: "description",
         content:
-          "PalladiumAI is the AI operating system for autonomous work: agents, workflows, and an AI workforce that runs your business.",
+          "Blackstar unifies AI models, autonomous agents, tools, applications, data and infrastructure through one governed intelligence layer.",
       },
-      { property: "og:title", content: "PalladiumAI — The AI Operating System" },
+      { property: "og:title", content: "Blackstar — Intelligence Hub & Infrastructure" },
       {
         property: "og:description",
         content:
-          "PalladiumAI is the AI operating system for autonomous work: agents, workflows, and an AI workforce that runs your business.",
+          "One intelligence layer. Every system. Build, automate, govern and scale intelligent operations with Blackstar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
