@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { executeRun, failRun, prepareRun } from "@/lib/runtime/runtime.server";
 
-const AGENT_ID = "8d702f3d-f67c-4c4f-bf02-9e415e6c546c";
+const AGENT_ID = "cc1576f9-2c3a-4333-b002-fc1d46d05d2f";
 const USER_ID = "7c4e5f60-f4f5-4009-ad41-37f20337720e";
 const EXPECTED = "PALLADIUM_RUNTIME_OK";
 
