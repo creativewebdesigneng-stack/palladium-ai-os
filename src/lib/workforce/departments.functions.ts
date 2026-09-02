@@ -16,7 +16,7 @@ const uuid = z.string().uuid();
 /** Departments for an organisation, with their member agent ids. */
 export const listDepartments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ orgId: uuid.nullish() }).parse(input ?? {}))
+  .validator((input: unknown) => z.object({ orgId: uuid.nullish() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     if (!data.orgId) return { departments: [] };
     const sb = context.supabase as unknown as Sb;
@@ -40,7 +40,7 @@ export const listDepartments = createServerFn({ method: "POST" })
 /** Creates or updates a department and re-files the agents assigned to it. */
 export const saveDepartment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         id: uuid.optional(),
@@ -73,7 +73,6 @@ export const saveDepartment = createServerFn({ method: "POST" })
     const teamId = team?.id ?? data.id;
     if (!teamId) throw new Error("You do not have permission to manage departments here.");
 
-    // Membership: clear this department, then file the selected agents into it.
     await sb.from("personal_agents").update({ team_id: null }).eq("team_id", teamId);
     if (data.agents.length) {
       const { error: assignError } = await sb
@@ -88,10 +87,8 @@ export const saveDepartment = createServerFn({ method: "POST" })
 /** Recent agent-to-agent messages produced by workforce runs (read-only). */
 export const listAgentMessages = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({ limit: z.number().int().min(1).max(200).optional().default(100) })
-      .parse(input ?? {}),
+  .validator((input: unknown) =>
+    z.object({ limit: z.number().int().min(1).max(200).optional().default(100) }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
