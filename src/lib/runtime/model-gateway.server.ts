@@ -13,6 +13,17 @@ const OPENAI_MODEL_FALLBACK = "gpt-4.1-mini";
 const GEMINI_MODEL_FALLBACK = "gemini-3.6-flash";
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
+/** The low-level base keeps provider compatibility details; the server gateway
+ * owns production model policy. 3.6 Flash is the Gemini model proven healthy
+ * in this deployment and is also used to migrate the former 3.7 default. */
+export function resolveModel(provider: Provider, model?: string | null): string {
+  const requested = (model ?? "").trim();
+  if (provider === "gemini" && (!requested || requested === "gemini-3.7-flash")) {
+    return GEMINI_MODEL_FALLBACK;
+  }
+  return base.resolveModel(provider, model);
+}
+
 const activeProviderByConversation = new WeakMap<ChatMessage[], ActiveProvider>();
 const providerCooldownUntil = new Map<Provider, number>();
 
@@ -50,8 +61,8 @@ function fallbackOrder(primary: Provider): Provider[] {
 }
 
 function modelCandidates(provider: Provider, model: string): string[] {
-  const candidates = [model];
-  if (provider === "gemini" && model !== GEMINI_MODEL_FALLBACK) candidates.push(GEMINI_MODEL_FALLBACK);
+  const candidates = [resolveModel(provider, model)];
+  if (provider === "gemini" && !candidates.includes(GEMINI_MODEL_FALLBACK)) candidates.push(GEMINI_MODEL_FALLBACK);
   if (provider === "groq" && model !== GROQ_MODEL_FALLBACK) candidates.push(GROQ_MODEL_FALLBACK);
   if (provider === "openai" && model !== OPENAI_MODEL_FALLBACK) candidates.push(OPENAI_MODEL_FALLBACK);
   return candidates;
@@ -158,7 +169,7 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
   ];
 
   for (const provider of fallbackOrder(primaryProvider)) {
-    const model = provider === primaryProvider ? primaryModel : base.resolveModel(provider, null);
+    const model = provider === primaryProvider ? primaryModel : resolveModel(provider, null);
     try {
       const result = await tryProviderModels({ ...args, messages, tools: [] }, provider, model);
       activeProviderByConversation.set(args.messages, {
@@ -179,11 +190,11 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   compactRunContextInPlace(args.messages);
   const remembered = activeProviderByConversation.get(args.messages);
   const primaryProvider = remembered?.provider ?? args.provider;
-  const primaryModel = remembered?.model ?? args.model;
+  const primaryModel = remembered?.model ?? resolveModel(primaryProvider, args.model);
   let lastError: unknown;
 
   for (const provider of fallbackOrder(primaryProvider)) {
-    const model = provider === primaryProvider ? primaryModel : base.resolveModel(provider, null);
+    const model = provider === primaryProvider ? primaryModel : resolveModel(provider, null);
     try {
       const result = await tryProviderModels(args, provider, model);
       activeProviderByConversation.set(args.messages, {
@@ -211,7 +222,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   compactRunContextInPlace(args.messages);
   if (args.provider === "gemini") {
-    yield* streamGeminiNative(args);
+    yield* streamGeminiNative({ ...args, model: resolveModel("gemini", args.model) });
     return;
   }
   yield* base.streamChat(args);
