@@ -6,6 +6,10 @@ const missionControl = readFileSync(
   fileURLToPath(new URL("../../../screens/MissionControl.jsx", import.meta.url)),
   "utf8",
 );
+const commandDeck = readFileSync(
+  fileURLToPath(new URL("../../../components/mission/BlackstarCommandDeck.jsx", import.meta.url)),
+  "utf8",
+);
 const orchestratorConsole = readFileSync(
   fileURLToPath(new URL("../../../components/mission/OrchestratorConsole.jsx", import.meta.url)),
   "utf8",
@@ -21,13 +25,18 @@ describe("Mission Control orchestrator surface", () => {
     expect(missionControl).toContain("<OrchestratorConsole");
   });
 
-  it("keeps Mission Control decomposed into dedicated operational surfaces", () => {
-    expect(missionControl).toContain("MissionStatusDeck");
-    expect(missionControl).toContain("MissionOperationsCore");
-    expect(missionControl).toContain("AlertsDecisionsRail");
-    expect(missionControl).toContain("ExecutionQueue");
-    expect(missionControl).toContain("MissionMetrics");
-    expect(missionControl).toContain("ActivityStream");
+  it("keeps the full command deck decomposed into dedicated operational surfaces", () => {
+    expect(missionControl).toContain("BlackstarCommandDeck");
+    expect(commandDeck).toContain("function HolographicCore");
+    expect(commandDeck).toContain("function AlertPanel");
+    expect(commandDeck).toContain("function TelemetryPanel");
+    expect(commandDeck).toContain("function MissionQueue");
+    expect(commandDeck).toContain("function LiveFeed");
+    expect(commandDeck).toContain("function PendingApprovals");
+    expect(commandDeck).toContain("function GlobalInfrastructure");
+    expect(commandDeck).toContain("function Heartbeat");
+    expect(commandDeck).toContain("function HealthMonitor");
+    expect(commandDeck).toContain("function LiveTicker");
   });
 
   it("shows delegation, approvals and verified output in the orchestrator console", () => {
