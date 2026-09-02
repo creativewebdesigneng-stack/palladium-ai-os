@@ -2,18 +2,19 @@
  * Model gateway — the agent runtime is never hard-coded to one vendor.
  *
  * Supported providers (an agent picks one via `personal_agents.model_provider`):
- *   - `lovable`     Lovable AI Gateway (default, no key management required)
- *   - `openai`      OpenAI                      -> OPENAI_API_KEY
- *   - `anthropic`   Anthropic Messages API      -> ANTHROPIC_API_KEY
- *   - `groq`        Groq OpenAI-compatible API  -> GROQ_API_KEY
- *   - `compatible`  Any OpenAI-compatible/local endpoint
- *                   -> OPENAI_COMPATIBLE_BASE_URL (+ optional OPENAI_COMPATIBLE_API_KEY)
+ *   - `lovable`     Lovable AI Gateway                    -> LOVABLE_API_KEY
+ *   - `gemini`      Google Gemini API                     -> GEMINI_API_KEY
+ *   - `openai`      OpenAI                                -> OPENAI_API_KEY
+ *   - `anthropic`   Anthropic Messages API                -> ANTHROPIC_API_KEY
+ *   - `groq`        Groq OpenAI-compatible API            -> GROQ_API_KEY
+ *   - `deepseek`    DeepSeek OpenAI-compatible API        -> DEEPSEEK_API_KEY
+ *   - `compatible`  Any OpenAI-compatible/local endpoint  -> OPENAI_COMPATIBLE_BASE_URL
  *
  * Keys are read inside the call, server-side only. They are never returned to
  * the caller and never leave this module.
  */
 
-export type Provider = "lovable" | "openai" | "anthropic" | "groq" | "deepseek" | "compatible";
+export type Provider = "lovable" | "gemini" | "openai" | "anthropic" | "groq" | "deepseek" | "compatible";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -56,6 +57,7 @@ export class ProviderError extends Error {
 
 const DEFAULT_MODEL: Record<Provider, string> = {
   lovable: "google/gemini-3-flash-preview",
+  gemini: "gemini-3.7-flash",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
@@ -65,14 +67,16 @@ const DEFAULT_MODEL: Record<Provider, string> = {
 
 export function normaliseProvider(value?: string | null): Provider {
   const v = (value ?? "").toLowerCase();
+  if (v === "gemini" || v === "google" || v === "google-gemini") return "gemini";
   if (v === "openai") return "openai";
   if (v === "anthropic" || v === "claude") return "anthropic";
   if (v === "groq") return "groq";
   if (v === "deepseek" || v === "deepseek-v3" || v === "deepseek-v3.1") return "deepseek";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
-  // No explicit choice: prefer a directly configured vendor key over the gateway.
+  // No explicit choice: prefer directly configured low-cost providers first.
   if (!v) {
+    if (process.env["GEMINI_API_KEY"]) return "gemini";
     if (process.env["GROQ_API_KEY"]) return "groq";
     if (process.env["OPENAI_API_KEY"]) return "openai";
     if (process.env["DEEPSEEK_API_KEY"]) return "deepseek";
@@ -92,6 +96,15 @@ export function resolveModel(provider: Provider, model?: string | null): string 
 type Endpoint = { url: string; headers: Record<string, string>; kind: "chat" | "anthropic" };
 
 function endpointFor(provider: Provider): Endpoint {
+  if (provider === "gemini") {
+    const key = process.env["GEMINI_API_KEY"];
+    if (!key) throw new ProviderError("Google Gemini is not configured for this workspace.", 503, false);
+    return {
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      kind: "chat",
+    };
+  }
   if (provider === "openai") {
     const key = process.env["OPENAI_API_KEY"];
     if (!key) throw new ProviderError("OpenAI is not configured for this workspace.", 503, false);
