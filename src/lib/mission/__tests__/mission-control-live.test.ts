@@ -50,10 +50,10 @@ describe('Mission Control live wiring', () => {
     expect(missionScreen).toContain("setTab(d?.requiresApproval ? 'approvals' : 'shopping')");
   });
 
-  it('labels task metrics according to what they actually count', () => {
-    expect(metrics).toContain("label: 'Personal tasks'");
-    expect(metrics).toContain("label: 'Professional tasks'");
+  it('labels mission telemetry according to what the metrics actually count', () => {
+    expect(metrics).toContain("label: 'Personal missions'");
+    expect(metrics).toContain("label: 'Business missions'");
     expect(metrics).toContain("key: 'runningWorkforceRuns'");
-    expect(metrics).toContain("label: 'Unread notifications'");
+    expect(metrics).toContain("label: 'Intelligence signals'");
   });
 });
