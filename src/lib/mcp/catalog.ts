@@ -39,40 +39,45 @@ export const PALLADIUM_MCP_TOOLS: McpToolCatalogItem[] = [
   {
     name: "create_task",
     title: "Create mission",
-    description: "Create a new Mission Control task for the signed-in user.",
+    description:
+      "Create a new Mission Control task (mission) for the signed-in user, optionally assigned to an agent.",
     area: "Mission Control",
     access: "write",
   },
   {
     name: "list_approvals",
-    title: "List approvals",
-    description: "List approval requests belonging to the signed-in user.",
+    title: "List approval requests",
+    description:
+      "List Approval Centre requests awaiting the signed-in user's decision, including estimated cost and risk.",
     area: "Approvals",
     access: "read",
   },
   {
     name: "decide_approval",
-    title: "Decide approval",
+    title: "Reject a request or direct the user to Approval Centre",
     description:
-      "Approve or reject one of the signed-in user's pending approval requests. Approval may authorise a consequential action and should only follow explicit user confirmation.",
+      "Reject a pending approval request. Approval must be confirmed in PalladiumAI's Approval Centre so spend limits, workflow resume and external-action execution gates cannot be bypassed.",
     area: "Approvals",
     access: "approval",
   },
   {
     name: "list_memories",
-    title: "List memories",
-    description: "List saved memory-vault items for the signed-in user.",
+    title: "List personal memory",
+    description:
+      "List entries from the signed-in user's PalladiumAI personal memory vault (preferences and facts agents use).",
     area: "Memory",
     access: "read",
   },
   {
     name: "remember",
-    title: "Remember",
-    description: "Store a new item in the signed-in user's PalladiumAI memory vault.",
+    title: "Save personal memory",
+    description:
+      "Save a preference or fact to the signed-in user's personal memory vault so agents can use it later.",
     area: "Memory",
     access: "write",
   },
 ];
+
 
 export const PALLADIUM_MCP_SERVER = {
   name: "palladiumai",
