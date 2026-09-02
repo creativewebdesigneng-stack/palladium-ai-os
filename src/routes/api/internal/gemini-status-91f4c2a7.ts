@@ -16,7 +16,16 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
               signal: AbortSignal.timeout(20000),
             },
           );
-          if (!res.ok) return json({ configured: true, ready: false, status: res.status });
+          if (!res.ok) {
+            let errorStatus: string | null = null;
+            let errorMessage: string | null = null;
+            try {
+              const body = (await res.json()) as { error?: { status?: unknown; message?: unknown } };
+              errorStatus = typeof body.error?.status === "string" ? body.error.status.slice(0, 80) : null;
+              errorMessage = typeof body.error?.message === "string" ? body.error.message.slice(0, 240) : null;
+            } catch {}
+            return json({ configured: true, ready: false, status: res.status, errorStatus, errorMessage });
+          }
           const body = (await res.json()) as {
             candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
           };
