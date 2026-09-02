@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
         if (!key) return json({ configured: false, ready: false, status: 503 });
         try {
           const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(key)}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
             ?.map((part) => (typeof part.text === "string" ? part.text : ""))
             .join("")
             .trim();
-          return json({ configured: true, ready: Boolean(text), status: 200, model: "gemini-2.5-flash" });
+          return json({ configured: true, ready: Boolean(text), status: 200, model: "gemini-3.6-flash" });
         } catch {
           return json({ configured: true, ready: false, status: 504 });
         }
