@@ -8,6 +8,7 @@ export type ProviderOption = {
 };
 
 const DEFINITIONS: Array<Omit<ProviderOption, "configured">> = [
+  { id: "gemini", name: "Google Gemini", defaultModel: "gemini-3.7-flash" },
   { id: "deepseek", name: "DeepSeek V3", defaultModel: "deepseek-chat" },
   { id: "groq", name: "Groq", defaultModel: "openai/gpt-oss-120b" },
   { id: "lovable", name: "Lovable AI Gateway", defaultModel: "google/gemini-3-flash-preview" },
@@ -17,6 +18,7 @@ const DEFINITIONS: Array<Omit<ProviderOption, "configured">> = [
 ];
 
 export function isProviderConfigured(provider: Provider): boolean {
+  if (provider === "gemini") return Boolean(process.env["GEMINI_API_KEY"]);
   if (provider === "groq") return Boolean(process.env["GROQ_API_KEY"]);
   if (provider === "deepseek") return Boolean(process.env["DEEPSEEK_API_KEY"]);
   if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
