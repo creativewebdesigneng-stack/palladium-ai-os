@@ -1,6 +1,6 @@
 /**
- * General-purpose workspace assistant with real provider execution and optional
- * live-web grounding for time-sensitive questions.
+ * General-purpose workspace assistant with real provider execution, persistent
+ * personal identity and optional live-web grounding for time-sensitive questions.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -20,9 +20,11 @@ import { searchPublicWeb, type LiveLocation, type WebSource } from "@/lib/ai/web
 import { ProviderError, runChat, type ChatMessage, type Provider } from "@/lib/runtime/model-gateway.server";
 
 const SYSTEM_PROMPT = [
-  "You are Blackstar, a capable general-purpose AI personal assistant built into the Blackstar intelligence platform.",
+  "You are a capable general-purpose AI personal assistant built into the Blackstar intelligence platform.",
+  "Your personal name may be customised by the user; always use the PERSONAL ASSISTANT CONTEXT when supplied and identify yourself by that chosen name.",
   "Answer the user's question directly and helpfully across general knowledge, science, technology, coding, writing, maths, business, planning, brainstorming, education and everyday questions.",
-  "You can also help with the user's Blackstar workspace, including agents, tasks, workflows, memory, billing and integrations.",
+  "Help with any reasonable task or question. You can also help with the user's Blackstar workspace, including agents, tasks, workflows, memory, billing, notifications and integrations.",
+  "When WORKSPACE CONTEXT is supplied, use it to give accurate run-downs of active work, failures, approvals, notifications and recent progress. Never invent workspace state beyond that context.",
   "Do not refuse or redirect a question merely because it is unrelated to Blackstar.",
   "Blackstar has live external-information capability. For questions about weather, news, prices, sports, politics, laws, releases, current office-holders or anything else that can change, use supplied LIVE WEB CONTEXT as the source of truth.",
   "When LIVE WEB CONTEXT is supplied, never say that you lack live information, internet access, browsing access, real-time data or current information. Answer from the supplied live evidence and cite supporting sources with Markdown links using only URLs present in that context.",
@@ -91,43 +93,22 @@ async function runAssistantWithFallback(args: {
   messages: ChatMessage[];
 }): Promise<AssistantRun> {
   try {
-    const primary = await runChat({
-      provider: args.provider,
-      model: args.model,
-      messages: args.messages,
-      maxTokens: 1100,
-    });
+    const primary = await runChat({ provider: args.provider, model: args.model, messages: args.messages, maxTokens: 1100 });
     const text = primary.text.trim();
     if (!text) throw new ProviderError("The model returned an empty response.", 502, true);
     return { text, provider: primary.provider, model: primary.model, usage: primary.usage };
   } catch (primaryError) {
     const canUseGroq = args.provider !== "groq" && isProviderConfigured("groq");
     if (!canUseGroq) throw primaryError;
-    console.warn(
-      "[assistant] primary provider failed; retrying with Groq",
-      args.provider,
-      primaryError instanceof Error ? primaryError.message : String(primaryError),
-    );
+    console.warn("[assistant] primary provider failed; retrying with Groq", args.provider, primaryError instanceof Error ? primaryError.message : String(primaryError));
     const fallbackModel = defaultModelFor("groq");
-    const fallback = await runChat({
-      provider: "groq",
-      model: fallbackModel,
-      messages: args.messages,
-      maxTokens: 1100,
-    });
+    const fallback = await runChat({ provider: "groq", model: fallbackModel, messages: args.messages, maxTokens: 1100 });
     const text = fallback.text.trim();
     if (!text) throw new ProviderError("The fallback model returned an empty response.", 502, true);
-    return {
-      text,
-      provider: fallback.provider,
-      model: fallback.model,
-      usage: fallback.usage,
-      fallbackFrom: args.provider,
-    };
+    return { text, provider: fallback.provider, model: fallback.model, usage: fallback.usage, fallbackFrom: args.provider };
   }
 }
 
-/** Runs one real assistant turn. Throws with a safe message on provider failure. */
 export const assistantChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { message: string; history?: Turn[]; location?: unknown }) => {
@@ -144,37 +125,56 @@ export const assistantChat = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as {
-      from: (t: string) => any;
-      rpc: (fn: string, args?: Record<string, unknown>) => any;
-    };
+    const sb = context.supabase as unknown as { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
-    let entitlements;
     try {
-      entitlements = await getEntitlements(sb, context.userId);
+      const entitlements = await getEntitlements(sb, context.userId);
       assertWithinLimit(entitlements, "tasks_per_month");
     } catch (error) {
       if (error instanceof EntitlementError) throw new Error(error.message);
       throw error;
     }
 
-    let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
-    try {
-      const preferenceResult = await sb
-        .from("user_ai_preferences")
-        .select("default_provider,default_model")
-        .eq("user_id", context.userId)
-        .maybeSingle();
-      if (preferenceResult.error) {
-        console.warn("[assistant] AI preference lookup failed; using deployment default", preferenceResult.error.message);
-      } else {
-        storedPreference = preferenceResult.data;
-      }
-    } catch (error) {
-      console.warn("[assistant] AI preference lookup unavailable; using deployment default", error);
-    }
+    const [preferenceResult, profileResult, personalResult, tasksResult, workflowsResult, approvalsResult, notificationsResult] = await Promise.all([
+      sb.from("user_ai_preferences").select("default_provider,default_model").eq("user_id", context.userId).maybeSingle(),
+      sb.from("profiles").select("full_name,email").eq("id", context.userId).maybeSingle(),
+      sb.from("personal_assistant_preferences").select("assistant_name,location_name,timezone").eq("user_id", context.userId).maybeSingle(),
+      sb.from("agent_tasks").select("title,status,output_text,error,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(8),
+      sb.from("workflow_runs").select("status,input,output,error,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(8),
+      sb.from("approval_requests").select("title,action_type,risk_level,status,created_at").eq("user_id", context.userId).eq("status", "pending").order("created_at", { ascending: false }).limit(6),
+      sb.from("notifications").select("title,body,severity,created_at").eq("user_id", context.userId).is("read_at", null).order("created_at", { ascending: false }).limit(6),
+    ]);
 
+    let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
+    if (preferenceResult.error) console.warn("[assistant] AI preference lookup failed; using deployment default", preferenceResult.error.message);
+    else storedPreference = preferenceResult.data;
     const { provider, model, source: preferenceSource } = resolveAssistantModelPreference(storedPreference);
+
+    const profile = profileResult.error ? null : profileResult.data;
+    const personal = personalResult.error ? null : personalResult.data;
+    const assistantName = personal?.assistant_name?.trim() || "Blackstar";
+    const userName = profile?.full_name?.trim() || profile?.email?.split("@")[0] || "the user";
+    const personalContext = [
+      "PERSONAL ASSISTANT CONTEXT",
+      `Your name: ${assistantName}`,
+      `User's name: ${userName}`,
+      personal?.location_name ? `User's saved location: ${personal.location_name}` : "User has not saved a location.",
+      personal?.timezone ? `User's timezone: ${personal.timezone}` : "User has not saved a timezone.",
+      "Address the user naturally by their name when appropriate, but do not overuse it.",
+    ].join("\n");
+
+    const tasks = tasksResult.error ? [] : tasksResult.data ?? [];
+    const workflows = workflowsResult.error ? [] : workflowsResult.data ?? [];
+    const approvals = approvalsResult.error ? [] : approvalsResult.data ?? [];
+    const notifications = notificationsResult.error ? [] : notificationsResult.data ?? [];
+    const workspaceContext = [
+      "WORKSPACE CONTEXT",
+      `Recent agent tasks: ${JSON.stringify(tasks)}`,
+      `Recent workflow runs: ${JSON.stringify(workflows)}`,
+      `Pending approvals: ${JSON.stringify(approvals)}`,
+      `Unread notifications: ${JSON.stringify(notifications)}`,
+      "Use this only when relevant to the user's request. Summarise rather than dumping raw JSON.",
+    ].join("\n\n").slice(0, 14000);
 
     let webSources: WebSource[] = [];
     let webSearchAttempted = false;
@@ -191,6 +191,8 @@ export const assistantChat = createServerFn({ method: "POST" })
     const webContext = webContextBlock(data.message, webSources, webSearchAttempted);
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: personalContext },
+      { role: "system", content: workspaceContext },
       ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
       ...data.history.map((t) => ({ role: t.role, content: t.content }) as ChatMessage),
       { role: "user", content: data.message },
@@ -207,6 +209,7 @@ export const assistantChat = createServerFn({ method: "POST" })
           model: result.model,
           preference_source: preferenceSource,
           fallback_from: result.fallbackFrom ?? null,
+          assistant_name: assistantName,
           live_web_attempted: webSearchAttempted,
           live_web_sources: webSources.length,
           live_location_used: Boolean(data.location),
@@ -219,24 +222,9 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "success",
-        metadata: {
-          provider: result.provider,
-          model: result.model,
-          preferenceSource,
-          fallbackFrom: result.fallbackFrom ?? null,
-          liveWebAttempted: webSearchAttempted,
-          liveWebSources: webSources.length,
-          liveLocationUsed: Boolean(data.location),
-        },
+        metadata: { provider: result.provider, model: result.model, assistantName, preferenceSource, fallbackFrom: result.fallbackFrom ?? null, liveWebAttempted: webSearchAttempted, liveWebSources: webSources.length, liveLocationUsed: Boolean(data.location) },
       });
-      return {
-        text: result.text,
-        provider: result.provider,
-        model: result.model,
-        sources: webSources.map(({ title, url }) => ({ title, url })),
-        webSearchAttempted,
-        liveLocationUsed: Boolean(data.location),
-      };
+      return { text: result.text, provider: result.provider, model: result.model, assistantName, sources: webSources.map(({ title, url }) => ({ title, url })), webSearchAttempted, liveLocationUsed: Boolean(data.location) };
     } catch (error) {
       const status = error instanceof ProviderError ? error.status : 500;
       console.error("[assistant] provider failure", status, error);
@@ -245,15 +233,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "failed",
-        metadata: {
-          provider,
-          model,
-          preferenceSource,
-          status,
-          liveWebAttempted: webSearchAttempted,
-          liveLocationUsed: Boolean(data.location),
-          error: error instanceof Error ? error.message : String(error),
-        },
+        metadata: { provider, model, assistantName, preferenceSource, status, liveWebAttempted: webSearchAttempted, liveLocationUsed: Boolean(data.location), error: error instanceof Error ? error.message : String(error) },
       });
       if (status === 503) throw new Error("AI provider is not configured.");
       throw new Error("AI service temporarily unavailable.");
