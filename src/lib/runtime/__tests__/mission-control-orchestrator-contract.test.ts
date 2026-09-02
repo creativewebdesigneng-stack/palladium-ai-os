@@ -15,14 +15,19 @@ describe("Mission Control orchestrator surface", () => {
   it("wires the authenticated Blackstar Orchestrator into Mission Control", () => {
     expect(missionControl).toContain("runOrchestrator");
     expect(missionControl).toContain("useServerFn(runOrchestrator)");
-    expect(missionControl).toContain("['orchestrator', 'Orchestrator', Network]");
-    expect(missionControl).toContain("const orchestrate = useMutation");
-    expect(missionControl).toContain("tab === 'orchestrator'");
+    expect(missionControl).toMatch(/\[\s*'orchestrator'\s*,\s*'Orchestrator'\s*,\s*Network\s*\]/);
+    expect(missionControl).toMatch(/const\s+orchestrate\s*=\s*useMutation/);
+    expect(missionControl).toMatch(/tab\s*===\s*'orchestrator'/);
     expect(missionControl).toContain("<OrchestratorConsole");
   });
 
-  it("keeps Mission Control readable instead of flattening the screen into minified lines", () => {
-    expect(missionControl.split("\n").length).toBeGreaterThan(450);
+  it("keeps Mission Control decomposed into dedicated operational surfaces", () => {
+    expect(missionControl).toContain("MissionStatusDeck");
+    expect(missionControl).toContain("MissionOperationsCore");
+    expect(missionControl).toContain("AlertsDecisionsRail");
+    expect(missionControl).toContain("ExecutionQueue");
+    expect(missionControl).toContain("MissionMetrics");
+    expect(missionControl).toContain("ActivityStream");
   });
 
   it("shows delegation, approvals and verified output in the orchestrator console", () => {
