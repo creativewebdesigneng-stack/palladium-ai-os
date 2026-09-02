@@ -36,7 +36,7 @@ describe('AI Hub inventory of the bundled PalladiumAI MCP surface', () => {
   it('advertises the live tool names as the server capabilities', () => {
     const server = resources.find((resource) => resource.kind === 'mcp')
     expect(server?.capabilities).toEqual(PALLADIUM_MCP_TOOLS.map((tool) => tool.name))
-    expect(server?.metadata.toolCount).toBe(String(PALLADIUM_MCP_TOOLS.length))
+    expect(server?.metadata['toolCount']).toBe(String(PALLADIUM_MCP_TOOLS.length))
   })
 
   it('never projects credentials, tokens or config secrets into Hub metadata', () => {
@@ -47,7 +47,7 @@ describe('AI Hub inventory of the bundled PalladiumAI MCP surface', () => {
     const empty = toAiHubMcpResources(PALLADIUM_MCP_SERVER, [])
     expect(empty).toHaveLength(1)
     expect(empty[0]?.capabilities).toEqual([])
-    expect(empty[0]?.metadata.toolCount).toBe('0')
+    expect(empty[0]?.metadata['toolCount']).toBe('0')
     expect(countAiHubResources(empty)).toMatchObject({ mcp: 1, tools: 0, total: 1 })
   })
 
