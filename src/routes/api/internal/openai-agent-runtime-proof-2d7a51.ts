@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { executeRun, failRun, prepareRun } from "@/lib/runtime/runtime.server";
 
 const AGENT_ID = "cc1576f9-2c3a-4333-b002-fc1d46d05d2f";
 const USER_ID = "7c4e5f60-f4f5-4009-ad41-37f20337720e";
@@ -10,7 +8,13 @@ export const Route = createFileRoute("/api/internal/openai-agent-runtime-proof-2
   server: {
     handlers: {
       GET: async () => {
+        const [{ supabaseAdmin }, runtime] = await Promise.all([
+          import("@/integrations/supabase/client.server"),
+          import("@/lib/runtime/runtime.server"),
+        ]);
         const db = supabaseAdmin as any;
+        const { prepareRun, executeRun, failRun } = runtime;
+
         const { data: before, error: loadError } = await db
           .from("personal_agents")
           .select("status,model_provider,model")
@@ -19,7 +23,7 @@ export const Route = createFileRoute("/api/internal/openai-agent-runtime-proof-2
           .maybeSingle();
         if (loadError || !before) return json({ ok: false, stage: "load_agent" });
 
-        let run: Awaited<ReturnType<typeof prepareRun>> | null = null;
+        let run: any = null;
         try {
           const { error: updateError } = await db
             .from("personal_agents")
