@@ -6,100 +6,93 @@ import SectionReveal from '@/components/site/SectionReveal';
 import { HowAgentsWork, AgentExamples, AgentCta } from '@/components/site/AgentsShowcase';
 import Footer from '@/components/site/Footer';
 
-// "What Are AI Agents?" explainer
 const PIPELINE = [
-  { icon: Sparkles, label: 'Goal', desc: 'You describe the objective in plain language.' },
-  { icon: Cpu, label: 'Reason', desc: 'The agent plans, picks tools and decides next steps.' },
-  { icon: Workflow, label: 'Act', desc: 'It executes — calling APIs, browsing, coding, writing.' },
-  { icon: Network, label: 'Deliver', desc: 'It returns results, learns and hands off to teammates.' },
+  { icon: Sparkles, label: 'Intent', desc: 'Set the objective in plain language and define the outcome that matters.' },
+  { icon: Cpu, label: 'Reason', desc: 'Blackstar plans the route, selects tools and resolves the next best action.' },
+  { icon: Workflow, label: 'Execute', desc: 'Agents call approved tools, services and workflows to complete real work.' },
+  { icon: Network, label: 'Coordinate', desc: 'Results, context and handoffs move across the workforce without losing control.' },
 ];
 
 export default function AIAgents() {
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="min-h-screen overflow-hidden bg-[#050507] text-zinc-100">
       <PublicNav />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden px-6 pb-16 pt-32">
+      <section className="relative overflow-hidden px-6 pb-20 pt-32">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/3 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-[150px]" />
-          <div className="absolute right-1/3 top-32 h-96 w-96 translate-x-1/2 rounded-full bg-cyan-500/15 blur-[150px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(139,92,246,.12),transparent_60%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.03)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+          <div className="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(139,92,246,.14),transparent_42%)]" />
+          <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.025)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]" />
         </div>
-        <SectionReveal className="relative mx-auto max-w-4xl text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-4 py-1.5 text-xs text-zinc-300 backdrop-blur">
-            <Bot className="h-3.5 w-3.5 text-violet-400" /> AI Agents
+
+        <SectionReveal className="relative mx-auto max-w-5xl text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-300/[.055] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80 backdrop-blur-xl">
+            <Bot className="h-3.5 w-3.5" /> Blackstar Agent Infrastructure
           </span>
-          <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl">
-            Meet your
-            <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent"> AI workforce.</span>
+          <h1 className="mt-7 text-4xl font-semibold leading-[1.02] tracking-[-0.055em] text-white sm:text-6xl md:text-7xl">
+            Intelligence that can
+            <span className="block text-violet-200">reason, act and coordinate.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-zinc-400">
-            PalladiumAI agents don't just chat — they reason, plan, use tools and complete real tasks. Deploy specialised agents that research, code, sell and support, all from one platform.
+          <p className="mx-auto mt-7 max-w-2xl text-base leading-8 text-white/52 sm:text-lg">
+            Blackstar agents are executable AI workers built for real operations — planning, using tools, collaborating across systems and completing governed tasks from one intelligence hub.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link to="/register?returnTo=/agents/new" className="group flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200">
-              Create Your First Agent <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link to="/register?returnTo=/agents/new" className="group flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition duration-200 hover:bg-zinc-200">
+              Create an Agent <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </Link>
-            <Link to="/agent-marketplace" className="rounded-xl border border-white/15 bg-white/[.03] px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10">Explore Marketplace</Link>
+            <Link to="/agent-marketplace" className="rounded-xl border border-white/10 bg-white/[.035] px-6 py-3 text-sm font-medium text-white/88 backdrop-blur-xl transition hover:border-violet-300/20 hover:bg-violet-300/[.06]">Explore Agent Network</Link>
           </div>
         </SectionReveal>
       </section>
 
-      {/* What Are AI Agents? */}
       <section aria-labelledby="what-heading" className="py-16">
         <SectionReveal className="mx-auto max-w-7xl px-6 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-violet-400">How it works</p>
-          <h2 id="what-heading" className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">What are AI agents?</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-zinc-400">
-            An AI agent is an autonomous worker powered by a language model. Give it a goal, tools and knowledge, and it plans the steps, takes actions and delivers results — escalating to you only when it needs to.
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-violet-300/70">Execution Model</p>
+          <h2 id="what-heading" className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">From intent to verified execution.</h2>
+          <p className="mx-auto mt-4 max-w-2xl leading-7 text-white/48">
+            Give an agent a goal, approved tools and the right knowledge. It can plan the work, execute within policy and escalate only when human control is required.
           </p>
         </SectionReveal>
-        <div className="mx-auto mt-14 grid max-w-5xl gap-4 px-6 md:grid-cols-4">
+        <div className="mx-auto mt-14 grid max-w-6xl gap-3 px-6 md:grid-cols-4">
           {PIPELINE.map((p, i) => (
             <motion.div
               key={p.label}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="relative rounded-2xl border border-white/10 bg-white/[.025] p-5 text-center"
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[.025] p-5 text-left shadow-[0_22px_60px_rgba(0,0,0,.25)] backdrop-blur-xl"
             >
-              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg">
-                <p.icon className="h-6 w-6" />
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/35 to-transparent" />
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-violet-300/15 bg-violet-300/[.075] text-violet-200">
+                <p.icon className="h-5 w-5" />
               </span>
-              <p className="mt-3 text-sm font-semibold text-white">{p.label}</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-400">{p.desc}</p>
-              {i < PIPELINE.length - 1 && (
-                <span className="absolute -right-2 top-1/2 hidden -translate-y-1/2 text-zinc-700 md:block">→</span>
-              )}
+              <p className="mt-5 text-sm font-semibold text-white">{p.label}</p>
+              <p className="mt-2 text-xs leading-6 text-white/45">{p.desc}</p>
+              <div className="mt-6 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/22">0{i + 1}</div>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* Capabilities */}
       <section aria-labelledby="capabilities-heading" className="py-16">
         <SectionReveal className="mx-auto mb-12 max-w-7xl px-6 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Capabilities</p>
-          <h2 id="capabilities-heading" className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">What every agent can do</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-zinc-400">Each capability is built in and composes with the rest — build a single agent or an entire workforce.</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-violet-300/70">Agent Capabilities</p>
+          <h2 id="capabilities-heading" className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">A governed operating layer for AI work.</h2>
+          <p className="mx-auto mt-3 max-w-2xl leading-7 text-white/45">Compose capabilities across one agent or an entire coordinated workforce while keeping execution visible and controlled.</p>
         </SectionReveal>
         <HowAgentsWork />
       </section>
 
-      {/* Examples */}
       <section aria-labelledby="examples-heading" className="py-16">
         <SectionReveal className="mx-auto mb-12 max-w-7xl px-6 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Examples</p>
-          <h2 id="examples-heading" className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Agents for every department</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-zinc-400">Start from a template or build your own — these are the agents teams deploy on day one.</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-violet-300/70">Deployment Patterns</p>
+          <h2 id="examples-heading" className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">Intelligence for every operating function.</h2>
+          <p className="mx-auto mt-3 max-w-2xl leading-7 text-white/45">Start with a proven configuration or assemble specialist agents around your own infrastructure and objectives.</p>
         </SectionReveal>
         <AgentExamples />
       </section>
 
-      {/* CTA */}
       <section className="py-24">
         <SectionReveal className="mx-auto max-w-5xl px-6"><AgentCta /></SectionReveal>
       </section>
