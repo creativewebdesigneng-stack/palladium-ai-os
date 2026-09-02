@@ -5,27 +5,28 @@ export const Route = createFileRoute("/api/internal/gemini-status-91f4c2a7")({
     handlers: {
       GET: async () => {
         const key = process.env["GEMINI_API_KEY"];
-        if (!key) return json({ configured: false, keyReady: false, models: [] });
+        if (!key) return json({ configured: false, ready: false, status: 503 });
         try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1000`, {
-            signal: AbortSignal.timeout(10000),
-          });
-          if (!res.ok) return json({ configured: true, keyReady: false, status: res.status, models: [] });
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply only with OK." }] }] }),
+              signal: AbortSignal.timeout(20000),
+            },
+          );
+          if (!res.ok) return json({ configured: true, ready: false, status: res.status });
           const body = (await res.json()) as {
-            models?: Array<{ name?: unknown; supportedGenerationMethods?: unknown }>;
+            candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
           };
-          const models = (body.models ?? [])
-            .filter((model) => {
-              const name = typeof model.name === "string" ? model.name.toLowerCase() : "";
-              const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods : [];
-              return name.includes("gemini") && name.includes("flash") && methods.includes("generateContent");
-            })
-            .map((model) => (typeof model.name === "string" ? model.name.replace(/^models\//, "") : ""))
-            .filter(Boolean)
-            .slice(0, 30);
-          return json({ configured: true, keyReady: true, status: 200, models });
+          const text = body.candidates?.[0]?.content?.parts
+            ?.map((part) => (typeof part.text === "string" ? part.text : ""))
+            .join("")
+            .trim();
+          return json({ configured: true, ready: Boolean(text), status: 200, model: "gemini-2.5-flash" });
         } catch {
-          return json({ configured: true, keyReady: false, status: 504, models: [] });
+          return json({ configured: true, ready: false, status: 504 });
         }
       },
     },
