@@ -106,7 +106,7 @@ function liveSearchOnlyResult(
   return {
     text:
       `### Live discovery results\n\n` +
-      `The AI model provider is temporarily unavailable, so PalladiumAI completed this read-only request directly from live web-search evidence. ` +
+      `The AI model provider is temporarily unavailable, so Blackstar completed this read-only request directly from live web-search evidence. ` +
       `These are search results to compare, not a booking or purchase.\n\n${items.join("\n\n")}`,
     toolCalls: [],
     usage: { input: 0, output: 0 },
