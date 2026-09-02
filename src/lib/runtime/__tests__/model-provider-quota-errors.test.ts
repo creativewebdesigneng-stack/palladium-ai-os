@@ -19,12 +19,14 @@ afterEach(() => {
 
 describe("provider quota error classification", () => {
   it("treats OpenAI insufficient quota as non-retryable credit exhaustion", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          error: { type: "insufficient_quota", code: "credit_balance_exhausted" },
-        }),
-        { status: 429, headers: { "Content-Type": "application/json" } },
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: { type: "insufficient_quota", code: "credit_balance_exhausted" },
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
+        ),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -38,12 +40,14 @@ describe("provider quota error classification", () => {
   });
 
   it("keeps ordinary 429 rate limiting retryable", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          error: { type: "rate_limit_error", code: "rate_limit_exceeded" },
-        }),
-        { status: 429, headers: { "Content-Type": "application/json" } },
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: { type: "rate_limit_error", code: "rate_limit_exceeded" },
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
+        ),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
