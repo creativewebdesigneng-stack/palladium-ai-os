@@ -115,7 +115,9 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
       const canTryAnotherModel =
         error instanceof base.ProviderError &&
         error.retryable &&
-        (error.status >= 500 || ((provider === "openai" || provider === "gemini") && error.status === 429));
+        (error.status >= 500 ||
+          (provider === "openai" && error.status === 429) ||
+          (provider === "gemini" && error.status === 429));
       if (!canTryAnotherModel) break;
     }
   }
