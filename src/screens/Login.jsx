@@ -16,9 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  // Post-login destination (e.g. the MCP OAuth consent page sends users here
-  // with returnTo so the grant flow can resume). Same-origin paths only.
-  // Computed after mount so SSR never touches `window`.
   const [returnTo, setReturnTo] = useState("/");
   useEffect(() => {
     setReturnTo(safeReturnTo());
@@ -42,8 +39,6 @@ export default function Login() {
     setError("");
     try {
       const result = await auth.loginWithProvider("google", returnTo);
-      // Popup (web_message) flow: the session is already set, so move the user
-      // on ourselves. Full-page redirect flows never reach this line.
       if (result && !result.redirected) {
         await checkUserAuth();
         window.location.href = returnTo;
@@ -59,25 +54,25 @@ export default function Login() {
   return (
     <AuthLayout
       icon={LogIn}
-      title="Welcome back"
-      subtitle="Continue to your AI operating system"
+      title="Enter Blackstar"
+      subtitle="Authenticate to access your intelligence infrastructure, agents, workflows and operational command surfaces."
       footer={
         <>
-          Don't have an account?{" "}
+          New to Blackstar?{" "}
           <Link
             to={"/register" + (returnTo !== "/" ? "?returnTo=" + encodeURIComponent(returnTo) : "")}
-            className="text-primary font-medium hover:underline"
+            className="font-medium text-violet-300 hover:text-violet-200 hover:underline"
           >
-            Create one
+            Create an account
           </Link>
         </>
       }
     >
       {visibleError && (
-        <div className="mb-5 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="mb-5 rounded-xl border border-rose-400/20 bg-rose-500/[.06] p-3 text-sm text-rose-200">
           <p>{visibleError}</p>
           {configurationBlocked && (
-            <p className="mt-2 text-xs opacity-80">
+            <p className="mt-2 text-xs text-rose-200/70">
               Configure the Supabase project/environment variables in the deployment, then reload this page. No credentials are stored in this browser by this setup notice.
             </p>
           )}
@@ -86,28 +81,28 @@ export default function Login() {
 
       <Button
         variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6"
+        className="mb-6 h-12 w-full border-white/10 bg-white/[.025] text-sm font-medium text-white hover:bg-white/[.06]"
         onClick={handleGoogle}
         disabled={configurationBlocked}
       >
-        <GoogleIcon className="w-5 h-5 mr-2" />
+        <GoogleIcon className="mr-2 h-5 w-5" />
         Continue with Google
       </Button>
 
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+          <div className="w-full border-t border-white/8" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">or</span>
+        <div className="relative flex justify-center text-[10px] uppercase tracking-[.22em]">
+          <span className="bg-[#08080b] px-3 text-white/30">or use credentials</span>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email or username</Label>
+          <Label htmlFor="email" className="text-xs text-white/55">Email or username</Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" aria-hidden="true" />
             <Input
               id="email"
               type="text"
@@ -116,7 +111,7 @@ export default function Login() {
               placeholder="you@example.com or username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12"
+              className="h-12 border-white/10 bg-black/35 pl-10 text-white placeholder:text-white/20 focus-visible:ring-violet-400/30"
               required
               disabled={configurationBlocked}
             />
@@ -124,13 +119,13 @@ export default function Login() {
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+            <Label htmlFor="password" className="text-xs text-white/55">Password</Label>
+            <Link to="/forgot-password" className="text-xs text-violet-300/80 hover:text-violet-200">
               Forgot password?
             </Link>
           </div>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" aria-hidden="true" />
             <Input
               id="password"
               type="password"
@@ -138,22 +133,22 @@ export default function Login() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12"
+              className="h-12 border-white/10 bg-black/35 pl-10 text-white placeholder:text-white/20 focus-visible:ring-violet-400/30"
               required
               disabled={configurationBlocked}
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading || configurationBlocked}>
+        <Button type="submit" className="h-12 w-full bg-white font-medium text-black hover:bg-zinc-200" disabled={loading || configurationBlocked}>
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Logging in...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Authenticating...
             </>
           ) : configurationBlocked ? (
             "Supabase setup required"
           ) : (
-            "Log in"
+            "Enter Blackstar"
           )}
         </Button>
       </form>

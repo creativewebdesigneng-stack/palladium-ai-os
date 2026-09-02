@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Plus, UserPlus, ClipboardPlus, Filter, Bot, Building2 } from 'lucide-react';
+import { Plus, UserPlus, ClipboardPlus, Filter, Bot, Building2, Activity, Network } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/palladium/PageHeader';
 import { SectionHead } from '@/components/workforce/wfShared';
@@ -117,27 +117,41 @@ export default function Workforce() {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      <button onClick={() => { setEditTeam(null); setDeptOpen(true); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"><UserPlus className="h-4 w-4" />New department</button>
-      <Link to="/mission-control" onClick={(event) => { if (!gate('runTasks')) event.preventDefault(); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"><ClipboardPlus className="h-4 w-4" />Assign Task</Link>
-      <Link to="/agents/new" onClick={(event) => { if (!gate('createAgents')) event.preventDefault(); }} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30"><Plus className="h-4 w-4" />Create Agent</Link>
+      <button onClick={() => { setEditTeam(null); setDeptOpen(true); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2 text-sm text-zinc-200 transition hover:border-violet-300/20 hover:bg-white/[.07]"><UserPlus className="h-4 w-4" />New department</button>
+      <Link to="/mission-control" onClick={(event) => { if (!gate('runTasks')) event.preventDefault(); }} className="pbtn pbtn-secondary flex items-center gap-1.5 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2 text-sm text-zinc-200 transition hover:border-violet-300/20 hover:bg-white/[.07]"><ClipboardPlus className="h-4 w-4" />Assign task</Link>
+      <Link to="/agents/new" onClick={(event) => { if (!gate('createAgents')) event.preventDefault(); }} className="pbtn pbtn-primary flex items-center gap-1.5 rounded-xl border border-violet-300/25 bg-violet-400/[.12] px-3 py-2 text-sm font-medium text-violet-100 shadow-[0_0_30px_rgba(139,92,246,.12)] transition hover:bg-violet-400/[.18]"><Plus className="h-4 w-4" />Deploy agent</Link>
     </div>
   );
 
   return (
     <>
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-40"><NeuralNetworkBackground intensity="low" /></div>
-      <PageHeader eyebrow="AI" title="AI Workforce" description="Manage your digital workforce." action={headerActions} />
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-45"><NeuralNetworkBackground intensity="low" /></div>
+      <PageHeader eyebrow="Blackstar Workforce" title="Autonomous Workforce" description="Deploy, organise and supervise your AI workforce as one coordinated intelligence network." action={headerActions} />
+
+      <div className="mb-5 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/[.07] bg-black/25 p-4 backdrop-blur-xl">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.2em] text-violet-300/70"><Network className="h-3.5 w-3.5" />Network</div>
+          <p className="mt-2 text-sm text-zinc-300">{overview.activeAgents} active intelligence nodes across {teams.length} department{teams.length === 1 ? '' : 's'}.</p>
+        </div>
+        <div className="rounded-2xl border border-white/[.07] bg-black/25 p-4 backdrop-blur-xl">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.2em] text-cyan-300/70"><Activity className="h-3.5 w-3.5" />Execution</div>
+          <p className="mt-2 text-sm text-zinc-300">{overview.runningTasks} task{overview.runningTasks === 1 ? '' : 's'} executing now with {overview.pendingTasks} queued.</p>
+        </div>
+        <div className="rounded-2xl border border-white/[.07] bg-black/25 p-4 backdrop-blur-xl">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.2em] text-emerald-300/70"><Bot className="h-3.5 w-3.5" />Reliability</div>
+          <p className="mt-2 text-sm text-zinc-300">{overview.performance}% successful completion across the current task ledger.</p>
+        </div>
+      </div>
 
       <WorkforceCommandCentre overview={overview} loading={loading} />
 
-      {/* Agent grid */}
-      <section className="mb-8">
-        <SectionHead icon={Bot} title="Agent grid" desc={`${filtered.length} of ${wfAgents.length} agents`} action={
-          <div className="flex items-center gap-1 text-[11px] text-zinc-500"><Filter className="h-3 w-3" />filter</div>
+      <section className="mb-8 rounded-2xl border border-white/[.065] bg-black/20 p-4 backdrop-blur-xl sm:p-5">
+        <SectionHead icon={Bot} title="Agent network" desc={`${filtered.length} of ${wfAgents.length} intelligence nodes`} action={
+          <div className="flex items-center gap-1 text-[11px] text-zinc-500"><Filter className="h-3 w-3" />status filter</div>
         } />
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <div className="mb-4 flex flex-wrap gap-1.5">
           {['All', ...STATUSES].map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={`rounded-full px-3 py-1.5 text-xs transition ${statusFilter === s ? 'bg-white text-black' : 'border border-white/10 text-zinc-400 hover:bg-white/5'}`}>{s}</button>
+            <button key={s} onClick={() => setStatusFilter(s)} className={`rounded-full border px-3 py-1.5 text-xs transition ${statusFilter === s ? 'border-violet-300/25 bg-violet-400/[.13] text-violet-100' : 'border-white/[.08] bg-black/15 text-zinc-500 hover:border-white/15 hover:text-zinc-300'}`}>{s}</button>
           ))}
         </div>
         {wfAgents.length ? (
@@ -145,11 +159,11 @@ export default function Workforce() {
             {filtered.map((a) => <AgentCard key={a.id} agent={a} onOpen={setActive} />)}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
-            <Bot className="mx-auto h-8 w-8 text-zinc-600" />
-            <p className="mt-3 text-sm font-medium text-white">No agents yet</p>
-            <p className="mt-1 text-xs text-zinc-500">Create your first AI employee to populate the workforce.</p>
-            <Link to="/agents/new" className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4" />Create Agent</Link>
+          <div className="rounded-2xl border border-dashed border-violet-300/15 bg-violet-400/[.025] px-6 py-14 text-center">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-violet-300/15 bg-violet-400/[.08]"><Bot className="h-6 w-6 text-violet-300" /></div>
+            <p className="mt-4 text-sm font-medium text-white">No intelligence nodes deployed</p>
+            <p className="mt-1 text-xs text-zinc-500">Deploy your first agent to bring the Blackstar workforce network online.</p>
+            <Link to="/agents/new" className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-violet-300/25 bg-violet-400/[.12] px-3.5 py-2 text-sm font-medium text-violet-100"><Plus className="h-4 w-4" />Deploy agent</Link>
           </div>
         )}
       </section>
@@ -159,11 +173,11 @@ export default function Workforce() {
       {activeOrgId ? (
         <DepartmentGrid teams={teams} agents={agents} onCreate={() => { setEditTeam(null); setDeptOpen(true); }} onEdit={(t) => { setEditTeam(t); setDeptOpen(true); }} />
       ) : (
-        <div className="mb-8 rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-12 text-center">
-          <Building2 className="mx-auto h-8 w-8 text-zinc-600" />
-          <p className="mt-3 text-sm font-medium text-white">Departments need an organisation</p>
-          <p className="mt-1 text-xs text-zinc-500">Set one up to group your agents into departments with shared goals and permissions.</p>
-          <Link to="/team" className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white">Set up your organisation</Link>
+        <div className="mb-8 rounded-2xl border border-dashed border-white/[.08] bg-black/20 px-6 py-12 text-center backdrop-blur-xl">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-white/[.08] bg-white/[.035]"><Building2 className="h-6 w-6 text-zinc-500" /></div>
+          <p className="mt-4 text-sm font-medium text-white">Departments need an organisation</p>
+          <p className="mt-1 text-xs text-zinc-500">Create an organisation to coordinate agents into governed departments with shared goals and permissions.</p>
+          <Link to="/team" className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-violet-300/25 bg-violet-400/[.12] px-3.5 py-2 text-sm font-medium text-violet-100">Set up organisation</Link>
         </div>
       )}
 

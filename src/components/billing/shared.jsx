@@ -2,15 +2,16 @@ import { motion } from 'framer-motion';
 
 export function Panel({ icon: Icon, title, grad, children, action }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[.035] p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="relative overflow-hidden rounded-[22px] border border-violet-300/10 bg-[linear-gradient(145deg,rgba(13,10,20,.88),rgba(6,6,10,.94))] p-4 shadow-[0_18px_60px_rgba(0,0,0,.18)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/20 to-transparent" />
+      <div className="relative mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={`grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br ${grad}`}><Icon className="h-3.5 w-3.5 text-white" /></span>
+          <span className="grid h-7 w-7 place-items-center rounded-lg border border-violet-300/15 bg-violet-400/[.07]"><Icon className="h-3.5 w-3.5 text-violet-300" /></span>
           <h3 className="text-sm font-semibold text-white">{title}</h3>
         </div>
         {action}
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </div>
   );
 }
@@ -19,9 +20,9 @@ export function SectionHead({ icon: Icon, title, count, grad, action }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2">
-        <span className={`grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br ${grad}`}><Icon className="h-3.5 w-3.5 text-white" /></span>
+        <span className="grid h-7 w-7 place-items-center rounded-lg border border-violet-300/15 bg-violet-400/[.07]"><Icon className="h-3.5 w-3.5 text-violet-300" /></span>
         <h3 className="text-sm font-semibold text-white">{title}</h3>
-        {count != null && <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">{count}</span>}
+        {count != null && <span className="rounded-md border border-violet-300/10 bg-violet-400/[.03] px-1.5 py-0.5 text-[10px] text-zinc-400">{count}</span>}
       </div>
       {action}
     </div>
@@ -50,8 +51,8 @@ export function ProgressRing({ value, max, grad = 'from-violet-500 to-indigo-500
           strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c - (pct / 100) * c }} transition={{ duration: 1, ease: 'easeOut' }} />
         <defs>
           <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop className={`bg-gradient-to-r ${grad}`} stopColor="rgb(139,92,246)" offset="0%" />
-            <stop className={`bg-gradient-to-r ${grad}`} stopColor="rgb(99,102,241)" offset="100%" />
+            <stop className={`bg-gradient-to-r ${grad}`} stopColor="rgb(196,181,253)" offset="0%" />
+            <stop className={`bg-gradient-to-r ${grad}`} stopColor="rgb(124,58,237)" offset="100%" />
           </linearGradient>
         </defs>
       </svg>
