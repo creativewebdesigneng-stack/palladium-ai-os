@@ -105,8 +105,9 @@ export default function McpHub() {
       </div>
 
       <div className="mt-6 rounded-xl border border-amber-400/15 bg-amber-400/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80">
-        <strong className="text-amber-100">Approval safety:</strong> the <code>decide_approval</code> tool can authorise consequential actions, including actions involving money. MCP clients must obtain explicit user confirmation before approving them.
+        <strong className="text-amber-100">Approval safety:</strong> the <code>decide_approval</code> tool can only reject a pending request. Consequential approvals — including anything involving money — must be confirmed by the user in the Approval Centre, so spend limits and execution gates cannot be bypassed over MCP.
       </div>
+
     </>
   );
 }
