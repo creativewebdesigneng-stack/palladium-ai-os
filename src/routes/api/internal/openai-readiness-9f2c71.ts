@@ -5,7 +5,8 @@ export const Route = createFileRoute("/api/internal/openai-readiness-9f2c71")({
     handlers: {
       GET: async () => {
         const key = process.env["OPENAI_API_KEY"]?.trim();
-        if (!key) return json({ configured: false, ready: false, status: null });
+        const supabaseServiceRoleConfigured = Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim());
+        if (!key) return json({ configured: false, ready: false, status: null, supabase_service_role_configured: supabaseServiceRoleConfigured });
 
         try {
           const response = await fetch("https://api.openai.com/v1/models", {
@@ -14,9 +15,9 @@ export const Route = createFileRoute("/api/internal/openai-readiness-9f2c71")({
             redirect: "error",
             signal: AbortSignal.timeout(10_000),
           });
-          return json({ configured: true, ready: response.ok, status: response.status });
+          return json({ configured: true, ready: response.ok, status: response.status, supabase_service_role_configured: supabaseServiceRoleConfigured });
         } catch {
-          return json({ configured: true, ready: false, status: null });
+          return json({ configured: true, ready: false, status: null, supabase_service_role_configured: supabaseServiceRoleConfigured });
         }
       },
     },
