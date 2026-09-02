@@ -39,6 +39,10 @@ jobs:
         run: bun run typecheck
 
       - name: Tests
+        env:
+          # Runtime model calls are mocked in Vitest. This non-secret placeholder
+          # lets provider-preflight coverage reach those mocked execution paths.
+          OPENAI_API_KEY: ci-test-provider-placeholder
         run: bun run test -- --reporter=junit --outputFile=test-results.xml
 
       - name: Upload test results
