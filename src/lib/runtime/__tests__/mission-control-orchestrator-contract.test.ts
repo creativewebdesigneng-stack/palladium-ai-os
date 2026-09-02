@@ -12,7 +12,7 @@ const orchestratorConsole = readFileSync(
 );
 
 describe("Mission Control orchestrator surface", () => {
-  it("wires the authenticated Palladium Orchestrator into Mission Control", () => {
+  it("wires the authenticated Blackstar Orchestrator into Mission Control", () => {
     expect(missionControl).toContain("runOrchestrator");
     expect(missionControl).toContain("useServerFn(runOrchestrator)");
     expect(missionControl).toContain("['orchestrator', 'Orchestrator', Network]");
@@ -26,9 +26,9 @@ describe("Mission Control orchestrator surface", () => {
   });
 
   it("shows delegation, approvals and verified output in the orchestrator console", () => {
-    expect(orchestratorConsole).toContain("Agent permissions stay isolated");
+    expect(orchestratorConsole).toContain("Isolated permissions");
     expect(orchestratorConsole).toContain("assignment.depends_on");
-    expect(orchestratorConsole).toContain("Approval gate required");
+    expect(orchestratorConsole).toContain("Human approval gate");
     expect(orchestratorConsole).toContain("Verified mission output");
   });
 });
