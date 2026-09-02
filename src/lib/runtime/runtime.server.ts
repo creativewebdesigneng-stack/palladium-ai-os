@@ -9,6 +9,7 @@
  * Runs are never left stuck: stale runs are reaped, every model call is
  * time-boxed and retried, and every failure path closes the task row.
  */
+import { isProviderConfigured } from "@/lib/ai/ai-preferences.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 import {
   renderMemoryPrompt,
@@ -128,8 +129,6 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
   const messages: ChatMessage[] = [];
 
   if (agent.memory_enabled !== false) {
-    // Memory is injected before execution: short-term context, long-term facts,
-    // organisation knowledge and document extracts relevant to this input.
     const [memory, historyRes] = await Promise.all([
       retrieveRelevantMemory({
         sb: sb as never,
@@ -263,10 +262,6 @@ export async function rescueRuntimeConnectedServiceRead(args: {
   return { task, result };
 }
 
-/**
- * Runs every pre-flight gate and opens the task row. Throws before any model
- * spend if the caller is not entitled to run.
- */
 export async function prepareRun(args: {
   sb: Sb;
   userId: string;
@@ -286,13 +281,19 @@ export async function prepareRun(args: {
   const agent = await loadAgent(args.sb, args.agentId);
   const orgId = agent.org_id_fk ?? agent.org_id ?? null;
 
-  // Subscription + monthly execution limit, resolved from the database.
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
   assertWithinLimit(ent, "tasks_per_month");
 
   const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
   const provider = normaliseProvider(agent.model_provider);
   const model = resolveModel(provider, agent.model);
+  if (!isProviderConfigured(provider)) {
+    throw new RuntimeError(
+      `The '${provider}' model provider is not configured on this server. Configure it or select another configured provider for this agent.`,
+      "PROVIDER_NOT_CONFIGURED",
+      503,
+    );
+  }
   const messages = await buildContext(args.sb, agent, input);
 
   const now = new Date().toISOString();
@@ -335,7 +336,6 @@ export async function prepareRun(args: {
     metadata: { task_id: task.id, agent_id: agent.id },
   });
 
-  // Warn before the monthly allowance runs out rather than after.
   await notifyUsageThreshold({
     userId: args.userId,
     orgId,
@@ -345,7 +345,6 @@ export async function prepareRun(args: {
     planName: ent.planName,
   });
 
-  // queued -> running only once every gate has passed and the row exists.
   await setRunState(args.sb, task.id as string, "running");
 
   return {
@@ -360,18 +359,11 @@ export async function prepareRun(args: {
   };
 }
 
-/* ------------------------------------------------------------ finalise a task */
-
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin as unknown as Sb;
 }
 
-/**
- * Canonical task states. `completed` is the spec name for a successful run;
- * `succeeded` is the historical label still stored and read across the app, so
- * both are treated as terminal success everywhere.
- */
 export const TASK_STATES = [
   "pending",
   "queued",
@@ -396,10 +388,6 @@ export function isSuccessState(status: string): boolean {
   return status === "succeeded" || status === "completed";
 }
 
-/**
- * Moves a live run between non-terminal states and refreshes its heartbeat, so
- * the reaper can tell a working run from an abandoned one.
- */
 export async function setRunState(
   sb: Sb,
   taskId: string,
@@ -426,7 +414,6 @@ async function heartbeat(sb: Sb, taskId: string) {
   }
 }
 
-/** Cancellation is authoritative from the database, never from the caller. */
 async function isCancelled(sb: Sb, taskId: string) {
   const { data } = await sb
     .from("agent_tasks")
@@ -468,7 +455,6 @@ export async function completeRun(args: {
     .update({ last_run_at: new Date().toISOString() })
     .eq("id", run.agent.id);
 
-  // Save memory: short-term run context (expires) plus the legacy key/value trace.
   if (run.agent.memory_enabled !== false && result.text) {
     const request = String(run.messages[run.messages.length - 1]?.content ?? "").slice(0, 300);
     const memoryPrefs = await loadMemoryPreferences(args.sb as never, args.userId).catch(
@@ -558,7 +544,6 @@ export async function completeRun(args: {
 
   const { data } = await args.sb.from("agent_tasks").select("*").eq("id", run.taskId).maybeSingle();
 
-  // Notify developer webhook subscribers (signed, best effort).
   const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
   const payload = {
     agent_id: run.agent.id,
@@ -666,8 +651,6 @@ export async function failRun(args: {
   return message;
 }
 
-/* ------------------------------------------------------------------- the loop */
-
 type ToolLoopDeps = {
   sb: Sb;
   userId: string;
@@ -675,7 +658,6 @@ type ToolLoopDeps = {
   grants: Map<string, ToolGrant>;
   onEvent?: (event: RunEvent) => void | Promise<void>;
   signal: AbortSignal;
-  /** Per-run repeated-call / no-progress protection. */
   guard: RunLoopGuard;
 };
 
@@ -694,7 +676,6 @@ async function invokeGuardedTool(
 ): Promise<ToolOutcome> {
   const decision = deps.guard.inspect(call);
   if (decision.action === "veto") {
-    // Blocked before execution: no underlying tool call, no external action.
     deps.guard.record(call, decision.output);
     return { ok: false, output: decision.output };
   }
@@ -732,18 +713,14 @@ function awaitsApproval(output: unknown): boolean {
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
   messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
-  // The run is visibly parked on tool work rather than silently "running".
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   try {
-    // Conservative batching: only an all-safe, all-granted, approval-free batch
-    // of reads runs concurrently. Anything else keeps the sequential path.
     const parallel = canBatchInParallel(result.toolCalls, deps.grants);
     const outcomes: ToolOutcome[] = parallel
       ? await Promise.all(result.toolCalls.map((call) => invokeGuardedTool(deps, call)))
       : [];
 
-    // Message order always follows the model's tool-call order.
     for (let index = 0; index < result.toolCalls.length; index += 1) {
       const call = result.toolCalls[index]!;
       const outcome = parallel ? outcomes[index]! : await invokeGuardedTool(deps, call);
@@ -768,7 +745,6 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   return { awaitingApproval };
 }
 
-/** Tells the operator a run has paused and is waiting on them. */
 async function notifyInputRequired(
   userId: string,
   run: Pick<PreparedRun, "taskId" | "agent" | "orgId">,
@@ -784,14 +760,11 @@ async function notifyInputRequired(
   });
 }
 
-/** Non-streaming execution: model turns + tool rounds until a final answer. */
 export async function executeRun(args: {
   sb: Sb;
   userId: string;
   run: PreparedRun;
-  /** An owning workflow can terminate an in-flight model or tool request. */
   signal?: AbortSignal;
-  /** A tighter owner budget, such as a workflow step timeout. */
   timeoutMs?: number;
 }) {
   const controller = new AbortController();
@@ -851,8 +824,6 @@ export async function executeRun(args: {
           throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
         throw error;
       }
-      // Some providers may resolve despite an aborted transport. Never turn a
-      // late response into a completed task after its owner stopped the run.
       if (externalFailure) throw externalFailure;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
 
@@ -893,7 +864,6 @@ export async function executeRun(args: {
   }
 }
 
-/** Streaming execution: yields runtime events for a live console. */
 export async function* streamRun(args: {
   sb: Sb;
   userId: string;
