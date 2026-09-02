@@ -57,10 +57,10 @@ export const getHarnessOverview = createServerFn({ method: "POST" })
 
 export const previewHarnessPolicy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: HarnessPolicyInput) => input)
+  .validator((input: HarnessPolicyInput) => input)
   .handler(async ({ data }) => evaluateHarnessPolicy(data));
 
 export const previewSubagentSpawn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: SubagentSpawnInput) => input)
+  .validator((input: SubagentSpawnInput) => input)
   .handler(async ({ data }) => evaluateSubagentSpawn(data));
