@@ -45,8 +45,13 @@ export function resolveAssistantModelPreference(preference: StoredPreference): {
   model: string;
   source: "user" | "deployment";
 } {
-  const deploymentProvider = normaliseProvider(process.env["ASSISTANT_PROVIDER"] ?? null);
-  const deploymentModel = resolveModel(deploymentProvider, process.env["ASSISTANT_MODEL"] ?? null);
+  // Blackstar's personal assistant is Gemini-first by default. ASSISTANT_PROVIDER
+  // and ASSISTANT_MODEL remain available as deployment-level overrides.
+  const deploymentProvider = normaliseProvider(process.env["ASSISTANT_PROVIDER"] ?? "gemini");
+  const deploymentModel = resolveModel(
+    deploymentProvider,
+    process.env["ASSISTANT_MODEL"] ?? defaultModelFor(deploymentProvider),
+  );
 
   if (!preference || typeof preference.default_provider !== "string") {
     return { provider: deploymentProvider, model: deploymentModel, source: "deployment" };
