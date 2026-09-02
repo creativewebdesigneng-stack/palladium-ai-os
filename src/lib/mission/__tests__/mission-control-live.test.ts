@@ -17,7 +17,7 @@ describe('Mission Control live wiring', () => {
 
   it('uses shared authentication instead of registering another auth listener', () => {
     expect(missionScreen).toContain("useAuth } from '@/lib/AuthContext'");
-    expect(missionScreen).toContain('const { isAuthenticated, isLoadingAuth } = useAuth()');
+    expect(missionScreen).toMatch(/const\s*\{\s*isAuthenticated\s*,\s*isLoadingAuth\s*\}\s*=\s*useAuth\(\)/);
     expect(missionScreen).not.toContain('supabase.auth.onAuthStateChange');
     expect(missionScreen).not.toContain('supabase.auth.getSession');
   });
@@ -26,8 +26,8 @@ describe('Mission Control live wiring', () => {
     expect(missionScreen).toContain('activeAgentCount');
     expect(missionScreen).toContain('active agents');
     expect(missionScreen).not.toContain('agents online');
-    expect(missionScreen).toContain("execution?.status === 'failed'");
-    expect(missionScreen).toContain("execution?.status === 'completed'");
+    expect(missionScreen).toMatch(/execution\?\.status\s*===\s*'failed'/);
+    expect(missionScreen).toMatch(/execution\?\.status\s*===\s*'completed'/);
   });
 
   it('routes read-only product discovery to Live Explorer before the approval executor', () => {
@@ -38,16 +38,16 @@ describe('Mission Control live wiring', () => {
     expect(missionDiscovery).not.toContain('approval_requests');
     expect(missionDiscovery).not.toContain('purchase_requests');
     expect(missionScreen).toContain('submitMissionDiscovery');
-    expect(missionScreen).toContain("if (discovery?.handled) return discovery");
-    expect(missionScreen).toContain("setTab('shopping')");
-    expect(missionScreen).toContain("['shopping', 'Live Explorer', ShoppingBag]");
+    expect(missionScreen).toMatch(/discovery\?\.handled\s*\?\s*discovery\s*:\s*submitTaskFn/);
+    expect(missionScreen).toMatch(/setTab\(\s*'shopping'\s*\)/);
+    expect(missionScreen).toMatch(/\[\s*'shopping'\s*,\s*'Live Explorer'\s*,\s*ShoppingBag\s*\]/);
   });
 
   it('keeps commitment words on the approval path', () => {
     expect(missionServer).toContain('COMMITMENT_WORDS');
     expect(missionServer).toContain('if (commitmentRequested) tools = [...tools, "checkout"]');
     expect(missionDiscovery).toContain('decision.commitmentRequested');
-    expect(missionScreen).toContain("setTab(d?.requiresApproval ? 'approvals' : 'shopping')");
+    expect(missionScreen).toMatch(/setTab\(\s*d\?\.requiresApproval\s*\?\s*'approvals'\s*:\s*'shopping'\s*\)/);
   });
 
   it('labels mission telemetry according to what the metrics actually count', () => {
@@ -55,5 +55,15 @@ describe('Mission Control live wiring', () => {
     expect(metrics).toContain("label: 'Business missions'");
     expect(metrics).toContain("key: 'runningWorkforceRuns'");
     expect(metrics).toContain("label: 'Intelligence signals'");
+  });
+
+  it('wires the live Blackstar command-centre surfaces to the overview', () => {
+    expect(missionScreen).toContain('MissionStatusDeck');
+    expect(missionScreen).toContain('MissionOperationsCore');
+    expect(missionScreen).toContain('AlertsDecisionsRail');
+    expect(missionScreen).toContain('ExecutionQueue');
+    expect(missionScreen).toContain('ActivityStream');
+    expect(missionScreen).toContain("supabase.channel('mission-control')");
+    expect(missionScreen).toContain('lastSync');
   });
 });
