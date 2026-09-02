@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { User, Globe, Palette, Sparkles, Bell, Lock, ShieldCheck, Link2, KeyRound, Code2, Search, Bot } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ProfileSection from '@/components/settings/ProfileSection';
+import PersonalAssistantSection from '@/components/settings/PersonalAssistantSection';
 import AccountSection from '@/components/settings/AccountSection';
 import AppearanceSection from '@/components/settings/AppearanceSection';
 import AIPreferencesSection from '@/components/settings/AIPreferencesSection';
@@ -23,6 +24,7 @@ export default function Settings() {
   const renderSection = () => {
     switch (active) {
       case 'profile': return <ProfileSection />;
+      case 'assistant': return <PersonalAssistantSection />;
       case 'account': return <AccountSection />;
       case 'appearance': return <AppearanceSection />;
       case 'ai': return <AIPreferencesSection />;
