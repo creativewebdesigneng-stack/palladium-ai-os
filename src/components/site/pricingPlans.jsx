@@ -1,6 +1,6 @@
-// Canonical PalladiumAI marketing pricing — single source of truth for plan
-// names, prices, features and limits. PalladiumAI is a paid product: Builder,
-// Business, and Enterprise. The stable plan ids remain unchanged so existing
+// Canonical Blackstar marketing pricing — single source of truth for plan
+// names, prices, features and limits. Blackstar is a paid product: Builder,
+// Business, and Enterprise. Stable plan ids remain unchanged so existing
 // billing/webhook/entitlement mappings stay backwards compatible.
 
 export const CURRENCY = '£';
@@ -76,7 +76,7 @@ export const FREEMIUM_PLANS = [
     popular: true,
     grad: 'from-violet-500 to-indigo-500',
     features: [
-      'Full PalladiumAI platform access',
+      'Full Blackstar platform access',
       'AI Agent Builder',
       'Create AI agents',
       'Deploy agents',
