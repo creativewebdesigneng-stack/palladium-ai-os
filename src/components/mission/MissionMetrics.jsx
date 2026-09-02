@@ -11,9 +11,9 @@ const CARDS = [
   { key: 'failedTasks', label: 'Exceptions', detail: 'execution failures', icon: AlertTriangle, tone: 'rose' },
   { key: 'activeWorkforces', label: 'Networks', detail: 'active workforces', icon: Users, tone: 'violet' },
   { key: 'runningWorkforceRuns', label: 'Network runs', detail: 'multi-agent live', icon: Activity, tone: 'emerald' },
-  { key: 'unreadNotifications', label: 'Signals', detail: 'unread intelligence', icon: Bell, tone: 'amber' },
-  { key: 'personalTasks', label: 'Personal', detail: 'private missions', icon: User, tone: 'neutral' },
-  { key: 'professionalTasks', label: 'Business', detail: 'professional missions', icon: Briefcase, tone: 'violet' },
+  { key: 'unreadNotifications', label: 'Intelligence signals', detail: 'unread notifications', icon: Bell, tone: 'amber' },
+  { key: 'personalTasks', label: 'Personal missions', detail: 'private operations', icon: User, tone: 'neutral' },
+  { key: 'professionalTasks', label: 'Business missions', detail: 'professional operations', icon: Briefcase, tone: 'violet' },
 ];
 const TONES = { violet: 'text-violet-200 bg-violet-300/70', emerald: 'text-emerald-200 bg-emerald-300/70', amber: 'text-amber-200 bg-amber-300/70', rose: 'text-rose-200 bg-rose-300/70', neutral: 'text-zinc-300 bg-zinc-400/60' };
 
