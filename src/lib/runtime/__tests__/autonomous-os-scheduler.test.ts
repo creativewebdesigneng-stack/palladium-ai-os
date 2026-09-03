@@ -37,6 +37,11 @@ describe("Autonomous OS scheduling", () => {
     expect(next.toISOString()).toBe("2026-09-04T07:00:00.000Z");
   });
 
+  it("uses standard cron OR semantics when both month-day and weekday are restricted", () => {
+    const next = nextCronRun("0 8 1 * 1", "UTC", new Date("2026-09-03T22:00:00Z"));
+    expect(next.toISOString()).toBe("2026-09-07T08:00:00.000Z");
+  });
+
   it("schedules continuous goals on a bounded five-minute cadence", () => {
     const after = new Date("2026-09-03T22:00:00.000Z");
     expect(nextAutonomousRun({ triggerType: "continuous", after })?.toISOString()).toBe(
