@@ -15,6 +15,14 @@ const orchestrator = readFileSync(
   fileURLToPath(new URL("../orchestrator.server.ts", import.meta.url)),
   "utf8",
 );
+const autonomousFunctions = readFileSync(
+  fileURLToPath(new URL("../autonomous-os.functions.ts", import.meta.url)),
+  "utf8",
+);
+const autonomousScreen = readFileSync(
+  fileURLToPath(new URL("../../../screens/AutonomousOS.jsx", import.meta.url)),
+  "utf8",
+);
 const migration = readFileSync(
   fileURLToPath(
     new URL("../../../../supabase/migrations/20260903224000_autonomous_os_scheduler.sql", import.meta.url),
@@ -25,6 +33,33 @@ const cancellationMigration = readFileSync(
   fileURLToPath(
     new URL(
       "../../../../supabase/migrations/20260903225500_autonomous_os_cancel_propagation.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const eventMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../supabase/migrations/20260904000500_autonomous_os_notification_events.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const guardrailMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../supabase/migrations/20260904001800_autonomous_os_hard_guardrails.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const fleetStateMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../supabase/migrations/20260904003000_autonomous_os_fleet_step_state.sql",
       import.meta.url,
     ),
   ),
@@ -66,7 +101,7 @@ describe("Autonomous OS durable worker contract", () => {
     expect(orchestrator).toContain("const prepared = await planOrchestratedGoal(args)");
     expect(scheduler).toContain("planOrchestratedGoal");
     expect(scheduler).toContain("queueWorkflowRun");
-    expect(scheduler).toContain('trigger: "autonomous_os"');
+    expect(scheduler).toContain('"autonomous_os_event"');
   });
 
   it("uses leases, planning heartbeats, reconciliation and bounded retries", () => {
@@ -91,5 +126,30 @@ describe("Autonomous OS durable worker contract", () => {
     expect(cancellationMigration).toContain("cancel_requested = true");
     expect(cancellationMigration).toContain("user_id = new.user_id");
     expect(cancellationMigration).toContain("waiting_for_approval");
+  });
+
+  it("wakes event goals only on explicit non-autonomous notification matches", () => {
+    expect(eventMigration).toContain("trigger_autonomous_goals_from_notification");
+    expect(eventMigration).toContain("autonomous_os");
+    expect(eventMigration).toContain("nullif(trim(g.event_match), '') is not null");
+    expect(autonomousFunctions).toContain("Event-triggered goals need a notification match phrase.");
+    expect(autonomousScreen).toContain("Wake when a notification contains");
+    expect(scheduler).toContain('["schedule", "continuous", "event"]');
+    expect(scheduler).toContain("pending_event_context");
+  });
+
+  it("enforces real spend and runtime ceilings independently of the browser", () => {
+    expect(guardrailMigration).toContain("enforce_autonomous_goal_guardrails");
+    expect(guardrailMigration).toContain("sum(at.cost_pence)");
+    expect(guardrailMigration).toContain("max_runtime_seconds");
+    expect(guardrailMigration).toContain("cancel_requested = true");
+    expect(guardrailMigration).toContain("* * * * *");
+  });
+
+  it("syncs each fleet assignment from its real workflow step state", () => {
+    expect(fleetStateMigration).toContain("sync_autonomous_fleet_step_state");
+    expect(fleetStateMigration).toContain("orchestrator_assignment_id");
+    expect(fleetStateMigration).toContain("workflow_step_runs");
+    expect(fleetStateMigration).toContain("autonomous_goal_fleet_assignments");
   });
 });
