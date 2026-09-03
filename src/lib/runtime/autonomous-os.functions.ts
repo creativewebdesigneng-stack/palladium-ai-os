@@ -17,7 +17,7 @@ const goalInput = z
     event_match: z.string().trim().max(160).nullable().optional(),
     timezone: z.string().trim().min(1).max(80).default("UTC"),
     max_parallel_agents: z.number().int().min(1).max(12).default(4),
-    max_runtime_seconds: z.number().int().min(30).max(86_400).default(3600),
+    max_runtime_seconds: z.number().int().min(30).max(600).default(600),
     budget_pence: z.number().int().min(0).nullable().optional(),
     require_approval_for_external_actions: z.boolean().default(true),
     allow_replanning: z.boolean().default(true),
