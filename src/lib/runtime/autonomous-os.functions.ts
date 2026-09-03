@@ -6,22 +6,34 @@ import { orchestrateGoal } from "./orchestrator.server";
 
 type Sb = { from: (table: string) => any };
 
-const goalInput = z.object({
-  name: z.string().trim().min(1).max(160),
-  objective: z.string().trim().min(1).max(12_000),
-  autonomy_level: z.enum(["assisted", "guarded", "autonomous"]).default("guarded"),
-  trigger_type: z.enum(["manual", "schedule", "event", "continuous"]).default("manual"),
-  schedule_cron: z.string().trim().max(120).nullable().optional(),
-  timezone: z.string().trim().min(1).max(80).default("UTC"),
-  max_parallel_agents: z.number().int().min(1).max(12).default(4),
-  max_runtime_seconds: z.number().int().min(30).max(86_400).default(3600),
-  budget_pence: z.number().int().min(0).nullable().optional(),
-  require_approval_for_external_actions: z.boolean().default(true),
-  allow_replanning: z.boolean().default(true),
-  workforce_id: z.string().uuid().nullable().optional(),
-  org_id: z.string().uuid().nullable().optional(),
-  success_criteria: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
-});
+const goalInput = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    objective: z.string().trim().min(1).max(12_000),
+    autonomy_level: z.enum(["assisted", "guarded", "autonomous"]).default("guarded"),
+    trigger_type: z.enum(["manual", "schedule", "event", "continuous"]).default("manual"),
+    schedule_cron: z.string().trim().max(120).nullable().optional(),
+    event_source: z.enum(["notification"]).nullable().optional(),
+    event_match: z.string().trim().max(160).nullable().optional(),
+    timezone: z.string().trim().min(1).max(80).default("UTC"),
+    max_parallel_agents: z.number().int().min(1).max(12).default(4),
+    max_runtime_seconds: z.number().int().min(30).max(86_400).default(3600),
+    budget_pence: z.number().int().min(0).nullable().optional(),
+    require_approval_for_external_actions: z.boolean().default(true),
+    allow_replanning: z.boolean().default(true),
+    workforce_id: z.string().uuid().nullable().optional(),
+    org_id: z.string().uuid().nullable().optional(),
+    success_criteria: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (value.trigger_type === "event" && !value.event_match?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["event_match"],
+        message: "Event-triggered goals need a notification match phrase.",
+      });
+    }
+  });
 
 async function event(
   sb: Sb,
@@ -83,7 +95,7 @@ export const listAutonomousGoals = createServerFn({ method: "GET" })
     const sb = context.supabase as unknown as Sb;
     const { data: goals, error } = await sb
       .from("autonomous_goals")
-      .select("id,name,objective,status,autonomy_level,trigger_type,schedule_cron,timezone,next_run_at,last_run_at,max_parallel_agents,max_runtime_seconds,budget_pence,require_approval_for_external_actions,allow_replanning,workforce_id,org_id,success_criteria,scheduler_attempts,last_scheduler_error,created_at,updated_at")
+      .select("id,name,objective,status,autonomy_level,trigger_type,schedule_cron,event_source,event_match,timezone,next_run_at,last_run_at,max_parallel_agents,max_runtime_seconds,budget_pence,require_approval_for_external_actions,allow_replanning,workforce_id,org_id,success_criteria,scheduler_attempts,last_scheduler_error,created_at,updated_at")
       .eq("user_id", context.userId)
       .order("updated_at", { ascending: false })
       .limit(100);
@@ -137,6 +149,8 @@ export const createAutonomousGoal = createServerFn({ method: "POST" })
         autonomy_level: data.autonomy_level,
         trigger_type: data.trigger_type,
         schedule_cron: data.schedule_cron ?? null,
+        event_source: data.trigger_type === "event" ? data.event_source ?? "notification" : null,
+        event_match: data.trigger_type === "event" ? data.event_match?.trim() || null : null,
         timezone: data.timezone,
         next_run_at: nextRun?.toISOString() ?? null,
         max_parallel_agents: data.max_parallel_agents,
@@ -156,7 +170,11 @@ export const createAutonomousGoal = createServerFn({ method: "POST" })
       user_id: context.userId,
       event_type: "goal_created",
       message: `Autonomous goal created: ${goal.name}`,
-      payload: { next_run_at: nextRun?.toISOString() ?? null },
+      payload: {
+        next_run_at: nextRun?.toISOString() ?? null,
+        event_source: goal.event_source ?? null,
+        event_match: goal.event_match ?? null,
+      },
     });
     return goal;
   });
