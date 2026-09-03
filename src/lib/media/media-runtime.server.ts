@@ -1,6 +1,6 @@
 import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
 
-const DEFAULT_WORKER_URL = 'https://blackstar-auto-editor-worker-0kjxvk.appdeploy.com';
+const DEFAULT_WORKER_URL = 'https://blackstar-auto-editor-worker-0kjxvk.v2.appdeploy.ai';
 const WORKER_URL = (process.env['AUTO_EDITOR_WORKER_URL'] ?? DEFAULT_WORKER_URL).replace(/\/$/, '');
 
 type SerializableValue = string | number | boolean | null | SerializableValue[] | { [key: string]: SerializableValue };
