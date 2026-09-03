@@ -34,6 +34,7 @@ type StepRow = {
 
 const MAX_STEPS = 25;
 const MAX_BATCH = 4;
+const MAX_OBJECTIVE_CHARS = 12_000;
 const STALE_AFTER_MS = 15 * 60 * 1000;
 const HEARTBEAT_MS = 30_000;
 
@@ -51,8 +52,11 @@ export async function queueWorkflowRun(args: {
 }) {
   const objective = String(args.input ?? "").trim();
   if (!objective) throw new WorkforceError("Give the workforce an objective.", "EMPTY_INPUT");
-  if (objective.length > 8_000)
-    throw new WorkforceError("Keep the workflow objective under 8,000 characters.", "INPUT_TOO_LONG");
+  if (objective.length > MAX_OBJECTIVE_CHARS)
+    throw new WorkforceError(
+      `Keep the workflow objective under ${MAX_OBJECTIVE_CHARS.toLocaleString()} characters.`,
+      "INPUT_TOO_LONG",
+    );
 
   const { data: workflow, error: workflowError } = await args.sb
     .from("workflows")
@@ -132,7 +136,8 @@ async function executeClaimedRun(db: Sb, claimed: any) {
     .select("id,name,org_id,user_id,workforce_id,status")
     .eq("id", claimed.workflow_id)
     .maybeSingle();
-  if (!workflow) throw new WorkforceError("Queued workflow no longer exists.", "NOT_FOUND");
+  if (!workflow || workflow.status !== "active")
+    throw new WorkforceError("Queued workflow is missing or inactive.", "WORKFLOW_UNAVAILABLE");
 
   const { data: rawSteps } = await db
     .from("workflow_steps")
@@ -140,7 +145,7 @@ async function executeClaimedRun(db: Sb, claimed: any) {
     .eq("workflow_id", workflow.id)
     .order("position", { ascending: true });
   const steps = ((rawSteps ?? []) as StepRow[]).slice(0, MAX_STEPS);
-  if (!steps.length) throw new WorkforceError("This workflow has no steps yet.", "NO_STEPS");
+  if (!steps.length) throw new WorkforceError("Queued workflow has no executable steps.", "NO_STEPS");
   for (const [index, step] of steps.entries())
     assertSupportedWorkflowStepKind(step.kind, `Step ${index + 1}`);
   await validateWorkerScope(db, claimed, workflow as WorkflowRow, steps);
@@ -172,110 +177,112 @@ async function executeClaimedRun(db: Sb, claimed: any) {
   }
 }
 
-async function failClaimedRun(db: Sb, runId: string, error: unknown) {
-  const message = error instanceof Error ? error.message : "Background workflow execution failed.";
+async function failClaimedRun(db: Sb, claimed: any, error: unknown) {
+  const message = error instanceof Error ? error.message : "Workflow worker failed.";
+  const attempts = Math.max(1, Number(claimed.worker_attempts ?? 1));
+  if (attempts < 3) {
+    await db
+      .from("workflow_runs")
+      .update({
+        status: "queued",
+        queued_at: new Date(Date.now() + attempts * 5_000).toISOString(),
+        worker_claimed_at: null,
+        worker_heartbeat_at: null,
+        worker_error: message.slice(0, 1000),
+      })
+      .eq("id", claimed.id)
+      .eq("status", "running");
+    return "requeued";
+  }
   await db
     .from("workflow_runs")
     .update({
       status: "failed",
       worker_error: message.slice(0, 1000),
-      error: message.slice(0, 600),
+      error: message.slice(0, 1000),
       completed_at: new Date().toISOString(),
-      worker_heartbeat_at: new Date().toISOString(),
     })
-    .eq("id", runId)
+    .eq("id", claimed.id)
     .eq("status", "running");
+  return "failed";
 }
 
-export async function requeueAbandonedWorkflowRuns(db: Sb) {
+async function requeueStaleRuns(db: Sb) {
   const cutoff = new Date(Date.now() - STALE_AFTER_MS).toISOString();
-  const { data: stale } = await db
+  const { data } = await db
     .from("workflow_runs")
     .select("id,worker_attempts")
     .eq("status", "running")
     .lt("worker_heartbeat_at", cutoff)
-    .limit(10);
-  for (const row of stale ?? []) {
-    const attempts = Number(row.worker_attempts ?? 0);
-    if (attempts >= 3) {
-      await db
-        .from("workflow_runs")
-        .update({
-          status: "failed",
-          worker_error: "Workflow worker lease expired too many times.",
-          error: "Background worker could not complete this run.",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", row.id)
-        .eq("status", "running");
-    } else {
-      await db
-        .from("workflow_runs")
-        .update({
-          status: "queued",
-          queued_at: new Date().toISOString(),
-          claimed_at: null,
-          worker_error: "Previous workflow worker lease expired; queued for retry.",
-        })
-        .eq("id", row.id)
-        .eq("status", "running");
-    }
+    .limit(MAX_BATCH * 2);
+  let requeued = 0;
+  for (const run of data ?? []) {
+    const attempts = Number(run.worker_attempts ?? 0);
+    await db
+      .from("workflow_runs")
+      .update({
+        status: attempts >= 3 ? "failed" : "queued",
+        queued_at: attempts >= 3 ? null : new Date().toISOString(),
+        worker_claimed_at: null,
+        worker_heartbeat_at: null,
+        worker_error: "Worker heartbeat expired before completion.",
+        ...(attempts >= 3
+          ? { error: "Worker heartbeat expired before completion.", completed_at: new Date().toISOString() }
+          : {}),
+      })
+      .eq("id", run.id)
+      .eq("status", "running");
+    requeued += 1;
   }
+  return requeued;
 }
 
-export async function processQueuedWorkflowRuns(limit = 2, dbOverride?: Sb) {
-  const db = dbOverride ?? (await admin());
-  await requeueAbandonedWorkflowRuns(db);
-
+export async function processQueuedWorkflowRuns(limit = 2) {
+  const db = await admin();
   const batch = Math.min(Math.max(Number(limit) || 1, 1), MAX_BATCH);
+  const staleRequeued = await requeueStaleRuns(db);
+  const now = new Date().toISOString();
   const { data: candidates, error } = await db
     .from("workflow_runs")
     .select("*")
     .eq("status", "queued")
+    .lte("queued_at", now)
     .order("queued_at", { ascending: true })
-    .limit(batch * 2);
-  if (error) throw new Error(error.message);
+    .limit(batch * 3);
+  if (error) throw new WorkforceError(error.message, "QUEUE_LOAD_FAILED");
 
-  let claimedCount = 0;
+  let claimed = 0;
   let succeeded = 0;
   let failed = 0;
+  let requeued = 0;
   for (const candidate of candidates ?? []) {
-    if (claimedCount >= batch) break;
-    const now = new Date().toISOString();
-    const { data: claimed } = await db
+    if (claimed >= batch) break;
+    const { data: run } = await db
       .from("workflow_runs")
       .update({
         status: "running",
-        claimed_at: now,
-        started_at: candidate.started_at ?? now,
+        worker_claimed_at: now,
         worker_heartbeat_at: now,
         worker_attempts: Number(candidate.worker_attempts ?? 0) + 1,
         worker_error: null,
+        started_at: candidate.started_at ?? now,
       })
       .eq("id", candidate.id)
       .eq("status", "queued")
       .select("*")
       .maybeSingle();
-    if (!claimed) continue;
-    claimedCount += 1;
-
-    if (claimed.cancel_requested) {
-      await db
-        .from("workflow_runs")
-        .update({ status: "cancelled", completed_at: new Date().toISOString() })
-        .eq("id", claimed.id)
-        .eq("status", "running");
-      continue;
-    }
-
+    if (!run) continue;
+    claimed += 1;
     try {
-      await executeClaimedRun(db, claimed);
-      succeeded += 1;
-    } catch (runError) {
-      await failClaimedRun(db, claimed.id, runError);
-      failed += 1;
+      const result = await executeClaimedRun(db, run);
+      if (result?.run?.status === "succeeded") succeeded += 1;
+      else if (result?.run?.status === "failed") failed += 1;
+    } catch (error) {
+      const outcome = await failClaimedRun(db, run, error);
+      if (outcome === "requeued") requeued += 1;
+      else failed += 1;
     }
   }
 
-  return { claimed: claimedCount, succeeded, failed };
+  return { claimed, succeeded, failed, requeued, stale_requeued: staleRequeued };
 }
