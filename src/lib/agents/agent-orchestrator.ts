@@ -145,16 +145,19 @@ export function normaliseOrchestratorPlan(args: {
   goal: string;
   value: unknown;
   candidates: OrchestratorCandidate[];
+  maxAssignments?: number;
+  forceApproval?: boolean;
 }): OrchestratorPlan {
   const row = args.value && typeof args.value === "object" && !Array.isArray(args.value)
     ? (args.value as Record<string, unknown>)
     : {};
   const allowedAgents = new Set(args.candidates.map((candidate) => candidate.id));
+  const assignmentLimit = Math.min(Math.max(Number(args.maxAssignments ?? 12) || 1, 1), 12);
   const assignments = Array.isArray(row["assignments"])
     ? row["assignments"]
         .map((item, index) => normaliseAssignment(item, index, allowedAgents))
         .filter((item): item is OrchestratorAssignment => Boolean(item))
-        .slice(0, 12)
+        .slice(0, assignmentLimit)
     : [];
 
   const unique: OrchestratorAssignment[] = [];
@@ -167,6 +170,7 @@ export function normaliseOrchestratorPlan(args: {
   const validIds = new Set(unique.map((assignment) => assignment.id));
   const cleaned = unique.map((assignment) => ({
     ...assignment,
+    requires_approval: args.forceApproval === true ? true : assignment.requires_approval,
     depends_on: assignment.depends_on.filter(
       (dependency) => dependency !== assignment.id && validIds.has(dependency),
     ),
@@ -184,6 +188,7 @@ export function normaliseOrchestratorPlan(args: {
 export function fallbackOrchestratorPlan(
   goal: string,
   candidate: OrchestratorCandidate,
+  forceApproval = false,
 ): OrchestratorPlan {
   return {
     version: 1,
@@ -197,7 +202,7 @@ export function fallbackOrchestratorPlan(
         agent_id: candidate.id,
         depends_on: [],
         success_criteria: candidate.operating_profile?.success_criteria?.slice(0, 12) ?? [],
-        requires_approval: false,
+        requires_approval: forceApproval,
       },
     ],
   };
