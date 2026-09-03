@@ -254,8 +254,7 @@ async function persistGeneratedWorkflow(args: {
   return workflow as { id: string; name: string };
 }
 
-/** Select specialists, generate a dependency-aware workflow, then execute it. */
-export async function orchestrateGoal(args: {
+export async function planOrchestratedGoal(args: {
   sb: Sb;
   userId: string;
   goal: string;
@@ -282,12 +281,24 @@ export async function orchestrateGoal(args: {
     goal,
     plan,
   });
+  return { workflow, plan, goal };
+}
+
+/** Select specialists, generate a dependency-aware workflow, then execute it. */
+export async function orchestrateGoal(args: {
+  sb: Sb;
+  userId: string;
+  goal: string;
+  workforceId?: string | null;
+  orgId?: string | null;
+}) {
+  const prepared = await planOrchestratedGoal(args);
   const execution = await executeWorkflow({
     sb: args.sb,
     userId: args.userId,
-    workflowId: workflow.id,
-    input: goal,
+    workflowId: prepared.workflow.id,
+    input: prepared.goal,
     trigger: "orchestrator",
   });
-  return { workflow, plan, execution };
+  return { workflow: prepared.workflow, plan: prepared.plan, execution };
 }
