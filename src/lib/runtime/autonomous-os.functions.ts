@@ -98,7 +98,7 @@ export const controlAutonomousGoal = createServerFn({ method: "POST" })
     const { data: goal, error } = await sb.from("autonomous_goals").update({ status }).eq("id", data.id).eq("user_id", context.userId).select("id,name,status").maybeSingle();
     if (error || !goal) throw new Error(error?.message ?? "Autonomous goal not found.");
     if (data.action === "cancel") {
-      await sb.from("autonomous_goal_runs").update({ status: "cancelled", completed_at: new Date().toISOString() }).eq("goal_id", data.id).eq("user_id", context.userId).in("status", ["queued", "planning", "running"]);
+      await sb.from("autonomous_goal_runs").update({ status: "cancelled", completed_at: new Date().toISOString() }).eq("goal_id", data.id).eq("user_id", context.userId).in("status", ["queued", "planning", "running", "waiting_for_approval"]);
     }
     await event(sb, { goal_id: data.id, user_id: context.userId, event_type: `goal_${data.action}`, severity: data.action === "cancel" ? "warning" : "info", message: `${goal.name} ${data.action === "pause" ? "paused" : data.action === "resume" ? "resumed" : "cancelled"}.` });
     return goal;
@@ -132,16 +132,17 @@ export const runAutonomousGoal = createServerFn({ method: "POST" })
         workforceId: goal.workforce_id ?? null,
         orgId: goal.org_id ?? null,
       });
-      const executionStatus = String(result.execution?.status ?? "running");
-      const finalStatus = executionStatus === "completed" || executionStatus === "succeeded" ? "completed" : executionStatus === "waiting_for_approval" ? "waiting_for_approval" : executionStatus === "failed" ? "failed" : "running";
+      const executionStatus = String(result.execution?.run?.status ?? "running");
+      const finalStatus = executionStatus === "completed" || executionStatus === "succeeded" ? "completed" : executionStatus === "waiting_for_approval" ? "waiting_for_approval" : executionStatus === "failed" ? "failed" : executionStatus === "cancelled" ? "cancelled" : "running";
+      const workflowRunId = result.execution?.run?.id ?? null;
       const now = new Date().toISOString();
       await sb.from("autonomous_goal_runs").update({
         status: finalStatus,
         workflow_id: result.workflow?.id ?? null,
-        workflow_run_id: result.execution?.run_id ?? result.execution?.id ?? null,
+        workflow_run_id: workflowRunId,
         plan: result.plan ?? null,
         summary: result.plan?.summary ?? null,
-        completed_at: finalStatus === "completed" || finalStatus === "failed" ? now : null,
+        completed_at: ["completed", "failed", "cancelled"].includes(finalStatus) ? now : null,
       }).eq("id", run.id).eq("user_id", context.userId);
       await sb.from("autonomous_goals").update({
         last_run_at: now,
@@ -152,9 +153,9 @@ export const runAutonomousGoal = createServerFn({ method: "POST" })
         run_id: run.id,
         user_id: context.userId,
         event_type: finalStatus === "completed" ? "goal_completed" : "execution_started",
-        severity: finalStatus === "completed" ? "success" : "info",
-        message: finalStatus === "completed" ? "Goal completed successfully." : finalStatus === "waiting_for_approval" ? "Execution is waiting for approval." : "Specialist fleet is executing the generated workflow.",
-        payload: { workflow_id: result.workflow?.id ?? null, workflow_run_id: result.execution?.run_id ?? result.execution?.id ?? null, assignments: result.plan?.assignments?.length ?? 0 },
+        severity: finalStatus === "completed" ? "success" : finalStatus === "failed" ? "error" : "info",
+        message: finalStatus === "completed" ? "Goal completed successfully." : finalStatus === "waiting_for_approval" ? "Execution is waiting for approval." : finalStatus === "failed" ? "The specialist workflow failed." : "Specialist fleet is executing the generated workflow.",
+        payload: { workflow_id: result.workflow?.id ?? null, workflow_run_id: workflowRunId, assignments: result.plan?.assignments?.length ?? 0 },
       });
       return { run_id: run.id, ...result };
     } catch (cause) {
