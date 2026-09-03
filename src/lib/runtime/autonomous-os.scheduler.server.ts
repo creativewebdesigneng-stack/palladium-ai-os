@@ -18,6 +18,7 @@ type GoalRow = {
   schedule_cron: string | null;
   timezone: string | null;
   scheduler_attempts: number | null;
+  pending_event_context?: Record<string, unknown> | null;
 };
 
 type AutonomousRunRow = {
@@ -71,6 +72,14 @@ function mapWorkflowStatus(status: unknown) {
   return "queued";
 }
 
+function executionObjective(goal: GoalRow) {
+  if (goal.trigger_type !== "event" || !goal.pending_event_context || !Object.keys(goal.pending_event_context).length)
+    return goal.objective;
+  const context = JSON.stringify(goal.pending_event_context).slice(0, 1400);
+  const base = goal.objective.slice(0, Math.max(0, 12_000 - context.length - 80));
+  return `${base}\n\nEvent trigger context (trusted system metadata):\n${context}`.slice(0, 12_000);
+}
+
 async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
   const assignments = Array.isArray(plan?.assignments) ? plan.assignments : [];
   if (!assignments.length) return;
@@ -117,6 +126,7 @@ async function deferBusyGoal(db: Sb, goal: GoalRow) {
 
 async function queueClaimedGoal(db: Sb, goal: GoalRow) {
   const startedAt = new Date().toISOString();
+  const objective = executionObjective(goal);
   const { data: run, error: runError } = await db
     .from("autonomous_goal_runs")
     .insert({
@@ -137,8 +147,12 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
     goalId: goal.id,
     runId: run.id,
     userId: goal.user_id,
-    eventType: "scheduler_claimed",
-    message: "Background scheduler claimed this goal and started specialist planning.",
+    eventType: goal.trigger_type === "event" ? "event_trigger_claimed" : "scheduler_claimed",
+    message:
+      goal.trigger_type === "event"
+        ? "Blackstar claimed an incoming event and started specialist planning."
+        : "Background scheduler claimed this goal and started specialist planning.",
+    payload: goal.trigger_type === "event" ? { trigger_context: goal.pending_event_context ?? {} } : {},
   });
 
   const heartbeat = setInterval(() => {
@@ -159,7 +173,7 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
     const prepared = await planOrchestratedGoal({
       sb: db,
       userId: goal.user_id,
-      goal: goal.objective,
+      goal: objective,
       workforceId: goal.workforce_id,
       orgId: goal.org_id,
       maxAssignments: Number(goal.max_parallel_agents ?? 4),
@@ -170,8 +184,8 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       sb: db,
       userId: goal.user_id,
       workflowId: prepared.workflow.id,
-      input: goal.objective,
-      trigger: "autonomous_os",
+      input: objective,
+      trigger: goal.trigger_type === "event" ? "autonomous_os_event" : "autonomous_os",
     });
     const workflowRunId = String(queued.run.id);
     const now = new Date();
@@ -199,6 +213,7 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       .update({
         last_run_at: now.toISOString(),
         next_run_at: nextRun?.toISOString() ?? null,
+        pending_event_context: goal.trigger_type === "event" ? {} : goal.pending_event_context ?? {},
         scheduler_claimed_at: null,
         scheduler_lease_until: null,
         scheduler_attempts: 0,
@@ -218,6 +233,7 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
         assignments: prepared.plan?.assignments?.length ?? 0,
         max_assignments: Number(goal.max_parallel_agents ?? 4),
         assisted_approval: goal.autonomy_level === "assisted",
+        trigger_type: goal.trigger_type,
         next_run_at: nextRun?.toISOString() ?? null,
       },
     });
@@ -253,7 +269,7 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       eventType: "scheduled_run_failed",
       severity: "error",
       message: message.slice(0, 600),
-      payload: { retry_at: retryAt.toISOString(), attempt: attempts },
+      payload: { retry_at: retryAt.toISOString(), attempt: attempts, trigger_type: goal.trigger_type },
     });
     throw error;
   } finally {
@@ -349,7 +365,7 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
     .from("autonomous_goals")
     .select("*")
     .eq("status", "active")
-    .in("trigger_type", ["schedule", "continuous"])
+    .in("trigger_type", ["schedule", "continuous", "event"])
     .not("next_run_at", "is", null)
     .lte("next_run_at", nowIso)
     .or(`scheduler_lease_until.is.null,scheduler_lease_until.lt.${nowIso}`)
