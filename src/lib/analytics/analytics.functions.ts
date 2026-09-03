@@ -41,7 +41,7 @@ export const getAnalytics = createServerFn({ method: "POST" })
       await Promise.all([
         sb
           .from("agent_tasks")
-          .select("id, status, created_at, completed_at, agent_id, model, total_tokens, cost_usd")
+          .select("id, status, created_at, completed_at, agent_id, model, tokens_in, tokens_out, cost_pence")
           .gte("created_at", since)
           .order("created_at", { ascending: false })
           .limit(2000),
@@ -52,8 +52,8 @@ export const getAnalytics = createServerFn({ method: "POST" })
           .limit(1000),
         sb
           .from("usage_records")
-          .select("metric, quantity, unit, created_at, metadata")
-          .gte("created_at", since)
+          .select("metric, quantity, unit, occurred_at, metadata")
+          .gte("occurred_at", since)
           .limit(2000),
         sb.from("personal_agents").select("id, name, status, category").limit(500),
         sb.from("crm_contacts").select("id, stage, value_gbp, created_at").limit(1000),
@@ -68,12 +68,12 @@ export const getAnalytics = createServerFn({ method: "POST" })
     if (tasksRes.error) throw new Error(tasksRes.error.message);
 
     const tasks = (tasksRes.data ?? []) as any[];
-    const runs = (runsRes.data ?? []) as any[];
-    const usage = (usageRes.data ?? []) as any[];
-    const agents = (agentsRes.data ?? []) as any[];
-    const contacts = (contactsRes.data ?? []) as any[];
-    const transactions = (txRes.data ?? []) as any[];
-    const campaigns = (campaignsRes.data ?? []) as any[];
+    const runs = runsRes.error ? [] : ((runsRes.data ?? []) as any[]);
+    const usage = usageRes.error ? [] : ((usageRes.data ?? []) as any[]);
+    const agents = agentsRes.error ? [] : ((agentsRes.data ?? []) as any[]);
+    const contacts = contactsRes.error ? [] : ((contactsRes.data ?? []) as any[]);
+    const transactions = txRes.error ? [] : ((txRes.data ?? []) as any[]);
+    const campaigns = campaignsRes.error ? [] : ((campaignsRes.data ?? []) as any[]);
 
     const completed = tasks.filter((t) => t.status === "completed" || t.status === "succeeded");
     const failed = tasks.filter((t) => t.status === "failed");
@@ -101,8 +101,8 @@ export const getAnalytics = createServerFn({ method: "POST" })
       const model = task.model || "unspecified";
       const bucket = modelMap.get(model) ?? { model, runs: 0, tokens: 0, cost: 0 };
       bucket.runs += 1;
-      bucket.tokens += Number(task.total_tokens ?? 0);
-      bucket.cost += Number(task.cost_usd ?? 0);
+      bucket.tokens += Number(task.tokens_in ?? 0) + Number(task.tokens_out ?? 0);
+      bucket.cost += Number(task.cost_pence ?? 0) / 100;
       modelMap.set(model, bucket);
     }
 
@@ -119,12 +119,20 @@ export const getAnalytics = createServerFn({ method: "POST" })
       if (task.status === "failed") bucket.failed += 1;
     }
 
-    const tokens = usage
+    const meteredTokens = usage
       .filter((u) => u.metric === "tokens" || u.unit === "token")
       .reduce((s, u) => s + Number(u.quantity ?? 0), 0);
-    const modelCost =
-      tasks.reduce((s, t) => s + Number(t.cost_usd ?? 0), 0) ||
-      usage.filter((u) => u.unit === "usd").reduce((s, u) => s + Number(u.quantity ?? 0), 0);
+    const taskTokens = tasks.reduce(
+      (s, t) => s + Number(t.tokens_in ?? 0) + Number(t.tokens_out ?? 0),
+      0,
+    );
+    const tokens = meteredTokens || taskTokens;
+
+    const taskCostGbp = tasks.reduce((s, t) => s + Number(t.cost_pence ?? 0) / 100, 0);
+    const meteredCostGbp = usage
+      .filter((u) => u.unit === "gbp" || u.unit === "GBP")
+      .reduce((s, u) => s + Number(u.quantity ?? 0), 0);
+    const modelCost = taskCostGbp || meteredCostGbp;
 
     const revenue = transactions
       .filter((t) => t.direction === "income")
