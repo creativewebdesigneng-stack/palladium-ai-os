@@ -5,13 +5,21 @@ import { BrainCircuit, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Squa
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
-import { createAutonomousGoal, listAutonomousGoals, runAutonomousGoal, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import { createAutonomousGoal, listAutonomousGoals, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
   if (status === 'failed' || status === 'cancelled') return 'border-rose-300/20 bg-rose-300/[.06] text-rose-200';
-  if (status === 'paused') return 'border-amber-300/20 bg-amber-300/[.06] text-amber-200';
+  if (status === 'paused' || status === 'waiting_for_approval') return 'border-amber-300/20 bg-amber-300/[.06] text-amber-200';
   return 'border-violet-300/20 bg-violet-300/[.06] text-violet-100';
+};
+
+const when = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 };
 
 export default function AutonomousOS() {
@@ -19,22 +27,27 @@ export default function AutonomousOS() {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutonomousGoals);
   const createFn = useServerFn(createAutonomousGoal);
-  const runFn = useServerFn(runAutonomousGoal);
+  const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
   const [draft, setDraft] = useState({ name: '', objective: '', autonomy_level: 'guarded', trigger_type: 'manual', schedule_cron: '' });
 
   const goalsQuery = useQuery({ queryKey: ['autonomous-os-goals'], queryFn: () => listFn(), enabled: session === 'yes', refetchInterval: 15000, retry: 1 });
   const refresh = () => qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft({ name: '', objective: '', autonomy_level: 'guarded', trigger_type: 'manual', schedule_cron: '' }); refresh(); } });
-  const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id, trigger: 'manual' } }), onSettled: refresh });
+  const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
 
-  const data = goalsQuery.data ?? { goals: [], runs: [], events: [] };
+  const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [] };
   const latestRun = useMemo(() => {
     const map = new Map();
     for (const run of data.runs ?? []) if (!map.has(run.goal_id)) map.set(run.goal_id, run);
     return map;
   }, [data.runs]);
+  const fleetByGoal = useMemo(() => {
+    const map = new Map();
+    for (const row of data.fleets ?? []) map.set(row.goal_id, (map.get(row.goal_id) ?? 0) + 1);
+    return map;
+  }, [data.fleets]);
 
   const submit = (event) => {
     event.preventDefault();
@@ -84,9 +97,9 @@ export default function AutonomousOS() {
         <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Runtime posture</p><h3 className="mt-1 text-lg font-semibold text-white">Agent fleet control</h3></div><button onClick={() => goalsQuery.refetch()} className="rounded-lg border border-white/10 p-2 text-white/45 hover:text-white"><RefreshCw className={`h-4 w-4 ${goalsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.goals?.filter((g) => g.status === 'active').length ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.runs?.filter((r) => ['planning','running','waiting_for_approval'].includes(r.status)).length ?? 0}</p><p className="text-xs text-white/35">Live / governed runs</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.runs?.filter((r) => ['queued','planning','running','waiting_for_approval'].includes(r.status)).length ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
         </div>
-        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Autonomous OS does not bypass them.</div>
+        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled and continuous runs all hand execution to the same durable workflow worker.</div>
       </section>
     </div>
 
@@ -96,11 +109,14 @@ export default function AutonomousOS() {
       {goalsQuery.isError && <p className="mt-5 text-sm text-rose-300">{friendlyMessage(goalsQuery.error)}</p>}
       {!goalsQuery.isLoading && !goalsQuery.isError && !data.goals?.length && <div className="mt-5 rounded-2xl border border-dashed border-white/10 p-8 text-center"><BrainCircuit className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">No autonomous goals yet. Create the first persistent mission above.</p></div>}
       <div className="mt-5 grid gap-3 xl:grid-cols-2">
-        {(data.goals ?? []).map((goal) => { const run = latestRun.get(goal.id); const busy = (runGoal.isPending && runGoal.variables === goal.id) || (controlGoal.isPending && controlGoal.variables?.id === goal.id); return <article key={goal.id} className="rounded-2xl border border-white/8 bg-white/[.018] p-4">
+        {(data.goals ?? []).map((goal) => { const run = latestRun.get(goal.id); const fleetCount = fleetByGoal.get(goal.id) ?? 0; const busy = (runGoal.isPending && runGoal.variables === goal.id) || (controlGoal.isPending && controlGoal.variables?.id === goal.id); return <article key={goal.id} className="rounded-2xl border border-white/8 bg-white/[.018] p-4">
           <div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold text-white">{goal.name}</h4><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(goal.status)}`}>{goal.status}</span></div><p className="mt-2 line-clamp-3 text-sm leading-6 text-white/42">{goal.objective}</p></div><BrainCircuit className="h-5 w-5 shrink-0 text-violet-300/60" /></div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span>{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
-          {run?.error && <p className="mt-3 text-xs text-rose-300/80">{run.error}</p>}
-          <div className="mt-4 flex flex-wrap gap-2">{goal.status === 'active' && <button disabled={busy} onClick={() => runGoal.mutate(goal.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"><Play className="h-3.5 w-3.5" />Run now</button>}{goal.status === 'active' && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'pause' })} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60"><Pause className="h-3.5 w-3.5" />Pause</button>}{goal.status === 'paused' && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'resume' })} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/15 px-3 py-2 text-xs text-emerald-200"><Play className="h-3.5 w-3.5" />Resume</button>}{!['cancelled','completed'].includes(goal.status) && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'cancel' })} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/15 px-3 py-2 text-xs text-rose-200"><Square className="h-3.5 w-3.5" />Cancel</button>}</div>
+          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span>{fleetCount > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{fleetCount} fleet assignments</span>}{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
+          {(goal.next_run_at || goal.scheduler_attempts > 0) && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/30">{goal.next_run_at && <span>Next worker pickup: {when(goal.next_run_at)}</span>}{goal.scheduler_attempts > 0 && <span className="text-amber-200/70">Scheduler retry {goal.scheduler_attempts}</span>}</div>}
+          {(run?.error || goal.last_scheduler_error) && <p className="mt-3 text-xs text-rose-300/80">{run?.error || goal.last_scheduler_error}</p>}
+          {run?.heartbeat_at && ['queued','planning','running','waiting_for_approval'].includes(run.status) && <p className="mt-2 text-[10px] text-emerald-200/45">Worker heartbeat: {when(run.heartbeat_at)}</p>}
+          <div className="mt-4 flex flex-wrap gap-2">{goal.status === 'active' && <button disabled={busy} onClick={() => runGoal.mutate(goal.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"><Play className="h-3.5 w-3.5" />{runGoal.isPending && runGoal.variables === goal.id ? 'Queueing…' : 'Run now'}</button>}{goal.status === 'active' && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'pause' })} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60"><Pause className="h-3.5 w-3.5" />Pause</button>}{goal.status === 'paused' && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'resume' })} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/15 px-3 py-2 text-xs text-emerald-200"><Play className="h-3.5 w-3.5" />Resume</button>}{!['cancelled','completed'].includes(goal.status) && <button disabled={busy} onClick={() => controlGoal.mutate({ id: goal.id, action: 'cancel' })} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/15 px-3 py-2 text-xs text-rose-200"><Square className="h-3.5 w-3.5" />Cancel</button>}</div>
+          {runGoal.isError && runGoal.variables === goal.id && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(runGoal.error)}</p>}
         </article>; })}
       </div>
     </section>
