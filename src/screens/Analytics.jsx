@@ -135,7 +135,7 @@ export default function Analytics() {
             <Stat label="Workflow runs" value={formatNumber(totals.workflowRuns)} />
             <Stat label="Workflow success" value={totals.workflowSuccessRate == null ? null : formatPercent(totals.workflowSuccessRate)} />
             <Stat label="Agents" value={formatNumber(totals.agents)} />
-            <Stat label="Model cost" value={totals.modelCost ? `$${Number(totals.modelCost).toFixed(2)}` : null} />
+            <Stat label="Model cost" value={totals.modelCost ? `£${Number(totals.modelCost).toFixed(2)}` : null} />
           </div>
         </>
       )}
