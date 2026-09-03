@@ -35,12 +35,12 @@ jobs:
           set +e
           for attempt in 1 2 3; do
             echo "Dependency audit attempt ${attempt}/3"
-            bun audit --audit-level high 2>&1 | tee audit-output.log
+            timeout --signal=TERM --kill-after=5s 75s bun audit --audit-level high 2>&1 | tee audit-output.log
             rc=${PIPESTATUS[0]}
             if [ "$rc" -eq 0 ]; then
               exit 0
             fi
-            if grep -Eqi 'ConnectionClosed|audit request failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket hang up|network' audit-output.log && [ "$attempt" -lt 3 ]; then
+            if { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ] || grep -Eqi 'ConnectionClosed|audit request failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket hang up|network' audit-output.log; } && [ "$attempt" -lt 3 ]; then
               echo "Transient audit service/network failure; retrying."
               sleep $((attempt * 5))
               continue
