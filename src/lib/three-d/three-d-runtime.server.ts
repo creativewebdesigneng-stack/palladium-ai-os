@@ -11,9 +11,10 @@ export type ThreeDWorkerResult = {
 };
 
 const ALLOWED_FORMATS = new Set(["glb", "gltf", "obj", "ply", "stl", "vox"]);
+const DEFAULT_MODLY_API_URL = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
 
 function workerConfig() {
-  const base = (process.env["MODLY_API_URL"] || "").trim().replace(/\/+$/, "");
+  const base = (process.env["MODLY_API_URL"] || DEFAULT_MODLY_API_URL).trim().replace(/\/+$/, "");
   const token = (process.env["MODLY_API_TOKEN"] || "").trim();
   return { base, token };
 }
@@ -26,7 +27,7 @@ export function getThreeDRuntimeCapabilities() {
     workflows: ["image-to-mesh"],
     formats: [...ALLOWED_FORMATS],
     localFirst: true,
-    note: "Uses a separately configured Modly-compatible worker. PalladiumAI does not bundle model weights, Python runtimes or desktop executables.",
+    note: "Uses the Blackstar hosted Modly-compatible image-to-mesh execution node by default. MODLY_API_URL can override it with a dedicated Modly-compatible GPU worker.",
   };
 }
 
@@ -76,7 +77,7 @@ function asJson(value: unknown, depth = 0): Json {
 
 async function request(path: string, init?: RequestInit): Promise<any> {
   const { base, token } = workerConfig();
-  if (!base) throw new Error("3D Studio is not configured. Set MODLY_API_URL to a Modly-compatible worker.");
+  if (!base) throw new Error("3D Studio execution worker is unavailable.");
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -95,7 +96,6 @@ export async function submitThreeDJob(input: { sourceUrl: string; outputFormat: 
   const source = publicHttpUrl(input.sourceUrl).toString();
   const format = input.outputFormat.toLowerCase();
   if (!ALLOWED_FORMATS.has(format)) throw new Error("Unsupported 3D output format.");
-  // Modly's canonical automation flow is workflow-runs/from-image. We keep that contract at the adapter boundary.
   const json = await request("/workflow-runs/from-image", { method: "POST", body: JSON.stringify({ image_url: source, output_format: format }) });
   const workerJobId = String(json.id ?? json.run_id ?? json.workflow_run_id ?? "").trim();
   if (!workerJobId) throw new Error("3D worker did not return a workflow run id.");
