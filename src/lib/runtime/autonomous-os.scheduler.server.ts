@@ -12,6 +12,8 @@ type GoalRow = {
   name: string;
   objective: string;
   status: string;
+  autonomy_level: string;
+  max_parallel_agents: number | null;
   trigger_type: string;
   schedule_cron: string | null;
   timezone: string | null;
@@ -160,6 +162,8 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       goal: goal.objective,
       workforceId: goal.workforce_id,
       orgId: goal.org_id,
+      maxAssignments: Number(goal.max_parallel_agents ?? 4),
+      forceApproval: goal.autonomy_level === "assisted",
     });
     await persistFleet(db, goal, run.id, prepared.plan);
     const queued = await queueWorkflowRun({
@@ -212,6 +216,8 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
         workflow_id: prepared.workflow.id,
         workflow_run_id: workflowRunId,
         assignments: prepared.plan?.assignments?.length ?? 0,
+        max_assignments: Number(goal.max_parallel_agents ?? 4),
+        assisted_approval: goal.autonomy_level === "assisted",
         next_run_at: nextRun?.toISOString() ?? null,
       },
     });
