@@ -11,9 +11,22 @@ const scheduler = readFileSync(
   fileURLToPath(new URL("../autonomous-os.scheduler.server.ts", import.meta.url)),
   "utf8",
 );
+const orchestrator = readFileSync(
+  fileURLToPath(new URL("../orchestrator.server.ts", import.meta.url)),
+  "utf8",
+);
 const migration = readFileSync(
   fileURLToPath(
     new URL("../../../../supabase/migrations/20260903224000_autonomous_os_scheduler.sql", import.meta.url),
+  ),
+  "utf8",
+);
+const cancellationMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../../supabase/migrations/20260903225500_autonomous_os_cancel_propagation.sql",
+      import.meta.url,
+    ),
   ),
   "utf8",
 );
@@ -43,12 +56,22 @@ describe("Autonomous OS durable worker contract", () => {
     expect(workerRoute).toContain("autonomous_goals");
   });
 
-  it("uses leases, heartbeats and bounded retries", () => {
+  it("splits orchestration planning from execution and hands work to the durable queue", () => {
+    expect(orchestrator).toContain("export async function planOrchestratedGoal");
+    expect(orchestrator).toContain("const prepared = await planOrchestratedGoal(args)");
+    expect(scheduler).toContain("planOrchestratedGoal");
+    expect(scheduler).toContain("queueWorkflowRun");
+    expect(scheduler).toContain('trigger: "autonomous_os"');
+  });
+
+  it("uses leases, planning heartbeats, reconciliation and bounded retries", () => {
     expect(scheduler).toContain("scheduler_lease_until");
     expect(scheduler).toContain("heartbeat_at");
     expect(scheduler).toContain("LEASE_MS");
     expect(scheduler).toContain("retryMinutes");
     expect(scheduler).toContain("scheduler_attempts");
+    expect(scheduler).toContain("reconcileAutonomousGoalRuns");
+    expect(scheduler).toContain("hasActiveGoalRun");
   });
 
   it("persists specialist fleet assignments behind owner RLS", () => {
@@ -56,5 +79,12 @@ describe("Autonomous OS durable worker contract", () => {
     expect(migration).toContain("enable row level security");
     expect(migration).toContain("to authenticated");
     expect(migration).toContain("auth.uid()");
+  });
+
+  it("propagates cancellation into an owner-matched active workflow run", () => {
+    expect(cancellationMigration).toContain("propagate_autonomous_run_cancellation");
+    expect(cancellationMigration).toContain("cancel_requested = true");
+    expect(cancellationMigration).toContain("user_id = new.user_id");
+    expect(cancellationMigration).toContain("waiting_for_approval");
   });
 });
