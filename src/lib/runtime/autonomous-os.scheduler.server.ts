@@ -1,5 +1,6 @@
-import { orchestrateGoal } from "./orchestrator.server";
 import { nextAutonomousRun } from "./autonomous-schedule";
+import { planOrchestratedGoal } from "./orchestrator.server";
+import { queueWorkflowRun } from "./workflow-queue.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -17,9 +18,18 @@ type GoalRow = {
   scheduler_attempts: number | null;
 };
 
+type AutonomousRunRow = {
+  id: string;
+  goal_id: string;
+  user_id: string;
+  status: string;
+  workflow_run_id: string | null;
+};
+
 const MAX_BATCH = 2;
 const LEASE_MS = 12 * 60 * 1000;
-const HEARTBEAT_MS = 30_000;
+const PLANNING_HEARTBEAT_MS = 30_000;
+const ACTIVE_AUTONOMOUS_STATES = ["queued", "planning", "running", "waiting_for_approval"];
 
 async function admin(): Promise<Sb> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -49,13 +59,14 @@ async function writeEvent(
   });
 }
 
-function executionStatus(result: any) {
-  const status = String(result?.execution?.run?.status ?? "running");
-  if (status === "succeeded") return "completed";
-  if (status === "waiting_for_approval") return "waiting_for_approval";
-  if (status === "failed") return "failed";
-  if (status === "cancelled") return "cancelled";
-  return "running";
+function mapWorkflowStatus(status: unknown) {
+  const value = String(status ?? "queued");
+  if (value === "succeeded") return "completed";
+  if (value === "waiting_for_approval") return "waiting_for_approval";
+  if (value === "failed") return "failed";
+  if (value === "cancelled") return "cancelled";
+  if (value === "running") return "running";
+  return "queued";
 }
 
 async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
@@ -72,12 +83,37 @@ async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
     depends_on: Array.isArray(assignment.depends_on) ? assignment.depends_on : [],
     success_criteria: Array.isArray(assignment.success_criteria) ? assignment.success_criteria : [],
     requires_approval: Boolean(assignment.requires_approval),
-    status: "planned",
+    status: "queued",
   }));
   await db.from("autonomous_goal_fleet_assignments").insert(rows);
 }
 
-async function executeClaimedGoal(db: Sb, goal: GoalRow) {
+async function hasActiveGoalRun(db: Sb, goalId: string) {
+  const { data } = await db
+    .from("autonomous_goal_runs")
+    .select("id")
+    .eq("goal_id", goalId)
+    .in("status", ACTIVE_AUTONOMOUS_STATES)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data?.id);
+}
+
+async function deferBusyGoal(db: Sb, goal: GoalRow) {
+  const deferred = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  await db
+    .from("autonomous_goals")
+    .update({
+      next_run_at: deferred,
+      scheduler_claimed_at: null,
+      scheduler_lease_until: null,
+    })
+    .eq("id", goal.id)
+    .eq("status", "active");
+  return deferred;
+}
+
+async function queueClaimedGoal(db: Sb, goal: GoalRow) {
   const startedAt = new Date().toISOString();
   const { data: run, error: runError } = await db
     .from("autonomous_goal_runs")
@@ -114,41 +150,46 @@ async function executeClaimedGoal(db: Sb, goal: GoalRow) {
       .from("autonomous_goal_runs")
       .update({ heartbeat_at: now.toISOString() })
       .eq("id", run.id)
-      .in("status", ["planning", "running", "waiting_for_approval"]);
-  }, HEARTBEAT_MS);
+      .eq("status", "planning");
+  }, PLANNING_HEARTBEAT_MS);
 
   try {
-    const result = await orchestrateGoal({
+    const prepared = await planOrchestratedGoal({
       sb: db,
       userId: goal.user_id,
       goal: goal.objective,
       workforceId: goal.workforce_id,
       orgId: goal.org_id,
     });
-    const status = executionStatus(result);
+    await persistFleet(db, goal, run.id, prepared.plan);
+    const queued = await queueWorkflowRun({
+      sb: db,
+      userId: goal.user_id,
+      workflowId: prepared.workflow.id,
+      input: goal.objective,
+      trigger: "autonomous_os",
+    });
+    const workflowRunId = String(queued.run.id);
     const now = new Date();
-    await persistFleet(db, goal, run.id, result.plan);
-    await db
-      .from("autonomous_goal_runs")
-      .update({
-        status,
-        workflow_id: result.workflow?.id ?? null,
-        workflow_run_id: result.execution?.run?.id ?? null,
-        plan: result.plan ?? null,
-        summary: result.plan?.summary ?? null,
-        heartbeat_at: now.toISOString(),
-        completed_at: ["completed", "failed", "cancelled"].includes(status)
-          ? now.toISOString()
-          : null,
-      })
-      .eq("id", run.id);
-
     const nextRun = nextAutonomousRun({
       triggerType: goal.trigger_type,
       scheduleCron: goal.schedule_cron,
       timezone: goal.timezone,
       after: now,
     });
+
+    await db
+      .from("autonomous_goal_runs")
+      .update({
+        status: "queued",
+        workflow_id: prepared.workflow.id,
+        workflow_run_id: workflowRunId,
+        plan: prepared.plan,
+        summary: prepared.plan?.summary ?? null,
+        heartbeat_at: now.toISOString(),
+      })
+      .eq("id", run.id)
+      .eq("status", "planning");
     await db
       .from("autonomous_goals")
       .update({
@@ -161,33 +202,22 @@ async function executeClaimedGoal(db: Sb, goal: GoalRow) {
       })
       .eq("id", goal.id);
 
-    await db
-      .from("autonomous_goal_fleet_assignments")
-      .update({ status: status === "completed" ? "completed" : status })
-      .eq("run_id", run.id);
-
     await writeEvent(db, {
       goalId: goal.id,
       runId: run.id,
       userId: goal.user_id,
-      eventType: status === "completed" ? "scheduled_run_completed" : "scheduled_run_updated",
-      severity: status === "completed" ? "success" : status === "failed" ? "error" : "info",
-      message:
-        status === "completed"
-          ? "Scheduled autonomous run completed successfully."
-          : status === "waiting_for_approval"
-            ? "Scheduled autonomous run is waiting for approval."
-            : `Scheduled autonomous run is ${status}.`,
+      eventType: "workflow_queued",
+      message: "Specialist plan created and handed to Blackstar's durable workflow worker.",
       payload: {
-        workflow_id: result.workflow?.id ?? null,
-        workflow_run_id: result.execution?.run?.id ?? null,
-        assignments: Array.isArray(result.plan?.assignments) ? result.plan.assignments.length : 0,
+        workflow_id: prepared.workflow.id,
+        workflow_run_id: workflowRunId,
+        assignments: prepared.plan?.assignments?.length ?? 0,
         next_run_at: nextRun?.toISOString() ?? null,
       },
     });
-    return status;
+    return "queued";
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Autonomous background execution failed.";
+    const message = error instanceof Error ? error.message : "Autonomous background planning failed.";
     const attempts = Math.max(1, Number(goal.scheduler_attempts ?? 0) + 1);
     const retryMinutes = Math.min(30, 2 ** Math.min(attempts, 4));
     const retryAt = new Date(Date.now() + retryMinutes * 60 * 1000);
@@ -225,8 +255,87 @@ async function executeClaimedGoal(db: Sb, goal: GoalRow) {
   }
 }
 
+export async function reconcileAutonomousGoalRuns(dbOverride?: Sb) {
+  const db = dbOverride ?? (await admin());
+  const { data: active, error } = await db
+    .from("autonomous_goal_runs")
+    .select("id,goal_id,user_id,status,workflow_run_id")
+    .in("status", ["queued", "running", "waiting_for_approval"])
+    .not("workflow_run_id", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(40);
+  if (error) throw new Error(error.message);
+
+  let updated = 0;
+  let completed = 0;
+  let failed = 0;
+  for (const run of (active ?? []) as AutonomousRunRow[]) {
+    const { data: workflowRun } = await db
+      .from("workflow_runs")
+      .select("id,status,error,worker_error,completed_at,worker_heartbeat_at")
+      .eq("id", run.workflow_run_id)
+      .maybeSingle();
+    if (!workflowRun) continue;
+    const nextStatus = mapWorkflowStatus(workflowRun.status);
+    const terminal = ["completed", "failed", "cancelled"].includes(nextStatus);
+    if (nextStatus === run.status && !terminal) {
+      await db
+        .from("autonomous_goal_runs")
+        .update({ heartbeat_at: workflowRun.worker_heartbeat_at ?? new Date().toISOString() })
+        .eq("id", run.id);
+      continue;
+    }
+
+    const now = new Date().toISOString();
+    const message = String(workflowRun.worker_error ?? workflowRun.error ?? "").slice(0, 1000) || null;
+    await db
+      .from("autonomous_goal_runs")
+      .update({
+        status: nextStatus,
+        error: nextStatus === "failed" ? message : null,
+        heartbeat_at: workflowRun.worker_heartbeat_at ?? now,
+        completed_at: terminal ? workflowRun.completed_at ?? now : null,
+      })
+      .eq("id", run.id);
+    await db
+      .from("autonomous_goal_fleet_assignments")
+      .update({ status: nextStatus })
+      .eq("run_id", run.id)
+      .in("status", ["queued", "running", "waiting_for_approval"]);
+
+    await writeEvent(db, {
+      goalId: run.goal_id,
+      runId: run.id,
+      userId: run.user_id,
+      eventType:
+        nextStatus === "completed"
+          ? "goal_run_completed"
+          : nextStatus === "failed"
+            ? "goal_run_failed"
+            : nextStatus === "waiting_for_approval"
+              ? "goal_run_waiting_for_approval"
+              : "goal_run_status_changed",
+      severity: nextStatus === "completed" ? "success" : nextStatus === "failed" ? "error" : "info",
+      message:
+        nextStatus === "completed"
+          ? "Autonomous specialist workflow completed successfully."
+          : nextStatus === "failed"
+            ? message ?? "Autonomous specialist workflow failed."
+            : nextStatus === "waiting_for_approval"
+              ? "Autonomous specialist workflow is waiting for operator approval."
+              : `Autonomous specialist workflow is ${nextStatus}.`,
+      payload: { workflow_run_id: run.workflow_run_id },
+    });
+    updated += 1;
+    if (nextStatus === "completed") completed += 1;
+    if (nextStatus === "failed") failed += 1;
+  }
+  return { updated, completed, failed };
+}
+
 export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
   const db = dbOverride ?? (await admin());
+  const reconciliation = await reconcileAutonomousGoalRuns(db);
   const batch = Math.min(Math.max(Number(limit) || 1, 1), MAX_BATCH);
   const now = new Date();
   const nowIso = now.toISOString();
@@ -243,11 +352,16 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
   if (error) throw new Error(error.message);
 
   let claimed = 0;
-  let completed = 0;
-  let waiting = 0;
+  let queued = 0;
+  let deferred = 0;
   let failed = 0;
   for (const candidate of (candidates ?? []) as GoalRow[]) {
     if (claimed >= batch) break;
+    if (await hasActiveGoalRun(db, candidate.id)) {
+      await deferBusyGoal(db, candidate);
+      deferred += 1;
+      continue;
+    }
     const leaseUntil = new Date(Date.now() + LEASE_MS).toISOString();
     const { data: goal } = await db
       .from("autonomous_goals")
@@ -261,12 +375,11 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
     if (!goal) continue;
     claimed += 1;
     try {
-      const status = await executeClaimedGoal(db, goal as GoalRow);
-      if (status === "completed") completed += 1;
-      else if (status === "waiting_for_approval") waiting += 1;
+      await queueClaimedGoal(db, goal as GoalRow);
+      queued += 1;
     } catch {
       failed += 1;
     }
   }
-  return { claimed, completed, waiting, failed };
+  return { claimed, queued, deferred, failed, reconciliation };
 }
