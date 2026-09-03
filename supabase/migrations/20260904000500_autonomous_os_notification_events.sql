@@ -35,9 +35,9 @@ begin
     and g.status = 'active'
     and g.trigger_type = 'event'
     and coalesce(g.event_source, 'notification') = 'notification'
+    and nullif(trim(g.event_match), '') is not null
     and (
-      nullif(trim(g.event_match), '') is null
-      or coalesce(new.title, '') ilike '%' || g.event_match || '%'
+      coalesce(new.title, '') ilike '%' || g.event_match || '%'
       or coalesce(new.body, '') ilike '%' || g.event_match || '%'
       or coalesce(new.kind, '') ilike '%' || g.event_match || '%'
     );
