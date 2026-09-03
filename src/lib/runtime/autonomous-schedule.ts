@@ -1,6 +1,6 @@
 const MAX_LOOKAHEAD_MINUTES = 60 * 24 * 370;
 
-type CronField = { matches: (value: number) => boolean };
+type CronField = { matches: (value: number) => boolean; unrestricted: boolean };
 
 function parsePart(part: string, min: number, max: number): Set<number> {
   const out = new Set<number>();
@@ -29,11 +29,12 @@ function parsePart(part: string, min: number, max: number): Set<number> {
 }
 
 function parseField(text: string, min: number, max: number): CronField {
+  const compact = text.trim();
   const values = new Set<number>();
-  for (const part of text.split(',')) {
+  for (const part of compact.split(',')) {
     for (const value of parsePart(part.trim(), min, max)) values.add(value);
   }
-  return { matches: (value) => values.has(value) };
+  return { matches: (value) => values.has(value), unrestricted: compact === '*' };
 }
 
 function localParts(date: Date, timezone: string) {
@@ -57,6 +58,15 @@ function localParts(date: Date, timezone: string) {
   };
 }
 
+function calendarDayMatches(day: CronField, weekday: CronField, localDay: number, localWeekday: number) {
+  const dayMatches = day.matches(localDay);
+  const weekdayMatches = weekday.matches(localWeekday);
+  if (day.unrestricted && weekday.unrestricted) return true;
+  if (day.unrestricted) return weekdayMatches;
+  if (weekday.unrestricted) return dayMatches;
+  return dayMatches || weekdayMatches;
+}
+
 export function nextCronRun(cron: string, timezone: string, after = new Date()): Date {
   const fields = cron.trim().split(/\s+/);
   if (fields.length !== 5) throw new Error('Use a standard five-field cron expression.');
@@ -76,9 +86,8 @@ export function nextCronRun(cron: string, timezone: string, after = new Date()):
     if (
       minute.matches(local.minute) &&
       hour.matches(local.hour) &&
-      day.matches(local.day) &&
       month.matches(local.month) &&
-      weekday.matches(local.weekday)
+      calendarDayMatches(day, weekday, local.day, local.weekday)
     ) return cursor;
     cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
   }
