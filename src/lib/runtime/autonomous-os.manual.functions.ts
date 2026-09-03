@@ -56,7 +56,7 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const { data: goal, error } = await sb
       .from("autonomous_goals")
-      .select("id,user_id,org_id,workforce_id,name,objective,status")
+      .select("id,user_id,org_id,workforce_id,name,objective,status,autonomy_level,max_parallel_agents")
       .eq("id", data.id)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -105,6 +105,8 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
         goal: goal.objective,
         workforceId: goal.workforce_id ?? null,
         orgId: goal.org_id ?? null,
+        maxAssignments: Number(goal.max_parallel_agents ?? 4),
+        forceApproval: goal.autonomy_level === "assisted",
       });
       await persistFleet(sb, {
         goalId: goal.id,
@@ -149,6 +151,8 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
           workflow_id: prepared.workflow.id,
           workflow_run_id: workflowRunId,
           assignments: prepared.plan?.assignments?.length ?? 0,
+          max_assignments: Number(goal.max_parallel_agents ?? 4),
+          assisted_approval: goal.autonomy_level === "assisted",
         },
       });
       return {
