@@ -29,6 +29,9 @@ const emptyDraft = () => ({
   trigger_type: 'manual',
   schedule_cron: '',
   event_match: '',
+  max_parallel_agents: '4',
+  max_runtime_seconds: '600',
+  budget_pounds: '',
 });
 
 export default function AutonomousOS() {
@@ -63,7 +66,11 @@ export default function AutonomousOS() {
     const name = draft.name.trim();
     const objective = draft.objective.trim();
     const eventMatch = draft.event_match.trim();
-    if (!name || !objective || createGoal.isPending || (draft.trigger_type === 'event' && !eventMatch)) return;
+    const maxAgents = Number(draft.max_parallel_agents);
+    const runtimeSeconds = Number(draft.max_runtime_seconds);
+    const budgetPounds = draft.budget_pounds.trim() === '' ? null : Number(draft.budget_pounds);
+    const invalidLimits = !Number.isInteger(maxAgents) || maxAgents < 1 || maxAgents > 12 || !Number.isInteger(runtimeSeconds) || runtimeSeconds < 30 || runtimeSeconds > 600 || (budgetPounds !== null && (!Number.isFinite(budgetPounds) || budgetPounds < 0));
+    if (!name || !objective || createGoal.isPending || invalidLimits || (draft.trigger_type === 'event' && !eventMatch)) return;
     createGoal.mutate({
       name,
       objective,
@@ -73,9 +80,9 @@ export default function AutonomousOS() {
       event_source: draft.trigger_type === 'event' ? 'notification' : null,
       event_match: draft.trigger_type === 'event' ? eventMatch : null,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      max_parallel_agents: 4,
-      max_runtime_seconds: 3600,
-      budget_pence: null,
+      max_parallel_agents: maxAgents,
+      max_runtime_seconds: runtimeSeconds,
+      budget_pence: budgetPounds === null ? null : Math.round(budgetPounds * 100),
       require_approval_for_external_actions: true,
       allow_replanning: true,
       success_criteria: [],
@@ -83,6 +90,10 @@ export default function AutonomousOS() {
   };
 
   const invalidEvent = draft.trigger_type === 'event' && !draft.event_match.trim();
+  const maxAgents = Number(draft.max_parallel_agents);
+  const runtimeSeconds = Number(draft.max_runtime_seconds);
+  const budgetPounds = draft.budget_pounds.trim() === '' ? null : Number(draft.budget_pounds);
+  const invalidLimits = !Number.isInteger(maxAgents) || maxAgents < 1 || maxAgents > 12 || !Number.isInteger(runtimeSeconds) || runtimeSeconds < 30 || runtimeSeconds > 600 || (budgetPounds !== null && (!Number.isFinite(budgetPounds) || budgetPounds < 0));
 
   return <>
     <PageHeader eyebrow="Autonomous Intelligence" title="Autonomous OS" description="Persistent goals that Blackstar can plan, delegate to specialist fleets, execute, observe and govern through the existing agent runtime." />
@@ -100,9 +111,14 @@ export default function AutonomousOS() {
               <label className="text-xs text-white/45">Autonomy level<select value={draft.autonomy_level} onChange={(e) => setDraft((v) => ({ ...v, autonomy_level: e.target.value }))} className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white"><option value="assisted">Assisted</option><option value="guarded">Guarded</option><option value="autonomous">Autonomous</option></select></label>
               <label className="text-xs text-white/45">Trigger<select value={draft.trigger_type} onChange={(e) => setDraft((v) => ({ ...v, trigger_type: e.target.value }))} className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white"><option value="manual">Manual</option><option value="schedule">Schedule</option><option value="event">Event</option><option value="continuous">Continuous</option></select></label>
             </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-xs text-white/45">Max specialists<input type="number" min="1" max="12" step="1" value={draft.max_parallel_agents} onChange={(e) => setDraft((v) => ({ ...v, max_parallel_agents: e.target.value }))} className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white" /></label>
+              <label className="text-xs text-white/45">Runtime ceiling (sec)<input type="number" min="30" max="600" step="30" value={draft.max_runtime_seconds} onChange={(e) => setDraft((v) => ({ ...v, max_runtime_seconds: e.target.value }))} className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white" /></label>
+              <label className="text-xs text-white/45">Spend ceiling (£)<input type="number" min="0" step="0.01" value={draft.budget_pounds} onChange={(e) => setDraft((v) => ({ ...v, budget_pounds: e.target.value }))} placeholder="Optional" className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white placeholder:text-white/22" /></label>
+            </div>
             {draft.trigger_type === 'schedule' && <input value={draft.schedule_cron} onChange={(e) => setDraft((v) => ({ ...v, schedule_cron: e.target.value }))} placeholder="Cron schedule · e.g. 0 8 * * 1-5" className="w-full rounded-xl border border-white/10 bg-white/[.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/22" />}
             {draft.trigger_type === 'event' && <div><input value={draft.event_match} onChange={(e) => setDraft((v) => ({ ...v, event_match: e.target.value }))} maxLength={160} placeholder="Wake when a notification contains · e.g. payment failed" className="w-full rounded-xl border border-cyan-300/15 bg-cyan-300/[.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/22 focus:border-cyan-300/30" /><p className="mt-1.5 text-[10px] text-white/28">Matches notification title, body or kind. Autonomous OS lifecycle notifications are excluded to prevent loops.</p></div>}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1"><p className="text-[10px] uppercase tracking-[.18em] text-white/24">External actions stay approval-gated by default.</p><button type="submit" disabled={createGoal.isPending || !draft.name.trim() || !draft.objective.trim() || invalidEvent} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40">{createGoal.isPending ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Plus className="h-4 w-4" />}{createGoal.isPending ? 'Creating…' : 'Create autonomous goal'}</button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1"><p className="text-[10px] uppercase tracking-[.18em] text-white/24">External actions stay approval-gated by default. Runtime and spend ceilings are enforced independently of the browser.</p><button type="submit" disabled={createGoal.isPending || !draft.name.trim() || !draft.objective.trim() || invalidEvent || invalidLimits} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40">{createGoal.isPending ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Plus className="h-4 w-4" />}{createGoal.isPending ? 'Creating…' : 'Create autonomous goal'}</button></div>
           </form>
           {createGoal.isError && <p className="mt-3 text-sm text-rose-300">{friendlyMessage(createGoal.error)}</p>}
         </div>
@@ -126,7 +142,7 @@ export default function AutonomousOS() {
       <div className="mt-5 grid gap-3 xl:grid-cols-2">
         {(data.goals ?? []).map((goal) => { const run = latestRun.get(goal.id); const fleetCount = fleetByGoal.get(goal.id) ?? 0; const busy = (runGoal.isPending && runGoal.variables === goal.id) || (controlGoal.isPending && controlGoal.variables?.id === goal.id); return <article key={goal.id} className="rounded-2xl border border-white/8 bg-white/[.018] p-4">
           <div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold text-white">{goal.name}</h4><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(goal.status)}`}>{goal.status}</span></div><p className="mt-2 line-clamp-3 text-sm leading-6 text-white/42">{goal.objective}</p></div><BrainCircuit className="h-5 w-5 shrink-0 text-violet-300/60" /></div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span>{goal.trigger_type === 'event' && goal.event_match && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">match: {goal.event_match}</span>}{fleetCount > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{fleetCount} fleet assignments</span>}{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
+          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.max_runtime_seconds}s max</span>{goal.budget_pence !== null && goal.budget_pence !== undefined && <span className="rounded-md border border-amber-300/10 px-2 py-1 text-amber-100/60">£{(Number(goal.budget_pence) / 100).toFixed(2)} ceiling</span>}{goal.trigger_type === 'event' && goal.event_match && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">match: {goal.event_match}</span>}{fleetCount > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{fleetCount} fleet assignments</span>}{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
           {(goal.next_run_at || goal.scheduler_attempts > 0) && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/30">{goal.next_run_at && <span>Next worker pickup: {when(goal.next_run_at)}</span>}{goal.scheduler_attempts > 0 && <span className="text-amber-200/70">Scheduler retry {goal.scheduler_attempts}</span>}</div>}
           {(run?.error || goal.last_scheduler_error) && <p className="mt-3 text-xs text-rose-300/80">{run?.error || goal.last_scheduler_error}</p>}
           {run?.heartbeat_at && ['queued','planning','running','waiting_for_approval'].includes(run.status) && <p className="mt-2 text-[10px] text-emerald-200/45">Worker heartbeat: {when(run.heartbeat_at)}</p>}
