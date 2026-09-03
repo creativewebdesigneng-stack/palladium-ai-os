@@ -22,6 +22,15 @@ const when = (value) => {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 };
 
+const emptyDraft = () => ({
+  name: '',
+  objective: '',
+  autonomy_level: 'guarded',
+  trigger_type: 'manual',
+  schedule_cron: '',
+  event_match: '',
+});
+
 export default function AutonomousOS() {
   const session = useSessionReady();
   const qc = useQueryClient();
@@ -29,11 +38,11 @@ export default function AutonomousOS() {
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
-  const [draft, setDraft] = useState({ name: '', objective: '', autonomy_level: 'guarded', trigger_type: 'manual', schedule_cron: '' });
+  const [draft, setDraft] = useState(emptyDraft);
 
   const goalsQuery = useQuery({ queryKey: ['autonomous-os-goals'], queryFn: () => listFn(), enabled: session === 'yes', refetchInterval: 15000, retry: 1 });
   const refresh = () => qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
-  const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft({ name: '', objective: '', autonomy_level: 'guarded', trigger_type: 'manual', schedule_cron: '' }); refresh(); } });
+  const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
 
@@ -53,13 +62,16 @@ export default function AutonomousOS() {
     event.preventDefault();
     const name = draft.name.trim();
     const objective = draft.objective.trim();
-    if (!name || !objective || createGoal.isPending) return;
+    const eventMatch = draft.event_match.trim();
+    if (!name || !objective || createGoal.isPending || (draft.trigger_type === 'event' && !eventMatch)) return;
     createGoal.mutate({
       name,
       objective,
       autonomy_level: draft.autonomy_level,
       trigger_type: draft.trigger_type,
       schedule_cron: draft.trigger_type === 'schedule' && draft.schedule_cron.trim() ? draft.schedule_cron.trim() : null,
+      event_source: draft.trigger_type === 'event' ? 'notification' : null,
+      event_match: draft.trigger_type === 'event' ? eventMatch : null,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       max_parallel_agents: 4,
       max_runtime_seconds: 3600,
@@ -69,6 +81,8 @@ export default function AutonomousOS() {
       success_criteria: [],
     });
   };
+
+  const invalidEvent = draft.trigger_type === 'event' && !draft.event_match.trim();
 
   return <>
     <PageHeader eyebrow="Autonomous Intelligence" title="Autonomous OS" description="Persistent goals that Blackstar can plan, delegate to specialist fleets, execute, observe and govern through the existing agent runtime." />
@@ -87,7 +101,8 @@ export default function AutonomousOS() {
               <label className="text-xs text-white/45">Trigger<select value={draft.trigger_type} onChange={(e) => setDraft((v) => ({ ...v, trigger_type: e.target.value }))} className="mt-1.5 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-white"><option value="manual">Manual</option><option value="schedule">Schedule</option><option value="event">Event</option><option value="continuous">Continuous</option></select></label>
             </div>
             {draft.trigger_type === 'schedule' && <input value={draft.schedule_cron} onChange={(e) => setDraft((v) => ({ ...v, schedule_cron: e.target.value }))} placeholder="Cron schedule · e.g. 0 8 * * 1-5" className="w-full rounded-xl border border-white/10 bg-white/[.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/22" />}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1"><p className="text-[10px] uppercase tracking-[.18em] text-white/24">External actions stay approval-gated by default.</p><button type="submit" disabled={createGoal.isPending || !draft.name.trim() || !draft.objective.trim()} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40">{createGoal.isPending ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Plus className="h-4 w-4" />}{createGoal.isPending ? 'Creating…' : 'Create autonomous goal'}</button></div>
+            {draft.trigger_type === 'event' && <div><input value={draft.event_match} onChange={(e) => setDraft((v) => ({ ...v, event_match: e.target.value }))} maxLength={160} placeholder="Wake when a notification contains · e.g. payment failed" className="w-full rounded-xl border border-cyan-300/15 bg-cyan-300/[.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/22 focus:border-cyan-300/30" /><p className="mt-1.5 text-[10px] text-white/28">Matches notification title, body or kind. Autonomous OS lifecycle notifications are excluded to prevent loops.</p></div>}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1"><p className="text-[10px] uppercase tracking-[.18em] text-white/24">External actions stay approval-gated by default.</p><button type="submit" disabled={createGoal.isPending || !draft.name.trim() || !draft.objective.trim() || invalidEvent} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40">{createGoal.isPending ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Plus className="h-4 w-4" />}{createGoal.isPending ? 'Creating…' : 'Create autonomous goal'}</button></div>
           </form>
           {createGoal.isError && <p className="mt-3 text-sm text-rose-300">{friendlyMessage(createGoal.error)}</p>}
         </div>
@@ -99,7 +114,7 @@ export default function AutonomousOS() {
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.goals?.filter((g) => g.status === 'active').length ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.runs?.filter((r) => ['queued','planning','running','waiting_for_approval'].includes(r.status)).length ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
         </div>
-        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled and continuous runs all hand execution to the same durable workflow worker.</div>
+        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled, event-triggered and continuous runs all hand execution to the same durable workflow worker.</div>
       </section>
     </div>
 
@@ -111,7 +126,7 @@ export default function AutonomousOS() {
       <div className="mt-5 grid gap-3 xl:grid-cols-2">
         {(data.goals ?? []).map((goal) => { const run = latestRun.get(goal.id); const fleetCount = fleetByGoal.get(goal.id) ?? 0; const busy = (runGoal.isPending && runGoal.variables === goal.id) || (controlGoal.isPending && controlGoal.variables?.id === goal.id); return <article key={goal.id} className="rounded-2xl border border-white/8 bg-white/[.018] p-4">
           <div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold text-white">{goal.name}</h4><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(goal.status)}`}>{goal.status}</span></div><p className="mt-2 line-clamp-3 text-sm leading-6 text-white/42">{goal.objective}</p></div><BrainCircuit className="h-5 w-5 shrink-0 text-violet-300/60" /></div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span>{fleetCount > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{fleetCount} fleet assignments</span>}{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
+          <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35"><span className="rounded-md border border-white/8 px-2 py-1">{goal.autonomy_level}</span><span className="rounded-md border border-white/8 px-2 py-1">{goal.trigger_type}</span><span className="rounded-md border border-white/8 px-2 py-1">up to {goal.max_parallel_agents} agents</span>{goal.trigger_type === 'event' && goal.event_match && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">match: {goal.event_match}</span>}{fleetCount > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{fleetCount} fleet assignments</span>}{run && <span className={`rounded-md border px-2 py-1 ${badge(run.status)}`}>last run: {run.status}</span>}</div>
           {(goal.next_run_at || goal.scheduler_attempts > 0) && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/30">{goal.next_run_at && <span>Next worker pickup: {when(goal.next_run_at)}</span>}{goal.scheduler_attempts > 0 && <span className="text-amber-200/70">Scheduler retry {goal.scheduler_attempts}</span>}</div>}
           {(run?.error || goal.last_scheduler_error) && <p className="mt-3 text-xs text-rose-300/80">{run?.error || goal.last_scheduler_error}</p>}
           {run?.heartbeat_at && ['queued','planning','running','waiting_for_approval'].includes(run.status) && <p className="mt-2 text-[10px] text-emerald-200/45">Worker heartbeat: {when(run.heartbeat_at)}</p>}
