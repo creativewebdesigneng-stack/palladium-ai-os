@@ -35,18 +35,85 @@ function useMissionClock() {
 
 function StarMark({ small = false }) {
   const reduced = useReducedMotion();
+  const sizeClass = small ? 'h-9 w-9' : 'h-28 w-28';
+  const outerDuration = small ? 22 : 16;
+  const innerDuration = small ? 16 : 10;
+
   return (
-    <motion.div
-      className={`relative grid place-items-center ${small ? 'h-8 w-8' : 'h-20 w-20'}`}
-      animate={{ rotate: 360, scale: reduced ? [1, 1.01, 1] : [1, 1.06, 1] }}
-      transition={{ rotate: { duration: small ? 18 : 13, repeat: Infinity, ease: 'linear' }, scale: { duration: reduced ? 6 : 2.8, repeat: Infinity, ease: 'easeInOut' } }}
-    >
-      <div className="absolute inset-[10%] rotate-45 border border-cyan-300/80 shadow-[0_0_20px_rgba(34,211,238,.4)]" />
-      <div className="absolute inset-[20%] border border-violet-300/90 shadow-[0_0_22px_rgba(167,139,250,.45)]" />
-      <div className="absolute h-[76%] w-px bg-gradient-to-b from-transparent via-white to-transparent" />
-      <div className="absolute h-px w-[76%] bg-gradient-to-r from-transparent via-white to-transparent" />
-      <motion.div className="h-2 w-2 rounded-full bg-white" animate={{ boxShadow: ['0 0 8px rgba(255,255,255,.5)', '0 0 30px rgba(255,255,255,1)', '0 0 8px rgba(255,255,255,.5)'] }} transition={{ duration: 1.8, repeat: Infinity }} />
-    </motion.div>
+    <div className={`relative grid place-items-center ${sizeClass}`} aria-label="Blackstar core">
+      <motion.div
+        className="absolute inset-0 rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{ duration: reduced ? outerDuration * 1.8 : outerDuration, repeat: Infinity, ease: 'linear' }}
+      >
+        <svg viewBox="0 0 160 160" className="h-full w-full overflow-visible" aria-hidden="true">
+          <defs>
+            <linearGradient id="blackstarOuter" x1="20" y1="20" x2="140" y2="140" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#67e8f9" stopOpacity="0.95" />
+              <stop offset="0.5" stopColor="#f8fafc" stopOpacity="0.9" />
+              <stop offset="1" stopColor="#a78bfa" stopOpacity="0.95" />
+            </linearGradient>
+            <filter id="blackstarGlow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <circle cx="80" cy="80" r="72" fill="none" stroke="url(#blackstarOuter)" strokeWidth="1.2" strokeDasharray="3 10" opacity="0.72" filter="url(#blackstarGlow)" />
+          <circle cx="80" cy="80" r="63" fill="none" stroke="#67e8f9" strokeWidth="0.6" strokeDasharray="1 7" opacity="0.4" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+            <g key={angle} transform={`rotate(${angle} 80 80)`}>
+              <path d="M80 2 L83 14 L80 20 L77 14 Z" fill="#e0f2fe" opacity="0.9" />
+              <circle cx="80" cy="8" r="1.7" fill="#ffffff" />
+            </g>
+          ))}
+        </svg>
+      </motion.div>
+
+      <motion.div
+        className="absolute inset-[11%]"
+        animate={{ rotate: -360 }}
+        transition={{ duration: reduced ? innerDuration * 1.8 : innerDuration, repeat: Infinity, ease: 'linear' }}
+      >
+        <svg viewBox="0 0 160 160" className="h-full w-full overflow-visible" aria-hidden="true">
+          <defs>
+            <linearGradient id="blackstarBlade" x1="38" y1="24" x2="126" y2="138" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#ffffff" />
+              <stop offset="0.28" stopColor="#67e8f9" />
+              <stop offset="0.72" stopColor="#8b5cf6" />
+              <stop offset="1" stopColor="#312e81" />
+            </linearGradient>
+            <radialGradient id="blackstarMetal" cx="0" cy="0" r="1" gradientTransform="translate(68 60) rotate(47) scale(74)">
+              <stop stopColor="#273449" />
+              <stop offset="0.42" stopColor="#090d16" />
+              <stop offset="1" stopColor="#02040a" />
+            </radialGradient>
+            <filter id="blackstarBladeGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="2.1" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <path d="M80 4 L94 55 L145 44 L103 72 L156 80 L103 88 L145 116 L94 105 L80 156 L66 105 L15 116 L57 88 L4 80 L57 72 L15 44 L66 55 Z" fill="url(#blackstarMetal)" stroke="url(#blackstarBlade)" strokeWidth="2.4" filter="url(#blackstarBladeGlow)" />
+          <path d="M80 20 L90 61 L131 52 L98 76 L140 80 L98 84 L131 108 L90 99 L80 140 L70 99 L29 108 L62 84 L20 80 L62 76 L29 52 L70 61 Z" fill="none" stroke="#7dd3fc" strokeWidth="0.9" opacity="0.55" />
+        </svg>
+      </motion.div>
+
+      <motion.div
+        className="absolute inset-[30%] rounded-full border border-cyan-100/35 bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,.35),rgba(34,211,238,.12)_28%,rgba(7,10,18,.95)_60%)] shadow-[inset_0_0_18px_rgba(56,189,248,.22),0_0_30px_rgba(56,189,248,.28)]"
+        animate={{ scale: reduced ? [1, 1.015, 1] : [1, 1.08, 1], boxShadow: ['inset 0 0 16px rgba(56,189,248,.18),0 0 16px rgba(56,189,248,.18)', 'inset 0 0 24px rgba(167,139,250,.3),0 0 38px rgba(56,189,248,.48)', 'inset 0 0 16px rgba(56,189,248,.18),0 0 16px rgba(56,189,248,.18)'] }}
+        transition={{ duration: reduced ? 5.5 : 2.6, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <div className="absolute inset-[24%] rounded-full border border-violet-300/50 bg-black/80" />
+        <motion.div className="absolute inset-[39%] rounded-full bg-white" animate={{ opacity: [0.55, 1, 0.55], scale: [0.8, 1.22, 0.8] }} transition={{ duration: 1.55, repeat: Infinity }} />
+      </motion.div>
+
+      {!small ? (
+        <>
+          <motion.div className="absolute -inset-[14%] rounded-full border border-cyan-300/10" animate={{ scale: [0.92, 1.05, 0.92], opacity: [0.15, 0.55, 0.15] }} transition={{ duration: 3.2, repeat: Infinity }} />
+          <motion.div className="absolute left-1/2 top-1/2 h-[135%] w-px -translate-x-1/2 -translate-y-1/2 bg-gradient-to-b from-transparent via-cyan-100/45 to-transparent" animate={{ opacity: [0.1, 0.55, 0.1] }} transition={{ duration: 2, repeat: Infinity }} />
+          <motion.div className="absolute left-1/2 top-1/2 h-px w-[135%] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-violet-200/45 to-transparent" animate={{ opacity: [0.55, 0.1, 0.55] }} transition={{ duration: 2, repeat: Infinity }} />
+        </>
+      ) : null}
+    </div>
   );
 }
 
