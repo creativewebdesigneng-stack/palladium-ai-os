@@ -1,6 +1,7 @@
 import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
 
-const WORKER_URL = (process.env['AUTO_EDITOR_WORKER_URL'] ?? '').replace(/\/$/, '');
+const DEFAULT_WORKER_URL = 'https://blackstar-auto-editor-worker-0kjxvk.appdeploy.com';
+const WORKER_URL = (process.env['AUTO_EDITOR_WORKER_URL'] ?? DEFAULT_WORKER_URL).replace(/\/$/, '');
 
 type SerializableValue = string | number | boolean | null | SerializableValue[] | { [key: string]: SerializableValue };
 type SerializableObject = { [key: string]: SerializableValue };
@@ -30,9 +31,9 @@ export function getMediaRuntimeCapabilities() {
   return {
     autoEditor: {
       configured: Boolean(WORKER_URL),
-      modes: ['silence', 'motion'],
-      exports: ['mp4', 'mov', 'premiere', 'resolve', 'final-cut-pro', 'shotcut', 'kdenlive', 'clip-sequence'],
-      note: 'Media edits are delegated to a configured Auto-Editor-compatible worker. PalladiumAI never simulates completed media output.',
+      modes: ['silence'],
+      exports: ['mp4', 'mov'],
+      note: 'Media edits are delegated to the Blackstar Auto-Editor execution node. Completed output is returned only after real FFmpeg processing succeeds.',
     },
   };
 }
