@@ -22,6 +22,7 @@ const SOCIAL_PROVIDERS = new Set([
   "telegram",
   "postiz",
 ]);
+const SOCIAL_READ_ACTIONS = new Set(["youtube:channel_read"]);
 const SECRET_KEY = /(token|secret|password|passwd|api[_-]?key|authorization|cookie|credential|private[_-]?key)/i;
 
 function cleanText(value: unknown, max: number): string {
@@ -69,6 +70,10 @@ function postId(value: unknown): string {
   const id = cleanText(value, 60);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("A valid social post ID is required.");
   return id;
+}
+
+function socialCapabilityKey(provider: unknown, action: unknown): string {
+  return `${normalizeIntegrationProvider(provider)}:${cleanText(action, 120).toLowerCase()}`;
 }
 
 export const listSocialPosts = createServerFn({ method: "POST" })
@@ -160,24 +165,15 @@ export const rescheduleSocialPost = createServerFn({ method: "POST" })
     return updated;
   });
 
+/** Publish/mutation capabilities only. Read-only social capabilities remain global for agents/workflows. */
 export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(() => ({}))
   .handler(async ({ context }) => {
-    const [allCapabilities, youtubeCapabilities] = await Promise.all([
-      listIntegrationCapabilities(context.userId),
-      listIntegrationCapabilities(context.userId, "youtube"),
-    ]);
-    const capabilities = [...allCapabilities, ...youtubeCapabilities];
-    const seen = new Set<string>();
+    const capabilities = await listIntegrationCapabilities(context.userId);
     return capabilities
       .filter((item) => SOCIAL_PROVIDERS.has(normalizeIntegrationProvider(item.provider)))
-      .filter((item) => {
-        const key = `${normalizeIntegrationProvider(item.provider)}:${item.action}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
+      .filter((item) => !SOCIAL_READ_ACTIONS.has(socialCapabilityKey(item.provider, item.action)))
       .map((item) => ({
         provider: normalizeIntegrationProvider(item.provider),
         action: item.action,
@@ -243,6 +239,9 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
     if (!SOCIAL_PROVIDERS.has(provider)) throw new Error("This provider is not a supported social destination.");
     const action = cleanText(input?.action, 120).toLowerCase();
     if (!/^[a-z0-9][a-z0-9_.:-]{0,119}$/.test(action)) throw new Error("A valid integration action is required.");
+    if (SOCIAL_READ_ACTIONS.has(`${provider}:${action}`)) {
+      throw new Error("Read-only social capabilities cannot be attached as publishing destinations.");
+    }
     const actionInput = record(input?.actionInput);
     return { postId: postId(input?.postId), provider, action, actionInput };
   })
