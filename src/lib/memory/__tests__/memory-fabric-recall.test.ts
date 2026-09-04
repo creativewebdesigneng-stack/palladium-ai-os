@@ -14,7 +14,7 @@ function sb(rows: TableRows) {
       const chain: any = {
         select: vi.fn(() => chain),
         in: vi.fn(async (_column: string, ids: string[]) => ({
-          data: (rows[table] ?? []).filter((row) => ids.includes(String(row.id))),
+          data: (rows[table] ?? []).filter((row) => ids.includes(String(row['id']))),
           error: null,
         })),
       }
