@@ -76,7 +76,6 @@ export function nextCronRun(cron: string, timezone: string, after = new Date()):
   const month = parseField(fields[3]!, 1, 12);
   const weekday = parseField(fields[4]!, 0, 6);
 
-  // Validate timezone before scanning.
   localParts(after, timezone);
   const cursor = new Date(after.getTime());
   cursor.setUTCSeconds(0, 0);
@@ -107,3 +106,6 @@ export function nextAutonomousRun(args: {
   if (!cron) throw new Error('Scheduled goals require a cron expression.');
   return nextCronRun(cron, args.timezone || 'UTC', after);
 }
+
+// Backwards-compatible name used by the authenticated Autonomous OS server functions.
+export const nextAutonomousRunAt = nextAutonomousRun;
