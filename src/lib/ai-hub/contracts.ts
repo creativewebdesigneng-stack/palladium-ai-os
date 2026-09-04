@@ -48,6 +48,10 @@ export interface AiHubWorkloadRequirements {
   requirePrivateExecution?: boolean
   requireHumanApproval?: boolean
   routingObjective?: AiHubRoutingObjective
+  /** Require a capability explicitly marked as offline-capable and place it on edge/device. */
+  requireOfflineExecution?: boolean
+  /** Maximum device memory available to the workload. Capability metadata may declare minDeviceMemoryMb. */
+  maxDeviceMemoryMb?: number
 }
 
 export interface AiHubWorkload {
