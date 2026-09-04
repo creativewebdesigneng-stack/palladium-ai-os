@@ -187,15 +187,15 @@ export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
     const { discoverMetaAssets } = await import("@/lib/integrations/meta-social.server");
     const assets = await discoverMetaAssets(context.userId);
     return assets.map((asset) => ({
-      pageId: String(asset.pageId),
-      pageName: String(asset.pageName),
+      pageId: String(asset.id),
+      pageName: String(asset.name),
       tasks: Array.isArray(asset.tasks) ? asset.tasks.map((task) => String(task)).slice(0, 30) : [],
-      instagram: asset.instagram
+      instagram: asset.instagramAccount
         ? {
-            id: String(asset.instagram.id),
-            username: asset.instagram.username ? String(asset.instagram.username) : null,
-            name: asset.instagram.name ? String(asset.instagram.name) : null,
-            profilePictureUrl: asset.instagram.profilePictureUrl ? String(asset.instagram.profilePictureUrl) : null,
+            id: String(asset.instagramAccount.id),
+            username: asset.instagramAccount.username ? String(asset.instagramAccount.username) : null,
+            name: asset.instagramAccount.name ? String(asset.instagramAccount.name) : null,
+            profilePictureUrl: asset.instagramAccount.profilePictureUrl ? String(asset.instagramAccount.profilePictureUrl) : null,
           }
         : null,
     }));
@@ -226,9 +226,6 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
       .single();
     if (postError || !post) throw postError ?? new Error("Social post not found.");
 
-    // Native Meta publishing must execute the exact content the user reviewed.
-    // Snapshot the saved post body into the immutable prepared/approval payload;
-    // never trust a browser-supplied message that could differ from the post.
     const actionInput = data.provider === "facebook" && data.action === "facebook_page_post"
       ? { ...data.actionInput, message: cleanText(post.content, 20_000) }
       : data.actionInput;
