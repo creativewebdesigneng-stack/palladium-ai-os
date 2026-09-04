@@ -7,6 +7,7 @@ import {
   createSocialPost,
   listLiveSocialCapabilities,
   listNativeMetaSocialAssets,
+  listNativePinterestBoards,
   listSocialPosts,
   rescheduleSocialPost,
 } from "@/lib/social/social-operations.functions";
@@ -20,7 +21,7 @@ function formatWhen(value) {
 function statusClass(status) {
   if (status === "published") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
   if (status === "scheduled") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-200";
-  if (status === "failed") return "border-red-400/20 bg-red-400/10 text-red-200";
+  if (status === "failed") return "border-red-400/20 bg-red-500/[.06] text-red-200";
   return "border-white/10 bg-white/[.04] text-zinc-300";
 }
 
@@ -28,6 +29,7 @@ export default function SocialOperations() {
   const [posts, setPosts] = useState([]);
   const [capabilities, setCapabilities] = useState([]);
   const [metaAssets, setMetaAssets] = useState([]);
+  const [pinterestBoards, setPinterestBoards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,6 +39,8 @@ export default function SocialOperations() {
     postId: "",
     capabilityKey: "",
     pageId: "",
+    boardId: "",
+    imageUrl: "",
     link: "",
     actionInput: "{}",
   });
@@ -45,14 +49,16 @@ export default function SocialOperations() {
     setLoading(true);
     setError("");
     try {
-      const [nextPosts, nextCapabilities, nextMetaAssets] = await Promise.all([
+      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards] = await Promise.all([
         listSocialPosts({ data: { limit: 100 } }),
         listLiveSocialCapabilities().catch(() => []),
         listNativeMetaSocialAssets().catch(() => []),
+        listNativePinterestBoards().catch(() => []),
       ]);
       setPosts(nextPosts ?? []);
       setCapabilities(nextCapabilities ?? []);
       setMetaAssets(nextMetaAssets ?? []);
+      setPinterestBoards(nextPinterestBoards ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social operations.");
     } finally {
@@ -73,6 +79,9 @@ export default function SocialOperations() {
   );
   const nativeFacebook = selectedCapability?.provider === "facebook"
     && selectedCapability?.action === "facebook_page_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativePinterest = selectedCapability?.provider === "pinterest"
+    && selectedCapability?.action === "pinterest_image_pin"
     && selectedCapability?.transport === "direct_oauth";
 
   async function createPost(event) {
@@ -112,6 +121,14 @@ export default function SocialOperations() {
         if (!targetForm.pageId) throw new Error("Choose a Facebook Page first.");
         actionInput = {
           page_id: targetForm.pageId,
+          ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else if (capability.provider === "pinterest" && capability.action === "pinterest_image_pin" && capability.transport === "direct_oauth") {
+        if (!targetForm.boardId) throw new Error("Choose a Pinterest board first.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add the HTTPS image URL for this Pin.");
+        actionInput = {
+          board_id: targetForm.boardId,
+          image_url: targetForm.imageUrl.trim(),
           ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
         };
       } else {
@@ -192,7 +209,7 @@ export default function SocialOperations() {
             <select
               required
               value={targetForm.capabilityKey}
-              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", link: "", actionInput: "{}" })}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", actionInput: "{}" })}
               className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
             >
               <option value="">Choose live social action</option>
@@ -211,27 +228,33 @@ export default function SocialOperations() {
                 </div>
                 <select required value={targetForm.pageId} onChange={(e) => setTargetForm({ ...targetForm, pageId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
                   <option value="">Choose Facebook Page</option>
-                  {metaAssets.map((asset) => (
-                    <option key={asset.pageId} value={asset.pageId}>
-                      {asset.pageName}{asset.instagram?.username ? ` · IG @${asset.instagram.username}` : ""}
-                    </option>
-                  ))}
+                  {metaAssets.map((asset) => <option key={asset.pageId} value={asset.pageId}>{asset.pageName}{asset.instagram?.username ? ` · IG @${asset.instagram.username}` : ""}</option>)}
                 </select>
-                <input
-                  type="url"
-                  inputMode="url"
-                  value={targetForm.link}
-                  onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })}
-                  placeholder="Optional HTTPS link"
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
-                />
+                <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
                 {!metaAssets.length && <p className="text-xs text-amber-200">No publishable Facebook Pages were discovered on the connected Meta account. Reconnect Meta with the required Page permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativePinterest ? (
+              <div className="space-y-3 rounded-xl border border-red-400/15 bg-red-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-red-100">Native Pinterest destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Choose a board discovered from your encrypted Pinterest OAuth connection. Blackstar snapshots the saved post title and copy into the approval payload.</p>
+                </div>
+                <select required value={targetForm.boardId} onChange={(e) => setTargetForm({ ...targetForm, boardId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Pinterest board</option>
+                  {pinterestBoards.map((board) => <option key={board.id} value={board.id}>{board.name}{board.privacy ? ` · ${board.privacy.toLowerCase()}` : ""}</option>)}
+                </select>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="HTTPS image URL for the Pin" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS destination link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                {!pinterestBoards.length && <p className="text-xs text-amber-200">No Pinterest boards were discovered. Reconnect Pinterest with board permissions or choose the optional connector fallback if one is available.</p>}
               </div>
             ) : (
               <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
             )}
 
-            <button disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length)} className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40">Attach destination</button>
+            <button
+              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length)}
+              className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40"
+            >Attach destination</button>
           </form>
           {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; Blackstar will discover its typed actions automatically.</p>}
         </section>
