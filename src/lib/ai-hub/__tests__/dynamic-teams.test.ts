@@ -17,7 +17,7 @@ describe('Blackstar Dynamic Agent Teams', () => {
 
   it('excludes candidates below the trust boundary', () => {
     const plan = formDynamicAgentTeam(candidates, { missionId: 'm', requiredCapabilities: ['execute'], minTrustScore: 0.8 })
-    expect(plan.capabilityAssignments.execute).toBe('b')
+    expect(plan.capabilityAssignments['execute']).toBe('b')
   })
 
   it('fails closed when required capability cannot be covered', () => {
