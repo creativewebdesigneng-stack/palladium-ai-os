@@ -1,10 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
-import { AI_HUB_CAPABILITY_KINDS, type AiHubCapabilityKind } from './contracts'
+import {
+  AI_HUB_CAPABILITY_KINDS,
+  type AiHubCapabilityKind,
+  type AiHubCapabilityRef,
+} from './contracts'
 import { AiHubOrchestrator } from './orchestrator'
 import { planBlackstarOpportunityExecution } from './opportunity-execution'
 import type { BlackstarOpportunityActionRisk, BlackstarOpportunitySignalKind } from './opportunities'
-import { createPalladiumAiHubRegistry } from './registry'
 
 type StageInput = {
   id: string
@@ -132,9 +135,8 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
     if (agentsRes.error) throw new Error(agentsRes.error.message)
     if (workflowsRes.error) throw new Error(workflowsRes.error.message)
 
-    const registry = createPalladiumAiHubRegistry()
-    for (const agent of agentsRes.data ?? []) {
-      registry.registerCapability({
+    const capabilities: AiHubCapabilityRef[] = [
+      ...(agentsRes.data ?? []).map((agent): AiHubCapabilityRef => ({
         id: agent.id,
         kind: 'agent',
         providerId: 'palladium-agent-runtime',
@@ -142,10 +144,8 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
         capabilities: ['agent-execution', ...((agent.allowed_tools ?? []) as string[])],
         deploymentTargets: ['palladium-cloud'],
         metadata: { orgId: agent.org_id ?? null },
-      })
-    }
-    for (const workflow of workflowsRes.data ?? []) {
-      registry.registerCapability({
+      })),
+      ...(workflowsRes.data ?? []).map((workflow): AiHubCapabilityRef => ({
         id: workflow.id,
         kind: 'workflow',
         providerId: 'palladium-workflows',
@@ -153,10 +153,10 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
         capabilities: ['workflow-execution'],
         deploymentTargets: ['palladium-cloud'],
         metadata: { orgId: workflow.org_id ?? null },
-      })
-    }
+      })),
+    ]
 
-    const orchestrator = new AiHubOrchestrator(() => registry.listCapabilities())
+    const orchestrator = new AiHubOrchestrator(() => capabilities)
     const tenantId = context.userId
     const plan = planBlackstarOpportunityExecution({
       id: data.id,
@@ -183,13 +183,13 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
       return {
         status: 'unroutable' as const,
         plan: null,
-        availableCapabilities: registry.listCapabilities().length,
+        availableCapabilities: capabilities.length,
       }
     }
 
     return {
       status: plan.status,
       plan,
-      availableCapabilities: registry.listCapabilities().length,
+      availableCapabilities: capabilities.length,
     }
   })
