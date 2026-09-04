@@ -54,6 +54,8 @@ export interface AiHubWorkloadRequirements {
   maxDeviceMemoryMb?: number
   /** Optional governed Spatial scene, zone, coordinate and action boundary. */
   spatial?: import('./spatial').AiHubSpatialRequirement
+  /** Optional governed Physical AI device/action request. */
+  physical?: import('./physical-ai').AiHubPhysicalRequirement
 }
 
 export interface AiHubWorkload {
