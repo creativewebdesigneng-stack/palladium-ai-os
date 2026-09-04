@@ -57,8 +57,11 @@ function unique(values: string[]) {
 }
 
 function inferRisk(signal: BlackstarOpportunitySignal): BlackstarOpportunityActionRisk {
-  if (signal.kind === 'risk' || signal.impact >= 0.85) return 'high'
-  if (signal.kind === 'cost' || signal.kind === 'operations' || signal.impact >= 0.55) return 'medium'
+  // Opportunity impact measures potential value/consequence, not execution risk.
+  // Keep the action boundary tied to the class of governed action so a high-impact
+  // growth signal is not automatically treated as a dangerous operation.
+  if (signal.kind === 'risk') return 'high'
+  if (signal.kind === 'cost' || signal.kind === 'operations') return 'medium'
   return 'low'
 }
 
