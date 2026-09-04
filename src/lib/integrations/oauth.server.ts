@@ -90,11 +90,14 @@ export function safeOrigin(candidate: string | undefined): string {
 export const callbackPath = "/api/public/integrations/callback";
 export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: string; origin: string }): string {
   const url = new URL(provider.authorizeUrl);
-  url.searchParams.set("client_id", process.env[provider.clientIdEnv]!);
+  const clientParam = provider.id === "tiktok" ? "client_key" : "client_id";
+  url.searchParams.set(clientParam, process.env[provider.clientIdEnv]!);
   url.searchParams.set("redirect_uri", `${args.origin}${callbackPath}`);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", args.state);
-  if (provider.scopes.length) url.searchParams.set("scope", provider.scopes.join(" "));
+  if (provider.scopes.length) {
+    url.searchParams.set("scope", provider.scopes.join(provider.id === "tiktok" ? "," : " "));
+  }
   if (provider.id === "salesforce") {
     url.searchParams.set("code_challenge", salesforcePkceChallenge(args.state));
     url.searchParams.set("code_challenge_method", "S256");
@@ -131,6 +134,10 @@ function providerConfigFromPayload(provider: IntegrationProvider, payload: Recor
     if (typeof payload["workspace_id"] === "string") result["workspace_id"] = payload["workspace_id"].slice(0, 200);
     if (typeof payload["workspace_name"] === "string") result["workspace_name"] = payload["workspace_name"].slice(0, 300);
     return result;
+  }
+  if (provider.id === "tiktok") {
+    const openId = typeof payload["open_id"] === "string" ? payload["open_id"].trim().slice(0, 200) : "";
+    return openId ? { open_id: openId } : {};
   }
   return {};
 }
@@ -233,6 +240,14 @@ export async function exchangeCode(
       redirect_uri: `${args.origin}${callbackPath}`,
       continuous_refresh: "true",
     }));
+  } else if (provider.id === "tiktok") {
+    payload = await postForm(provider.tokenUrl, new URLSearchParams({
+      client_key: process.env[provider.clientIdEnv]!,
+      client_secret: process.env[provider.clientSecretEnv]!,
+      code: args.code,
+      grant_type: "authorization_code",
+      redirect_uri: `${args.origin}${callbackPath}`,
+    }));
   } else {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -257,10 +272,17 @@ export async function refreshTokens(provider: IntegrationProvider, refreshToken:
           grant_type: "refresh_token",
           refresh_token: refreshToken,
         }))
-      : await postForm(provider.tokenUrl, new URLSearchParams({
-          grant_type: "refresh_token", refresh_token: refreshToken,
-          client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-        }));
+      : provider.id === "tiktok"
+        ? await postForm(provider.tokenUrl, new URLSearchParams({
+            client_key: process.env[provider.clientIdEnv]!,
+            client_secret: process.env[provider.clientSecretEnv]!,
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+          }))
+        : await postForm(provider.tokenUrl, new URLSearchParams({
+            grant_type: "refresh_token", refresh_token: refreshToken,
+            client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+          }));
   const next = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
