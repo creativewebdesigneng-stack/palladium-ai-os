@@ -11,7 +11,7 @@
  */
 
 export type IntegrationCategory =
-  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email" | "ecommerce";
+  "productivity" | "communication" | "crm" | "project_management" | "calendar" | "email" | "ecommerce" | "social";
 
 export type IntegrationProvider = {
   id: string;
@@ -49,6 +49,26 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     clientSecretEnv: "SHOPIFY_CLIENT_SECRET",
     connectMode: "shopify_store",
     docsUrl: "https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant",
+  },
+  {
+    id: "meta",
+    name: "Meta",
+    category: "social",
+    summary: "Connect Facebook Pages and linked Instagram professional accounts through Meta's native OAuth and Graph API, with connector transports retained as fallbacks.",
+    scopes: [
+      "pages_show_list",
+      "pages_read_engagement",
+      "pages_manage_posts",
+      "instagram_basic",
+      "instagram_content_publish",
+    ],
+    tools: ["integration_capabilities", "integration_action"],
+    authorizeUrl: "https://www.facebook.com/dialog/oauth",
+    tokenUrl: "https://graph.facebook.com/oauth/access_token",
+    clientIdEnv: "META_INTEGRATION_CLIENT_ID",
+    clientSecretEnv: "META_INTEGRATION_CLIENT_SECRET",
+    identity: { url: "https://graph.facebook.com/me?fields=id,name", labelKeys: ["name", "id"] },
+    docsUrl: "https://developers.facebook.com/docs/facebook-login/",
   },
   {
     id: "google",
@@ -214,6 +234,7 @@ export const INTEGRATION_CATEGORY_LABELS: Record<IntegrationCategory, string> = 
   calendar: "Calendar",
   email: "Email",
   ecommerce: "E-commerce",
+  social: "Social",
 };
 
 export function findProvider(id: string): IntegrationProvider | undefined {
