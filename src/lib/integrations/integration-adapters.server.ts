@@ -23,6 +23,13 @@ import {
 } from "./meta-social-actions.server";
 import { publishFacebookPagePost } from "./meta-social.server";
 import {
+  PINTEREST_SOCIAL_ACTION,
+  PINTEREST_SOCIAL_INPUT_SCHEMA,
+  hasNativePinterestConnection,
+  preparePinterestSocialAction,
+} from "./pinterest-social-actions.server";
+import { publishPinterestImagePin } from "./pinterest-social.server";
+import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
   prepareNangoAgentAction,
@@ -173,7 +180,7 @@ const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
   supportsProvider(provider) {
-    return isDirectConnectedServiceProvider(provider) || provider === "facebook";
+    return isDirectConnectedServiceProvider(provider) || provider === "facebook" || provider === "pinterest";
   },
   async listCapabilities(userId, provider) {
     const rows: AdapterCapability[] = [];
@@ -190,9 +197,21 @@ const directOAuthAdapter: IntegrationAdapter = {
       });
     }
 
+    if ((!provider || provider === "pinterest") && await hasNativePinterestConnection(userId)) {
+      rows.push({
+        provider: "pinterest",
+        action: PINTEREST_SOCIAL_ACTION,
+        description: "Create an approved image Pin on an owned Pinterest board through the native Pinterest API.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: PINTEREST_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
     const providers = provider
       ? [provider]
-      : ["google", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
+      : ["google", "youtube", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
     for (const providerId of providers) {
       if (!isDirectConnectedServiceProvider(providerId)) continue;
       if (!(await hasDirectConnectedService(userId, providerId))) continue;
@@ -214,6 +233,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (provider === "facebook") {
       return action === META_SOCIAL_ACTION && await hasNativeMetaConnection(userId);
     }
+    if (provider === "pinterest") {
+      return action === PINTEREST_SOCIAL_ACTION && await hasNativePinterestConnection(userId);
+    }
     return (
       isDirectConnectedServiceProvider(provider) &&
       directConnectedServiceActions(provider).includes(action) &&
@@ -221,9 +243,8 @@ const directOAuthAdapter: IntegrationAdapter = {
     );
   },
   async prepare(input) {
-    if (input.provider === "facebook") {
-      return prepareMetaSocialAction(input);
-    }
+    if (input.provider === "facebook") return prepareMetaSocialAction(input);
+    if (input.provider === "pinterest") return preparePinterestSocialAction(input);
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
@@ -263,18 +284,48 @@ const directOAuthAdapter: IntegrationAdapter = {
         });
         return {
           ok: true,
-          result: {
-            provider: "facebook",
-            action: META_SOCIAL_ACTION,
-            read_only: false,
-            transport: "direct_oauth",
-            data,
-          },
+          result: { provider: "facebook", action: META_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
         };
       } catch (error) {
         return {
           ok: false,
           error: error instanceof Error ? error.message : "Native Meta publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "pinterest") {
+      let prepared;
+      try {
+        prepared = await preparePinterestSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Pinterest action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishPinterestImagePin({
+          userId: input.userId,
+          boardId: prepared.input.board_id,
+          imageUrl: prepared.input.image_url,
+          description: prepared.input.description,
+          ...(prepared.input.title ? { title: prepared.input.title } : {}),
+          ...(prepared.input.link ? { link: prepared.input.link } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "pinterest", action: PINTEREST_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Pinterest publishing failed.",
           failurePhase: "ambiguous",
           safeToFailover: false,
         };
@@ -349,10 +400,7 @@ const githubAppAdapter: IntegrationAdapter = {
           safeToFailover: true,
         };
       }
-      const data = await executeGitHubConnectedService(
-        installationId,
-        asGitHubInput(input.action, input.actionInput),
-      );
+      const data = await executeGitHubConnectedService(installationId, asGitHubInput(input.action, input.actionInput));
       return {
         ok: true,
         result: { provider: "github", action: input.action, read_only: true, transport: "github_app", data },
@@ -430,13 +478,7 @@ const salesforceOAuthAdapter: IntegrationAdapter = {
             });
       return {
         ok: true,
-        result: {
-          provider: "salesforce",
-          action: input.action,
-          read_only: true,
-          transport: "salesforce_oauth",
-          data,
-        },
+        result: { provider: "salesforce", action: input.action, read_only: true, transport: "salesforce_oauth", data },
       };
     } catch (error) {
       return {
@@ -463,9 +505,7 @@ const nativeShopifyAdapter: IntegrationAdapter = {
     return capabilities.some((item) => item.action === action);
   },
   async prepare(input) {
-    if (input.provider !== "shopify") {
-      throw new Error(`No native Shopify adapter is registered for ${input.provider}.`);
-    }
+    if (input.provider !== "shopify") throw new Error(`No native Shopify adapter is registered for ${input.provider}.`);
     return prepareNativeShopifyAction(input);
   },
   async execute(input) {
