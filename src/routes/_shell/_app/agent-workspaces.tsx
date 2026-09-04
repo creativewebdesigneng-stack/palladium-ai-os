@@ -4,10 +4,10 @@ import Screen from "@/screens/AgentWorkspaces";
 export const Route = createFileRoute("/_shell/_app/agent-workspaces")({
   head: () => ({
     meta: [
-      { title: "Agent Workspaces — PalladiumAI" },
-      { name: "description", content: "Coordinate parallel agent workspaces and durable context timelines in PalladiumAI." },
-      { property: "og:title", content: "Agent Workspaces — PalladiumAI" },
-      { property: "og:description", content: "Coordinate parallel agent workspaces and durable context timelines in PalladiumAI." },
+      { title: "Agent Workspaces — Blackstar" },
+      { name: "description", content: "Coordinate parallel agent workspaces and durable context timelines in Blackstar." },
+      { property: "og:title", content: "Agent Workspaces — Blackstar" },
+      { property: "og:description", content: "Coordinate parallel agent workspaces and durable context timelines in Blackstar." },
       { property: "og:type", content: "website" },
     ],
   }),
