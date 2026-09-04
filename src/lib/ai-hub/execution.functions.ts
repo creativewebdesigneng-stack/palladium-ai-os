@@ -6,10 +6,22 @@ import { callExternalMcpTool, listExternalMcpTools } from '@/lib/mcp/external-mc
 import { createAiHubApprovalGate } from './approval.server'
 import { AiHubExecutionGateway } from './execution'
 import type { AiHubOrchestrationPlan } from './orchestrator'
+import type { AiHubDeploymentTarget } from './contracts'
 import { createPalladiumAiHubRegistry } from './registry'
 
 type Sb = { from: (table: string) => any }
 type Input = { resourceId: string; goal: string; approvalRequestId?: string }
+
+function selectedPlacement(workloadId: string, capabilityId: string, deploymentTarget: AiHubDeploymentTarget) {
+  return {
+    workloadId,
+    capabilityId,
+    deploymentTarget,
+    privateExecution: deploymentTarget === 'customer-cloud' || deploymentTarget === 'on-prem' || deploymentTarget === 'edge' || deploymentTarget === 'device',
+    reason: `Operator-selected AI Hub resource is placed on ${deploymentTarget} through the Blackstar Agent Cloud boundary.`,
+    policyChecks: ['tenant-isolation', 'capability-placement', 'deployment-target'],
+  }
+}
 
 function validate(input: unknown): Input {
   const row = input && typeof input === 'object' ? input as Record<string, unknown> : {}
@@ -37,13 +49,15 @@ export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
     if (!workflow) throw new Error('Workflow not found or you do not have access to it.')
     if (workflow.status !== 'active') throw new Error('Activate this workflow before running it from the Hub.')
 
+    const workloadId = `workflow:${workflow.id}`
     const plan: AiHubOrchestrationPlan = {
-      workloadId: `workflow:${workflow.id}`,
+      workloadId,
       discovery: [],
       requiresApproval: true,
       executionBoundary: 'palladium-policy-gateway',
+      placement: selectedPlacement(workloadId, workflow.id, 'palladium-cloud'),
       route: {
-        workloadId: `workflow:${workflow.id}`,
+        workloadId,
         capability: {
           id: workflow.id,
           kind: 'workflow',
@@ -103,11 +117,13 @@ export const executeAiHubAgent = createServerFn({ method: 'POST' })
     if (!agent) throw new Error('Agent not found or you do not have access to it.')
     if (agent.status !== 'active') throw new Error('Activate this agent before running it from the Hub.')
 
+    const workloadId = `agent:${agent.id}`
     const plan: AiHubOrchestrationPlan = {
-      workloadId: `agent:${agent.id}`,
+      workloadId,
       discovery: [], requiresApproval: true, executionBoundary: 'palladium-policy-gateway',
+      placement: selectedPlacement(workloadId, agent.id, 'palladium-cloud'),
       route: {
-        workloadId: `agent:${agent.id}`,
+        workloadId,
         capability: { id: agent.id, kind: 'agent', providerId: 'palladium-agent-runtime', name: agent.name, capabilities: ['agent-execution'], deploymentTargets: ['palladium-cloud'] },
         reason: 'The operator selected this agent from the authenticated AI Hub inventory.',
         policyChecks: ['tenant-isolation', 'approval-required'],
@@ -171,12 +187,15 @@ export const executeAiHubExternalMcp = createServerFn({ method: 'POST' })
     if (!discovered.tools.some((tool) => tool.name === toolName)) throw new Error('That MCP tool is not available.')
 
     const providerId = `external-mcp:${server.id}`
+    const workloadId = `external-mcp:${server.id}:${toolName}`
+    const capabilityId = `${server.id}:${toolName}`
     const plan: AiHubOrchestrationPlan = {
-      workloadId: `external-mcp:${server.id}:${toolName}`,
+      workloadId,
       discovery: [], requiresApproval: true, executionBoundary: 'palladium-policy-gateway',
+      placement: selectedPlacement(workloadId, capabilityId, 'provider-cloud'),
       route: {
-        workloadId: `external-mcp:${server.id}:${toolName}`,
-        capability: { id: `${server.id}:${toolName}`, kind: 'tool', providerId, name: `${server.name}: ${toolName}`, capabilities: [toolName], deploymentTargets: ['provider-cloud'] },
+        workloadId,
+        capability: { id: capabilityId, kind: 'tool', providerId, name: `${server.name}: ${toolName}`, capabilities: [toolName], deploymentTargets: ['provider-cloud'] },
         reason: 'The operator selected this configured external MCP tool from the authenticated AI Hub inventory.',
         policyChecks: ['tenant-isolation', 'external-mcp-allowlist', 'approval-required'],
       },
