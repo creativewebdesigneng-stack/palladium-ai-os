@@ -8,6 +8,7 @@ import AgentCard from '@/components/workforce/AgentCard';
 import AgentProfileDrawer from '@/components/workforce/AgentProfileDrawer';
 import WorkforceCommandCentre from '@/components/workforce/WorkforceCommandCentre';
 import WorkforceOrchestrator from '@/components/workforce/WorkforceOrchestrator';
+import WorkforceOSPanel from '@/components/workforce/WorkforceOSPanel';
 import DepartmentGrid from '@/components/workforce/DepartmentGrid';
 import CreateDepartmentModal from '@/components/workforce/CreateDepartmentModal';
 import AgentCommsFeed from '@/components/workforce/AgentCommsFeed';
@@ -126,7 +127,7 @@ export default function Workforce() {
   return (
     <>
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-45"><NeuralNetworkBackground intensity="low" /></div>
-      <PageHeader eyebrow="Blackstar Workforce" title="Autonomous Workforce" description="Deploy, organise and supervise your AI workforce as one coordinated intelligence network." action={headerActions} />
+      <PageHeader eyebrow="Blackstar Workforce OS" title="Autonomous Workforce" description="Deploy, organise, govern and supervise your AI workforce as one coordinated intelligence network." action={headerActions} />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-white/[.07] bg-black/25 p-4 backdrop-blur-xl">
@@ -143,6 +144,7 @@ export default function Workforce() {
         </div>
       </div>
 
+      <WorkforceOSPanel />
       <WorkforceCommandCentre overview={overview} loading={loading} />
 
       <section className="mb-8 rounded-2xl border border-white/[.065] bg-black/20 p-4 backdrop-blur-xl sm:p-5">
