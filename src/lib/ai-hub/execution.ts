@@ -44,6 +44,7 @@ export class AiHubExecutionGateway {
     if (!context.tenantId || !context.actorId) {
       throw new Error('AI Hub execution requires tenant and actor identity')
     }
+    this.assertPlacement(plan)
 
     if (plan.requiresApproval) {
       const provider = this.resolveProvider(plan)
@@ -87,6 +88,19 @@ export class AiHubExecutionGateway {
         })
       }
       throw error
+    }
+  }
+
+  private assertPlacement(plan: AiHubOrchestrationPlan) {
+    const capability = plan.route.capability
+    if (plan.placement.workloadId !== plan.workloadId || plan.route.workloadId !== plan.workloadId) {
+      throw new Error('AI Hub placement does not match the routed workload')
+    }
+    if (plan.placement.capabilityId !== capability.id) {
+      throw new Error('AI Hub placement does not match the routed capability')
+    }
+    if (!capability.deploymentTargets.includes(plan.placement.deploymentTarget)) {
+      throw new Error('AI Hub placement uses a deployment target not allowed by the routed capability')
     }
   }
 
