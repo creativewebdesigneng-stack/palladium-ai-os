@@ -25,18 +25,18 @@ describe("Mission Control orchestrator surface", () => {
     expect(missionControl).toContain("<OrchestratorConsole");
   });
 
-  it("keeps the full command deck decomposed into dedicated operational surfaces", () => {
+  it("keeps the full command deck operational surfaces present after the Blackstar redesign", () => {
     expect(missionControl).toContain("BlackstarCommandDeck");
     expect(commandDeck).toContain("function HolographicCore");
     expect(commandDeck).toContain("function AlertPanel");
-    expect(commandDeck).toContain("function TelemetryPanel");
+    expect(commandDeck).toContain("function Telemetry");
     expect(commandDeck).toContain("function MissionQueue");
-    expect(commandDeck).toContain("function LiveFeed");
-    expect(commandDeck).toContain("function PendingApprovals");
-    expect(commandDeck).toContain("function GlobalInfrastructure");
+    expect(commandDeck).toContain("function MissionFeed");
     expect(commandDeck).toContain("function Heartbeat");
-    expect(commandDeck).toContain("function HealthMonitor");
     expect(commandDeck).toContain("function LiveTicker");
+    expect(commandDeck).toContain("Pending approvals");
+    expect(commandDeck).toContain("Global infrastructure");
+    expect(commandDeck).toContain("System health monitor");
   });
 
   it("shows delegation, approvals and verified output in the orchestrator console", () => {
