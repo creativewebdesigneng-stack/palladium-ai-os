@@ -27,7 +27,7 @@ const simulationSchema = z.object({
 
 async function assertOwnedAgent(sb: Sb, userId: string, agentId: string | null | undefined) {
   if (!agentId) return;
-  const { data, error } = await sb.from("agents").select("id").eq("id", agentId).eq("user_id", userId).maybeSingle();
+  const { data, error } = await sb.from("personal_agents").select("id").eq("id", agentId).eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("AGENT_NOT_OWNED");
 }
