@@ -11,7 +11,7 @@ import {
 describe("connected service read request whitelist", () => {
   it("contains only the intended read-capable providers", () => {
     expect(Object.keys(CONNECTED_SERVICE_ACTIONS).sort()).toEqual(
-      ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "salesforce", "slack"].sort(),
+      ["asana", "github", "google", "hubspot", "linear", "microsoft", "notion", "salesforce", "slack", "youtube"].sort(),
     );
     expect(CONNECTED_SERVICE_ACTIONS["github"]).toEqual([
       "repositories_list",
@@ -21,6 +21,7 @@ describe("connected service read request whitelist", () => {
       "path_list",
       "file_read",
     ]);
+    expect(CONNECTED_SERVICE_ACTIONS["youtube"]).toEqual(["channel_read"]);
   });
 
   it("rejects an unknown provider/action before building a request", () => {
@@ -37,6 +38,15 @@ describe("connected service read request whitelist", () => {
     const url = new URL(req.url);
     expect(url.origin).toBe("https://www.googleapis.com");
     expect(url.pathname).toBe("/calendar/v3/calendars/primary/events");
+    expect(url.searchParams.get("maxResults")).toBe("5");
+  });
+
+  it("uses fixed YouTube channel discovery origin/path and mine=true", () => {
+    const req = buildConnectedServiceRequest({ provider: "youtube", action: "channel_read", limit: 5 });
+    const url = new URL(req.url);
+    expect(url.origin).toBe("https://www.googleapis.com");
+    expect(url.pathname).toBe("/youtube/v3/channels");
+    expect(url.searchParams.get("mine")).toBe("true");
     expect(url.searchParams.get("maxResults")).toBe("5");
   });
 
