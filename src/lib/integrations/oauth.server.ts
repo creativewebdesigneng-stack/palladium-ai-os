@@ -191,6 +191,20 @@ async function parseResponse(response: Response): Promise<Record<string, any>> {
 async function postForm(url: string, body: URLSearchParams): Promise<Record<string, any>> {
   return parseResponse(await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }));
 }
+async function postBasicForm(provider: IntegrationProvider, body: URLSearchParams): Promise<Record<string, any>> {
+  const clientId = process.env[provider.clientIdEnv]!;
+  const clientSecret = process.env[provider.clientSecretEnv]!;
+  const authorization = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  return parseResponse(await fetch(provider.tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      Authorization: `Basic ${authorization}`,
+    },
+    body,
+  }));
+}
 async function postNotionToken(provider: IntegrationProvider, body: Record<string, string>): Promise<Record<string, any>> {
   const clientId = process.env[provider.clientIdEnv]!;
   const clientSecret = process.env[provider.clientSecretEnv]!;
@@ -212,6 +226,13 @@ export async function exchangeCode(
   let payload: Record<string, any>;
   if (provider.id === "notion") {
     payload = await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` });
+  } else if (provider.id === "pinterest") {
+    payload = await postBasicForm(provider, new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      continuous_refresh: "true",
+    }));
   } else {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -231,10 +252,15 @@ export async function exchangeCode(
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "refresh_token", refresh_token: refreshToken })
-    : await postForm(provider.tokenUrl, new URLSearchParams({
-        grant_type: "refresh_token", refresh_token: refreshToken,
-        client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-      }));
+    : provider.id === "pinterest"
+      ? await postBasicForm(provider, new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }))
+      : await postForm(provider.tokenUrl, new URLSearchParams({
+          grant_type: "refresh_token", refresh_token: refreshToken,
+          client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+        }));
   const next = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
