@@ -6,6 +6,7 @@ import {
   addSocialPostTarget,
   createSocialPost,
   listLiveSocialCapabilities,
+  listNativeMetaSocialAssets,
   listSocialPosts,
   rescheduleSocialPost,
 } from "@/lib/social/social-operations.functions";
@@ -26,23 +27,32 @@ function statusClass(status) {
 export default function SocialOperations() {
   const [posts, setPosts] = useState([]);
   const [capabilities, setCapabilities] = useState([]);
+  const [metaAssets, setMetaAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({ title: "", content: "", campaign: "", scheduledFor: "" });
-  const [targetForm, setTargetForm] = useState({ postId: "", capabilityKey: "", actionInput: "{}" });
+  const [targetForm, setTargetForm] = useState({
+    postId: "",
+    capabilityKey: "",
+    pageId: "",
+    link: "",
+    actionInput: "{}",
+  });
 
   async function refresh() {
     setLoading(true);
     setError("");
     try {
-      const [nextPosts, nextCapabilities] = await Promise.all([
+      const [nextPosts, nextCapabilities, nextMetaAssets] = await Promise.all([
         listSocialPosts({ data: { limit: 100 } }),
         listLiveSocialCapabilities().catch(() => []),
+        listNativeMetaSocialAssets().catch(() => []),
       ]);
       setPosts(nextPosts ?? []);
       setCapabilities(nextCapabilities ?? []);
+      setMetaAssets(nextMetaAssets ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social operations.");
     } finally {
@@ -57,6 +67,13 @@ export default function SocialOperations() {
     published: posts.filter((post) => post.status === "published").length,
     targets: posts.reduce((sum, post) => sum + (post.social_post_targets?.length ?? 0), 0),
   }), [posts]);
+
+  const selectedCapability = capabilities.find(
+    (item) => `${item.provider}:${item.action}` === targetForm.capabilityKey,
+  );
+  const nativeFacebook = selectedCapability?.provider === "facebook"
+    && selectedCapability?.action === "facebook_page_post"
+    && selectedCapability?.transport === "direct_oauth";
 
   async function createPost(event) {
     event.preventDefault();
@@ -90,7 +107,16 @@ export default function SocialOperations() {
     setError("");
     setNotice("");
     try {
-      const actionInput = JSON.parse(targetForm.actionInput || "{}");
+      let actionInput;
+      if (capability.provider === "facebook" && capability.action === "facebook_page_post" && capability.transport === "direct_oauth") {
+        if (!targetForm.pageId) throw new Error("Choose a Facebook Page first.");
+        actionInput = {
+          page_id: targetForm.pageId,
+          ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else {
+        actionInput = JSON.parse(targetForm.actionInput || "{}");
+      }
       const result = await addSocialPostTarget({
         data: {
           postId: targetForm.postId,
@@ -100,8 +126,8 @@ export default function SocialOperations() {
         },
       });
       setNotice(result?.capability?.requiresApproval
-        ? "Target attached. This external action remains approval-gated by PalladiumAI."
-        : "Target attached to a live PalladiumAI integration capability.");
+        ? "Target attached. This external action remains approval-gated by Blackstar."
+        : "Target attached to a live Blackstar integration capability.");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not attach social destination.");
@@ -127,7 +153,7 @@ export default function SocialOperations() {
       <PageHeader
         eyebrow="Marketing operations"
         title="Social Operations"
-        description="Connect social accounts, plan multi-platform content, schedule posts and bind each destination to live PalladiumAI integration capabilities without exposing credentials to agents or the browser."
+        description="Connect social accounts, plan multi-platform content, schedule posts and bind each destination to live Blackstar integration capabilities without exposing credentials to agents or the browser."
         action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><RefreshCw className="h-4 w-4" />Refresh</button>}
       />
 
@@ -158,18 +184,56 @@ export default function SocialOperations() {
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <div className="mb-2 flex items-center gap-2"><Link2 className="h-4 w-4 text-cyan-300" /><h2 className="font-semibold text-white">Bind a live destination</h2></div>
-          <p className="mb-4 text-xs leading-5 text-zinc-500">Only capabilities discovered from the authenticated user's existing PalladiumAI connections appear here. Provider credentials are never accepted in this form.</p>
+          <p className="mb-4 text-xs leading-5 text-zinc-500">Native provider connections are preferred. Connector transports remain available only when no equivalent native route is live. Provider credentials are never accepted in this form.</p>
           <form onSubmit={attachTarget} className="space-y-3">
             <select required value={targetForm.postId} onChange={(e) => setTargetForm({ ...targetForm, postId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
               <option value="">Choose post</option>{posts.map((post) => <option key={post.id} value={post.id}>{post.title || post.content.slice(0, 48)}</option>)}
             </select>
-            <select required value={targetForm.capabilityKey} onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
-              <option value="">Choose live social action</option>{capabilities.map((cap) => <option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>{cap.provider} · {cap.action}{cap.requiresApproval ? " · approval" : ""}</option>)}
+            <select
+              required
+              value={targetForm.capabilityKey}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", link: "", actionInput: "{}" })}
+              className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
+            >
+              <option value="">Choose live social action</option>
+              {capabilities.map((cap) => (
+                <option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>
+                  {cap.provider} · {cap.action} · {cap.transport === "direct_oauth" ? "native" : cap.transport}{cap.requiresApproval ? " · approval" : ""}
+                </option>
+              ))}
             </select>
-            <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
-            <button disabled={busy || !capabilities.length} className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40">Attach destination</button>
+
+            {nativeFacebook ? (
+              <div className="space-y-3 rounded-xl border border-cyan-400/15 bg-cyan-400/[.04] p-3">
+                <div>
+                  <p className="text-xs font-medium text-cyan-100">Native Meta destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Blackstar discovered these Pages directly from your encrypted Meta OAuth connection. Page access tokens stay server-side.</p>
+                </div>
+                <select required value={targetForm.pageId} onChange={(e) => setTargetForm({ ...targetForm, pageId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Facebook Page</option>
+                  {metaAssets.map((asset) => (
+                    <option key={asset.pageId} value={asset.pageId}>
+                      {asset.pageName}{asset.instagram?.username ? ` · IG @${asset.instagram.username}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="url"
+                  inputMode="url"
+                  value={targetForm.link}
+                  onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })}
+                  placeholder="Optional HTTPS link"
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none"
+                />
+                {!metaAssets.length && <p className="text-xs text-amber-200">No publishable Facebook Pages were discovered on the connected Meta account. Reconnect Meta with the required Page permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : (
+              <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
+            )}
+
+            <button disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length)} className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40">Attach destination</button>
           </form>
-          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; PalladiumAI will discover its typed actions automatically.</p>}
+          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; Blackstar will discover its typed actions automatically.</p>}
         </section>
       </div>
 
