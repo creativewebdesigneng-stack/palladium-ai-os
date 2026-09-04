@@ -10,6 +10,7 @@ import { runBoundedBrowserTask } from "./browser-task.server";
 import { asBrowserDatabase } from "./browser-database.types";
 import { loadBrowserProfile, saveBrowserProfile } from "./browser-profiles.server";
 import { createStatefulBrowserTool, type StatefulBrowserTool } from "./stateful-browser-tool.server";
+import { buildBrowserTaskComputerUsePlan } from "./browser-computer-use-policy.server";
 
 export const BROWSER_TASK_TOOL_DEF: ToolDef = {
   name: "browser_task",
@@ -96,6 +97,20 @@ export async function runBrowserTaskTool(
   ctx: ToolContext,
 ): Promise<unknown> {
   const allowedDomains = ctx.allowedDomains ?? [];
+  const computerUsePlan = buildBrowserTaskComputerUsePlan(input, allowedDomains);
+  if (!computerUsePlan.executable) {
+    const firstBlocked = computerUsePlan.decisions.find((decision) => !decision.allowed);
+    return {
+      error: firstBlocked?.reason ?? "Blackstar Computer Use policy blocked this browser task.",
+      policy: {
+        engine: "blackstar_computer_use",
+        executable: false,
+        blocked_count: computerUsePlan.blockedCount,
+        allowed_domains: computerUsePlan.allowedDomains,
+      },
+    };
+  }
+
   const persistSession = input["persist_session"] === true;
   const browserConfig = {
     allowedDomains,
@@ -184,6 +199,12 @@ export async function runBrowserTaskTool(
     return {
       provider: tool.provider,
       simulated: tool.kind === "development",
+      policy: {
+        engine: "blackstar_computer_use",
+        executable: computerUsePlan.executable,
+        blocked_count: computerUsePlan.blockedCount,
+        allowed_domains: computerUsePlan.allowedDomains,
+      },
       ...(tool.kind === "development"
         ? { warning: "Development simulation — this did not happen in a real browser." }
         : {}),
