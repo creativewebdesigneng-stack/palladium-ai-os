@@ -43,14 +43,52 @@ create policy "a2a messages owner insert"
   on public.agent_a2a_messages
   for insert
   to authenticated
-  with check (user_id = auth.uid());
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.personal_agents sender
+      where sender.id = sender_agent_id
+        and sender.user_id = auth.uid()
+    )
+    and exists (
+      select 1
+      from public.personal_agents recipient
+      where recipient.id = recipient_agent_id
+        and recipient.user_id = auth.uid()
+        and coalesce(recipient.org_id_fk, recipient.org_id) is not distinct from org_id
+    )
+    and exists (
+      select 1
+      from public.personal_agents sender
+      where sender.id = sender_agent_id
+        and sender.user_id = auth.uid()
+        and coalesce(sender.org_id_fk, sender.org_id) is not distinct from org_id
+    )
+  );
 
 create policy "a2a messages owner update"
   on public.agent_a2a_messages
   for update
   to authenticated
   using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.personal_agents sender
+      where sender.id = sender_agent_id
+        and sender.user_id = auth.uid()
+        and coalesce(sender.org_id_fk, sender.org_id) is not distinct from org_id
+    )
+    and exists (
+      select 1
+      from public.personal_agents recipient
+      where recipient.id = recipient_agent_id
+        and recipient.user_id = auth.uid()
+        and coalesce(recipient.org_id_fk, recipient.org_id) is not distinct from org_id
+    )
+  );
 
 comment on table public.agent_a2a_messages is
   'Blackstar Trust Fabric governed agent-to-agent message envelopes. Runtime execution remains in the canonical Agent Runtime.';
