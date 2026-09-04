@@ -8,6 +8,8 @@ export type PreparedAgentSkillPackage = {
   body: string;
   requiresTools: string[];
   requiresScripts: string[];
+  providesCapabilities: string[];
+  requiresProviders: string[];
   dangerous: boolean;
   scan: SkillScanResult;
   files: Record<string, string>;
@@ -56,6 +58,8 @@ export function prepareAgentSkillPackage(
     body: parsed.body,
     requiresTools: parsed.manifest.requiresTools,
     requiresScripts: parsed.manifest.requiresScripts,
+    providesCapabilities: parsed.manifest.providesCapabilities,
+    requiresProviders: parsed.manifest.requiresProviders,
     dangerous: parsed.manifest.dangerous || scan.verdict === "dangerous",
     scan,
     files: fileMap,
