@@ -1,5 +1,6 @@
 -- Blackstar Agent Economy: owner-scoped, auditable micro-unit ledger.
 -- Money movement is recorded here; external settlement remains with the canonical billing/payment system.
+-- Authenticated user sessions are read-only. Account and ledger mutation is server/service-role only.
 
 create table if not exists public.agent_economy_accounts (
   id uuid primary key default gen_random_uuid(),
@@ -39,13 +40,22 @@ alter table public.agent_economy_entries enable row level security;
 
 revoke all on public.agent_economy_accounts from anon;
 revoke all on public.agent_economy_entries from anon;
-grant select, insert, update on public.agent_economy_accounts to authenticated;
-grant select, insert on public.agent_economy_entries to authenticated;
+revoke all on public.agent_economy_accounts from authenticated;
+revoke all on public.agent_economy_entries from authenticated;
+grant select on public.agent_economy_accounts to authenticated;
+grant select on public.agent_economy_entries to authenticated;
 
-create policy "agent economy accounts owner select" on public.agent_economy_accounts for select to authenticated using (user_id = auth.uid());
-create policy "agent economy accounts owner insert" on public.agent_economy_accounts for insert to authenticated with check (user_id = auth.uid());
-create policy "agent economy accounts owner update" on public.agent_economy_accounts for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy "agent economy entries owner select" on public.agent_economy_entries for select to authenticated using (user_id = auth.uid());
-create policy "agent economy entries owner insert" on public.agent_economy_entries for insert to authenticated with check (user_id = auth.uid());
+create policy "agent economy accounts owner select"
+  on public.agent_economy_accounts
+  for select
+  to authenticated
+  using (user_id = auth.uid());
 
-comment on table public.agent_economy_entries is 'Append-only Blackstar agent economy ledger. External payment settlement remains in canonical billing/payment infrastructure.';
+create policy "agent economy entries owner select"
+  on public.agent_economy_entries
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+comment on table public.agent_economy_accounts is 'Blackstar agent economy accounts. Authenticated sessions may read owner-scoped rows; mutation is restricted to trusted server/service-role paths.';
+comment on table public.agent_economy_entries is 'Append-only Blackstar agent economy ledger. Authenticated sessions may read owner-scoped rows only; mutation and external settlement remain in trusted server/payment infrastructure.';
