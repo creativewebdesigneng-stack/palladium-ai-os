@@ -100,7 +100,7 @@ export function resolveAgentNetworkRoute(
           granteeAgentId: passport.agent_id,
           scope: request.capability,
           hop,
-          externalAction: request.externalAction,
+          ...(request.externalAction === undefined ? {} : { externalAction: request.externalAction }),
         },
         now,
       );
