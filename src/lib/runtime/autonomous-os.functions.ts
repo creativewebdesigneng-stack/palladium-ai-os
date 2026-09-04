@@ -104,7 +104,7 @@ export const createAutonomousGoal = createServerFn({ method: "POST" })
       .from("autonomous_goals")
       .insert({
         user_id: context.userId,
-        org_id: context.orgId ?? null,
+        org_id: null,
         workforce_id: data.workforce_id ?? null,
         name: data.name,
         objective: data.objective,
