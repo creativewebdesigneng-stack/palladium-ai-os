@@ -164,9 +164,20 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(() => ({}))
   .handler(async ({ context }) => {
-    const capabilities = await listIntegrationCapabilities(context.userId);
+    const [allCapabilities, youtubeCapabilities] = await Promise.all([
+      listIntegrationCapabilities(context.userId),
+      listIntegrationCapabilities(context.userId, "youtube"),
+    ]);
+    const capabilities = [...allCapabilities, ...youtubeCapabilities];
+    const seen = new Set<string>();
     return capabilities
       .filter((item) => SOCIAL_PROVIDERS.has(normalizeIntegrationProvider(item.provider)))
+      .filter((item) => {
+        const key = `${normalizeIntegrationProvider(item.provider)}:${item.action}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .map((item) => ({
         provider: normalizeIntegrationProvider(item.provider),
         action: item.action,
