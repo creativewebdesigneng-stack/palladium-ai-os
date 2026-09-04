@@ -50,6 +50,7 @@ import { Route as ShellAppAiToolsRouteImport } from './routes/_shell/_app/ai-too
 import { Route as ShellAppAnalyticsRouteImport } from './routes/_shell/_app/analytics'
 import { Route as ShellAppAutomationRouteImport } from './routes/_shell/_app/automation'
 import { Route as ShellAppAutomationsRouteImport } from './routes/_shell/_app/automations'
+import { Route as ShellAppAutonomousOsRouteImport } from './routes/_shell/_app/autonomous-os'
 import { Route as ShellAppBillingRouteImport } from './routes/_shell/_app/billing'
 import { Route as ShellAppBrowserPreviewRouteImport } from './routes/_shell/_app/browser-preview'
 import { Route as ShellAppBuilderRouteImport } from './routes/_shell/_app/builder'
@@ -359,6 +360,11 @@ const ShellAppAutomationRoute = ShellAppAutomationRouteImport.update({
 const ShellAppAutomationsRoute = ShellAppAutomationsRouteImport.update({
   id: '/automations',
   path: '/automations',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAutonomousOsRoute = ShellAppAutonomousOsRouteImport.update({
+  id: '/autonomous-os',
+  path: '/autonomous-os',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppBillingRoute = ShellAppBillingRouteImport.update({
@@ -936,6 +942,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof ShellAppAnalyticsRoute
   '/automation': typeof ShellAppAutomationRoute
   '/automations': typeof ShellAppAutomationsRoute
+  '/autonomous-os': typeof ShellAppAutonomousOsRoute
   '/billing': typeof ShellAppBillingRoute
   '/browser-preview': typeof ShellAppBrowserPreviewRoute
   '/builder': typeof ShellAppBuilderRoute
@@ -1080,6 +1087,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof ShellAppAnalyticsRoute
   '/automation': typeof ShellAppAutomationRoute
   '/automations': typeof ShellAppAutomationsRoute
+  '/autonomous-os': typeof ShellAppAutonomousOsRoute
   '/billing': typeof ShellAppBillingRoute
   '/browser-preview': typeof ShellAppBrowserPreviewRoute
   '/builder': typeof ShellAppBuilderRoute
@@ -1227,6 +1235,7 @@ export interface FileRoutesById {
   '/_shell/_app/analytics': typeof ShellAppAnalyticsRoute
   '/_shell/_app/automation': typeof ShellAppAutomationRoute
   '/_shell/_app/automations': typeof ShellAppAutomationsRoute
+  '/_shell/_app/autonomous-os': typeof ShellAppAutonomousOsRoute
   '/_shell/_app/billing': typeof ShellAppBillingRoute
   '/_shell/_app/browser-preview': typeof ShellAppBrowserPreviewRoute
   '/_shell/_app/builder': typeof ShellAppBuilderRoute
@@ -1373,6 +1382,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/automation'
     | '/automations'
+    | '/autonomous-os'
     | '/billing'
     | '/browser-preview'
     | '/builder'
@@ -1517,6 +1527,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/automation'
     | '/automations'
+    | '/autonomous-os'
     | '/billing'
     | '/browser-preview'
     | '/builder'
@@ -1663,6 +1674,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/analytics'
     | '/_shell/_app/automation'
     | '/_shell/_app/automations'
+    | '/_shell/_app/autonomous-os'
     | '/_shell/_app/billing'
     | '/_shell/_app/browser-preview'
     | '/_shell/_app/builder'
@@ -2101,6 +2113,13 @@ declare module '@tanstack/react-router' {
       path: '/automations'
       fullPath: '/automations'
       preLoaderRoute: typeof ShellAppAutomationsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/autonomous-os': {
+      id: '/_shell/_app/autonomous-os'
+      path: '/autonomous-os'
+      fullPath: '/autonomous-os'
+      preLoaderRoute: typeof ShellAppAutonomousOsRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/billing': {
@@ -2840,6 +2859,7 @@ interface ShellAppRouteChildren {
   ShellAppAnalyticsRoute: typeof ShellAppAnalyticsRoute
   ShellAppAutomationRoute: typeof ShellAppAutomationRoute
   ShellAppAutomationsRoute: typeof ShellAppAutomationsRoute
+  ShellAppAutonomousOsRoute: typeof ShellAppAutonomousOsRoute
   ShellAppBillingRoute: typeof ShellAppBillingRoute
   ShellAppBrowserPreviewRoute: typeof ShellAppBrowserPreviewRoute
   ShellAppBuilderRoute: typeof ShellAppBuilderRoute
@@ -2940,6 +2960,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppAnalyticsRoute: ShellAppAnalyticsRoute,
   ShellAppAutomationRoute: ShellAppAutomationRoute,
   ShellAppAutomationsRoute: ShellAppAutomationsRoute,
+  ShellAppAutonomousOsRoute: ShellAppAutonomousOsRoute,
   ShellAppBillingRoute: ShellAppBillingRoute,
   ShellAppBrowserPreviewRoute: ShellAppBrowserPreviewRoute,
   ShellAppBuilderRoute: ShellAppBuilderRoute,
