@@ -10,6 +10,7 @@ const MAX_RESPONSE_CHARS = 18_000;
 
 export const DIRECT_CONNECTED_SERVICE_PROVIDERS = [
   "google",
+  "youtube",
   "microsoft",
   "slack",
   "hubspot",
