@@ -96,6 +96,7 @@ function includesBlockedTerm(value: string, blockedTerms: string[]) {
 function stepText(step: BlackstarComputerUseStep) {
   return [
     step.purpose ?? '',
+    step.selector ?? '',
     step.text ?? '',
     ...Object.entries(step.fields ?? {}).flatMap(([key, value]) => [key, value]),
   ].join(' ')
