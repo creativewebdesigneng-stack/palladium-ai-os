@@ -174,10 +174,31 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
         risk: item.risk,
         requiresApproval: item.requiresApproval,
         deployed: item.deployed,
-        inputSchema: item.inputSchema,
         transport: item.transport,
         lane: item.lane,
       }));
+  });
+
+/** Safe account/page metadata for native Meta social destination selection. */
+export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { discoverMetaAssets } = await import("@/lib/integrations/meta-social.server");
+    const assets = await discoverMetaAssets(context.userId);
+    return assets.map((asset) => ({
+      pageId: String(asset.pageId),
+      pageName: String(asset.pageName),
+      tasks: Array.isArray(asset.tasks) ? asset.tasks.map((task) => String(task)).slice(0, 30) : [],
+      instagram: asset.instagram
+        ? {
+            id: String(asset.instagram.id),
+            username: asset.instagram.username ? String(asset.instagram.username) : null,
+            name: asset.instagram.name ? String(asset.instagram.name) : null,
+            profilePictureUrl: asset.instagram.profilePictureUrl ? String(asset.instagram.profilePictureUrl) : null,
+          }
+        : null,
+    }));
   });
 
 export const addSocialPostTarget = createServerFn({ method: "POST" })
