@@ -100,6 +100,17 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       return { ok: true, checkedAt, message: "Shopify store responded successfully through the native API." };
     }
 
+    if (providerId === "meta") {
+      const { discoverMetaAssets } = await import("./meta-social.server");
+      const assets = await discoverMetaAssets(context.userId, AbortSignal.timeout(12_000));
+      const instagramCount = assets.filter((asset) => asset.instagramAccount).length;
+      return {
+        ok: true,
+        checkedAt,
+        message: `Meta connection is valid. ${assets.length} Facebook Page${assets.length === 1 ? "" : "s"} and ${instagramCount} linked Instagram professional account${instagramCount === 1 ? "" : "s"} are available.`,
+      };
+    }
+
     if (providerId === "discord") {
       const provider = findProvider(providerId);
       if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
