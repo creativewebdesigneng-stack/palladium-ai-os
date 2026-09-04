@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { resolveAgentNetworkRoute } from "./a2a-network";
+import { resolveAgentNetworkRoute, type AgentNetworkPassport } from "./a2a-network";
 import type { AgentDelegationGrant } from "./agent-trust";
 
 type Sb = { from: (table: string) => any };
@@ -44,7 +44,7 @@ async function networkState(sb: Sb, userId: string) {
   if (identityError) throw new Error(identityError.message);
   if (grantError) throw new Error(grantError.message);
 
-  const passports = (identities ?? []).map((identity: any) => {
+  const passports: AgentNetworkPassport[] = (identities ?? []).map((identity: any) => {
     const passport = Array.isArray(identity.agent_passports) ? identity.agent_passports[0] : identity.agent_passports;
     return {
       agent_id: identity.agent_id,
@@ -136,18 +136,4 @@ export const queueAgentNetworkMessage = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !message) throw new Error(error?.message ?? "Could not queue A2A message.");
     return { route, message };
-  });
-
-export const listAgentNetworkMessages = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const sb = context.supabase as unknown as Sb;
-    const { data, error } = await sb
-      .from("agent_a2a_messages")
-      .select("*")
-      .eq("user_id", context.userId)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    return data ?? [];
   });
