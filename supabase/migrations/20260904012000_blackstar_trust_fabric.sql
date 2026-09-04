@@ -20,8 +20,9 @@ create table if not exists public.agent_identities (
 create index if not exists agent_identities_owner_idx on public.agent_identities(user_id, org_id);
 create index if not exists agent_identities_status_idx on public.agent_identities(status, trust_tier);
 
-grant select, insert, update, delete on public.agent_identities to authenticated;
-grant all on public.agent_identities to service_role;
+revoke all on table public.agent_identities from anon, authenticated;
+grant select, insert, update, delete on table public.agent_identities to authenticated;
+grant all on table public.agent_identities to service_role;
 alter table public.agent_identities enable row level security;
 
 create policy agent_identities_select on public.agent_identities for select to authenticated
@@ -63,8 +64,9 @@ create table if not exists public.agent_passports (
   updated_at timestamptz not null default now()
 );
 
-grant select, insert, update, delete on public.agent_passports to authenticated;
-grant all on public.agent_passports to service_role;
+revoke all on table public.agent_passports from anon, authenticated;
+grant select, insert, update, delete on table public.agent_passports to authenticated;
+grant all on table public.agent_passports to service_role;
 alter table public.agent_passports enable row level security;
 
 create or replace function public.agent_identity_is_visible(_identity uuid)
@@ -83,8 +85,8 @@ returns boolean language sql stable security definer set search_path = public as
   )
 $$;
 
-revoke all on function public.agent_identity_is_visible(uuid) from public;
-revoke all on function public.agent_identity_is_manageable(uuid) from public;
+revoke all on function public.agent_identity_is_visible(uuid) from public, anon, authenticated;
+revoke all on function public.agent_identity_is_manageable(uuid) from public, anon, authenticated;
 grant execute on function public.agent_identity_is_visible(uuid) to authenticated, service_role;
 grant execute on function public.agent_identity_is_manageable(uuid) to authenticated, service_role;
 
@@ -121,8 +123,9 @@ create unique index if not exists agent_delegation_active_pair_idx
 create index if not exists agent_delegation_grantee_idx
   on public.agent_delegation_grants(grantee_agent_id, status, expires_at);
 
-grant select, insert, update, delete on public.agent_delegation_grants to authenticated;
-grant all on public.agent_delegation_grants to service_role;
+revoke all on table public.agent_delegation_grants from anon, authenticated;
+grant select, insert, update, delete on table public.agent_delegation_grants to authenticated;
+grant all on table public.agent_delegation_grants to service_role;
 alter table public.agent_delegation_grants enable row level security;
 
 create policy agent_delegation_select on public.agent_delegation_grants for select to authenticated
@@ -176,7 +179,7 @@ create or replace function public.resolve_agent_delegation(
   limit 1
 $$;
 
-revoke all on function public.resolve_agent_delegation(uuid, uuid, text) from public;
+revoke all on function public.resolve_agent_delegation(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.resolve_agent_delegation(uuid, uuid, text) to authenticated, service_role;
 
 -- Backfill canonical identities and passports for existing agents. Private signing keys are never stored here.
