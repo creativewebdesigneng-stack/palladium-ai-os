@@ -189,7 +189,7 @@ where a.user_id is not null
 on conflict (agent_id) do nothing;
 
 insert into public.agent_passports (identity_id, display_name, description)
-select i.id, a.name, a.description
+select i.id, a.name, a.purpose
 from public.agent_identities i
 join public.personal_agents a on a.id = i.agent_id
 on conflict (identity_id) do nothing;
