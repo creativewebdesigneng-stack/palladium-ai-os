@@ -16,6 +16,13 @@ import {
   type GitHubConnectedServiceInput,
 } from "./github-connected-service.server";
 import {
+  META_SOCIAL_ACTION,
+  META_SOCIAL_INPUT_SCHEMA,
+  hasNativeMetaConnection,
+  prepareMetaSocialAction,
+} from "./meta-social-actions.server";
+import { publishFacebookPagePost } from "./meta-social.server";
+import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
   prepareNangoAgentAction,
@@ -108,7 +115,7 @@ const GITHUB_INPUT_SCHEMA: Record<string, unknown> = {
   properties: {
     repository: { type: "string", maxLength: 220 },
     path: { type: "string", maxLength: 1000 },
-    ref: { type: "string", maxLength: 250 },
+    ref: { type: "string", maxLength: 160 },
     limit: { type: "integer", minimum: 1, maximum: 25 },
   },
   additionalProperties: false,
@@ -165,12 +172,27 @@ async function hasSalesforceDirectConnection(userId: string): Promise<boolean> {
 const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
-  supportsProvider: isDirectConnectedServiceProvider,
+  supportsProvider(provider) {
+    return isDirectConnectedServiceProvider(provider) || provider === "facebook";
+  },
   async listCapabilities(userId, provider) {
+    const rows: AdapterCapability[] = [];
+
+    if ((!provider || provider === "facebook") && await hasNativeMetaConnection(userId)) {
+      rows.push({
+        provider: "facebook",
+        action: META_SOCIAL_ACTION,
+        description: "Publish an approved post to a Facebook Page through Meta's native Graph API.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: META_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
     const providers = provider
       ? [provider]
       : ["google", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
-    const rows: AdapterCapability[] = [];
     for (const providerId of providers) {
       if (!isDirectConnectedServiceProvider(providerId)) continue;
       if (!(await hasDirectConnectedService(userId, providerId))) continue;
@@ -189,6 +211,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     return rows;
   },
   async isAvailable(userId, provider, action) {
+    if (provider === "facebook") {
+      return action === META_SOCIAL_ACTION && await hasNativeMetaConnection(userId);
+    }
     return (
       isDirectConnectedServiceProvider(provider) &&
       directConnectedServiceActions(provider).includes(action) &&
@@ -196,6 +221,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     );
   },
   async prepare(input) {
+    if (input.provider === "facebook") {
+      return prepareMetaSocialAction(input);
+    }
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
@@ -213,6 +241,46 @@ const directOAuthAdapter: IntegrationAdapter = {
     };
   },
   async execute(input) {
+    if (input.provider === "facebook") {
+      let prepared;
+      try {
+        prepared = await prepareMetaSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Meta action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishFacebookPagePost({
+          userId: input.userId,
+          pageId: prepared.input.page_id,
+          message: prepared.input.message,
+          ...(prepared.input.link ? { link: prepared.input.link } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: {
+            provider: "facebook",
+            action: META_SOCIAL_ACTION,
+            read_only: false,
+            transport: "direct_oauth",
+            data,
+          },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Meta publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
     try {
       const result = await executeDirectConnectedService(
         input.userId,
