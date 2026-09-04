@@ -55,4 +55,32 @@ describe('Blackstar Agent Cloud placement', () => {
   it('fails closed when no requested region can be placed', () => {
     expect(planAiHubPlacement(workload({ requiredRegions: ['us'] }), capability)).toBeNull()
   })
+
+  it('places offline workloads only on explicitly offline-capable edge targets', () => {
+    const edgeCapability: AiHubCapabilityRef = {
+      ...capability,
+      id: 'edge-reasoner',
+      deploymentTargets: ['provider-cloud', 'edge', 'device'],
+      metadata: { offlineCapable: true, minDeviceMemoryMb: 4096 },
+    }
+    const placement = planAiHubPlacement(
+      workload({ requireOfflineExecution: true, maxDeviceMemoryMb: 8192 }),
+      edgeCapability,
+    )
+    expect(placement).toMatchObject({ deploymentTarget: 'edge', privateExecution: true })
+    expect(placement?.policyChecks).toContain('offline-capability')
+    expect(placement?.policyChecks).toContain('edge-placement')
+  })
+
+  it('fails closed when edge memory is insufficient', () => {
+    const edgeCapability: AiHubCapabilityRef = {
+      ...capability,
+      deploymentTargets: ['edge'],
+      metadata: { offlineCapable: true, minDeviceMemoryMb: 8192 },
+    }
+    expect(planAiHubPlacement(
+      workload({ requireOfflineExecution: true, maxDeviceMemoryMb: 4096 }),
+      edgeCapability,
+    )).toBeNull()
+  })
 })
