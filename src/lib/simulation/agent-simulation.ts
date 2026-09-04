@@ -6,7 +6,7 @@ export type SimulationStep = {
   action: SimulationAction;
   risk: SimulationRisk;
   estimatedCostMicros: number;
-  requiresApproval?: boolean;
+  requiresApproval?: boolean | undefined;
 };
 
 export type SimulationPolicy = {
