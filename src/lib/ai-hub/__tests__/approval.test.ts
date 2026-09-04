@@ -7,6 +7,10 @@ const plan: AiHubOrchestrationPlan = {
   discovery: [],
   requiresApproval: true,
   executionBoundary: 'palladium-policy-gateway',
+  placement: {
+    workloadId: 'workload-1', capabilityId: 'reasoner', deploymentTarget: 'palladium-cloud',
+    privateExecution: false, reason: 'test placement', policyChecks: ['deployment-target'],
+  },
   route: {
     workloadId: 'workload-1',
     capability: {
