@@ -1,6 +1,8 @@
 import type { AiHubCapabilityRef, AiHubRouteDecision, AiHubWorkload } from './contracts'
 import type { AiHubDiscoveryQuery, AiHubDiscoveryResult } from './discovery'
 import { discoverAiHubCapabilities } from './discovery'
+import type { AiHubPhysicalDecision } from './physical-ai'
+import { planAiHubPhysicalAction } from './physical-ai'
 import type { AiHubPlacementDecision } from './placement'
 import { planAiHubPlacement } from './placement'
 import { routeAiHubWorkload } from './router'
@@ -18,6 +20,7 @@ export interface AiHubOrchestrationPlan {
   route: AiHubRouteDecision
   placement: AiHubPlacementDecision
   spatial?: AiHubSpatialDecision
+  physical?: AiHubPhysicalDecision
   requiresApproval: boolean
   executionBoundary: 'palladium-policy-gateway'
 }
@@ -55,13 +58,19 @@ export class AiHubOrchestrator {
       : null
     if (request.workload.requirements.spatial && !spatial) return null
 
+    const physical = request.workload.requirements.physical
+      ? planAiHubPhysicalAction(request.workload, route.capability, spatial ?? undefined)
+      : null
+    if (request.workload.requirements.physical && !physical) return null
+
     return {
       workloadId: request.workload.id,
       discovery,
       route,
       placement,
       ...(spatial ? { spatial } : {}),
-      requiresApproval: request.workload.requirements.requireHumanApproval === true,
+      ...(physical ? { physical } : {}),
+      requiresApproval: request.workload.requirements.requireHumanApproval === true || physical?.requiresApproval === true,
       executionBoundary: 'palladium-policy-gateway',
     }
   }
