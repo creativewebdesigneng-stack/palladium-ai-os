@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AiHubCapabilityRef, AiHubWorkload } from '../contracts'
 import { AiHubOrchestrator } from '../orchestrator'
+import type { AiHubSpatialRequirement } from '../spatial'
 import { planAiHubSpatialContext } from '../spatial'
 
 const spatialCapability: AiHubCapabilityRef = {
@@ -20,7 +21,7 @@ const spatialCapability: AiHubCapabilityRef = {
   },
 }
 
-function workload(spatial: AiHubWorkload['requirements']['spatial']): AiHubWorkload {
+function workload(spatial: AiHubSpatialRequirement): AiHubWorkload {
   return {
     id: 'spatial-workload',
     tenantId: 'tenant-1',
@@ -76,11 +77,13 @@ describe('Blackstar Spatial', () => {
 
   it('makes Spatial a mandatory part of orchestration when requested', () => {
     const orchestrator = new AiHubOrchestrator(() => [spatialCapability])
-    const plan = orchestrator.plan(workload({ sceneId: 'factory-a', zoneId: 'assembly', requiredActions: ['inspect'] }))
+    const plan = orchestrator.plan({
+      workload: workload({ sceneId: 'factory-a', zoneId: 'assembly', requiredActions: ['inspect'] }),
+    })
 
     expect(plan?.spatial).toMatchObject({ sceneId: 'factory-a', zoneId: 'assembly' })
 
-    const rejected = orchestrator.plan(workload({ sceneId: 'factory-a', zoneId: 'restricted' }))
+    const rejected = orchestrator.plan({ workload: workload({ sceneId: 'factory-a', zoneId: 'restricted' }) })
     expect(rejected).toBeNull()
   })
 })
