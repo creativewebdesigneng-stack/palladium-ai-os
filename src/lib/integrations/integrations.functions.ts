@@ -24,16 +24,13 @@ const startInput = z.object({
   origin: z.string().trim().url().max(300).optional(),
 });
 
-/** Provider catalogue plus this user's connection state and safe health summary. */
 export const listIntegrations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data: rows, error } = await sb
       .from("integrations")
-      .select(
-        "id,provider,name,status,scopes,granted_scopes,account_label,integration_type,last_error,connected_at,last_sync_at,expires_at,created_at",
-      )
+      .select("id,provider,name,status,scopes,granted_scopes,account_label,integration_type,last_error,connected_at,last_sync_at,expires_at,created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
@@ -45,9 +42,7 @@ export const listIntegrations = createServerFn({ method: "POST" })
       .from("integration_credentials")
       .select("provider,refresh_token_ciphertext,expires_at")
       .eq("user_id", context.userId);
-    const credentialsByProvider = new Map(
-      (credentials ?? []).map((row: any) => [String(row.provider), row]),
-    );
+    const credentialsByProvider = new Map((credentials ?? []).map((row: any) => [String(row.provider), row]));
 
     const catalogue = INTEGRATION_PROVIDERS.map((provider) => {
       const connection = (rows ?? []).find((r: any) => r.provider === provider.id) ?? null;
@@ -77,10 +72,6 @@ export const listIntegrations = createServerFn({ method: "POST" })
     return { integrations: rows ?? [], catalogue };
   });
 
-/**
- * Performs one bounded, read-only provider request to prove the stored
- * credential works now. No external data is written by this health check.
- */
 export const testIntegrationConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => providerInput.pick({ provider: true }).parse(input))
@@ -90,12 +81,7 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
 
     if (providerId === "shopify") {
       const { executeNativeShopifyAction } = await import("./shopify.server");
-      const result = await executeNativeShopifyAction({
-        userId: context.userId,
-        action: "shop_overview",
-        actionInput: {},
-        signal: AbortSignal.timeout(12_000),
-      });
+      const result = await executeNativeShopifyAction({ userId: context.userId, action: "shop_overview", actionInput: {}, signal: AbortSignal.timeout(12_000) });
       if (!result.ok) throw new Error(result.error ?? "Shopify did not respond successfully.");
       return { ok: true, checkedAt, message: "Shopify store responded successfully through the native API." };
     }
@@ -104,11 +90,7 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       const { discoverMetaAssets } = await import("./meta-social.server");
       const assets = await discoverMetaAssets(context.userId, AbortSignal.timeout(12_000));
       const instagramCount = assets.filter((asset) => asset.instagramAccount).length;
-      return {
-        ok: true,
-        checkedAt,
-        message: `Meta connection is valid. ${assets.length} Facebook Page${assets.length === 1 ? "" : "s"} and ${instagramCount} linked Instagram professional account${instagramCount === 1 ? "" : "s"} are available.`,
-      };
+      return { ok: true, checkedAt, message: `Meta connection is valid. ${assets.length} Facebook Page${assets.length === 1 ? "" : "s"} and ${instagramCount} linked Instagram professional account${instagramCount === 1 ? "" : "s"} are available.` };
     }
 
     if (providerId === "youtube") {
@@ -130,19 +112,23 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       const { getIntegrationAccessToken } = await import("./oauth.server");
       const token = await getIntegrationAccessToken(context.userId, providerId);
       if (!token) throw new Error("LinkedIn is not connected, has expired, or needs to be reconnected.");
-      const response = await fetch(provider.identity.url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        signal: AbortSignal.timeout(12_000),
-      });
+      const response = await fetch(provider.identity.url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
       if (!response.ok) throw new Error(`LinkedIn returned ${response.status}. Reconnect the account and try again.`);
       const profile = await response.json() as Record<string, unknown>;
       const name = typeof profile["name"] === "string" ? profile["name"].slice(0, 120) : "";
+      return { ok: true, checkedAt, message: name ? `LinkedIn member connection is valid for ${name}. Native posting remains disabled until an approved author URN is available.` : "LinkedIn member connection is valid. Native posting remains disabled until an approved author URN is available." };
+    }
+
+    if (providerId === "pinterest") {
+      const { discoverPinterestAccount, discoverPinterestBoards } = await import("./pinterest-social.server");
+      const [account, boards] = await Promise.all([
+        discoverPinterestAccount(context.userId, AbortSignal.timeout(12_000)),
+        discoverPinterestBoards(context.userId, AbortSignal.timeout(12_000)),
+      ]);
       return {
         ok: true,
         checkedAt,
-        message: name
-          ? `LinkedIn member connection is valid for ${name}. Native posting remains disabled until an approved author URN is available.`
-          : "LinkedIn member connection is valid. Native posting remains disabled until an approved author URN is available.",
+        message: `Pinterest connection is valid${account.username ? ` for @${account.username}` : ""}. ${boards.length} board${boards.length === 1 ? "" : "s"} discovered for native publishing.`,
       };
     }
 
@@ -152,10 +138,7 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       const { getIntegrationAccessToken } = await import("./oauth.server");
       const token = await getIntegrationAccessToken(context.userId, providerId);
       if (!token) throw new Error("Discord is not connected, has expired, or needs to be reconnected.");
-      const response = await fetch(provider.identity.url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        signal: AbortSignal.timeout(12_000),
-      });
+      const response = await fetch(provider.identity.url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
       if (!response.ok) throw new Error(`Discord returned ${response.status}. Reconnect the account and try again.`);
       return { ok: true, checkedAt, message: "Discord account token is valid. Agent channel actions are not enabled." };
     }
@@ -180,11 +163,6 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
     return { ok: true, checkedAt, message: `${providerId === "github" ? "GitHub" : findProvider(providerId)?.name ?? providerId} responded successfully.` };
   });
 
-/**
- * Step 1 of OAuth: mint a signed state and hand back the provider consent URL.
- * Nothing is trusted from the browser except the return origin, which is
- * validated against the app's own origins.
- */
 export const startIntegrationOAuth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => startInput.parse(input))
@@ -192,68 +170,43 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const provider = findProvider(data.provider);
     if (!provider) throw new Error("Unknown integration provider.");
 
-    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } =
-      await import("./oauth.server");
-    if (!providerConfigured(provider)) {
-      throw new Error(
-        `${provider.name} is not available yet: the workspace owner needs to add its OAuth client credentials.`,
-      );
-    }
+    const { providerConfigured, createState, buildAuthorizeUrl, safeOrigin } = await import("./oauth.server");
+    if (!providerConfigured(provider)) throw new Error(`${provider.name} is not available yet: the workspace owner needs to add its OAuth client credentials.`);
 
     const origin = safeOrigin(data.origin);
-    if (provider.connectMode === "shopify_store") {
-      return { authorizeUrl: `${origin}/shopify-connect` };
-    }
+    if (provider.connectMode === "shopify_store") return { authorizeUrl: `${origin}/shopify-connect` };
 
     const sb = context.supabase as unknown as Sb;
-    await sb.from("integrations").upsert(
-      {
-        user_id: context.userId,
-        org_id: null,
-        provider: provider.id,
-        name: provider.name,
-        integration_type: "oauth",
-        status: "pending",
-        scopes: provider.scopes,
-        last_error: null,
-      },
-      { onConflict: "user_id,provider" },
-    );
+    await sb.from("integrations").upsert({
+      user_id: context.userId,
+      org_id: null,
+      provider: provider.id,
+      name: provider.name,
+      integration_type: "oauth",
+      status: "pending",
+      scopes: provider.scopes,
+      last_error: null,
+    }, { onConflict: "user_id,provider" });
 
-    return {
-      authorizeUrl: buildAuthorizeUrl(provider, {
-        origin,
-        state: createState({ userId: context.userId, provider: provider.id, origin }),
-      }),
-    };
+    return { authorizeUrl: buildAuthorizeUrl(provider, { origin, state: createState({ userId: context.userId, provider: provider.id, origin }) }) };
   });
 
-/** Drops the connection and destroys the stored tokens. */
 export const disconnectIntegration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { error } = await sb
-      .from("integrations")
-      .update({
-        status: "disconnected",
-        connected_at: null,
-        expires_at: null,
-        account_label: null,
-        granted_scopes: [],
-        last_error: null,
-      })
-      .eq("user_id", context.userId)
-      .eq("provider", data.provider);
+    const { error } = await sb.from("integrations").update({
+      status: "disconnected",
+      connected_at: null,
+      expires_at: null,
+      account_label: null,
+      granted_scopes: [],
+      last_error: null,
+    }).eq("user_id", context.userId).eq("provider", data.provider);
     if (error) throw new Error(error.message);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("integration_credentials")
-      .delete()
-      .eq("user_id", context.userId)
-      .eq("provider", data.provider);
-
+    await supabaseAdmin.from("integration_credentials").delete().eq("user_id", context.userId).eq("provider", data.provider);
     return { ok: true };
   });
