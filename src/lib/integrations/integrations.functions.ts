@@ -124,6 +124,28 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       };
     }
 
+    if (providerId === "linkedin") {
+      const provider = findProvider(providerId);
+      if (!provider?.identity?.url) throw new Error("LinkedIn identity test is unavailable.");
+      const { getIntegrationAccessToken } = await import("./oauth.server");
+      const token = await getIntegrationAccessToken(context.userId, providerId);
+      if (!token) throw new Error("LinkedIn is not connected, has expired, or needs to be reconnected.");
+      const response = await fetch(provider.identity.url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error(`LinkedIn returned ${response.status}. Reconnect the account and try again.`);
+      const profile = await response.json() as Record<string, unknown>;
+      const name = typeof profile["name"] === "string" ? profile["name"].slice(0, 120) : "";
+      return {
+        ok: true,
+        checkedAt,
+        message: name
+          ? `LinkedIn member connection is valid for ${name}. Native posting remains disabled until an approved author URN is available.`
+          : "LinkedIn member connection is valid. Native posting remains disabled until an approved author URN is available.",
+      };
+    }
+
     if (providerId === "discord") {
       const provider = findProvider(providerId);
       if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
