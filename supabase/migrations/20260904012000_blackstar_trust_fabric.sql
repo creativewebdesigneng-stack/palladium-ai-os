@@ -166,11 +166,11 @@ create or replace function public.resolve_agent_delegation(
     and g.grantee_agent_id = _grantee
     and g.status = 'active'
     and (g.expires_at is null or g.expires_at > now())
-    and (_scope is null or g.scopes ? _scope)
+    and (_scope is null or g.scopes ? _scope or g.scopes ? '*')
     and (
       g.user_id = auth.uid()
       or public.is_org_member(g.org_id)
-      or auth.role() = 'service_role'
+      or coalesce(auth.jwt() ->> 'role', '') = 'service_role'
     )
   order by g.created_at desc
   limit 1
