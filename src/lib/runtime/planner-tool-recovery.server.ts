@@ -1,14 +1,14 @@
 /**
- * Safe tool-failure recovery for planned PalladiumAI runs.
+ * Safe tool-failure recovery for planned Blackstar runs.
  *
- * A planned agent may revise its approach immediately after a clearly failed
- * read-only tool call. External writes, approvals, ambiguous dispatches and
- * unknown tools never auto-replan here: those remain under their existing
- * approval/verification/error semantics so Palladium never retries a possibly
- * completed real-world action by accident.
+ * Blackstar's self-healing policy is the decision layer over the existing
+ * planner recovery path. It never creates a second executor: safe read failures
+ * can consume the existing bounded replan budget, while ambiguous writes,
+ * approvals and policy failures remain fail-closed under existing semantics.
  */
 import type { AgentPlan, VerificationDecision } from "@/lib/agents/agent-planner";
 import { normaliseVerificationDecision } from "@/lib/agents/agent-planner";
+import { decideRecovery, type HealingDecision } from "@/lib/ai-hub/self-healing";
 import { SAFE_PARALLEL_READ_TOOLS } from "./atomic-loop-guard.server";
 
 const SAFE_READS = new Set(SAFE_PARALLEL_READ_TOOLS);
@@ -19,6 +19,7 @@ export type PlannedToolRecovery = {
   shouldReplan: boolean;
   decision: VerificationDecision | null;
   reason: string | null;
+  healing: HealingDecision;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -37,7 +38,6 @@ export function isApprovalWait(output: unknown): boolean {
   );
 }
 
-/** True when a failed result could mean an external action was already dispatched. */
 export function isAmbiguousExternalFailure(output: unknown): boolean {
   const row = asRecord(output);
   if (!row) return false;
@@ -51,17 +51,16 @@ function failureReason(tool: string, output: unknown): string {
   const row = asRecord(output);
   const detail = String(
     row?.["message"] ?? row?.["error"] ?? row?.["reason"] ?? "tool returned an unsuccessful result",
-  )
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 500);
+  ).replace(/\s+/g, " ").trim().slice(0, 500);
   return `${tool} failed: ${detail}`;
 }
 
-/**
- * Automatic replanning is intentionally narrow. Only explicitly known
- * side-effect-free reads with an approval-free grant qualify.
- */
+const failClosed = (reason: string): HealingDecision => ({
+  action: "fail_closed",
+  automatic: false,
+  reason,
+});
+
 export function classifyPlannedToolFailure(args: {
   plan: unknown;
   tool: string;
@@ -70,19 +69,27 @@ export function classifyPlannedToolFailure(args: {
   grant?: RecoveryGrant | null;
 }): PlannedToolRecovery {
   const plan = args.plan as AgentPlan;
-  if (args.ok) return { shouldReplan: false, decision: null, reason: null };
-  if (isApprovalWait(args.output)) return { shouldReplan: false, decision: null, reason: null };
+  if (args.ok) return { shouldReplan: false, decision: null, reason: null, healing: failClosed("no_failure") };
+  if (isApprovalWait(args.output)) {
+    return { shouldReplan: false, decision: null, reason: null, healing: { action: "pause_for_approval", automatic: false, reason: "existing_approval_wait" } };
+  }
   if (isAmbiguousExternalFailure(args.output)) {
-    return { shouldReplan: false, decision: null, reason: "ambiguous_external_failure" };
+    const healing = decideRecovery({ id: `${args.tool}:${plan.current_step_id ?? "unknown"}`, failureClass: "unknown", attempt: plan.replan_count, mutationOccurred: true });
+    return { shouldReplan: false, decision: null, reason: "ambiguous_external_failure", healing };
   }
   if (!SAFE_READS.has(args.tool)) {
-    return { shouldReplan: false, decision: null, reason: "tool_not_safe_for_automatic_replan" };
+    return { shouldReplan: false, decision: null, reason: "tool_not_safe_for_automatic_replan", healing: failClosed("tool_not_safe_for_automatic_replan") };
   }
   if (!args.grant || args.grant.requiresApproval !== false) {
-    return { shouldReplan: false, decision: null, reason: "tool_not_approval_free" };
+    return { shouldReplan: false, decision: null, reason: "tool_not_approval_free", healing: { action: "pause_for_approval", automatic: false, reason: "tool_not_approval_free" } };
   }
-  if (plan.replan_count >= plan.max_replans) {
-    return { shouldReplan: false, decision: null, reason: "replan_budget_exhausted" };
+
+  const healing = decideRecovery(
+    { id: `${args.tool}:${plan.current_step_id ?? "unknown"}`, failureClass: "transient", attempt: plan.replan_count },
+    { maxRetries: plan.max_replans },
+  );
+  if (healing.action !== "retry") {
+    return { shouldReplan: false, decision: null, reason: "replan_budget_exhausted", healing };
   }
 
   const reason = failureReason(args.tool, args.output);
@@ -95,9 +102,7 @@ export function classifyPlannedToolFailure(args: {
   revised.push({
     id: `recovery-${plan.replan_count + 1}`,
     title: `Recover from ${args.tool} failure`,
-    objective:
-      `Find a different safe route to satisfy the objective after this failed ${args.tool} call. ` +
-      "Do not repeat the exact failed request unless new information or changed inputs justify it.",
+    objective: `Find a different safe route to satisfy the objective after this failed ${args.tool} call. Do not repeat the exact failed request unless new information or changed inputs justify it.`,
     success_criteria: ["Use new evidence or a materially different safe approach"],
     status: "pending",
     evidence: [reason],
@@ -106,13 +111,7 @@ export function classifyPlannedToolFailure(args: {
   return {
     shouldReplan: true,
     reason,
-    decision: normaliseVerificationDecision({
-      passed: false,
-      score: 0,
-      issues: [reason],
-      evidence: [reason],
-      next_action: "replan",
-      revised_steps: revised,
-    }),
+    healing,
+    decision: normaliseVerificationDecision({ passed: false, score: 0, issues: [reason], evidence: [reason], next_action: "replan", revised_steps: revised }),
   };
 }
