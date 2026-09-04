@@ -11,6 +11,8 @@ describe("Atomic-style agent skill foundation", () => {
       version: "1.0.0",
       requiresTools: ["integration_action", "browser_task"],
       requiresScripts: ["summarize.js"],
+      providesCapabilities: [],
+      requiresProviders: [],
       dangerous: false,
     });
     expect(parsed.body).toContain("approved integration tools");
