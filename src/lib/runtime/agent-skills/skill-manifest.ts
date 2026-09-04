@@ -4,6 +4,8 @@ export type AgentSkillManifest = {
   version: string;
   requiresTools: string[];
   requiresScripts: string[];
+  providesCapabilities: string[];
+  requiresProviders: string[];
   dangerous: boolean;
 };
 
@@ -13,6 +15,7 @@ export type ParsedAgentSkill = {
 };
 
 const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const CAPABILITY_RE = /^[a-z0-9](?:[a-z0-9._:-]{0,158}[a-z0-9*])?$/;
 const MAX_DESCRIPTION = 240;
 const MAX_LIST_ITEMS = 64;
 const MAX_ITEM_LENGTH = 160;
@@ -44,6 +47,14 @@ function asStringList(value: unknown, field: string): string[] {
     if (normalized.length > MAX_ITEM_LENGTH) throw new Error(`Skill ${field} entry is too long.`);
     return normalized;
   });
+}
+
+function asCapabilityList(value: unknown): string[] {
+  const capabilities = asStringList(value, "provides_capabilities");
+  for (const capability of capabilities) {
+    if (!CAPABILITY_RE.test(capability)) throw new Error("Skill provides_capabilities entries must be lowercase capability identifiers.");
+  }
+  return [...new Set(capabilities)];
 }
 
 function parseFrontmatter(raw: string): Record<string, unknown> {
@@ -90,6 +101,8 @@ export function parseAgentSkillMarkdown(markdown: string): ParsedAgentSkill {
   if (typeof dangerous !== "boolean") throw new Error("Skill dangerous must be a boolean.");
   const requiresTools = asStringList(raw["requires_tools"], "requires_tools");
   const requiresScripts = asStringList(raw["requires_scripts"], "requires_scripts");
+  const providesCapabilities = asCapabilityList(raw["provides_capabilities"]);
+  const requiresProviders = asStringList(raw["requires_providers"], "requires_providers");
   for (const script of requiresScripts) {
     if (script.includes("/") || script.includes("\\") || script === "." || script === "..") {
       throw new Error("Skill script allowlist entries must be file names, not paths.");
@@ -97,5 +110,17 @@ export function parseAgentSkillMarkdown(markdown: string): ParsedAgentSkill {
   }
   const body = match[2]!.trim();
   if (!body) throw new Error("SKILL.md must contain a playbook body.");
-  return { manifest: { name, description, version, requiresTools, requiresScripts, dangerous }, body };
+  return {
+    manifest: {
+      name,
+      description,
+      version,
+      requiresTools,
+      requiresScripts,
+      providesCapabilities,
+      requiresProviders,
+      dangerous,
+    },
+    body,
+  };
 }
