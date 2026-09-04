@@ -49,6 +49,22 @@ function stringList(value: unknown, maxItems = 20, maxLength = 160) {
   return [...new Set(value.map((item) => boundedText(item, maxLength)).filter(Boolean))].slice(0, maxItems)
 }
 
+function serializableCapability(capability: AiHubCapabilityRef) {
+  return {
+    id: capability.id,
+    kind: capability.kind,
+    providerId: capability.providerId,
+    name: capability.name,
+    capabilities: capability.capabilities,
+    deploymentTargets: capability.deploymentTargets,
+    ...(capability.version ? { version: capability.version } : {}),
+    ...(capability.regions ? { regions: capability.regions } : {}),
+    ...(capability.estimatedLatencyMs !== undefined ? { estimatedLatencyMs: capability.estimatedLatencyMs } : {}),
+    ...(capability.estimatedCostMinorUnits !== undefined ? { estimatedCostMinorUnits: capability.estimatedCostMinorUnits } : {}),
+    ...(capability.currency ? { currency: capability.currency } : {}),
+  }
+}
+
 export function validateOpportunityExecutionInput(input: unknown): OpportunityExecutionInput {
   const row = input && typeof input === 'object' && !Array.isArray(input)
     ? input as Record<string, unknown>
@@ -187,9 +203,30 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
       }
     }
 
+    const serializablePlan = {
+      ...plan,
+      intelligence: {
+        ...plan.intelligence,
+        stages: plan.intelligence.stages.map((stage) => ({
+          ...stage,
+          plan: {
+            ...stage.plan,
+            discovery: stage.plan.discovery.map((result) => ({
+              ...result,
+              capability: serializableCapability(result.capability),
+            })),
+            route: {
+              ...stage.plan.route,
+              capability: serializableCapability(stage.plan.route.capability),
+            },
+          },
+        })),
+      },
+    }
+
     return {
       status: plan.status,
-      plan,
+      plan: serializablePlan,
       availableCapabilities: capabilities.length,
     }
   })
