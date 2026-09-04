@@ -52,6 +52,8 @@ export interface AiHubWorkloadRequirements {
   requireOfflineExecution?: boolean
   /** Maximum device memory available to the workload. Capability metadata may declare minDeviceMemoryMb. */
   maxDeviceMemoryMb?: number
+  /** Optional governed Spatial scene, zone, coordinate and action boundary. */
+  spatial?: import('./spatial').AiHubSpatialRequirement
 }
 
 export interface AiHubWorkload {
