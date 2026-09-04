@@ -111,6 +111,19 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       };
     }
 
+    if (providerId === "youtube") {
+      const { discoverYouTubeChannels } = await import("./youtube-social.server");
+      const channels = await discoverYouTubeChannels(context.userId, AbortSignal.timeout(12_000));
+      const label = channels[0]?.title;
+      return {
+        ok: true,
+        checkedAt,
+        message: channels.length
+          ? `YouTube connection is valid. ${channels.length} channel${channels.length === 1 ? "" : "s"} available${label ? `; primary channel: ${label}.` : "."}`
+          : "YouTube token is valid, but no channel is available for this Google account.",
+      };
+    }
+
     if (providerId === "discord") {
       const provider = findProvider(providerId);
       if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
