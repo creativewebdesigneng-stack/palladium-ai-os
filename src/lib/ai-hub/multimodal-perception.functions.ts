@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import {
   buildBlackstarPerceptionPlan,
-  type PerceptionInput,
-  type PerceptionPolicy,
+  type BlackstarPerceptionInput,
+  type BlackstarPerceptionPolicy,
 } from './multimodal-perception'
 
 const modality = z.enum(['text', 'image', 'audio', 'video', 'sensor'])
@@ -36,7 +36,7 @@ const inputSchema = z.object({
 type ValidatedInput = z.infer<typeof perceptionInputSchema>
 type ValidatedPolicy = z.infer<typeof perceptionPolicySchema>
 
-function normalizePerceptionInput(input: ValidatedInput): PerceptionInput {
+function normalizePerceptionInput(input: ValidatedInput): BlackstarPerceptionInput {
   return {
     id: input.id,
     modality: input.modality,
@@ -47,7 +47,7 @@ function normalizePerceptionInput(input: ValidatedInput): PerceptionInput {
   }
 }
 
-function normalizePerceptionPolicy(policy: ValidatedPolicy | undefined): PerceptionPolicy {
+function normalizePerceptionPolicy(policy: ValidatedPolicy | undefined): BlackstarPerceptionPolicy {
   if (!policy) return {}
   return {
     ...(policy.allowedModalities !== undefined ? { allowedModalities: policy.allowedModalities } : {}),
