@@ -13,6 +13,8 @@ export interface MemoryFabricCandidate {
   scope?: string
   document_id?: string | null
   source?: string | null
+  agent_id?: string | null
+  org_id?: string | null
 }
 
 export interface MemoryFabricProvenance {
@@ -25,15 +27,27 @@ export interface MemoryFabricProvenance {
 /**
  * Blackstar Memory Fabric is an execution-time governance layer over the
  * existing RLS-protected Memory/Knowledge stores. Database RLS remains the
- * authority for membership; this policy additionally prevents a personal or
- * agent-only execution from accidentally receiving broader workspace memory.
+ * authority for membership; this policy additionally prevents a personal,
+ * agent-only, or workspace execution from receiving memory outside its exact
+ * current execution boundary.
  */
 export function memoryFabricAllows(candidate: MemoryFabricCandidate, context: MemoryFabricContext): boolean {
-  if (candidate.kind === 'document') return true
+  if (candidate.org_id && candidate.org_id !== context.orgId) return false
+  if (candidate.agent_id && candidate.agent_id !== context.agentId) return false
+
+  if (candidate.kind === 'document') {
+    if (candidate.org_id) return Boolean(context.orgId)
+    if (candidate.agent_id) return Boolean(context.agentId)
+    return true
+  }
 
   const scope = (candidate.scope ?? 'private') as MemoryFabricScope
-  if (scope === 'shared' || scope === 'organisation') return Boolean(context.orgId)
-  if (scope === 'agent') return Boolean(context.agentId)
+  if (scope === 'shared' || scope === 'organisation') {
+    return Boolean(context.orgId && candidate.org_id === context.orgId)
+  }
+  if (scope === 'agent') {
+    return Boolean(context.agentId && candidate.agent_id === context.agentId)
+  }
   return scope === 'private' || scope === 'user'
 }
 
