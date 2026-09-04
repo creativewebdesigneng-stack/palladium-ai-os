@@ -3,6 +3,7 @@ import {
   filterMemoryFabric,
   memoryFabricLayer,
   memoryFabricProvenance,
+  type MemoryFabricCandidate,
   type MemoryFabricContext,
 } from './memory-fabric'
 
@@ -25,12 +26,18 @@ type DocumentAuthorityRow = {
   metadata: Record<string, unknown> | null
 }
 
+type GovernedMemoryHit = MemorySearchHit & MemoryFabricCandidate & {
+  source: string | null
+  agent_id: string | null
+  org_id: string | null
+}
+
 export interface MemoryFabricRecallItem extends MemorySearchHit {
   layer: ReturnType<typeof memoryFabricLayer>
   provenance: ReturnType<typeof memoryFabricProvenance>
-  agent_id?: string | null
-  org_id?: string | null
-  source?: string | null
+  agent_id: string | null
+  org_id: string | null
+  source: string | null
 }
 
 export async function recallMemoryFabric(args: {
@@ -50,7 +57,7 @@ export async function recallMemoryFabric(args: {
     limit: requestedLimit,
     agentId: args.context.agentId,
     types: args.types ?? null,
-    includeDocuments: args.includeDocuments,
+    ...(args.includeDocuments === undefined ? {} : { includeDocuments: args.includeDocuments }),
   })
 
   const memoryIds = hits.filter((hit) => hit.kind === 'memory').map((hit) => hit.id)
@@ -82,32 +89,36 @@ export async function recallMemoryFabric(args: {
     (documentRows as DocumentAuthorityRow[]).map((row) => [row.id, row]),
   )
 
-  const governed = hits.flatMap((hit) => {
+  const governed: GovernedMemoryHit[] = []
+  for (const hit of hits) {
     if (hit.kind === 'memory') {
       const authority = memoryAuthority.get(hit.id)
-      if (!authority) return []
-      return [{
+      if (!authority) continue
+      const scope = authority.scope ?? hit.scope
+      const memoryType = authority.memory_type ?? hit.memory_type
+      governed.push({
         ...hit,
-        scope: authority.scope ?? hit.scope,
-        memory_type: authority.memory_type ?? hit.memory_type,
+        ...(scope === undefined ? {} : { scope }),
+        ...(memoryType === undefined ? {} : { memory_type: memoryType }),
         source: authority.source,
         agent_id: authority.agent_id,
         org_id: authority.org_id,
-      }]
+      })
+      continue
     }
 
     const authority = hit.document_id ? documentAuthority.get(hit.document_id) : undefined
-    if (!authority) return []
+    if (!authority) continue
     const source = typeof authority.metadata?.['source'] === 'string'
       ? authority.metadata['source'] as string
       : authority.title
-    return [{
+    governed.push({
       ...hit,
       source,
       agent_id: authority.agent_id,
       org_id: authority.org_id,
-    }]
-  })
+    })
+  }
 
   return filterMemoryFabric(governed, args.context)
     .slice(0, requestedLimit)
