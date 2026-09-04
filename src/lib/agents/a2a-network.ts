@@ -4,9 +4,9 @@ export type AgentNetworkPassport = {
   agent_id: string;
   canonical_id: string;
   status?: string | null;
-  capabilities?: unknown;
-  tool_scopes?: unknown;
-  provider_scopes?: unknown;
+  capabilities?: string[];
+  tool_scopes?: string[];
+  provider_scopes?: string[];
   autonomy_tier?: string | null;
   risk_tier?: string | null;
 };
