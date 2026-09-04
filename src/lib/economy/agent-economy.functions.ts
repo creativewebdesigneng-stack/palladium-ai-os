@@ -8,7 +8,7 @@ type Sb = { from: (table: string) => any };
 const scopeSchema = z.object({ agentId: z.string().uuid(), currency: z.string().trim().length(3).default("GBP") });
 
 async function assertOwnedAgent(sb: Sb, userId: string, agentId: string) {
-  const { data, error } = await sb.from("agents").select("id").eq("id", agentId).eq("user_id", userId).maybeSingle();
+  const { data, error } = await sb.from("personal_agents").select("id").eq("id", agentId).eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("AGENT_NOT_OWNED");
 }
