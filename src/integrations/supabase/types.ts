@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_a2a_messages: {
+        Row: {
+          consumed_at: string | null
+          correlation_id: string | null
+          created_at: string
+          delegation_grant_id: string | null
+          delivered_at: string | null
+          expires_at: string | null
+          hop: number
+          id: string
+          kind: string
+          org_id: string | null
+          payload: Json
+          recipient_agent_id: string
+          requires_approval: boolean
+          scope: string
+          sender_agent_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          delegation_grant_id?: string | null
+          delivered_at?: string | null
+          expires_at?: string | null
+          hop?: number
+          id?: string
+          kind?: string
+          org_id?: string | null
+          payload?: Json
+          recipient_agent_id: string
+          requires_approval?: boolean
+          scope: string
+          sender_agent_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          delegation_grant_id?: string | null
+          delivered_at?: string | null
+          expires_at?: string | null
+          hop?: number
+          id?: string
+          kind?: string
+          org_id?: string | null
+          payload?: Json
+          recipient_agent_id?: string
+          requires_approval?: boolean
+          scope?: string
+          sender_agent_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_activities: {
         Row: {
           agent_id: string | null
@@ -68,6 +131,336 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "personal_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_collective_deliberations: {
+        Row: {
+          agreement_ratio: number
+          confidence: number
+          consensus: Json
+          correlation_id: string | null
+          created_at: string
+          id: string
+          org_id: string | null
+          participant_agent_ids: string[]
+          proposals: Json
+          selected_answer_key: string
+          status: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          agreement_ratio: number
+          confidence: number
+          consensus: Json
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          participant_agent_ids: string[]
+          proposals: Json
+          selected_answer_key: string
+          status: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          agreement_ratio?: number
+          confidence?: number
+          consensus?: Json
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          participant_agent_ids?: string[]
+          proposals?: Json
+          selected_answer_key?: string
+          status?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_delegation_grants: {
+        Row: {
+          allow_external_actions: boolean
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          grantee_agent_id: string
+          grantor_agent_id: string
+          id: string
+          max_hops: number
+          org_id: string | null
+          requires_approval: boolean
+          scopes: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allow_external_actions?: boolean
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          grantee_agent_id: string
+          grantor_agent_id: string
+          id?: string
+          max_hops?: number
+          org_id?: string | null
+          requires_approval?: boolean
+          scopes?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allow_external_actions?: boolean
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          grantee_agent_id?: string
+          grantor_agent_id?: string
+          id?: string
+          max_hops?: number
+          org_id?: string | null
+          requires_approval?: boolean
+          scopes?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_delegation_grants_grantee_agent_id_fkey"
+            columns: ["grantee_agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_grants_grantor_agent_id_fkey"
+            columns: ["grantor_agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_grants_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_economy_accounts: {
+        Row: {
+          agent_id: string
+          created_at: string
+          currency: string
+          id: string
+          org_id: string | null
+          spend_limit_micros: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string | null
+          spend_limit_micros?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string | null
+          spend_limit_micros?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_economy_entries: {
+        Row: {
+          account_id: string
+          agent_id: string
+          amount_micros: number
+          correlation_id: string | null
+          counterparty_agent_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          kind: string
+          metadata: Json
+          org_id: string | null
+          reference: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          agent_id: string
+          amount_micros: number
+          correlation_id?: string | null
+          counterparty_agent_id?: string | null
+          created_at?: string
+          currency: string
+          id?: string
+          kind: string
+          metadata?: Json
+          org_id?: string | null
+          reference: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          agent_id?: string
+          amount_micros?: number
+          correlation_id?: string | null
+          counterparty_agent_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          org_id?: string | null
+          reference?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_economy_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "agent_economy_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_evolution_proposals: {
+        Row: {
+          agent_id: string
+          applied: boolean
+          baseline_metrics: Json
+          candidate_metrics: Json
+          change_summary: string
+          change_type: string
+          correlation_id: string | null
+          created_at: string
+          decision_reasons: Json
+          decision_score: number
+          decision_status: string
+          evidence_refs: Json
+          id: string
+          org_id: string | null
+          requires_approval: boolean
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          applied?: boolean
+          baseline_metrics: Json
+          candidate_metrics: Json
+          change_summary: string
+          change_type: string
+          correlation_id?: string | null
+          created_at?: string
+          decision_reasons?: Json
+          decision_score: number
+          decision_status: string
+          evidence_refs?: Json
+          id?: string
+          org_id?: string | null
+          requires_approval?: boolean
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          applied?: boolean
+          baseline_metrics?: Json
+          candidate_metrics?: Json
+          change_summary?: string
+          change_type?: string
+          correlation_id?: string | null
+          created_at?: string
+          decision_reasons?: Json
+          decision_score?: number
+          decision_status?: string
+          evidence_refs?: Json
+          id?: string
+          org_id?: string | null
+          requires_approval?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_identities: {
+        Row: {
+          agent_id: string
+          canonical_id: string
+          created_at: string
+          id: string
+          issuer: string
+          org_id: string | null
+          provenance: Json
+          public_key_fingerprint: string | null
+          status: string
+          trust_tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          canonical_id: string
+          created_at?: string
+          id?: string
+          issuer?: string
+          org_id?: string | null
+          provenance?: Json
+          public_key_fingerprint?: string | null
+          status?: string
+          trust_tier?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          canonical_id?: string
+          created_at?: string
+          id?: string
+          issuer?: string
+          org_id?: string | null
+          provenance?: Json
+          public_key_fingerprint?: string | null
+          status?: string
+          trust_tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_identities_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_identities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -282,6 +675,110 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_passports: {
+        Row: {
+          attestations: Json
+          autonomy_tier: string
+          capabilities: Json
+          description: string | null
+          display_name: string | null
+          expires_at: string | null
+          id: string
+          identity_id: string
+          issued_at: string
+          metadata: Json
+          provider_scopes: Json
+          revoked_at: string | null
+          risk_tier: string
+          tool_scopes: Json
+          updated_at: string
+        }
+        Insert: {
+          attestations?: Json
+          autonomy_tier?: string
+          capabilities?: Json
+          description?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          identity_id: string
+          issued_at?: string
+          metadata?: Json
+          provider_scopes?: Json
+          revoked_at?: string | null
+          risk_tier?: string
+          tool_scopes?: Json
+          updated_at?: string
+        }
+        Update: {
+          attestations?: Json
+          autonomy_tier?: string
+          capabilities?: Json
+          description?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          identity_id?: string
+          issued_at?: string
+          metadata?: Json
+          provider_scopes?: Json
+          revoked_at?: string | null
+          risk_tier?: string
+          tool_scopes?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_passports_identity_id_fkey"
+            columns: ["identity_id"]
+            isOneToOne: true
+            referencedRelation: "agent_identities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_simulation_runs: {
+        Row: {
+          agent_id: string | null
+          correlation_id: string | null
+          created_at: string
+          id: string
+          org_id: string | null
+          projected_cost_micros: number
+          result: Json
+          risk_score: number
+          scenario: Json
+          status: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          projected_cost_micros: number
+          result: Json
+          risk_score: number
+          scenario: Json
+          status: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          projected_cost_micros?: number
+          result?: Json
+          risk_score?: number
+          scenario?: Json
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       agent_skill_script_executions: {
         Row: {
@@ -1176,6 +1673,328 @@ export type Database = {
           },
         ]
       }
+      autonomous_goal_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          goal_id: string
+          id: string
+          message: string
+          payload: Json
+          run_id: string | null
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          goal_id: string
+          id?: string
+          message: string
+          payload?: Json
+          run_id?: string | null
+          severity?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          goal_id?: string
+          id?: string
+          message?: string
+          payload?: Json
+          run_id?: string | null
+          severity?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomous_goal_events_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "autonomous_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomous_goal_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "autonomous_goal_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autonomous_goal_fleet_assignments: {
+        Row: {
+          agent_id: string | null
+          assignment_id: string
+          created_at: string
+          depends_on: Json
+          goal_id: string
+          id: string
+          objective: string
+          requires_approval: boolean
+          run_id: string
+          status: string
+          success_criteria: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          assignment_id: string
+          created_at?: string
+          depends_on?: Json
+          goal_id: string
+          id?: string
+          objective: string
+          requires_approval?: boolean
+          run_id: string
+          status?: string
+          success_criteria?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          assignment_id?: string
+          created_at?: string
+          depends_on?: Json
+          goal_id?: string
+          id?: string
+          objective?: string
+          requires_approval?: boolean
+          run_id?: string
+          status?: string
+          success_criteria?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomous_goal_fleet_assignments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomous_goal_fleet_assignments_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "autonomous_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomous_goal_fleet_assignments_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "autonomous_goal_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autonomous_goal_runs: {
+        Row: {
+          attempt: number
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          goal_id: string
+          heartbeat_at: string | null
+          id: string
+          plan: Json | null
+          queued_at: string | null
+          started_at: string | null
+          status: string
+          summary: string | null
+          trigger: string
+          updated_at: string
+          user_id: string
+          workflow_id: string | null
+          workflow_run_id: string | null
+        }
+        Insert: {
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          goal_id: string
+          heartbeat_at?: string | null
+          id?: string
+          plan?: Json | null
+          queued_at?: string | null
+          started_at?: string | null
+          status?: string
+          summary?: string | null
+          trigger?: string
+          updated_at?: string
+          user_id: string
+          workflow_id?: string | null
+          workflow_run_id?: string | null
+        }
+        Update: {
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          goal_id?: string
+          heartbeat_at?: string | null
+          id?: string
+          plan?: Json | null
+          queued_at?: string | null
+          started_at?: string | null
+          status?: string
+          summary?: string | null
+          trigger?: string
+          updated_at?: string
+          user_id?: string
+          workflow_id?: string | null
+          workflow_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomous_goal_runs_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "autonomous_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomous_goal_runs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomous_goal_runs_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autonomous_goals: {
+        Row: {
+          allow_replanning: boolean
+          autonomy_level: string
+          budget_pence: number | null
+          context: Json
+          created_at: string
+          event_match: string | null
+          event_source: string | null
+          id: string
+          last_recovery_at: string | null
+          last_recovery_error: string | null
+          last_run_at: string | null
+          last_scheduler_error: string | null
+          max_parallel_agents: number
+          max_runtime_seconds: number
+          name: string
+          next_run_at: string | null
+          objective: string
+          org_id: string | null
+          pending_event_context: Json
+          recovery_attempts: number
+          require_approval_for_external_actions: boolean
+          schedule_cron: string | null
+          scheduler_attempts: number
+          scheduler_claimed_at: string | null
+          scheduler_lease_until: string | null
+          status: string
+          success_criteria: Json
+          timezone: string
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+          user_id: string
+          workforce_id: string | null
+        }
+        Insert: {
+          allow_replanning?: boolean
+          autonomy_level?: string
+          budget_pence?: number | null
+          context?: Json
+          created_at?: string
+          event_match?: string | null
+          event_source?: string | null
+          id?: string
+          last_recovery_at?: string | null
+          last_recovery_error?: string | null
+          last_run_at?: string | null
+          last_scheduler_error?: string | null
+          max_parallel_agents?: number
+          max_runtime_seconds?: number
+          name: string
+          next_run_at?: string | null
+          objective: string
+          org_id?: string | null
+          pending_event_context?: Json
+          recovery_attempts?: number
+          require_approval_for_external_actions?: boolean
+          schedule_cron?: string | null
+          scheduler_attempts?: number
+          scheduler_claimed_at?: string | null
+          scheduler_lease_until?: string | null
+          status?: string
+          success_criteria?: Json
+          timezone?: string
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+          user_id: string
+          workforce_id?: string | null
+        }
+        Update: {
+          allow_replanning?: boolean
+          autonomy_level?: string
+          budget_pence?: number | null
+          context?: Json
+          created_at?: string
+          event_match?: string | null
+          event_source?: string | null
+          id?: string
+          last_recovery_at?: string | null
+          last_recovery_error?: string | null
+          last_run_at?: string | null
+          last_scheduler_error?: string | null
+          max_parallel_agents?: number
+          max_runtime_seconds?: number
+          name?: string
+          next_run_at?: string | null
+          objective?: string
+          org_id?: string | null
+          pending_event_context?: Json
+          recovery_attempts?: number
+          require_approval_for_external_actions?: boolean
+          schedule_cron?: string | null
+          scheduler_attempts?: number
+          scheduler_claimed_at?: string | null
+          scheduler_lease_until?: string | null
+          status?: string
+          success_criteria?: Json
+          timezone?: string
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
+          workforce_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomous_goals_workforce_id_fkey"
+            columns: ["workforce_id"]
+            isOneToOne: false
+            referencedRelation: "workforces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_webhook_events: {
         Row: {
           environment: string
@@ -1866,6 +2685,48 @@ export type Database = {
           provider?: string
           resource_kind?: string
           resource_uuid?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      enterprise_autonomy_policies: {
+        Row: {
+          allowed_capabilities: string[]
+          allowed_providers: string[]
+          created_at: string
+          id: string
+          max_concurrent_runs: number
+          max_daily_spend_micros: number
+          org_id: string
+          require_approval_for_external_writes: boolean
+          require_approval_for_financial_actions: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed_capabilities?: string[]
+          allowed_providers?: string[]
+          created_at?: string
+          id?: string
+          max_concurrent_runs?: number
+          max_daily_spend_micros?: number
+          org_id: string
+          require_approval_for_external_writes?: boolean
+          require_approval_for_financial_actions?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed_capabilities?: string[]
+          allowed_providers?: string[]
+          created_at?: string
+          id?: string
+          max_concurrent_runs?: number
+          max_daily_spend_micros?: number
+          org_id?: string
+          require_approval_for_external_writes?: boolean
+          require_approval_for_financial_actions?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -3394,6 +4255,39 @@ export type Database = {
           },
         ]
       }
+      personal_assistant_preferences: {
+        Row: {
+          assistant_name: string
+          briefing_enabled: boolean
+          created_at: string
+          location_name: string | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+          welcome_enabled: boolean
+        }
+        Insert: {
+          assistant_name?: string
+          briefing_enabled?: boolean
+          created_at?: string
+          location_name?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+          welcome_enabled?: boolean
+        }
+        Update: {
+          assistant_name?: string
+          briefing_enabled?: boolean
+          created_at?: string
+          location_name?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+          welcome_enabled?: boolean
+        }
+        Relationships: []
+      }
       personal_memories: {
         Row: {
           agent_id: string | null
@@ -3450,6 +4344,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      personal_os_profiles: {
+        Row: {
+          allowed_capabilities: string[]
+          created_at: string
+          max_daily_spend_micros: number
+          primary_agent_id: string | null
+          quiet_hours_end: number | null
+          quiet_hours_start: number | null
+          require_approval_for_external_writes: boolean
+          require_approval_for_messages: boolean
+          require_approval_for_purchases: boolean
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed_capabilities?: string[]
+          created_at?: string
+          max_daily_spend_micros?: number
+          primary_agent_id?: string | null
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          require_approval_for_external_writes?: boolean
+          require_approval_for_messages?: boolean
+          require_approval_for_purchases?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed_capabilities?: string[]
+          created_at?: string
+          max_daily_spend_micros?: number
+          primary_agent_id?: string | null
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          require_approval_for_external_writes?: boolean
+          require_approval_for_messages?: boolean
+          require_approval_for_purchases?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       personal_tasks: {
         Row: {
@@ -5960,6 +6899,60 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_studio_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          id: string
+          input_mime_type: string | null
+          input_text: string | null
+          kind: string
+          metadata: Json
+          model: string
+          output_format: string | null
+          output_text: string | null
+          provider: string
+          status: string
+          user_id: string
+          voice: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          input_mime_type?: string | null
+          input_text?: string | null
+          kind: string
+          metadata?: Json
+          model: string
+          output_format?: string | null
+          output_text?: string | null
+          provider?: string
+          status?: string
+          user_id: string
+          voice?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          input_mime_type?: string | null
+          input_text?: string | null
+          kind?: string
+          metadata?: Json
+          model?: string
+          output_format?: string | null
+          output_text?: string | null
+          provider?: string
+          status?: string
+          user_id?: string
+          voice?: string | null
+        }
+        Relationships: []
+      }
       web_crawl_jobs: {
         Row: {
           created_at: string
@@ -6887,12 +7880,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      agent_identity_is_manageable: {
+        Args: { _identity: string }
+        Returns: boolean
+      }
+      agent_identity_is_visible: {
+        Args: { _identity: string }
+        Returns: boolean
+      }
       agent_is_visible: { Args: { _agent: string }; Returns: boolean }
       can_access: { Args: { _org: string; _user: string }; Returns: boolean }
       effective_plan: {
         Args: { _org?: string; _user: string }
         Returns: string
       }
+      enforce_autonomous_goal_guardrails: { Args: never; Returns: number }
       get_published_app_studio_release: {
         Args: { p_app_id: string }
         Returns: Json
@@ -6928,6 +7930,16 @@ export type Database = {
           _user: string
         }
         Returns: string
+      }
+      resolve_agent_delegation: {
+        Args: { _grantee: string; _grantor: string; _scope?: string }
+        Returns: {
+          allow_external_actions: boolean
+          grant_id: string
+          max_hops: number
+          requires_approval: boolean
+          scopes: Json
+        }[]
       }
       search_agent_memories: {
         Args: {
@@ -7024,12 +8036,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7053,11 +8065,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7078,11 +8090,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7103,11 +8115,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7120,11 +8132,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
