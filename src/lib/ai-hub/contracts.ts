@@ -19,6 +19,9 @@ export type AiHubCapabilityKind = (typeof AI_HUB_CAPABILITY_KINDS)[number]
 export const AI_HUB_DEPLOYMENT_TARGETS = ['palladium-cloud', 'provider-cloud', 'customer-cloud', 'on-prem', 'edge', 'device'] as const
 export type AiHubDeploymentTarget = (typeof AI_HUB_DEPLOYMENT_TARGETS)[number]
 
+export const AI_HUB_ROUTING_OBJECTIVES = ['balanced', 'lowest-cost', 'lowest-latency', 'highest-reliability', 'highest-quality'] as const
+export type AiHubRoutingObjective = (typeof AI_HUB_ROUTING_OBJECTIVES)[number]
+
 export interface AiHubCapabilityRef {
   id: string
   kind: AiHubCapabilityKind
@@ -44,6 +47,7 @@ export interface AiHubWorkloadRequirements {
   requiredDeploymentTargets?: AiHubDeploymentTarget[]
   requirePrivateExecution?: boolean
   requireHumanApproval?: boolean
+  routingObjective?: AiHubRoutingObjective
 }
 
 export interface AiHubWorkload {
@@ -55,9 +59,21 @@ export interface AiHubWorkload {
   context?: Record<string, unknown>
 }
 
+export interface AiHubRoutingSignals {
+  objective: AiHubRoutingObjective
+  score: number
+  costScore: number
+  latencyScore: number
+  reliabilityScore: number
+  qualityScore: number
+  observedRuns: number
+  evaluationCount: number
+}
+
 export interface AiHubRouteDecision {
   workloadId: string
   capability: AiHubCapabilityRef
   reason: string
   policyChecks: string[]
+  routingSignals?: AiHubRoutingSignals
 }
