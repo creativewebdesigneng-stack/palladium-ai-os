@@ -37,7 +37,7 @@ const createGoalInput = z
         ctx.addIssue({ code: "custom", path: ["event_source"], message: "Choose a supported event source." });
       }
       if (!value.event_match?.trim()) {
-        ctx.addIssue({ code: "custom", path: ["event_match"], message: "Event goals need a notification match phrase." });
+        ctx.addIssue({ code: "custom", path: ["event_match"], message: "Event-triggered goals need a notification match phrase." });
       }
     }
   });
