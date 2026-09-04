@@ -44,10 +44,10 @@ describe('AI Hub foundation', () => {
 
     const decision = routeAiHubWorkload(workload, capabilities)
     expect(decision?.capability.id).toBe('eligible')
-    expect(decision?.policyChecks).toEqual(expect.arrayContaining(['latency-budget', 'cost-budget']))
+    expect(decision?.policyChecks).toEqual(expect.arrayContaining(['latency-budget', 'cost-budget', 'intelligence-routing']))
   })
 
-  it('chooses lower cost, then lower latency, without reordering exact ties', () => {
+  it('chooses lower cost, then lower latency when intelligence signals are neutral', () => {
     const workload: AiHubWorkload = {
       id: 'ranked', tenantId: 'tenant-1', actorId: 'actor-1', goal: 'Choose efficient inference',
       requirements: { capabilities: ['inference'], preferredKinds: ['model'] },
@@ -59,5 +59,65 @@ describe('AI Hub foundation', () => {
     ]
 
     expect(routeAiHubWorkload(workload, capabilities)?.capability.id).toBe('cheaper-fast')
+  })
+
+  it('can prefer a slightly more expensive provider when reliability history is materially stronger', () => {
+    const workload: AiHubWorkload = {
+      id: 'reliable', tenantId: 'tenant-1', actorId: 'actor-1', goal: 'Choose dependable inference',
+      requirements: { capabilities: ['inference'], preferredKinds: ['model'], routingObjective: 'highest-reliability' },
+    }
+    const capabilities: AiHubCapabilityRef[] = [
+      {
+        id: 'cheap-flaky', kind: 'model', providerId: 'provider-a', name: 'Cheap flaky', capabilities: ['inference'],
+        deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 150, estimatedCostMinorUnits: 3, currency: 'GBP',
+        metadata: { recentRuns: '100', succeededRuns: '55', failedRuns: '45' },
+      },
+      {
+        id: 'stable', kind: 'model', providerId: 'provider-b', name: 'Stable', capabilities: ['inference'],
+        deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 180, estimatedCostMinorUnits: 5, currency: 'GBP',
+        metadata: { recentRuns: '100', succeededRuns: '98', failedRuns: '2' },
+      },
+    ]
+
+    const decision = routeAiHubWorkload(workload, capabilities)
+    expect(decision?.capability.id).toBe('stable')
+    expect(decision?.routingSignals?.reliabilityScore).toBeGreaterThan(0.9)
+    expect(decision?.policyChecks).toContain('reliability-telemetry')
+  })
+
+  it('uses evaluation trust for quality routing without treating missing history as perfect', () => {
+    const workload: AiHubWorkload = {
+      id: 'quality', tenantId: 'tenant-1', actorId: 'actor-1', goal: 'Choose the highest evaluated quality',
+      requirements: { capabilities: ['reasoning'], preferredKinds: ['model'], routingObjective: 'highest-quality' },
+    }
+    const capabilities: AiHubCapabilityRef[] = [
+      {
+        id: 'unknown-quality', kind: 'model', providerId: 'provider-a', name: 'Unknown', capabilities: ['reasoning'],
+        deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 100, estimatedCostMinorUnits: 4, currency: 'GBP',
+      },
+      {
+        id: 'evaluated', kind: 'model', providerId: 'provider-b', name: 'Evaluated', capabilities: ['reasoning'],
+        deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 110, estimatedCostMinorUnits: 5, currency: 'GBP',
+        metadata: { evalCount: '20', evalAverageScore: '94.0' },
+      },
+    ]
+
+    const decision = routeAiHubWorkload(workload, capabilities)
+    expect(decision?.capability.id).toBe('evaluated')
+    expect(decision?.routingSignals?.qualityScore).toBeCloseTo(0.94)
+    expect(decision?.policyChecks).toContain('evaluation-trust')
+  })
+
+  it('keeps exact score, cost and latency ties deterministic by preserving discovery order', () => {
+    const workload: AiHubWorkload = {
+      id: 'tie', tenantId: 'tenant-1', actorId: 'actor-1', goal: 'Deterministic routing',
+      requirements: { capabilities: ['inference'], preferredKinds: ['model'] },
+    }
+    const capabilities: AiHubCapabilityRef[] = [
+      { id: 'first', kind: 'model', providerId: 'provider-a', name: 'First', capabilities: ['inference'], deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 100, estimatedCostMinorUnits: 4 },
+      { id: 'second', kind: 'model', providerId: 'provider-b', name: 'Second', capabilities: ['inference'], deploymentTargets: ['provider-cloud'], estimatedLatencyMs: 100, estimatedCostMinorUnits: 4 },
+    ]
+
+    expect(routeAiHubWorkload(workload, capabilities)?.capability.id).toBe('first')
   })
 })
