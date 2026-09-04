@@ -111,6 +111,21 @@ export function resolveIntegrationTransport(provider: string): IntegrationTransp
   return adapter?.id ?? "nango";
 }
 
+function appendCapabilities(
+  rows: IntegrationCapability[],
+  adapter: IntegrationAdapter,
+  capabilities: Awaited<ReturnType<IntegrationAdapter["listCapabilities"]>>,
+): void {
+  for (const capability of capabilities) {
+    rows.push({
+      ...capability,
+      provider: normalizeIntegrationProvider(capability.provider),
+      transport: adapter.id,
+      lane: adapter.lane,
+    });
+  }
+}
+
 /** Live, typed actions exposed by the authenticated user's actual connections. */
 export async function listIntegrationCapabilities(
   userId: string,
@@ -120,14 +135,18 @@ export async function listIntegrationCapabilities(
   const rows: IntegrationCapability[] = [];
   for (const adapter of integrationAdapters()) {
     if (normalized && !adapter.supportsProvider(normalized)) continue;
-    const capabilities = await adapter.listCapabilities(userId, normalized || undefined);
-    for (const capability of capabilities) {
-      rows.push({
-        ...capability,
-        provider: normalizeIntegrationProvider(capability.provider),
-        transport: adapter.id,
-        lane: adapter.lane,
-      });
+    appendCapabilities(rows, adapter, await adapter.listCapabilities(userId, normalized || undefined));
+  }
+
+  // Some adapters still enumerate a fixed legacy provider set when no provider
+  // is supplied. Probe native YouTube explicitly so the shared agent/workflow
+  // catalogue sees the same direct capability as Social Operations. Grouping
+  // below removes any duplicate connector/native entries and preserves the
+  // normal direct-before-connector routing preference.
+  if (!normalized) {
+    for (const adapter of integrationAdapters()) {
+      if (!adapter.supportsProvider("youtube")) continue;
+      appendCapabilities(rows, adapter, await adapter.listCapabilities(userId, "youtube"));
     }
   }
 
