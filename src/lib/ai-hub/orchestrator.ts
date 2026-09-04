@@ -1,6 +1,8 @@
 import type { AiHubCapabilityRef, AiHubRouteDecision, AiHubWorkload } from './contracts'
 import type { AiHubDiscoveryQuery, AiHubDiscoveryResult } from './discovery'
 import { discoverAiHubCapabilities } from './discovery'
+import type { AiHubPlacementDecision } from './placement'
+import { planAiHubPlacement } from './placement'
 import { routeAiHubWorkload } from './router'
 
 export interface AiHubOrchestrationRequest {
@@ -12,6 +14,7 @@ export interface AiHubOrchestrationPlan {
   workloadId: string
   discovery: AiHubDiscoveryResult[]
   route: AiHubRouteDecision
+  placement: AiHubPlacementDecision
   requiresApproval: boolean
   executionBoundary: 'palladium-policy-gateway'
 }
@@ -41,10 +44,14 @@ export class AiHubOrchestrator {
     )
     if (!route) return null
 
+    const placement = planAiHubPlacement(request.workload, route.capability)
+    if (!placement) return null
+
     return {
       workloadId: request.workload.id,
       discovery,
       route,
+      placement,
       requiresApproval: request.workload.requirements.requireHumanApproval === true,
       executionBoundary: 'palladium-policy-gateway',
     }
