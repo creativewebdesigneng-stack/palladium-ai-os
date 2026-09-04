@@ -31,7 +31,7 @@ function numberMetadata(capability: AiHubCapabilityRef, key: string) {
 function edgeCompatible(workload: AiHubWorkload, capability: AiHubCapabilityRef) {
   if (!workload.requirements.requireOfflineExecution && workload.requirements.maxDeviceMemoryMb === undefined) return true
   if (!capability.deploymentTargets.some((target) => EDGE_TARGETS.has(target))) return false
-  if (workload.requirements.requireOfflineExecution && capability.metadata?.offlineCapable !== true) return false
+  if (workload.requirements.requireOfflineExecution && capability.metadata?.['offlineCapable'] !== true) return false
   const availableMemory = workload.requirements.maxDeviceMemoryMb
   const requiredMemory = numberMetadata(capability, 'minDeviceMemoryMb')
   if (availableMemory !== undefined) {
