@@ -28,20 +28,34 @@ function numberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-async function pinterestGet(
+function httpsUrl(value: unknown, label: string, max = 2000): string {
+  const raw = text(value, max);
+  if (!raw) throw new Error(`${label} is required.`);
+  const url = new URL(raw);
+  if (url.protocol !== "https:") throw new Error(`${label} must use HTTPS.`);
+  return url.toString();
+}
+
+async function pinterestRequest(
   userId: string,
   path: string,
-  query?: Record<string, string>,
-  signal?: AbortSignal,
+  init: { method?: "GET" | "POST"; query?: Record<string, string>; body?: Record<string, unknown>; signal?: AbortSignal } = {},
 ): Promise<Record<string, unknown>> {
   const token = await getIntegrationAccessToken(userId, "pinterest");
   if (!token) throw new Error("Pinterest is not connected or its access has expired.");
   if (!/^\/[a-z0-9_/-]*$/i.test(path) || path.includes("..")) throw new Error("Invalid Pinterest API path.");
   const url = new URL(`${PINTEREST_API}${path}`);
-  for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(init.query ?? {})) url.searchParams.set(key, value);
+  const body = init.body ? JSON.stringify(init.body) : undefined;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    signal: signal ?? AbortSignal.timeout(20_000),
+    method: init.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body } : {}),
+    signal: init.signal ?? AbortSignal.timeout(20_000),
   });
   const raw = (await response.text()).slice(0, MAX_RESPONSE_CHARS * 2);
   let payload: Record<string, unknown> = {};
@@ -61,7 +75,7 @@ export async function discoverPinterestAccount(
   userId: string,
   signal?: AbortSignal,
 ): Promise<PinterestAccountAsset> {
-  const payload = await pinterestGet(userId, "/user_account", undefined, signal);
+  const payload = await pinterestRequest(userId, "/user_account", { ...(signal ? { signal } : {}) });
   return {
     username: text(payload["username"], 120) || null,
     accountType: text(payload["account_type"], 80) || null,
@@ -74,7 +88,7 @@ export async function discoverPinterestBoards(
   userId: string,
   signal?: AbortSignal,
 ): Promise<PinterestBoardAsset[]> {
-  const payload = await pinterestGet(userId, "/boards", { page_size: "100" }, signal);
+  const payload = await pinterestRequest(userId, "/boards", { query: { page_size: "100" }, ...(signal ? { signal } : {}) });
   const items = Array.isArray(payload["items"]) ? payload["items"] as unknown[] : [];
   return items.flatMap((value): PinterestBoardAsset[] => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
@@ -91,4 +105,47 @@ export async function discoverPinterestBoards(
       followerCount: numberOrNull(row["follower_count"]),
     }];
   });
+}
+
+export async function publishPinterestImagePin(input: {
+  userId: string;
+  boardId: string;
+  imageUrl: string;
+  title?: string;
+  description: string;
+  link?: string;
+  signal?: AbortSignal;
+}): Promise<{ id: string; boardId: string; link: string | null }> {
+  const boardId = text(input.boardId, 80);
+  if (!/^\d{2,80}$/.test(boardId)) throw new Error("A valid Pinterest board ID is required.");
+  const imageUrl = httpsUrl(input.imageUrl, "Pinterest image URL");
+  const description = text(input.description, 500);
+  if (!description) throw new Error("Pinterest Pin description is required.");
+  const title = text(input.title, 100);
+  const link = input.link ? httpsUrl(input.link, "Pinterest destination link") : null;
+
+  // Prove the selected board is visible to the authenticated token before dispatch.
+  const boards = await discoverPinterestBoards(input.userId, input.signal);
+  if (!boards.some((board) => board.id === boardId)) {
+    throw new Error("The selected Pinterest board is not available to this connection.");
+  }
+
+  const payload = await pinterestRequest(input.userId, "/pins", {
+    method: "POST",
+    body: {
+      board_id: boardId,
+      ...(title ? { title } : {}),
+      description,
+      ...(link ? { link } : {}),
+      media_source: {
+        source_type: "image_url",
+        url: imageUrl,
+        is_standard: true,
+      },
+    },
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+  const id = text(payload["id"], 100);
+  if (!id) throw new Error("Pinterest accepted the request but did not return a Pin ID.");
+  return { id, boardId, link };
 }
