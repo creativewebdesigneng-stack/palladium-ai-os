@@ -6,7 +6,7 @@ const base = () => ({
   memberships: [{ workforce_id: 'wf-1', agent_id: 'agent-1' }],
   workflowRuns: [{ id: 'run-1', status: 'running' }],
   fleetAssignments: [{ id: 'fleet-1', agent_id: 'agent-1', status: 'active' }],
-  approvals: [],
+  approvals: [] as Array<{ id: string; status: string; agent_id: string }>,
   identities: [{ id: 'identity-1', agent_id: 'agent-1', status: 'active' }],
   passports: [{ id: 'passport-1', identity_id: 'identity-1', autonomy_tier: 'guarded', risk_tier: 'medium' }],
   delegations: [{ id: 'grant-1', status: 'active', expires_at: '2027-01-01T00:00:00.000Z' }],
