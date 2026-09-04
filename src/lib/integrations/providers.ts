@@ -95,6 +95,23 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     docsUrl: "https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps",
   },
   {
+    id: "linkedin",
+    name: "LinkedIn",
+    category: "social",
+    summary: "Connect a LinkedIn member through native OAuth/OIDC. Blackstar can validate the member connection directly; posting is enabled only when LinkedIn exposes a legitimate author URN for the app's approved products.",
+    scopes: ["openid", "profile", "email", "w_member_social"],
+    tools: ["integration_capabilities", "integration_action"],
+    authorizeUrl: "https://www.linkedin.com/oauth/v2/authorization",
+    tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
+    clientIdEnv: "LINKEDIN_INTEGRATION_CLIENT_ID",
+    clientSecretEnv: "LINKEDIN_INTEGRATION_CLIENT_SECRET",
+    identity: {
+      url: "https://api.linkedin.com/v2/userinfo",
+      labelKeys: ["name", "email", "sub"],
+    },
+    docsUrl: "https://learn.microsoft.com/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
+  },
+  {
     id: "google",
     name: "Google Workspace",
     category: "productivity",
