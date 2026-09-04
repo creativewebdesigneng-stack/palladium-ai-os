@@ -201,6 +201,25 @@ export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
     }));
   });
 
+/** Safe channel metadata for native YouTube account selection and health display. */
+export const listNativeYouTubeChannels = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { discoverYouTubeChannels } = await import("@/lib/integrations/youtube-social.server");
+    const channels = await discoverYouTubeChannels(context.userId);
+    return channels.map((channel) => ({
+      id: String(channel.id),
+      title: String(channel.title),
+      description: String(channel.description).slice(0, 2000),
+      customUrl: channel.customUrl ? String(channel.customUrl) : null,
+      thumbnailUrl: channel.thumbnailUrl ? String(channel.thumbnailUrl) : null,
+      subscriberCount: channel.subscriberCount ? String(channel.subscriberCount) : null,
+      videoCount: channel.videoCount ? String(channel.videoCount) : null,
+      viewCount: channel.viewCount ? String(channel.viewCount) : null,
+    }));
+  });
+
 export const addSocialPostTarget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: {
