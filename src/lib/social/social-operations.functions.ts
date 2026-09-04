@@ -174,6 +174,7 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
         risk: item.risk,
         requiresApproval: item.requiresApproval,
         deployed: item.deployed,
+        inputSchema: item.inputSchema,
         transport: item.transport,
         lane: item.lane,
       }));
@@ -204,11 +205,18 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
       .single();
     if (postError || !post) throw postError ?? new Error("Social post not found.");
 
+    // Native Meta publishing must execute the exact content the user reviewed.
+    // Snapshot the saved post body into the immutable prepared/approval payload;
+    // never trust a browser-supplied message that could differ from the post.
+    const actionInput = data.provider === "facebook" && data.action === "facebook_page_post"
+      ? { ...data.actionInput, message: cleanText(post.content, 20_000) }
+      : data.actionInput;
+
     const prepared = await prepareIntegrationAction({
       userId: context.userId,
       provider: data.provider,
       action: data.action,
-      actionInput: data.actionInput,
+      actionInput,
     });
 
     const { data: target, error } = await sb
