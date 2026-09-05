@@ -117,7 +117,7 @@ export async function executeAssessedGeneralIntelligence(args: {
     }
   }
 
-  const executeAssignment: ExecuteTask = (async (taskArgs) => {
+  const executeAssignment: ExecuteTask = async (taskArgs) => {
     let input = taskArgs.input
     try {
       const verifiedKnowledge = await loadVerifiedKnowledge({
@@ -136,8 +136,8 @@ export async function executeAssessedGeneralIntelligence(args: {
     if (args.assessment.mode === 'collective') {
       input = `${input}\n${COLLECTIVE_PROPOSAL_INSTRUCTION}`
     }
-    return execute({ ...taskArgs, input })
-  }) as ExecuteTask
+    return execute({ sb: args.sb, userId: taskArgs.userId, agentId: taskArgs.agentId, input })
+  }
 
   const orchestration = await orchestrate({ sb: args.sb, userId: args.userId, plan: args.plan, authorisedAgentIds: selected, executeAssignment })
   if (orchestration.status !== 'completed') {
