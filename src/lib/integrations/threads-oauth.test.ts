@@ -42,7 +42,7 @@ describe("native Threads OAuth contract", () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      calls.push({ url, init });
+      calls.push({ url, ...(init ? { init } : {}) });
       if (url.startsWith("https://graph.threads.net/oauth/access_token")) {
         return jsonResponse({ access_token: "short-token", user_id: "123456" });
       }
