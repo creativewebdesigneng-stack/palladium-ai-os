@@ -28,6 +28,9 @@ export const TIKTOK_VIDEO_INPUT_SCHEMA: Record<string, unknown> = {
 function text(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
+function binaryBody(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
 function requiredBoolean(value: unknown, label: string): boolean {
   if (typeof value !== "boolean") throw new Error(`${label} must be explicitly selected.`);
   return value;
@@ -137,9 +140,17 @@ export async function publishTikTokTrustedVideo(input: {
   const raw = (await initResponse.text()).slice(0, 20_000);
   let payload: Record<string, any> = {};
   try { payload = JSON.parse(raw) as Record<string, any>; } catch { throw new Error(`TikTok returned an unreadable video-init response (${initResponse.status}).`); }
-  if (!initResponse.ok || payload?.error?.code !== "ok") throw new Error(String(payload?.error?.message ?? `TikTok video initialization failed (${initResponse.status}).`).slice(0, 500));
-  const publishId = validPublishId(payload?.data?.publish_id);
-  const uploadUrl = text(payload?.data?.upload_url, 1000);
+  const providerError = payload["error"] && typeof payload["error"] === "object" && !Array.isArray(payload["error"])
+    ? payload["error"] as Record<string, unknown>
+    : {};
+  if (!initResponse.ok || providerError["code"] !== "ok") {
+    throw new Error(String(providerError["message"] ?? `TikTok video initialization failed (${initResponse.status}).`).slice(0, 500));
+  }
+  const providerData = payload["data"] && typeof payload["data"] === "object" && !Array.isArray(payload["data"])
+    ? payload["data"] as Record<string, unknown>
+    : {};
+  const publishId = validPublishId(providerData["publish_id"]);
+  const uploadUrl = text(providerData["upload_url"], 1000);
   if (!uploadUrl.startsWith("https://")) throw new Error("TikTok did not return a valid video upload URL.");
 
   let offset = 0;
@@ -154,7 +165,7 @@ export async function publishTikTokTrustedVideo(input: {
         "Content-Length": String(bytes.byteLength),
         "Content-Range": `bytes ${offset}-${end}/${asset.sizeBytes}`,
       },
-      body: bytes,
+      body: binaryBody(bytes),
       signal: input.signal ?? AbortSignal.timeout(90_000),
     });
     const expected = isLast ? 201 : 206;
