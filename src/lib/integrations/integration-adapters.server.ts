@@ -535,7 +535,7 @@ const salesforceOAuthAdapter: IntegrationAdapter = {
           : await searchSalesforceOpportunities({
               userId: input.userId,
               query,
-              limit,
+              ...(limit === undefined ? {} : { limit }),
               ...(input.signal ? { signal: input.signal } : {}),
             });
       return {
