@@ -74,7 +74,7 @@ describe("Social Operations native contract", () => {
   it("keeps Social Operations as its own first-class page and navigation destination", () => {
     expect(route).toContain('createFileRoute("/_shell/_app/social-operations")');
     expect(route).toContain('import Screen from "@/screens/SocialOperations"');
-    expect(route).toContain('title: "Social Operations — PalladiumAI"');
+    expect(route).toContain('title: "Social Operations — Blackstar"');
     expect(screen).toContain('title="Social Operations"');
     expect(screen).toContain("SocialConnectorPanel");
     expect(screen).toContain("Bind a live destination");
