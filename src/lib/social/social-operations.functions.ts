@@ -177,6 +177,23 @@ export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
     };
   });
 
+/** Safe TikTok publish-status polling for a publish ID returned by Direct Post. */
+export const getNativeTikTokPublishStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { publishId: string }) => ({ publishId: cleanText(input?.publishId, 100) }))
+  .handler(async ({ data, context }) => {
+    const { fetchTikTokPublishStatus } = await import("@/lib/integrations/tiktok-social.server");
+    const status = await fetchTikTokPublishStatus({ userId: context.userId, publishId: data.publishId });
+    return {
+      publishId: String(status.publishId),
+      status: String(status.status),
+      failReason: status.failReason ? String(status.failReason) : null,
+      publiclyAvailablePostIds: status.publiclyAvailablePostIds.map((value) => String(value)).slice(0, 20),
+      uploadedBytes: typeof status.uploadedBytes === "number" ? status.uploadedBytes : null,
+      downloadedBytes: typeof status.downloadedBytes === "number" ? status.downloadedBytes : null,
+    };
+  });
+
 /** Safe X account identity for destination confirmation; no credentials leave the server. */
 export const getNativeXAccountInfo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
