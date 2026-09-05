@@ -66,15 +66,26 @@ export function verifyState(state: string): { userId: string; provider: string; 
 }
 
 /**
- * Salesforce External Client Apps can require PKCE even for server-side web
- * flows. Derive the verifier from the already HMAC-protected OAuth state so no
- * additional verifier secret needs to be stored in browser storage or the DB.
+ * Derive PKCE verifiers from the already HMAC-protected OAuth state so the
+ * verifier never needs to live in browser storage or a separate database row.
  */
+function providerPkceVerifier(providerId: "salesforce" | "x", state: string): string {
+  return b64url(createHmac("sha256", stateSecret()).update(`${providerId}-pkce:${state}`).digest());
+}
+function providerPkceChallenge(providerId: "salesforce" | "x", state: string): string {
+  return b64url(createHash("sha256").update(providerPkceVerifier(providerId, state), "ascii").digest());
+}
 export function salesforcePkceVerifier(state: string): string {
-  return b64url(createHmac("sha256", stateSecret()).update(`salesforce-pkce:${state}`).digest());
+  return providerPkceVerifier("salesforce", state);
 }
 export function salesforcePkceChallenge(state: string): string {
-  return b64url(createHash("sha256").update(salesforcePkceVerifier(state), "ascii").digest());
+  return providerPkceChallenge("salesforce", state);
+}
+export function xPkceVerifier(state: string): string {
+  return providerPkceVerifier("x", state);
+}
+export function xPkceChallenge(state: string): string {
+  return providerPkceChallenge("x", state);
 }
 
 export function safeOrigin(candidate: string | undefined): string {
@@ -98,8 +109,8 @@ export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: 
   if (provider.scopes.length) {
     url.searchParams.set("scope", provider.scopes.join(provider.id === "tiktok" ? "," : " "));
   }
-  if (provider.id === "salesforce") {
-    url.searchParams.set("code_challenge", salesforcePkceChallenge(args.state));
+  if (provider.id === "salesforce" || provider.id === "x") {
+    url.searchParams.set("code_challenge", providerPkceChallenge(provider.id, args.state));
     url.searchParams.set("code_challenge_method", "S256");
   }
   for (const [key, value] of Object.entries(provider.authorizeParams ?? {})) if (value !== "") url.searchParams.set(key, value);
@@ -248,6 +259,14 @@ export async function exchangeCode(
       grant_type: "authorization_code",
       redirect_uri: `${args.origin}${callbackPath}`,
     }));
+  } else if (provider.id === "x") {
+    if (!args.state) throw new Error("X authorization state is required to complete PKCE.");
+    payload = await postBasicForm(provider, new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      code_verifier: xPkceVerifier(args.state),
+    }));
   } else {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -279,10 +298,15 @@ export async function refreshTokens(provider: IntegrationProvider, refreshToken:
             grant_type: "refresh_token",
             refresh_token: refreshToken,
           }))
-        : await postForm(provider.tokenUrl, new URLSearchParams({
-            grant_type: "refresh_token", refresh_token: refreshToken,
-            client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-          }));
+        : provider.id === "x"
+          ? await postBasicForm(provider, new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: refreshToken,
+            }))
+          : await postForm(provider.tokenUrl, new URLSearchParams({
+              grant_type: "refresh_token", refresh_token: refreshToken,
+              client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+            }));
   const next = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
@@ -292,8 +316,11 @@ export async function fetchAccountLabel(provider: IntegrationProvider, accessTok
     const response = await fetch(provider.identity.url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
     if (!response.ok) return null;
     const payload = (await response.json()) as Record<string, unknown>;
+    const identityPayload = provider.id === "x" && payload["data"] && typeof payload["data"] === "object" && !Array.isArray(payload["data"])
+      ? payload["data"] as Record<string, unknown>
+      : payload;
     for (const key of provider.identity.labelKeys) {
-      const value = payload[key];
+      const value = identityPayload[key];
       if (typeof value === "string" && value) return value.slice(0, 120);
     }
   } catch { /* cosmetic */ }
