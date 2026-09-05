@@ -43,10 +43,21 @@ export async function getVerifiedTrustedMediaAsset(
   };
 }
 
+export async function getVerifiedTrustedMediaAssetForUser(userId: string, assetId: string): Promise<VerifiedTrustedMediaAsset> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return getVerifiedTrustedMediaAsset(supabaseAdmin, userId, assetId);
+}
+
 export async function createTrustedMediaReadUrl(sb: any, asset: VerifiedTrustedMediaAsset, expiresIn = 900): Promise<string> {
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(asset.objectPath, expiresIn);
   if (error || !data?.signedUrl) throw new Error(error?.message ?? "Could not create trusted media read URL.");
   return String(data.signedUrl);
+}
+
+export async function createTrustedMediaReadUrlForUser(userId: string, assetId: string, expiresIn = 900): Promise<{ asset: VerifiedTrustedMediaAsset; url: string }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const asset = await getVerifiedTrustedMediaAsset(supabaseAdmin, userId, assetId);
+  return { asset, url: await createTrustedMediaReadUrl(supabaseAdmin, asset, expiresIn) };
 }
 
 export async function readTrustedMediaRange(input: {
