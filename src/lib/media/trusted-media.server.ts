@@ -27,7 +27,11 @@ function assetId(value: unknown): string {
 
 export async function getTrustedVideoAsset(userId: string, id: unknown): Promise<TrustedVideoAsset> {
   const trustedId = assetId(id);
-  const { data, error } = await supabaseAdmin.from("trusted_media_assets")
+  // The migration introducing this table lands with this code. Generated
+  // database types are refreshed separately by Lovable/Supabase, so keep this
+  // one new-table access dynamically typed while retaining explicit row checks.
+  const db = supabaseAdmin as any;
+  const { data, error } = await db.from("trusted_media_assets")
     .select("id,user_id,bucket,object_path,filename,mime_type,size_bytes,duration_seconds,status")
     .eq("id", trustedId).eq("user_id", userId).eq("status", "ready").maybeSingle();
   if (error) throw new Error(error.message);
