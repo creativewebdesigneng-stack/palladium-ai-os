@@ -56,7 +56,7 @@ export default function QuantStudio() {
   const selected = useMemo(() => strategies.find((item) => item.id === strategyId), [strategies, strategyId]);
 
   return <>
-    <PageHeader eyebrow="Business · Research" title="Quant Studio" description="Systematic strategy research and deterministic backtesting using your real historical return series. PalladiumAI stores strategy/risk configuration and results; it does not fabricate market data or place trades." />
+    <PageHeader eyebrow="Business · Research" title="Quant Studio" description="Systematic strategy research and deterministic backtesting using your real historical return series. Blackstar stores strategy/risk configuration and results; it does not fabricate market data or place trades." />
     {session === 'no' && <Failed message="Sign in to use Quant Studio." />}
     {overview.error && <Failed message={friendlyMessage(overview.error)} />}
     <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -71,7 +71,7 @@ export default function QuantStudio() {
             <button disabled={!form.name.trim() || save.isPending} onClick={() => save.mutate()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Save strategy</button>
           </div>
         </section>
-        <section className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.04] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300" />Research-only by default. Live order execution must go through PalladiumAI integrations, agent permissions and approval controls; Quant Studio never stores broker secrets in strategy JSON.</section>
+        <section className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.04] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300" />Research-only by default. Live order execution must go through Blackstar integrations, agent permissions and approval controls; Quant Studio never stores broker secrets in strategy JSON.</section>
       </div>
 
       <div className="space-y-4">
