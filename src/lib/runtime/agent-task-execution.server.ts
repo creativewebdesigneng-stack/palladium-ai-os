@@ -1,5 +1,6 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
+import { applyGeneralIntelligenceControl } from './general-intelligence-runtime.server'
 import { executePlannedRun } from './planner-runtime.server'
 import { failRun, prepareRun, rescueRuntimeConnectedServiceRead, RuntimeError } from './runtime.server'
 
@@ -29,6 +30,8 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
   let run: Awaited<ReturnType<typeof prepareRun>> | null = null
   try {
     run = await prepareRun({ sb: args.sb, userId: args.userId, agentId: args.agentId, input: args.input })
+    const intelligence = await applyGeneralIntelligenceControl({ sb: args.sb, run, input: args.input })
+    run = intelligence.run
     let task = await executePlannedRun({ sb: args.sb, userId: args.userId, run })
     if (!outputText(task)) {
       run = {
