@@ -75,6 +75,8 @@ export async function uploadYouTubeVideo(input: {
   let videoId: string | null = null;
   for (const chunk of planYouTubeUploadChunks(asset.sizeBytes)) {
     const bytes = await readTrustedMediaRange({ url, start: chunk.start, end: chunk.end, totalSize: asset.sizeBytes, ...(input.signal ? { signal: input.signal } : {}) });
+    const body = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(body).set(bytes);
     const response = await fetch(sessionUrl, {
       method: "PUT",
       headers: {
@@ -82,7 +84,7 @@ export async function uploadYouTubeVideo(input: {
         "Content-Length": String(bytes.byteLength),
         "Content-Range": `bytes ${chunk.start}-${chunk.end}/${asset.sizeBytes}`,
       },
-      body: bytes,
+      body,
       signal: input.signal ?? AbortSignal.timeout(60_000),
     });
     if (response.status === 308) continue;
