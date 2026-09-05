@@ -151,7 +151,7 @@ async function readTikTokPublishStatus(userId: string, target: any, publishId: s
   const execution = await executeIntegrationAction({
     userId, provider: prepared.provider, action: prepared.action, actionInput: prepared.input, transport: prepared.transport,
   });
-  return execution.ok ? { ok: true, result: execution.result } : { ok: false, error: execution.error };
+  return execution.ok ? { ok: true, result: execution.result } : { ok: false, error: execution.error ?? "TikTok publish status lookup failed." };
 }
 async function reconcileSocialTarget(sb: any, userId: string, target: any): Promise<any> {
   if (!target?.id) return target;
