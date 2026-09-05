@@ -132,6 +132,32 @@ export const testIntegrationConnection = createServerFn({ method: "POST" })
       };
     }
 
+    if (providerId === "tiktok") {
+      const { getIntegrationAccessToken } = await import("./oauth.server");
+      const token = await getIntegrationAccessToken(context.userId, providerId);
+      if (!token) throw new Error("TikTok is not connected, has expired, or needs to be reconnected.");
+      const url = new URL("https://open.tiktokapis.com/v2/user/info/");
+      url.searchParams.set("fields", "open_id,union_id,avatar_url,display_name");
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      const payload = await response.json() as Record<string, any>;
+      if (!response.ok || (payload["error"]?.code && payload["error"].code !== "ok")) {
+        const message = typeof payload["error"]?.message === "string" ? payload["error"].message.slice(0, 300) : `TikTok returned ${response.status}.`;
+        throw new Error(message);
+      }
+      const user = payload["data"]?.user && typeof payload["data"].user === "object" ? payload["data"].user as Record<string, unknown> : {};
+      const displayName = typeof user["display_name"] === "string" ? user["display_name"].trim().slice(0, 120) : "";
+      return {
+        ok: true,
+        checkedAt,
+        message: displayName
+          ? `TikTok connection is valid for ${displayName}. Direct Post remains governed by TikTok creator-info/privacy requirements and Blackstar approval.`
+          : "TikTok connection is valid. Direct Post remains governed by TikTok creator-info/privacy requirements and Blackstar approval.",
+      };
+    }
+
     if (providerId === "discord") {
       const provider = findProvider(providerId);
       if (!provider?.identity?.url) throw new Error("Discord identity test is unavailable.");
