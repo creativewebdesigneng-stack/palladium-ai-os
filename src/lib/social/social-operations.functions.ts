@@ -212,6 +212,13 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
     let actionInput = data.actionInput;
     if (data.provider === "facebook" && data.action === "facebook_page_post") {
       actionInput = { ...data.actionInput, message: cleanText(post.content, 20_000) };
+    } else if (data.provider === "instagram" && data.action === "instagram_image_post") {
+      actionInput = {
+        instagram_id: cleanText(data.actionInput["instagram_id"], 160),
+        image_url: cleanText(data.actionInput["image_url"], 2000),
+        caption: cleanText(post.content, 2200),
+        ...(cleanText(data.actionInput["alt_text"], 1000) ? { alt_text: cleanText(data.actionInput["alt_text"], 1000) } : {}),
+      };
     } else if (data.provider === "pinterest" && data.action === "pinterest_image_pin") {
       actionInput = {
         ...data.actionInput,
