@@ -52,7 +52,18 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
         if (!code) return fail("Authorisation code missing from the provider response.");
 
         try {
-          const tokens = await exchangeCode(provider, { code, origin, state });
+          let tokens = await exchangeCode(provider, { code, origin, state });
+          if (provider.id === "meta") {
+            const { exchangeForLongLivedMetaToken } = await import("@/lib/integrations/meta-social.server");
+            const longLived = await exchangeForLongLivedMetaToken(tokens.accessToken);
+            tokens = {
+              ...tokens,
+              accessToken: longLived.accessToken,
+              refreshToken: null,
+              expiresAt: longLived.expiresAt,
+              scopes: tokens.scopes.length ? tokens.scopes : [...provider.scopes],
+            };
+          }
           const label = await fetchAccountLabel(provider, tokens.accessToken);
 
           const { data: connection, error } = await supabaseAdmin

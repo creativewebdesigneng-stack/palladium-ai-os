@@ -16,7 +16,7 @@ import {
 
 const SOCIAL_TERMS = [
   "instagram", "facebook", "tiktok", "linkedin", "youtube", "twitter", "threads",
-  "pinterest", "bluesky", "mastodon", "discord", "telegram", " x ", "x.com",
+  "pinterest", "bluesky", "mastodon", "discord", "telegram", " x ", "x.com", "meta",
 ];
 
 function isSocialProvider(provider) {
@@ -28,6 +28,13 @@ function healthy(provider) {
   if (provider.nangoProvider) return provider.connected === true;
   if (provider.connection?.health) return provider.connection.health.healthy === true;
   return provider.connection?.status === "connected";
+}
+
+function nativeCoverage(providerId) {
+  const id = String(providerId || "").toLowerCase();
+  if (id === "meta") return ["facebook", "instagram", "meta"];
+  if (id === "x") return ["x", "twitter"];
+  return [id];
 }
 
 export default function SocialConnectorPanel({ onConnectionsChanged }) {
@@ -49,9 +56,16 @@ export default function SocialConnectorPanel({ onConnectionsChanged }) {
       const nativeProviders = (nativeResult?.catalogue ?? [])
         .filter(isSocialProvider)
         .map((provider) => ({ ...provider, providerId: provider.id, nangoProvider: false }));
+      const nativeCovered = new Set(nativeProviders.flatMap((provider) => nativeCoverage(provider.providerId)));
       const nangoProviders = (nangoResult ?? [])
         .filter(isSocialProvider)
-        .map((provider) => ({ ...provider, providerId: provider.id, id: `${provider.id}-nango`, nangoProvider: true }));
+        .map((provider) => ({
+          ...provider,
+          providerId: provider.id,
+          id: `${provider.id}-nango`,
+          nangoProvider: true,
+          fallbackOnly: nativeCovered.has(String(provider.id || "").toLowerCase()),
+        }));
       setProviders([...nativeProviders, ...nangoProviders]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social account connectors.");
@@ -85,7 +99,7 @@ export default function SocialConnectorPanel({ onConnectionsChanged }) {
           detectClosedAuthWindow: true,
           onEvent: async (event) => {
             if (event.type === "connect") {
-              setTestResults((current) => ({ ...current, [provider.id]: { ok: true, message: `${provider.name} connected.` } }));
+              setTestResults((current) => ({ ...current, [provider.id]: { ok: true, message: `${provider.name} fallback connected.` } }));
               await refresh();
               await onConnectionsChanged?.();
             } else if (event.type === "error") {
@@ -150,7 +164,7 @@ export default function SocialConnectorPanel({ onConnectionsChanged }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2"><Plug className="h-5 w-5 text-violet-300" /><h2 className="font-semibold text-white">Social media accounts</h2></div>
-          <p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-400">Connect social accounts here using PalladiumAI's existing OAuth and provider marketplace. Tokens stay server-side. Connected accounts become available to Social Operations, agents and approved integration actions.</p>
+          <p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-400">Connect social accounts through Blackstar's native OAuth integrations first. Provider tokens remain encrypted and server-side. Optional connector fallbacks are retained only where they add coverage or resilience.</p>
         </div>
         <button onClick={refresh} disabled={loading} className="flex shrink-0 items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />Refresh accounts</button>
       </div>
@@ -169,19 +183,20 @@ export default function SocialConnectorPanel({ onConnectionsChanged }) {
           const result = testResults[provider.id];
           const isBusy = busy === provider.id;
           return (
-            <article key={provider.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <article key={provider.id} className={`rounded-xl border bg-black/20 p-4 ${provider.fallbackOnly ? "border-white/[.06] opacity-80" : "border-white/10"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2"><h3 className="truncate text-sm font-medium text-white">{provider.name}</h3>{isConnected && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />}</div>
-                  <p className="mt-1 text-[11px] text-zinc-500">{provider.nangoProvider ? "Provider marketplace" : "Native OAuth"}{provider.accountLabel || provider.connection?.account_label ? ` · ${provider.accountLabel || provider.connection?.account_label}` : ""}</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">{provider.nangoProvider ? (provider.fallbackOnly ? "Optional fallback connector" : "Connector transport") : "Native OAuth · preferred"}{provider.accountLabel || provider.connection?.account_label ? ` · ${provider.accountLabel || provider.connection?.account_label}` : ""}</p>
                 </div>
                 <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${isConnected ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-white/10 text-zinc-500"}`}>{isConnected ? "connected" : "not connected"}</span>
               </div>
               {provider.nangoProvider && provider.capabilityCount > 0 && <p className="mt-3 text-xs text-zinc-400">{provider.capabilityCount} live actions · {provider.approvalActionCount ?? 0} approval-gated</p>}
+              {provider.fallbackOnly && <p className="mt-3 text-[11px] leading-4 text-zinc-500">Blackstar has a native integration for this network. Use this connector only when the native route is unavailable or does not yet cover the required action.</p>}
               {result && <p className={`mt-3 text-xs ${result.ok ? "text-emerald-300" : "text-red-300"}`}>{result.message}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
                 {!isConnected ? (
-                  <button onClick={() => connect(provider)} disabled={isBusy || provider.configured === false} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-40">{isBusy ? "Connecting…" : "Connect account"}</button>
+                  <button onClick={() => connect(provider)} disabled={isBusy || provider.configured === false} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-40">{isBusy ? "Connecting…" : provider.fallbackOnly ? "Connect fallback" : "Connect account"}</button>
                 ) : (
                   <>
                     <button onClick={() => test(provider)} disabled={isBusy} className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-100 disabled:opacity-40">Test connection</button>
@@ -190,11 +205,11 @@ export default function SocialConnectorPanel({ onConnectionsChanged }) {
                 )}
                 {provider.docsUrl && <a href={provider.docsUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300">Docs<ExternalLink className="h-3 w-3" /></a>}
               </div>
-              {provider.configured === false && <p className="mt-3 text-[11px] leading-4 text-amber-200">This connector needs workspace OAuth/provider configuration before users can connect accounts.</p>}
+              {provider.configured === false && <p className="mt-3 text-[11px] leading-4 text-amber-200">This native connector needs workspace OAuth/provider configuration before users can connect accounts.</p>}
             </article>
           );
         })}
-        {!loading && !providers.length && <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-500">No social connectors are currently configured in the PalladiumAI integration catalogue.</div>}
+        {!loading && !providers.length && <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-500">No social connectors are currently configured in the Blackstar integration catalogue.</div>}
       </div>
     </section>
   );

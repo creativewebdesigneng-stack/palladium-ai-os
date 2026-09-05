@@ -16,6 +16,7 @@ import { findProvider, type IntegrationProvider } from "./providers";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const NOTION_VERSION = "2026-03-11";
+const THREADS_API = "https://graph.threads.net";
 type ProviderConfig = Record<string, string>;
 
 function encryptionKey(): Buffer {
@@ -66,15 +67,26 @@ export function verifyState(state: string): { userId: string; provider: string; 
 }
 
 /**
- * Salesforce External Client Apps can require PKCE even for server-side web
- * flows. Derive the verifier from the already HMAC-protected OAuth state so no
- * additional verifier secret needs to be stored in browser storage or the DB.
+ * Derive PKCE verifiers from the already HMAC-protected OAuth state so the
+ * verifier never needs to live in browser storage or a separate database row.
  */
+function providerPkceVerifier(providerId: "salesforce" | "x", state: string): string {
+  return b64url(createHmac("sha256", stateSecret()).update(`${providerId}-pkce:${state}`).digest());
+}
+function providerPkceChallenge(providerId: "salesforce" | "x", state: string): string {
+  return b64url(createHash("sha256").update(providerPkceVerifier(providerId, state), "ascii").digest());
+}
 export function salesforcePkceVerifier(state: string): string {
-  return b64url(createHmac("sha256", stateSecret()).update(`salesforce-pkce:${state}`).digest());
+  return providerPkceVerifier("salesforce", state);
 }
 export function salesforcePkceChallenge(state: string): string {
-  return b64url(createHash("sha256").update(salesforcePkceVerifier(state), "ascii").digest());
+  return providerPkceChallenge("salesforce", state);
+}
+export function xPkceVerifier(state: string): string {
+  return providerPkceVerifier("x", state);
+}
+export function xPkceChallenge(state: string): string {
+  return providerPkceChallenge("x", state);
 }
 
 export function safeOrigin(candidate: string | undefined): string {
@@ -90,13 +102,17 @@ export function safeOrigin(candidate: string | undefined): string {
 export const callbackPath = "/api/public/integrations/callback";
 export function buildAuthorizeUrl(provider: IntegrationProvider, args: { state: string; origin: string }): string {
   const url = new URL(provider.authorizeUrl);
-  url.searchParams.set("client_id", process.env[provider.clientIdEnv]!);
+  const clientParam = provider.id === "tiktok" ? "client_key" : "client_id";
+  url.searchParams.set(clientParam, process.env[provider.clientIdEnv]!);
   url.searchParams.set("redirect_uri", `${args.origin}${callbackPath}`);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", args.state);
-  if (provider.scopes.length) url.searchParams.set("scope", provider.scopes.join(" "));
-  if (provider.id === "salesforce") {
-    url.searchParams.set("code_challenge", salesforcePkceChallenge(args.state));
+  if (provider.scopes.length) {
+    const separator = provider.id === "tiktok" || provider.id === "threads" ? "," : " ";
+    url.searchParams.set("scope", provider.scopes.join(separator));
+  }
+  if (provider.id === "salesforce" || provider.id === "x") {
+    url.searchParams.set("code_challenge", providerPkceChallenge(provider.id, args.state));
     url.searchParams.set("code_challenge_method", "S256");
   }
   for (const [key, value] of Object.entries(provider.authorizeParams ?? {})) if (value !== "") url.searchParams.set(key, value);
@@ -132,14 +148,24 @@ function providerConfigFromPayload(provider: IntegrationProvider, payload: Recor
     if (typeof payload["workspace_name"] === "string") result["workspace_name"] = payload["workspace_name"].slice(0, 300);
     return result;
   }
+  if (provider.id === "tiktok") {
+    const openId = typeof payload["open_id"] === "string" ? payload["open_id"].trim().slice(0, 200) : "";
+    return openId ? { open_id: openId } : {};
+  }
+  if (provider.id === "threads") {
+    const userId = typeof payload["user_id"] === "string" || typeof payload["user_id"] === "number"
+      ? String(payload["user_id"]).trim().slice(0, 200)
+      : "";
+    return userId ? { user_id: userId } : {};
+  }
   return {};
 }
 
 /**
  * Normalises provider grant reporting without trusting browser input.
  * HubSpot returns `scopes` as an array, while most providers return a singular
- * `scope` string. Asana and Salesforce successful exchanges do not reliably
- * echo scopes, so the exact scopes PalladiumAI requested are the effective grant.
+ * `scope` string. Some successful exchanges do not echo scopes, so the exact
+ * scopes Blackstar requested are the effective grant only for those providers.
  */
 export function grantedScopesFromTokenPayload(
   provider: IntegrationProvider,
@@ -165,7 +191,9 @@ export function grantedScopesFromTokenPayload(
     .filter(Boolean);
   if (stringScopes.length) return stringScopes;
 
-  return provider.id === "asana" || provider.id === "salesforce" ? [...provider.scopes] : [];
+  return provider.id === "asana" || provider.id === "salesforce" || provider.id === "threads"
+    ? [...provider.scopes]
+    : [];
 }
 
 function parseTokenPayload(provider: IntegrationProvider, payload: Record<string, any>): Omit<TokenSet, "providerConfig"> {
@@ -191,6 +219,20 @@ async function parseResponse(response: Response): Promise<Record<string, any>> {
 async function postForm(url: string, body: URLSearchParams): Promise<Record<string, any>> {
   return parseResponse(await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }));
 }
+async function postBasicForm(provider: IntegrationProvider, body: URLSearchParams): Promise<Record<string, any>> {
+  const clientId = process.env[provider.clientIdEnv]!;
+  const clientSecret = process.env[provider.clientSecretEnv]!;
+  const authorization = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  return parseResponse(await fetch(provider.tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      Authorization: `Basic ${authorization}`,
+    },
+    body,
+  }));
+}
 async function postNotionToken(provider: IntegrationProvider, body: Record<string, string>): Promise<Record<string, any>> {
   const clientId = process.env[provider.clientIdEnv]!;
   const clientSecret = process.env[provider.clientSecretEnv]!;
@@ -205,6 +247,33 @@ async function postNotionToken(provider: IntegrationProvider, body: Record<strin
     body: JSON.stringify(body),
   }));
 }
+async function exchangeThreadsCode(provider: IntegrationProvider, args: { code: string; origin: string }): Promise<Record<string, any>> {
+  const url = new URL(provider.tokenUrl);
+  url.searchParams.set("client_id", process.env[provider.clientIdEnv]!);
+  url.searchParams.set("client_secret", process.env[provider.clientSecretEnv]!);
+  url.searchParams.set("code", args.code);
+  url.searchParams.set("grant_type", "authorization_code");
+  url.searchParams.set("redirect_uri", `${args.origin}${callbackPath}`);
+  const short = await parseResponse(await fetch(url, { method: "POST", headers: { Accept: "application/json" } }));
+  const shortToken = typeof short["access_token"] === "string" ? short["access_token"] : "";
+  if (!shortToken) throw new Error("Threads did not return a short-lived access token.");
+
+  const exchangeUrl = new URL(`${THREADS_API}/access_token`);
+  exchangeUrl.searchParams.set("grant_type", "th_exchange_token");
+  exchangeUrl.searchParams.set("client_secret", process.env[provider.clientSecretEnv]!);
+  const long = await parseResponse(await fetch(exchangeUrl, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${shortToken}` },
+  }));
+  return { ...long, user_id: short["user_id"] };
+}
+async function refreshThreadsToken(provider: IntegrationProvider, accessToken: string): Promise<Record<string, any>> {
+  const url = new URL(`${THREADS_API}/refresh_access_token`);
+  url.searchParams.set("grant_type", "th_refresh_token");
+  return parseResponse(await fetch(url, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+  }));
+}
+
 export async function exchangeCode(
   provider: IntegrationProvider,
   args: { code: string; origin: string; state?: string },
@@ -212,6 +281,31 @@ export async function exchangeCode(
   let payload: Record<string, any>;
   if (provider.id === "notion") {
     payload = await postNotionToken(provider, { grant_type: "authorization_code", code: args.code, redirect_uri: `${args.origin}${callbackPath}` });
+  } else if (provider.id === "pinterest") {
+    payload = await postBasicForm(provider, new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      continuous_refresh: "true",
+    }));
+  } else if (provider.id === "tiktok") {
+    payload = await postForm(provider.tokenUrl, new URLSearchParams({
+      client_key: process.env[provider.clientIdEnv]!,
+      client_secret: process.env[provider.clientSecretEnv]!,
+      code: args.code,
+      grant_type: "authorization_code",
+      redirect_uri: `${args.origin}${callbackPath}`,
+    }));
+  } else if (provider.id === "x") {
+    if (!args.state) throw new Error("X authorization state is required to complete PKCE.");
+    payload = await postBasicForm(provider, new URLSearchParams({
+      grant_type: "authorization_code",
+      code: args.code,
+      redirect_uri: `${args.origin}${callbackPath}`,
+      code_verifier: xPkceVerifier(args.state),
+    }));
+  } else if (provider.id === "threads") {
+    payload = await exchangeThreadsCode(provider, args);
   } else {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -226,16 +320,38 @@ export async function exchangeCode(
     }
     payload = await postForm(provider.tokenUrl, body);
   }
-  return { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
+  const parsed = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
+  if (provider.id === "threads") return { ...parsed, refreshToken: parsed.accessToken };
+  return parsed;
 }
 export async function refreshTokens(provider: IntegrationProvider, refreshToken: string): Promise<TokenSet> {
   const payload = provider.id === "notion"
     ? await postNotionToken(provider, { grant_type: "refresh_token", refresh_token: refreshToken })
-    : await postForm(provider.tokenUrl, new URLSearchParams({
-        grant_type: "refresh_token", refresh_token: refreshToken,
-        client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
-      }));
+    : provider.id === "pinterest"
+      ? await postBasicForm(provider, new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }))
+      : provider.id === "tiktok"
+        ? await postForm(provider.tokenUrl, new URLSearchParams({
+            client_key: process.env[provider.clientIdEnv]!,
+            client_secret: process.env[provider.clientSecretEnv]!,
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+          }))
+        : provider.id === "x"
+          ? await postBasicForm(provider, new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: refreshToken,
+            }))
+          : provider.id === "threads"
+            ? await refreshThreadsToken(provider, refreshToken)
+            : await postForm(provider.tokenUrl, new URLSearchParams({
+                grant_type: "refresh_token", refresh_token: refreshToken,
+                client_id: process.env[provider.clientIdEnv]!, client_secret: process.env[provider.clientSecretEnv]!,
+              }));
   const next = { ...parseTokenPayload(provider, payload), providerConfig: providerConfigFromPayload(provider, payload) };
+  if (provider.id === "threads") return { ...next, refreshToken: next.accessToken };
   return { ...next, refreshToken: next.refreshToken ?? refreshToken };
 }
 export async function fetchAccountLabel(provider: IntegrationProvider, accessToken: string): Promise<string | null> {
@@ -244,8 +360,11 @@ export async function fetchAccountLabel(provider: IntegrationProvider, accessTok
     const response = await fetch(provider.identity.url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
     if (!response.ok) return null;
     const payload = (await response.json()) as Record<string, unknown>;
+    const identityPayload = provider.id === "x" && payload["data"] && typeof payload["data"] === "object" && !Array.isArray(payload["data"])
+      ? payload["data"] as Record<string, unknown>
+      : payload;
     for (const key of provider.identity.labelKeys) {
-      const value = payload[key];
+      const value = identityPayload[key];
       if (typeof value === "string" && value) return value.slice(0, 120);
     }
   } catch { /* cosmetic */ }

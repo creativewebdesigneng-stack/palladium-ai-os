@@ -16,6 +16,34 @@ import {
   type GitHubConnectedServiceInput,
 } from "./github-connected-service.server";
 import {
+  META_SOCIAL_ACTION,
+  META_SOCIAL_INPUT_SCHEMA,
+  hasNativeMetaConnection,
+  prepareMetaSocialAction,
+} from "./meta-social-actions.server";
+import { publishFacebookPagePost } from "./meta-social.server";
+import {
+  PINTEREST_SOCIAL_ACTION,
+  PINTEREST_SOCIAL_INPUT_SCHEMA,
+  hasNativePinterestConnection,
+  preparePinterestSocialAction,
+} from "./pinterest-social-actions.server";
+import { publishPinterestImagePin } from "./pinterest-social.server";
+import {
+  TIKTOK_SOCIAL_ACTION,
+  TIKTOK_SOCIAL_INPUT_SCHEMA,
+  hasNativeTikTokConnection,
+  prepareTikTokSocialAction,
+} from "./tiktok-social-actions.server";
+import { publishTikTokPhotoPost } from "./tiktok-social.server";
+import {
+  X_SOCIAL_ACTION,
+  X_SOCIAL_INPUT_SCHEMA,
+  hasNativeXConnection,
+  prepareXSocialAction,
+} from "./x-social-actions.server";
+import { publishXPost } from "./x-social.server";
+import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
   prepareNangoAgentAction,
@@ -108,7 +136,7 @@ const GITHUB_INPUT_SCHEMA: Record<string, unknown> = {
   properties: {
     repository: { type: "string", maxLength: 220 },
     path: { type: "string", maxLength: 1000 },
-    ref: { type: "string", maxLength: 250 },
+    ref: { type: "string", maxLength: 160 },
     limit: { type: "integer", minimum: 1, maximum: 25 },
   },
   additionalProperties: false,
@@ -165,12 +193,67 @@ async function hasSalesforceDirectConnection(userId: string): Promise<boolean> {
 const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
-  supportsProvider: isDirectConnectedServiceProvider,
+  supportsProvider(provider) {
+    return isDirectConnectedServiceProvider(provider)
+      || provider === "facebook"
+      || provider === "pinterest"
+      || provider === "tiktok"
+      || provider === "x";
+  },
   async listCapabilities(userId, provider) {
+    const rows: AdapterCapability[] = [];
+
+    if ((!provider || provider === "facebook") && await hasNativeMetaConnection(userId)) {
+      rows.push({
+        provider: "facebook",
+        action: META_SOCIAL_ACTION,
+        description: "Publish an approved post to a Facebook Page through Meta's native Graph API.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: META_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
+    if ((!provider || provider === "pinterest") && await hasNativePinterestConnection(userId)) {
+      rows.push({
+        provider: "pinterest",
+        action: PINTEREST_SOCIAL_ACTION,
+        description: "Create an approved image Pin on an owned Pinterest board through the native Pinterest API.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: PINTEREST_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
+    if ((!provider || provider === "tiktok") && await hasNativeTikTokConnection(userId)) {
+      rows.push({
+        provider: "tiktok",
+        action: TIKTOK_SOCIAL_ACTION,
+        description: "Publish an approved photo to TikTok through Direct Post using creator-selected privacy and disclosure settings.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: TIKTOK_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
+    if ((!provider || provider === "x") && await hasNativeXConnection(userId)) {
+      rows.push({
+        provider: "x",
+        action: X_SOCIAL_ACTION,
+        description: "Publish an approved text post through the native X API v2.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: X_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
     const providers = provider
       ? [provider]
-      : ["google", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
-    const rows: AdapterCapability[] = [];
+      : ["google", "youtube", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
     for (const providerId of providers) {
       if (!isDirectConnectedServiceProvider(providerId)) continue;
       if (!(await hasDirectConnectedService(userId, providerId))) continue;
@@ -189,6 +272,18 @@ const directOAuthAdapter: IntegrationAdapter = {
     return rows;
   },
   async isAvailable(userId, provider, action) {
+    if (provider === "facebook") {
+      return action === META_SOCIAL_ACTION && await hasNativeMetaConnection(userId);
+    }
+    if (provider === "pinterest") {
+      return action === PINTEREST_SOCIAL_ACTION && await hasNativePinterestConnection(userId);
+    }
+    if (provider === "tiktok") {
+      return action === TIKTOK_SOCIAL_ACTION && await hasNativeTikTokConnection(userId);
+    }
+    if (provider === "x") {
+      return action === X_SOCIAL_ACTION && await hasNativeXConnection(userId);
+    }
     return (
       isDirectConnectedServiceProvider(provider) &&
       directConnectedServiceActions(provider).includes(action) &&
@@ -196,6 +291,10 @@ const directOAuthAdapter: IntegrationAdapter = {
     );
   },
   async prepare(input) {
+    if (input.provider === "facebook") return prepareMetaSocialAction(input);
+    if (input.provider === "pinterest") return preparePinterestSocialAction(input);
+    if (input.provider === "tiktok") return prepareTikTokSocialAction(input);
+    if (input.provider === "x") return prepareXSocialAction(input);
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
@@ -213,6 +312,149 @@ const directOAuthAdapter: IntegrationAdapter = {
     };
   },
   async execute(input) {
+    if (input.provider === "facebook") {
+      let prepared;
+      try {
+        prepared = await prepareMetaSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Meta action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishFacebookPagePost({
+          userId: input.userId,
+          pageId: prepared.input.page_id,
+          message: prepared.input.message,
+          ...(prepared.input.link ? { link: prepared.input.link } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "facebook", action: META_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Meta publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "pinterest") {
+      let prepared;
+      try {
+        prepared = await preparePinterestSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Pinterest action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishPinterestImagePin({
+          userId: input.userId,
+          boardId: prepared.input.board_id,
+          imageUrl: prepared.input.image_url,
+          description: prepared.input.description,
+          ...(prepared.input.title ? { title: prepared.input.title } : {}),
+          ...(prepared.input.link ? { link: prepared.input.link } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "pinterest", action: PINTEREST_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native Pinterest publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "tiktok") {
+      let prepared;
+      try {
+        prepared = await prepareTikTokSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native TikTok action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishTikTokPhotoPost({
+          userId: input.userId,
+          imageUrl: prepared.input.image_url,
+          privacyLevel: prepared.input.privacy_level,
+          allowComment: prepared.input.allow_comment,
+          autoAddMusic: prepared.input.auto_add_music,
+          brandContent: prepared.input.brand_content,
+          brandOrganic: prepared.input.brand_organic,
+          ...(prepared.input.title ? { title: prepared.input.title } : {}),
+          ...(prepared.input.description ? { description: prepared.input.description } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "tiktok", action: TIKTOK_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native TikTok publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "x") {
+      let prepared;
+      try {
+        prepared = await prepareXSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native X action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishXPost({
+          userId: input.userId,
+          text: prepared.input.text,
+          madeWithAi: prepared.input.made_with_ai,
+          paidPartnership: prepared.input.paid_partnership,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "x", action: X_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native X publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
     try {
       const result = await executeDirectConnectedService(
         input.userId,
@@ -281,10 +523,7 @@ const githubAppAdapter: IntegrationAdapter = {
           safeToFailover: true,
         };
       }
-      const data = await executeGitHubConnectedService(
-        installationId,
-        asGitHubInput(input.action, input.actionInput),
-      );
+      const data = await executeGitHubConnectedService(installationId, asGitHubInput(input.action, input.actionInput));
       return {
         ok: true,
         result: { provider: "github", action: input.action, read_only: true, transport: "github_app", data },
@@ -362,13 +601,7 @@ const salesforceOAuthAdapter: IntegrationAdapter = {
             });
       return {
         ok: true,
-        result: {
-          provider: "salesforce",
-          action: input.action,
-          read_only: true,
-          transport: "salesforce_oauth",
-          data,
-        },
+        result: { provider: "salesforce", action: input.action, read_only: true, transport: "salesforce_oauth", data },
       };
     } catch (error) {
       return {
@@ -395,9 +628,7 @@ const nativeShopifyAdapter: IntegrationAdapter = {
     return capabilities.some((item) => item.action === action);
   },
   async prepare(input) {
-    if (input.provider !== "shopify") {
-      throw new Error(`No native Shopify adapter is registered for ${input.provider}.`);
-    }
+    if (input.provider !== "shopify") throw new Error(`No native Shopify adapter is registered for ${input.provider}.`);
     return prepareNativeShopifyAction(input);
   },
   async execute(input) {

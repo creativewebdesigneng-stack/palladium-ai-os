@@ -5,7 +5,12 @@ import SocialConnectorPanel from "@/components/social/SocialConnectorPanel";
 import {
   addSocialPostTarget,
   createSocialPost,
+  getNativeThreadsAccountInfo,
+  getNativeTikTokCreatorInfo,
+  getNativeXAccountInfo,
   listLiveSocialCapabilities,
+  listNativeMetaSocialAssets,
+  listNativePinterestBoards,
   listSocialPosts,
   rescheduleSocialPost,
 } from "@/lib/social/social-operations.functions";
@@ -19,30 +24,72 @@ function formatWhen(value) {
 function statusClass(status) {
   if (status === "published") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
   if (status === "scheduled") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-200";
-  if (status === "failed") return "border-red-400/20 bg-red-400/10 text-red-200";
+  if (status === "failed") return "border-red-400/20 bg-red-500/[.06] text-red-200";
   return "border-white/10 bg-white/[.04] text-zinc-300";
+}
+
+function privacyLabel(value) {
+  return ({
+    PUBLIC_TO_EVERYONE: "Everyone",
+    MUTUAL_FOLLOW_FRIENDS: "Friends",
+    FOLLOWER_OF_CREATOR: "Followers",
+    SELF_ONLY: "Only me",
+  })[value] ?? value;
 }
 
 export default function SocialOperations() {
   const [posts, setPosts] = useState([]);
   const [capabilities, setCapabilities] = useState([]);
+  const [metaAssets, setMetaAssets] = useState([]);
+  const [pinterestBoards, setPinterestBoards] = useState([]);
+  const [tiktokCreator, setTikTokCreator] = useState(null);
+  const [xAccount, setXAccount] = useState(null);
+  const [threadsAccount, setThreadsAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({ title: "", content: "", campaign: "", scheduledFor: "" });
-  const [targetForm, setTargetForm] = useState({ postId: "", capabilityKey: "", actionInput: "{}" });
+  const [targetForm, setTargetForm] = useState({
+    postId: "",
+    capabilityKey: "",
+    pageId: "",
+    instagramId: "",
+    boardId: "",
+    imageUrl: "",
+    altText: "",
+    link: "",
+    privacyLevel: "",
+    allowComment: false,
+    autoAddMusic: false,
+    brandContent: false,
+    brandOrganic: false,
+    musicUsageConfirmed: false,
+    madeWithAi: false,
+    paidPartnership: false,
+    actionInput: "{}",
+  });
 
   async function refresh() {
     setLoading(true);
     setError("");
     try {
-      const [nextPosts, nextCapabilities] = await Promise.all([
+      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards, nextTikTokCreator, nextXAccount, nextThreadsAccount] = await Promise.all([
         listSocialPosts({ data: { limit: 100 } }),
         listLiveSocialCapabilities().catch(() => []),
+        listNativeMetaSocialAssets().catch(() => []),
+        listNativePinterestBoards().catch(() => []),
+        getNativeTikTokCreatorInfo().catch(() => null),
+        getNativeXAccountInfo().catch(() => null),
+        getNativeThreadsAccountInfo().catch(() => null),
       ]);
       setPosts(nextPosts ?? []);
       setCapabilities(nextCapabilities ?? []);
+      setMetaAssets(nextMetaAssets ?? []);
+      setPinterestBoards(nextPinterestBoards ?? []);
+      setTikTokCreator(nextTikTokCreator ?? null);
+      setXAccount(nextXAccount ?? null);
+      setThreadsAccount(nextThreadsAccount ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social operations.");
     } finally {
@@ -57,6 +104,32 @@ export default function SocialOperations() {
     published: posts.filter((post) => post.status === "published").length,
     targets: posts.reduce((sum, post) => sum + (post.social_post_targets?.length ?? 0), 0),
   }), [posts]);
+
+  const instagramAccounts = useMemo(() => metaAssets
+    .filter((asset) => asset.instagram?.id)
+    .map((asset) => ({ ...asset.instagram, pageName: asset.pageName })), [metaAssets]);
+
+  const selectedCapability = capabilities.find(
+    (item) => `${item.provider}:${item.action}` === targetForm.capabilityKey,
+  );
+  const nativeFacebook = selectedCapability?.provider === "facebook"
+    && selectedCapability?.action === "facebook_page_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeInstagram = selectedCapability?.provider === "instagram"
+    && selectedCapability?.action === "instagram_image_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativePinterest = selectedCapability?.provider === "pinterest"
+    && selectedCapability?.action === "pinterest_image_pin"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeTikTok = selectedCapability?.provider === "tiktok"
+    && selectedCapability?.action === "tiktok_photo_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeX = selectedCapability?.provider === "x"
+    && selectedCapability?.action === "x_text_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeThreads = selectedCapability?.provider === "threads"
+    && selectedCapability?.action === "threads_text_post"
+    && selectedCapability?.transport === "direct_oauth";
 
   async function createPost(event) {
     event.preventDefault();
@@ -90,7 +163,55 @@ export default function SocialOperations() {
     setError("");
     setNotice("");
     try {
-      const actionInput = JSON.parse(targetForm.actionInput || "{}");
+      let actionInput;
+      if (capability.provider === "facebook" && capability.action === "facebook_page_post" && capability.transport === "direct_oauth") {
+        if (!targetForm.pageId) throw new Error("Choose a Facebook Page first.");
+        actionInput = {
+          page_id: targetForm.pageId,
+          ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else if (capability.provider === "instagram" && capability.action === "instagram_image_post" && capability.transport === "direct_oauth") {
+        if (!targetForm.instagramId) throw new Error("Choose an Instagram professional account first.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add the public HTTPS image URL for this Instagram post.");
+        actionInput = {
+          instagram_id: targetForm.instagramId,
+          image_url: targetForm.imageUrl.trim(),
+          ...(targetForm.altText.trim() ? { alt_text: targetForm.altText.trim() } : {}),
+        };
+      } else if (capability.provider === "pinterest" && capability.action === "pinterest_image_pin" && capability.transport === "direct_oauth") {
+        if (!targetForm.boardId) throw new Error("Choose a Pinterest board first.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add the HTTPS image URL for this Pin.");
+        actionInput = {
+          board_id: targetForm.boardId,
+          image_url: targetForm.imageUrl.trim(),
+          ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else if (capability.provider === "tiktok" && capability.action === "tiktok_photo_post" && capability.transport === "direct_oauth") {
+        if (!tiktokCreator) throw new Error("TikTok creator controls are unavailable. Reconnect TikTok and try again.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add an HTTPS image URL under a prefix verified for the Blackstar TikTok app.");
+        if (!targetForm.privacyLevel) throw new Error("Choose a TikTok privacy level first.");
+        if (!targetForm.musicUsageConfirmed) throw new Error("Confirm TikTok's Music Usage requirement before attaching this destination.");
+        actionInput = {
+          image_url: targetForm.imageUrl.trim(),
+          privacy_level: targetForm.privacyLevel,
+          allow_comment: targetForm.allowComment,
+          auto_add_music: targetForm.autoAddMusic,
+          brand_content: targetForm.brandContent,
+          brand_organic: targetForm.brandOrganic,
+          music_usage_confirmed: true,
+        };
+      } else if (capability.provider === "x" && capability.action === "x_text_post" && capability.transport === "direct_oauth") {
+        if (!xAccount) throw new Error("X account details are unavailable. Reconnect X and try again.");
+        actionInput = {
+          made_with_ai: targetForm.madeWithAi,
+          paid_partnership: targetForm.paidPartnership,
+        };
+      } else if (capability.provider === "threads" && capability.action === "threads_text_post" && capability.transport === "direct_oauth") {
+        if (!threadsAccount) throw new Error("Threads account details are unavailable. Reconnect Threads and try again.");
+        actionInput = {};
+      } else {
+        actionInput = JSON.parse(targetForm.actionInput || "{}");
+      }
       const result = await addSocialPostTarget({
         data: {
           postId: targetForm.postId,
@@ -100,8 +221,8 @@ export default function SocialOperations() {
         },
       });
       setNotice(result?.capability?.requiresApproval
-        ? "Target attached. This external action remains approval-gated by PalladiumAI."
-        : "Target attached to a live PalladiumAI integration capability.");
+        ? "Target attached. This external action remains approval-gated by Blackstar."
+        : "Target attached to a live Blackstar integration capability.");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not attach social destination.");
@@ -127,7 +248,7 @@ export default function SocialOperations() {
       <PageHeader
         eyebrow="Marketing operations"
         title="Social Operations"
-        description="Connect social accounts, plan multi-platform content, schedule posts and bind each destination to live PalladiumAI integration capabilities without exposing credentials to agents or the browser."
+        description="Connect social accounts, plan multi-platform content, schedule posts and bind each destination to live Blackstar integration capabilities without exposing credentials to agents or the browser."
         action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><RefreshCw className="h-4 w-4" />Refresh</button>}
       />
 
@@ -158,18 +279,119 @@ export default function SocialOperations() {
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <div className="mb-2 flex items-center gap-2"><Link2 className="h-4 w-4 text-cyan-300" /><h2 className="font-semibold text-white">Bind a live destination</h2></div>
-          <p className="mb-4 text-xs leading-5 text-zinc-500">Only capabilities discovered from the authenticated user's existing PalladiumAI connections appear here. Provider credentials are never accepted in this form.</p>
+          <p className="mb-4 text-xs leading-5 text-zinc-500">Native provider connections are preferred. Connector transports remain available only when no equivalent native route is live. Provider credentials are never accepted in this form.</p>
           <form onSubmit={attachTarget} className="space-y-3">
             <select required value={targetForm.postId} onChange={(e) => setTargetForm({ ...targetForm, postId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
               <option value="">Choose post</option>{posts.map((post) => <option key={post.id} value={post.id}>{post.title || post.content.slice(0, 48)}</option>)}
             </select>
-            <select required value={targetForm.capabilityKey} onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
-              <option value="">Choose live social action</option>{capabilities.map((cap) => <option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>{cap.provider} · {cap.action}{cap.requiresApproval ? " · approval" : ""}</option>)}
+            <select
+              required
+              value={targetForm.capabilityKey}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", instagramId: "", boardId: "", imageUrl: "", altText: "", link: "", privacyLevel: "", allowComment: false, autoAddMusic: false, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, madeWithAi: false, paidPartnership: false, actionInput: "{}" })}
+              className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
+            >
+              <option value="">Choose live social action</option>
+              {capabilities.map((cap) => (
+                <option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>
+                  {cap.provider} · {cap.action} · {cap.transport === "direct_oauth" ? "native" : cap.transport}{cap.requiresApproval ? " · approval" : ""}
+                </option>
+              ))}
             </select>
-            <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
-            <button disabled={busy || !capabilities.length} className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40">Attach destination</button>
+
+            {nativeFacebook ? (
+              <div className="space-y-3 rounded-xl border border-cyan-400/15 bg-cyan-400/[.04] p-3">
+                <div>
+                  <p className="text-xs font-medium text-cyan-100">Native Meta destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Blackstar discovered these Pages directly from your encrypted Meta OAuth connection. Page access tokens stay server-side.</p>
+                </div>
+                <select required value={targetForm.pageId} onChange={(e) => setTargetForm({ ...targetForm, pageId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Facebook Page</option>
+                  {metaAssets.map((asset) => <option key={asset.pageId} value={asset.pageId}>{asset.pageName}{asset.instagram?.username ? ` · IG @${asset.instagram.username}` : ""}</option>)}
+                </select>
+                <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                {!metaAssets.length && <p className="text-xs text-amber-200">No publishable Facebook Pages were discovered on the connected Meta account. Reconnect Meta with the required Page permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativeInstagram ? (
+              <div className="space-y-3 rounded-xl border border-pink-400/15 bg-pink-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-pink-100">Native Instagram destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Choose a linked Instagram professional account and a public HTTPS image. Blackstar takes the caption from the saved content item server-side and snapshots it into the approval payload.</p>
+                </div>
+                <select required value={targetForm.instagramId} onChange={(e) => setTargetForm({ ...targetForm, instagramId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Instagram professional account</option>
+                  {instagramAccounts.map((account) => <option key={account.id} value={account.id}>{account.username ? `@${account.username}` : account.name || account.id}{account.pageName ? ` · ${account.pageName}` : ""}</option>)}
+                </select>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="Public HTTPS image URL" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <textarea value={targetForm.altText} onChange={(e) => setTargetForm({ ...targetForm, altText: e.target.value })} rows={3} maxLength={1000} placeholder="Optional image alt text" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                {!instagramAccounts.length && <p className="text-xs text-amber-200">No linked Instagram professional accounts were discovered. Reconnect Meta with Instagram permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativePinterest ? (
+              <div className="space-y-3 rounded-xl border border-red-400/15 bg-red-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-red-100">Native Pinterest destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Choose a board discovered from your encrypted Pinterest OAuth connection. Blackstar snapshots the saved post title and copy into the approval payload.</p>
+                </div>
+                <select required value={targetForm.boardId} onChange={(e) => setTargetForm({ ...targetForm, boardId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Pinterest board</option>
+                  {pinterestBoards.map((board) => <option key={board.id} value={board.id}>{board.name}{board.privacy ? ` · ${board.privacy.toLowerCase()}` : ""}</option>)}
+                </select>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="HTTPS image URL for the Pin" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS destination link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                {!pinterestBoards.length && <p className="text-xs text-amber-200">No Pinterest boards were discovered. Reconnect Pinterest with board permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativeTikTok ? (
+              <div className="space-y-3 rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-fuchsia-100">Native TikTok Direct Post</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{tiktokCreator ? `Publishing as ${tiktokCreator.nickname || tiktokCreator.username || "the connected creator"}. ` : "Creator controls are unavailable. "}Blackstar reads TikTok's current privacy/interaction controls before approval and rechecks them immediately before dispatch.</p>
+                </div>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="HTTPS photo URL under your TikTok-verified media prefix" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <select required value={targetForm.privacyLevel} onChange={(e) => setTargetForm({ ...targetForm, privacyLevel: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose TikTok privacy</option>
+                  {(tiktokCreator?.privacyLevelOptions ?? []).map((level) => <option key={level} value={level}>{privacyLabel(level)}</option>)}
+                </select>
+                <div className="grid gap-2 text-xs text-zinc-300 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.allowComment} disabled={tiktokCreator?.commentDisabled === true} onChange={(e) => setTargetForm({ ...targetForm, allowComment: e.target.checked })} />Allow comments</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.autoAddMusic} onChange={(e) => setTargetForm({ ...targetForm, autoAddMusic: e.target.checked })} />Auto-add music</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.brandContent} onChange={(e) => setTargetForm({ ...targetForm, brandContent: e.target.checked })} />Branded content</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.brandOrganic} onChange={(e) => setTargetForm({ ...targetForm, brandOrganic: e.target.checked })} />Promoting own brand</label>
+                </div>
+                <label className="flex items-start gap-2 rounded-lg border border-amber-300/15 bg-amber-300/[.035] p-2 text-xs leading-5 text-amber-100"><input className="mt-1" type="checkbox" checked={targetForm.musicUsageConfirmed} onChange={(e) => setTargetForm({ ...targetForm, musicUsageConfirmed: e.target.checked })} /><span>I confirm the post complies with TikTok's Music Usage requirements. This confirmation is included in the approval snapshot.</span></label>
+                {tiktokCreator?.commentDisabled && <p className="text-xs text-zinc-500">Comments are currently disabled by this TikTok creator/account and cannot be enabled here.</p>}
+                {!tiktokCreator && <p className="text-xs text-amber-200">No TikTok creator controls could be loaded. Reconnect the native TikTok account or use the optional connector fallback if available.</p>}
+              </div>
+            ) : nativeX ? (
+              <div className="space-y-3 rounded-xl border border-sky-400/15 bg-sky-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-sky-100">Native X destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{xAccount ? `Posting to @${xAccount.username}${xAccount.verified ? " · verified" : ""}. ` : "Connected X account details are unavailable. "}Blackstar takes the post text from the saved content item server-side, then snapshots it into the approval payload.</p>
+                </div>
+                <div className="grid gap-2 text-xs text-zinc-300 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.madeWithAi} onChange={(e) => setTargetForm({ ...targetForm, madeWithAi: e.target.checked })} />Mark as made with AI</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.paidPartnership} onChange={(e) => setTargetForm({ ...targetForm, paidPartnership: e.target.checked })} />Paid partnership</label>
+                </div>
+                {xAccount?.protected && <p className="text-xs text-zinc-500">This X account is protected; post visibility follows the account's X privacy settings.</p>}
+                {!xAccount && <p className="text-xs text-amber-200">No native X account identity could be loaded. Reconnect X or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativeThreads ? (
+              <div className="space-y-3 rounded-xl border border-violet-400/15 bg-violet-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-violet-100">Native Threads destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{threadsAccount ? `Posting to @${threadsAccount.username}. ` : "Connected Threads account details are unavailable. "}Blackstar takes the Threads text from the saved content item server-side, truncates it to the native text-post contract, and snapshots the exact copy into the approval payload.</p>
+                </div>
+                {threadsAccount?.profilePictureUrl && <img src={threadsAccount.profilePictureUrl} alt="" className="h-10 w-10 rounded-full border border-white/10 object-cover" />}
+                {!threadsAccount && <p className="text-xs text-amber-200">No native Threads account identity could be loaded. Reconnect Threads or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : (
+              <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
+            )}
+
+            <button
+              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativeInstagram && !instagramAccounts.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed)) || (nativeX && !xAccount) || (nativeThreads && !threadsAccount)}
+              className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40"
+            >Attach destination</button>
           </form>
-          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; PalladiumAI will discover its typed actions automatically.</p>}
+          {!capabilities.length && !loading && <p className="mt-3 text-xs text-amber-200">No live social publishing capability is connected yet. Connect an account above; Blackstar will discover its typed actions automatically.</p>}
         </section>
       </div>
 
