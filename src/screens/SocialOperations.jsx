@@ -6,6 +6,7 @@ import {
   addSocialPostTarget,
   createSocialPost,
   getNativeTikTokCreatorInfo,
+  getNativeXAccountInfo,
   listLiveSocialCapabilities,
   listNativeMetaSocialAssets,
   listNativePinterestBoards,
@@ -41,6 +42,7 @@ export default function SocialOperations() {
   const [metaAssets, setMetaAssets] = useState([]);
   const [pinterestBoards, setPinterestBoards] = useState([]);
   const [tiktokCreator, setTikTokCreator] = useState(null);
+  const [xAccount, setXAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -59,6 +61,8 @@ export default function SocialOperations() {
     brandContent: false,
     brandOrganic: false,
     musicUsageConfirmed: false,
+    madeWithAi: false,
+    paidPartnership: false,
     actionInput: "{}",
   });
 
@@ -66,18 +70,20 @@ export default function SocialOperations() {
     setLoading(true);
     setError("");
     try {
-      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards, nextTikTokCreator] = await Promise.all([
+      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards, nextTikTokCreator, nextXAccount] = await Promise.all([
         listSocialPosts({ data: { limit: 100 } }),
         listLiveSocialCapabilities().catch(() => []),
         listNativeMetaSocialAssets().catch(() => []),
         listNativePinterestBoards().catch(() => []),
         getNativeTikTokCreatorInfo().catch(() => null),
+        getNativeXAccountInfo().catch(() => null),
       ]);
       setPosts(nextPosts ?? []);
       setCapabilities(nextCapabilities ?? []);
       setMetaAssets(nextMetaAssets ?? []);
       setPinterestBoards(nextPinterestBoards ?? []);
       setTikTokCreator(nextTikTokCreator ?? null);
+      setXAccount(nextXAccount ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social operations.");
     } finally {
@@ -104,6 +110,9 @@ export default function SocialOperations() {
     && selectedCapability?.transport === "direct_oauth";
   const nativeTikTok = selectedCapability?.provider === "tiktok"
     && selectedCapability?.action === "tiktok_photo_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeX = selectedCapability?.provider === "x"
+    && selectedCapability?.action === "x_text_post"
     && selectedCapability?.transport === "direct_oauth";
 
   async function createPost(event) {
@@ -166,6 +175,12 @@ export default function SocialOperations() {
           brand_content: targetForm.brandContent,
           brand_organic: targetForm.brandOrganic,
           music_usage_confirmed: true,
+        };
+      } else if (capability.provider === "x" && capability.action === "x_text_post" && capability.transport === "direct_oauth") {
+        if (!xAccount) throw new Error("X account details are unavailable. Reconnect X and try again.");
+        actionInput = {
+          made_with_ai: targetForm.madeWithAi,
+          paid_partnership: targetForm.paidPartnership,
         };
       } else {
         actionInput = JSON.parse(targetForm.actionInput || "{}");
@@ -245,7 +260,7 @@ export default function SocialOperations() {
             <select
               required
               value={targetForm.capabilityKey}
-              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", privacyLevel: "", allowComment: true, autoAddMusic: true, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, actionInput: "{}" })}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", privacyLevel: "", allowComment: true, autoAddMusic: true, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, madeWithAi: false, paidPartnership: false, actionInput: "{}" })}
               className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
             >
               <option value="">Choose live social action</option>
@@ -304,12 +319,25 @@ export default function SocialOperations() {
                 {tiktokCreator?.commentDisabled && <p className="text-xs text-zinc-500">Comments are currently disabled by this TikTok creator/account and cannot be enabled here.</p>}
                 {!tiktokCreator && <p className="text-xs text-amber-200">No TikTok creator controls could be loaded. Reconnect the native TikTok account or use the optional connector fallback if available.</p>}
               </div>
+            ) : nativeX ? (
+              <div className="space-y-3 rounded-xl border border-sky-400/15 bg-sky-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-sky-100">Native X destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{xAccount ? `Posting to @${xAccount.username}${xAccount.verified ? " · verified" : ""}. ` : "Connected X account details are unavailable. "}Blackstar takes the post text from the saved content item server-side, then snapshots it into the approval payload.</p>
+                </div>
+                <div className="grid gap-2 text-xs text-zinc-300 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.madeWithAi} onChange={(e) => setTargetForm({ ...targetForm, madeWithAi: e.target.checked })} />Mark as made with AI</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.paidPartnership} onChange={(e) => setTargetForm({ ...targetForm, paidPartnership: e.target.checked })} />Paid partnership</label>
+                </div>
+                {xAccount?.protected && <p className="text-xs text-zinc-500">This X account is protected; post visibility follows the account's X privacy settings.</p>}
+                {!xAccount && <p className="text-xs text-amber-200">No native X account identity could be loaded. Reconnect X or choose the optional connector fallback if one is available.</p>}
+              </div>
             ) : (
               <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
             )}
 
             <button
-              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed))}
+              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed)) || (nativeX && !xAccount)}
               className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40"
             >Attach destination</button>
           </form>
