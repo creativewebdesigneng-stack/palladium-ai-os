@@ -30,6 +30,13 @@ import {
 } from "./pinterest-social-actions.server";
 import { publishPinterestImagePin } from "./pinterest-social.server";
 import {
+  TIKTOK_SOCIAL_ACTION,
+  TIKTOK_SOCIAL_INPUT_SCHEMA,
+  hasNativeTikTokConnection,
+  prepareTikTokSocialAction,
+} from "./tiktok-social-actions.server";
+import { publishTikTokPhotoPost } from "./tiktok-social.server";
+import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
   prepareNangoAgentAction,
@@ -180,7 +187,7 @@ const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
   supportsProvider(provider) {
-    return isDirectConnectedServiceProvider(provider) || provider === "facebook" || provider === "pinterest";
+    return isDirectConnectedServiceProvider(provider) || provider === "facebook" || provider === "pinterest" || provider === "tiktok";
   },
   async listCapabilities(userId, provider) {
     const rows: AdapterCapability[] = [];
@@ -206,6 +213,18 @@ const directOAuthAdapter: IntegrationAdapter = {
         requiresApproval: true,
         deployed: true,
         inputSchema: PINTEREST_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
+    if ((!provider || provider === "tiktok") && await hasNativeTikTokConnection(userId)) {
+      rows.push({
+        provider: "tiktok",
+        action: TIKTOK_SOCIAL_ACTION,
+        description: "Publish an approved photo to TikTok through Direct Post using creator-selected privacy and disclosure settings.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: TIKTOK_SOCIAL_INPUT_SCHEMA,
       });
     }
 
@@ -236,6 +255,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (provider === "pinterest") {
       return action === PINTEREST_SOCIAL_ACTION && await hasNativePinterestConnection(userId);
     }
+    if (provider === "tiktok") {
+      return action === TIKTOK_SOCIAL_ACTION && await hasNativeTikTokConnection(userId);
+    }
     return (
       isDirectConnectedServiceProvider(provider) &&
       directConnectedServiceActions(provider).includes(action) &&
@@ -245,6 +267,7 @@ const directOAuthAdapter: IntegrationAdapter = {
   async prepare(input) {
     if (input.provider === "facebook") return prepareMetaSocialAction(input);
     if (input.provider === "pinterest") return preparePinterestSocialAction(input);
+    if (input.provider === "tiktok") return prepareTikTokSocialAction(input);
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
@@ -326,6 +349,45 @@ const directOAuthAdapter: IntegrationAdapter = {
         return {
           ok: false,
           error: error instanceof Error ? error.message : "Native Pinterest publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "tiktok") {
+      let prepared;
+      try {
+        prepared = await prepareTikTokSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native TikTok action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishTikTokPhotoPost({
+          userId: input.userId,
+          imageUrl: prepared.input.image_url,
+          privacyLevel: prepared.input.privacy_level,
+          allowComment: prepared.input.allow_comment,
+          autoAddMusic: prepared.input.auto_add_music,
+          brandContent: prepared.input.brand_content,
+          brandOrganic: prepared.input.brand_organic,
+          ...(prepared.input.title ? { title: prepared.input.title } : {}),
+          ...(prepared.input.description ? { description: prepared.input.description } : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "tiktok", action: TIKTOK_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native TikTok publishing failed.",
           failurePhase: "ambiguous",
           safeToFailover: false,
         };
@@ -473,7 +535,7 @@ const salesforceOAuthAdapter: IntegrationAdapter = {
           : await searchSalesforceOpportunities({
               userId: input.userId,
               query,
-              ...(limit === undefined ? {} : { limit }),
+              limit,
               ...(input.signal ? { signal: input.signal } : {}),
             });
       return {
