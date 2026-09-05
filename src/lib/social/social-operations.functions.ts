@@ -193,6 +193,19 @@ export const getNativeXAccountInfo = createServerFn({ method: "POST" })
     };
   });
 
+/** Safe Threads account identity for destination confirmation. */
+export const getNativeThreadsAccountInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { getThreadsAccountInfo } = await import("@/lib/integrations/threads-social.server");
+    const account = await getThreadsAccountInfo(context.userId);
+    return {
+      id: String(account.id),
+      username: String(account.username),
+      profilePictureUrl: account.profilePictureUrl ? String(account.profilePictureUrl) : null,
+    };
+  });
+
 export const addSocialPostTarget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { postId: string; provider: string; action: string; actionInput?: Record<string, unknown> }) => {
@@ -237,6 +250,8 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
         made_with_ai: data.actionInput["made_with_ai"] === true,
         paid_partnership: data.actionInput["paid_partnership"] === true,
       };
+    } else if (data.provider === "threads" && data.action === "threads_text_post") {
+      actionInput = { text: cleanText(post.content, 500) };
     }
 
     const prepared = await prepareIntegrationAction({
