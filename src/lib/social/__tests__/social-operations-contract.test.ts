@@ -28,6 +28,8 @@ describe("Social Operations native contract", () => {
     expect(functions).toContain("SOCIAL_PROVIDERS");
     expect(functions).toContain("Credential-like field");
     expect(functions).toContain('status: prepared.requiresApproval ? "approval_required" : "pending"');
+    expect(functions).toContain("SOCIAL_READ_ACTIONS");
+    expect(functions).toContain("Read-only social capabilities cannot be attached as publishing destinations");
   });
 
   it("creates a real immutable Mission Control approval and links it to the social target", () => {
@@ -49,15 +51,24 @@ describe("Social Operations native contract", () => {
     expect(functions).toContain("approval.execution_result");
     expect(functions).toContain("PUBLISH_ID_KEYS");
     expect(functions).toContain('normalizeIntegrationProvider(target.provider) === "tiktok"');
+    expect(functions).toContain("readTikTokPublishStatus");
+    expect(functions).toContain("fetchTikTokPublishStatus");
     expect(functions).toContain('listIntegrationCapabilities(userId, "tiktok")');
     expect(functions).toContain("tiktokStatusCapability");
-    expect(functions).toContain("statusActionInput");
     expect(functions).toContain("executeIntegrationAction");
-    expect(functions).toContain('status = mapped ?? "publishing"');
     expect(functions).toContain("provider_post_id: providerPostId");
     expect(functions).toContain("published_at: publishedAt");
     expect(functions).toContain("last_error: lastError");
     expect(functions).toContain("refreshSocialPostTarget");
+  });
+
+  it("keeps native provider-specific immutable bindings while approvals own the external mutation", () => {
+    expect(functions).toContain('data.provider === "facebook" && data.action === "facebook_page_post"');
+    expect(functions).toContain('data.provider === "instagram" && data.action === "instagram_image_post"');
+    expect(functions).toContain('data.provider === "pinterest" && data.action === "pinterest_image_pin"');
+    expect(functions).toContain('data.provider === "tiktok" && data.action === "tiktok_photo_post"');
+    expect(functions).toContain('data.provider === "x" && data.action === "x_text_post"');
+    expect(functions).toContain('data.provider === "threads" && data.action === "threads_text_post"');
   });
 
   it("keeps Social Operations as its own first-class page and navigation destination", () => {

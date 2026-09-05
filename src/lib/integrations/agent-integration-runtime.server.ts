@@ -13,6 +13,8 @@ import {
   type IntegrationAdapter,
   type IntegrationAdapterId,
 } from "./integration-adapters.server";
+import { instagramIntegrationAdapter } from "./instagram-integration-adapter.server";
+import { threadsIntegrationAdapter } from "./threads-integration-adapter.server";
 
 export const INTEGRATION_TRANSPORTS = [
   "direct_oauth",
@@ -65,13 +67,28 @@ export type IntegrationExecutionResult = {
   attempts: IntegrationExecutionAttempt[];
 };
 
+const EXTENSION_ADAPTERS: readonly IntegrationAdapter[] = [
+  instagramIntegrationAdapter,
+  threadsIntegrationAdapter,
+];
+
+function runtimeAdapters(): readonly IntegrationAdapter[] {
+  return [...integrationAdapters(), ...EXTENSION_ADAPTERS];
+}
+
+function runtimeAdapterById(id: string, provider?: string): IntegrationAdapter | undefined {
+  if (id === "direct_oauth" && provider === "instagram") return instagramIntegrationAdapter;
+  if (id === "direct_oauth" && provider === "threads") return threadsIntegrationAdapter;
+  return integrationAdapterById(id) ?? EXTENSION_ADAPTERS.find((adapter) => adapter.id === id);
+}
+
 /** Accepts both neutral (`slack`) and legacy prefixed (`nango_slack`) IDs. */
 export function normalizeIntegrationProvider(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase().replace(/^nango_/, "") : "";
 }
 
 export function isIntegrationTransport(value: unknown): value is IntegrationTransport {
-  return typeof value === "string" && Boolean(integrationAdapterById(value));
+  return typeof value === "string" && Boolean(runtimeAdapterById(value));
 }
 
 async function availableAdapters(input: {
@@ -80,7 +97,7 @@ async function availableAdapters(input: {
   action: string;
 }): Promise<IntegrationAdapter[]> {
   const available: IntegrationAdapter[] = [];
-  for (const adapter of integrationAdapters()) {
+  for (const adapter of runtimeAdapters()) {
     if (!adapter.supportsProvider(input.provider)) continue;
     if (await adapter.isAvailable(input.userId, input.provider, input.action)) {
       available.push(adapter);
@@ -107,8 +124,23 @@ function orderAdapters(provider: string, adapters: readonly IntegrationAdapter[]
  */
 export function resolveIntegrationTransport(provider: string): IntegrationTransport {
   const normalized = normalizeIntegrationProvider(provider);
-  const adapter = integrationAdapters().find((item) => item.supportsProvider(normalized));
+  const adapter = runtimeAdapters().find((item) => item.supportsProvider(normalized));
   return adapter?.id ?? "nango";
+}
+
+function appendCapabilities(
+  rows: IntegrationCapability[],
+  adapter: IntegrationAdapter,
+  capabilities: Awaited<ReturnType<IntegrationAdapter["listCapabilities"]>>,
+): void {
+  for (const capability of capabilities) {
+    rows.push({
+      ...capability,
+      provider: normalizeIntegrationProvider(capability.provider),
+      transport: adapter.id,
+      lane: adapter.lane,
+    });
+  }
 }
 
 /** Live, typed actions exposed by the authenticated user's actual connections. */
@@ -118,21 +150,18 @@ export async function listIntegrationCapabilities(
 ): Promise<IntegrationCapability[]> {
   const normalized = normalizeIntegrationProvider(provider);
   const rows: IntegrationCapability[] = [];
-  for (const adapter of integrationAdapters()) {
+  for (const adapter of runtimeAdapters()) {
     if (normalized && !adapter.supportsProvider(normalized)) continue;
-    const capabilities = await adapter.listCapabilities(userId, normalized || undefined);
-    for (const capability of capabilities) {
-      rows.push({
-        ...capability,
-        provider: normalizeIntegrationProvider(capability.provider),
-        transport: adapter.id,
-        lane: adapter.lane,
-      });
+    appendCapabilities(rows, adapter, await adapter.listCapabilities(userId, normalized || undefined));
+  }
+
+  if (!normalized) {
+    for (const adapter of runtimeAdapters()) {
+      if (!adapter.supportsProvider("youtube")) continue;
+      appendCapabilities(rows, adapter, await adapter.listCapabilities(userId, "youtube"));
     }
   }
 
-  // One logical provider/action should be advertised once. Prefer the route the
-  // runtime itself would choose (direct API before connector transport).
   const grouped = new Map<string, IntegrationCapability[]>();
   for (const row of rows) {
     const key = `${row.provider}:${row.action}`;
@@ -145,7 +174,7 @@ export async function listIntegrationCapabilities(
     const ordered = orderAdapters(
       group[0]!.provider,
       group
-        .map((row) => integrationAdapterById(row.transport))
+        .map((row) => runtimeAdapterById(row.transport, row.provider))
         .filter((item): item is IntegrationAdapter => Boolean(item)),
     );
     const preferred = ordered[0];
@@ -191,8 +220,6 @@ export async function prepareIntegrationAction(input: {
       };
     } catch (error) {
       lastError = error;
-      // Preparation is pre-dispatch, so trying the next live adapter cannot
-      // duplicate an external side effect.
     }
   }
   throw lastError instanceof Error
@@ -218,7 +245,7 @@ export async function executeIntegrationAction(input: {
   let candidates: IntegrationAdapter[];
 
   if (requested) {
-    const adapter = integrationAdapterById(requested);
+    const adapter = runtimeAdapterById(requested, provider);
     candidates = adapter ? [adapter] : [];
   } else {
     candidates = orderAdapters(

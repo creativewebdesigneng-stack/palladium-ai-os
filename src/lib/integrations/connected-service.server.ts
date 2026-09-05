@@ -39,6 +39,7 @@ const MAX_LIMIT = 25;
 
 export const CONNECTED_SERVICE_ACTIONS: Record<string, readonly string[]> = {
   google: ["calendar_upcoming", "drive_search"],
+  youtube: ["channel_read"],
   microsoft: ["calendar_upcoming", "onedrive_search", "mail_search"],
   slack: ["channels_list", "channel_history"],
   hubspot: ["contacts_list", "deals_list"],
@@ -105,6 +106,13 @@ export function buildConnectedServiceRequest(input: ConnectedServiceInput): Requ
         const escaped = query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
         url.searchParams.set("q", `name contains '${escaped}' and trashed = false`);
       }
+      return { url: url.toString() };
+    }
+    case "youtube:channel_read": {
+      const url = new URL("https://www.googleapis.com/youtube/v3/channels");
+      url.searchParams.set("part", "id,snippet,statistics");
+      url.searchParams.set("mine", "true");
+      url.searchParams.set("maxResults", String(Math.min(limit, 50)));
       return { url: url.toString() };
     }
     case "microsoft:calendar_upcoming": {

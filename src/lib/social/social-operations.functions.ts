@@ -9,21 +9,10 @@ import {
 } from "@/lib/integrations/agent-integration-runtime.server";
 
 const SOCIAL_PROVIDERS = new Set([
-  "instagram",
-  "facebook",
-  "tiktok",
-  "linkedin",
-  "youtube",
-  "x",
-  "twitter",
-  "threads",
-  "pinterest",
-  "bluesky",
-  "mastodon",
-  "discord",
-  "telegram",
-  "postiz",
+  "instagram", "facebook", "tiktok", "linkedin", "youtube", "x", "twitter", "threads",
+  "pinterest", "bluesky", "mastodon", "discord", "telegram", "postiz",
 ]);
+const SOCIAL_READ_ACTIONS = new Set(["youtube:channel_read"]);
 const SECRET_KEY = /(token|secret|password|passwd|api[_-]?key|authorization|cookie|credential|private[_-]?key)/i;
 const PUBLISH_ID_KEYS = new Set(["publishid", "publish_id", "postid", "post_id", "videoid", "video_id"]);
 const STATUS_KEYS = new Set(["status", "statuscode", "status_code", "publishstatus", "publish_status", "poststatus", "post_status"]);
@@ -31,16 +20,10 @@ const STATUS_KEYS = new Set(["status", "statuscode", "status_code", "publishstat
 function cleanText(value: unknown, max: number): string {
   return typeof value === "string" ? value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max) : "";
 }
-
 function boundedLabels(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => cleanText(item, 40))
-    .filter(Boolean)
-    .slice(0, 20);
+  return value.filter((item): item is string => typeof item === "string").map((item) => cleanText(item, 40)).filter(Boolean).slice(0, 20);
 }
-
 function assertSecretFree(value: unknown, path = "input", depth = 0): void {
   if (depth > 8) throw new Error(`${path} is too deeply nested.`);
   if (!value || typeof value !== "object") return;
@@ -54,19 +37,14 @@ function assertSecretFree(value: unknown, path = "input", depth = 0): void {
     assertSecretFree(child, `${path}.${key}`, depth + 1);
   }
 }
-
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   assertSecretFree(value);
   return value as Record<string, unknown>;
 }
-
 function untrustedRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-
 function isoOrNull(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   const raw = cleanText(value, 80);
@@ -74,19 +52,19 @@ function isoOrNull(value: unknown): string | null {
   if (!raw || Number.isNaN(time)) throw new Error("scheduledFor must be a valid date/time.");
   return new Date(time).toISOString();
 }
-
 function postId(value: unknown): string {
   const id = cleanText(value, 60);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("A valid social post ID is required.");
   return id;
 }
-
 function targetId(value: unknown): string {
   const id = cleanText(value, 60);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("A valid social target ID is required.");
   return id;
 }
-
+function socialCapabilityKey(provider: unknown, action: unknown): string {
+  return `${normalizeIntegrationProvider(provider)}:${cleanText(action, 120).toLowerCase()}`;
+}
 function deepValue(value: unknown, keys: Set<string>, depth = 0): string | null {
   if (depth > 6 || value === null || value === undefined) return null;
   if (Array.isArray(value)) {
@@ -112,7 +90,6 @@ function deepValue(value: unknown, keys: Set<string>, depth = 0): string | null 
   }
   return null;
 }
-
 function mappedPublishStatus(value: unknown): "published" | "failed" | "publishing" | null {
   const raw = deepValue(value, STATUS_KEYS);
   if (!raw) return null;
@@ -122,13 +99,11 @@ function mappedPublishStatus(value: unknown): "published" | "failed" | "publishi
   if (/PROCESS|PENDING|UPLOAD|DOWNLOAD|QUEUED|SUBMIT/.test(status)) return "publishing";
   return null;
 }
-
 function schemaProperties(capability: IntegrationCapability): Record<string, unknown> {
   return untrustedRecord(untrustedRecord(capability.inputSchema)["properties"]);
 }
-
 function tiktokStatusCapability(capabilities: IntegrationCapability[]): IntegrationCapability | null {
-  const scored = capabilities
+  return capabilities
     .filter((item) => normalizeIntegrationProvider(item.provider) === "tiktok")
     .map((item) => {
       const haystack = `${item.action} ${item.description}`.toLowerCase();
@@ -140,31 +115,44 @@ function tiktokStatusCapability(capabilities: IntegrationCapability[]): Integrat
       return { item, score };
     })
     .filter(({ score }) => score > 0)
-    .sort((left, right) => right.score - left.score);
-  return scored[0]?.item ?? null;
+    .sort((left, right) => right.score - left.score)[0]?.item ?? null;
 }
-
 function statusActionInput(capability: IntegrationCapability, providerPostId: string): Record<string, unknown> {
   const properties = schemaProperties(capability);
-  const candidates = ["publishId", "publish_id", "postId", "post_id", "videoId", "video_id"];
-  for (const key of candidates) {
+  for (const key of ["publishId", "publish_id", "postId", "post_id", "videoId", "video_id"]) {
     if (Object.prototype.hasOwnProperty.call(properties, key)) return { [key]: providerPostId };
   }
   return { publishId: providerPostId };
 }
-
 async function approvalForTarget(sb: any, userId: string, approvalRequestId: string | null) {
   if (!approvalRequestId) return null;
-  const { data, error } = await sb
-    .from("approval_requests")
+  const { data, error } = await sb.from("approval_requests")
     .select("id,status,execution_status,execution_error,execution_result")
-    .eq("id", approvalRequestId)
-    .eq("user_id", userId)
-    .maybeSingle();
+    .eq("id", approvalRequestId).eq("user_id", userId).maybeSingle();
   if (error) throw error;
   return data ?? null;
 }
-
+async function readTikTokPublishStatus(userId: string, target: any, publishId: string): Promise<{ ok: boolean; result?: unknown; error?: string }> {
+  if (target.transport === "direct_oauth") {
+    try {
+      const { fetchTikTokPublishStatus } = await import("@/lib/integrations/tiktok-social.server");
+      const result = await fetchTikTokPublishStatus({ userId, publishId });
+      return { ok: true, result };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "TikTok publish status lookup failed." };
+    }
+  }
+  const capabilities = await listIntegrationCapabilities(userId, "tiktok");
+  const capability = tiktokStatusCapability(capabilities);
+  if (!capability || capability.requiresApproval) return { ok: false, error: "No safe TikTok publish-status capability is available." };
+  const prepared = await prepareIntegrationAction({
+    userId, provider: "tiktok", action: capability.action, actionInput: statusActionInput(capability, publishId),
+  });
+  const execution = await executeIntegrationAction({
+    userId, provider: prepared.provider, action: prepared.action, actionInput: prepared.input, transport: prepared.transport,
+  });
+  return execution.ok ? { ok: true, result: execution.result } : { ok: false, error: execution.error ?? "TikTok publish status lookup failed." };
+}
 async function reconcileSocialTarget(sb: any, userId: string, target: any): Promise<any> {
   if (!target?.id) return target;
   let status = String(target.status ?? "");
@@ -183,66 +171,31 @@ async function reconcileSocialTarget(sb: any, userId: string, target: any): Prom
     } else if (approval?.execution_status === "succeeded") {
       providerPostId = providerPostId ?? deepValue(approval.execution_result, PUBLISH_ID_KEYS);
       status = providerPostId ? "publishing" : "published";
-      metrics = {
-        ...metrics,
-        approval_execution_result: untrustedRecord(approval.execution_result),
-      };
+      metrics = { ...metrics, approval_execution_result: untrustedRecord(approval.execution_result) };
     }
   }
 
   if (normalizeIntegrationProvider(target.provider) === "tiktok" && providerPostId && status === "publishing") {
-    const capabilities = await listIntegrationCapabilities(userId, "tiktok");
-    const capability = tiktokStatusCapability(capabilities);
-    if (capability && !capability.requiresApproval) {
-      const prepared = await prepareIntegrationAction({
-        userId,
-        provider: "tiktok",
-        action: capability.action,
-        actionInput: statusActionInput(capability, providerPostId),
-      });
-      const execution = await executeIntegrationAction({
-        userId,
-        provider: prepared.provider,
-        action: prepared.action,
-        actionInput: prepared.input,
-        transport: prepared.transport,
-      });
-      if (execution.ok) {
-        const mapped = mappedPublishStatus(execution.result);
-        status = mapped ?? "publishing";
-        lastError = null;
-        metrics = {
-          ...metrics,
-          publish_status: execution.result ?? null,
-          publish_status_checked_at: new Date().toISOString(),
-        };
-      } else {
-        lastError = cleanText(execution.error, 1000) || lastError;
-      }
+    const execution = await readTikTokPublishStatus(userId, target, providerPostId);
+    if (execution.ok) {
+      const mapped = mappedPublishStatus(execution.result);
+      status = mapped ?? "publishing";
+      lastError = mapped === "failed" ? (deepValue(execution.result, new Set(["failreason", "fail_reason", "error", "message"])) ?? "TikTok publishing failed.") : null;
+      metrics = { ...metrics, publish_status: execution.result ?? null, publish_status_checked_at: new Date().toISOString() };
+    } else {
+      lastError = cleanText(execution.error, 1000) || lastError;
     }
   }
 
   const publishedAt = status === "published" ? (target.published_at ?? new Date().toISOString()) : target.published_at ?? null;
-  const changed =
-    status !== target.status ||
-    providerPostId !== (target.provider_post_id ?? null) ||
-    lastError !== (target.last_error ?? null) ||
-    publishedAt !== (target.published_at ?? null) ||
+  const changed = status !== target.status || providerPostId !== (target.provider_post_id ?? null) ||
+    lastError !== (target.last_error ?? null) || publishedAt !== (target.published_at ?? null) ||
     JSON.stringify(metrics) !== JSON.stringify(untrustedRecord(target.metrics));
-
   if (!changed) return { ...target, provider_post_id: providerPostId };
-  const { data: updated, error } = await sb
-    .from("social_post_targets")
-    .update({
-      status,
-      provider_post_id: providerPostId,
-      published_at: publishedAt,
-      last_error: lastError,
-      metrics,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", target.id)
-    .eq("user_id", userId)
+  const { data: updated, error } = await sb.from("social_post_targets").update({
+    status, provider_post_id: providerPostId, published_at: publishedAt, last_error: lastError, metrics,
+    updated_at: new Date().toISOString(),
+  }).eq("id", target.id).eq("user_id", userId)
     .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at")
     .maybeSingle();
   if (error) throw error;
@@ -251,100 +204,57 @@ async function reconcileSocialTarget(sb: any, userId: string, target: any): Prom
 
 export const listSocialPosts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { limit?: number } = {}) => ({
-    limit: Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 100),
-  }))
+  .inputValidator((input: { limit?: number } = {}) => ({ limit: Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 100) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: posts, error } = await sb
-      .from("social_posts")
+    const { data: posts, error } = await sb.from("social_posts")
       .select("id,title,content,campaign,labels,media,metadata,status,scheduled_for,published_at,created_at,updated_at,social_post_targets(id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics)")
-      .eq("user_id", context.userId)
-      .order("created_at", { ascending: false })
-      .limit(data.limit);
+      .eq("user_id", context.userId).order("created_at", { ascending: false }).limit(data.limit);
     if (error) throw error;
-
     for (const post of posts ?? []) {
       if (!Array.isArray(post.social_post_targets)) continue;
-      post.social_post_targets = await Promise.all(
-        post.social_post_targets.map((target: any) => reconcileSocialTarget(sb, context.userId, target)),
-      );
+      post.social_post_targets = await Promise.all(post.social_post_targets.map((target: any) => reconcileSocialTarget(sb, context.userId, target)));
     }
     return posts ?? [];
   });
 
 export const createSocialPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    title?: string;
-    content: string;
-    campaign?: string;
-    labels?: string[];
-    media?: unknown;
-    metadata?: unknown;
-    scheduledFor?: string | null;
-  }) => {
+  .inputValidator((input: { title?: string; content: string; campaign?: string; labels?: string[]; media?: unknown; metadata?: unknown; scheduledFor?: string | null }) => {
     const content = cleanText(input?.content, 20_000);
     if (!content) throw new Error("Post content is required.");
     const media = Array.isArray(input?.media) ? input.media.slice(0, 20) : [];
     const metadata = record(input?.metadata);
     assertSecretFree(media, "media");
-    const scheduledFor = isoOrNull(input?.scheduledFor);
     return {
-      title: cleanText(input?.title, 200),
-      content,
-      campaign: cleanText(input?.campaign, 120) || null,
-      labels: boundedLabels(input?.labels),
-      media,
-      metadata,
-      scheduledFor,
+      title: cleanText(input?.title, 200), content, campaign: cleanText(input?.campaign, 120) || null,
+      labels: boundedLabels(input?.labels), media, metadata, scheduledFor: isoOrNull(input?.scheduledFor),
     };
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: created, error } = await sb
-      .from("social_posts")
-      .insert({
-        user_id: context.userId,
-        title: data.title,
-        content: data.content,
-        campaign: data.campaign,
-        labels: data.labels,
-        media: data.media,
-        metadata: data.metadata,
-        status: data.scheduledFor ? "scheduled" : "draft",
-        scheduled_for: data.scheduledFor,
-      })
-      .select("*")
-      .single();
+    const { data: created, error } = await sb.from("social_posts").insert({
+      user_id: context.userId, title: data.title, content: data.content, campaign: data.campaign,
+      labels: data.labels, media: data.media, metadata: data.metadata,
+      status: data.scheduledFor ? "scheduled" : "draft", scheduled_for: data.scheduledFor,
+    }).select("*").single();
     if (error) throw error;
     return created;
   });
 
 export const rescheduleSocialPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { postId: string; scheduledFor?: string | null }) => ({
-    postId: postId(input?.postId),
-    scheduledFor: isoOrNull(input?.scheduledFor),
-  }))
+  .inputValidator((input: { postId: string; scheduledFor?: string | null }) => ({ postId: postId(input?.postId), scheduledFor: isoOrNull(input?.scheduledFor) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: updated, error } = await sb
-      .from("social_posts")
-      .update({
-        scheduled_for: data.scheduledFor,
-        status: data.scheduledFor ? "scheduled" : "draft",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", data.postId)
-      .eq("user_id", context.userId)
-      .in("status", ["draft", "scheduled", "failed", "cancelled"])
-      .select("*")
-      .single();
+    const { data: updated, error } = await sb.from("social_posts").update({
+      scheduled_for: data.scheduledFor, status: data.scheduledFor ? "scheduled" : "draft", updated_at: new Date().toISOString(),
+    }).eq("id", data.postId).eq("user_id", context.userId).in("status", ["draft", "scheduled", "failed", "cancelled"]).select("*").single();
     if (error) throw error;
     return updated;
   });
 
+/** Publish/mutation capabilities only. Read-only social capabilities remain global for agents/workflows. */
 export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(() => ({}))
@@ -352,68 +262,155 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
     const capabilities = await listIntegrationCapabilities(context.userId);
     return capabilities
       .filter((item) => SOCIAL_PROVIDERS.has(normalizeIntegrationProvider(item.provider)))
+      .filter((item) => !SOCIAL_READ_ACTIONS.has(socialCapabilityKey(item.provider, item.action)))
       .map((item) => ({
-        provider: normalizeIntegrationProvider(item.provider),
-        action: item.action,
-        description: item.description,
-        risk: item.risk,
-        requiresApproval: item.requiresApproval,
-        deployed: item.deployed,
-        transport: item.transport,
-        lane: item.lane,
+        provider: normalizeIntegrationProvider(item.provider), action: item.action, description: item.description,
+        risk: item.risk, requiresApproval: item.requiresApproval, deployed: item.deployed, transport: item.transport, lane: item.lane,
       }));
+  });
+
+export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { discoverMetaAssets } = await import("@/lib/integrations/meta-social.server");
+    const assets = await discoverMetaAssets(context.userId);
+    return assets.map((asset) => ({
+      pageId: String(asset.id), pageName: String(asset.name),
+      tasks: Array.isArray(asset.tasks) ? asset.tasks.map((task) => String(task)).slice(0, 30) : [],
+      instagram: asset.instagramAccount ? {
+        id: String(asset.instagramAccount.id), username: asset.instagramAccount.username ? String(asset.instagramAccount.username) : null,
+        name: asset.instagramAccount.name ? String(asset.instagramAccount.name) : null,
+        profilePictureUrl: asset.instagramAccount.profilePictureUrl ? String(asset.instagramAccount.profilePictureUrl) : null,
+      } : null,
+    }));
+  });
+
+export const listNativeYouTubeChannels = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { discoverYouTubeChannels } = await import("@/lib/integrations/youtube-social.server");
+    const channels = await discoverYouTubeChannels(context.userId);
+    return channels.map((channel) => ({
+      id: String(channel.id), title: String(channel.title), description: String(channel.description).slice(0, 2000),
+      customUrl: channel.customUrl ? String(channel.customUrl) : null, thumbnailUrl: channel.thumbnailUrl ? String(channel.thumbnailUrl) : null,
+      subscriberCount: channel.subscriberCount ? String(channel.subscriberCount) : null,
+      videoCount: channel.videoCount ? String(channel.videoCount) : null, viewCount: channel.viewCount ? String(channel.viewCount) : null,
+    }));
+  });
+
+export const listNativePinterestBoards = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { discoverPinterestBoards } = await import("@/lib/integrations/pinterest-social.server");
+    const boards = await discoverPinterestBoards(context.userId);
+    return boards.map((board) => ({
+      id: String(board.id), name: String(board.name), description: String(board.description).slice(0, 2000),
+      privacy: board.privacy ? String(board.privacy) : null,
+      pinCount: typeof board.pinCount === "number" ? board.pinCount : null,
+      followerCount: typeof board.followerCount === "number" ? board.followerCount : null,
+    }));
+  });
+
+/** Safe creator controls required by TikTok before every Direct Post. */
+export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { queryTikTokCreatorInfo } = await import("@/lib/integrations/tiktok-social.server");
+    const creator = await queryTikTokCreatorInfo(context.userId);
+    return {
+      username: creator.username ? String(creator.username) : null,
+      nickname: creator.nickname ? String(creator.nickname) : null,
+      avatarUrl: creator.avatarUrl ? String(creator.avatarUrl) : null,
+      privacyLevelOptions: creator.privacyLevelOptions.map((value) => String(value)).slice(0, 8),
+      commentDisabled: creator.commentDisabled === true, duetDisabled: creator.duetDisabled === true,
+      stitchDisabled: creator.stitchDisabled === true,
+      maxVideoPostDurationSec: typeof creator.maxVideoPostDurationSec === "number" ? creator.maxVideoPostDurationSec : null,
+    };
+  });
+
+/** Safe TikTok publish-status polling for a publish ID returned by Direct Post. */
+export const getNativeTikTokPublishStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { publishId: string }) => ({ publishId: cleanText(input?.publishId, 100) }))
+  .handler(async ({ data, context }) => {
+    const { fetchTikTokPublishStatus } = await import("@/lib/integrations/tiktok-social.server");
+    const status = await fetchTikTokPublishStatus({ userId: context.userId, publishId: data.publishId });
+    return {
+      publishId: String(status.publishId), status: String(status.status),
+      failReason: status.failReason ? String(status.failReason) : null,
+      publiclyAvailablePostIds: status.publiclyAvailablePostIds.map((value) => String(value)).slice(0, 20),
+      uploadedBytes: typeof status.uploadedBytes === "number" ? status.uploadedBytes : null,
+      downloadedBytes: typeof status.downloadedBytes === "number" ? status.downloadedBytes : null,
+    };
+  });
+
+/** Safe X account identity for destination confirmation; no credentials leave the server. */
+export const getNativeXAccountInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { getXAccountInfo } = await import("@/lib/integrations/x-social.server");
+    const account = await getXAccountInfo(context.userId);
+    return {
+      id: String(account.id), username: String(account.username), name: String(account.name),
+      profileImageUrl: account.profileImageUrl ? String(account.profileImageUrl) : null,
+      protected: account.protected === true, verified: account.verified === true,
+    };
+  });
+
+/** Safe Threads account identity for destination confirmation. */
+export const getNativeThreadsAccountInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { getThreadsAccountInfo } = await import("@/lib/integrations/threads-social.server");
+    const account = await getThreadsAccountInfo(context.userId);
+    return {
+      id: String(account.id), username: String(account.username),
+      profilePictureUrl: account.profilePictureUrl ? String(account.profilePictureUrl) : null,
+    };
   });
 
 export const addSocialPostTarget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    postId: string;
-    provider: string;
-    action: string;
-    actionInput?: Record<string, unknown>;
-  }) => {
+  .inputValidator((input: { postId: string; provider: string; action: string; actionInput?: Record<string, unknown> }) => {
     const provider = normalizeIntegrationProvider(input?.provider);
     if (!SOCIAL_PROVIDERS.has(provider)) throw new Error("This provider is not a supported social destination.");
     const action = cleanText(input?.action, 120).toLowerCase();
     if (!/^[a-z0-9][a-z0-9_.:-]{0,119}$/.test(action)) throw new Error("A valid integration action is required.");
-    const actionInput = record(input?.actionInput);
-    return { postId: postId(input?.postId), provider, action, actionInput };
+    if (SOCIAL_READ_ACTIONS.has(`${provider}:${action}`)) throw new Error("Read-only social capabilities cannot be attached as publishing destinations.");
+    return { postId: postId(input?.postId), provider, action, actionInput: record(input?.actionInput) };
   })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: post, error: postError } = await sb
-      .from("social_posts")
-      .select("id,content,title,media,metadata")
-      .eq("id", data.postId)
-      .eq("user_id", context.userId)
-      .single();
+    const { data: post, error: postError } = await sb.from("social_posts").select("id,content,title,media,metadata")
+      .eq("id", data.postId).eq("user_id", context.userId).single();
     if (postError || !post) throw postError ?? new Error("Social post not found.");
 
-    const prepared = await prepareIntegrationAction({
-      userId: context.userId,
-      provider: data.provider,
-      action: data.action,
-      actionInput: data.actionInput,
-    });
+    let actionInput = data.actionInput;
+    if (data.provider === "facebook" && data.action === "facebook_page_post") {
+      actionInput = { ...data.actionInput, message: cleanText(post.content, 20_000) };
+    } else if (data.provider === "instagram" && data.action === "instagram_image_post") {
+      actionInput = {
+        instagram_id: cleanText(data.actionInput["instagram_id"], 160), image_url: cleanText(data.actionInput["image_url"], 2000),
+        caption: cleanText(post.content, 2200),
+        ...(cleanText(data.actionInput["alt_text"], 1000) ? { alt_text: cleanText(data.actionInput["alt_text"], 1000) } : {}),
+      };
+    } else if (data.provider === "pinterest" && data.action === "pinterest_image_pin") {
+      actionInput = { ...data.actionInput, description: cleanText(post.content, 500), ...(cleanText(post.title, 100) ? { title: cleanText(post.title, 100) } : {}) };
+    } else if (data.provider === "tiktok" && data.action === "tiktok_photo_post") {
+      actionInput = { ...data.actionInput, description: cleanText(post.content, 4000), ...(cleanText(post.title, 90) ? { title: cleanText(post.title, 90) } : {}) };
+    } else if (data.provider === "x" && data.action === "x_text_post") {
+      actionInput = { text: cleanText(post.content, 10_000), made_with_ai: data.actionInput["made_with_ai"] === true, paid_partnership: data.actionInput["paid_partnership"] === true };
+    } else if (data.provider === "threads" && data.action === "threads_text_post") {
+      actionInput = { text: cleanText(post.content, 500) };
+    }
 
-    const { data: target, error } = await sb
-      .from("social_post_targets")
-      .upsert(
-        {
-          post_id: data.postId,
-          user_id: context.userId,
-          provider: prepared.provider,
-          action: prepared.action,
-          action_input: prepared.input,
-          transport: prepared.transport,
-          status: prepared.requiresApproval ? "approval_required" : "pending",
-          last_error: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "post_id,provider,action" },
-      )
-      .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at")
-      .single();
+    const prepared = await prepareIntegrationAction({ userId: context.userId, provider: data.provider, action: data.action, actionInput });
+    const { data: target, error } = await sb.from("social_post_targets").upsert({
+      post_id: data.postId, user_id: context.userId, provider: prepared.provider, action: prepared.action,
+      action_input: prepared.input, transport: prepared.transport,
+      status: prepared.requiresApproval ? "approval_required" : "pending", last_error: null, updated_at: new Date().toISOString(),
+    }, { onConflict: "post_id,provider,action" })
+      .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at").single();
     if (error) throw error;
 
     let linkedTarget = target;
@@ -421,48 +418,30 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
     if (prepared.requiresApproval) {
       const existing = await approvalForTarget(sb, context.userId, approvalRequestId);
       if (!existing || existing.status !== "pending") {
-        const { data: approval, error: approvalError } = await sb
-          .from("approval_requests")
-          .insert({
-            user_id: context.userId,
-            action_type: "nango_dynamic_action",
-            title: `Publish ${post.title || "social post"} to ${prepared.provider}`.slice(0, 200),
-            summary: `Approve publishing this Social Operations post through the connected ${prepared.provider} account.`.slice(0, 500),
-            details: {
-              provider: prepared.provider,
-              action: prepared.action,
-              input: prepared.input,
-              transport: prepared.transport,
-              social_post_target_id: target.id,
-            },
-            risk_level: prepared.risk,
-            status: "pending",
-          })
-          .select("id")
-          .single();
+        const { data: approval, error: approvalError } = await sb.from("approval_requests").insert({
+          user_id: context.userId,
+          action_type: "nango_dynamic_action",
+          title: `Publish ${post.title || "social post"} to ${prepared.provider}`.slice(0, 200),
+          summary: `Approve publishing this Social Operations post through the connected ${prepared.provider} account.`.slice(0, 500),
+          details: { provider: prepared.provider, action: prepared.action, input: prepared.input, transport: prepared.transport, social_post_target_id: target.id },
+          risk_level: prepared.risk,
+          status: "pending",
+        }).select("id").single();
         if (approvalError || !approval?.id) {
-          await sb
-            .from("social_post_targets")
-            .update({ status: "failed", last_error: "Could not create publishing approval request.", updated_at: new Date().toISOString() })
-            .eq("id", target.id)
-            .eq("user_id", context.userId);
+          await sb.from("social_post_targets").update({
+            status: "failed", last_error: "Could not create publishing approval request.", updated_at: new Date().toISOString(),
+          }).eq("id", target.id).eq("user_id", context.userId);
           throw approvalError ?? new Error("Could not create publishing approval request.");
         }
         approvalRequestId = approval.id;
-        const { data: updated, error: linkError } = await sb
-          .from("social_post_targets")
+        const { data: updated, error: linkError } = await sb.from("social_post_targets")
           .update({ approval_request_id: approval.id, status: "approval_required", updated_at: new Date().toISOString() })
-          .eq("id", target.id)
-          .eq("user_id", context.userId)
-          .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at")
-          .single();
+          .eq("id", target.id).eq("user_id", context.userId)
+          .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at").single();
         if (linkError) {
-          await sb
-            .from("approval_requests")
+          await sb.from("approval_requests")
             .update({ status: "expired", decided_at: new Date().toISOString(), decision_note: "The social publishing target could not be linked." })
-            .eq("id", approval.id)
-            .eq("user_id", context.userId)
-            .eq("status", "pending");
+            .eq("id", approval.id).eq("user_id", context.userId).eq("status", "pending");
           throw linkError;
         }
         linkedTarget = updated;
@@ -470,16 +449,10 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
     }
 
     return {
-      target: linkedTarget,
-      approvalRequestId,
+      target: linkedTarget, approvalRequestId,
       capability: {
-        provider: prepared.provider,
-        action: prepared.action,
-        description: prepared.description,
-        risk: prepared.risk,
-        requiresApproval: prepared.requiresApproval,
-        transport: prepared.transport,
-        lane: prepared.lane,
+        provider: prepared.provider, action: prepared.action, description: prepared.description, risk: prepared.risk,
+        requiresApproval: prepared.requiresApproval, transport: prepared.transport, lane: prepared.lane,
       },
     };
   });
@@ -489,12 +462,9 @@ export const refreshSocialPostTarget = createServerFn({ method: "POST" })
   .inputValidator((input: { targetId: string }) => ({ targetId: targetId(input?.targetId) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
-    const { data: target, error } = await sb
-      .from("social_post_targets")
+    const { data: target, error } = await sb.from("social_post_targets")
       .select("id,post_id,provider,action,transport,status,approval_request_id,provider_post_id,published_at,published_url,last_error,metrics,created_at,updated_at")
-      .eq("id", data.targetId)
-      .eq("user_id", context.userId)
-      .single();
+      .eq("id", data.targetId).eq("user_id", context.userId).single();
     if (error || !target) throw error ?? new Error("Social publishing target not found.");
     return reconcileSocialTarget(sb, context.userId, target);
   });
