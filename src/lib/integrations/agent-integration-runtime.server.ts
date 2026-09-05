@@ -14,6 +14,7 @@ import {
   type IntegrationAdapterId,
 } from "./integration-adapters.server";
 import { instagramIntegrationAdapter } from "./instagram-integration-adapter.server";
+import { threadsIntegrationAdapter } from "./threads-integration-adapter.server";
 
 export const INTEGRATION_TRANSPORTS = [
   "direct_oauth",
@@ -66,7 +67,10 @@ export type IntegrationExecutionResult = {
   attempts: IntegrationExecutionAttempt[];
 };
 
-const EXTENSION_ADAPTERS: readonly IntegrationAdapter[] = [instagramIntegrationAdapter];
+const EXTENSION_ADAPTERS: readonly IntegrationAdapter[] = [
+  instagramIntegrationAdapter,
+  threadsIntegrationAdapter,
+];
 
 function runtimeAdapters(): readonly IntegrationAdapter[] {
   return [...integrationAdapters(), ...EXTENSION_ADAPTERS];
@@ -74,6 +78,7 @@ function runtimeAdapters(): readonly IntegrationAdapter[] {
 
 function runtimeAdapterById(id: string, provider?: string): IntegrationAdapter | undefined {
   if (id === "direct_oauth" && provider === "instagram") return instagramIntegrationAdapter;
+  if (id === "direct_oauth" && provider === "threads") return threadsIntegrationAdapter;
   return integrationAdapterById(id) ?? EXTENSION_ADAPTERS.find((adapter) => adapter.id === id);
 }
 
