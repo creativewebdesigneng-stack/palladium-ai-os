@@ -2,6 +2,12 @@ import type { GeneralIntelligenceAssessment } from '@/lib/agents/general-intelli
 import type { OrchestratorPlan } from '@/lib/agents/agent-orchestrator'
 import { executeAgentTask } from './agent-task-execution.server'
 import {
+  COLLECTIVE_PROPOSAL_INSTRUCTION,
+  renderCollectiveConsensusEvidence,
+  resolveGeneralIntelligenceCollective,
+  type GeneralIntelligenceCollectiveResult,
+} from './general-intelligence-collective.server'
+import {
   executeGeneralIntelligenceOrchestration,
   type GeneralIntelligenceOrchestrationResult,
 } from './general-intelligence-orchestration.server'
@@ -15,6 +21,7 @@ type RoutedGeneralIntelligenceResult = {
   mode: GeneralIntelligenceAssessment['mode']
   output?: string
   orchestration?: GeneralIntelligenceOrchestrationResult
+  collective?: GeneralIntelligenceCollectiveResult
   synthesis_agent_id?: string
   reason?: string
 }
@@ -29,14 +36,17 @@ function completedEvidence(orchestration: GeneralIntelligenceOrchestrationResult
 function synthesisInput(args: {
   assessment: GeneralIntelligenceAssessment
   orchestration: GeneralIntelligenceOrchestrationResult
+  collective?: GeneralIntelligenceCollectiveResult
 }): string {
   return [
     'BLACKSTAR AUTHORISED MULTI-AGENT SYNTHESIS',
     `Objective: ${args.assessment.goal.objective}`,
     `Mode: ${args.assessment.mode}`,
     '',
-    'VERIFIED DELEGATION OUTPUTS',
-    completedEvidence(args.orchestration) || '- none',
+    args.collective ? renderCollectiveConsensusEvidence(args.collective) : [
+      'VERIFIED DELEGATION OUTPUTS',
+      completedEvidence(args.orchestration) || '- none',
+    ].join('\n'),
     '',
     'Produce one bounded final answer from this evidence. Reconcile overlaps, explicitly surface material conflicts or uncertainty, and do not invent agreement, evidence, permissions, tool results, or facts that are not supported above. Independently verify any claim that must be relied on for the final answer. Preserve all approval and safety boundaries.',
   ].join('\n')
@@ -47,6 +57,8 @@ function synthesisInput(args: {
  * Direct work uses the existing single-agent runtime. Delegate and collective
  * work use the existing authorised orchestration executor and, after successful
  * completion, an explicitly authorised synthesis agent through that same runtime.
+ * Collective mode additionally reuses Blackstar's existing trusted consensus
+ * resolver; consensus remains advisory and never creates execution authority.
  */
 export async function executeAssessedGeneralIntelligence(args: {
   sb: Sb
@@ -57,10 +69,12 @@ export async function executeAssessedGeneralIntelligence(args: {
   synthesisAgentId?: string
   executeTask?: ExecuteTask
   executeOrchestration?: typeof executeGeneralIntelligenceOrchestration
+  resolveCollective?: typeof resolveGeneralIntelligenceCollective
 }): Promise<RoutedGeneralIntelligenceResult> {
   const authorised = new Set(args.authorisedAgentIds)
   const execute = args.executeTask ?? executeAgentTask
   const orchestrate = args.executeOrchestration ?? executeGeneralIntelligenceOrchestration
+  const resolveCollective = args.resolveCollective ?? resolveGeneralIntelligenceCollective
 
   if (args.assessment.mode === 'escalate') {
     return {
@@ -124,12 +138,19 @@ export async function executeAssessedGeneralIntelligence(args: {
     }
   }
 
+  const executeAssignment: ExecuteTask = args.assessment.mode === 'collective'
+    ? ((taskArgs) => execute({
+        ...taskArgs,
+        input: `${taskArgs.input}\n${COLLECTIVE_PROPOSAL_INSTRUCTION}`,
+      })) as ExecuteTask
+    : execute
+
   const orchestration = await orchestrate({
     sb: args.sb,
     userId: args.userId,
     plan: args.plan,
     authorisedAgentIds: selected,
-    executeAssignment: execute,
+    executeAssignment,
   })
 
   if (orchestration.status !== 'completed') {
@@ -143,12 +164,31 @@ export async function executeAssessedGeneralIntelligence(args: {
     }
   }
 
+  let collective: GeneralIntelligenceCollectiveResult | undefined
+  if (args.assessment.mode === 'collective') {
+    try {
+      collective = await resolveCollective({
+        sb: args.sb,
+        userId: args.userId,
+        orchestration,
+      })
+    } catch (error) {
+      return {
+        status: 'failed',
+        mode: 'collective',
+        orchestration,
+        reason: error instanceof Error ? error.message : 'Collective consensus resolution failed.',
+      }
+    }
+  }
+
   const synthesisAgentId = args.synthesisAgentId ?? selected[0]!
   if (!authorised.has(synthesisAgentId) || !selected.includes(synthesisAgentId)) {
     return {
       status: 'failed',
       mode: args.assessment.mode,
       orchestration,
+      collective,
       reason: 'The synthesis agent is not authorised and selected for this General Intelligence run.',
     }
   }
@@ -158,13 +198,14 @@ export async function executeAssessedGeneralIntelligence(args: {
       sb: args.sb,
       userId: args.userId,
       agentId: synthesisAgentId,
-      input: synthesisInput({ assessment: args.assessment, orchestration }),
+      input: synthesisInput({ assessment: args.assessment, orchestration, collective }),
     })
     return {
       status: 'completed',
       mode: args.assessment.mode,
       output: synthesis.output,
       orchestration,
+      collective,
       synthesis_agent_id: synthesisAgentId,
     }
   } catch (error) {
@@ -172,6 +213,7 @@ export async function executeAssessedGeneralIntelligence(args: {
       status: 'failed',
       mode: args.assessment.mode,
       orchestration,
+      collective,
       synthesis_agent_id: synthesisAgentId,
       reason: error instanceof Error ? error.message : 'General Intelligence synthesis failed.',
     }
