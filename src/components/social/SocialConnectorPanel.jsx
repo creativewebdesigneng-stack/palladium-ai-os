@@ -32,7 +32,9 @@ function healthy(provider) {
 
 function nativeCoverage(providerId) {
   const id = String(providerId || "").toLowerCase();
-  return id === "meta" ? ["facebook", "instagram", "meta"] : [id];
+  if (id === "meta") return ["facebook", "instagram", "meta"];
+  if (id === "x") return ["x", "twitter"];
+  return [id];
 }
 
 export default function SocialConnectorPanel({ onConnectionsChanged }) {
