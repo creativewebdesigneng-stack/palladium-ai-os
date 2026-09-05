@@ -119,18 +119,6 @@ export function updatePlanAfterObservation(
   return { ...plan, steps, current_step_id: next?.id ?? null };
 }
 
-export function applyReplan(plan: AgentPlan, decision: VerificationDecision): AgentPlan {
-  if (decision.next_action !== "replan" || plan.replan_count >= plan.max_replans) return plan;
-  const revised = decision.revised_steps.length ? decision.revised_steps : plan.steps;
-  const next = revised.find((step) => step.status === "pending" || step.status === "in_progress");
-  return {
-    ...plan,
-    steps: revised,
-    current_step_id: next?.id ?? null,
-    replan_count: plan.replan_count + 1,
-  };
-}
-
 export function normaliseVerificationDecision(value: unknown): VerificationDecision {
   const row = value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -162,13 +150,32 @@ export function shouldComplete(plan: AgentPlan, decision: VerificationDecision):
   return decision.passed && decision.score >= plan.quality_threshold;
 }
 
+/**
+ * Treat any non-escalated verifier result below the configured quality bar as
+ * uncertainty that deserves another bounded attempt while budget remains.
+ * This prevents an internally inconsistent verifier result such as
+ * { passed: true, score: 0.6, next_action: "complete" } from prematurely
+ * terminating a run that still has safe re-planning capacity.
+ */
 export function shouldReplan(plan: AgentPlan, decision: VerificationDecision): boolean {
   return (
     plan.verification_required &&
     !shouldComplete(plan, decision) &&
-    decision.next_action === "replan" &&
+    decision.next_action !== "escalate" &&
     plan.replan_count < plan.max_replans
   );
+}
+
+export function applyReplan(plan: AgentPlan, decision: VerificationDecision): AgentPlan {
+  if (!shouldReplan(plan, decision)) return plan;
+  const revised = decision.revised_steps.length ? decision.revised_steps : plan.steps;
+  const next = revised.find((step) => step.status === "pending" || step.status === "in_progress");
+  return {
+    ...plan,
+    steps: revised,
+    current_step_id: next?.id ?? null,
+    replan_count: plan.replan_count + 1,
+  };
 }
 
 export function renderPlannerPrompt(plan: AgentPlan): string {
