@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync("supabase/migrations/20260828183000_social_operations.sql", "utf8");
 const functions = readFileSync("src/lib/social/social-operations.functions.ts", "utf8");
+const externalApprovals = readFileSync("src/lib/mission/external-action-approval.functions.ts", "utf8");
 const screen = readFileSync("src/screens/SocialOperations.jsx", "utf8");
 const connectors = readFileSync("src/components/social/SocialConnectorPanel.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/social-operations.tsx", "utf8");
@@ -27,6 +28,36 @@ describe("Social Operations native contract", () => {
     expect(functions).toContain("SOCIAL_PROVIDERS");
     expect(functions).toContain("Credential-like field");
     expect(functions).toContain('status: prepared.requiresApproval ? "approval_required" : "pending"');
+  });
+
+  it("creates a real immutable Mission Control approval and links it to the social target", () => {
+    expect(functions).toContain('.from("approval_requests")');
+    expect(functions).toContain('action_type: "nango_dynamic_action"');
+    expect(functions).toContain("social_post_target_id: target.id");
+    expect(functions).toContain("provider: prepared.provider");
+    expect(functions).toContain("action: prepared.action");
+    expect(functions).toContain("input: prepared.input");
+    expect(functions).toContain("transport: prepared.transport");
+    expect(functions).toContain("approval_request_id: approval.id");
+    expect(externalApprovals).toContain('if (type === "nango_dynamic_action")');
+    expect(externalApprovals).toContain("executeApprovedIntegrationAction(userId, details)");
+    expect(externalApprovals).toContain('.eq("status", "pending")');
+    expect(externalApprovals).toContain('execution_status: "executing"');
+  });
+
+  it("reconciles provider execution and TikTok publish status without a second executor", () => {
+    expect(functions).toContain("approval.execution_result");
+    expect(functions).toContain("PUBLISH_ID_KEYS");
+    expect(functions).toContain('normalizeIntegrationProvider(target.provider) === "tiktok"');
+    expect(functions).toContain('listIntegrationCapabilities(userId, "tiktok")');
+    expect(functions).toContain("tiktokStatusCapability");
+    expect(functions).toContain("statusActionInput");
+    expect(functions).toContain("executeIntegrationAction");
+    expect(functions).toContain('status = mapped ?? "publishing"');
+    expect(functions).toContain("provider_post_id: providerPostId");
+    expect(functions).toContain("published_at: publishedAt");
+    expect(functions).toContain("last_error: lastError");
+    expect(functions).toContain("refreshSocialPostTarget");
   });
 
   it("keeps Social Operations as its own first-class page and navigation destination", () => {
