@@ -96,6 +96,8 @@ export async function publishTikTokVideoPost(input: {
 
   for (const chunk of chunks) {
     const bytes = await readTrustedMediaRange({ url, start: chunk.start, end: chunk.end, totalSize: asset.sizeBytes, ...(input.signal ? { signal: input.signal } : {}) });
+    const body = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(body).set(bytes);
     const response = await fetch(uploadUrl, {
       method: "PUT",
       headers: {
@@ -103,7 +105,7 @@ export async function publishTikTokVideoPost(input: {
         "Content-Length": String(bytes.byteLength),
         "Content-Range": `bytes ${chunk.start}-${chunk.end}/${asset.sizeBytes}`,
       },
-      body: bytes,
+      body,
       signal: input.signal ?? AbortSignal.timeout(60_000),
     });
     if (!response.ok && response.status !== 201) throw new Error(`TikTok video upload failed after provider initialization (${response.status}).`);
