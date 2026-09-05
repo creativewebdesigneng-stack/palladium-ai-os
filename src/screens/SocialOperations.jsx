@@ -52,8 +52,10 @@ export default function SocialOperations() {
     postId: "",
     capabilityKey: "",
     pageId: "",
+    instagramId: "",
     boardId: "",
     imageUrl: "",
+    altText: "",
     link: "",
     privacyLevel: "",
     allowComment: true,
@@ -99,11 +101,18 @@ export default function SocialOperations() {
     targets: posts.reduce((sum, post) => sum + (post.social_post_targets?.length ?? 0), 0),
   }), [posts]);
 
+  const instagramAccounts = useMemo(() => metaAssets
+    .filter((asset) => asset.instagram?.id)
+    .map((asset) => ({ ...asset.instagram, pageName: asset.pageName })), [metaAssets]);
+
   const selectedCapability = capabilities.find(
     (item) => `${item.provider}:${item.action}` === targetForm.capabilityKey,
   );
   const nativeFacebook = selectedCapability?.provider === "facebook"
     && selectedCapability?.action === "facebook_page_post"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeInstagram = selectedCapability?.provider === "instagram"
+    && selectedCapability?.action === "instagram_image_post"
     && selectedCapability?.transport === "direct_oauth";
   const nativePinterest = selectedCapability?.provider === "pinterest"
     && selectedCapability?.action === "pinterest_image_pin"
@@ -153,6 +162,14 @@ export default function SocialOperations() {
         actionInput = {
           page_id: targetForm.pageId,
           ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else if (capability.provider === "instagram" && capability.action === "instagram_image_post" && capability.transport === "direct_oauth") {
+        if (!targetForm.instagramId) throw new Error("Choose an Instagram professional account first.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add the public HTTPS image URL for this Instagram post.");
+        actionInput = {
+          instagram_id: targetForm.instagramId,
+          image_url: targetForm.imageUrl.trim(),
+          ...(targetForm.altText.trim() ? { alt_text: targetForm.altText.trim() } : {}),
         };
       } else if (capability.provider === "pinterest" && capability.action === "pinterest_image_pin" && capability.transport === "direct_oauth") {
         if (!targetForm.boardId) throw new Error("Choose a Pinterest board first.");
@@ -260,7 +277,7 @@ export default function SocialOperations() {
             <select
               required
               value={targetForm.capabilityKey}
-              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", privacyLevel: "", allowComment: true, autoAddMusic: true, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, madeWithAi: false, paidPartnership: false, actionInput: "{}" })}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", instagramId: "", boardId: "", imageUrl: "", altText: "", link: "", privacyLevel: "", allowComment: true, autoAddMusic: true, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, madeWithAi: false, paidPartnership: false, actionInput: "{}" })}
               className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
             >
               <option value="">Choose live social action</option>
@@ -283,6 +300,20 @@ export default function SocialOperations() {
                 </select>
                 <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
                 {!metaAssets.length && <p className="text-xs text-amber-200">No publishable Facebook Pages were discovered on the connected Meta account. Reconnect Meta with the required Page permissions or choose the optional connector fallback if one is available.</p>}
+              </div>
+            ) : nativeInstagram ? (
+              <div className="space-y-3 rounded-xl border border-pink-400/15 bg-pink-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-pink-100">Native Instagram destination</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">Choose a linked Instagram professional account and a public HTTPS image. Blackstar takes the caption from the saved content item server-side and snapshots it into the approval payload.</p>
+                </div>
+                <select required value={targetForm.instagramId} onChange={(e) => setTargetForm({ ...targetForm, instagramId: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose Instagram professional account</option>
+                  {instagramAccounts.map((account) => <option key={account.id} value={account.id}>{account.username ? `@${account.username}` : account.name || account.id}{account.pageName ? ` · ${account.pageName}` : ""}</option>)}
+                </select>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="Public HTTPS image URL" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <textarea value={targetForm.altText} onChange={(e) => setTargetForm({ ...targetForm, altText: e.target.value })} rows={3} maxLength={1000} placeholder="Optional image alt text" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                {!instagramAccounts.length && <p className="text-xs text-amber-200">No linked Instagram professional accounts were discovered. Reconnect Meta with Instagram permissions or choose the optional connector fallback if one is available.</p>}
               </div>
             ) : nativePinterest ? (
               <div className="space-y-3 rounded-xl border border-red-400/15 bg-red-400/[.035] p-3">
@@ -337,7 +368,7 @@ export default function SocialOperations() {
             )}
 
             <button
-              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed)) || (nativeX && !xAccount)}
+              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativeInstagram && !instagramAccounts.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed)) || (nativeX && !xAccount)}
               className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40"
             >Attach destination</button>
           </form>
