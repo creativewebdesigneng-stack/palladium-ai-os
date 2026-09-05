@@ -146,7 +146,6 @@ export const listNativeYouTubeChannels = createServerFn({ method: "POST" })
     }));
   });
 
-/** Safe board metadata for the native Pinterest destination picker. */
 export const listNativePinterestBoards = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
@@ -158,6 +157,24 @@ export const listNativePinterestBoards = createServerFn({ method: "POST" })
       pinCount: typeof board.pinCount === "number" ? board.pinCount : null,
       followerCount: typeof board.followerCount === "number" ? board.followerCount : null,
     }));
+  });
+
+/** Safe creator controls required by TikTok before every Direct Post. */
+export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { queryTikTokCreatorInfo } = await import("@/lib/integrations/tiktok-social.server");
+    const creator = await queryTikTokCreatorInfo(context.userId);
+    return {
+      username: creator.username ? String(creator.username) : null,
+      nickname: creator.nickname ? String(creator.nickname) : null,
+      avatarUrl: creator.avatarUrl ? String(creator.avatarUrl) : null,
+      privacyLevelOptions: creator.privacyLevelOptions.map((value) => String(value)).slice(0, 8),
+      commentDisabled: creator.commentDisabled === true,
+      duetDisabled: creator.duetDisabled === true,
+      stitchDisabled: creator.stitchDisabled === true,
+      maxVideoPostDurationSec: typeof creator.maxVideoPostDurationSec === "number" ? creator.maxVideoPostDurationSec : null,
+    };
   });
 
 export const addSocialPostTarget = createServerFn({ method: "POST" })
@@ -184,6 +201,12 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
         ...data.actionInput,
         description: cleanText(post.content, 500),
         ...(cleanText(post.title, 100) ? { title: cleanText(post.title, 100) } : {}),
+      };
+    } else if (data.provider === "tiktok" && data.action === "tiktok_photo_post") {
+      actionInput = {
+        ...data.actionInput,
+        description: cleanText(post.content, 4000),
+        ...(cleanText(post.title, 90) ? { title: cleanText(post.title, 90) } : {}),
       };
     }
 
