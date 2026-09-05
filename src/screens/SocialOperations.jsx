@@ -5,6 +5,7 @@ import SocialConnectorPanel from "@/components/social/SocialConnectorPanel";
 import {
   addSocialPostTarget,
   createSocialPost,
+  getNativeTikTokCreatorInfo,
   listLiveSocialCapabilities,
   listNativeMetaSocialAssets,
   listNativePinterestBoards,
@@ -25,11 +26,21 @@ function statusClass(status) {
   return "border-white/10 bg-white/[.04] text-zinc-300";
 }
 
+function privacyLabel(value) {
+  return ({
+    PUBLIC_TO_EVERYONE: "Everyone",
+    MUTUAL_FOLLOW_FRIENDS: "Friends",
+    FOLLOWER_OF_CREATOR: "Followers",
+    SELF_ONLY: "Only me",
+  })[value] ?? value;
+}
+
 export default function SocialOperations() {
   const [posts, setPosts] = useState([]);
   const [capabilities, setCapabilities] = useState([]);
   const [metaAssets, setMetaAssets] = useState([]);
   const [pinterestBoards, setPinterestBoards] = useState([]);
+  const [tiktokCreator, setTikTokCreator] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +53,12 @@ export default function SocialOperations() {
     boardId: "",
     imageUrl: "",
     link: "",
+    privacyLevel: "",
+    allowComment: true,
+    autoAddMusic: true,
+    brandContent: false,
+    brandOrganic: false,
+    musicUsageConfirmed: false,
     actionInput: "{}",
   });
 
@@ -49,16 +66,18 @@ export default function SocialOperations() {
     setLoading(true);
     setError("");
     try {
-      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards] = await Promise.all([
+      const [nextPosts, nextCapabilities, nextMetaAssets, nextPinterestBoards, nextTikTokCreator] = await Promise.all([
         listSocialPosts({ data: { limit: 100 } }),
         listLiveSocialCapabilities().catch(() => []),
         listNativeMetaSocialAssets().catch(() => []),
         listNativePinterestBoards().catch(() => []),
+        getNativeTikTokCreatorInfo().catch(() => null),
       ]);
       setPosts(nextPosts ?? []);
       setCapabilities(nextCapabilities ?? []);
       setMetaAssets(nextMetaAssets ?? []);
       setPinterestBoards(nextPinterestBoards ?? []);
+      setTikTokCreator(nextTikTokCreator ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load social operations.");
     } finally {
@@ -82,6 +101,9 @@ export default function SocialOperations() {
     && selectedCapability?.transport === "direct_oauth";
   const nativePinterest = selectedCapability?.provider === "pinterest"
     && selectedCapability?.action === "pinterest_image_pin"
+    && selectedCapability?.transport === "direct_oauth";
+  const nativeTikTok = selectedCapability?.provider === "tiktok"
+    && selectedCapability?.action === "tiktok_photo_post"
     && selectedCapability?.transport === "direct_oauth";
 
   async function createPost(event) {
@@ -130,6 +152,20 @@ export default function SocialOperations() {
           board_id: targetForm.boardId,
           image_url: targetForm.imageUrl.trim(),
           ...(targetForm.link.trim() ? { link: targetForm.link.trim() } : {}),
+        };
+      } else if (capability.provider === "tiktok" && capability.action === "tiktok_photo_post" && capability.transport === "direct_oauth") {
+        if (!tiktokCreator) throw new Error("TikTok creator controls are unavailable. Reconnect TikTok and try again.");
+        if (!targetForm.imageUrl.trim()) throw new Error("Add an HTTPS image URL under a prefix verified for the Blackstar TikTok app.");
+        if (!targetForm.privacyLevel) throw new Error("Choose a TikTok privacy level first.");
+        if (!targetForm.musicUsageConfirmed) throw new Error("Confirm TikTok's Music Usage requirement before attaching this destination.");
+        actionInput = {
+          image_url: targetForm.imageUrl.trim(),
+          privacy_level: targetForm.privacyLevel,
+          allow_comment: targetForm.allowComment,
+          auto_add_music: targetForm.autoAddMusic,
+          brand_content: targetForm.brandContent,
+          brand_organic: targetForm.brandOrganic,
+          music_usage_confirmed: true,
         };
       } else {
         actionInput = JSON.parse(targetForm.actionInput || "{}");
@@ -209,7 +245,7 @@ export default function SocialOperations() {
             <select
               required
               value={targetForm.capabilityKey}
-              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", actionInput: "{}" })}
+              onChange={(e) => setTargetForm({ ...targetForm, capabilityKey: e.target.value, pageId: "", boardId: "", imageUrl: "", link: "", privacyLevel: "", allowComment: true, autoAddMusic: true, brandContent: false, brandOrganic: false, musicUsageConfirmed: false, actionInput: "{}" })}
               className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300"
             >
               <option value="">Choose live social action</option>
@@ -247,12 +283,33 @@ export default function SocialOperations() {
                 <input type="url" inputMode="url" value={targetForm.link} onChange={(e) => setTargetForm({ ...targetForm, link: e.target.value })} placeholder="Optional HTTPS destination link" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
                 {!pinterestBoards.length && <p className="text-xs text-amber-200">No Pinterest boards were discovered. Reconnect Pinterest with board permissions or choose the optional connector fallback if one is available.</p>}
               </div>
+            ) : nativeTikTok ? (
+              <div className="space-y-3 rounded-xl border border-fuchsia-400/15 bg-fuchsia-400/[.035] p-3">
+                <div>
+                  <p className="text-xs font-medium text-fuchsia-100">Native TikTok Direct Post</p>
+                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{tiktokCreator ? `Publishing as ${tiktokCreator.nickname || tiktokCreator.username || "the connected creator"}. ` : "Creator controls are unavailable. "}Blackstar reads TikTok's current privacy/interaction controls before approval and rechecks them immediately before dispatch.</p>
+                </div>
+                <input required type="url" inputMode="url" value={targetForm.imageUrl} onChange={(e) => setTargetForm({ ...targetForm, imageUrl: e.target.value })} placeholder="HTTPS photo URL under your TikTok-verified media prefix" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none" />
+                <select required value={targetForm.privacyLevel} onChange={(e) => setTargetForm({ ...targetForm, privacyLevel: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#101117] px-3 py-2 text-sm text-zinc-300">
+                  <option value="">Choose TikTok privacy</option>
+                  {(tiktokCreator?.privacyLevelOptions ?? []).map((level) => <option key={level} value={level}>{privacyLabel(level)}</option>)}
+                </select>
+                <div className="grid gap-2 text-xs text-zinc-300 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.allowComment} disabled={tiktokCreator?.commentDisabled === true} onChange={(e) => setTargetForm({ ...targetForm, allowComment: e.target.checked })} />Allow comments</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.autoAddMusic} onChange={(e) => setTargetForm({ ...targetForm, autoAddMusic: e.target.checked })} />Auto-add music</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.brandContent} onChange={(e) => setTargetForm({ ...targetForm, brandContent: e.target.checked })} />Branded content</label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 p-2"><input type="checkbox" checked={targetForm.brandOrganic} onChange={(e) => setTargetForm({ ...targetForm, brandOrganic: e.target.checked })} />Promoting own brand</label>
+                </div>
+                <label className="flex items-start gap-2 rounded-lg border border-amber-300/15 bg-amber-300/[.035] p-2 text-xs leading-5 text-amber-100"><input className="mt-1" type="checkbox" checked={targetForm.musicUsageConfirmed} onChange={(e) => setTargetForm({ ...targetForm, musicUsageConfirmed: e.target.checked })} /><span>I confirm the post complies with TikTok's Music Usage requirements. This confirmation is included in the approval snapshot.</span></label>
+                {tiktokCreator?.commentDisabled && <p className="text-xs text-zinc-500">Comments are currently disabled by this TikTok creator/account and cannot be enabled here.</p>}
+                {!tiktokCreator && <p className="text-xs text-amber-200">No TikTok creator controls could be loaded. Reconnect the native TikTok account or use the optional connector fallback if available.</p>}
+              </div>
             ) : (
               <textarea value={targetForm.actionInput} onChange={(e) => setTargetForm({ ...targetForm, actionInput: e.target.value })} rows={5} spellCheck={false} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-300 outline-none" />
             )}
 
             <button
-              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length)}
+              disabled={busy || !capabilities.length || (nativeFacebook && !metaAssets.length) || (nativePinterest && !pinterestBoards.length) || (nativeTikTok && (!tiktokCreator || !tiktokCreator.privacyLevelOptions?.length || !targetForm.musicUsageConfirmed))}
               className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 disabled:opacity-40"
             >Attach destination</button>
           </form>
