@@ -44,11 +44,15 @@ function parseCollectiveOutput(output: string): CollectiveOutput {
     throw new Error('COLLECTIVE_INVALID_STRUCTURED_OUTPUT')
   }
   const row = parsed as Record<string, unknown>
-  const answerKey = typeof row.answerKey === 'string' ? row.answerKey.trim().slice(0, 500) : ''
-  const answer = typeof row.answer === 'string' ? row.answer.trim().slice(0, 12_000) : ''
-  const confidence = typeof row.confidence === 'number' ? row.confidence : Number.NaN
-  const evidenceRefs = Array.isArray(row.evidenceRefs)
-    ? row.evidenceRefs
+  const rawAnswerKey = row['answerKey']
+  const rawAnswer = row['answer']
+  const rawConfidence = row['confidence']
+  const rawEvidenceRefs = row['evidenceRefs']
+  const answerKey = typeof rawAnswerKey === 'string' ? rawAnswerKey.trim().slice(0, 500) : ''
+  const answer = typeof rawAnswer === 'string' ? rawAnswer.trim().slice(0, 12_000) : ''
+  const confidence = typeof rawConfidence === 'number' ? rawConfidence : Number.NaN
+  const evidenceRefs = Array.isArray(rawEvidenceRefs)
+    ? rawEvidenceRefs
         .filter((value): value is string => typeof value === 'string')
         .map((value) => value.trim().slice(0, 500))
         .filter(Boolean)
