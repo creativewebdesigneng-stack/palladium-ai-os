@@ -177,6 +177,22 @@ export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
     };
   });
 
+/** Safe X account identity for destination confirmation; no credentials leave the server. */
+export const getNativeXAccountInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { getXAccountInfo } = await import("@/lib/integrations/x-social.server");
+    const account = await getXAccountInfo(context.userId);
+    return {
+      id: String(account.id),
+      username: String(account.username),
+      name: String(account.name),
+      profileImageUrl: account.profileImageUrl ? String(account.profileImageUrl) : null,
+      protected: account.protected === true,
+      verified: account.verified === true,
+    };
+  });
+
 export const addSocialPostTarget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { postId: string; provider: string; action: string; actionInput?: Record<string, unknown> }) => {
@@ -207,6 +223,12 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
         ...data.actionInput,
         description: cleanText(post.content, 4000),
         ...(cleanText(post.title, 90) ? { title: cleanText(post.title, 90) } : {}),
+      };
+    } else if (data.provider === "x" && data.action === "x_text_post") {
+      actionInput = {
+        text: cleanText(post.content, 10_000),
+        made_with_ai: data.actionInput["made_with_ai"] === true,
+        paid_partnership: data.actionInput["paid_partnership"] === true,
       };
     }
 
