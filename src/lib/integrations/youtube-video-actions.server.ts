@@ -21,6 +21,10 @@ function text(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function binaryBody(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 export async function hasNativeYouTubeUploadConnection(userId: string): Promise<boolean> {
   return Boolean(await getIntegrationAccessToken(userId, "youtube"));
 }
@@ -99,7 +103,7 @@ export async function uploadYouTubeTrustedVideo(input: {
         "Content-Length": String(bytes.byteLength),
         "Content-Range": `bytes ${offset}-${end}/${asset.sizeBytes}`,
       },
-      body: bytes,
+      body: binaryBody(bytes),
       signal: input.signal ?? AbortSignal.timeout(60_000),
     });
     if (response.status === 308) {
