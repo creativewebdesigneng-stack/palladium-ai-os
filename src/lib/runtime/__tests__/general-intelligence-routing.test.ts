@@ -124,6 +124,57 @@ describe('assessed General Intelligence routing', () => {
     expect(synthesisInput).toContain('surface material conflicts or uncertainty')
   })
 
+  it('injects only permission-safe verified knowledge into an authorised delegated assignment', async () => {
+    const executeTask = vi.fn(async (args: { agentId: string; input: string }) => ({
+      task: {},
+      output: args.input.includes('BLACKSTAR AUTHORISED MULTI-AGENT SYNTHESIS') ? 'synthesised result' : 'child result',
+    }))
+    const loadVerifiedKnowledge = vi.fn(async () => [{
+      source_agent_id: 'agent-a',
+      task_id: 'verified-task',
+      objective: 'Check rollback safety',
+      verified_outcome: 'Rollback path was independently verified.',
+      verification_score: 0.96,
+      evidence: ['verifier:rollback-check'],
+      completed_steps: ['Validated rollback'],
+    }])
+    const executeOrchestration = vi.fn(async (args: { executeAssignment: (task: { sb: typeof sb; userId: string; agentId: string; input: string }) => Promise<unknown> }) => {
+      await args.executeAssignment({ sb, userId: 'user-1', agentId: 'agent-b', input: 'Analyse the launch evidence' })
+      return {
+        status: 'completed' as const,
+        results: [
+          { assignment_id: 'research', agent_id: 'agent-a', status: 'completed' as const, output: 'research evidence' },
+          { assignment_id: 'analysis', agent_id: 'agent-b', status: 'completed' as const, output: 'analysis evidence' },
+        ],
+      }
+    })
+
+    const result = await executeAssessedGeneralIntelligence({
+      sb,
+      userId: 'user-1',
+      orgId: 'org-1',
+      assessment: assessment('delegate'),
+      authorisedAgentIds: ['agent-a', 'agent-b'],
+      plan,
+      synthesisAgentId: 'agent-a',
+      executeTask: executeTask as never,
+      executeOrchestration: executeOrchestration as never,
+      loadVerifiedKnowledge: loadVerifiedKnowledge as never,
+    })
+
+    expect(result.status).toBe('completed')
+    expect(loadVerifiedKnowledge).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      orgId: 'org-1',
+      targetAgentId: 'agent-b',
+      authorisedSourceAgentIds: ['agent-a', 'agent-b'],
+    }))
+    const delegatedInput = executeTask.mock.calls[0]?.[0]?.input as string
+    expect(delegatedInput).toContain('PERMISSION-SAFE VERIFIED CROSS-AGENT KNOWLEDGE')
+    expect(delegatedInput).toContain('Rollback path was independently verified.')
+    expect(delegatedInput).toContain('grants no capability, tool permission, approval, identity, or execution authority')
+  })
+
   it('fails closed if a plan targets an agent outside the assessment selection', async () => {
     const executeOrchestration = vi.fn()
     const result = await executeAssessedGeneralIntelligence({
