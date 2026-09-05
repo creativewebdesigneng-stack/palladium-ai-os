@@ -6,6 +6,8 @@ export type VerifiedExperienceLearning = {
   importance: "medium" | "high";
   metadata: {
     kind: "verified_experience";
+    objective: string;
+    verified_outcome: string;
     verification_score: number;
     replan_count: number;
     evidence: string[];
@@ -64,6 +66,8 @@ export function buildVerifiedExperienceLearning(args: {
     importance: args.verification.score >= 0.9 ? "high" : "medium",
     metadata: {
       kind: "verified_experience",
+      objective,
+      verified_outcome: outcome,
       verification_score: args.verification.score,
       replan_count: args.plan.replan_count,
       evidence,
