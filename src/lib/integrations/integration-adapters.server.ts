@@ -37,6 +37,13 @@ import {
 } from "./tiktok-social-actions.server";
 import { publishTikTokPhotoPost } from "./tiktok-social.server";
 import {
+  X_SOCIAL_ACTION,
+  X_SOCIAL_INPUT_SCHEMA,
+  hasNativeXConnection,
+  prepareXSocialAction,
+} from "./x-social-actions.server";
+import { publishXPost } from "./x-social.server";
+import {
   executeNangoAgentAction,
   listNangoAgentCapabilities,
   prepareNangoAgentAction,
@@ -187,7 +194,11 @@ const directOAuthAdapter: IntegrationAdapter = {
   id: "direct_oauth",
   lane: "direct_api",
   supportsProvider(provider) {
-    return isDirectConnectedServiceProvider(provider) || provider === "facebook" || provider === "pinterest" || provider === "tiktok";
+    return isDirectConnectedServiceProvider(provider)
+      || provider === "facebook"
+      || provider === "pinterest"
+      || provider === "tiktok"
+      || provider === "x";
   },
   async listCapabilities(userId, provider) {
     const rows: AdapterCapability[] = [];
@@ -228,6 +239,18 @@ const directOAuthAdapter: IntegrationAdapter = {
       });
     }
 
+    if ((!provider || provider === "x") && await hasNativeXConnection(userId)) {
+      rows.push({
+        provider: "x",
+        action: X_SOCIAL_ACTION,
+        description: "Publish an approved text post through the native X API v2.",
+        risk: "medium",
+        requiresApproval: true,
+        deployed: true,
+        inputSchema: X_SOCIAL_INPUT_SCHEMA,
+      });
+    }
+
     const providers = provider
       ? [provider]
       : ["google", "youtube", "microsoft", "slack", "hubspot", "notion", "asana", "linear"];
@@ -258,6 +281,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (provider === "tiktok") {
       return action === TIKTOK_SOCIAL_ACTION && await hasNativeTikTokConnection(userId);
     }
+    if (provider === "x") {
+      return action === X_SOCIAL_ACTION && await hasNativeXConnection(userId);
+    }
     return (
       isDirectConnectedServiceProvider(provider) &&
       directConnectedServiceActions(provider).includes(action) &&
@@ -268,6 +294,7 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (input.provider === "facebook") return prepareMetaSocialAction(input);
     if (input.provider === "pinterest") return preparePinterestSocialAction(input);
     if (input.provider === "tiktok") return prepareTikTokSocialAction(input);
+    if (input.provider === "x") return prepareXSocialAction(input);
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
     }
@@ -388,6 +415,40 @@ const directOAuthAdapter: IntegrationAdapter = {
         return {
           ok: false,
           error: error instanceof Error ? error.message : "Native TikTok publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (input.provider === "x") {
+      let prepared;
+      try {
+        prepared = await prepareXSocialAction(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native X action preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const data = await publishXPost({
+          userId: input.userId,
+          text: prepared.input.text,
+          madeWithAi: prepared.input.made_with_ai,
+          paidPartnership: prepared.input.paid_partnership,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: { provider: "x", action: X_SOCIAL_ACTION, read_only: false, transport: "direct_oauth", data },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Native X publishing failed.",
           failurePhase: "ambiguous",
           safeToFailover: false,
         };
