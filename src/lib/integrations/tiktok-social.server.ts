@@ -8,6 +8,13 @@ const PRIVACY_LEVELS = new Set([
   "FOLLOWER_OF_CREATOR",
   "SELF_ONLY",
 ]);
+const PUBLISH_STATUSES = new Set([
+  "PROCESSING_UPLOAD",
+  "PROCESSING_DOWNLOAD",
+  "SEND_TO_USER_INBOX",
+  "PUBLISH_COMPLETE",
+  "FAILED",
+]);
 
 export type TikTokCreatorInfo = {
   username: string | null;
@@ -18,6 +25,15 @@ export type TikTokCreatorInfo = {
   duetDisabled: boolean;
   stitchDisabled: boolean;
   maxVideoPostDurationSec: number | null;
+};
+
+export type TikTokPublishStatus = {
+  publishId: string;
+  status: "PROCESSING_UPLOAD" | "PROCESSING_DOWNLOAD" | "SEND_TO_USER_INBOX" | "PUBLISH_COMPLETE" | "FAILED";
+  failReason: string | null;
+  publiclyAvailablePostIds: string[];
+  uploadedBytes: number | null;
+  downloadedBytes: number | null;
 };
 
 function text(value: unknown, max: number): string {
@@ -31,6 +47,17 @@ function bool(value: unknown): boolean {
 function positiveInt(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 86_400 ? parsed : null;
+}
+
+function nonNegativeSafeInt(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function publishId(value: unknown): string {
+  const id = text(value, 100);
+  if (!/^[A-Za-z0-9._~-]{6,100}$/.test(id)) throw new Error("A valid TikTok publish ID is required.");
+  return id;
 }
 
 function configuredMediaPrefixes(): URL[] {
@@ -129,6 +156,48 @@ export async function queryTikTokCreatorInfo(
   };
 }
 
+export async function fetchTikTokPublishStatus(input: {
+  userId: string;
+  publishId: string;
+  signal?: AbortSignal;
+}): Promise<TikTokPublishStatus> {
+  const token = await getIntegrationAccessToken(input.userId, "tiktok");
+  if (!token) throw new Error("TikTok is not connected or its access has expired.");
+  const id = publishId(input.publishId);
+
+  const response = await fetch(`${TIKTOK_API}/v2/post/publish/status/fetch/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json; charset=UTF-8",
+    },
+    body: JSON.stringify({ publish_id: id }),
+    signal: input.signal ?? AbortSignal.timeout(20_000),
+  });
+  const payload = await readTikTokPayload(response, "publish-status");
+  const data = payload["data"] && typeof payload["data"] === "object" && !Array.isArray(payload["data"])
+    ? payload["data"] as Record<string, unknown>
+    : {};
+  const status = text(data["status"], 80);
+  if (!PUBLISH_STATUSES.has(status)) throw new Error("TikTok returned an unknown publish status.");
+  const publicIds = Array.isArray(data["publicaly_available_post_id"])
+    ? data["publicaly_available_post_id"]
+        .map((value) => typeof value === "string" || typeof value === "number" ? String(value) : "")
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+
+  return {
+    publishId: id,
+    status: status as TikTokPublishStatus["status"],
+    failReason: text(data["fail_reason"], 200) || null,
+    publiclyAvailablePostIds: publicIds,
+    uploadedBytes: nonNegativeSafeInt(data["uploaded_bytes"]),
+    downloadedBytes: nonNegativeSafeInt(data["downloaded_bytes"]),
+  };
+}
+
 export async function publishTikTokPhotoPost(input: {
   userId: string;
   imageUrl: string;
@@ -194,7 +263,6 @@ export async function publishTikTokPhotoPost(input: {
   const data = payload["data"] && typeof payload["data"] === "object" && !Array.isArray(payload["data"])
     ? payload["data"] as Record<string, unknown>
     : {};
-  const publishId = text(data["publish_id"], 100);
-  if (!publishId) throw new Error("TikTok accepted the request but did not return a publish ID.");
-  return { publishId };
+  const id = publishId(data["publish_id"]);
+  return { publishId: id };
 }
