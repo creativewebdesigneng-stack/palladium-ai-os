@@ -1,5 +1,6 @@
 import type { GeneralIntelligenceAssessment } from '@/lib/agents/general-intelligence-kernel'
 import type { OrchestratorPlan } from '@/lib/agents/agent-orchestrator'
+import { renderPermissionSafeVerifiedKnowledge } from '@/lib/agents/verified-knowledge-transfer'
 import { executeAgentTask } from './agent-task-execution.server'
 import {
   COLLECTIVE_PROPOSAL_INSTRUCTION,
@@ -11,9 +12,11 @@ import {
   executeGeneralIntelligenceOrchestration,
   type GeneralIntelligenceOrchestrationResult,
 } from './general-intelligence-orchestration.server'
+import { loadPermissionSafeVerifiedKnowledge } from './general-intelligence-verified-knowledge.server'
 
 type Sb = { from: (table: string) => any }
 type ExecuteTask = typeof executeAgentTask
+type LoadVerifiedKnowledge = typeof loadPermissionSafeVerifiedKnowledge
 
 type RoutedGeneralIntelligenceResult = {
   status: 'completed' | 'waiting_for_approval' | 'escalated' | 'failed'
@@ -62,10 +65,15 @@ function withCollective<T extends object>(value: T, collective: GeneralIntellige
  * completion, an explicitly authorised synthesis agent through that same runtime.
  * Collective mode additionally reuses Blackstar's existing trusted consensus
  * resolver; consensus remains advisory and never creates execution authority.
+ *
+ * Delegated agents may receive verifier-approved cross-agent experience as
+ * advisory context only. The transfer path never reads raw memory content and
+ * cannot grant capabilities, tools, approvals, identity or execution authority.
  */
 export async function executeAssessedGeneralIntelligence(args: {
   sb: Sb
   userId: string
+  orgId?: string | null
   assessment: GeneralIntelligenceAssessment
   authorisedAgentIds: Iterable<string>
   plan?: OrchestratorPlan
@@ -73,11 +81,13 @@ export async function executeAssessedGeneralIntelligence(args: {
   executeTask?: ExecuteTask
   executeOrchestration?: typeof executeGeneralIntelligenceOrchestration
   resolveCollective?: typeof resolveGeneralIntelligenceCollective
+  loadVerifiedKnowledge?: LoadVerifiedKnowledge
 }): Promise<RoutedGeneralIntelligenceResult> {
   const authorised = new Set(args.authorisedAgentIds)
   const execute = args.executeTask ?? executeAgentTask
   const orchestrate = args.executeOrchestration ?? executeGeneralIntelligenceOrchestration
   const resolveCollective = args.resolveCollective ?? resolveGeneralIntelligenceCollective
+  const loadVerifiedKnowledge = args.loadVerifiedKnowledge ?? loadPermissionSafeVerifiedKnowledge
 
   if (args.assessment.mode === 'escalate') {
     return { status: 'escalated', mode: 'escalate', reason: args.assessment.reasons.join(' ') }
@@ -107,9 +117,27 @@ export async function executeAssessedGeneralIntelligence(args: {
     }
   }
 
-  const executeAssignment: ExecuteTask = args.assessment.mode === 'collective'
-    ? ((taskArgs) => execute({ ...taskArgs, input: `${taskArgs.input}\n${COLLECTIVE_PROPOSAL_INSTRUCTION}` })) as ExecuteTask
-    : execute
+  const executeAssignment: ExecuteTask = (async (taskArgs) => {
+    let input = taskArgs.input
+    try {
+      const verifiedKnowledge = await loadVerifiedKnowledge({
+        sb: args.sb,
+        userId: args.userId,
+        orgId: args.orgId ?? null,
+        targetAgentId: taskArgs.agentId,
+        authorisedSourceAgentIds: selected,
+      })
+      const renderedKnowledge = renderPermissionSafeVerifiedKnowledge(verifiedKnowledge)
+      if (renderedKnowledge) input = `${input}\n\n${renderedKnowledge}`
+    } catch (error) {
+      console.error('[general-intelligence] verified cross-agent knowledge unavailable', error)
+    }
+
+    if (args.assessment.mode === 'collective') {
+      input = `${input}\n${COLLECTIVE_PROPOSAL_INSTRUCTION}`
+    }
+    return execute({ ...taskArgs, input })
+  }) as ExecuteTask
 
   const orchestration = await orchestrate({ sb: args.sb, userId: args.userId, plan: args.plan, authorisedAgentIds: selected, executeAssignment })
   if (orchestration.status !== 'completed') {
