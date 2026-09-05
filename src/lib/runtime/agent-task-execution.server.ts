@@ -1,6 +1,7 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
 import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
+import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
 import { executePlannedRun } from './planner-runtime.server'
 import { failRun, prepareRun, rescueRuntimeConnectedServiceRead, RuntimeError } from './runtime.server'
 
@@ -30,12 +31,19 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
   let run: Awaited<ReturnType<typeof prepareRun>> | null = null
   try {
     run = await prepareRun({ sb: args.sb, userId: args.userId, agentId: args.agentId, input: args.input })
-    const intelligence = buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })
+    const [intelligence, metacognition] = await Promise.all([
+      Promise.resolve(buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })),
+      loadVerifiedExperienceMetacognition({ sb: args.sb, agentId: run.agent.id }).catch((error) => {
+        console.error('[runtime.metacognition] verified experience load failed', error)
+        return { version: 1 as const, experience_count: 0, strengths: [], cautions: [], evidence: [] }
+      }),
+    ])
     run = {
       ...run,
       messages: [
         run.messages[0]!,
         { role: 'system', content: intelligence.prompt },
+        { role: 'system', content: renderMetacognitionControl(metacognition) },
         ...run.messages.slice(1),
       ],
     }
