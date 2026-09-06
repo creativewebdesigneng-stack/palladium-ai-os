@@ -46,7 +46,10 @@ vi.mock("../model-gateway.server", () => ({
 }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
 
-import { resumeOneStaleAgentRun } from "../run-resume-worker.server";
+import {
+  reasoningControlForResumedAstraRun,
+  resumeOneStaleAgentRun,
+} from "../run-resume-worker.server";
 
 const checkpoint = {
   schema: 1,
@@ -74,6 +77,14 @@ function claim(resumeCount = 1) {
   };
 }
 
+function astraClaim(resumeCount = 1) {
+  return {
+    ...claim(resumeCount),
+    provider: "compatible",
+    model: "blackstar-astra-v0.1",
+  };
+}
+
 function db(checkpointState: unknown = checkpoint) {
   return createFakeSupabase({
     personal_agents: [{
@@ -87,6 +98,8 @@ function db(checkpointState: unknown = checkpoint) {
       allowed_tools: [],
       allowed_providers: [],
       name: "Atlas",
+      category: "reasoning",
+      requires_approval: false,
     }],
     agent_tasks: [{ id: "task-1", status: "running", checkpoint_state: checkpointState }],
   }) as any;
@@ -94,6 +107,7 @@ function db(checkpointState: unknown = checkpoint) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env["BLACKSTAR_ASTRA_MODEL"];
   resume.release.mockResolvedValue(true);
   checkpointMod.invalidate.mockResolvedValue(undefined);
   checkpointMod.parse.mockImplementation((value: unknown) => value ? checkpoint : null);
@@ -111,10 +125,44 @@ describe("durable run resume worker", () => {
     expect(planner.execute).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user-1",
       resumeCheckpoint: checkpoint,
+      reasoningControl: null,
       run: expect.objectContaining({ taskId: "task-1" }),
     }));
     expect(checkpointMod.invalidate).toHaveBeenCalledWith({ sb, taskId: "task-1" });
     expect(resume.release).toHaveBeenCalledWith({ sb, taskId: "task-1", leaseToken: "lease-1" });
+  });
+
+  it("rebuilds Astra bounded reasoning control when the exact persisted serving identity resumes", async () => {
+    const sb = db();
+    resume.claim.mockResolvedValue(astraClaim());
+    planner.execute.mockResolvedValue({ id: "task-1", status: "succeeded" });
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("resumed");
+
+    expect(planner.execute).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      resumeCheckpoint: checkpoint,
+      run: expect.objectContaining({ provider: "compatible", model: "blackstar-astra-v0.1" }),
+      reasoningControl: expect.objectContaining({
+        effort: expect.stringMatching(/^(low|medium|high|xhigh|max)$/),
+      }),
+    }));
+  });
+
+  it("does not treat a rebound compatible model as Astra during resume", () => {
+    process.env["BLACKSTAR_ASTRA_MODEL"] = "blackstar-astra-v0.2";
+    const run = {
+      agent: { id: "agent-1", name: "Atlas", category: "reasoning" },
+      orgId: null,
+      taskId: "task-1",
+      messages: [{ role: "user", content: "continue" }],
+      tools: { defs: [], grants: new Map() },
+      provider: "compatible",
+      model: "blackstar-astra-v0.1",
+      startedAt: Date.now(),
+    } as any;
+
+    expect(reasoningControlForResumedAstraRun(run)).toBeNull();
   });
 
   it("leaves a safe checkpoint retryable after an early resume failure", async () => {
@@ -132,8 +180,6 @@ describe("durable run resume worker", () => {
   });
 
   it("fails closed when the checkpoint disappeared during tool execution", async () => {
-    // Missing checkpoint means the crash could have happened after an external
-    // dispatch, so this path must never be auto-retried.
     const sb = db(null);
     resume.claim.mockResolvedValue(claim(1));
     planner.execute.mockRejectedValue(new Error("worker died after dispatch"));
