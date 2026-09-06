@@ -36,6 +36,11 @@ import {
   type DurableRunCheckpoint,
   type RunCheckpointPhase,
 } from "./run-checkpoint.server";
+import type { BlackstarAstraReasoningControl } from "./blackstar-astra-reasoning";
+import {
+  combineBlackstarAstraVerificationDecisions,
+  resolveBlackstarAstraPlannerPolicy,
+} from "./blackstar-astra-planner-policy";
 
 type Sb = { from: (t: string) => any };
 
@@ -44,7 +49,6 @@ type PlannerAgent = PreparedRun["agent"] & {
   spec_version?: number | null;
 };
 
-const MAX_TOTAL_MODEL_ROUNDS = 10;
 const MAX_TOOL_ROUNDS = 4;
 const MAX_RUNTIME_MS = 120_000;
 
@@ -220,6 +224,20 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
   }
 }
 
+async function verifyCandidateWithDepth(
+  run: PreparedRun,
+  plan: AgentPlan,
+  candidate: string,
+  signal: AbortSignal,
+  passes: number,
+) {
+  const decisions: VerificationDecision[] = [];
+  for (let index = 0; index < passes; index += 1) {
+    decisions.push(await verifyCandidate(run, plan, candidate, signal));
+  }
+  return combineBlackstarAstraVerificationDecisions(decisions);
+}
+
 type PlannedToolOutcome = {
   ok: boolean;
   output: unknown;
@@ -381,6 +399,7 @@ export async function executePlannedRun(args: {
   signal?: AbortSignal;
   timeoutMs?: number;
   resumeCheckpoint?: DurableRunCheckpoint | null;
+  reasoningControl?: BlackstarAstraReasoningControl | null;
 }) {
   const controller = new AbortController();
   let ownerAbort: RuntimeError | null = null;
@@ -397,6 +416,7 @@ export async function executePlannedRun(args: {
     controller.abort();
   }, Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS));
 
+  const astraPolicy = resolveBlackstarAstraPlannerPolicy(args.reasoningControl);
   const resumed = args.resumeCheckpoint ?? null;
   let plan = resumed ? resumed.plan : await buildPlan(args.run);
   await persistPlan(args.sb, args.run.taskId, plan);
@@ -416,7 +436,7 @@ export async function executePlannedRun(args: {
   const steeringCursor = createSteeringCursor();
 
   try {
-    for (let round = 0; round < MAX_TOTAL_MODEL_ROUNDS; round += 1) {
+    for (let round = 0; round < astraPolicy.model_round_budget; round += 1) {
       if (ownerAbort) throw ownerAbort;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await cancelled(args.sb, args.run.taskId)) {
@@ -485,7 +505,13 @@ export async function executePlannedRun(args: {
         continue;
       }
 
-      const decision = await verifyCandidate(args.run, plan, result.text, controller.signal);
+      const decision = await verifyCandidateWithDepth(
+        args.run,
+        plan,
+        result.text,
+        controller.signal,
+        astraPolicy.verification_passes,
+      );
       await persistVerification(args.sb, args.run.taskId, decision);
 
       if (shouldComplete(plan, decision)) {
