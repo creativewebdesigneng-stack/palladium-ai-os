@@ -2,6 +2,12 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import {
+  ASTRA_CERTIFICATION_CASE_COUNT,
+  astraCertificationSuiteId,
+  getAstraCertificationBenchmarkCase,
+  isAstraCertificationTaskClass,
+} from '@/lib/evals/astra-certification-benchmark-suite'
+import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelForTaskClass,
   isBlackstarAstraEngineConfigured,
@@ -48,7 +54,7 @@ type ArenaScore = {
 type ProvenanceResponse = Omit<ArenaResponse, 'run_id'>
 type ProvenanceScore = Omit<ArenaScore, 'run_id'>
 
-type ProvenanceInput = {
+export type AstraEvaluationProvenanceInput = {
   runId: string
   userId: string
   orgId: string | null
@@ -60,6 +66,8 @@ type ProvenanceInput = {
   criteria: unknown
   responses: ProvenanceResponse[]
   scores: ProvenanceScore[]
+  suiteId?: string | null
+  caseId?: string | null
 }
 
 type AdminDb = {
@@ -70,10 +78,9 @@ type AdminDb = {
   }>
 }
 
-const MIN_RUNS = 20
-const MAX_RUNS = 100
-const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v1'
-const PROVENANCE_VERSION = 1
+const MIN_RUNS = ASTRA_CERTIFICATION_CASE_COUNT
+const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v2'
+const PROVENANCE_VERSION = 2
 const astraEvalAdmin = supabaseAdmin as unknown as AdminDb
 
 function stableJson(value: unknown): string {
@@ -93,7 +100,7 @@ function provenanceSecret(): string {
   return secret
 }
 
-function normalizeProvenance(input: ProvenanceInput) {
+function normalizeProvenance(input: AstraEvaluationProvenanceInput) {
   return {
     version: PROVENANCE_VERSION,
     runId: input.runId,
@@ -102,6 +109,8 @@ function normalizeProvenance(input: ProvenanceInput) {
     taskClass: input.taskClass,
     provider: 'compatible',
     model: input.model,
+    suiteId: input.suiteId ?? null,
+    caseId: input.caseId ?? null,
     prompt: input.prompt,
     judgeProvider: input.judgeProvider,
     judgeModel: input.judgeModel,
@@ -130,13 +139,13 @@ function normalizeProvenance(input: ProvenanceInput) {
   }
 }
 
-export function signAstraEvaluationEvidence(input: ProvenanceInput): string {
+export function signAstraEvaluationEvidence(input: AstraEvaluationProvenanceInput): string {
   return createHmac('sha256', provenanceSecret())
     .update(stableJson(normalizeProvenance(input)))
     .digest('hex')
 }
 
-function validProvenanceSignature(signature: unknown, input: ProvenanceInput): boolean {
+function validProvenanceSignature(signature: unknown, input: AstraEvaluationProvenanceInput): boolean {
   if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/i.test(signature)) return false
   const expected = Buffer.from(signAstraEvaluationEvidence(input), 'hex')
   const supplied = Buffer.from(signature, 'hex')
@@ -165,15 +174,19 @@ async function matchingRuns(scope: Scope) {
   if (!isBlackstarAstraEngineConfigured()) {
     throw new Error('Blackstar Astra serving is not configured on this deployment.')
   }
+  if (!isAstraCertificationTaskClass(scope.taskClass)) {
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+  }
 
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
+  const suiteId = astraCertificationSuiteId(scope.taskClass)
   let query = astraEvalAdmin
     .from('model_eval_runs')
     .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
     .eq('status', 'completed')
     .not('completed_at', 'is', null)
     .order('completed_at', { ascending: false })
-    .limit(MAX_RUNS)
+    .limit(200)
 
   query = scope.orgId
     ? query.eq('org_id', scope.orgId)
@@ -189,6 +202,8 @@ async function matchingRuns(scope: Scope) {
       && metadata?.['task_class'] === scope.taskClass
       && metadata?.['provider'] === 'compatible'
       && metadata?.['model'] === model
+      && metadata?.['suite_id'] === suiteId
+      && typeof metadata?.['case_id'] === 'string'
   })
 
   if (!tagged.length) return { model, runs: [] as ArenaRun[] }
@@ -211,6 +226,13 @@ async function matchingRuns(scope: Scope) {
   const scores = (scoreData ?? []) as ArenaScore[]
   const verifiedRuns = tagged.filter((run) => {
     const metadata = astraMetadata(run)
+    const caseId = metadata?.['case_id']
+    if (typeof caseId !== 'string') return false
+    const benchmarkCase = getAstraCertificationBenchmarkCase(scope.taskClass, caseId)
+    if (!benchmarkCase || benchmarkCase.suiteId !== suiteId) return false
+    if (run.prompt !== benchmarkCase.prompt) return false
+    if (stableJson(run.metadata?.['criteria'] ?? null) !== stableJson(benchmarkCase.criteria)) return false
+
     const runResponses = responses.filter((response) => response.run_id === run.id)
     const runScores = scores.filter((score) => score.run_id === run.id)
     const hasExactAstraResponse = runResponses.some((response) => response.provider === 'compatible' && response.model === model)
@@ -222,6 +244,8 @@ async function matchingRuns(scope: Scope) {
       orgId: run.org_id,
       taskClass: scope.taskClass,
       model,
+      suiteId,
+      caseId,
       prompt: run.prompt,
       judgeProvider: run.judge_provider,
       judgeModel: run.judge_model,
@@ -231,7 +255,15 @@ async function matchingRuns(scope: Scope) {
     })
   })
 
-  return { model, runs: verifiedRuns }
+  const distinctCases = new Set<string>()
+  const distinctRuns = verifiedRuns.filter((run) => {
+    const caseId = astraMetadata(run)?.['case_id']
+    if (typeof caseId !== 'string' || distinctCases.has(caseId)) return false
+    distinctCases.add(caseId)
+    return true
+  })
+
+  return { model, runs: distinctRuns }
 }
 
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
@@ -242,20 +274,33 @@ export async function getAstraEvaluationCertificationStatus(scope: Scope) {
     model,
     completedRuns: runs.length,
     minimumRuns: MIN_RUNS,
-    readyToCertify: runs.length >= MIN_RUNS,
+    readyToCertify: isAstraCertificationTaskClass(scope.taskClass) && runs.length >= MIN_RUNS,
+    certificationSupported: isAstraCertificationTaskClass(scope.taskClass),
   }
 }
 
 export async function certifyAstraEvaluation(scope: Scope) {
-  const { model, runs } = await matchingRuns(scope)
-  if (runs.length < MIN_RUNS) {
-    throw new Error(`At least ${MIN_RUNS} completed server-verified Astra evaluations are required for ${scope.taskClass}.`)
+  if (!isAstraCertificationTaskClass(scope.taskClass)) {
+    throw new Error('Vision certification requires a multimodal benchmark path and cannot be certified by the text-only Model Arena.')
   }
 
-  const sourceRuns = runs.slice(0, MAX_RUNS).sort((a, b) => a.id.localeCompare(b.id))
-  const benchmarkHash = hash(sourceRuns.map((run) => ({ id: run.id, promptHash: hash(run.prompt) })))
+  const { model, runs } = await matchingRuns(scope)
+  if (runs.length < MIN_RUNS) {
+    throw new Error(`All ${MIN_RUNS} distinct trusted benchmark cases are required for ${scope.taskClass} certification.`)
+  }
+
+  const sourceRuns = runs.slice(0, MIN_RUNS).sort((a, b) => {
+    const aCase = String(astraMetadata(a)?.['case_id'] ?? '')
+    const bCase = String(astraMetadata(b)?.['case_id'] ?? '')
+    return aCase.localeCompare(bCase)
+  })
+  const suiteId = astraCertificationSuiteId(scope.taskClass)
+  const benchmarkHash = hash(sourceRuns.map((run) => ({
+    caseId: astraMetadata(run)?.['case_id'],
+    promptHash: hash(run.prompt),
+  })))
   const evaluatorHash = hash(sourceRuns.map((run) => ({
-    id: run.id,
+    caseId: astraMetadata(run)?.['case_id'],
     judgeProvider: run.judge_provider,
     judgeModel: run.judge_model,
     criteria: run.metadata?.['criteria'] ?? null,
@@ -268,7 +313,6 @@ export async function certifyAstraEvaluation(scope: Scope) {
     routingAuthority: BLACKSTAR_ASTRA_ENGINE_PROFILE.routingAuthority,
   })
 
-  const suiteId = `blackstar-astra-${scope.taskClass}-operator-v1`
   const { data, error } = await astraEvalAdmin.rpc('certify_native_intelligence_model_evaluation', {
     p_run_ids: sourceRuns.map((run) => run.id),
     p_model_id: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
