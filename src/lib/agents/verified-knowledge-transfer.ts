@@ -18,6 +18,8 @@ type VerifiedKnowledgeMemoryRow = {
   metadata?: unknown;
 };
 
+export const MIN_TRANSFER_VERIFICATION_SCORE = 0.75;
+
 const clean = (value: unknown, max: number) =>
   typeof value === 'string' ? value.trim().slice(0, max) : '';
 
@@ -60,7 +62,14 @@ export function buildPermissionSafeVerifiedKnowledge(args: {
     const objective = clean(row.metadata['objective'], 3000);
     const verifiedOutcome = clean(row.metadata['verified_outcome'], 5000);
     const score = row.metadata['verification_score'];
-    if (!objective || !verifiedOutcome || typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1) continue;
+    if (
+      !objective ||
+      !verifiedOutcome ||
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < MIN_TRANSFER_VERIFICATION_SCORE ||
+      score > 1
+    ) continue;
 
     result.push({
       source_agent_id: sourceAgentId,
