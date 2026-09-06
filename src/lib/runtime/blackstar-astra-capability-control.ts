@@ -1,0 +1,75 @@
+export type BlackstarAstraRunCapability =
+  | 'adaptive_reasoning'
+  | 'long_context'
+  | 'structured_output'
+  | 'tool_use'
+  | 'browsing'
+  | 'research'
+  | 'computer_use'
+  | 'coding'
+  | 'artifact_creation'
+  | 'memory'
+  | 'external_integrations'
+  | 'checkpointed_work'
+  | 'mid_turn_steering'
+
+export type BlackstarAstraRunCapabilityControl = {
+  version: 1
+  available: BlackstarAstraRunCapability[]
+  unavailable_target_capabilities: string[]
+}
+
+const hasAny = (tools: Set<string>, names: string[]) => names.some((name) => tools.has(name))
+
+/**
+ * Reports what this exact Astra run can really use. It never creates grants;
+ * availability is derived only from tool definitions already resolved by the
+ * authoritative Blackstar runtime.
+ */
+export function buildBlackstarAstraRunCapabilityControl(
+  toolNames: readonly string[],
+): BlackstarAstraRunCapabilityControl {
+  const tools = new Set(toolNames)
+  const available = new Set<BlackstarAstraRunCapability>([
+    'adaptive_reasoning',
+    'long_context',
+    'structured_output',
+    'checkpointed_work',
+    'mid_turn_steering',
+  ])
+
+  if (tools.size) available.add('tool_use')
+  if (hasAny(tools, ['web_search', 'web_fetch', 'browser', 'browser_task'])) available.add('browsing')
+  if (hasAny(tools, ['web_search', 'web_fetch'])) available.add('research')
+  if (hasAny(tools, ['browser', 'browser_task'])) available.add('computer_use')
+  if (hasAny(tools, ['github_write', 'agent_workspace', 'skill_script', 'html_studio', 'app_studio'])) available.add('coding')
+  if (hasAny(tools, ['agent_workspace', 'html_studio', 'app_studio', 'voxel_studio', 'three_d_studio', 'short_video'])) available.add('artifact_creation')
+  if (hasAny(tools, ['memory_search', 'memory_write'])) available.add('memory')
+  if (hasAny(tools, ['integration_capabilities', 'integration_action', 'connected_service', 'connected_service_write', 'github_write', 'social_ops'])) {
+    available.add('external_integrations')
+  }
+
+  const unavailable: string[] = []
+  // These target capabilities are intentionally not claimed until their actual
+  // transport/runtime implementation is present and tested.
+  if (!available.has('artifact_creation')) unavailable.push('artifact_creation')
+  unavailable.push('vision', 'multimodal_input', 'native_async_tools', 'persisted_hidden_reasoning')
+
+  return {
+    version: 1,
+    available: [...available],
+    unavailable_target_capabilities: unavailable,
+  }
+}
+
+export function renderBlackstarAstraRunCapabilityControl(
+  control: BlackstarAstraRunCapabilityControl,
+): string {
+  return [
+    'BLACKSTAR ASTRA RUN CAPABILITIES',
+    `Available now: ${control.available.join(', ') || 'none'}`,
+    `Not available in this run: ${control.unavailable_target_capabilities.join(', ') || 'none'}`,
+    'Capability rule: use only capabilities and tools already granted by the Blackstar runtime. This manifest reports authority; it never creates authority.',
+    'Do not claim vision, multimodal understanding, external actions, artifacts or computer use unless they are listed as available for this run and the required tool is actually granted.',
+  ].join('\n')
+}
