@@ -200,6 +200,27 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
   return liveSearchOnlyResult(query, search, primaryProvider);
 }
 
+/**
+ * Exact provider/model execution for evaluation and certification paths that
+ * need reproducible transport identity. This deliberately keeps transport-level
+ * retries from the low-level provider client, but does not use alternate models,
+ * cross-provider failover, remembered providers, or web-search rescue.
+ */
+export async function runChatPinned(args: RunArgs): Promise<ChatResult> {
+  compactRunContextInPlace(
+    args.messages,
+    blackstarAstraContextCompactionOptions(args.provider, args.model),
+  );
+  const model = resolveModel(args.provider, args.model);
+  const callArgs = { ...args, model };
+  if (isAstraGroqBootstrapRequest(args.provider, model)) {
+    return runAstraGroqBootstrap(callArgs);
+  }
+  return args.provider === "gemini"
+    ? runGeminiNative(callArgs)
+    : base.runChat(callArgs);
+}
+
 /** Non-streaming model calls get bounded cross-provider failover. */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
   compactRunContextInPlace(
