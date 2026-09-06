@@ -8,9 +8,11 @@ import type { Provider } from './model-gateway.base'
  * Blackstar Astra-class Engine v0.1.
  *
  * This is Blackstar's own bounded General Intelligence engine slot. It does not
- * use or claim OpenAI model weights. The serving layer is Blackstar-controlled
- * and may be backed by one or more open-weight models exposed through an
- * OpenAI-compatible protocol (vLLM, SGLang, TGI, Ollama, etc.).
+ * use or claim OpenAI hosted model access. The preferred serving layer is a
+ * Blackstar-controlled OpenAI-compatible endpoint (vLLM, SGLang, TGI, Ollama,
+ * etc.). When no dedicated endpoint is configured, production may bootstrap
+ * through the already-authorised Groq transport using the verified Qwen 3.8
+ * open-weight candidate. The dedicated endpoint always takes precedence.
  *
  * The model is deliberately granted no execution authority here. Tools,
  * approvals, identity, delegation, verification and side effects remain owned
@@ -26,6 +28,7 @@ export const BLACKSTAR_ASTRA_ENGINE_PROFILE = {
   apiKeyEnv: 'OPENAI_COMPATIBLE_API_KEY',
   modelEnv: 'BLACKSTAR_ASTRA_MODEL',
   defaultModel: 'blackstar-astra-v0.1',
+  groqBootstrapModel: 'qwen/qwen3.8-27b',
   specialistModelEnvs: {
     reasoning: 'BLACKSTAR_ASTRA_REASONING_MODEL',
     coding: 'BLACKSTAR_ASTRA_CODING_MODEL',
@@ -59,9 +62,16 @@ export const BLACKSTAR_ASTRA_ENGINE_PROFILE = {
   },
 } as const
 
+export function isBlackstarAstraGroqBootstrapConfigured(): boolean {
+  return !process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim()
+    && Boolean(process.env['GROQ_API_KEY']?.trim())
+}
+
 function baseAstraModel() {
   return process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
-    || BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel
+    || (isBlackstarAstraGroqBootstrapConfigured()
+      ? BLACKSTAR_ASTRA_ENGINE_PROFILE.groqBootstrapModel
+      : BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel)
 }
 
 export function blackstarAstraModelForTaskClass(taskClass: NativeIntelligenceTaskClass): string {
@@ -113,4 +123,5 @@ export function isBlackstarAstraServingIdentity(provider: Provider, model?: stri
 
 export function isBlackstarAstraEngineConfigured(): boolean {
   return Boolean(process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim())
+    || isBlackstarAstraGroqBootstrapConfigured()
 }
