@@ -37,7 +37,7 @@ export const certifyAstraTaskClass = createServerFn({ method: 'POST' })
       orgId: data.orgId ?? null,
       action: 'native_intelligence.astra_certified',
       targetType: 'model_eval_verified_evidence',
-      targetId: evidence.id ?? undefined,
+      ...(evidence.id ? { targetId: evidence.id } : {}),
       status: 'success',
       metadata: {
         taskClass: evidence.taskClass,
