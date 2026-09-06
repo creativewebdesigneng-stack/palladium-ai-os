@@ -1,4 +1,5 @@
-import { CheckCircle2, CircleAlert, Cpu, Database, Route, Server, ShieldCheck, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, CircleAlert, Cpu, Database, FlaskConical, Route, Server, ShieldCheck, XCircle } from 'lucide-react';
 import { deriveAstraActivationSummary } from '@/lib/runtime/blackstar-astra-activation-status';
 
 const stageIcons = {
@@ -40,6 +41,15 @@ function evidenceDetail(item) {
   if (!item.certified_eligible) return 'Unqualified / stale';
   const score = Number.isFinite(item.evaluation_score) ? `${(item.evaluation_score * 100).toFixed(1)}%` : '—';
   return `${score} · ${item.evaluation_samples.toLocaleString()} samples`;
+}
+
+function evaluationHref(item) {
+  const params = new URLSearchParams({
+    source: 'astra-activation',
+    task_class: item.task_class,
+    model: item.model,
+  });
+  return `/model-arena?${params.toString()}`;
 }
 
 export default function BlackstarAstraActivationPanel({ readiness }) {
@@ -119,9 +129,10 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
             <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">Verifier-backed certification</p>
             <span className="text-[10px] text-zinc-500">{readiness.certified_task_classes ?? 0}/{readiness.certification.length} eligible · {readiness.routable_task_classes ?? 0}/{readiness.certification.length} routable</span>
           </div>
-          <table className="w-full min-w-[900px] text-left text-xs">
+          <p className="mb-3 rounded-lg border border-white/10 bg-white/[.025] px-3 py-2 text-[10px] leading-relaxed text-zinc-500">Missing, stale or unqualified evidence must be refreshed through the existing Model Arena. Blackstar's trusted verifier requires at least 20 distinct completed runs for the exact provider/model before it can issue routing evidence. Running evaluations does not itself certify or grant execution authority.</p>
+          <table className="w-full min-w-[1040px] text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
-              <tr><th className="pb-2 font-medium">Task class</th><th className="pb-2 font-medium">Exact model</th><th className="pb-2 font-medium">Evidence</th><th className="pb-2 font-medium">Certified / eligible</th><th className="pb-2 font-medium">Actually routable</th><th className="pb-2 font-medium">Qualified score</th></tr>
+              <tr><th className="pb-2 font-medium">Task class</th><th className="pb-2 font-medium">Exact model</th><th className="pb-2 font-medium">Evidence</th><th className="pb-2 font-medium">Certified / eligible</th><th className="pb-2 font-medium">Actually routable</th><th className="pb-2 font-medium">Qualified score</th><th className="pb-2 font-medium">Evaluation action</th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {readiness.certification.map((item) => (
@@ -131,7 +142,15 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
                   <td className={`py-2.5 pr-3 ${item.evidence_available ? 'text-cyan-300' : 'text-zinc-500'}`}>{item.evidence_available ? 'Available' : 'Missing'}</td>
                   <td className={`py-2.5 pr-3 ${item.certified_eligible ? 'text-emerald-300' : 'text-amber-300'}`}>{item.certified_eligible ? 'Eligible' : 'Not eligible'}</td>
                   <td className={`py-2.5 pr-3 ${certificationClass(item)}`}>{certificationLabel(item)}</td>
-                  <td className="py-2.5 text-zinc-500">{evidenceDetail(item)}</td>
+                  <td className="py-2.5 pr-3 text-zinc-500">{evidenceDetail(item)}</td>
+                  <td className="py-2.5">
+                    {!item.certified_eligible ? (
+                      <Link to={evaluationHref(item)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-400/[.07] px-2.5 py-1.5 text-[10px] font-medium text-violet-200 transition hover:bg-violet-400/[.12]">
+                        <FlaskConical className="h-3 w-3" />
+                        {item.evidence_available ? 'Refresh evaluation' : 'Run evaluation'}
+                      </Link>
+                    ) : <span className="text-[10px] text-zinc-600">No evaluation needed</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
