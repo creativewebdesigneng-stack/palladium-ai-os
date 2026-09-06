@@ -27,13 +27,18 @@ function parseJudge(raw: string) {
   if (!Array.isArray(parsed) || parsed.length !== 2) throw new Error('The vision judge must score both candidates.')
   const seen = new Set<number>()
   return parsed.map((entry) => {
-    const index = Number(entry.index)
-    const score = Number(entry.score)
+    const index = Number(entry['index'])
+    const score = Number(entry['score'])
     if (!Number.isInteger(index) || index < 0 || index > 1 || seen.has(index) || !Number.isFinite(score) || score < 0 || score > 100) {
       throw new Error('The vision judge returned an invalid candidate score.')
     }
     seen.add(index)
-    return { index, score, verdict: typeof entry.verdict === 'string' ? entry.verdict.slice(0, 120) : null, reasoning: typeof entry.reasoning === 'string' ? entry.reasoning.slice(0, 2000) : null }
+    return {
+      index,
+      score,
+      verdict: typeof entry['verdict'] === 'string' ? entry['verdict'].slice(0, 120) : null,
+      reasoning: typeof entry['reasoning'] === 'string' ? entry['reasoning'].slice(0, 2000) : null,
+    }
   })
 }
 
