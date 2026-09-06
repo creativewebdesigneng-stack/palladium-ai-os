@@ -124,7 +124,7 @@ describe('assessed General Intelligence routing', () => {
     expect(synthesisInput).toContain('surface material conflicts or uncertainty')
   })
 
-  it('injects only permission-safe verified knowledge into an authorised delegated assignment', async () => {
+  it('injects only permission-safe verified knowledge relevant to an authorised delegated assignment', async () => {
     const executeTask = vi.fn(async (args: { agentId: string; input: string }) => ({
       task: {},
       output: args.input.includes('BLACKSTAR AUTHORISED MULTI-AGENT SYNTHESIS') ? 'synthesised result' : 'child result',
@@ -167,6 +167,7 @@ describe('assessed General Intelligence routing', () => {
       userId: 'user-1',
       orgId: 'org-1',
       targetAgentId: 'agent-b',
+      objective: 'Analyse the launch evidence',
       authorisedSourceAgentIds: ['agent-a', 'agent-b'],
     }))
     const delegatedInput = executeTask.mock.calls[0]?.[0]?.input as string
