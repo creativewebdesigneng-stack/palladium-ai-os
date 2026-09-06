@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createInitialPlan } from "@/lib/agents/agent-planner";
+import { createInitialPlan, normaliseVerificationDecision } from "@/lib/agents/agent-planner";
 import {
+  createDurableDecisionState,
   createDurableRunCheckpoint,
   invalidateDurableRunCheckpoint,
   parseDurableRunCheckpoint,
@@ -31,7 +32,116 @@ describe("durable run checkpoints", () => {
     expect(checkpoint.tool_rounds).toBe(2);
     expect(checkpoint.tool_call_count).toBe(4);
     expect(checkpoint.saved_at).toBe("2026-08-26T21:45:00.000Z");
+    expect(checkpoint.decision_state).toEqual({
+      version: 1,
+      informational_only: true,
+      current_step_id: "step-1",
+      steps: [{ id: "step-1", status: "pending", evidence_count: 0 }],
+      verification: null,
+      next_action: "continue_plan",
+    });
     expect(parseDurableRunCheckpoint(checkpoint)).toEqual(checkpoint);
+  });
+
+  it("persists verifier facts without storing hidden reasoning or raw verifier prose", () => {
+    const plan = createInitialPlan({ objective: "Ship a verified result" });
+    const verification = normaliseVerificationDecision({
+      passed: false,
+      score: 0.72,
+      issues: ["Need another source", "Check the final total"],
+      evidence: ["source-a", "source-b", "source-c"],
+      next_action: "replan",
+    });
+    const state = createDurableDecisionState({ plan, verification });
+
+    expect(state.verification).toEqual({
+      passed: false,
+      score: 0.72,
+      issue_count: 2,
+      evidence_count: 3,
+      next_action: "replan",
+    });
+    expect(state.next_action).toBe("replan");
+    expect(JSON.stringify(state)).not.toContain("Need another source");
+    expect(JSON.stringify(state)).not.toContain("source-a");
+    expect(state).not.toHaveProperty("reasoning");
+    expect(state).not.toHaveProperty("chain_of_thought");
+  });
+
+  it("parses legacy schema-1 checkpoints with no decision state", () => {
+    const plan = createInitialPlan({ objective: "Legacy run" });
+    const legacy = {
+      schema: 1,
+      phase: "model_boundary",
+      safe_to_resume: true,
+      saved_at: "2026-09-01T12:00:00.000Z",
+      messages: [{ role: "user", content: "continue" }],
+      plan,
+      tool_rounds: 0,
+      tool_call_count: 0,
+      usage: { input: 1, output: 0 },
+    };
+
+    expect(parseDurableRunCheckpoint(legacy)).toEqual(legacy);
+  });
+
+  it("strips authority-shaped and hidden-reasoning fields from restored decision state", () => {
+    const plan = createInitialPlan({ objective: "Resume safely" });
+    const checkpoint = createDurableRunCheckpoint({
+      phase: "verification_boundary",
+      messages: [{ role: "user", content: "continue" }],
+      plan,
+      toolRounds: 1,
+      toolCallCount: 1,
+      usage: { input: 10, output: 5 },
+    }) as unknown as Record<string, unknown>;
+
+    checkpoint["decision_state"] = {
+      version: 1,
+      informational_only: true,
+      current_step_id: "step-1",
+      steps: [{
+        id: "step-1",
+        status: "in_progress",
+        evidence_count: 999999,
+        tool_grants: ["admin"],
+        approval_granted: true,
+      }],
+      verification: {
+        passed: true,
+        score: 99,
+        issue_count: 999,
+        evidence_count: 999,
+        next_action: "complete",
+        reasoning: "secret hidden reasoning",
+      },
+      next_action: "complete",
+      tool_grants: ["admin"],
+      approval_granted: true,
+      delegation_depth: 999,
+      execution_authority: "root",
+      chain_of_thought: "do not persist me",
+    };
+
+    const parsed = parseDurableRunCheckpoint(checkpoint);
+    expect(parsed?.decision_state).toEqual({
+      version: 1,
+      informational_only: true,
+      current_step_id: "step-1",
+      steps: [{ id: "step-1", status: "in_progress", evidence_count: 100 }],
+      verification: {
+        passed: true,
+        score: 1,
+        issue_count: 100,
+        evidence_count: 100,
+        next_action: "complete",
+      },
+      next_action: "complete",
+    });
+    expect(JSON.stringify(parsed?.decision_state)).not.toContain("admin");
+    expect(JSON.stringify(parsed?.decision_state)).not.toContain("approval_granted");
+    expect(JSON.stringify(parsed?.decision_state)).not.toContain("chain_of_thought");
+    expect(JSON.stringify(parsed?.decision_state)).not.toContain("execution_authority");
   });
 
   it("rejects checkpoints that are not explicitly safe to resume", () => {
