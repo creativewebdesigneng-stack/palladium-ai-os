@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase } from './fake-supabase'
 import {
   persistNativeIntelligenceRuntimeRouting,
@@ -8,6 +8,7 @@ import type { PreparedRun } from '../runtime.server'
 
 const USER = 'user-1'
 const HASH = 'a'.repeat(64)
+const ASTRA_READY = async () => ({ ready: true, reason: 'ready' as const })
 
 function run(overrides: Partial<PreparedRun> = {}): PreparedRun {
   return {
@@ -124,10 +125,15 @@ describe('Native Intelligence runtime routing', () => {
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.94, 10)
   })
 
-  it('routes to Blackstar Astra-class only when its exact serving identity is verified', async () => {
+  it('routes to Blackstar Astra-class only when its exact serving identity is verified and live', async () => {
     process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
     const sb = createFakeSupabase({ model_eval_verified_evidence: [astraCertificate()] }) as any
-    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({
+      sb,
+      userId: USER,
+      run: run(),
+      probeAstraServing: ASTRA_READY,
+    })
 
     expect(resolved).toMatchObject({
       provider: 'compatible',
@@ -142,19 +148,50 @@ describe('Native Intelligence runtime routing', () => {
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.97, 10)
   })
 
-  it('routes reasoning work to a configured Astra specialist only with an exact specialist certificate', async () => {
+  it('routes reasoning work to a configured Astra specialist only with an exact specialist certificate and live identity', async () => {
     process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
     process.env['BLACKSTAR_ASTRA_REASONING_MODEL'] = 'astra-reasoning-specialist-v1'
     const sb = createFakeSupabase({
       model_eval_verified_evidence: [astraCertificate({ model: 'astra-reasoning-specialist-v1' })],
     }) as any
-    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+    const probeAstraServing = vi.fn(ASTRA_READY)
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({
+      sb,
+      userId: USER,
+      run: run(),
+      probeAstraServing,
+    })
 
     expect(resolved).toMatchObject({
       provider: 'compatible',
       model: 'astra-reasoning-specialist-v1',
       decision: {
         model_id: 'blackstar-astra-v0.1',
+        source: 'verified_evaluation',
+      },
+    })
+    expect(probeAstraServing).toHaveBeenCalledWith({ model: 'astra-reasoning-specialist-v1' })
+  })
+
+  it('removes Astra from routing when the certified model is not actually being served', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
+    const sb = createFakeSupabase({
+      model_eval_verified_evidence: [certificate(), astraCertificate()],
+    }) as any
+    const probeAstraServing = vi.fn(async () => ({ ready: false, reason: 'model_missing' as const }))
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({
+      sb,
+      userId: USER,
+      run: run(),
+      probeAstraServing,
+    })
+
+    expect(probeAstraServing).toHaveBeenCalledWith({ model: 'blackstar-astra-v0.1' })
+    expect(resolved).toMatchObject({
+      provider: 'compatible',
+      model: 'blackstar-native-v0.1',
+      decision: {
+        model_id: 'blackstar-native-v0.1',
         source: 'verified_evaluation',
       },
     })
@@ -254,7 +291,12 @@ describe('Native Intelligence runtime routing', () => {
       })],
     }) as any
 
-    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: originalRun })
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({
+      sb,
+      userId: USER,
+      run: originalRun,
+      probeAstraServing: ASTRA_READY,
+    })
     expect(originalRun.tools.grants).toBe(originalGrants)
     expect(originalRun.tools.grants.size).toBe(0)
     expect(JSON.stringify(resolved.decision)).not.toMatch(/tool_grant|approval|delegation|execution_authority/i)
