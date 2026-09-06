@@ -17,22 +17,33 @@ function unique(values: string[], limit: number) {
 
 /**
  * Builds a bounded self-evaluation snapshot from verifier-approved long-term
- * experience only. It stores and reuses outcomes/evidence, never hidden chain-of-thought.
+ * experience only. It reuses sanitized metadata, never raw memory content or
+ * hidden chain-of-thought. Tenant and verifier provenance are explicit defence
+ * in depth in addition to caller-scoped RLS.
  */
 export async function loadVerifiedExperienceMetacognition(args: {
   sb: Sb
+  userId: string
+  orgId: string | null
   agentId: string
   limit?: number
 }): Promise<MetacognitionSnapshot> {
   const limit = Math.min(Math.max(args.limit ?? 6, 1), 12)
-  const { data, error } = await args.sb
+  let query = args.sb
     .from('agent_memories')
-    .select('content,metadata,created_at')
+    .select('metadata,created_at')
+    .eq('user_id', args.userId)
     .eq('agent_id', args.agentId)
     .eq('category', 'verified_experience')
+    .eq('source', 'agent_verifier')
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  query = args.orgId === null
+    ? query.is('org_id', null)
+    : query.eq('org_id', args.orgId)
+
+  const { data, error } = await query
   if (error || !Array.isArray(data) || data.length === 0) {
     return { version: 1, experience_count: 0, strengths: [], cautions: [], evidence: [] }
   }

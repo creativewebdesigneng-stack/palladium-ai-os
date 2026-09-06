@@ -33,7 +33,12 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
     run = await prepareRun({ sb: args.sb, userId: args.userId, agentId: args.agentId, input: args.input })
     const [intelligence, metacognition] = await Promise.all([
       Promise.resolve(buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })),
-      loadVerifiedExperienceMetacognition({ sb: args.sb, agentId: run.agent.id }).catch((error) => {
+      loadVerifiedExperienceMetacognition({
+        sb: args.sb,
+        userId: args.userId,
+        orgId: run.orgId,
+        agentId: run.agent.id,
+      }).catch((error) => {
         console.error('[runtime.metacognition] verified experience load failed', error)
         return { version: 1 as const, experience_count: 0, strengths: [], cautions: [], evidence: [] }
       }),
