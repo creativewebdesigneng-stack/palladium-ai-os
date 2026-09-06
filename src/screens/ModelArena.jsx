@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
+import { useSearchParams } from 'react-router-dom';
 import { BarChart3, Bot, FlaskConical, Gauge, Loader2, Plus, Scale, Sparkles, Trash2, Trophy } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
+import { astraEvaluationContestants, parseAstraEvaluationHandoff } from '@/lib/evals/astra-evaluation-handoff';
 import { getModelEvalRun, listModelEvalRuns, runModelArena } from '@/lib/evals/model-arena.functions';
 
 const DEFAULT_CONTESTANTS = [
@@ -17,15 +19,17 @@ const PROVIDERS = ['openai', 'anthropic', 'groq', 'deepseek', 'lovable', 'compat
 export default function ModelArena() {
   const { session } = useWorkspace();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const astraHandoff = useMemo(() => parseAstraEvaluationHandoff(searchParams), [searchParams]);
   const overviewFn = useServerFn(getModelRuntimeOverview);
   const listFn = useServerFn(listModelEvalRuns);
   const getFn = useServerFn(getModelEvalRun);
   const runFn = useServerFn(runModelArena);
-  const [name, setName] = useState('Model comparison');
+  const [name, setName] = useState(() => astraHandoff?.runName ?? 'Model comparison');
   const [prompt, setPrompt] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
-  const [criteria, setCriteria] = useState('correctness, helpfulness, clarity');
-  const [contestants, setContestants] = useState(DEFAULT_CONTESTANTS);
+  const [criteria, setCriteria] = useState(() => astraHandoff?.criteria ?? 'correctness, helpfulness, clarity');
+  const [contestants, setContestants] = useState(() => astraHandoff ? astraEvaluationContestants(astraHandoff) : DEFAULT_CONTESTANTS);
   const [judge, setJudge] = useState({ provider: 'openai', model: 'gpt-5-mini', label: 'Judge' });
   const [selectedRunId, setSelectedRunId] = useState(null);
 
@@ -89,6 +93,18 @@ export default function ModelArena() {
         description="Run the same real prompt across multiple configured providers, then score the outputs with an independent LLM judge. Results, latency, token use and judge reasoning are persisted for audit and comparison."
         action={<span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-[11px] text-violet-200"><FlaskConical className="h-3.5 w-3.5" />Live gateway evaluation</span>}
       />
+
+      {astraHandoff && (
+        <div className="mb-5 rounded-2xl border border-violet-400/20 bg-violet-400/[.05] p-4">
+          <div className="flex items-start gap-3">
+            <FlaskConical className="mt-0.5 h-4 w-4 text-violet-300" />
+            <div>
+              <p className="text-xs font-semibold text-white">Astra evaluation handoff · {astraHandoff.taskClass}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">The exact Blackstar Astra serving identity <code className="text-violet-200">compatible/{astraHandoff.model}</code> has been preselected as a candidate. Complete a representative benchmark prompt and run enough distinct evaluations for the trusted verifier. Model Arena results alone do not certify the model or grant routing/execution authority.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.55fr)]">
         <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5">

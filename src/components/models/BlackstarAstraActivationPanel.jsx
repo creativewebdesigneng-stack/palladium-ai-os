@@ -47,6 +47,7 @@ function evaluationHref(item) {
   const params = new URLSearchParams({
     source: 'astra-activation',
     task_class: item.task_class,
+    provider: 'compatible',
     model: item.model,
   });
   return `/model-arena?${params.toString()}`;
