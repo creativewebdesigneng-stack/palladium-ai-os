@@ -13,6 +13,7 @@ export type BlackstarAstraRunCapability =
   | 'external_integrations'
   | 'checkpointed_work'
   | 'long_running_work'
+  | 'async_tools'
   | 'mid_turn_steering'
 
 export type BlackstarAstraRunCapabilityControl = {
@@ -48,6 +49,7 @@ export function buildBlackstarAstraRunCapabilityControl(
   if (hasAny(tools, ['github_write', 'agent_workspace', 'skill_script', 'html_studio', 'app_studio'])) available.add('coding')
   if (hasAny(tools, ['agent_workspace', 'html_studio', 'app_studio', 'voxel_studio', 'three_d_studio', 'short_video'])) available.add('artifact_creation')
   if (tools.has('astra_vision')) available.add('vision')
+  if (tools.has('astra_async_workflow')) available.add('async_tools')
   if (hasAny(tools, ['memory_search', 'memory_write'])) available.add('memory')
   if (hasAny(tools, ['integration_capabilities', 'integration_action', 'connected_service', 'connected_service_write', 'github_write', 'social_ops'])) {
     available.add('external_integrations')
@@ -56,10 +58,11 @@ export function buildBlackstarAstraRunCapabilityControl(
   const unavailable: string[] = []
   if (!available.has('artifact_creation')) unavailable.push('artifact_creation')
   if (!available.has('vision')) unavailable.push('vision')
-  // Direct image/message transport and provider-native async tool execution are
-  // still intentionally not claimed. Long-running work is Blackstar-owned:
-  // durable checkpoints + stale-run leasing/resume, not provider-side authority.
-  unavailable.push('multimodal_input', 'native_async_tools', 'persisted_hidden_reasoning')
+  if (!available.has('async_tools')) unavailable.push('async_tools')
+  // Direct image/message transport and hidden chain-of-thought persistence are
+  // intentionally not claimed. Async tools are Blackstar-owned durable workflow
+  // hand-offs, not provider-side authority or unrestricted background execution.
+  unavailable.push('multimodal_input', 'persisted_hidden_reasoning')
 
   return {
     version: 1,
@@ -76,7 +79,8 @@ export function renderBlackstarAstraRunCapabilityControl(
     `Available now: ${control.available.join(', ') || 'none'}`,
     `Not available in this run: ${control.unavailable_target_capabilities.join(', ') || 'none'}`,
     'Capability rule: use only capabilities and tools already granted by the Blackstar runtime. This manifest reports authority; it never creates authority.',
-    'Long-running work means Blackstar may checkpoint and resume the same bounded run after interruption; it does not grant extra time, permissions, tools or external authority.',
-    'Do not claim vision, multimodal understanding, external actions, artifacts or computer use unless they are listed as available for this run and the required tool is actually granted.',
+    'Long-running work means Blackstar may checkpoint and resume the same bounded run after interruption; it does not grant extra permissions, tools or external authority.',
+    'Async tools mean a granted Astra run may queue an already-authorised active Blackstar workflow for durable background execution; the workflow worker, approvals and step policies remain authoritative.',
+    'Do not claim vision, multimodal understanding, external actions, artifacts, async execution or computer use unless they are listed as available for this run and the required tool is actually granted.',
   ].join('\n')
 }
