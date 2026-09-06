@@ -12,6 +12,7 @@ export type BlackstarAstraRunCapability =
   | 'memory'
   | 'external_integrations'
   | 'checkpointed_work'
+  | 'long_running_work'
   | 'mid_turn_steering'
 
 export type BlackstarAstraRunCapabilityControl = {
@@ -36,6 +37,7 @@ export function buildBlackstarAstraRunCapabilityControl(
     'long_context',
     'structured_output',
     'checkpointed_work',
+    'long_running_work',
     'mid_turn_steering',
   ])
 
@@ -54,9 +56,9 @@ export function buildBlackstarAstraRunCapabilityControl(
   const unavailable: string[] = []
   if (!available.has('artifact_creation')) unavailable.push('artifact_creation')
   if (!available.has('vision')) unavailable.push('vision')
-  // Direct image/message transport and model-native async execution are still
-  // intentionally not claimed; vision currently enters only through the
-  // owner-scoped private-artifact tool boundary.
+  // Direct image/message transport and provider-native async tool execution are
+  // still intentionally not claimed. Long-running work is Blackstar-owned:
+  // durable checkpoints + stale-run leasing/resume, not provider-side authority.
   unavailable.push('multimodal_input', 'native_async_tools', 'persisted_hidden_reasoning')
 
   return {
@@ -74,6 +76,7 @@ export function renderBlackstarAstraRunCapabilityControl(
     `Available now: ${control.available.join(', ') || 'none'}`,
     `Not available in this run: ${control.unavailable_target_capabilities.join(', ') || 'none'}`,
     'Capability rule: use only capabilities and tools already granted by the Blackstar runtime. This manifest reports authority; it never creates authority.',
+    'Long-running work means Blackstar may checkpoint and resume the same bounded run after interruption; it does not grant extra time, permissions, tools or external authority.',
     'Do not claim vision, multimodal understanding, external actions, artifacts or computer use unless they are listed as available for this run and the required tool is actually granted.',
   ].join('\n')
 }
