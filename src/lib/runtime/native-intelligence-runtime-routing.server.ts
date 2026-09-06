@@ -15,6 +15,10 @@ import {
   blackstarAstraModelDescriptorForTaskClass,
   isBlackstarAstraEngineConfigured,
 } from './blackstar-astra-engine-profile'
+import {
+  probeBlackstarAstraServingReadiness,
+  type BlackstarAstraServingReadiness,
+} from './blackstar-astra-serving-readiness.server'
 
 const TASK_CLASSES = new Set<NativeIntelligenceTaskClass>([
   'general',
@@ -36,6 +40,7 @@ const PROVIDER_MODEL_IDS: Record<string, string> = {
 }
 
 type Sb = { from: (table: string) => any }
+type AstraServingProbe = (args: { model: string }) => Promise<Pick<BlackstarAstraServingReadiness, 'ready' | 'reason'>>
 
 export type NativeIntelligenceRuntimeRouting = {
   provider: PreparedRun['provider']
@@ -118,7 +123,9 @@ export async function persistNativeIntelligenceRuntimeRouting(args: {
  *
  * Blackstar Astra-class is a candidate intelligence engine, not an authority
  * source. Its task-class specialist may only win routing through exact, fresh,
- * verified evidence for the specialist's bound provider/model identity.
+ * verified evidence for the specialist's bound provider/model identity. In
+ * addition, the exact model must be currently exposed by the configured
+ * compatible serving endpoint; a configured URL alone is not enough.
  *
  * This function never changes the run's tools, approvals, identity, agent,
  * organisation, delegation, or execution permissions.
@@ -127,6 +134,7 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
   sb: Sb
   userId: string
   run: PreparedRun
+  probeAstraServing?: AstraServingProbe
 }): Promise<NativeIntelligenceRuntimeRouting> {
   const fallback = configuredDescriptor(args.run)
   const taskClass = taskClassForAgent(args.run.agent)
@@ -137,7 +145,16 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
   if (nativeConfigured) pushDistinctModel(models, native)
 
   if (isBlackstarAstraEngineConfigured()) {
-    pushDistinctModel(models, blackstarAstraModelDescriptorForTaskClass(taskClass))
+    const astra = blackstarAstraModelDescriptorForTaskClass(taskClass)
+    try {
+      const readiness = await (args.probeAstraServing ?? probeBlackstarAstraServingReadiness)({
+        model: astra.model,
+      })
+      if (readiness.ready) pushDistinctModel(models, astra)
+      else console.warn('[runtime.native-intelligence] Astra serving model unavailable', readiness.reason)
+    } catch (error) {
+      console.error('[runtime.native-intelligence] Astra serving readiness check failed', error)
+    }
   }
 
   let evidence: ReturnType<typeof mapNativeIntelligenceEvaluationEvidence> = []
