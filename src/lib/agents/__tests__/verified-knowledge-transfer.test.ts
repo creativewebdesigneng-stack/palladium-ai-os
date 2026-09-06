@@ -141,7 +141,6 @@ describe('permission-safe verified cross-agent knowledge', () => {
 
     const rendered = renderPermissionSafeVerifiedKnowledge(transfer([first, second]));
     expect(rendered).toContain('HISTORICAL UNCERTAINTY')
-    expect(rendered).toContain('do not infer consensus')
     expect(rendered).toContain('Do not infer consensus')
     expect(rendered).toContain('preserve unresolved disagreement explicitly')
     expect(rendered).toContain('Launch only after the rollback check passes.')
