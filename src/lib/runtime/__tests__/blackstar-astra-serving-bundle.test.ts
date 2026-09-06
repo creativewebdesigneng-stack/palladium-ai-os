@@ -20,7 +20,8 @@ describe('Blackstar Astra serving bundle policy', () => {
     expect(gateway).toContain('location = /v1/chat/completions')
     expect(gateway).toContain('location / {\n    return 404;')
     expect(gateway).not.toContain('/invocations')
-    expect(gateway).toContain('Authorization: Bearer')
+    expect(gateway).toContain('if ($http_authorization != "Bearer ${BLACKSTAR_ASTRA_API_KEY}") { return 401; }')
+    expect(gateway).toContain('proxy_set_header Authorization "";')
   })
 
   it('keeps the serving checkpoint and credentials operator-selected and secret', () => {
