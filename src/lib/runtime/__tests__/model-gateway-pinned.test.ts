@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const baseRunChat = vi.fn();
-const geminiRunChat = vi.fn();
+const mocks = vi.hoisted(() => ({
+  baseRunChat: vi.fn(),
+  geminiRunChat: vi.fn(),
+}));
 
 vi.mock("../model-gateway.base", () => {
   class ProviderError extends Error {
@@ -17,13 +19,13 @@ vi.mock("../model-gateway.base", () => {
   return {
     ProviderError,
     resolveModel: (_provider: string, model?: string | null) => model?.trim() || "default-model",
-    runChat: baseRunChat,
+    runChat: mocks.baseRunChat,
     streamChat: vi.fn(),
   };
 });
 
 vi.mock("../gemini-provider.server", () => ({
-  runGeminiNative: geminiRunChat,
+  runGeminiNative: mocks.geminiRunChat,
   streamGeminiNative: vi.fn(),
 }));
 
@@ -49,7 +51,7 @@ describe("runChatPinned", () => {
   });
 
   it("uses exactly the requested provider and model", async () => {
-    baseRunChat.mockResolvedValue({
+    mocks.baseRunChat.mockResolvedValue({
       text: "ok",
       toolCalls: [],
       usage: { input: 1, output: 1 },
@@ -65,16 +67,16 @@ describe("runChatPinned", () => {
 
     expect(result.provider).toBe("openai");
     expect(result.model).toBe("gpt-5-mini");
-    expect(baseRunChat).toHaveBeenCalledTimes(1);
-    expect(baseRunChat).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.baseRunChat).toHaveBeenCalledTimes(1);
+    expect(mocks.baseRunChat).toHaveBeenCalledWith(expect.objectContaining({
       provider: "openai",
       model: "gpt-5-mini",
     }));
-    expect(geminiRunChat).not.toHaveBeenCalled();
+    expect(mocks.geminiRunChat).not.toHaveBeenCalled();
   });
 
   it("does not cross-provider fail over when the pinned provider fails", async () => {
-    baseRunChat.mockRejectedValue(new Error("pinned provider unavailable"));
+    mocks.baseRunChat.mockRejectedValue(new Error("pinned provider unavailable"));
     process.env["GROQ_API_KEY"] = "configured-for-test";
 
     await expect(runChatPinned({
@@ -83,11 +85,11 @@ describe("runChatPinned", () => {
       messages: [{ role: "user", content: "score this" }],
     })).rejects.toThrow("pinned provider unavailable");
 
-    expect(baseRunChat).toHaveBeenCalledTimes(1);
-    expect(baseRunChat).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.baseRunChat).toHaveBeenCalledTimes(1);
+    expect(mocks.baseRunChat).toHaveBeenCalledWith(expect.objectContaining({
       provider: "openai",
       model: "gpt-5-mini",
     }));
-    expect(geminiRunChat).not.toHaveBeenCalled();
+    expect(mocks.geminiRunChat).not.toHaveBeenCalled();
   });
 });
