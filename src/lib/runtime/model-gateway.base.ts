@@ -1,3 +1,5 @@
+import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serving-cache";
+
 /**
  * Model gateway — the agent runtime is never hard-coded to one vendor.
  *
@@ -194,11 +196,13 @@ export function chatBody(args: RunArgs, stream: boolean) {
     }
     return { role: m.role, content: m.content };
   });
+  const cacheControl = resolveBlackstarAstraServingCacheControl(args.provider, args.model);
 
   return {
     model: args.model,
     messages,
     stream,
+    ...cacheControl.request_fields,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
     ...(args.temperature != null ? { temperature: args.temperature } : {}),
     ...(args.maxTokens
