@@ -1,5 +1,6 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
+import { isolateGeneralIntelligenceCurrentTaskContext } from './general-intelligence-context-isolation'
 import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
 import { composeGeneralIntelligencePlanningSystemPrompt } from './general-intelligence-planning-context'
 import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
@@ -32,6 +33,10 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
   let run: Awaited<ReturnType<typeof prepareRun>> | null = null
   try {
     run = await prepareRun({ sb: args.sb, userId: args.userId, agentId: args.agentId, input: args.input })
+    run = {
+      ...run,
+      messages: isolateGeneralIntelligenceCurrentTaskContext({ messages: run.messages, input: args.input }),
+    }
     const [intelligence, metacognition] = await Promise.all([
       Promise.resolve(buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })),
       loadVerifiedExperienceMetacognition({
