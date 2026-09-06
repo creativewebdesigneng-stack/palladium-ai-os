@@ -76,6 +76,25 @@ function configuredDescriptor(run: PreparedRun): NativeIntelligenceModelDescript
 }
 
 /**
+ * Persist the actual model transport selected for an already-created task row.
+ * This updates provenance only. Routing evidence and authority metadata are not
+ * stored on the task and this helper cannot change tools, approvals or identity.
+ */
+export async function persistNativeIntelligenceRuntimeRouting(args: {
+  sb: Sb
+  taskId: string
+  routing: Pick<NativeIntelligenceRuntimeRouting, 'provider' | 'model'>
+}): Promise<void> {
+  const { error } = await args.sb
+    .from('agent_tasks')
+    .update({ provider: args.routing.provider, model: args.routing.model })
+    .eq('id', args.taskId)
+  if (error) {
+    console.error('[runtime.native-intelligence] could not persist routed model provenance', error)
+  }
+}
+
+/**
  * Resolve a model for an already-authorised agent run using verifier-owned
  * Native Intelligence evidence. The existing agent-selected provider/model is
  * always an explicit fallback and remains the only route when evidence is
