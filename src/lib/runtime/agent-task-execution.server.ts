@@ -1,5 +1,10 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
+import { BLACKSTAR_ASTRA_ENGINE_PROFILE } from './blackstar-astra-engine-profile'
+import {
+  renderBlackstarAstraReasoningControl,
+  selectBlackstarAstraReasoningControl,
+} from './blackstar-astra-reasoning'
 import { isolateGeneralIntelligenceCurrentTaskContext } from './general-intelligence-context-isolation'
 import { loadGeneralIntelligenceFailureFeedback, renderGeneralIntelligenceFailureFeedback } from './general-intelligence-failure-feedback.server'
 import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
@@ -83,6 +88,13 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
         }
       }),
     ])
+    const reasoningControl = routing.decision?.model_id === BLACKSTAR_ASTRA_ENGINE_PROFILE.id
+      ? selectBlackstarAstraReasoningControl(intelligence.assessment)
+      : null
+    const intelligenceControl = [
+      intelligence.prompt,
+      reasoningControl ? renderBlackstarAstraReasoningControl(reasoningControl) : '',
+    ].filter(Boolean).join('\n\n')
     const metacognitionControl = [
       renderMetacognitionControl(metacognition),
       renderGeneralIntelligenceFailureFeedback(failureFeedback),
@@ -95,14 +107,14 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
           role: 'system',
           content: composeGeneralIntelligencePlanningSystemPrompt({
             baseSystemPrompt: baseSystemMessage.content,
-            intelligenceControl: intelligence.prompt,
+            intelligenceControl,
             metacognitionControl,
           }),
         },
         ...run.messages.slice(1),
       ],
     }
-    let task = await executePlannedRun({ sb: args.sb, userId: args.userId, run })
+    let task = await executePlannedRun({ sb: args.sb, userId: args.userId, run, reasoningControl })
     if (!outputText(task)) {
       run = {
         ...run,
@@ -111,7 +123,7 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
           content: 'DELIVERABLE RECOVERY REQUIRED. Complete the original task now and return a concrete non-empty deliverable. Use enabled read-only tools when evidence is needed. Do not finish with an empty response.',
         }],
       }
-      task = await executePlannedRun({ sb: args.sb, userId: args.userId, run })
+      task = await executePlannedRun({ sb: args.sb, userId: args.userId, run, reasoningControl })
     }
     const output = outputText(task)
     if (!output) throw new RuntimeError('The agent could not produce a usable final deliverable. Please review its tools/model configuration and retry.', 'EMPTY_DELIVERABLE', 502)
