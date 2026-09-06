@@ -8,6 +8,7 @@ export type BlackstarAstraRunCapability =
   | 'computer_use'
   | 'coding'
   | 'artifact_creation'
+  | 'vision'
   | 'memory'
   | 'external_integrations'
   | 'checkpointed_work'
@@ -44,16 +45,19 @@ export function buildBlackstarAstraRunCapabilityControl(
   if (hasAny(tools, ['browser', 'browser_task'])) available.add('computer_use')
   if (hasAny(tools, ['github_write', 'agent_workspace', 'skill_script', 'html_studio', 'app_studio'])) available.add('coding')
   if (hasAny(tools, ['agent_workspace', 'html_studio', 'app_studio', 'voxel_studio', 'three_d_studio', 'short_video'])) available.add('artifact_creation')
+  if (tools.has('astra_vision')) available.add('vision')
   if (hasAny(tools, ['memory_search', 'memory_write'])) available.add('memory')
   if (hasAny(tools, ['integration_capabilities', 'integration_action', 'connected_service', 'connected_service_write', 'github_write', 'social_ops'])) {
     available.add('external_integrations')
   }
 
   const unavailable: string[] = []
-  // These target capabilities are intentionally not claimed until their actual
-  // transport/runtime implementation is present and tested.
   if (!available.has('artifact_creation')) unavailable.push('artifact_creation')
-  unavailable.push('vision', 'multimodal_input', 'native_async_tools', 'persisted_hidden_reasoning')
+  if (!available.has('vision')) unavailable.push('vision')
+  // Direct image/message transport and model-native async execution are still
+  // intentionally not claimed; vision currently enters only through the
+  // owner-scoped private-artifact tool boundary.
+  unavailable.push('multimodal_input', 'native_async_tools', 'persisted_hidden_reasoning')
 
   return {
     version: 1,
