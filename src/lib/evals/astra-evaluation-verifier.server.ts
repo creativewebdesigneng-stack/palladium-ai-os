@@ -61,6 +61,7 @@ export type AstraEvaluationProvenanceInput = {
   taskClass: NativeIntelligenceTaskClass
   model: string
   prompt: string
+  systemPromptHash?: string | null
   judgeProvider: string | null
   judgeModel: string | null
   criteria: unknown
@@ -79,8 +80,8 @@ type AdminDb = {
 }
 
 const MIN_RUNS = ASTRA_CERTIFICATION_CASE_COUNT
-const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v2'
-const PROVENANCE_VERSION = 2
+const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v3'
+const PROVENANCE_VERSION = 3
 const astraEvalAdmin = supabaseAdmin as unknown as AdminDb
 
 function stableJson(value: unknown): string {
@@ -92,6 +93,10 @@ function stableJson(value: unknown): string {
 
 function hash(value: unknown): string {
   return createHash('sha256').update(stableJson(value)).digest('hex')
+}
+
+export function hashAstraEvaluationSystemPrompt(value?: string | null): string {
+  return hash(value?.trim() || null)
 }
 
 function provenanceSecret(): string {
@@ -112,6 +117,7 @@ function normalizeProvenance(input: AstraEvaluationProvenanceInput) {
     suiteId: input.suiteId ?? null,
     caseId: input.caseId ?? null,
     prompt: input.prompt,
+    systemPromptHash: input.systemPromptHash ?? null,
     judgeProvider: input.judgeProvider,
     judgeModel: input.judgeModel,
     criteria: input.criteria,
@@ -180,6 +186,7 @@ async function matchingRuns(scope: Scope) {
 
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
   const suiteId = astraCertificationSuiteId(scope.taskClass)
+  const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
   let query = astraEvalAdmin
     .from('model_eval_runs')
     .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
@@ -203,6 +210,7 @@ async function matchingRuns(scope: Scope) {
       && metadata?.['provider'] === 'compatible'
       && metadata?.['model'] === model
       && metadata?.['suite_id'] === suiteId
+      && metadata?.['system_prompt_hash'] === emptySystemPromptHash
       && typeof metadata?.['case_id'] === 'string'
   })
 
@@ -247,6 +255,7 @@ async function matchingRuns(scope: Scope) {
       suiteId,
       caseId,
       prompt: run.prompt,
+      systemPromptHash: emptySystemPromptHash,
       judgeProvider: run.judge_provider,
       judgeModel: run.judge_model,
       criteria: run.metadata?.['criteria'] ?? null,

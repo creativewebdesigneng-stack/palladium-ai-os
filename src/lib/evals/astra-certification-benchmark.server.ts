@@ -8,6 +8,7 @@ import {
   listAstraCertificationBenchmarkCases,
 } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
+  hashAstraEvaluationSystemPrompt,
   signAstraEvaluationEvidence,
   type AstraEvaluationProvenanceInput,
 } from '@/lib/evals/astra-evaluation-verifier.server'
@@ -30,6 +31,7 @@ type AttestationInput = Scope & {
 
 type AdminDb = { from: (table: string) => any }
 const db = supabaseAdmin as unknown as AdminDb
+const PROVENANCE_VERSION = 3
 
 function safeEqualHex(a: unknown, b: string): boolean {
   if (typeof a !== 'string' || !/^[a-f0-9]{64}$/i.test(a)) return false
@@ -49,6 +51,22 @@ function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`
   const record = value as Record<string, unknown>
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`
+}
+
+function actualJudgeIdentity(scores: any[]): { provider: string; model: string } | null {
+  let provider: string | null = null
+  let model: string | null = null
+  for (const score of scores) {
+    if (score.evaluator_type !== 'llm_judge') return null
+    const criteria = metadataObject(score.criteria)
+    const scoreProvider = criteria?.['judgeProvider']
+    const scoreModel = criteria?.['judgeModel']
+    if (typeof scoreProvider !== 'string' || typeof scoreModel !== 'string') return null
+    if (provider === null) provider = scoreProvider
+    if (model === null) model = scoreModel
+    if (provider !== scoreProvider || model !== scoreModel) return null
+  }
+  return provider && model ? { provider, model } : null
 }
 
 async function assertScopeAccess(scope: Scope) {
@@ -94,8 +112,9 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
     const astra = metadataObject(metadataObject(row.metadata)?.['astra_activation'])
     if (
       astra?.['server_verified'] === true
-      && astra?.['provenance_version'] === 2
+      && astra?.['provenance_version'] === PROVENANCE_VERSION
       && astra?.['suite_id'] === suiteId
+      && astra?.['system_prompt_hash'] === hashAstraEvaluationSystemPrompt(null)
       && typeof astra?.['case_id'] === 'string'
     ) completedCaseIds.add(astra['case_id'])
   }
@@ -146,13 +165,16 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   }
 
   const astra = metadataObject(runMetadata['astra_activation'])
+  const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
   if (
     astra?.['server_verified'] !== true
+    || astra?.['provenance_version'] !== PROVENANCE_VERSION
+    || astra?.['system_prompt_hash'] !== emptySystemPromptHash
     || astra?.['task_class'] !== input.taskClass
     || astra?.['provider'] !== 'compatible'
     || astra?.['model'] !== expectedModel
     || astra?.['engine_id'] !== BLACKSTAR_ASTRA_ENGINE_PROFILE.id
-  ) throw new Error('Evaluation was not produced by the exact configured Astra serving identity.')
+  ) throw new Error('Evaluation was not produced by the exact clean Astra benchmark context.')
 
   const [{ data: responses, error: responseError }, { data: scores, error: scoreError }] = await Promise.all([
     db.from('model_eval_responses')
@@ -169,6 +191,10 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (!responses.some((response: any) => response.provider === 'compatible' && response.model === expectedModel)) {
     throw new Error('Evaluation is missing the exact Astra response.')
   }
+  const judge = actualJudgeIdentity(scores ?? [])
+  if (!judge || judge.provider === 'compatible' || judge.model === expectedModel) {
+    throw new Error('Astra certification requires a complete independent judge that did not execute through the Astra serving identity.')
+  }
 
   const baseProvenance: AstraEvaluationProvenanceInput = {
     runId: run.id,
@@ -177,6 +203,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
     taskClass: input.taskClass,
     model: expectedModel,
     prompt: run.prompt,
+    systemPromptHash: emptySystemPromptHash,
     judgeProvider: run.judge_provider,
     judgeModel: run.judge_model,
     criteria: runMetadata['criteria'] ?? null,
@@ -198,7 +225,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
     ...runMetadata,
     astra_activation: {
       ...astra,
-      provenance_version: 2,
+      provenance_version: PROVENANCE_VERSION,
       suite_id: suiteId,
       case_id: benchmarkCase.caseId,
       provenance_signature: provenanceSignature,
