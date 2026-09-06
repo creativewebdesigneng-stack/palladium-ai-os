@@ -15,6 +15,7 @@ export type BlackstarAstraRunCapability =
   | 'checkpointed_work'
   | 'long_running_work'
   | 'async_tools'
+  | 'multi_agent'
   | 'mid_turn_steering'
 
 export type BlackstarAstraRunCapabilityControl = {
@@ -54,6 +55,7 @@ export function buildBlackstarAstraRunCapabilityControl(
     available.add('multimodal_input')
   }
   if (tools.has('astra_async_workflow')) available.add('async_tools')
+  if (tools.has('astra_orchestrate')) available.add('multi_agent')
   if (hasAny(tools, ['memory_search', 'memory_write'])) available.add('memory')
   if (hasAny(tools, ['integration_capabilities', 'integration_action', 'connected_service', 'connected_service_write', 'github_write', 'social_ops'])) {
     available.add('external_integrations')
@@ -64,6 +66,7 @@ export function buildBlackstarAstraRunCapabilityControl(
   if (!available.has('vision')) unavailable.push('vision')
   if (!available.has('multimodal_input')) unavailable.push('multimodal_input')
   if (!available.has('async_tools')) unavailable.push('async_tools')
+  if (!available.has('multi_agent')) unavailable.push('multi_agent')
   // Hidden chain-of-thought persistence is intentionally never claimed. Blackstar
   // persists plans, verification state, checkpoints and bounded evidence instead.
   unavailable.push('persisted_hidden_reasoning')
@@ -86,6 +89,7 @@ export function renderBlackstarAstraRunCapabilityControl(
     'Multimodal input means authenticated private image artifact ids are inspected through the owner-scoped Astra vision tool and converted to bounded untrusted visual evidence before planning; raw storage credentials and arbitrary image URLs never enter the language-model context.',
     'Long-running work means Blackstar may checkpoint and resume the same bounded run after interruption; it does not grant extra permissions, tools or external authority.',
     'Async tools mean a granted Astra run may queue an already-authorised active Blackstar workflow for durable background execution; the workflow worker, approvals and step policies remain authoritative.',
-    'Do not claim vision, multimodal understanding, external actions, artifacts, async execution or computer use unless they are listed as available for this run and the required tool is actually granted.',
+    'Multi-agent means a granted Astra run may hand a bounded objective to Blackstar’s existing Orchestrator and Workforce engine. Specialist agents execute only with their own existing tools, approvals, entitlements, memory and verification boundaries; orchestration never transfers the caller’s authority.',
+    'Do not claim vision, multimodal understanding, external actions, artifacts, async execution, multi-agent execution or computer use unless they are listed as available for this run and the required tool is actually granted.',
   ].join('\n')
 }
