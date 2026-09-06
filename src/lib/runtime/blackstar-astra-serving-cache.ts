@@ -1,5 +1,8 @@
 import type { Provider } from './model-gateway.base'
-import { isBlackstarAstraServingIdentity } from './blackstar-astra-engine-profile'
+import {
+  isBlackstarAstraEngineConfigured,
+  isBlackstarAstraServingIdentity,
+} from './blackstar-astra-engine-profile'
 
 export type BlackstarAstraServingCacheMode = 'none' | 'cache_prompt'
 
@@ -29,7 +32,8 @@ export function resolveBlackstarAstraServingCacheControl(
 ): BlackstarAstraServingCacheControl {
   const rawMode = (configuredMode ?? '').trim().toLowerCase()
   const exactAstraIdentity = isBlackstarAstraServingIdentity(provider, model)
-  const enabled = exactAstraIdentity && rawMode === 'cache_prompt'
+  const endpointConfigured = isBlackstarAstraEngineConfigured()
+  const enabled = endpointConfigured && exactAstraIdentity && rawMode === 'cache_prompt'
 
   return enabled
     ? {
@@ -37,16 +41,18 @@ export function resolveBlackstarAstraServingCacheControl(
         enabled: true,
         mode: 'cache_prompt',
         request_fields: { cache_prompt: true },
-        rationale: 'The exact configured Blackstar Astra serving identity is opted into the backend cache_prompt extension.',
+        rationale: 'The configured Blackstar Astra endpoint and exact serving identity are opted into the backend cache_prompt extension.',
       }
     : {
         version: 1,
         enabled: false,
         mode: 'none',
         request_fields: {},
-        rationale: exactAstraIdentity
-          ? 'No supported Blackstar Astra prefix-cache request mode is configured.'
-          : 'Prompt-cache requests are restricted to exact configured Blackstar Astra serving identities.',
+        rationale: !endpointConfigured
+          ? 'No Blackstar Astra serving endpoint is configured.'
+          : exactAstraIdentity
+            ? 'No supported Blackstar Astra prefix-cache request mode is configured.'
+            : 'Prompt-cache requests are restricted to exact configured Blackstar Astra serving identities.',
       }
 }
 
