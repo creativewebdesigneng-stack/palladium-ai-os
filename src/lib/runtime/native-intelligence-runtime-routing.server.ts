@@ -12,6 +12,7 @@ import {
 import type { Agent, PreparedRun } from './runtime.server'
 import { blackstarNativeModelDescriptor } from './blackstar-native-inference-profile'
 import {
+  BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelDescriptorForTaskClass,
   isBlackstarAstraEngineConfigured,
 } from './blackstar-astra-engine-profile'
@@ -95,6 +96,24 @@ function pushDistinctModel(
   models.push(descriptor)
 }
 
+function selectRouting(args: {
+  models: NativeIntelligenceModelDescriptor[]
+  evidence: ReturnType<typeof mapNativeIntelligenceEvaluationEvidence>
+  taskClass: NativeIntelligenceTaskClass
+  run: PreparedRun
+  fallbackId: string
+}): NativeIntelligenceRoutingDecision | null {
+  return selectNativeIntelligenceModel({
+    models: args.models,
+    evidence: args.evidence,
+    request: {
+      task_class: args.taskClass,
+      required_capabilities: capabilitiesForRun(args.run, args.taskClass),
+      fallback_model_id: args.fallbackId,
+    },
+  })
+}
+
 /**
  * Persist the actual model transport selected for an already-created task row.
  * This updates provenance only. Routing evidence and authority metadata are not
@@ -123,9 +142,9 @@ export async function persistNativeIntelligenceRuntimeRouting(args: {
  *
  * Blackstar Astra-class is a candidate intelligence engine, not an authority
  * source. Its task-class specialist may only win routing through exact, fresh,
- * verified evidence for the specialist's bound provider/model identity. In
- * addition, the exact model must be currently exposed by the configured
- * compatible serving endpoint; a configured URL alone is not enough.
+ * verified evidence for the specialist's bound provider/model identity. If the
+ * evidence would select Astra, the exact model must also be currently exposed by
+ * the configured compatible endpoint. A configured URL alone is never enough.
  *
  * This function never changes the run's tools, approvals, identity, agent,
  * organisation, delegation, or execution permissions.
@@ -145,16 +164,7 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
   if (nativeConfigured) pushDistinctModel(models, native)
 
   if (isBlackstarAstraEngineConfigured()) {
-    const astra = blackstarAstraModelDescriptorForTaskClass(taskClass)
-    try {
-      const readiness = await (args.probeAstraServing ?? probeBlackstarAstraServingReadiness)({
-        model: astra.model,
-      })
-      if (readiness.ready) pushDistinctModel(models, astra)
-      else console.warn('[runtime.native-intelligence] Astra serving model unavailable', readiness.reason)
-    } catch (error) {
-      console.error('[runtime.native-intelligence] Astra serving readiness check failed', error)
-    }
+    pushDistinctModel(models, blackstarAstraModelDescriptorForTaskClass(taskClass))
   }
 
   let evidence: ReturnType<typeof mapNativeIntelligenceEvaluationEvidence> = []
@@ -178,15 +188,40 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
     console.error('[runtime.native-intelligence] verified evaluation evidence load failed', error)
   }
 
-  const decision = selectNativeIntelligenceModel({
+  let decision = selectRouting({
     models,
     evidence,
-    request: {
-      task_class: taskClass,
-      required_capabilities: capabilitiesForRun(args.run, taskClass),
-      fallback_model_id: fallback.id,
-    },
+    taskClass,
+    run: args.run,
+    fallbackId: fallback.id,
   })
+
+  if (decision?.model_id === BLACKSTAR_ASTRA_ENGINE_PROFILE.id) {
+    try {
+      const readiness = await (args.probeAstraServing ?? probeBlackstarAstraServingReadiness)({
+        model: decision.model,
+      })
+      if (!readiness.ready) {
+        console.warn('[runtime.native-intelligence] Astra serving model unavailable', readiness.reason)
+        decision = selectRouting({
+          models: models.filter((model) => model.id !== BLACKSTAR_ASTRA_ENGINE_PROFILE.id),
+          evidence,
+          taskClass,
+          run: args.run,
+          fallbackId: fallback.id,
+        })
+      }
+    } catch (error) {
+      console.error('[runtime.native-intelligence] Astra serving readiness check failed', error)
+      decision = selectRouting({
+        models: models.filter((model) => model.id !== BLACKSTAR_ASTRA_ENGINE_PROFILE.id),
+        evidence,
+        taskClass,
+        run: args.run,
+        fallbackId: fallback.id,
+      })
+    }
+  }
 
   if (!decision) {
     return { provider: args.run.provider, model: args.run.model, decision: null }
