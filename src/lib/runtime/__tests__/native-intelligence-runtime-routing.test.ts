@@ -51,6 +51,8 @@ function certificate(overrides: Record<string, unknown> = {}) {
     user_id: USER,
     organization_id: null,
     model_id: 'blackstar-native-v0.1',
+    provider: 'compatible',
+    model: 'blackstar-native-v0.1',
     suite_id: 'reasoning-suite-v1',
     task_class: 'reasoning',
     score: 0.94,
@@ -103,6 +105,17 @@ describe('Native Intelligence runtime routing', () => {
       },
     })
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.94, 10)
+  })
+
+  it('does not replay a certificate after the native model environment is rebound', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://native.invalid/v1'
+    process.env['BLACKSTAR_NATIVE_MODEL'] = 'blackstar-native-v0.2'
+    const sb = createFakeSupabase({ model_eval_verified_evidence: [certificate()] }) as any
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+
+    expect(resolved.provider).toBe('openai')
+    expect(resolved.model).toBe('gpt-5-mini')
+    expect(resolved.decision?.source).toBe('explicit_fallback')
   })
 
   it('persists the actual routed provider/model without persisting routing authority metadata', async () => {
