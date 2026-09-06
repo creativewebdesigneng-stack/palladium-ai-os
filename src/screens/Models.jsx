@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Link } from 'react-router-dom';
 import { Bot, CheckCircle2, Cpu, KeyRound, Loader2, Search, Server, ShieldCheck, XCircle } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import BlackstarAstraActivationPanel from '@/components/models/BlackstarAstraActivationPanel';
 import DeepSeekRuntimePanel from '@/components/models/DeepSeekRuntimePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
@@ -30,6 +31,7 @@ export default function Models() {
   const providers = q.data?.providers ?? [];
   const assignments = q.data?.assignments ?? [];
   const usage = q.data?.usage ?? [];
+  const astra = q.data?.astra ?? null;
   const totals = q.data?.totals ?? { agents: 0, activeAgents: 0, recentRuns: 0, recentCostPence: 0, configuredProviders: 0 };
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -50,12 +52,12 @@ export default function Models() {
   );
 
   if (session !== 'yes' || q.isLoading) {
-    return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your PalladiumAI agents." action={headerAction} />
+    return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your Blackstar agents." action={headerAction} />
       <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Loading runtime model state…</div></>);
   }
 
   if (q.error) {
-    return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your PalladiumAI agents." action={headerAction} />
+    return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your Blackstar agents." action={headerAction} />
       <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.05] p-6 text-sm text-rose-200">{friendlyMessage(q.error)}</div></>);
   }
 
@@ -70,6 +72,7 @@ export default function Models() {
         <Metric icon={KeyRound} label="Recent model cost" value={moneyFromPence(totals.recentCostPence)} />
       </div>
 
+      <BlackstarAstraActivationPanel readiness={astra} />
       <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
 
       <section className="mb-6">
