@@ -10,7 +10,8 @@ import { certifyAstraTaskClass, getAstraCertificationStatus } from '@/lib/evals/
 import { runModelArena } from '@/lib/evals/model-arena.functions';
 
 const TASK_CLASSES = ['general', 'reasoning', 'coding', 'tool_use', 'agentic', 'vision'];
-const PROVIDERS = ['groq', 'openai', 'lovable', 'gemini'];
+const TEXT_PROVIDERS = ['groq', 'openai', 'anthropic', 'deepseek', 'lovable'];
+const VISION_PROVIDERS = ['groq', 'openai', 'lovable', 'gemini'];
 const DEFAULT_JUDGE = ASTRA_CERTIFICATION_JUDGES[0];
 
 export default function AstraCertificationWorkbench() {
@@ -75,6 +76,7 @@ export default function AstraCertificationWorkbench() {
   const completed = benchmark.data?.completedCases ?? 0;
   const total = benchmark.data?.totalCases ?? 20;
   const canRun = supported && Boolean(status.data?.model) && Boolean(reference.model.trim()) && Boolean(judge.model.trim()) && !judgeIsCandidate;
+  const referenceProviders = taskClass === 'vision' ? VISION_PROVIDERS : TEXT_PROVIDERS;
 
   return (
     <section className="mb-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.035] p-5">
@@ -88,11 +90,11 @@ export default function AstraCertificationWorkbench() {
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[180px_1fr_1fr]">
         <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Task class<select value={taskClass} onChange={(event) => setTaskClass(event.target.value)} className="input mt-1.5 w-full">{TASK_CLASSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-        <ProviderModel label={taskClass === 'vision' ? 'Multimodal reference candidate' : 'Reference candidate'} value={reference} onChange={setReference} />
+        <ProviderModel label={taskClass === 'vision' ? 'Multimodal reference candidate' : 'Reference candidate'} value={reference} onChange={setReference} providers={referenceProviders} />
         <TrustedJudge value={judge} onChange={setJudge} />
       </div>
 
-      {taskClass === 'vision' && supported && <p className="mt-3 inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.05] p-3 text-xs text-violet-200"><Eye className="h-3.5 w-3.5" />Trusted vision mode: each case renders a deterministic PNG on the server and binds its SHA-256 digest before attestation.</p>}
+      {taskClass === 'vision' && supported && <p className="mt-3 inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.05] p-3 text-xs text-violet-200"><Eye className="h-3.5 w-3.5" />Trusted vision mode: each case renders a deterministic PNG on the server, binds its SHA-256 digest, and scores responses against a server-owned ground-truth key.</p>}
       {judgeIsCandidate && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">The certification judge must be different from every candidate. Choose another reference model or trusted judge.</p>}
       {(benchmark.isLoading || status.isLoading) && <p className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading trusted suite…</p>}
       {(benchmark.error || status.error) && <p className="mt-4 text-xs text-rose-300">{friendlyMessage(benchmark.error ?? status.error)}</p>}
@@ -119,8 +121,8 @@ export default function AstraCertificationWorkbench() {
   );
 }
 
-function ProviderModel({ label, value, onChange }) {
-  return <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}<div className="mt-1.5 grid grid-cols-[130px_1fr] gap-2"><select value={value.provider} onChange={(event) => onChange({ ...value, provider: event.target.value })} className="input">{PROVIDERS.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select><input value={value.model} onChange={(event) => onChange({ ...value, model: event.target.value })} className="input" placeholder="Model ID" /></div></label>;
+function ProviderModel({ label, value, onChange, providers }) {
+  return <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}<div className="mt-1.5 grid grid-cols-[130px_1fr] gap-2"><select value={value.provider} onChange={(event) => onChange({ ...value, provider: event.target.value })} className="input">{providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select><input value={value.model} onChange={(event) => onChange({ ...value, model: event.target.value })} className="input" placeholder="Model ID" /></div></label>;
 }
 function TrustedJudge({ value, onChange }) {
   const selected = `${value.provider}::${value.model}`;
