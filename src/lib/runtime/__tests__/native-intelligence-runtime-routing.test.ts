@@ -66,9 +66,23 @@ function certificate(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function astraCertificate(overrides: Record<string, unknown> = {}) {
+  return certificate({
+    id: 'astra-evidence-1',
+    model_id: 'blackstar-astra-v0.1',
+    provider: 'compatible',
+    model: 'blackstar-astra-v0.1',
+    suite_id: 'astra-reasoning-suite-v1',
+    score: 0.97,
+    sample_count: 60,
+    ...overrides,
+  })
+}
+
 afterEach(() => {
   delete process.env['OPENAI_COMPATIBLE_BASE_URL']
   delete process.env['BLACKSTAR_NATIVE_MODEL']
+  delete process.env['BLACKSTAR_ASTRA_MODEL']
 })
 
 describe('Native Intelligence runtime routing', () => {
@@ -105,6 +119,35 @@ describe('Native Intelligence runtime routing', () => {
       },
     })
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.94, 10)
+  })
+
+  it('routes to Blackstar Astra-class only when its exact serving identity is verified', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
+    const sb = createFakeSupabase({ model_eval_verified_evidence: [astraCertificate()] }) as any
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+
+    expect(resolved).toMatchObject({
+      provider: 'compatible',
+      model: 'blackstar-astra-v0.1',
+      decision: {
+        model_id: 'blackstar-astra-v0.1',
+        ownership: 'blackstar',
+        source: 'verified_evaluation',
+        evaluation_samples: 60,
+      },
+    })
+    expect(resolved.decision?.evaluation_score).toBeCloseTo(0.97, 10)
+  })
+
+  it('does not replay Astra evidence after its serving model is rebound', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
+    process.env['BLACKSTAR_ASTRA_MODEL'] = 'blackstar-astra-v0.2'
+    const sb = createFakeSupabase({ model_eval_verified_evidence: [astraCertificate()] }) as any
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+
+    expect(resolved.provider).toBe('openai')
+    expect(resolved.model).toBe('gpt-5-mini')
+    expect(resolved.decision?.source).toBe('explicit_fallback')
   })
 
   it('does not replay a certificate after the native model environment is rebound', async () => {
@@ -145,7 +188,7 @@ describe('Native Intelligence runtime routing', () => {
   })
 
   it('does not route to the native slot when the native transport is not configured', async () => {
-    const sb = createFakeSupabase({ model_eval_verified_evidence: [certificate()] }) as any
+    const sb = createFakeSupabase({ model_eval_verified_evidence: [certificate(), astraCertificate()] }) as any
     const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
 
     expect(resolved.provider).toBe('openai')
@@ -169,7 +212,7 @@ describe('Native Intelligence runtime routing', () => {
     const originalRun = run()
     const originalGrants = originalRun.tools.grants
     const sb = createFakeSupabase({
-      model_eval_verified_evidence: [certificate({
+      model_eval_verified_evidence: [astraCertificate({
         tool_grants: ['*'],
         approval_granted: true,
         delegation: 'admin-agent',
