@@ -64,21 +64,21 @@ export function toNativeIntelligenceEvaluationEvidence(
 ): NativeIntelligenceEvaluationEvidence | null {
   if (!isRecord(row)) return null
 
-  const modelId = cleanIdentifier(row.model_id)
-  const suiteId = cleanIdentifier(row.suite_id)
-  const taskClass = row.task_class
-  const score = finiteScore(row.score)
-  const sampleCount = row.sample_count
-  const completedAt = row.completed_at
-  const verifiedAt = row.verified_at
+  const modelId = cleanIdentifier(row['model_id'])
+  const suiteId = cleanIdentifier(row['suite_id'])
+  const taskClass = row['task_class']
+  const score = finiteScore(row['score'])
+  const sampleCount = row['sample_count']
+  const completedAt = row['completed_at']
+  const verifiedAt = row['verified_at']
 
   if (!modelId || !suiteId) return null
   if (typeof taskClass !== 'string' || !TASK_CLASSES.has(taskClass as NativeIntelligenceTaskClass)) return null
   if (score === null) return null
   if (!Number.isInteger(sampleCount) || (sampleCount as number) < NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES) return null
-  if (typeof row.benchmark_hash !== 'string' || !SHA256_HEX.test(row.benchmark_hash)) return null
-  if (typeof row.evaluator_hash !== 'string' || !SHA256_HEX.test(row.evaluator_hash)) return null
-  if (typeof row.model_config_hash !== 'string' || !SHA256_HEX.test(row.model_config_hash)) return null
+  if (typeof row['benchmark_hash'] !== 'string' || !SHA256_HEX.test(row['benchmark_hash'])) return null
+  if (typeof row['evaluator_hash'] !== 'string' || !SHA256_HEX.test(row['evaluator_hash'])) return null
+  if (typeof row['model_config_hash'] !== 'string' || !SHA256_HEX.test(row['model_config_hash'])) return null
   if (!validIsoTimestamp(completedAt) || !validIsoTimestamp(verifiedAt)) return null
   if (Date.parse(verifiedAt) < Date.parse(completedAt)) return null
 
