@@ -6,6 +6,10 @@ import {
 } from './blackstar-astra-capability-control'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE } from './blackstar-astra-engine-profile'
 import {
+  attachBlackstarAstraMultimodalContext,
+  resolveBlackstarAstraPrivateMultimodalInput,
+} from './blackstar-astra-multimodal-input.server'
+import {
   renderBlackstarAstraReasoningControl,
   selectBlackstarAstraReasoningControl,
 } from './blackstar-astra-reasoning'
@@ -43,7 +47,13 @@ function outputText(task: unknown): string {
 }
 
 /** Shared, authenticated agent execution path used by every first-party UI. */
-export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: string; input: string }) {
+export async function executeAgentTask(args: {
+  sb: Sb
+  userId: string
+  agentId: string
+  input: string
+  artifactIds?: string[]
+}) {
   let run: Awaited<ReturnType<typeof prepareRun>> | null = null
   try {
     run = await prepareRun({ sb: args.sb, userId: args.userId, agentId: args.agentId, input: args.input })
@@ -66,6 +76,29 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
       provider: routing.provider,
       model: routing.model,
     }
+
+    const artifactIds = args.artifactIds ?? []
+    if (artifactIds.length) {
+      if (routing.decision?.model_id !== BLACKSTAR_ASTRA_ENGINE_PROFILE.id) {
+        throw new RuntimeError(
+          'Private multimodal input requires this task to be routed to a verified Blackstar Astra engine.',
+          'ASTRA_MULTIMODAL_UNAVAILABLE',
+          409,
+        )
+      }
+      const visualContext = await resolveBlackstarAstraPrivateMultimodalInput({
+        sb: args.sb,
+        userId: args.userId,
+        run,
+        objective: args.input,
+        artifactIds,
+      })
+      run = {
+        ...run,
+        messages: attachBlackstarAstraMultimodalContext(run.messages, args.input, visualContext),
+      }
+    }
+
     const [intelligence, metacognition, failureFeedback] = await Promise.all([
       Promise.resolve(buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })),
       loadVerifiedExperienceMetacognition({

@@ -28,14 +28,17 @@ describe('Blackstar Astra vision transport', () => {
     })).toThrow('Unsupported vision artifact type')
   })
 
-  it('advertises vision only when astra_vision is already granted', () => {
+  it('advertises vision and private-artifact multimodal input only when astra_vision is already granted', () => {
     const withoutVision = buildBlackstarAstraRunCapabilityControl(['browser_task'])
     expect(withoutVision.available).not.toContain('vision')
+    expect(withoutVision.available).not.toContain('multimodal_input')
     expect(withoutVision.unavailable_target_capabilities).toContain('vision')
+    expect(withoutVision.unavailable_target_capabilities).toContain('multimodal_input')
 
     const withVision = buildBlackstarAstraRunCapabilityControl(['browser_task', 'astra_vision'])
     expect(withVision.available).toContain('vision')
+    expect(withVision.available).toContain('multimodal_input')
     expect(withVision.unavailable_target_capabilities).not.toContain('vision')
-    expect(withVision.unavailable_target_capabilities).toContain('multimodal_input')
+    expect(withVision.unavailable_target_capabilities).not.toContain('multimodal_input')
   })
 })
