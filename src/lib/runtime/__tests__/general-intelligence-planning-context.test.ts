@@ -30,13 +30,13 @@ describe('general intelligence verified planning context', () => {
 
   it('bounds every composed input before it reaches planning', () => {
     const prompt = composeGeneralIntelligencePlanningSystemPrompt({
-      baseSystemPrompt: 'b'.repeat(20_000),
-      intelligenceControl: 'i'.repeat(20_000),
-      metacognitionControl: 'm'.repeat(20_000),
+      baseSystemPrompt: '◆'.repeat(20_000),
+      intelligenceControl: '◇'.repeat(20_000),
+      metacognitionControl: '■'.repeat(20_000),
     })
 
-    expect(prompt.match(/b/g)?.length).toBe(16_000)
-    expect(prompt.match(/i/g)?.length).toBe(12_000)
-    expect(prompt.match(/m/g)?.length).toBe(12_000)
+    expect(prompt.match(/◆/g)?.length).toBe(16_000)
+    expect(prompt.match(/◇/g)?.length).toBe(12_000)
+    expect(prompt.match(/■/g)?.length).toBe(12_000)
   })
 })
