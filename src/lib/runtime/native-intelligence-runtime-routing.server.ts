@@ -11,6 +11,10 @@ import {
 } from '@/lib/ai/native-intelligence-model-platform'
 import type { Agent, PreparedRun } from './runtime.server'
 import { blackstarNativeModelDescriptor } from './blackstar-native-inference-profile'
+import {
+  blackstarAstraModelDescriptor,
+  isBlackstarAstraEngineConfigured,
+} from './blackstar-astra-engine-profile'
 
 const TASK_CLASSES = new Set<NativeIntelligenceTaskClass>([
   'general',
@@ -75,6 +79,17 @@ function configuredDescriptor(run: PreparedRun): NativeIntelligenceModelDescript
   }
 }
 
+function pushDistinctModel(
+  models: NativeIntelligenceModelDescriptor[],
+  descriptor: NativeIntelligenceModelDescriptor,
+): void {
+  if (models.some((model) =>
+    model.id === descriptor.id ||
+    (model.provider === descriptor.provider && model.model === descriptor.model),
+  )) return
+  models.push(descriptor)
+}
+
 /**
  * Persist the actual model transport selected for an already-created task row.
  * This updates provenance only. Routing evidence and authority metadata are not
@@ -98,7 +113,12 @@ export async function persistNativeIntelligenceRuntimeRouting(args: {
  * Resolve a model for an already-authorised agent run using verifier-owned
  * Native Intelligence evidence. The existing agent-selected provider/model is
  * always an explicit fallback and remains the only route when evidence is
- * absent, malformed, inaccessible, or the native endpoint is not configured.
+ * absent, malformed, inaccessible, or a Blackstar-native endpoint is not
+ * configured.
+ *
+ * Blackstar Astra-class is a candidate intelligence engine, not an authority
+ * source. It can only win routing through exact, fresh, verified evaluation
+ * evidence for its bound provider/model identity.
  *
  * This function never changes the run's tools, approvals, identity, agent,
  * organisation, delegation, or execution permissions.
@@ -114,8 +134,10 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
 
   const native = blackstarNativeModelDescriptor()
   const nativeConfigured = Boolean(process.env['OPENAI_COMPATIBLE_BASE_URL']?.trim())
-  if (nativeConfigured && (native.provider !== fallback.provider || native.model !== fallback.model)) {
-    models.push(native)
+  if (nativeConfigured) pushDistinctModel(models, native)
+
+  if (isBlackstarAstraEngineConfigured()) {
+    pushDistinctModel(models, blackstarAstraModelDescriptor())
   }
 
   let evidence: ReturnType<typeof mapNativeIntelligenceEvaluationEvidence> = []
