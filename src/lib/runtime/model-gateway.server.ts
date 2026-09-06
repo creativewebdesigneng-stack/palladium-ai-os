@@ -12,6 +12,7 @@ type ActiveProvider = { provider: Provider; model: string };
 const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
 const OPENAI_MODEL_FALLBACK = "gpt-4.1-mini";
 const GEMINI_MODEL_FALLBACK = "gemini-3.6-flash";
+const ASTRA_GROQ_BOOTSTRAP_MODEL = "qwen/qwen3.8-27b";
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
 /** The low-level base keeps provider compatibility details; the server gateway
@@ -69,6 +70,18 @@ function modelCandidates(provider: Provider, model: string): string[] {
   return candidates;
 }
 
+export function isAstraGroqBootstrapRequest(provider: Provider, model?: string | null): boolean {
+  return provider === "compatible"
+    && !process.env["OPENAI_COMPATIBLE_BASE_URL"]?.trim()
+    && Boolean(process.env["GROQ_API_KEY"]?.trim())
+    && (model ?? "").trim() === ASTRA_GROQ_BOOTSTRAP_MODEL;
+}
+
+async function runAstraGroqBootstrap(callArgs: RunArgs): Promise<ChatResult> {
+  const result = await base.runChat({ ...callArgs, provider: "groq" });
+  return { ...result, provider: "compatible", model: callArgs.model };
+}
+
 function latestUserQuery(messages: ChatMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -121,6 +134,7 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
   for (const candidate of modelCandidates(provider, model)) {
     try {
       const callArgs = { ...args, provider, model: candidate };
+      if (isAstraGroqBootstrapRequest(provider, candidate)) return await runAstraGroqBootstrap(callArgs);
       return provider === "gemini" ? await runGeminiNative(callArgs) : await base.runChat(callArgs);
     } catch (error) {
       if (error instanceof base.ProviderError && error.status === 499) throw error;
@@ -230,6 +244,19 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   );
   if (args.provider === "gemini") {
     yield* streamGeminiNative({ ...args, model: resolveModel("gemini", args.model) });
+    return;
+  }
+  if (isAstraGroqBootstrapRequest(args.provider, args.model)) {
+    for await (const event of base.streamChat({ ...args, provider: "groq" })) {
+      if (event.type === "done") {
+        yield {
+          ...event,
+          result: { ...event.result, provider: "compatible", model: args.model },
+        };
+      } else {
+        yield event;
+      }
+    }
     return;
   }
   yield* base.streamChat(args);
