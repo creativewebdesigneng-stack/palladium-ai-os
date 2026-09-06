@@ -4,6 +4,7 @@ import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
 } from "./model-providers.server";
+import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -11,7 +12,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [{ data: agents, error: agentError }, { data: tasks, error: taskError }] = await Promise.all([
+    const [{ data: agents, error: agentError }, { data: tasks, error: taskError }, astra] = await Promise.all([
       sb
         .from("personal_agents")
         .select("id,name,status,model,model_provider,updated_at")
@@ -22,6 +23,10 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
         .select("id,agent_id,provider,model,status,tokens_in,tokens_out,cost_pence,created_at")
         .order("created_at", { ascending: false })
         .limit(500),
+      resolveBlackstarAstraRuntimeReadiness({ sb }).catch((error) => {
+        console.error("[model-management] Astra readiness unavailable", error);
+        return null;
+      }),
     ]);
     if (agentError) throw new Error(agentError.message);
     if (taskError) throw new Error(taskError.message);
@@ -101,6 +106,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       providers,
       assignments,
       usage,
+      astra,
       totals: {
         agents: assignments.length,
         activeAgents: assignments.filter((agent) => agent.status === "active").length,
