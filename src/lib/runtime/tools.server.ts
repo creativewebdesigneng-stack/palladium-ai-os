@@ -19,14 +19,18 @@ import { APP_STUDIO_TOOL_DEF, runAppStudioTool } from "@/lib/app-studio/app-stud
 import { VOXEL_STUDIO_TOOL_DEF, runVoxelStudioTool } from "@/lib/voxel/voxel-agent-tool.server";
 import { THREE_D_STUDIO_TOOL_DEF, runThreeDStudioTool } from "@/lib/three-d/three-d-agent-tool.server";
 import { SHORT_VIDEO_TOOL_DEF, runShortVideoTool } from "@/lib/media/short-video-agent-tool.server";
+import {
+  BLACKSTAR_ASTRA_VISION_TOOL_DEF,
+  runBlackstarAstraVisionTool,
+} from "./blackstar-astra-vision-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
-const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF, VOXEL_STUDIO_TOOL_DEF, THREE_D_STUDIO_TOOL_DEF, SHORT_VIDEO_TOOL_DEF] as const;
+const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF, VOXEL_STUDIO_TOOL_DEF, THREE_D_STUDIO_TOOL_DEF, SHORT_VIDEO_TOOL_DEF, BLACKSTAR_ASTRA_VISION_TOOL_DEF] as const;
 const LOCAL_TOOL_NAMES = new Set<string>(LOCAL_TOOL_DEFS.map((item) => item.name));
 
-export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio", "voxel_studio", "three_d_studio", "short_video"];
+export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio", "voxel_studio", "three_d_studio", "short_video", "astra_vision"];
 export const TOOL_MANIFEST = [
   ...CORE_TOOL_MANIFEST,
   { slug: "skill_script", description: SKILL_SCRIPT_TOOL_DEF.description, sensitive: false },
@@ -38,6 +42,7 @@ export const TOOL_MANIFEST = [
   { slug: "voxel_studio", description: VOXEL_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "three_d_studio", description: THREE_D_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "short_video", description: SHORT_VIDEO_TOOL_DEF.description, sensitive: false },
+  { slug: "astra_vision", description: BLACKSTAR_ASTRA_VISION_TOOL_DEF.description, sensitive: false },
 ];
 
 const PLAN_RANK: Record<string, number> = {
@@ -175,7 +180,9 @@ export async function executeTool(
                   ? await runVoxelStudioTool(input)
                   : name === "three_d_studio"
                     ? await runThreeDStudioTool(input, { userId: ctx.userId, sb: ctx.sb })
-                    : await runShortVideoTool(input, { userId: ctx.userId, sb: ctx.sb });
+                    : name === "short_video"
+                      ? await runShortVideoTool(input, { userId: ctx.userId, sb: ctx.sb })
+                      : await runBlackstarAstraVisionTool(input, localCtx);
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
