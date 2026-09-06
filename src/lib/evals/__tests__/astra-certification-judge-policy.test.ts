@@ -13,8 +13,8 @@ describe('Astra certification judge policy', () => {
     expect(isTrustedAstraCertificationJudge('compatible', 'blackstar-astra-v0.1')).toBe(false)
   })
 
-  it('never includes the Astra compatible serving identity as an approved judge', () => {
-    expect(ASTRA_CERTIFICATION_JUDGES.every((judge) => judge.provider !== 'compatible')).toBe(true)
+  it('restricts approved judges to the independent provider set', () => {
+    expect(new Set(ASTRA_CERTIFICATION_JUDGES.map((judge) => judge.provider))).toEqual(new Set(['groq', 'openai']))
   })
 
   it('detects when the judge is also one of the contestants', () => {
