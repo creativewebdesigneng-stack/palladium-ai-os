@@ -7,7 +7,7 @@ import {
   listAstraCertificationBenchmarkCases,
 } from '@/lib/evals/astra-certification-benchmark-suite'
 
-const supported = ['general', 'reasoning', 'coding', 'tool_use', 'agentic'] as const
+const supported = ['general', 'reasoning', 'coding', 'tool_use', 'agentic', 'vision'] as const
 
 describe('Astra certification benchmark suite', () => {
   it.each(supported)('defines 20 distinct immutable cases for %s', (taskClass) => {
@@ -26,8 +26,11 @@ describe('Astra certification benchmark suite', () => {
     expect(getAstraCertificationBenchmarkCase('reasoning', `${benchmarkCase!.caseId}-forged`)).toBeNull()
   })
 
-  it('does not allow text-only vision certification', () => {
-    expect(isAstraCertificationTaskClass('vision')).toBe(false)
-    expect(getAstraCertificationBenchmarkCase('vision', 'v1-01-constraint-satisfaction')).toBeNull()
+  it('marks vision cases as genuinely multimodal', () => {
+    expect(isAstraCertificationTaskClass('vision')).toBe(true)
+    const cases = listAstraCertificationBenchmarkCases('vision')
+    expect(cases).toHaveLength(20)
+    expect(cases.every((entry) => entry.modality === 'vision')).toBe(true)
+    expect(getAstraCertificationBenchmarkCase('vision', cases[0]!.caseId)).toEqual(cases[0])
   })
 })
