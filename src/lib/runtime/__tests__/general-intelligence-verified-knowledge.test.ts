@@ -10,7 +10,7 @@ const row = {
   source: 'agent_verifier',
   metadata: {
     kind: 'verified_experience',
-    objective: 'Validate launch safety',
+    objective: 'Validate launch safety and rollback readiness',
     verified_outcome: 'Rollback was verified.',
     verification_score: 0.95,
     evidence: ['verifier:rollback'],
@@ -28,8 +28,17 @@ function queryWith(data: unknown[]) {
 }
 
 describe('General Intelligence verified knowledge loader', () => {
-  it('selects metadata only and applies owner, organisation and authorised-source filters', async () => {
-    const query = queryWith([row])
+  it('selects metadata only and applies owner, organisation, authorised-source and relevance filters', async () => {
+    const unrelated = {
+      ...row,
+      task_id: 'task-2',
+      metadata: {
+        ...row.metadata,
+        objective: 'Write an Instagram caption for a summer campaign',
+        verified_outcome: 'Caption was approved.',
+      },
+    }
+    const query = queryWith([unrelated, row])
     const sb = { from: vi.fn(() => query) }
 
     const result = await loadPermissionSafeVerifiedKnowledge({
@@ -37,6 +46,7 @@ describe('General Intelligence verified knowledge loader', () => {
       userId: 'user-1',
       orgId: 'org-1',
       targetAgentId: 'agent-b',
+      objective: 'Analyse launch safety and verify rollback readiness',
       authorisedSourceAgentIds: ['agent-a', 'agent-b'],
     })
 
@@ -48,6 +58,7 @@ describe('General Intelligence verified knowledge loader', () => {
     expect(query['in']).toHaveBeenCalledWith('agent_id', ['agent-a'])
     expect(result).toHaveLength(1)
     expect(result[0]?.verified_outcome).toBe('Rollback was verified.')
+    expect(JSON.stringify(result)).not.toContain('Caption was approved')
   })
 
   it('uses an explicit null organisation boundary for personal-scope transfer', async () => {
@@ -59,6 +70,7 @@ describe('General Intelligence verified knowledge loader', () => {
       userId: 'user-1',
       orgId: null,
       targetAgentId: 'agent-b',
+      objective: 'Validate launch safety and rollback readiness',
       authorisedSourceAgentIds: ['agent-a'],
     })
 
@@ -74,6 +86,7 @@ describe('General Intelligence verified knowledge loader', () => {
       userId: 'user-1',
       orgId: 'org-1',
       targetAgentId: 'agent-a',
+      objective: 'Validate launch safety',
       authorisedSourceAgentIds: ['agent-a'],
     })
 

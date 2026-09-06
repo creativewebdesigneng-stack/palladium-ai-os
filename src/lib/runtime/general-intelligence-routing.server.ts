@@ -66,9 +66,9 @@ function withCollective<T extends object>(value: T, collective: GeneralIntellige
  * Collective mode additionally reuses Blackstar's existing trusted consensus
  * resolver; consensus remains advisory and never creates execution authority.
  *
- * Delegated agents may receive verifier-approved cross-agent experience as
- * advisory context only. The transfer path never reads raw memory content and
- * cannot grant capabilities, tools, approvals, identity or execution authority.
+ * Delegated agents may receive verifier-approved, assignment-relevant cross-agent
+ * experience as advisory context only. The transfer path never reads raw memory
+ * content and cannot grant capabilities, tools, approvals, identity or authority.
  */
 export async function executeAssessedGeneralIntelligence(args: {
   sb: Sb
@@ -125,6 +125,7 @@ export async function executeAssessedGeneralIntelligence(args: {
         userId: args.userId,
         orgId: args.orgId ?? null,
         targetAgentId: taskArgs.agentId,
+        objective: taskArgs.input,
         authorisedSourceAgentIds: selected,
       })
       const renderedKnowledge = renderPermissionSafeVerifiedKnowledge(verifiedKnowledge)
