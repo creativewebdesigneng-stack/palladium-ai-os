@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, Bot, FlaskConical, Gauge, Loader2, Plus, Scale, Sparkles, Trash2, Trophy } from 'lucide-react';
+import { BarChart3, Bot, CheckCircle2, FlaskConical, Gauge, Loader2, Plus, Scale, ShieldCheck, Sparkles, Trash2, Trophy } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
 import { astraEvaluationContestants, parseAstraEvaluationHandoff } from '@/lib/evals/astra-evaluation-handoff';
+import { certifyAstraTaskClass, getAstraCertificationStatus } from '@/lib/evals/astra-evaluation-verifier.functions';
 import { getModelEvalRun, listModelEvalRuns, runModelArena } from '@/lib/evals/model-arena.functions';
 
 const DEFAULT_CONTESTANTS = [
@@ -25,6 +26,8 @@ export default function ModelArena() {
   const listFn = useServerFn(listModelEvalRuns);
   const getFn = useServerFn(getModelEvalRun);
   const runFn = useServerFn(runModelArena);
+  const astraStatusFn = useServerFn(getAstraCertificationStatus);
+  const astraCertifyFn = useServerFn(certifyAstraTaskClass);
   const [name, setName] = useState(() => astraHandoff?.runName ?? 'Model comparison');
   const [prompt, setPrompt] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -51,6 +54,12 @@ export default function ModelArena() {
     enabled: session === 'yes' && Boolean(selectedRunId),
     retry: false,
   });
+  const astraStatus = useQuery({
+    queryKey: ['astra-certification-status', astraHandoff?.taskClass],
+    queryFn: () => astraStatusFn({ data: { taskClass: astraHandoff.taskClass } }),
+    enabled: session === 'yes' && Boolean(astraHandoff),
+    retry: false,
+  });
 
   const configured = useMemo(() => new Map((overview.data?.providers ?? []).map((p) => [p.id, p.configured])), [overview.data]);
   const runMutation = useMutation({
@@ -62,12 +71,21 @@ export default function ModelArena() {
         contestants: contestants.map((row) => ({ provider: row.provider, model: row.model.trim(), label: row.label.trim() || undefined })),
         judge: { provider: judge.provider, model: judge.model.trim(), label: judge.label },
         criteria: criteria.split(',').map((item) => item.trim()).filter(Boolean),
+        astraTaskClass: astraHandoff?.taskClass ?? null,
       },
     }),
     onSuccess: async (data) => {
       setSelectedRunId(data.runId);
       await queryClient.invalidateQueries({ queryKey: ['model-arena-runs'] });
       await queryClient.invalidateQueries({ queryKey: ['model-arena-run', data.runId] });
+      if (astraHandoff) await queryClient.invalidateQueries({ queryKey: ['astra-certification-status', astraHandoff.taskClass] });
+    },
+  });
+  const certifyMutation = useMutation({
+    mutationFn: () => astraCertifyFn({ data: { taskClass: astraHandoff.taskClass } }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['astra-certification-status', astraHandoff?.taskClass] });
+      await queryClient.invalidateQueries({ queryKey: ['model-runtime-overview'] });
     },
   });
 
@@ -96,13 +114,27 @@ export default function ModelArena() {
 
       {astraHandoff && (
         <div className="mb-5 rounded-2xl border border-violet-400/20 bg-violet-400/[.05] p-4">
-          <div className="flex items-start gap-3">
+          <div className="flex flex-wrap items-start gap-3">
             <FlaskConical className="mt-0.5 h-4 w-4 text-violet-300" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-white">Astra evaluation handoff · {astraHandoff.taskClass}</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">The exact Blackstar Astra serving identity <code className="text-violet-200">compatible/{astraHandoff.model}</code> has been preselected as a candidate. Complete a representative benchmark prompt and run enough distinct evaluations for the trusted verifier. Model Arena results alone do not certify the model or grant routing/execution authority.</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">The exact Blackstar Astra serving identity <code className="text-violet-200">compatible/{astraHandoff.model}</code> has been preselected. Runs launched from this handoff are tagged only after the server confirms the configured Astra identity. Model Arena results alone do not certify the model or grant routing/execution authority.</p>
             </div>
+            {astraStatus.data && (
+              <div className="min-w-[220px] rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-cyan-300" /><p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Trusted verifier</p></div>
+                <p className="mt-2 text-lg font-semibold text-white">{astraStatus.data.completedRuns}/{astraStatus.data.minimumRuns}</p>
+                <p className="text-[10px] text-zinc-500">completed server-verified runs</p>
+                <button type="button" disabled={!astraStatus.data.readyToCertify || certifyMutation.isPending} onClick={() => certifyMutation.mutate()} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-400/[.07] px-3 py-2 text-[10px] font-medium text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+                  {certifyMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : astraStatus.data.readyToCertify ? <ShieldCheck className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                  {certifyMutation.isPending ? 'Certifying…' : astraStatus.data.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, astraStatus.data.minimumRuns - astraStatus.data.completedRuns)} more runs`}
+                </button>
+                {certifyMutation.error && <p className="mt-2 text-[10px] leading-relaxed text-rose-300">{friendlyMessage(certifyMutation.error)}</p>}
+                {certifyMutation.data && <p className="mt-2 text-[10px] leading-relaxed text-emerald-300">Verified evidence issued from {certifyMutation.data.sampleCount} runs.</p>}
+              </div>
+            )}
           </div>
+          {astraStatus.error && <div className="mt-3"><ErrorBox error={astraStatus.error} /></div>}
         </div>
       )}
 
