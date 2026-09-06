@@ -1,6 +1,7 @@
 import type { Provider } from '@/lib/runtime/model-gateway.base'
 
 export const NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES = 20
+export const NATIVE_INTELLIGENCE_MIN_EVAL_SCORE = 0.75
 export const NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 export type NativeIntelligenceTaskClass =
@@ -114,7 +115,7 @@ function qualifiedEvidenceScore(
       row.task_class === taskClass &&
       row.verified &&
       Number.isFinite(row.score) &&
-      row.score >= 0 &&
+      row.score >= NATIVE_INTELLIGENCE_MIN_EVAL_SCORE &&
       row.score <= 1 &&
       Number.isInteger(row.sample_count) &&
       row.sample_count >= NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES &&
@@ -137,8 +138,9 @@ function qualifiedEvidenceScore(
  * does not grant tools, approvals, capabilities, identities, delegation rights,
  * or execution authority. A model only wins automatically when reproducible,
  * verified, sufficiently recent evidence exists for the exact provider/model
- * transport currently described by that model ID. Without qualified evidence
- * the caller must provide an explicit fallback model.
+ * transport currently described by that model ID and meets the minimum trusted
+ * evaluation score. Without qualified evidence the caller must provide an
+ * explicit fallback model.
  */
 export function selectNativeIntelligenceModel(args: {
   models: readonly NativeIntelligenceModelDescriptor[]
