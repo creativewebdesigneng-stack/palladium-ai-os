@@ -4,10 +4,10 @@ import Screen from "@/screens/Models";
 export const Route = createFileRoute("/_shell/_app/models")({
   head: () => ({
     meta: [
-      { title: "Models — PalladiumAI" },
-      { name: "description", content: "Compare and route across frontier and open models." },
-      { property: "og:title", content: "Models — PalladiumAI" },
-      { property: "og:description", content: "Compare and route across frontier and open models." },
+      { title: "Models — Blackstar" },
+      { name: "description", content: "Inspect Blackstar runtime models, Astra-class serving readiness and evidence-gated routing infrastructure." },
+      { property: "og:title", content: "Models — Blackstar" },
+      { property: "og:description", content: "Inspect Blackstar runtime models, Astra-class serving readiness and evidence-gated routing infrastructure." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
