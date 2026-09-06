@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS,
   NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES,
+  NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
   isValidNativeIntelligenceModelDescriptor,
   selectNativeIntelligenceModel,
   type NativeIntelligenceEvaluationEvidence,
@@ -92,12 +93,13 @@ describe('Blackstar Native Intelligence model platform', () => {
     })
   })
 
-  it('does not promote a native model on unverified or undersized evaluation evidence', () => {
+  it('does not promote a native model on unverified, undersized, or sub-threshold evidence', () => {
     const decision = selectNativeIntelligenceModel({
       models: [external, native],
       evidence: [
         evidence(native.id, 0.99, { verified: false }),
         evidence(native.id, 0.98, { sample_count: NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES - 1 }),
+        evidence(native.id, NATIVE_INTELLIGENCE_MIN_EVAL_SCORE - 0.01),
       ],
       request: {
         task_class: 'reasoning',
@@ -115,6 +117,18 @@ describe('Blackstar Native Intelligence model platform', () => {
       evaluation_score: null,
       evaluation_samples: 0,
     })
+  })
+
+  it('accepts verified evidence exactly on the minimum score boundary', () => {
+    const decision = selectNativeIntelligenceModel({
+      models: [native],
+      evidence: [evidence(native.id, NATIVE_INTELLIGENCE_MIN_EVAL_SCORE)],
+      request: { task_class: 'reasoning', now: NOW },
+    })
+
+    expect(decision?.model_id).toBe(native.id)
+    expect(decision?.source).toBe('verified_evaluation')
+    expect(decision?.evaluation_score).toBe(NATIVE_INTELLIGENCE_MIN_EVAL_SCORE)
   })
 
   it('expires stale routing evidence and falls back explicitly', () => {
@@ -196,7 +210,7 @@ describe('Blackstar Native Intelligence model platform', () => {
     const decision = selectNativeIntelligenceModel({
       models: [external, tinyVisionless],
       evidence: [
-        evidence(external.id, 0.70, { task_class: 'agentic' }),
+        evidence(external.id, 0.80, { task_class: 'agentic' }),
         evidence(tinyVisionless.id, 0.99, {
           provider: tinyVisionless.provider,
           model: tinyVisionless.model,
