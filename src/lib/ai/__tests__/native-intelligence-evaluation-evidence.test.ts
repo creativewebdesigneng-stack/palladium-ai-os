@@ -15,6 +15,8 @@ const hash = 'a'.repeat(64)
 function certificate(overrides: Record<string, unknown> = {}) {
   return {
     model_id: 'blackstar-native-v0.1',
+    provider: 'compatible',
+    model: 'blackstar-native-v0.1',
     suite_id: 'reasoning-suite-v1',
     task_class: 'reasoning',
     score: 0.93,
@@ -58,6 +60,8 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
   it('maps a reproducible verifier certificate into the narrow routing contract', () => {
     expect(toNativeIntelligenceEvaluationEvidence(certificate())).toEqual({
       model_id: 'blackstar-native-v0.1',
+      provider: 'compatible',
+      model: 'blackstar-native-v0.1',
       suite_id: 'reasoning-suite-v1',
       task_class: 'reasoning',
       score: 0.93,
@@ -67,12 +71,14 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
     })
   })
 
-  it('fails closed on undersized, malformed, or non-reproducible certificates', () => {
+  it('fails closed on undersized, malformed, non-reproducible, or unknown-provider certificates', () => {
     const invalid = [
       certificate({ sample_count: NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES - 1 }),
       certificate({ score: 1.01 }),
       certificate({ score: Number.NaN }),
       certificate({ task_class: 'unknown' }),
+      certificate({ provider: 'unknown-provider' }),
+      certificate({ model: '' }),
       certificate({ benchmark_hash: 'not-a-hash' }),
       certificate({ evaluator_hash: '' }),
       certificate({ model_config_hash: 'f'.repeat(63) }),
@@ -112,11 +118,45 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
     )
   })
 
-  it('lets only persisted certificate-shaped evidence influence the existing #288 selector', () => {
+  it('does not replay evidence when a stable model ID is rebound to another provider or model', () => {
+    const evidence = mapNativeIntelligenceEvaluationEvidence([
+      certificate({ model_id: native.id, score: 0.99 }),
+    ])
+    const reboundProvider = { ...native, provider: 'openai' as const }
+    const reboundModel = { ...native, model: 'blackstar-native-v0.2' }
+
+    const providerDecision = selectNativeIntelligenceModel({
+      models: [external, reboundProvider],
+      evidence,
+      request: {
+        task_class: 'reasoning',
+        fallback_model_id: external.id,
+        now: '2026-09-06T12:00:00.000Z',
+      },
+    })
+    const modelDecision = selectNativeIntelligenceModel({
+      models: [external, reboundModel],
+      evidence,
+      request: {
+        task_class: 'reasoning',
+        fallback_model_id: external.id,
+        now: '2026-09-06T12:00:00.000Z',
+      },
+    })
+
+    expect(providerDecision?.model_id).toBe(external.id)
+    expect(providerDecision?.source).toBe('explicit_fallback')
+    expect(modelDecision?.model_id).toBe(external.id)
+    expect(modelDecision?.source).toBe('explicit_fallback')
+  })
+
+  it('lets only persisted certificate-shaped evidence influence the existing Native Intelligence selector', () => {
     const evidence = mapNativeIntelligenceEvaluationEvidence([
       certificate({ model_id: native.id, score: 0.94 }),
       certificate({
         model_id: external.id,
+        provider: external.provider,
+        model: external.model,
         score: 0.88,
         benchmark_hash: 'd'.repeat(64),
         model_config_hash: 'e'.repeat(64),
@@ -130,6 +170,7 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
         task_class: 'reasoning',
         required_capabilities: ['reasoning'],
         fallback_model_id: external.id,
+        now: '2026-09-06T12:00:00.000Z',
       },
     })
 
