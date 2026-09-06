@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS,
   NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES,
   isValidNativeIntelligenceModelDescriptor,
   selectNativeIntelligenceModel,
@@ -32,6 +33,8 @@ const native: NativeIntelligenceModelDescriptor = {
   latency_class: 'standard',
   cost_class: 'standard',
 }
+
+const NOW = '2026-09-06T12:00:00.000Z'
 
 function evidence(
   model_id: string,
@@ -66,6 +69,7 @@ describe('Blackstar Native Intelligence model platform', () => {
         task_class: 'reasoning',
         required_capabilities: ['reasoning'],
         fallback_model_id: external.id,
+        now: NOW,
       },
     })
 
@@ -89,6 +93,7 @@ describe('Blackstar Native Intelligence model platform', () => {
       request: {
         task_class: 'reasoning',
         fallback_model_id: external.id,
+        now: NOW,
       },
     })
 
@@ -103,11 +108,72 @@ describe('Blackstar Native Intelligence model platform', () => {
     })
   })
 
+  it('expires stale routing evidence and falls back explicitly', () => {
+    const tooOld = new Date(Date.parse(NOW) - NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS - 1).toISOString()
+    const decision = selectNativeIntelligenceModel({
+      models: [external, native],
+      evidence: [evidence(native.id, 0.99, { completed_at: tooOld })],
+      request: {
+        task_class: 'reasoning',
+        fallback_model_id: external.id,
+        now: NOW,
+      },
+    })
+
+    expect(decision?.model_id).toBe(external.id)
+    expect(decision?.source).toBe('explicit_fallback')
+  })
+
+  it('accepts evidence exactly on the freshness boundary and rejects future completion timestamps', () => {
+    const boundary = new Date(Date.parse(NOW) - NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS).toISOString()
+    const accepted = selectNativeIntelligenceModel({
+      models: [external, native],
+      evidence: [evidence(native.id, 0.94, { completed_at: boundary })],
+      request: { task_class: 'reasoning', fallback_model_id: external.id, now: NOW },
+    })
+    const future = selectNativeIntelligenceModel({
+      models: [external, native],
+      evidence: [evidence(native.id, 1, { completed_at: '2026-09-06T12:00:00.001Z' })],
+      request: { task_class: 'reasoning', fallback_model_id: external.id, now: NOW },
+    })
+
+    expect(accepted?.model_id).toBe(native.id)
+    expect(future?.model_id).toBe(external.id)
+    expect(future?.source).toBe('explicit_fallback')
+  })
+
+  it('allows callers to tighten but not accidentally bypass evidence age with a negative window', () => {
+    const twoHoursOld = '2026-09-06T10:00:00.000Z'
+    const tightened = selectNativeIntelligenceModel({
+      models: [external, native],
+      evidence: [evidence(native.id, 0.99, { completed_at: twoHoursOld })],
+      request: {
+        task_class: 'reasoning',
+        fallback_model_id: external.id,
+        now: NOW,
+        max_evidence_age_ms: 60 * 60 * 1000,
+      },
+    })
+    const zeroed = selectNativeIntelligenceModel({
+      models: [external, native],
+      evidence: [evidence(native.id, 0.99)],
+      request: {
+        task_class: 'reasoning',
+        fallback_model_id: external.id,
+        now: NOW,
+        max_evidence_age_ms: -1,
+      },
+    })
+
+    expect(tightened?.source).toBe('explicit_fallback')
+    expect(zeroed?.source).toBe('explicit_fallback')
+  })
+
   it('fails closed when no model has qualified evidence and no explicit fallback is supplied', () => {
     expect(selectNativeIntelligenceModel({
       models: [external, native],
       evidence: [],
-      request: { task_class: 'reasoning' },
+      request: { task_class: 'reasoning', now: NOW },
     })).toBeNull()
   })
 
@@ -129,6 +195,7 @@ describe('Blackstar Native Intelligence model platform', () => {
         required_capabilities: ['tools'],
         min_context_window: 32_000,
         fallback_model_id: external.id,
+        now: NOW,
       },
     })
 
@@ -145,7 +212,7 @@ describe('Blackstar Native Intelligence model platform', () => {
         evidence(native.id, 0.80, { sample_count: 80, suite_id: 'reasoning-suite-v2' }),
         evidence(alternate.id, 0.82, { sample_count: 100 }),
       ],
-      request: { task_class: 'reasoning' },
+      request: { task_class: 'reasoning', now: NOW },
     })
 
     expect(decision?.model_id).toBe('a-external')
@@ -156,7 +223,7 @@ describe('Blackstar Native Intelligence model platform', () => {
     const decision = selectNativeIntelligenceModel({
       models: [native],
       evidence: [evidence(native.id, 0.95)],
-      request: { task_class: 'reasoning' },
+      request: { task_class: 'reasoning', now: NOW },
     })
     const rendered = JSON.stringify(decision)
 
