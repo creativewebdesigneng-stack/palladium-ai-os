@@ -4,6 +4,7 @@ import {
   isBlackstarAstraEngineConfigured,
 } from './blackstar-astra-engine-profile'
 import { probeBlackstarAstraServingReadiness } from './blackstar-astra-serving-readiness.server'
+import type { BlackstarAstraServingHealth } from './blackstar-astra-serving-readiness.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 
 const ASTRA_TASK_CLASSES: NativeIntelligenceTaskClass[] = [
@@ -25,6 +26,8 @@ export type BlackstarAstraRuntimeReadiness = {
     model: string
     serving_ready: boolean
     serving_reason: string
+    serving_health: BlackstarAstraServingHealth
+    latency_ms: number | null
     checked_at: string
   }>
   evidence_store_available: boolean
@@ -59,7 +62,8 @@ async function evidenceStoreAvailable(sb: Sb): Promise<boolean> {
 /**
  * Returns only safe operational readiness metadata for the Astra-class engine.
  * Endpoint URLs, API keys, raw certificates and benchmark contents are never
- * returned. This status is informational only and creates no routing authority.
+ * returned. Health/latency are diagnostic metadata only and create no routing
+ * or execution authority.
  */
 export async function resolveBlackstarAstraRuntimeReadiness(args: {
   sb: Sb
@@ -74,6 +78,8 @@ export async function resolveBlackstarAstraRuntimeReadiness(args: {
       : {
           ready: false,
           reason: 'not_configured' as const,
+          health: 'unavailable' as const,
+          latency_ms: null,
           checked_at: new Date().toISOString(),
         }
     return {
@@ -81,6 +87,8 @@ export async function resolveBlackstarAstraRuntimeReadiness(args: {
       model,
       serving_ready: serving.ready,
       serving_reason: serving.reason,
+      serving_health: serving.health,
+      latency_ms: serving.latency_ms,
       checked_at: serving.checked_at,
     }
   }))
@@ -97,6 +105,6 @@ export async function resolveBlackstarAstraRuntimeReadiness(args: {
     certification_note:
       'Routing infrastructure readiness does not mean a model is certified. Each task class and exact provider/model identity still requires fresh verifier-owned Model Arena evidence before Astra can win routing.',
     authority_note:
-      'Readiness is operational metadata only. It grants no tools, approvals, permissions, identity, delegation, verification bypass or execution authority.',
+      'Readiness and health telemetry are operational metadata only. They grant no tools, approvals, permissions, identity, delegation, verification bypass or execution authority.',
   }
 }
