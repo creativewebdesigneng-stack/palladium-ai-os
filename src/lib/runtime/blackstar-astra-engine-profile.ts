@@ -1,4 +1,5 @@
 import type { NativeIntelligenceModelDescriptor } from '@/lib/ai/native-intelligence-model-platform'
+import type { Provider } from './model-gateway.base'
 
 /**
  * Blackstar Astra-class Engine v0.1.
@@ -59,15 +60,17 @@ export function blackstarAstraModelDescriptor(
     model,
     ownership: 'blackstar',
     lifecycle: 'candidate',
-    // These are the capabilities currently consumable through Blackstar's
-    // existing model-gateway contract. Computer/browser/artifact capabilities
-    // remain runtime tools and therefore never become model authority.
     capabilities: ['text', 'reasoning', 'coding', 'tools', 'structured_output'],
     context_window: BLACKSTAR_ASTRA_ENGINE_PROFILE.target.contextWindow,
     streaming: true,
     latency_class: 'high',
     cost_class: 'high',
   }
+}
+
+export function isBlackstarAstraServingIdentity(provider: Provider, model?: string | null): boolean {
+  const configured = blackstarAstraModelDescriptor()
+  return provider === configured.provider && (model ?? '').trim() === configured.model
 }
 
 export function isBlackstarAstraEngineConfigured(): boolean {
