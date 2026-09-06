@@ -4,7 +4,7 @@ import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-m
 import { astraCertificationSuiteId, getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass, listAstraCertificationBenchmarkCases } from '@/lib/evals/astra-certification-benchmark-suite'
 import { isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
-import { renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
+import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 
 type Scope = { userId: string; orgId?: string | null; taskClass: NativeIntelligenceTaskClass }
@@ -98,6 +98,14 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (responseError) throw new Error(responseError.message); if (scoreError) throw new Error(scoreError.message)
   if (!responses?.length || scores?.length !== responses.length) throw new Error('Evaluation evidence is incomplete.')
   if (!responses.some((response: any) => response.provider === 'compatible' && response.model === expectedModel)) throw new Error('Evaluation is missing the exact Astra response.')
+  if (input.taskClass === 'vision') {
+    const expectedGroundTruth = getAstraVisionBenchmarkGroundTruth(input.caseId)
+    const groundTruthMatches = (scores ?? []).every((score: any) => {
+      const criteria = metadataObject(score.criteria)
+      return stableJson(criteria?.['benchmarkGroundTruth'] ?? null) === stableJson(expectedGroundTruth)
+    })
+    if (!groundTruthMatches) throw new Error('Vision judge evidence does not contain the exact server-owned benchmark ground truth.')
+  }
 
   const judge = actualJudgeIdentity(scores ?? [])
   if (!judge || judge.provider === 'compatible' || judge.model === expectedModel) throw new Error('Astra certification requires a complete independent judge that did not execute through the Astra serving identity.')
