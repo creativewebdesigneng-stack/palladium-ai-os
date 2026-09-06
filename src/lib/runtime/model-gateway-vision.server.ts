@@ -68,6 +68,7 @@ export async function runVisionChatPinned(args: VisionArgs): Promise<ChatResult>
     : Array.isArray(message?.content)
       ? message.content.map((part: any) => typeof part?.text === 'string' ? part.text : '').join('').trim()
       : ''
+  if (!text) throw new Error('Pinned multimodal provider returned an empty response.')
   return {
     text,
     toolCalls: [],
