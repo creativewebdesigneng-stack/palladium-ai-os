@@ -1,6 +1,7 @@
 import type { Provider } from '@/lib/runtime/model-gateway.base'
 
 export const NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES = 20
+export const NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 export type NativeIntelligenceTaskClass =
   | 'general'
@@ -46,6 +47,8 @@ export type NativeIntelligenceRoutingRequest = {
   required_capabilities?: readonly NativeIntelligenceCapability[]
   min_context_window?: number
   fallback_model_id?: string
+  now?: string
+  max_evidence_age_ms?: number
 }
 
 export type NativeIntelligenceRoutingDecision = {
@@ -96,17 +99,25 @@ function qualifiedEvidenceScore(
   modelId: string,
   taskClass: NativeIntelligenceTaskClass,
   evidence: readonly NativeIntelligenceEvaluationEvidence[],
+  request: NativeIntelligenceRoutingRequest,
 ): QualifiedScore | null {
-  const rows = evidence.filter((row) =>
-    row.model_id === modelId &&
-    row.task_class === taskClass &&
-    row.verified &&
-    Number.isFinite(row.score) &&
-    row.score >= 0 &&
-    row.score <= 1 &&
-    Number.isInteger(row.sample_count) &&
-    row.sample_count >= NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES,
-  )
+  const now = Date.parse(request.now ?? new Date().toISOString())
+  if (!Number.isFinite(now)) return null
+  const maxAge = Math.max(0, request.max_evidence_age_ms ?? NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS)
+  const rows = evidence.filter((row) => {
+    const completedAt = Date.parse(row.completed_at)
+    return row.model_id === modelId &&
+      row.task_class === taskClass &&
+      row.verified &&
+      Number.isFinite(row.score) &&
+      row.score >= 0 &&
+      row.score <= 1 &&
+      Number.isInteger(row.sample_count) &&
+      row.sample_count >= NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES &&
+      Number.isFinite(completedAt) &&
+      completedAt <= now &&
+      now - completedAt <= maxAge
+  })
   if (!rows.length) return null
 
   const samples = rows.reduce((sum, row) => sum + row.sample_count, 0)
@@ -121,8 +132,9 @@ function qualifiedEvidenceScore(
  * This function can select a Blackstar-owned model or an external model, but it
  * does not grant tools, approvals, capabilities, identities, delegation rights,
  * or execution authority. A model only wins automatically when reproducible,
- * verified evaluation evidence exists for the requested task class. Without
- * qualified evidence the caller must provide an explicit fallback model.
+ * verified and sufficiently recent evaluation evidence exists for the requested
+ * task class. Without qualified evidence the caller must provide an explicit
+ * fallback model.
  */
 export function selectNativeIntelligenceModel(args: {
   models: readonly NativeIntelligenceModelDescriptor[]
@@ -133,7 +145,7 @@ export function selectNativeIntelligenceModel(args: {
   const scored = eligible
     .map((descriptor) => ({
       descriptor,
-      evaluation: qualifiedEvidenceScore(descriptor.id, args.request.task_class, args.evidence),
+      evaluation: qualifiedEvidenceScore(descriptor.id, args.request.task_class, args.evidence, args.request),
     }))
     .filter((row): row is { descriptor: NativeIntelligenceModelDescriptor; evaluation: QualifiedScore } =>
       row.evaluation !== null,
