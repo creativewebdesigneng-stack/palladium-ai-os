@@ -5,7 +5,10 @@ import { loadGeneralIntelligenceFailureFeedback, renderGeneralIntelligenceFailur
 import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
 import { composeGeneralIntelligencePlanningSystemPrompt } from './general-intelligence-planning-context'
 import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
-import { resolveNativeIntelligenceRuntimeRouting } from './native-intelligence-runtime-routing.server'
+import {
+  persistNativeIntelligenceRuntimeRouting,
+  resolveNativeIntelligenceRuntimeRouting,
+} from './native-intelligence-runtime-routing.server'
 import { executePlannedRun } from './planner-runtime.server'
 import { failRun, prepareRun, rescueRuntimeConnectedServiceRead, RuntimeError } from './runtime.server'
 
@@ -43,6 +46,11 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
       sb: args.sb,
       userId: args.userId,
       run,
+    })
+    await persistNativeIntelligenceRuntimeRouting({
+      sb: args.sb,
+      taskId: run.taskId,
+      routing,
     })
     run = {
       ...run,
