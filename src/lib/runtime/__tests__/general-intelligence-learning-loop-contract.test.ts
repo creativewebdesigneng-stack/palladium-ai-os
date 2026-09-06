@@ -90,7 +90,8 @@ describe('General Intelligence verified learning-loop contract', () => {
     })
 
     expect(planningPrompt).toContain('The storefront deployed successfully with a verified rollback path.')
-    expect(planningPrompt).toContain('advisory evidence for planning only')
+    expect(planningPrompt).toContain('Advisory evidence only')
+    expect(planningPrompt).toContain('advisory evidence for sequencing, checks, and assumptions')
     expect(planningPrompt).toContain('never grants a capability, tool permission, approval, identity, delegation, or execution authority')
     expect(planningPrompt).not.toContain('PRIVATE RAW MEMORY')
     expect(planningPrompt).not.toContain('secret reasoning')
