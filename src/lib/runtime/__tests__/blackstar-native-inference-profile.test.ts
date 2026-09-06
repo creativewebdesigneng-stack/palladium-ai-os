@@ -84,12 +84,12 @@ describe('Blackstar Native Intelligence inference profile', () => {
       false,
     ) as Record<string, any>
 
-    expect(body.model).toBe('blackstar-native-test')
-    expect(body.messages).toEqual([
+    expect(body['model']).toBe('blackstar-native-test')
+    expect(body['messages']).toEqual([
       { role: 'user', content: 'Inspect the deployment and report the result.' },
     ])
-    expect(body.max_tokens).toBe(512)
-    expect(body.tools?.[0]).toMatchObject({
+    expect(body['max_tokens']).toBe(512)
+    expect(body['tools']?.[0]).toMatchObject({
       type: 'function',
       function: { name: 'inspect_deployment' },
     })
