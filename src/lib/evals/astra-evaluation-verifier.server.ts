@@ -37,7 +37,20 @@ function astraMetadata(run: ArenaRun) {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null
 }
 
+async function assertScopeAccess(scope: Scope) {
+  if (!scope.orgId) return
+  const { data, error } = await supabaseAdmin
+    .from('organisation_members')
+    .select('role')
+    .eq('org_id', scope.orgId)
+    .eq('user_id', scope.userId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('You do not have access to this workspace.')
+}
+
 async function matchingRuns(scope: Scope) {
+  await assertScopeAccess(scope)
   if (!isBlackstarAstraEngineConfigured()) {
     throw new Error('Blackstar Astra serving is not configured on this deployment.')
   }
