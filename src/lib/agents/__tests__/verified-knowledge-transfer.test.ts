@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPermissionSafeVerifiedKnowledge,
+  MIN_TRANSFER_VERIFICATION_SCORE,
   renderPermissionSafeVerifiedKnowledge,
 } from '../verified-knowledge-transfer';
 
@@ -46,6 +47,20 @@ describe('permission-safe verified cross-agent knowledge', () => {
     }]);
     expect(JSON.stringify(result)).not.toContain('PRIVATE RAW MEMORY');
     expect(JSON.stringify(result)).not.toContain('HIDDEN REASONING');
+  });
+
+  it('requires the configured minimum verification score before knowledge can cross agents', () => {
+    const belowThreshold = {
+      ...base,
+      metadata: { ...base.metadata, verification_score: MIN_TRANSFER_VERIFICATION_SCORE - 0.01 },
+    };
+    const atThreshold = {
+      ...base,
+      metadata: { ...base.metadata, verification_score: MIN_TRANSFER_VERIFICATION_SCORE },
+    };
+
+    expect(transfer([belowThreshold])).toEqual([]);
+    expect(transfer([atThreshold])).toHaveLength(1);
   });
 
   it('enforces owner isolation', () => {
