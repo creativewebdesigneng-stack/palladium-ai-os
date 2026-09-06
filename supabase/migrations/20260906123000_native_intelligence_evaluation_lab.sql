@@ -7,7 +7,7 @@
 create table if not exists public.model_eval_verified_evidence (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  organization_id uuid null,
+  organization_id uuid null references public.organisations(id) on delete cascade,
   model_id text not null check (char_length(btrim(model_id)) between 1 and 200),
   provider text not null check (char_length(btrim(provider)) between 1 and 100),
   model text not null check (char_length(btrim(model)) between 1 and 200),
@@ -64,7 +64,12 @@ using (
   user_id = auth.uid()
   or (
     organization_id is not null
-    and public.is_org_member(organization_id, auth.uid())
+    and exists (
+      select 1
+      from public.organisation_members membership
+      where membership.org_id = model_eval_verified_evidence.organization_id
+        and membership.user_id = auth.uid()
+    )
   )
 );
 
@@ -108,10 +113,8 @@ declare
   v_completed_at timestamptz;
   v_evidence public.model_eval_verified_evidence;
 begin
-  if auth.role() is distinct from 'service_role' then
-    raise exception 'Trusted verifier service role required' using errcode = '42501';
-  end if;
-
+  -- Execute permission is revoked from PUBLIC/anon/authenticated below and granted
+  -- only to service_role. Do not duplicate that authorization boundary via auth.role().
   if p_task_class not in ('general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic') then
     raise exception 'Unsupported Native Intelligence task class';
   end if;
