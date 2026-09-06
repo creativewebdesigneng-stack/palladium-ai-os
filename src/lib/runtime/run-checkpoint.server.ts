@@ -188,7 +188,10 @@ export function createDurableRunCheckpoint(args: {
       input: clampNumber(args.usage.input),
       output: clampNumber(args.usage.output),
     },
-    decision_state: createDurableDecisionState({ plan: args.plan, verification: args.verification }),
+    decision_state: createDurableDecisionState({
+      plan: args.plan,
+      ...(args.verification !== undefined ? { verification: args.verification } : {}),
+    }),
   };
 }
 
