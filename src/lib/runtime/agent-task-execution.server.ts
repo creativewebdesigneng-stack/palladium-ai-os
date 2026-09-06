@@ -1,5 +1,9 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
+import {
+  buildBlackstarAstraRunCapabilityControl,
+  renderBlackstarAstraRunCapabilityControl,
+} from './blackstar-astra-capability-control'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE } from './blackstar-astra-engine-profile'
 import {
   renderBlackstarAstraReasoningControl,
@@ -91,9 +95,13 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
     const reasoningControl = routing.decision?.model_id === BLACKSTAR_ASTRA_ENGINE_PROFILE.id
       ? selectBlackstarAstraReasoningControl(intelligence.assessment)
       : null
+    const capabilityControl = reasoningControl
+      ? buildBlackstarAstraRunCapabilityControl(run.tools.defs.map((tool) => tool.name))
+      : null
     const intelligenceControl = [
       intelligence.prompt,
       reasoningControl ? renderBlackstarAstraReasoningControl(reasoningControl) : '',
+      capabilityControl ? renderBlackstarAstraRunCapabilityControl(capabilityControl) : '',
     ].filter(Boolean).join('\n\n')
     const metacognitionControl = [
       renderMetacognitionControl(metacognition),
