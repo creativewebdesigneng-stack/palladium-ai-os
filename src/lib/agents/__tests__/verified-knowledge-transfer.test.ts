@@ -118,4 +118,42 @@ describe('permission-safe verified cross-agent knowledge', () => {
     expect(rendered).not.toContain('publish_anywhere');
     expect(rendered).not.toContain('secret reasoning');
   });
+
+  it('surfaces divergent verified historical outcomes as uncertainty rather than consensus', () => {
+    const first = {
+      ...base,
+      task_id: 'task-1',
+      metadata: {
+        ...base.metadata,
+        verified_outcome: 'Launch only after the rollback check passes.',
+        verification_score: 0.96,
+      },
+    };
+    const second = {
+      ...base,
+      task_id: 'task-2',
+      metadata: {
+        ...base.metadata,
+        verified_outcome: 'Do not launch because rollback validation failed.',
+        verification_score: 0.98,
+      },
+    };
+
+    const rendered = renderPermissionSafeVerifiedKnowledge(transfer([first, second]));
+    expect(rendered).toContain('HISTORICAL UNCERTAINTY')
+    expect(rendered).toContain('Do not infer consensus')
+    expect(rendered).toContain('preserve unresolved disagreement explicitly')
+    expect(rendered).toContain('Launch only after the rollback check passes.')
+    expect(rendered).toContain('Do not launch because rollback validation failed.')
+  });
+
+  it('does not invent a conflict when repeated verified records report the same outcome', () => {
+    const repeated = {
+      ...base,
+      task_id: 'task-2',
+      metadata: { ...base.metadata, verification_score: 0.99 },
+    };
+    const rendered = renderPermissionSafeVerifiedKnowledge(transfer([base, repeated]));
+    expect(rendered).not.toContain('HISTORICAL UNCERTAINTY')
+  });
 });
