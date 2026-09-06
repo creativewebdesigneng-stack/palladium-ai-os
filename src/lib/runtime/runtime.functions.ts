@@ -12,9 +12,16 @@ type Sb = { from: (t: string) => any };
 /** Runs an agent task end to end and returns the finished task row. */
 export const runAgentTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { agent_id: string; input: string }) => {
+  .inputValidator((input: { agent_id: string; input: string; artifact_ids?: string[] }) => {
     if (!input?.agent_id) throw new Error("An agent is required.");
-    return { agent_id: String(input.agent_id), input: String(input.input ?? "") };
+    const rawArtifactIds = Array.isArray(input?.artifact_ids) ? input.artifact_ids : [];
+    if (rawArtifactIds.length > 4) throw new Error("Attach at most 4 private images to one agent task.");
+    const artifactIds = [...new Set(rawArtifactIds.map((value) => String(value ?? "").trim()).filter(Boolean))];
+    return {
+      agent_id: String(input.agent_id),
+      input: String(input.input ?? ""),
+      artifact_ids: artifactIds,
+    };
   })
   .handler(async ({ data, context }) => {
     return executeAgentTask({
@@ -22,6 +29,7 @@ export const runAgentTask = createServerFn({ method: "POST" })
       userId: context.userId,
       agentId: data.agent_id,
       input: data.input,
+      artifactIds: data.artifact_ids,
     });
   });
 
