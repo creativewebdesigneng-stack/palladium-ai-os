@@ -5,6 +5,7 @@ const stageIcons = {
   configured: Server,
   serving: Cpu,
   evidence: Database,
+  certification: ShieldCheck,
   routing: Route,
 };
 
@@ -18,6 +19,27 @@ function servingHealthClass(health) {
   if (health === 'healthy') return 'text-emerald-300';
   if (health === 'degraded') return 'text-amber-300';
   return 'text-rose-300';
+}
+
+function certificationClass(item) {
+  if (item.actually_routable) return 'text-emerald-300';
+  if (item.certified_eligible) return 'text-cyan-300';
+  if (item.evidence_available) return 'text-amber-300';
+  return 'text-zinc-500';
+}
+
+function certificationLabel(item) {
+  if (item.actually_routable) return 'Routable';
+  if (item.certified_eligible) return 'Eligible, serving gate blocked';
+  if (item.evidence_available) return 'Evidence present, not eligible';
+  return 'No exact evidence';
+}
+
+function evidenceDetail(item) {
+  if (!item.evidence_available) return '—';
+  if (!item.certified_eligible) return 'Unqualified / stale';
+  const score = Number.isFinite(item.evaluation_score) ? `${(item.evaluation_score * 100).toFixed(1)}%` : '—';
+  return `${score} · ${item.evaluation_samples.toLocaleString()} samples`;
 }
 
 export default function BlackstarAstraActivationPanel({ readiness }) {
@@ -45,14 +67,14 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
             <ShieldCheck className="h-4 w-4 text-violet-300" />
             <h2 className="text-sm font-semibold text-white">Blackstar Astra-class Engine</h2>
           </div>
-          <p className="mt-1 text-[11px] text-zinc-500">Blackstar-owned serving and evidence infrastructure. Configuration, health and latency never grant routing authority.</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Operator activation state from Blackstar's existing serving probes and verifier-owned Evaluation Lab evidence. No client-side certification inference.</p>
         </div>
         <span className={`rounded-xl border px-3 py-1.5 text-[10px] font-medium ${summary.state === 'routing_ready' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>
           {summary.label}
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {summary.stages.map((stage) => {
           const Icon = stageIcons[stage.id];
           return (
@@ -70,6 +92,7 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
 
       {readiness.models?.length ? (
         <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-600">Serving identities</p>
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
               <tr><th className="pb-2 font-medium">Task classes</th><th className="pb-2 font-medium">Model</th><th className="pb-2 font-medium">Serving</th><th className="pb-2 font-medium">Health</th><th className="pb-2 font-medium">Latency</th><th className="pb-2 font-medium">Probe</th></tr>
@@ -83,6 +106,32 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
                   <td className={`py-2.5 pr-3 capitalize ${servingHealthClass(model.serving_health)}`}>{model.serving_health ?? 'unavailable'}</td>
                   <td className="py-2.5 pr-3 text-zinc-400">{Number.isFinite(model.latency_ms) ? `${model.latency_ms} ms` : '—'}</td>
                   <td className="py-2.5 text-zinc-500">{model.serving_reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {readiness.certification?.length ? (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">Verifier-backed certification</p>
+            <span className="text-[10px] text-zinc-500">{readiness.certified_task_classes ?? 0}/{readiness.certification.length} eligible · {readiness.routable_task_classes ?? 0}/{readiness.certification.length} routable</span>
+          </div>
+          <table className="w-full min-w-[900px] text-left text-xs">
+            <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
+              <tr><th className="pb-2 font-medium">Task class</th><th className="pb-2 font-medium">Exact model</th><th className="pb-2 font-medium">Evidence</th><th className="pb-2 font-medium">Certified / eligible</th><th className="pb-2 font-medium">Actually routable</th><th className="pb-2 font-medium">Qualified score</th></tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {readiness.certification.map((item) => (
+                <tr key={`${item.task_class}:${item.model}`}>
+                  <td className="py-2.5 pr-3 font-medium text-zinc-300">{item.task_class}</td>
+                  <td className="py-2.5 pr-3"><code className="text-violet-200">{item.model}</code></td>
+                  <td className={`py-2.5 pr-3 ${item.evidence_available ? 'text-cyan-300' : 'text-zinc-500'}`}>{item.evidence_available ? 'Available' : 'Missing'}</td>
+                  <td className={`py-2.5 pr-3 ${item.certified_eligible ? 'text-emerald-300' : 'text-amber-300'}`}>{item.certified_eligible ? 'Eligible' : 'Not eligible'}</td>
+                  <td className={`py-2.5 pr-3 ${certificationClass(item)}`}>{certificationLabel(item)}</td>
+                  <td className="py-2.5 text-zinc-500">{evidenceDetail(item)}</td>
                 </tr>
               ))}
             </tbody>
