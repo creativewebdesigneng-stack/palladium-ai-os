@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
-import { runChat, type Provider } from "@/lib/runtime/model-gateway.server";
+import { runChat, runChatPinned, type Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
 type ArenaPolicy = {
@@ -220,7 +220,8 @@ export const runModelArena = createServerFn({ method: "POST" })
       }
 
       const anonymized = responseRows.map((response, index) => `RESPONSE ${index}\n${response.response_text}`).join("\n\n---\n\n");
-      const judgeResult = await runChat({
+      const judgeRunner = data.astraTaskClass ? runChatPinned : runChat;
+      const judgeResult = await judgeRunner({
         provider: data.judge.provider as Provider,
         model: data.judge.model,
         messages: [
@@ -235,6 +236,9 @@ export const runModelArena = createServerFn({ method: "POST" })
         ],
         maxTokens: 1400,
       });
+      if (data.astraTaskClass && (judgeResult.provider !== data.judge.provider || judgeResult.model !== data.judge.model)) {
+        throw new Error("Astra certification judge transport did not preserve the exact requested evaluator identity.");
+      }
       const judged = parseJudgeJson(judgeResult.text);
       const scores = judged.map((score) => {
         const response = responseRows[score.index];
@@ -264,8 +268,8 @@ export const runModelArena = createServerFn({ method: "POST" })
           model: astraModel,
           prompt: safePrompt,
           systemPromptHash: astraSystemPromptHash,
-          judgeProvider: data.judge.provider,
-          judgeModel: data.judge.model,
+          judgeProvider: judgeResult.provider,
+          judgeModel: judgeResult.model,
           criteria,
           responses: responseRows,
           scores,
@@ -283,6 +287,8 @@ export const runModelArena = createServerFn({ method: "POST" })
       const { error: completeError } = await sb.from("model_eval_runs").update({
         status: "completed",
         completed_at: new Date().toISOString(),
+        judge_provider: judgeResult.provider,
+        judge_model: judgeResult.model,
         metadata: completedMetadata,
       }).eq("id", run.id);
       if (completeError) throw new Error(completeError.message);
