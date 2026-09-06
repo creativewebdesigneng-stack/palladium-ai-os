@@ -25,6 +25,7 @@ type ModelEvalResponse = {
 };
 
 const providerSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible"]);
+const taskClassSchema = z.enum(["general", "reasoning", "coding", "tool_use", "vision", "agentic"]);
 const contestantSchema = z.object({
   provider: providerSchema,
   model: z.string().trim().min(1).max(160),
@@ -132,6 +133,7 @@ export const runModelArena = createServerFn({ method: "POST" })
     contestants: z.array(contestantSchema).min(2).max(6),
     judge: contestantSchema,
     criteria: z.array(z.string().trim().min(1).max(200)).min(1).max(12).optional(),
+    astraTaskClass: taskClassSchema.nullish(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -139,6 +141,33 @@ export const runModelArena = createServerFn({ method: "POST" })
     const policy = await loadArenaPolicy(sb, context.userId);
     const safePrompt = applyArenaPolicy(data.prompt, policy, "request");
     const safeSystemPrompt = data.systemPrompt ? applyArenaPolicy(data.systemPrompt, policy, "request") : null;
+
+    let astraActivation: Record<string, unknown> | null = null;
+    if (data.astraTaskClass) {
+      const {
+        BLACKSTAR_ASTRA_ENGINE_PROFILE,
+        blackstarAstraModelForTaskClass,
+        isBlackstarAstraEngineConfigured,
+      } = await import("@/lib/runtime/blackstar-astra-engine-profile");
+      if (!isBlackstarAstraEngineConfigured()) throw new Error("Blackstar Astra serving is not configured on this deployment.");
+      const exactModel = blackstarAstraModelForTaskClass(data.astraTaskClass);
+      const hasExactAstraCandidate = data.contestants.some((candidate) => candidate.provider === "compatible" && candidate.model.trim() === exactModel);
+      if (!hasExactAstraCandidate) throw new Error("Astra evaluation must include the exact configured Astra serving identity.");
+      astraActivation = {
+        server_verified: true,
+        task_class: data.astraTaskClass,
+        provider: "compatible",
+        model: exactModel,
+        engine_id: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
+      };
+    }
+
+    const criteria = data.criteria ?? ["correctness", "helpfulness", "clarity"];
+    const runMetadata = {
+      criteria,
+      complianceApplied: Boolean(policy),
+      ...(astraActivation ? { astra_activation: astraActivation } : {}),
+    };
     const { data: run, error: runError } = await sb.from("model_eval_runs").insert({
       user_id: context.userId,
       org_id: data.orgId ?? null,
@@ -148,7 +177,7 @@ export const runModelArena = createServerFn({ method: "POST" })
       status: "running",
       judge_provider: data.judge.provider,
       judge_model: data.judge.model,
-      metadata: { criteria: data.criteria ?? ["correctness", "helpfulness", "clarity"], complianceApplied: Boolean(policy) },
+      metadata: runMetadata,
     }).select("id,name").single();
     if (runError) throw new Error(runError.message);
 
@@ -183,7 +212,6 @@ export const runModelArena = createServerFn({ method: "POST" })
         responseRows.push(saved as ModelEvalResponse);
       }
 
-      const criteria = data.criteria ?? ["correctness", "helpfulness", "clarity"];
       const anonymized = responseRows.map((response, index) => `RESPONSE ${index}\n${response.response_text}`).join("\n\n---\n\n");
       const judgeResult = await runChat({
         provider: data.judge.provider as Provider,
@@ -226,11 +254,11 @@ export const runModelArena = createServerFn({ method: "POST" })
         targetType: "model_eval_run",
         targetId: run.id,
         status: "success",
-        metadata: { contestants: data.contestants.length, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model, complianceApplied: Boolean(policy) },
+        metadata: { contestants: data.contestants.length, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model, complianceApplied: Boolean(policy), astraTaskClass: data.astraTaskClass ?? null },
       });
       return { runId: run.id, responses: responseRows, scores };
     } catch (error) {
-      await sb.from("model_eval_runs").update({ status: "failed", completed_at: new Date().toISOString(), metadata: { failure: error instanceof Error ? error.message : "Evaluation failed", complianceApplied: Boolean(policy) } }).eq("id", run.id);
+      await sb.from("model_eval_runs").update({ status: "failed", completed_at: new Date().toISOString(), metadata: { ...runMetadata, failure: error instanceof Error ? error.message : "Evaluation failed" } }).eq("id", run.id);
       await writeAudit({ userId: context.userId, orgId: data.orgId ?? null, action: "model_eval.failed", targetType: "model_eval_run", targetId: run.id, status: "failed" });
       throw error;
     }
