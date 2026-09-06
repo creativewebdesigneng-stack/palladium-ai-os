@@ -137,8 +137,8 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
       model_id: native.id,
       ownership: 'blackstar',
       source: 'verified_evaluation',
-      evaluation_score: 0.94,
       evaluation_samples: 40,
     })
+    expect(decision.evaluation_score).toBeCloseTo(0.94, 10)
   })
 })
