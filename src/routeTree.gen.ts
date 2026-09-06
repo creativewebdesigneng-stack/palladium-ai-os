@@ -64,6 +64,7 @@ import { Route as ShellAppCreatorHubRouteImport } from './routes/_shell/_app/cre
 import { Route as ShellAppCrmRouteImport } from './routes/_shell/_app/crm'
 import { Route as ShellAppCrmStudioRouteImport } from './routes/_shell/_app/crm-studio'
 import { Route as ShellAppDashboardRouteImport } from './routes/_shell/_app/dashboard'
+import { Route as ShellAppDecisionStudioRouteImport } from './routes/_shell/_app/decision-studio'
 import { Route as ShellAppDeploymentsRouteImport } from './routes/_shell/_app/deployments'
 import { Route as ShellAppDeveloperRouteImport } from './routes/_shell/_app/developer'
 import { Route as ShellAppDeveloperPortalRouteImport } from './routes/_shell/_app/developer-portal'
@@ -99,6 +100,7 @@ import { Route as ShellAppSearchRouteImport } from './routes/_shell/_app/search'
 import { Route as ShellAppSecurityRouteImport } from './routes/_shell/_app/security'
 import { Route as ShellAppSeoStudioRouteImport } from './routes/_shell/_app/seo-studio'
 import { Route as ShellAppSettingsRouteImport } from './routes/_shell/_app/settings'
+import { Route as ShellAppSharedIntelligenceRouteImport } from './routes/_shell/_app/shared-intelligence'
 import { Route as ShellAppShopifyConnectRouteImport } from './routes/_shell/_app/shopify-connect'
 import { Route as ShellAppSkillsRouteImport } from './routes/_shell/_app/skills'
 import { Route as ShellAppSmartTablesRouteImport } from './routes/_shell/_app/smart-tables'
@@ -112,6 +114,7 @@ import { Route as ShellAppTerminalRouteImport } from './routes/_shell/_app/termi
 import { Route as ShellAppThreeDStudioRouteImport } from './routes/_shell/_app/three-d-studio'
 import { Route as ShellAppToolMarketplaceRouteImport } from './routes/_shell/_app/tool-marketplace'
 import { Route as ShellAppToolsFrameworkRouteImport } from './routes/_shell/_app/tools-framework'
+import { Route as ShellAppTrustedSocialVideoRouteImport } from './routes/_shell/_app/trusted-social-video'
 import { Route as ShellAppVersionControlRouteImport } from './routes/_shell/_app/version-control'
 import { Route as ShellAppVoiceStudioRouteImport } from './routes/_shell/_app/voice-studio'
 import { Route as ShellAppWebRouteImport } from './routes/_shell/_app/web'
@@ -434,6 +437,11 @@ const ShellAppDashboardRoute = ShellAppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppDecisionStudioRoute = ShellAppDecisionStudioRouteImport.update({
+  id: '/decision-studio',
+  path: '/decision-studio',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppDeploymentsRoute = ShellAppDeploymentsRouteImport.update({
   id: '/deployments',
   path: '/deployments',
@@ -611,6 +619,12 @@ const ShellAppSettingsRoute = ShellAppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppSharedIntelligenceRoute =
+  ShellAppSharedIntelligenceRouteImport.update({
+    id: '/shared-intelligence',
+    path: '/shared-intelligence',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppShopifyConnectRoute = ShellAppShopifyConnectRouteImport.update({
   id: '/shopify-connect',
   path: '/shopify-connect',
@@ -677,6 +691,12 @@ const ShellAppToolsFrameworkRoute = ShellAppToolsFrameworkRouteImport.update({
   path: '/tools-framework',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppTrustedSocialVideoRoute =
+  ShellAppTrustedSocialVideoRouteImport.update({
+    id: '/trusted-social-video',
+    path: '/trusted-social-video',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppVersionControlRoute = ShellAppVersionControlRouteImport.update({
   id: '/version-control',
   path: '/version-control',
@@ -956,6 +976,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof ShellAppCrmRoute
   '/crm-studio': typeof ShellAppCrmStudioRoute
   '/dashboard': typeof ShellAppDashboardRoute
+  '/decision-studio': typeof ShellAppDecisionStudioRoute
   '/deployments': typeof ShellAppDeploymentsRoute
   '/developer': typeof ShellAppDeveloperRoute
   '/developer-portal': typeof ShellAppDeveloperPortalRoute
@@ -991,6 +1012,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof ShellAppSecurityRoute
   '/seo-studio': typeof ShellAppSeoStudioRoute
   '/settings': typeof ShellAppSettingsRoute
+  '/shared-intelligence': typeof ShellAppSharedIntelligenceRoute
   '/shopify-connect': typeof ShellAppShopifyConnectRoute
   '/skills': typeof ShellAppSkillsRoute
   '/smart-tables': typeof ShellAppSmartTablesRoute
@@ -1004,6 +1026,7 @@ export interface FileRoutesByFullPath {
   '/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/version-control': typeof ShellAppVersionControlRoute
   '/voice-studio': typeof ShellAppVoiceStudioRoute
   '/web': typeof ShellAppWebRoute
@@ -1101,6 +1124,7 @@ export interface FileRoutesByTo {
   '/crm': typeof ShellAppCrmRoute
   '/crm-studio': typeof ShellAppCrmStudioRoute
   '/dashboard': typeof ShellAppDashboardRoute
+  '/decision-studio': typeof ShellAppDecisionStudioRoute
   '/deployments': typeof ShellAppDeploymentsRoute
   '/developer': typeof ShellAppDeveloperRoute
   '/developer-portal': typeof ShellAppDeveloperPortalRoute
@@ -1136,6 +1160,7 @@ export interface FileRoutesByTo {
   '/security': typeof ShellAppSecurityRoute
   '/seo-studio': typeof ShellAppSeoStudioRoute
   '/settings': typeof ShellAppSettingsRoute
+  '/shared-intelligence': typeof ShellAppSharedIntelligenceRoute
   '/shopify-connect': typeof ShellAppShopifyConnectRoute
   '/skills': typeof ShellAppSkillsRoute
   '/smart-tables': typeof ShellAppSmartTablesRoute
@@ -1149,6 +1174,7 @@ export interface FileRoutesByTo {
   '/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/version-control': typeof ShellAppVersionControlRoute
   '/voice-studio': typeof ShellAppVoiceStudioRoute
   '/web': typeof ShellAppWebRoute
@@ -1249,6 +1275,7 @@ export interface FileRoutesById {
   '/_shell/_app/crm': typeof ShellAppCrmRoute
   '/_shell/_app/crm-studio': typeof ShellAppCrmStudioRoute
   '/_shell/_app/dashboard': typeof ShellAppDashboardRoute
+  '/_shell/_app/decision-studio': typeof ShellAppDecisionStudioRoute
   '/_shell/_app/deployments': typeof ShellAppDeploymentsRoute
   '/_shell/_app/developer': typeof ShellAppDeveloperRoute
   '/_shell/_app/developer-portal': typeof ShellAppDeveloperPortalRoute
@@ -1284,6 +1311,7 @@ export interface FileRoutesById {
   '/_shell/_app/security': typeof ShellAppSecurityRoute
   '/_shell/_app/seo-studio': typeof ShellAppSeoStudioRoute
   '/_shell/_app/settings': typeof ShellAppSettingsRoute
+  '/_shell/_app/shared-intelligence': typeof ShellAppSharedIntelligenceRoute
   '/_shell/_app/shopify-connect': typeof ShellAppShopifyConnectRoute
   '/_shell/_app/skills': typeof ShellAppSkillsRoute
   '/_shell/_app/smart-tables': typeof ShellAppSmartTablesRoute
@@ -1297,6 +1325,7 @@ export interface FileRoutesById {
   '/_shell/_app/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/_shell/_app/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/_shell/_app/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/_shell/_app/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/_shell/_app/version-control': typeof ShellAppVersionControlRoute
   '/_shell/_app/voice-studio': typeof ShellAppVoiceStudioRoute
   '/_shell/_app/web': typeof ShellAppWebRoute
@@ -1396,6 +1425,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/crm-studio'
     | '/dashboard'
+    | '/decision-studio'
     | '/deployments'
     | '/developer'
     | '/developer-portal'
@@ -1431,6 +1461,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/seo-studio'
     | '/settings'
+    | '/shared-intelligence'
     | '/shopify-connect'
     | '/skills'
     | '/smart-tables'
@@ -1444,6 +1475,7 @@ export interface FileRouteTypes {
     | '/three-d-studio'
     | '/tool-marketplace'
     | '/tools-framework'
+    | '/trusted-social-video'
     | '/version-control'
     | '/voice-studio'
     | '/web'
@@ -1541,6 +1573,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/crm-studio'
     | '/dashboard'
+    | '/decision-studio'
     | '/deployments'
     | '/developer'
     | '/developer-portal'
@@ -1576,6 +1609,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/seo-studio'
     | '/settings'
+    | '/shared-intelligence'
     | '/shopify-connect'
     | '/skills'
     | '/smart-tables'
@@ -1589,6 +1623,7 @@ export interface FileRouteTypes {
     | '/three-d-studio'
     | '/tool-marketplace'
     | '/tools-framework'
+    | '/trusted-social-video'
     | '/version-control'
     | '/voice-studio'
     | '/web'
@@ -1688,6 +1723,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/crm'
     | '/_shell/_app/crm-studio'
     | '/_shell/_app/dashboard'
+    | '/_shell/_app/decision-studio'
     | '/_shell/_app/deployments'
     | '/_shell/_app/developer'
     | '/_shell/_app/developer-portal'
@@ -1723,6 +1759,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/security'
     | '/_shell/_app/seo-studio'
     | '/_shell/_app/settings'
+    | '/_shell/_app/shared-intelligence'
     | '/_shell/_app/shopify-connect'
     | '/_shell/_app/skills'
     | '/_shell/_app/smart-tables'
@@ -1736,6 +1773,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/three-d-studio'
     | '/_shell/_app/tool-marketplace'
     | '/_shell/_app/tools-framework'
+    | '/_shell/_app/trusted-social-video'
     | '/_shell/_app/version-control'
     | '/_shell/_app/voice-studio'
     | '/_shell/_app/web'
@@ -2213,6 +2251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppDashboardRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/decision-studio': {
+      id: '/_shell/_app/decision-studio'
+      path: '/decision-studio'
+      fullPath: '/decision-studio'
+      preLoaderRoute: typeof ShellAppDecisionStudioRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/deployments': {
       id: '/_shell/_app/deployments'
       path: '/deployments'
@@ -2458,6 +2503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppSettingsRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/shared-intelligence': {
+      id: '/_shell/_app/shared-intelligence'
+      path: '/shared-intelligence'
+      fullPath: '/shared-intelligence'
+      preLoaderRoute: typeof ShellAppSharedIntelligenceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/shopify-connect': {
       id: '/_shell/_app/shopify-connect'
       path: '/shopify-connect'
@@ -2547,6 +2599,13 @@ declare module '@tanstack/react-router' {
       path: '/tools-framework'
       fullPath: '/tools-framework'
       preLoaderRoute: typeof ShellAppToolsFrameworkRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/trusted-social-video': {
+      id: '/_shell/_app/trusted-social-video'
+      path: '/trusted-social-video'
+      fullPath: '/trusted-social-video'
+      preLoaderRoute: typeof ShellAppTrustedSocialVideoRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/version-control': {
@@ -2873,6 +2932,7 @@ interface ShellAppRouteChildren {
   ShellAppCrmRoute: typeof ShellAppCrmRoute
   ShellAppCrmStudioRoute: typeof ShellAppCrmStudioRoute
   ShellAppDashboardRoute: typeof ShellAppDashboardRoute
+  ShellAppDecisionStudioRoute: typeof ShellAppDecisionStudioRoute
   ShellAppDeploymentsRoute: typeof ShellAppDeploymentsRoute
   ShellAppDeveloperRoute: typeof ShellAppDeveloperRoute
   ShellAppDeveloperPortalRoute: typeof ShellAppDeveloperPortalRoute
@@ -2908,6 +2968,7 @@ interface ShellAppRouteChildren {
   ShellAppSecurityRoute: typeof ShellAppSecurityRoute
   ShellAppSeoStudioRoute: typeof ShellAppSeoStudioRoute
   ShellAppSettingsRoute: typeof ShellAppSettingsRoute
+  ShellAppSharedIntelligenceRoute: typeof ShellAppSharedIntelligenceRoute
   ShellAppShopifyConnectRoute: typeof ShellAppShopifyConnectRoute
   ShellAppSkillsRoute: typeof ShellAppSkillsRoute
   ShellAppSmartTablesRoute: typeof ShellAppSmartTablesRoute
@@ -2921,6 +2982,7 @@ interface ShellAppRouteChildren {
   ShellAppThreeDStudioRoute: typeof ShellAppThreeDStudioRoute
   ShellAppToolMarketplaceRoute: typeof ShellAppToolMarketplaceRoute
   ShellAppToolsFrameworkRoute: typeof ShellAppToolsFrameworkRoute
+  ShellAppTrustedSocialVideoRoute: typeof ShellAppTrustedSocialVideoRoute
   ShellAppVersionControlRoute: typeof ShellAppVersionControlRoute
   ShellAppVoiceStudioRoute: typeof ShellAppVoiceStudioRoute
   ShellAppWebRoute: typeof ShellAppWebRoute
@@ -2974,6 +3036,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppCrmRoute: ShellAppCrmRoute,
   ShellAppCrmStudioRoute: ShellAppCrmStudioRoute,
   ShellAppDashboardRoute: ShellAppDashboardRoute,
+  ShellAppDecisionStudioRoute: ShellAppDecisionStudioRoute,
   ShellAppDeploymentsRoute: ShellAppDeploymentsRoute,
   ShellAppDeveloperRoute: ShellAppDeveloperRoute,
   ShellAppDeveloperPortalRoute: ShellAppDeveloperPortalRoute,
@@ -3009,6 +3072,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppSecurityRoute: ShellAppSecurityRoute,
   ShellAppSeoStudioRoute: ShellAppSeoStudioRoute,
   ShellAppSettingsRoute: ShellAppSettingsRoute,
+  ShellAppSharedIntelligenceRoute: ShellAppSharedIntelligenceRoute,
   ShellAppShopifyConnectRoute: ShellAppShopifyConnectRoute,
   ShellAppSkillsRoute: ShellAppSkillsRoute,
   ShellAppSmartTablesRoute: ShellAppSmartTablesRoute,
@@ -3022,6 +3086,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppThreeDStudioRoute: ShellAppThreeDStudioRoute,
   ShellAppToolMarketplaceRoute: ShellAppToolMarketplaceRoute,
   ShellAppToolsFrameworkRoute: ShellAppToolsFrameworkRoute,
+  ShellAppTrustedSocialVideoRoute: ShellAppTrustedSocialVideoRoute,
   ShellAppVersionControlRoute: ShellAppVersionControlRoute,
   ShellAppVoiceStudioRoute: ShellAppVoiceStudioRoute,
   ShellAppWebRoute: ShellAppWebRoute,
