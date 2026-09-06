@@ -2,6 +2,7 @@ import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import { runGeminiNative, streamGeminiNative } from "./gemini-provider.server";
 import * as base from "./model-gateway.base";
 import type { ChatMessage, ChatResult, Provider, RunArgs, StreamEvent } from "./model-gateway.base";
+import { blackstarAstraContextCompactionOptions } from "./blackstar-astra-context-policy";
 import { compactRunContextInPlace } from "./run-context-journal.server";
 
 export * from "./model-gateway.base";
@@ -187,7 +188,10 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
 
 /** Non-streaming model calls get bounded cross-provider failover. */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
-  compactRunContextInPlace(args.messages);
+  compactRunContextInPlace(
+    args.messages,
+    blackstarAstraContextCompactionOptions(args.provider, args.model),
+  );
   const remembered = activeProviderByConversation.get(args.messages);
   const primaryProvider = remembered?.provider ?? args.provider;
   const primaryModel = remembered?.model ?? resolveModel(primaryProvider, args.model);
@@ -220,7 +224,10 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 /** Streaming shares the same bounded context policy. Gemini uses its native
  * transport and emits the same runtime event contract. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
-  compactRunContextInPlace(args.messages);
+  compactRunContextInPlace(
+    args.messages,
+    blackstarAstraContextCompactionOptions(args.provider, args.model),
+  );
   if (args.provider === "gemini") {
     yield* streamGeminiNative({ ...args, model: resolveModel("gemini", args.model) });
     return;
