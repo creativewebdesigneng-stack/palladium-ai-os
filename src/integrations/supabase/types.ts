@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.5.1"
   }
   public: {
     Tables: {
@@ -3933,6 +3933,104 @@ export type Database = {
           },
         ]
       }
+      model_eval_verified_evidence: {
+        Row: {
+          benchmark_hash: string
+          completed_at: string
+          created_at: string
+          evaluator_hash: string
+          id: string
+          model: string
+          model_config_hash: string
+          model_id: string
+          organization_id: string | null
+          provider: string
+          sample_count: number
+          score: number
+          suite_id: string
+          task_class: string
+          user_id: string
+          verified_at: string
+          verifier: string
+        }
+        Insert: {
+          benchmark_hash: string
+          completed_at: string
+          created_at?: string
+          evaluator_hash: string
+          id?: string
+          model: string
+          model_config_hash: string
+          model_id: string
+          organization_id?: string | null
+          provider: string
+          sample_count: number
+          score: number
+          suite_id: string
+          task_class: string
+          user_id: string
+          verified_at?: string
+          verifier: string
+        }
+        Update: {
+          benchmark_hash?: string
+          completed_at?: string
+          created_at?: string
+          evaluator_hash?: string
+          id?: string
+          model?: string
+          model_config_hash?: string
+          model_id?: string
+          organization_id?: string | null
+          provider?: string
+          sample_count?: number
+          score?: number
+          suite_id?: string
+          task_class?: string
+          user_id?: string
+          verified_at?: string
+          verifier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_eval_verified_evidence_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_eval_verified_evidence_runs: {
+        Row: {
+          evidence_id: string
+          run_id: string
+        }
+        Insert: {
+          evidence_id: string
+          run_id: string
+        }
+        Update: {
+          evidence_id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_eval_verified_evidence_runs_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "model_eval_verified_evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_eval_verified_evidence_runs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "model_eval_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_endpoints: {
         Row: {
           created_at: string
@@ -6641,6 +6739,57 @@ export type Database = {
           },
         ]
       }
+      trusted_media_assets: {
+        Row: {
+          bucket: string
+          created_at: string
+          duration_seconds: number | null
+          filename: string
+          id: string
+          last_error: string | null
+          metadata: Json
+          mime_type: string
+          object_path: string
+          size_bytes: number | null
+          status: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          bucket?: string
+          created_at?: string
+          duration_seconds?: number | null
+          filename: string
+          id?: string
+          last_error?: string | null
+          metadata?: Json
+          mime_type: string
+          object_path: string
+          size_bytes?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          duration_seconds?: number | null
+          filename?: string
+          id?: string
+          last_error?: string | null
+          metadata?: Json
+          mime_type?: string
+          object_path?: string
+          size_bytes?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       usage_records: {
         Row: {
           agent_id: string | null
@@ -7890,6 +8039,45 @@ export type Database = {
       }
       agent_is_visible: { Args: { _agent: string }; Returns: boolean }
       can_access: { Args: { _org: string; _user: string }; Returns: boolean }
+      certify_native_intelligence_model_evaluation: {
+        Args: {
+          p_benchmark_hash: string
+          p_evaluator_hash: string
+          p_model: string
+          p_model_config_hash: string
+          p_model_id: string
+          p_provider: string
+          p_run_ids: string[]
+          p_suite_id: string
+          p_task_class: string
+          p_verifier: string
+        }
+        Returns: {
+          benchmark_hash: string
+          completed_at: string
+          created_at: string
+          evaluator_hash: string
+          id: string
+          model: string
+          model_config_hash: string
+          model_id: string
+          organization_id: string | null
+          provider: string
+          sample_count: number
+          score: number
+          suite_id: string
+          task_class: string
+          user_id: string
+          verified_at: string
+          verifier: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "model_eval_verified_evidence"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       effective_plan: {
         Args: { _org?: string; _user: string }
         Returns: string
