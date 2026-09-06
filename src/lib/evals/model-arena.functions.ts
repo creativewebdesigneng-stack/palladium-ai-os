@@ -143,6 +143,7 @@ export const runModelArena = createServerFn({ method: "POST" })
     const safeSystemPrompt = data.systemPrompt ? applyArenaPolicy(data.systemPrompt, policy, "request") : null;
 
     let astraActivation: Record<string, unknown> | null = null;
+    let astraModel: string | null = null;
     if (data.astraTaskClass) {
       const {
         BLACKSTAR_ASTRA_ENGINE_PROFILE,
@@ -153,8 +154,10 @@ export const runModelArena = createServerFn({ method: "POST" })
       const exactModel = blackstarAstraModelForTaskClass(data.astraTaskClass);
       const hasExactAstraCandidate = data.contestants.some((candidate) => candidate.provider === "compatible" && candidate.model.trim() === exactModel);
       if (!hasExactAstraCandidate) throw new Error("Astra evaluation must include the exact configured Astra serving identity.");
+      astraModel = exactModel;
       astraActivation = {
-        server_verified: true,
+        server_verified: false,
+        provenance_version: 1,
         task_class: data.astraTaskClass,
         provider: "compatible",
         model: exactModel,
@@ -245,7 +248,38 @@ export const runModelArena = createServerFn({ method: "POST" })
       if (scores.length !== responseRows.length) throw new Error("The judge did not score every candidate response.");
       const { error: scoreError } = await sb.from("model_eval_scores").insert(scores);
       if (scoreError) throw new Error(scoreError.message);
-      const { error: completeError } = await sb.from("model_eval_runs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", run.id);
+
+      let completedMetadata: Record<string, unknown> = runMetadata;
+      if (astraActivation && astraModel && data.astraTaskClass) {
+        const { signAstraEvaluationEvidence } = await import("@/lib/evals/astra-evaluation-verifier.server");
+        const provenanceSignature = signAstraEvaluationEvidence({
+          runId: run.id,
+          userId: context.userId,
+          orgId: data.orgId ?? null,
+          taskClass: data.astraTaskClass,
+          model: astraModel,
+          prompt: safePrompt,
+          judgeProvider: data.judge.provider,
+          judgeModel: data.judge.model,
+          criteria,
+          responses: responseRows,
+          scores,
+        });
+        completedMetadata = {
+          ...runMetadata,
+          astra_activation: {
+            ...astraActivation,
+            server_verified: true,
+            provenance_signature: provenanceSignature,
+          },
+        };
+      }
+
+      const { error: completeError } = await sb.from("model_eval_runs").update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        metadata: completedMetadata,
+      }).eq("id", run.id);
       if (completeError) throw new Error(completeError.message);
       await writeAudit({
         userId: context.userId,
