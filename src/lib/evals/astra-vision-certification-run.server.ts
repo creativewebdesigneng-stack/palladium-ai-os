@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { getAstraCertificationBenchmarkCase } from './astra-certification-benchmark-suite'
-import { renderAstraVisionBenchmarkMedia } from './astra-vision-benchmark-media.server'
+import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from './astra-vision-benchmark-media.server'
 import { isTrustedAstraCertificationJudge, judgeMatchesCandidate } from './astra-certification-judge-policy'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
@@ -58,6 +58,7 @@ export async function runTrustedAstraVisionCertificationCase(input: RunInput) {
   if (judgeMatchesCandidate(input.judge, candidates)) throw new Error('Vision certification judge must not also be a candidate model.')
 
   const media = renderAstraVisionBenchmarkMedia(input.caseId)
+  const groundTruth = getAstraVisionBenchmarkGroundTruth(input.caseId)
   const systemPromptHash = hashAstraEvaluationSystemPrompt(null)
   const runMetadata = {
     criteria: [...benchmarkCase.criteria], complianceApplied: false,
@@ -92,15 +93,20 @@ export async function runTrustedAstraVisionCertificationCase(input: RunInput) {
     const judgeResult = await runChatPinned({
       provider: input.judge.provider, model: input.judge.model,
       messages: [
-        { role: 'system', content: 'You are an impartial vision benchmark evaluator. Score each textual answer from 0 to 100 against the supplied visual-grounding criteria. Return ONLY a JSON array with index, score, verdict and reasoning.' },
-        { role: 'user', content: `TRUSTED VISION PROMPT\n${benchmarkCase.prompt}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE ANSWERS\n${anonymized}` },
+        { role: 'system', content: 'You are an impartial benchmark evaluator. Compare each candidate answer against the supplied server-owned visual ground truth and criteria. Score each answer from 0 to 100. Return ONLY a JSON array with index, score, verdict and reasoning.' },
+        { role: 'user', content: `TRUSTED VISION PROMPT\n${benchmarkCase.prompt}\n\nSERVER-OWNED GROUND TRUTH\n${JSON.stringify(groundTruth)}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE ANSWERS\n${anonymized}` },
       ], maxTokens: 1200,
     })
     const judged = parseJudge(judgeResult.text)
     const scores = judged.map((score) => ({
       run_id: run.id, response_id: responseRows[score.index].id, evaluator_type: 'llm_judge', score: score.score,
       verdict: score.verdict, reasoning: score.reasoning,
-      criteria: { names: benchmarkCase.criteria, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model },
+      criteria: {
+        names: benchmarkCase.criteria,
+        judgeProvider: judgeResult.provider,
+        judgeModel: judgeResult.model,
+        benchmarkGroundTruth: groundTruth,
+      },
     }))
     const { error: scoreError } = await db.from('model_eval_scores').insert(scores)
     if (scoreError) throw new Error(scoreError.message)
