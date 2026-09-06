@@ -3,9 +3,12 @@ import {
   type NativeIntelligenceEvaluationEvidence,
   type NativeIntelligenceTaskClass,
 } from './native-intelligence-model-platform'
+import { normaliseProvider } from '@/lib/runtime/model-gateway.base'
 
 export const NATIVE_INTELLIGENCE_VERIFIED_EVIDENCE_SELECT = [
   'model_id',
+  'provider',
+  'model',
   'suite_id',
   'task_class',
   'score',
@@ -55,7 +58,9 @@ function validIsoTimestamp(value: unknown): value is string {
  * Converts a verifier-controlled Evaluation Lab certificate into the narrow
  * evidence contract consumed by Native Intelligence routing.
  *
- * Reproducibility metadata is mandatory at this boundary, but deliberately
+ * Exact provider/model identity remains in the routing contract so evidence
+ * cannot be replayed after a stable model ID is pointed at a different serving
+ * target. Reproducibility hashes are mandatory at this boundary but deliberately
  * discarded after validation. Raw Arena prompts/responses/judge reasoning and
  * execution-authority metadata are not part of this contract.
  */
@@ -65,6 +70,8 @@ export function toNativeIntelligenceEvaluationEvidence(
   if (!isRecord(row)) return null
 
   const modelId = cleanIdentifier(row['model_id'])
+  const providerId = cleanIdentifier(row['provider'])
+  const model = cleanIdentifier(row['model'])
   const suiteId = cleanIdentifier(row['suite_id'])
   const taskClass = row['task_class']
   const score = finiteScore(row['score'])
@@ -72,7 +79,9 @@ export function toNativeIntelligenceEvaluationEvidence(
   const completedAt = row['completed_at']
   const verifiedAt = row['verified_at']
 
-  if (!modelId || !suiteId) return null
+  if (!modelId || !providerId || !model || !suiteId) return null
+  const provider = normaliseProvider(providerId)
+  if (providerId.toLowerCase() !== provider) return null
   if (typeof taskClass !== 'string' || !TASK_CLASSES.has(taskClass as NativeIntelligenceTaskClass)) return null
   if (score === null) return null
   if (!Number.isInteger(sampleCount) || (sampleCount as number) < NATIVE_INTELLIGENCE_MIN_EVAL_SAMPLES) return null
@@ -84,6 +93,8 @@ export function toNativeIntelligenceEvaluationEvidence(
 
   return {
     model_id: modelId,
+    provider,
+    model,
     suite_id: suiteId,
     task_class: taskClass as NativeIntelligenceTaskClass,
     score,
