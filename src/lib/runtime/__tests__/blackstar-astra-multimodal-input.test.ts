@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const tools = vi.hoisted(() => ({ execute: vi.fn() }))
 vi.mock('../tools.server', () => ({ executeTool: tools.execute }))
@@ -26,6 +26,10 @@ function run(granted = true) {
     startedAt: Date.now(),
   } as any
 }
+
+beforeEach(() => {
+  tools.execute.mockReset()
+})
 
 describe('Blackstar Astra private multimodal input', () => {
   it('uses the existing audited astra_vision tool for every private artifact', async () => {
