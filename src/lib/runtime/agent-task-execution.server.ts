@@ -1,7 +1,8 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
-import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
 import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
+import { composeGeneralIntelligencePlanningSystemPrompt } from './general-intelligence-planning-context'
+import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
 import { executePlannedRun } from './planner-runtime.server'
 import { failRun, prepareRun, rescueRuntimeConnectedServiceRead, RuntimeError } from './runtime.server'
 
@@ -43,12 +44,19 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
         return { version: 1 as const, experience_count: 0, strengths: [], cautions: [], evidence: [] }
       }),
     ])
+    const metacognitionControl = renderMetacognitionControl(metacognition)
+    const baseSystemMessage = run.messages[0] ?? { role: 'system' as const, content: '' }
     run = {
       ...run,
       messages: [
-        run.messages[0]!,
-        { role: 'system', content: intelligence.prompt },
-        { role: 'system', content: renderMetacognitionControl(metacognition) },
+        {
+          role: 'system',
+          content: composeGeneralIntelligencePlanningSystemPrompt({
+            baseSystemPrompt: baseSystemMessage.content,
+            intelligenceControl: intelligence.prompt,
+            metacognitionControl,
+          }),
+        },
         ...run.messages.slice(1),
       ],
     }
