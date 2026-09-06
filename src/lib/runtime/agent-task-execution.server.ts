@@ -1,6 +1,7 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
 import { isolateGeneralIntelligenceCurrentTaskContext } from './general-intelligence-context-isolation'
+import { loadGeneralIntelligenceFailureFeedback, renderGeneralIntelligenceFailureFeedback } from './general-intelligence-failure-feedback.server'
 import { loadVerifiedExperienceMetacognition, renderMetacognitionControl } from './general-intelligence-metacognition.server'
 import { composeGeneralIntelligencePlanningSystemPrompt } from './general-intelligence-planning-context'
 import { buildRuntimeIntelligenceControl } from './general-intelligence-runtime'
@@ -37,7 +38,7 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
       ...run,
       messages: isolateGeneralIntelligenceCurrentTaskContext({ messages: run.messages, input: args.input }),
     }
-    const [intelligence, metacognition] = await Promise.all([
+    const [intelligence, metacognition, failureFeedback] = await Promise.all([
       Promise.resolve(buildRuntimeIntelligenceControl({ agent: run.agent, input: args.input })),
       loadVerifiedExperienceMetacognition({
         sb: args.sb,
@@ -49,8 +50,24 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
         console.error('[runtime.metacognition] verified experience load failed', error)
         return { version: 1 as const, experience_count: 0, strengths: [], cautions: [], evidence: [] }
       }),
+      loadGeneralIntelligenceFailureFeedback({
+        sb: args.sb,
+        agentId: run.agent.id,
+      }).catch((error) => {
+        console.error('[runtime.failure-feedback] recent failure pattern load failed', error)
+        return {
+          version: 1 as const,
+          recent_runs: 0,
+          failed_runs: 0,
+          high_replan_runs: 0,
+          recurring_patterns: [],
+        }
+      }),
     ])
-    const metacognitionControl = renderMetacognitionControl(metacognition)
+    const metacognitionControl = [
+      renderMetacognitionControl(metacognition),
+      renderGeneralIntelligenceFailureFeedback(failureFeedback),
+    ].filter(Boolean).join('\n\n')
     const baseSystemMessage = run.messages[0] ?? { role: 'system' as const, content: '' }
     run = {
       ...run,
