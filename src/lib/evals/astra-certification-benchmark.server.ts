@@ -8,6 +8,10 @@ import {
   listAstraCertificationBenchmarkCases,
 } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
+  isTrustedAstraCertificationJudge,
+  judgeMatchesCandidate,
+} from '@/lib/evals/astra-certification-judge-policy'
+import {
   hashAstraEvaluationSystemPrompt,
   signAstraEvaluationEvidence,
   type AstraEvaluationProvenanceInput,
@@ -191,9 +195,19 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (!responses.some((response: any) => response.provider === 'compatible' && response.model === expectedModel)) {
     throw new Error('Evaluation is missing the exact Astra response.')
   }
+
   const judge = actualJudgeIdentity(scores ?? [])
   if (!judge || judge.provider === 'compatible' || judge.model === expectedModel) {
     throw new Error('Astra certification requires a complete independent judge that did not execute through the Astra serving identity.')
+  }
+  if (!isTrustedAstraCertificationJudge(judge.provider, judge.model)) {
+    throw new Error('Astra certification requires a server-approved independent judge identity.')
+  }
+  if (judgeMatchesCandidate(judge, (responses ?? []).map((response: any) => ({
+    provider: response.provider,
+    model: response.model,
+  })))) {
+    throw new Error('Astra certification judge must not also be one of the candidate models.')
   }
 
   const baseProvenance: AstraEvaluationProvenanceInput = {
