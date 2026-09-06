@@ -143,7 +143,7 @@ begin
     raise exception 'At least 20 distinct completed Model Arena runs are required';
   end if;
 
-  select runs.user_id, runs.organization_id
+  select runs.user_id, runs.org_id
   into v_user_id, v_organization_id
   from public.model_eval_runs runs
   where runs.id = v_run_ids[1];
@@ -159,30 +159,30 @@ begin
     and runs.status = 'completed'
     and runs.completed_at is not null
     and runs.user_id = v_user_id
-    and runs.organization_id is not distinct from v_organization_id;
+    and runs.org_id is not distinct from v_organization_id;
 
   if v_valid_run_count <> v_sample_count then
     raise exception 'All source runs must be completed and belong to one exact owner/organization scope';
   end if;
 
+  -- Collapse all successful exact-provider/model responses and their persisted judge
+  -- scores to one score per run before averaging across runs. This prevents runs with
+  -- duplicate responses or additional judge-score rows from receiving extra weight.
   with per_run as (
     select
       runs.id as run_id,
       avg(scores.score)::numeric / 10 as normalized_score,
-      max(runs.completed_at) as completed_at
+      runs.completed_at
     from public.model_eval_runs runs
     join public.model_eval_responses responses
       on responses.run_id = runs.id
       and responses.provider = p_provider
       and responses.model = p_model
-      and responses.error is null
     join public.model_eval_scores scores
       on scores.run_id = runs.id
       and scores.response_id = responses.id
-      and scores.provider = p_provider
-      and scores.model = p_model
     where runs.id = any(v_run_ids)
-    group by runs.id
+    group by runs.id, runs.completed_at
   )
   select
     count(*)::integer,
@@ -253,4 +253,4 @@ comment on table public.model_eval_verified_evidence is
 comment on function public.certify_native_intelligence_model_evaluation(
   uuid[], text, text, text, text, text, text, text, text, text
 ) is
-  'Service-role-only certification of >=20 completed same-scope Model Arena runs. Scores are computed from persisted Arena judge scores and normalized to 0..1.';
+  'Service-role-only certification of >=20 completed same-scope Model Arena runs. Scores are computed from persisted Arena judge scores and normalized to 0..1, with each distinct run weighted exactly once.';
