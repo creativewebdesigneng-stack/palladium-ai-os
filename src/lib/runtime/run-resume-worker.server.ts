@@ -16,6 +16,9 @@ import {
   releaseRunResumeLease,
   type ClaimedRunResume,
 } from "./run-resume.server";
+import { isBlackstarAstraServingIdentity } from "./blackstar-astra-engine-profile";
+import { selectBlackstarAstraReasoningControl } from "./blackstar-astra-reasoning";
+import { buildRuntimeIntelligenceControl } from "./general-intelligence-runtime";
 
 type Sb = { from: (table: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -24,6 +27,27 @@ const MAX_RESUME_ATTEMPTS = 3;
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "Durable resume failed unexpectedly.";
+}
+
+function resumedObjective(run: PreparedRun): string {
+  for (let index = run.messages.length - 1; index >= 0; index -= 1) {
+    const message = run.messages[index];
+    if (message?.role === "user" && message.content.trim()) return message.content.trim().slice(0, 12_000);
+  }
+  return "";
+}
+
+/**
+ * Rebuilds only Astra's bounded compute policy after a durable process resume.
+ * Provider/model provenance was persisted before the interruption, so exact
+ * serving identity is required and no re-routing or authority mutation occurs.
+ */
+export function reasoningControlForResumedAstraRun(run: PreparedRun) {
+  if (!isBlackstarAstraServingIdentity(run.provider, run.model)) return null;
+  const objective = resumedObjective(run);
+  if (!objective) return null;
+  const intelligence = buildRuntimeIntelligenceControl({ agent: run.agent, input: objective });
+  return selectBlackstarAstraReasoningControl(intelligence.assessment);
 }
 
 export function shouldRetryResumedRun(args: {
@@ -91,12 +115,14 @@ export async function resumeOneStaleAgentRun(args: {
   let run: PreparedRun | null = null;
   try {
     run = await prepareClaimedRun(sb, claim);
+    const reasoningControl = reasoningControlForResumedAstraRun(run);
     await setRunState(sb, claim.taskId, "running");
     await executePlannedRun({
       sb,
       userId: claim.userId,
       run,
       resumeCheckpoint: claim.checkpoint,
+      reasoningControl,
     });
     await invalidateDurableRunCheckpoint({ sb, taskId: claim.taskId });
     await releaseRunResumeLease({ sb, taskId: claim.taskId, leaseToken: claim.leaseToken });
