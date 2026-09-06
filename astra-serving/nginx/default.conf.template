@@ -1,0 +1,50 @@
+upstream blackstar_astra_model {
+  server model:8000;
+  keepalive 32;
+}
+
+server {
+  listen 8080;
+  server_name _;
+  server_tokens off;
+
+  client_max_body_size 16m;
+
+  # Blackstar readiness probe. Expose only the exact compatible endpoint needed
+  # by the runtime; the underlying vLLM server is never published directly.
+  location = /v1/models {
+    if ($http_authorization != "Bearer ${BLACKSTAR_ASTRA_API_KEY}") { return 401; }
+    limit_except GET { deny all; }
+
+    proxy_pass http://blackstar_astra_model;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header Authorization "";
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+  }
+
+  # Blackstar's current provider-independent model gateway uses Chat Completions.
+  location = /v1/chat/completions {
+    if ($http_authorization != "Bearer ${BLACKSTAR_ASTRA_API_KEY}") { return 401; }
+    limit_except POST { deny all; }
+
+    proxy_pass http://blackstar_astra_model;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header Authorization "";
+    proxy_buffering off;
+    proxy_request_buffering on;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 60s;
+  }
+
+  # Do not expose vLLM's other routes. Its own API-key mode does not protect all
+  # endpoints, so the external attack surface is an explicit allowlist here.
+  location / {
+    return 404;
+  }
+}
