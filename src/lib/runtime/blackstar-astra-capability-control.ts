@@ -9,6 +9,7 @@ export type BlackstarAstraRunCapability =
   | 'coding'
   | 'artifact_creation'
   | 'vision'
+  | 'multimodal_input'
   | 'memory'
   | 'external_integrations'
   | 'checkpointed_work'
@@ -48,7 +49,10 @@ export function buildBlackstarAstraRunCapabilityControl(
   if (hasAny(tools, ['browser', 'browser_task'])) available.add('computer_use')
   if (hasAny(tools, ['github_write', 'agent_workspace', 'skill_script', 'html_studio', 'app_studio'])) available.add('coding')
   if (hasAny(tools, ['agent_workspace', 'html_studio', 'app_studio', 'voxel_studio', 'three_d_studio', 'short_video'])) available.add('artifact_creation')
-  if (tools.has('astra_vision')) available.add('vision')
+  if (tools.has('astra_vision')) {
+    available.add('vision')
+    available.add('multimodal_input')
+  }
   if (tools.has('astra_async_workflow')) available.add('async_tools')
   if (hasAny(tools, ['memory_search', 'memory_write'])) available.add('memory')
   if (hasAny(tools, ['integration_capabilities', 'integration_action', 'connected_service', 'connected_service_write', 'github_write', 'social_ops'])) {
@@ -58,11 +62,11 @@ export function buildBlackstarAstraRunCapabilityControl(
   const unavailable: string[] = []
   if (!available.has('artifact_creation')) unavailable.push('artifact_creation')
   if (!available.has('vision')) unavailable.push('vision')
+  if (!available.has('multimodal_input')) unavailable.push('multimodal_input')
   if (!available.has('async_tools')) unavailable.push('async_tools')
-  // Direct image/message transport and hidden chain-of-thought persistence are
-  // intentionally not claimed. Async tools are Blackstar-owned durable workflow
-  // hand-offs, not provider-side authority or unrestricted background execution.
-  unavailable.push('multimodal_input', 'persisted_hidden_reasoning')
+  // Hidden chain-of-thought persistence is intentionally never claimed. Blackstar
+  // persists plans, verification state, checkpoints and bounded evidence instead.
+  unavailable.push('persisted_hidden_reasoning')
 
   return {
     version: 1,
@@ -79,6 +83,7 @@ export function renderBlackstarAstraRunCapabilityControl(
     `Available now: ${control.available.join(', ') || 'none'}`,
     `Not available in this run: ${control.unavailable_target_capabilities.join(', ') || 'none'}`,
     'Capability rule: use only capabilities and tools already granted by the Blackstar runtime. This manifest reports authority; it never creates authority.',
+    'Multimodal input means authenticated private image artifact ids are inspected through the owner-scoped Astra vision tool and converted to bounded untrusted visual evidence before planning; raw storage credentials and arbitrary image URLs never enter the language-model context.',
     'Long-running work means Blackstar may checkpoint and resume the same bounded run after interruption; it does not grant extra permissions, tools or external authority.',
     'Async tools mean a granted Astra run may queue an already-authorised active Blackstar workflow for durable background execution; the workflow worker, approvals and step policies remain authoritative.',
     'Do not claim vision, multimodal understanding, external actions, artifacts, async execution or computer use unless they are listed as available for this run and the required tool is actually granted.',
