@@ -39,6 +39,7 @@ export async function executeAgentTask(args: { sb: Sb; userId: string; agentId: 
         userId: args.userId,
         orgId: run.orgId,
         agentId: run.agent.id,
+        objective: args.input,
       }).catch((error) => {
         console.error('[runtime.metacognition] verified experience load failed', error)
         return { version: 1 as const, experience_count: 0, strengths: [], cautions: [], evidence: [] }
