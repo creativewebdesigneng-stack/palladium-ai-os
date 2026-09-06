@@ -11,6 +11,7 @@ import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelForTaskClass,
   isBlackstarAstraEngineConfigured,
+  isBlackstarAstraVisionConfigured,
 } from '@/lib/runtime/blackstar-astra-engine-profile'
 
 type Scope = {
@@ -183,6 +184,9 @@ async function matchingRuns(scope: Scope) {
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
     return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
   }
+  if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) {
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+  }
 
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
   const suiteId = astraCertificationSuiteId(scope.taskClass)
@@ -276,6 +280,8 @@ async function matchingRuns(scope: Scope) {
 }
 
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
+  const visionConfigured = scope.taskClass !== 'vision' || isBlackstarAstraVisionConfigured()
+  const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured
   const { model, runs } = await matchingRuns(scope)
   return {
     taskClass: scope.taskClass,
@@ -283,14 +289,17 @@ export async function getAstraEvaluationCertificationStatus(scope: Scope) {
     model,
     completedRuns: runs.length,
     minimumRuns: MIN_RUNS,
-    readyToCertify: isAstraCertificationTaskClass(scope.taskClass) && runs.length >= MIN_RUNS,
-    certificationSupported: isAstraCertificationTaskClass(scope.taskClass),
+    readyToCertify: supported && runs.length >= MIN_RUNS,
+    certificationSupported: supported,
   }
 }
 
 export async function certifyAstraEvaluation(scope: Scope) {
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
-    throw new Error('Vision certification requires a multimodal benchmark path and cannot be certified by the text-only Model Arena.')
+    throw new Error('This task class does not have a trusted certification benchmark path.')
+  }
+  if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) {
+    throw new Error('Vision certification requires a dedicated multimodal Astra endpoint and BLACKSTAR_ASTRA_VISION_MODEL.')
   }
 
   const { model, runs } = await matchingRuns(scope)
