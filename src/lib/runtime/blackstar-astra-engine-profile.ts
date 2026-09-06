@@ -1,4 +1,7 @@
-import type { NativeIntelligenceModelDescriptor } from '@/lib/ai/native-intelligence-model-platform'
+import type {
+  NativeIntelligenceModelDescriptor,
+  NativeIntelligenceTaskClass,
+} from '@/lib/ai/native-intelligence-model-platform'
 import type { Provider } from './model-gateway.base'
 
 /**
@@ -23,6 +26,12 @@ export const BLACKSTAR_ASTRA_ENGINE_PROFILE = {
   apiKeyEnv: 'OPENAI_COMPATIBLE_API_KEY',
   modelEnv: 'BLACKSTAR_ASTRA_MODEL',
   defaultModel: 'blackstar-astra-v0.1',
+  specialistModelEnvs: {
+    reasoning: 'BLACKSTAR_ASTRA_REASONING_MODEL',
+    coding: 'BLACKSTAR_ASTRA_CODING_MODEL',
+    tool_use: 'BLACKSTAR_ASTRA_AGENTIC_MODEL',
+    agentic: 'BLACKSTAR_ASTRA_AGENTIC_MODEL',
+  },
   routingAuthority: 'verified-evaluation-only',
   executionAuthority: 'none',
   target: {
@@ -50,9 +59,24 @@ export const BLACKSTAR_ASTRA_ENGINE_PROFILE = {
   },
 } as const
 
+function baseAstraModel() {
+  return process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
+    || BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel
+}
+
+export function blackstarAstraModelForTaskClass(taskClass: NativeIntelligenceTaskClass): string {
+  const env = taskClass === 'reasoning'
+    ? BLACKSTAR_ASTRA_ENGINE_PROFILE.specialistModelEnvs.reasoning
+    : taskClass === 'coding'
+      ? BLACKSTAR_ASTRA_ENGINE_PROFILE.specialistModelEnvs.coding
+      : taskClass === 'tool_use' || taskClass === 'agentic'
+        ? BLACKSTAR_ASTRA_ENGINE_PROFILE.specialistModelEnvs.agentic
+        : null
+  return (env ? process.env[env]?.trim() : '') || baseAstraModel()
+}
+
 export function blackstarAstraModelDescriptor(
-  model = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
-    || BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel,
+  model = baseAstraModel(),
 ): NativeIntelligenceModelDescriptor {
   return {
     id: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
@@ -68,9 +92,23 @@ export function blackstarAstraModelDescriptor(
   }
 }
 
+export function blackstarAstraModelDescriptorForTaskClass(
+  taskClass: NativeIntelligenceTaskClass,
+): NativeIntelligenceModelDescriptor {
+  return blackstarAstraModelDescriptor(blackstarAstraModelForTaskClass(taskClass))
+}
+
+function configuredAstraModels(): Set<string> {
+  const models = new Set<string>([baseAstraModel()])
+  for (const env of new Set(Object.values(BLACKSTAR_ASTRA_ENGINE_PROFILE.specialistModelEnvs))) {
+    const value = process.env[env]?.trim()
+    if (value) models.add(value)
+  }
+  return models
+}
+
 export function isBlackstarAstraServingIdentity(provider: Provider, model?: string | null): boolean {
-  const configured = blackstarAstraModelDescriptor()
-  return provider === configured.provider && (model ?? '').trim() === configured.model
+  return provider === 'compatible' && configuredAstraModels().has((model ?? '').trim())
 }
 
 export function isBlackstarAstraEngineConfigured(): boolean {

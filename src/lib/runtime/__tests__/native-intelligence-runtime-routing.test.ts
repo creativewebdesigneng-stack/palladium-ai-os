@@ -83,6 +83,9 @@ afterEach(() => {
   delete process.env['OPENAI_COMPATIBLE_BASE_URL']
   delete process.env['BLACKSTAR_NATIVE_MODEL']
   delete process.env['BLACKSTAR_ASTRA_MODEL']
+  delete process.env['BLACKSTAR_ASTRA_REASONING_MODEL']
+  delete process.env['BLACKSTAR_ASTRA_CODING_MODEL']
+  delete process.env['BLACKSTAR_ASTRA_AGENTIC_MODEL']
 })
 
 describe('Native Intelligence runtime routing', () => {
@@ -137,6 +140,37 @@ describe('Native Intelligence runtime routing', () => {
       },
     })
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.97, 10)
+  })
+
+  it('routes reasoning work to a configured Astra specialist only with an exact specialist certificate', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
+    process.env['BLACKSTAR_ASTRA_REASONING_MODEL'] = 'astra-reasoning-specialist-v1'
+    const sb = createFakeSupabase({
+      model_eval_verified_evidence: [astraCertificate({ model: 'astra-reasoning-specialist-v1' })],
+    }) as any
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+
+    expect(resolved).toMatchObject({
+      provider: 'compatible',
+      model: 'astra-reasoning-specialist-v1',
+      decision: {
+        model_id: 'blackstar-astra-v0.1',
+        source: 'verified_evaluation',
+      },
+    })
+  })
+
+  it('fails back when a certified Astra specialist is rebound to a different model', async () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'http://blackstar.invalid/v1'
+    process.env['BLACKSTAR_ASTRA_REASONING_MODEL'] = 'astra-reasoning-specialist-v2'
+    const sb = createFakeSupabase({
+      model_eval_verified_evidence: [astraCertificate({ model: 'astra-reasoning-specialist-v1' })],
+    }) as any
+    const resolved = await resolveNativeIntelligenceRuntimeRouting({ sb, userId: USER, run: run() })
+
+    expect(resolved.provider).toBe('openai')
+    expect(resolved.model).toBe('gpt-5-mini')
+    expect(resolved.decision?.source).toBe('explicit_fallback')
   })
 
   it('does not replay Astra evidence after its serving model is rebound', async () => {

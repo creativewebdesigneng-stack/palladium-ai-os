@@ -12,7 +12,7 @@ import {
 import type { Agent, PreparedRun } from './runtime.server'
 import { blackstarNativeModelDescriptor } from './blackstar-native-inference-profile'
 import {
-  blackstarAstraModelDescriptor,
+  blackstarAstraModelDescriptorForTaskClass,
   isBlackstarAstraEngineConfigured,
 } from './blackstar-astra-engine-profile'
 
@@ -117,8 +117,8 @@ export async function persistNativeIntelligenceRuntimeRouting(args: {
  * configured.
  *
  * Blackstar Astra-class is a candidate intelligence engine, not an authority
- * source. It can only win routing through exact, fresh, verified evaluation
- * evidence for its bound provider/model identity.
+ * source. Its task-class specialist may only win routing through exact, fresh,
+ * verified evidence for the specialist's bound provider/model identity.
  *
  * This function never changes the run's tools, approvals, identity, agent,
  * organisation, delegation, or execution permissions.
@@ -137,7 +137,7 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
   if (nativeConfigured) pushDistinctModel(models, native)
 
   if (isBlackstarAstraEngineConfigured()) {
-    pushDistinctModel(models, blackstarAstraModelDescriptor())
+    pushDistinctModel(models, blackstarAstraModelDescriptorForTaskClass(taskClass))
   }
 
   let evidence: ReturnType<typeof mapNativeIntelligenceEvaluationEvidence> = []
