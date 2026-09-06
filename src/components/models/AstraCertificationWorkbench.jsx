@@ -9,6 +9,10 @@ import {
   getAstraCertificationBenchmark,
 } from '@/lib/evals/astra-certification-benchmark.functions';
 import {
+  ASTRA_CERTIFICATION_JUDGES,
+  judgeMatchesCandidate,
+} from '@/lib/evals/astra-certification-judge-policy';
+import {
   certifyAstraTaskClass,
   getAstraCertificationStatus,
 } from '@/lib/evals/astra-evaluation-verifier.functions';
@@ -16,13 +20,14 @@ import { runModelArena } from '@/lib/evals/model-arena.functions';
 
 const TASK_CLASSES = ['general', 'reasoning', 'coding', 'tool_use', 'agentic', 'vision'];
 const PROVIDERS = ['groq', 'openai', 'anthropic', 'deepseek', 'lovable'];
+const DEFAULT_JUDGE = ASTRA_CERTIFICATION_JUDGES[0];
 
 export default function AstraCertificationWorkbench() {
   const { session } = useWorkspace();
   const queryClient = useQueryClient();
   const [taskClass, setTaskClass] = useState('reasoning');
-  const [reference, setReference] = useState({ provider: 'groq', model: 'openai/gpt-oss-20b' });
-  const [judge, setJudge] = useState({ provider: 'groq', model: 'openai/gpt-oss-20b' });
+  const [reference, setReference] = useState({ provider: 'openai', model: 'gpt-5-mini' });
+  const [judge, setJudge] = useState(() => ({ provider: DEFAULT_JUDGE.provider, model: DEFAULT_JUDGE.model }));
   const [activeCaseId, setActiveCaseId] = useState(null);
 
   const benchmarkFn = useServerFn(getAstraCertificationBenchmark);
@@ -48,10 +53,17 @@ export default function AstraCertificationWorkbench() {
     () => benchmark.data?.cases?.find((entry) => !entry.completed) ?? null,
     [benchmark.data],
   );
+  const judgeIsCandidate = useMemo(
+    () => judgeMatchesCandidate(judge, [reference]),
+    [judge, reference],
+  );
 
   const runCase = useMutation({
     mutationFn: async (benchmarkCase) => {
       if (!status.data?.model) throw new Error('Astra serving identity is unavailable.');
+      if (judgeMatchesCandidate(judge, [reference])) {
+        throw new Error('The trusted judge must be different from every candidate model.');
+      }
       const run = await runFn({
         data: {
           name: benchmarkCase.name,
@@ -101,7 +113,11 @@ export default function AstraCertificationWorkbench() {
   const supported = benchmark.data?.certificationSupported !== false;
   const completed = benchmark.data?.completedCases ?? 0;
   const total = benchmark.data?.totalCases ?? 20;
-  const canRun = supported && Boolean(status.data?.model) && reference.model.trim() && judge.model.trim();
+  const canRun = supported
+    && Boolean(status.data?.model)
+    && Boolean(reference.model.trim())
+    && Boolean(judge.model.trim())
+    && !judgeIsCandidate;
 
   return (
     <section className="mb-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.035] p-5">
@@ -112,7 +128,7 @@ export default function AstraCertificationWorkbench() {
             <h2 className="text-sm font-semibold text-white">Astra Certification Workbench</h2>
           </div>
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-zinc-400">
-            Runs Blackstar's versioned server-owned benchmark cases through the existing Model Arena, then trusted-attests the persisted evidence. Arbitrary prompts and duplicate cases never advance certification.
+            Runs Blackstar's versioned server-owned benchmark cases through the existing Model Arena, then trusted-attests the persisted evidence. Arbitrary prompts, duplicate cases, unapproved judges, and self-judged candidate runs never advance certification.
           </p>
         </div>
         <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-right">
@@ -129,8 +145,14 @@ export default function AstraCertificationWorkbench() {
           </select>
         </label>
         <ProviderModel label="Reference candidate" value={reference} onChange={setReference} />
-        <ProviderModel label="Independent judge" value={judge} onChange={setJudge} />
+        <TrustedJudge value={judge} onChange={setJudge} />
       </div>
+
+      {judgeIsCandidate && (
+        <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">
+          The certification judge must be different from every candidate. Choose another reference model or trusted judge.
+        </p>
+      )}
 
       {(benchmark.isLoading || status.isLoading) && <p className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading trusted suite…</p>}
       {(benchmark.error || status.error) && <p className="mt-4 text-xs text-rose-300">{friendlyMessage(benchmark.error ?? status.error)}</p>}
@@ -203,6 +225,29 @@ function ProviderModel({ label, value, onChange }) {
         </select>
         <input value={value.model} onChange={(event) => onChange({ ...value, model: event.target.value })} className="input" placeholder="Model ID" />
       </div>
+    </label>
+  );
+}
+
+function TrustedJudge({ value, onChange }) {
+  const selected = `${value.provider}::${value.model}`;
+  return (
+    <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+      Trusted independent judge
+      <select
+        value={selected}
+        onChange={(event) => {
+          const next = ASTRA_CERTIFICATION_JUDGES.find((entry) => `${entry.provider}::${entry.model}` === event.target.value);
+          if (next) onChange({ provider: next.provider, model: next.model });
+        }}
+        className="input mt-1.5 w-full"
+      >
+        {ASTRA_CERTIFICATION_JUDGES.map((entry) => (
+          <option key={`${entry.provider}/${entry.model}`} value={`${entry.provider}::${entry.model}`}>
+            {entry.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
