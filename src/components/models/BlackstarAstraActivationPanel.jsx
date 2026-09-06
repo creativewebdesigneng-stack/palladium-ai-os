@@ -14,6 +14,12 @@ function statusClass(ready) {
     : 'border-amber-400/20 bg-amber-400/[.04] text-amber-200';
 }
 
+function servingHealthClass(health) {
+  if (health === 'healthy') return 'text-emerald-300';
+  if (health === 'degraded') return 'text-amber-300';
+  return 'text-rose-300';
+}
+
 export default function BlackstarAstraActivationPanel({ readiness }) {
   const summary = deriveAstraActivationSummary(readiness);
 
@@ -39,7 +45,7 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
             <ShieldCheck className="h-4 w-4 text-violet-300" />
             <h2 className="text-sm font-semibold text-white">Blackstar Astra-class Engine</h2>
           </div>
-          <p className="mt-1 text-[11px] text-zinc-500">Blackstar-owned serving and evidence infrastructure. Configuration or health never grants routing authority.</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Blackstar-owned serving and evidence infrastructure. Configuration, health and latency never grant routing authority.</p>
         </div>
         <span className={`rounded-xl border px-3 py-1.5 text-[10px] font-medium ${summary.state === 'routing_ready' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>
           {summary.label}
@@ -64,9 +70,9 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
 
       {readiness.models?.length ? (
         <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3">
-          <table className="w-full min-w-[620px] text-left text-xs">
+          <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
-              <tr><th className="pb-2 font-medium">Task classes</th><th className="pb-2 font-medium">Model</th><th className="pb-2 font-medium">Serving</th><th className="pb-2 font-medium">Probe</th></tr>
+              <tr><th className="pb-2 font-medium">Task classes</th><th className="pb-2 font-medium">Model</th><th className="pb-2 font-medium">Serving</th><th className="pb-2 font-medium">Health</th><th className="pb-2 font-medium">Latency</th><th className="pb-2 font-medium">Probe</th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {readiness.models.map((model) => (
@@ -74,6 +80,8 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
                   <td className="py-2.5 pr-3 text-zinc-400">{model.task_classes.join(' · ')}</td>
                   <td className="py-2.5 pr-3"><code className="text-violet-200">{model.model}</code></td>
                   <td className={`py-2.5 pr-3 ${model.serving_ready ? 'text-emerald-300' : 'text-amber-300'}`}>{model.serving_ready ? 'Ready' : 'Not ready'}</td>
+                  <td className={`py-2.5 pr-3 capitalize ${servingHealthClass(model.serving_health)}`}>{model.serving_health ?? 'unavailable'}</td>
+                  <td className="py-2.5 pr-3 text-zinc-400">{Number.isFinite(model.latency_ms) ? `${model.latency_ms} ms` : '—'}</td>
                   <td className="py-2.5 text-zinc-500">{model.serving_reason}</td>
                 </tr>
               ))}
