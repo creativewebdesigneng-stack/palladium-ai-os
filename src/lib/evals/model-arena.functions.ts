@@ -144,20 +144,24 @@ export const runModelArena = createServerFn({ method: "POST" })
 
     let astraActivation: Record<string, unknown> | null = null;
     let astraModel: string | null = null;
+    let astraSystemPromptHash: string | null = null;
     if (data.astraTaskClass) {
       const {
         BLACKSTAR_ASTRA_ENGINE_PROFILE,
         blackstarAstraModelForTaskClass,
         isBlackstarAstraEngineConfigured,
       } = await import("@/lib/runtime/blackstar-astra-engine-profile");
+      const { hashAstraEvaluationSystemPrompt } = await import("@/lib/evals/astra-evaluation-verifier.server");
       if (!isBlackstarAstraEngineConfigured()) throw new Error("Blackstar Astra serving is not configured on this deployment.");
       const exactModel = blackstarAstraModelForTaskClass(data.astraTaskClass);
       const hasExactAstraCandidate = data.contestants.some((candidate) => candidate.provider === "compatible" && candidate.model.trim() === exactModel);
       if (!hasExactAstraCandidate) throw new Error("Astra evaluation must include the exact configured Astra serving identity.");
       astraModel = exactModel;
+      astraSystemPromptHash = hashAstraEvaluationSystemPrompt(safeSystemPrompt);
       astraActivation = {
         server_verified: false,
-        provenance_version: 1,
+        provenance_version: 3,
+        system_prompt_hash: astraSystemPromptHash,
         task_class: data.astraTaskClass,
         provider: "compatible",
         model: exactModel,
@@ -250,7 +254,7 @@ export const runModelArena = createServerFn({ method: "POST" })
       if (scoreError) throw new Error(scoreError.message);
 
       let completedMetadata: Record<string, unknown> = runMetadata;
-      if (astraActivation && astraModel && data.astraTaskClass) {
+      if (astraActivation && astraModel && astraSystemPromptHash && data.astraTaskClass) {
         const { signAstraEvaluationEvidence } = await import("@/lib/evals/astra-evaluation-verifier.server");
         const provenanceSignature = signAstraEvaluationEvidence({
           runId: run.id,
@@ -259,6 +263,7 @@ export const runModelArena = createServerFn({ method: "POST" })
           taskClass: data.astraTaskClass,
           model: astraModel,
           prompt: safePrompt,
+          systemPromptHash: astraSystemPromptHash,
           judgeProvider: data.judge.provider,
           judgeModel: data.judge.model,
           criteria,
