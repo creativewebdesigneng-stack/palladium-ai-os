@@ -210,11 +210,9 @@ export function parseDurableRunCheckpoint(value: unknown): DurableRunCheckpoint 
   if (![input, output, toolRounds, toolCallCount].every(Number.isFinite)) return null;
 
   const checkpoint = value as DurableRunCheckpoint;
+  const { decision_state: _untrustedDecisionState, ...base } = checkpoint;
   const decisionState = parseDecisionState(row["decision_state"]);
-  return {
-    ...checkpoint,
-    ...(decisionState ? { decision_state: decisionState } : { decision_state: undefined }),
-  };
+  return decisionState ? { ...base, decision_state: decisionState } : base;
 }
 
 export async function persistDurableRunCheckpoint(args: {
