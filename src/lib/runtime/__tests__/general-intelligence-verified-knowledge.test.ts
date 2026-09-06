@@ -23,7 +23,7 @@ function queryWith(data: unknown[]) {
   for (const method of ['select', 'eq', 'in', 'order', 'limit', 'is']) {
     query[method] = vi.fn(() => query)
   }
-  query.then = (resolve: (value: unknown) => void) => resolve({ data, error: null })
+  query['then'] = (resolve: (value: unknown) => void) => resolve({ data, error: null })
   return query
 }
 
@@ -41,11 +41,11 @@ describe('General Intelligence verified knowledge loader', () => {
     })
 
     expect(sb.from).toHaveBeenCalledWith('agent_memories')
-    expect(query.select).toHaveBeenCalledWith('user_id,org_id,agent_id,task_id,category,source,metadata')
-    expect(query.select.mock.calls[0]?.[0]).not.toContain('content')
-    expect(query.eq).toHaveBeenCalledWith('user_id', 'user-1')
-    expect(query.eq).toHaveBeenCalledWith('org_id', 'org-1')
-    expect(query.in).toHaveBeenCalledWith('agent_id', ['agent-a'])
+    expect(query['select']).toHaveBeenCalledWith('user_id,org_id,agent_id,task_id,category,source,metadata')
+    expect(query['select'].mock.calls[0]?.[0]).not.toContain('content')
+    expect(query['eq']).toHaveBeenCalledWith('user_id', 'user-1')
+    expect(query['eq']).toHaveBeenCalledWith('org_id', 'org-1')
+    expect(query['in']).toHaveBeenCalledWith('agent_id', ['agent-a'])
     expect(result).toHaveLength(1)
     expect(result[0]?.verified_outcome).toBe('Rollback was verified.')
   })
@@ -62,8 +62,8 @@ describe('General Intelligence verified knowledge loader', () => {
       authorisedSourceAgentIds: ['agent-a'],
     })
 
-    expect(query.is).toHaveBeenCalledWith('org_id', null)
-    expect(query.eq).not.toHaveBeenCalledWith('org_id', expect.anything())
+    expect(query['is']).toHaveBeenCalledWith('org_id', null)
+    expect(query['eq']).not.toHaveBeenCalledWith('org_id', expect.anything())
   })
 
   it('does not query when no independent authorised source agent exists', async () => {
