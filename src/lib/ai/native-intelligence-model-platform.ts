@@ -34,6 +34,8 @@ export type NativeIntelligenceModelDescriptor = {
 
 export type NativeIntelligenceEvaluationEvidence = {
   model_id: string
+  provider: Provider
+  model: string
   suite_id: string
   task_class: NativeIntelligenceTaskClass
   score: number
@@ -96,7 +98,7 @@ function eligibleModel(
 }
 
 function qualifiedEvidenceScore(
-  modelId: string,
+  descriptor: NativeIntelligenceModelDescriptor,
   taskClass: NativeIntelligenceTaskClass,
   evidence: readonly NativeIntelligenceEvaluationEvidence[],
   request: NativeIntelligenceRoutingRequest,
@@ -106,7 +108,9 @@ function qualifiedEvidenceScore(
   const maxAge = Math.max(0, request.max_evidence_age_ms ?? NATIVE_INTELLIGENCE_MAX_EVIDENCE_AGE_MS)
   const rows = evidence.filter((row) => {
     const completedAt = Date.parse(row.completed_at)
-    return row.model_id === modelId &&
+    return row.model_id === descriptor.id &&
+      row.provider === descriptor.provider &&
+      row.model === descriptor.model &&
       row.task_class === taskClass &&
       row.verified &&
       Number.isFinite(row.score) &&
@@ -132,9 +136,9 @@ function qualifiedEvidenceScore(
  * This function can select a Blackstar-owned model or an external model, but it
  * does not grant tools, approvals, capabilities, identities, delegation rights,
  * or execution authority. A model only wins automatically when reproducible,
- * verified and sufficiently recent evaluation evidence exists for the requested
- * task class. Without qualified evidence the caller must provide an explicit
- * fallback model.
+ * verified, sufficiently recent evidence exists for the exact provider/model
+ * transport currently described by that model ID. Without qualified evidence
+ * the caller must provide an explicit fallback model.
  */
 export function selectNativeIntelligenceModel(args: {
   models: readonly NativeIntelligenceModelDescriptor[]
@@ -145,7 +149,7 @@ export function selectNativeIntelligenceModel(args: {
   const scored = eligible
     .map((descriptor) => ({
       descriptor,
-      evaluation: qualifiedEvidenceScore(descriptor.id, args.request.task_class, args.evidence, args.request),
+      evaluation: qualifiedEvidenceScore(descriptor, args.request.task_class, args.evidence, args.request),
     }))
     .filter((row): row is { descriptor: NativeIntelligenceModelDescriptor; evaluation: QualifiedScore } =>
       row.evaluation !== null,
