@@ -23,14 +23,18 @@ import {
   BLACKSTAR_ASTRA_VISION_TOOL_DEF,
   runBlackstarAstraVisionTool,
 } from "./blackstar-astra-vision-tool.server";
+import {
+  BLACKSTAR_ASTRA_ASYNC_WORKFLOW_TOOL_DEF,
+  runBlackstarAstraAsyncWorkflowTool,
+} from "./blackstar-astra-async-workflow-tool.server";
 import { assertHarnessToolInput } from "./agent-harness";
 
 export type { ToolContext, ToolGrant } from "./tools-core.server";
 
-const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF, VOXEL_STUDIO_TOOL_DEF, THREE_D_STUDIO_TOOL_DEF, SHORT_VIDEO_TOOL_DEF, BLACKSTAR_ASTRA_VISION_TOOL_DEF] as const;
+const LOCAL_TOOL_DEFS = [SKILL_SCRIPT_TOOL_DEF, SOCIAL_OPS_TOOL_DEF, HTML_STUDIO_TOOL_DEF, AGENT_WORKSPACE_TOOL_DEF, SEO_TOOL_DEF, APP_STUDIO_TOOL_DEF, VOXEL_STUDIO_TOOL_DEF, THREE_D_STUDIO_TOOL_DEF, SHORT_VIDEO_TOOL_DEF, BLACKSTAR_ASTRA_VISION_TOOL_DEF, BLACKSTAR_ASTRA_ASYNC_WORKFLOW_TOOL_DEF] as const;
 const LOCAL_TOOL_NAMES = new Set<string>(LOCAL_TOOL_DEFS.map((item) => item.name));
 
-export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio", "voxel_studio", "three_d_studio", "short_video", "astra_vision"];
+export const TOOL_SLUGS = [...CORE_TOOL_SLUGS, "skill_script", "social_ops", "html_studio", "agent_workspace", "seo_ops", "app_studio", "voxel_studio", "three_d_studio", "short_video", "astra_vision", "astra_async_workflow"];
 export const TOOL_MANIFEST = [
   ...CORE_TOOL_MANIFEST,
   { slug: "skill_script", description: SKILL_SCRIPT_TOOL_DEF.description, sensitive: false },
@@ -43,6 +47,7 @@ export const TOOL_MANIFEST = [
   { slug: "three_d_studio", description: THREE_D_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "short_video", description: SHORT_VIDEO_TOOL_DEF.description, sensitive: false },
   { slug: "astra_vision", description: BLACKSTAR_ASTRA_VISION_TOOL_DEF.description, sensitive: false },
+  { slug: "astra_async_workflow", description: BLACKSTAR_ASTRA_ASYNC_WORKFLOW_TOOL_DEF.description, sensitive: false },
 ];
 
 const PLAN_RANK: Record<string, number> = {
@@ -182,7 +187,9 @@ export async function executeTool(
                     ? await runThreeDStudioTool(input, { userId: ctx.userId, sb: ctx.sb })
                     : name === "short_video"
                       ? await runShortVideoTool(input, { userId: ctx.userId, sb: ctx.sb })
-                      : await runBlackstarAstraVisionTool(input, localCtx);
+                      : name === "astra_vision"
+                        ? await runBlackstarAstraVisionTool(input, localCtx)
+                        : await runBlackstarAstraAsyncWorkflowTool(input, localCtx);
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
