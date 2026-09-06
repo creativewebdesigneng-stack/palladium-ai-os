@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
+import {
+  hashAstraEvaluationSystemPrompt,
+  signAstraEvaluationEvidence,
+} from './astra-evaluation-verifier.server'
 
 const originalServiceRoleKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
 
@@ -10,6 +13,7 @@ const baseEvidence = {
   taskClass: 'reasoning' as const,
   model: 'blackstar-astra-reasoning',
   prompt: 'Solve the evaluation problem.',
+  systemPromptHash: hashAstraEvaluationSystemPrompt(null),
   judgeProvider: 'anthropic',
   judgeModel: 'judge-model',
   criteria: ['correctness', 'reasoning'],
@@ -43,7 +47,7 @@ describe('Astra evaluation provenance', () => {
     expect(signAstraEvaluationEvidence(baseEvidence)).toBe(signAstraEvaluationEvidence(baseEvidence))
   })
 
-  it('binds the signature to run identity, response content, and judge score', () => {
+  it('binds the signature to run identity, response content, judge score, and system prompt state', () => {
     process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'test-service-role-provenance-key'
     const signature = signAstraEvaluationEvidence(baseEvidence)
 
@@ -61,5 +65,15 @@ describe('Astra evaluation provenance', () => {
       ...baseEvidence,
       scores: [{ ...baseEvidence.scores[0]!, score: 100 }],
     })).not.toBe(signature)
+
+    expect(signAstraEvaluationEvidence({
+      ...baseEvidence,
+      systemPromptHash: hashAstraEvaluationSystemPrompt('hidden benchmark steering'),
+    })).not.toBe(signature)
+  })
+
+  it('normalises an empty system prompt to the same clean-context hash', () => {
+    expect(hashAstraEvaluationSystemPrompt(null)).toBe(hashAstraEvaluationSystemPrompt('   '))
+    expect(hashAstraEvaluationSystemPrompt('hidden')).not.toBe(hashAstraEvaluationSystemPrompt(null))
   })
 })
