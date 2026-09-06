@@ -133,6 +133,9 @@ describe('Native Intelligence Evaluation Lab evidence', () => {
       },
     })
 
+    expect(decision).not.toBeNull()
+    if (!decision) throw new Error('Expected Native Intelligence selector to return a decision')
+
     expect(decision).toMatchObject({
       model_id: native.id,
       ownership: 'blackstar',
