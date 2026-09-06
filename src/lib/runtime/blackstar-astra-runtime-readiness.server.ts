@@ -105,6 +105,6 @@ export async function resolveBlackstarAstraRuntimeReadiness(args: {
     certification_note:
       'Routing infrastructure readiness does not mean a model is certified. Each task class and exact provider/model identity still requires fresh verifier-owned Model Arena evidence before Astra can win routing.',
     authority_note:
-      'Readiness and health telemetry are operational metadata only. They grant no tools, approvals, permissions, identity, delegation, verification bypass or execution authority.',
+      'Readiness and health telemetry are operational metadata only and grants no tools, approvals, permissions, identity, delegation, verification bypass or execution authority.',
   }
 }
