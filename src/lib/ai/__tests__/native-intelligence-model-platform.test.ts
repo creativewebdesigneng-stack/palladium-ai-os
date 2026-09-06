@@ -36,13 +36,22 @@ const native: NativeIntelligenceModelDescriptor = {
 
 const NOW = '2026-09-06T12:00:00.000Z'
 
+function descriptorFor(modelId: string): NativeIntelligenceModelDescriptor {
+  if (modelId === native.id) return native
+  if (modelId === external.id) return external
+  return { ...external, id: modelId }
+}
+
 function evidence(
   model_id: string,
   score: number,
   overrides: Partial<NativeIntelligenceEvaluationEvidence> = {},
 ): NativeIntelligenceEvaluationEvidence {
+  const descriptor = descriptorFor(model_id)
   return {
     model_id,
+    provider: descriptor.provider,
+    model: descriptor.model,
     suite_id: 'reasoning-suite-v1',
     task_class: 'reasoning',
     score,
@@ -188,7 +197,11 @@ describe('Blackstar Native Intelligence model platform', () => {
       models: [external, tinyVisionless],
       evidence: [
         evidence(external.id, 0.70, { task_class: 'agentic' }),
-        evidence(tinyVisionless.id, 0.99, { task_class: 'agentic' }),
+        evidence(tinyVisionless.id, 0.99, {
+          provider: tinyVisionless.provider,
+          model: tinyVisionless.model,
+          task_class: 'agentic',
+        }),
       ],
       request: {
         task_class: 'agentic',
@@ -210,7 +223,7 @@ describe('Blackstar Native Intelligence model platform', () => {
       evidence: [
         evidence(native.id, 0.90, { sample_count: 20 }),
         evidence(native.id, 0.80, { sample_count: 80, suite_id: 'reasoning-suite-v2' }),
-        evidence(alternate.id, 0.82, { sample_count: 100 }),
+        evidence(alternate.id, 0.82, { provider: alternate.provider, model: alternate.model, sample_count: 100 }),
       ],
       request: { task_class: 'reasoning', now: NOW },
     })
