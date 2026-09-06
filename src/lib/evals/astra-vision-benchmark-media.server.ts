@@ -7,6 +7,13 @@ export type AstraVisionBenchmarkMedia = {
   digest: string
 }
 
+export type AstraVisionBenchmarkGroundTruth = {
+  barCount: number
+  leftMostBarColor: 'red' | 'blue' | 'green' | 'gold' | 'purple'
+  markerHalf: 'left' | 'right'
+  shortestToTallestPositions: number[]
+}
+
 type RGB = readonly [number, number, number]
 const WHITE: RGB = [255, 255, 255]
 const BLACK: RGB = [20, 20, 24]
@@ -16,6 +23,34 @@ const GREEN: RGB = [45, 170, 90]
 const GOLD: RGB = [225, 170, 35]
 const PURPLE: RGB = [135, 70, 200]
 const COLORS = [RED, BLUE, GREEN, GOLD, PURPLE] as const
+const COLOR_NAMES = ['red', 'blue', 'green', 'gold', 'purple'] as const
+
+function benchmarkIndex(caseId: string): number {
+  const match = /^v1-(\d{2})-/.exec(caseId)
+  if (!match) throw new Error('Unknown Astra vision benchmark case.')
+  const index = Number(match[1]) - 1
+  if (!Number.isInteger(index) || index < 0 || index >= 20) throw new Error('Unknown Astra vision benchmark case.')
+  return index
+}
+
+function barHeights(index: number): number[] {
+  const count = 2 + (index % 5)
+  return Array.from({ length: count }, (_, i) => 18 + ((index * 11 + i * 17) % 58))
+}
+
+export function getAstraVisionBenchmarkGroundTruth(caseId: string): AstraVisionBenchmarkGroundTruth {
+  const index = benchmarkIndex(caseId)
+  const heights = barHeights(index)
+  return {
+    barCount: heights.length,
+    leftMostBarColor: COLOR_NAMES[index % COLOR_NAMES.length]!,
+    markerHalf: index % 2 === 0 ? 'left' : 'right',
+    shortestToTallestPositions: heights
+      .map((height, position) => ({ height, position: position + 1 }))
+      .sort((a, b) => a.height - b.height)
+      .map((entry) => entry.position),
+  }
+}
 
 function crc32(data: Uint8Array): number {
   let crc = 0xffffffff
@@ -81,31 +116,25 @@ function line(pixels: Uint8Array, width: number, height: number, x1: number, y1:
 }
 
 export function renderAstraVisionBenchmarkMedia(caseId: string): AstraVisionBenchmarkMedia {
-  const match = /^v1-(\d{2})-/.exec(caseId)
-  if (!match) throw new Error('Unknown Astra vision benchmark case.')
-  const index = Number(match[1]) - 1
-  if (!Number.isInteger(index) || index < 0 || index >= 20) throw new Error('Unknown Astra vision benchmark case.')
-
+  const index = benchmarkIndex(caseId)
   const width = 160
   const height = 120
   const pixels = new Uint8Array(width * height * 4)
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) setPixel(pixels, width, x, y, WHITE)
 
-  // Each case is visually distinct while remaining deterministic and machine-verifiable.
-  const count = 2 + (index % 5)
+  const heights = barHeights(index)
   const primary = COLORS[index % COLORS.length]!
   const secondary = COLORS[(index + 2) % COLORS.length]!
   rect(pixels, width, height, 8, 8, 144, 104, [245, 245, 247])
   line(pixels, width, height, 16, 96, 144, 96, BLACK)
   line(pixels, width, height, 16, 20, 16, 96, BLACK)
 
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < heights.length; i += 1) {
     const barWidth = 14
-    const barHeight = 18 + ((index * 11 + i * 17) % 58)
+    const barHeight = heights[i]!
     const x = 25 + i * 22
     rect(pixels, width, height, x, 95 - barHeight, barWidth, barHeight, i % 2 === 0 ? primary : secondary)
   }
-  // A small marker gives spatial-relation cases an independent feature.
   const markerLeft = index % 2 === 0
   rect(pixels, width, height, markerLeft ? 24 : 126, 16 + (index % 3) * 9, 10, 10, GOLD)
 
