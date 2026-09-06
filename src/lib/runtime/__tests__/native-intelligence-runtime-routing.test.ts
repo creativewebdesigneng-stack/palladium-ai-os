@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createFakeSupabase } from './fake-supabase'
-import { resolveNativeIntelligenceRuntimeRouting } from '../native-intelligence-runtime-routing.server'
+import {
+  persistNativeIntelligenceRuntimeRouting,
+  resolveNativeIntelligenceRuntimeRouting,
+} from '../native-intelligence-runtime-routing.server'
 import type { PreparedRun } from '../runtime.server'
 
 const USER = 'user-1'
@@ -100,6 +103,32 @@ describe('Native Intelligence runtime routing', () => {
       },
     })
     expect(resolved.decision?.evaluation_score).toBeCloseTo(0.94, 10)
+  })
+
+  it('persists the actual routed provider/model without persisting routing authority metadata', async () => {
+    const sb = createFakeSupabase({
+      agent_tasks: [{
+        id: 'task-1',
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        tool_grants: ['existing-tool'],
+        approval_granted: false,
+      }],
+    }) as any
+
+    await persistNativeIntelligenceRuntimeRouting({
+      sb,
+      taskId: 'task-1',
+      routing: { provider: 'compatible', model: 'blackstar-native-v0.1' },
+    })
+
+    expect(sb.tables['agent_tasks'][0]).toEqual({
+      id: 'task-1',
+      provider: 'compatible',
+      model: 'blackstar-native-v0.1',
+      tool_grants: ['existing-tool'],
+      approval_granted: false,
+    })
   })
 
   it('does not route to the native slot when the native transport is not configured', async () => {
