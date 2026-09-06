@@ -1,0 +1,60 @@
+services:
+  model:
+    image: vllm/vllm-openai:v0.28.0
+    restart: unless-stopped
+    ipc: host
+    gpus: all
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+      - vllm-cache:/root/.cache/vllm
+    command:
+      - --model
+      - ${BLACKSTAR_MODEL_REPOSITORY:?Set BLACKSTAR_MODEL_REPOSITORY}
+      - --served-model-name
+      - ${BLACKSTAR_SERVED_MODEL_NAME:-blackstar-astra-v0.1}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --dtype
+      - auto
+      - --enable-prefix-caching
+      - --max-model-len
+      - ${BLACKSTAR_MAX_MODEL_LEN:-131072}
+      - --tensor-parallel-size
+      - ${BLACKSTAR_TENSOR_PARALLEL_SIZE:-1}
+      - --gpu-memory-utilization
+      - ${BLACKSTAR_GPU_MEMORY_UTILIZATION:-0.90}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/models', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+  gateway:
+    image: nginx:1.28.0-alpine
+    restart: unless-stopped
+    depends_on:
+      model:
+        condition: service_healthy
+    environment:
+      BLACKSTAR_ASTRA_API_KEY: ${BLACKSTAR_ASTRA_API_KEY:?Set BLACKSTAR_ASTRA_API_KEY}
+      NGINX_ENVSUBST_FILTER: ^BLACKSTAR_ASTRA_API_KEY$
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${BLACKSTAR_PROXY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --header='Authorization: Bearer '$$BLACKSTAR_ASTRA_API_KEY -O /dev/null http://127.0.0.1:8080/v1/models || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  huggingface-cache:
+  vllm-cache:
