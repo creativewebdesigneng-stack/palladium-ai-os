@@ -17,7 +17,7 @@ export default function IndependentEvaluatorVerification() {
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-300" /><h2 className="text-sm font-semibold text-white">Independent evaluator verification</h2></div>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-zinc-400">Runs a tiny bounded request through the dedicated FreeLLM evaluator transport and exact server-configured model. This path is separate from Blackstar's native Qwen serving lane and has no compatible-provider fallback.</p>
+          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-zinc-400">Runs a tiny bounded request through the dedicated FreeLLM evaluator transport and exact server-configured model. The response must include FreeLLM's upstream route identity so Blackstar can distinguish the evaluator gateway from the model that actually served the request.</p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] text-zinc-400"><ShieldCheck className="h-3.5 w-3.5" />Transport evidence only · not certification</span>
       </div>
@@ -27,18 +27,19 @@ export default function IndependentEvaluatorVerification() {
           {verification.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BadgeCheck className="h-3.5 w-3.5" />}
           {verification.isPending ? 'Verifying evaluator…' : 'Verify independent evaluator'}
         </button>
-        <p className="text-[10px] text-zinc-500">30-second hard bound. The exact configured FreeLLM model must return the verification marker.</p>
+        <p className="text-[10px] text-zinc-500">30-second hard bound. The exact configured FreeLLM model must return the marker and a valid routed provider/model identity.</p>
       </div>
 
       {verification.error && <p className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(verification.error)}</p>}
-      {verification.data && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      {verification.data && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
         <Evidence label="Status" value="VERIFIED" />
-        <Evidence label="Identity" value={`${verification.data.provider}/${verification.data.model}`} />
+        <Evidence label="Gateway identity" value={`${verification.data.provider}/${verification.data.model}`} />
+        <Evidence label="Actual route" value={verification.data.routedVia} />
         <Evidence label="Latency" value={`${verification.data.latencyMs} ms`} />
-        <Evidence label="Tokens" value={`${verification.data.inputTokens + verification.data.outputTokens}`} />
+        <Evidence label="Fallback attempts" value={`${verification.data.fallbackAttempts}`} />
         <Evidence label="Marker" value={verification.data.marker} />
       </div>}
-      {verification.data && <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">This confirms that the independent evaluator transport can execute the exact configured model. It does not certify Astra model quality or create benchmark evidence by itself.</p>}
+      {verification.data && <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">The actual upstream route was <code className="text-amber-200">{verification.data.routedProvider}/{verification.data.routedModel}</code>. This confirms evaluator transport execution and route provenance only; it does not certify Astra model quality or create benchmark evidence by itself.</p>}
     </section>
   );
 }
