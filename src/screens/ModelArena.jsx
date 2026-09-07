@@ -62,6 +62,7 @@ export default function ModelArena() {
   });
 
   const configured = useMemo(() => new Map((overview.data?.providers ?? []).map((p) => [p.id, p.configured])), [overview.data]);
+  const providerDefaults = useMemo(() => new Map((overview.data?.providers ?? []).map((p) => [p.id, p.defaultModel])), [overview.data]);
   const runMutation = useMutation({
     mutationFn: () => runFn({
       data: {
@@ -154,18 +155,18 @@ export default function ModelArena() {
           <div className="mt-3 space-y-2">
             {contestants.map((row, index) => (
               <div key={index} className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 md:grid-cols-[140px_1fr_150px_auto]">
-                <ProviderSelect value={row.provider} onChange={(provider) => updateContestant(index, { provider })} configured={configured} />
+                <ProviderSelect value={row.provider} onChange={(provider) => changeContestantProvider(index, provider)} configured={configured} />
                 <input value={row.model} onChange={(e) => updateContestant(index, { model: e.target.value })} className="input" placeholder="Model ID" />
                 <input value={row.label} onChange={(e) => updateContestant(index, { label: e.target.value })} className="input" placeholder="Label" />
                 <button type="button" disabled={contestants.length <= 2} onClick={() => setContestants((rows) => rows.filter((_, i) => i !== index))} className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-zinc-500 transition hover:text-rose-300 disabled:opacity-30" aria-label={`Remove candidate ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
               </div>
             ))}
           </div>
-          {contestants.length < 6 && <button type="button" onClick={() => setContestants((rows) => [...rows, { provider: 'openai', model: '', label: `Candidate ${String.fromCharCode(65 + rows.length)}` }])} className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"><Plus className="h-3.5 w-3.5" />Add candidate</button>}
+          {contestants.length < 6 && <button type="button" onClick={() => setContestants((rows) => [...rows, { provider: 'openai', model: providerDefaults.get('openai') ?? 'gpt-5-mini', label: `Candidate ${String.fromCharCode(65 + rows.length)}` }])} className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"><Plus className="h-3.5 w-3.5" />Add candidate</button>}
 
           <div className="mt-5 flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-300" /><h3 className="text-xs font-semibold text-white">Independent judge</h3></div>
           <div className="mt-3 grid gap-2 rounded-xl border border-amber-400/15 bg-amber-400/[.03] p-3 md:grid-cols-[140px_1fr]">
-            <ProviderSelect value={judge.provider} onChange={(provider) => setJudge((value) => ({ ...value, provider }))} configured={configured} />
+            <ProviderSelect value={judge.provider} onChange={(provider) => setJudge((value) => ({ ...value, provider, model: providerDefaults.get(provider) ?? '' }))} configured={configured} />
             <input value={judge.model} onChange={(e) => setJudge((value) => ({ ...value, model: e.target.value }))} className="input" placeholder="Judge model ID" />
           </div>
 
@@ -192,6 +193,10 @@ export default function ModelArena() {
       <style>{`.input{width:100%;border-radius:.75rem;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.3);padding:.55rem .75rem;font-size:.75rem;color:white;outline:none}.input:focus{border-color:rgba(139,92,246,.45);box-shadow:0 0 0 2px rgba(139,92,246,.08)}.input::placeholder{color:rgb(82 82 91)}`}</style>
     </>
   );
+
+  function changeContestantProvider(index, provider) {
+    updateContestant(index, { provider, model: providerDefaults.get(provider) ?? '' });
+  }
 
   function updateContestant(index, patch) {
     setContestants((rows) => rows.map((row, i) => i === index ? { ...row, ...patch } : row));
