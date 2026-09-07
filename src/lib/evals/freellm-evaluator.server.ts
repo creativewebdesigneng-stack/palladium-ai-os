@@ -1,11 +1,18 @@
 import { ProviderError } from "@/lib/runtime/model-gateway.base";
 
+export type FreeLlmRouteIdentity = {
+  routedVia: string;
+  routedProvider: string;
+  routedModel: string;
+  fallbackAttempts: number;
+};
+
 export type FreeLlmJudgeResult = {
   text: string;
   usage: { input: number; output: number };
   provider: "freellm";
   model: string;
-};
+} & FreeLlmRouteIdentity;
 
 export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.env) {
   const baseUrl = env["FREELLMAPI_BASE_URL"]?.trim().replace(/\/+$/, "") || null;
@@ -17,6 +24,22 @@ export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.e
     apiKey,
     model,
   } as const;
+}
+
+export function parseFreeLlmRouteIdentity(headers: Headers): FreeLlmRouteIdentity {
+  const routedVia = headers.get("x-routed-via")?.trim() || "";
+  const slash = routedVia.indexOf("/");
+  if (slash <= 0 || slash === routedVia.length - 1) {
+    throw new ProviderError("FreeLLMAPI response did not include a valid X-Routed-Via identity.", 502, false);
+  }
+  const routedProvider = routedVia.slice(0, slash).trim();
+  const routedModel = routedVia.slice(slash + 1).trim();
+  if (!routedProvider || !routedModel) {
+    throw new ProviderError("FreeLLMAPI response did not include a valid routed provider/model identity.", 502, false);
+  }
+  const rawAttempts = Number(headers.get("x-fallback-attempts") ?? 0);
+  const fallbackAttempts = Number.isFinite(rawAttempts) && rawAttempts >= 0 ? Math.floor(rawAttempts) : 0;
+  return { routedVia, routedProvider, routedModel, fallbackAttempts };
 }
 
 export async function runFreeLlmJudge(args: {
@@ -82,6 +105,7 @@ export async function runFreeLlmJudge(args: {
     throw new ProviderError(`FreeLLMAPI evaluator error (${response.status}): ${body.slice(0, 400)}`, response.status, response.status >= 500);
   }
 
+  const routeIdentity = parseFreeLlmRouteIdentity(response.headers);
   let json: any;
   try {
     json = JSON.parse(body);
@@ -99,5 +123,6 @@ export async function runFreeLlmJudge(args: {
     },
     provider: "freellm",
     model: config.model,
+    ...routeIdentity,
   };
 }
