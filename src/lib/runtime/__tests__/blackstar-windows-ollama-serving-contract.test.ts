@@ -20,6 +20,12 @@ describe('Blackstar Windows Ollama serving bundle', () => {
     expect(readme).toContain('qwen3:8b-q4_K_M')
   })
 
+  it('gives thinking-capable Qwen3 enough completion budget to emit final content', () => {
+    expect(setup).toContain('BLACKSTAR_READY /no_think')
+    expect(setup).toContain('max_tokens = 512')
+    expect(setup).toContain('TimeoutSec 300')
+  })
+
   it('prints the exact Blackstar native-primary environment contract', () => {
     expect(setup).toContain('OPENAI_COMPATIBLE_BASE_URL=$OpenAiBaseUrl')
     expect(setup).toContain('BLACKSTAR_NATIVE_MODEL=$Model')
