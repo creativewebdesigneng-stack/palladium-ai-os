@@ -1,19 +1,37 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   ASTRA_CERTIFICATION_JUDGES,
   isTrustedAstraCertificationJudge,
   judgeMatchesCandidate,
 } from '../astra-certification-judge-policy'
 
+const previousBase = process.env['FREELLMAPI_BASE_URL']
+const previousModel = process.env['FREELLMAPI_MODEL']
+
+afterEach(() => {
+  if (previousBase == null) delete process.env['FREELLMAPI_BASE_URL']
+  else process.env['FREELLMAPI_BASE_URL'] = previousBase
+  if (previousModel == null) delete process.env['FREELLMAPI_MODEL']
+  else process.env['FREELLMAPI_MODEL'] = previousModel
+})
+
 describe('Astra certification judge policy', () => {
-  it('accepts only server-owned judge identities', () => {
+  it('accepts only server-owned or exact configured FreeLLM judge identities', () => {
     expect(isTrustedAstraCertificationJudge('groq', 'openai/gpt-oss-20b')).toBe(true)
     expect(isTrustedAstraCertificationJudge('openai', 'gpt-5-mini')).toBe(true)
     expect(isTrustedAstraCertificationJudge('deepseek', 'deepseek-chat')).toBe(false)
     expect(isTrustedAstraCertificationJudge('compatible', 'blackstar-astra-v0.1')).toBe(false)
+
+    process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
+    process.env['FREELLMAPI_MODEL'] = 'independent-judge'
+    expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(true)
+    expect(isTrustedAstraCertificationJudge('freellm', 'other-model')).toBe(false)
+
+    delete process.env['FREELLMAPI_BASE_URL']
+    expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(false)
   })
 
-  it('restricts approved judges to the independent provider set', () => {
+  it('keeps static approved judges restricted to the established independent providers', () => {
     expect(new Set(ASTRA_CERTIFICATION_JUDGES.map((judge) => judge.provider))).toEqual(new Set(['groq', 'openai']))
   })
 
