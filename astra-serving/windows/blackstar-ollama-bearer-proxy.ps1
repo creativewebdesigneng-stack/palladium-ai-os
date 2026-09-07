@@ -9,13 +9,17 @@ if (-not $token -or $token.Length -lt 32) {
   throw "BLACKSTAR_BRIDGE_TOKEN must be set to a random secret of at least 32 characters."
 }
 
-$listener = [System.Net.HttpListener]::new()
+# Windows PowerShell 5.1 does not reliably auto-load System.Net.Http types.
+# Load the framework assembly explicitly before constructing HttpClient objects.
+Add-Type -AssemblyName System.Net.Http
+
+$listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$Port/")
 $listener.Start()
 
-$handler = [System.Net.Http.HttpClientHandler]::new()
+$handler = New-Object System.Net.Http.HttpClientHandler
 $handler.AllowAutoRedirect = $false
-$client = [System.Net.Http.HttpClient]::new($handler)
+$client = New-Object System.Net.Http.HttpClient($handler)
 $client.Timeout = [System.Threading.Timeout]::InfiniteTimeSpan
 
 Write-Host "Blackstar bearer proxy listening on 127.0.0.1:$Port"
@@ -52,15 +56,13 @@ try {
       }
 
       $target = "$OllamaBaseUrl$($request.Url.PathAndQuery)"
-      $message = [System.Net.Http.HttpRequestMessage]::new(
-        [System.Net.Http.HttpMethod]::new($request.HttpMethod),
-        $target
-      )
+      $method = New-Object System.Net.Http.HttpMethod($request.HttpMethod)
+      $message = New-Object System.Net.Http.HttpRequestMessage($method, $target)
 
       if ($request.HasEntityBody) {
-        $memory = [System.IO.MemoryStream]::new()
+        $memory = New-Object System.IO.MemoryStream
         $request.InputStream.CopyTo($memory)
-        $content = [System.Net.Http.ByteArrayContent]::new($memory.ToArray())
+        $content = New-Object System.Net.Http.ByteArrayContent -ArgumentList @(,$memory.ToArray())
         if ($request.ContentType) {
           $content.Headers.TryAddWithoutValidation("Content-Type", $request.ContentType) | Out-Null
         }
