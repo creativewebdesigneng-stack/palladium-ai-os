@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
+import { runFreeLlmJudge } from "@/lib/evals/freellm-evaluator.server";
 import { runChatPinned, type Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
@@ -24,10 +25,16 @@ type ModelEvalResponse = {
   output_tokens: number | null;
 };
 
-const providerSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible"]);
+const contestantProviderSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible"]);
+const judgeProviderSchema = z.enum(["openai", "anthropic", "groq", "deepseek", "lovable", "compatible", "freellm"]);
 const taskClassSchema = z.enum(["general", "reasoning", "coding", "tool_use", "vision", "agentic"]);
 const contestantSchema = z.object({
-  provider: providerSchema,
+  provider: contestantProviderSchema,
+  model: z.string().trim().min(1).max(160),
+  label: z.string().trim().min(1).max(80).optional(),
+});
+const judgeSchema = z.object({
+  provider: judgeProviderSchema,
   model: z.string().trim().min(1).max(160),
   label: z.string().trim().min(1).max(80).optional(),
 });
@@ -131,7 +138,7 @@ export const runModelArena = createServerFn({ method: "POST" })
     prompt: z.string().trim().min(1).max(12000),
     systemPrompt: z.string().trim().max(6000).nullish(),
     contestants: z.array(contestantSchema).min(2).max(6),
-    judge: contestantSchema,
+    judge: judgeSchema,
     criteria: z.array(z.string().trim().min(1).max(200)).min(1).max(12).optional(),
     astraTaskClass: taskClassSchema.nullish(),
   }).parse(input))
@@ -223,21 +230,28 @@ export const runModelArena = createServerFn({ method: "POST" })
       }
 
       const anonymized = responseRows.map((response, index) => `RESPONSE ${index}\n${response.response_text}`).join("\n\n---\n\n");
-      const judgeResult = await runChatPinned({
-        provider: data.judge.provider as Provider,
-        model: data.judge.model,
-        messages: [
-          {
-            role: "system",
-            content: "You are an impartial model evaluator. Score each response from 0 to 100 against the requested criteria. Do not reward verbosity by itself. Return ONLY a JSON array of objects with index, score, verdict and reasoning.",
-          },
-          {
-            role: "user",
-            content: `PROMPT\n${safePrompt}\n\nCRITERIA\n${criteria.join("; ")}\n\nCANDIDATES\n${anonymized}`,
-          },
-        ],
-        maxTokens: 1400,
-      });
+      const judgeMessages = [
+        {
+          role: "system" as const,
+          content: "You are an impartial model evaluator. Score each response from 0 to 100 against the requested criteria. Do not reward verbosity by itself. Return ONLY a JSON array of objects with index, score, verdict and reasoning.",
+        },
+        {
+          role: "user" as const,
+          content: `PROMPT\n${safePrompt}\n\nCRITERIA\n${criteria.join("; ")}\n\nCANDIDATES\n${anonymized}`,
+        },
+      ];
+      const judgeResult = data.judge.provider === "freellm"
+        ? await runFreeLlmJudge({
+            model: data.judge.model,
+            messages: judgeMessages,
+            maxTokens: 1400,
+          })
+        : await runChatPinned({
+            provider: data.judge.provider as Provider,
+            model: data.judge.model,
+            messages: judgeMessages,
+            maxTokens: 1400,
+          });
       if (judgeResult.provider !== data.judge.provider || judgeResult.model !== data.judge.model) {
         throw new Error("Model Arena judge transport did not preserve the exact requested evaluator identity.");
       }
