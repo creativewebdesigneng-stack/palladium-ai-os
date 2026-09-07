@@ -28,10 +28,10 @@ describe("FreeLLM independent evaluator lane", () => {
   });
 
   it("surfaces the dedicated evaluator separately from local compatible inference", () => {
-    const previousBase = process.env.FREELLMAPI_BASE_URL;
-    const previousModel = process.env.FREELLMAPI_MODEL;
-    process.env.FREELLMAPI_BASE_URL = "https://judge.example/v1";
-    process.env.FREELLMAPI_MODEL = "judge-model";
+    const previousBase = process.env["FREELLMAPI_BASE_URL"];
+    const previousModel = process.env["FREELLMAPI_MODEL"];
+    process.env["FREELLMAPI_BASE_URL"] = "https://judge.example/v1";
+    process.env["FREELLMAPI_MODEL"] = "judge-model";
     try {
       const providers = listModelProviderDefinitions();
       const freeLlm = providers.find((provider) => provider.id === "freellm");
@@ -40,10 +40,10 @@ describe("FreeLLM independent evaluator lane", () => {
       expect(compatible?.id).toBe("compatible");
       expect(isModelProviderConfigured("freellm")).toBe(true);
     } finally {
-      if (previousBase == null) delete process.env.FREELLMAPI_BASE_URL;
-      else process.env.FREELLMAPI_BASE_URL = previousBase;
-      if (previousModel == null) delete process.env.FREELLMAPI_MODEL;
-      else process.env.FREELLMAPI_MODEL = previousModel;
+      if (previousBase == null) delete process.env["FREELLMAPI_BASE_URL"];
+      else process.env["FREELLMAPI_BASE_URL"] = previousBase;
+      if (previousModel == null) delete process.env["FREELLMAPI_MODEL"];
+      else process.env["FREELLMAPI_MODEL"] = previousModel;
     }
   });
 });
