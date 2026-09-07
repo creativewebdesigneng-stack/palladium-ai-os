@@ -82,10 +82,8 @@ export function normaliseProvider(value?: string | null): Provider {
   if (v === "deepseek" || v === "deepseek-v3" || v === "deepseek-v3.1") return "deepseek";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
-  // No explicit choice: an explicitly activated Blackstar-controlled runtime is
-  // the primary route. External providers remain bounded fallback lanes in the
-  // server gateway. Merely configuring a compatible evaluation endpoint does
-  // not silently change production routing.
+  // No explicit choice: an intentionally activated Blackstar-controlled runtime
+  // is the primary route. External providers remain bounded fallback lanes.
   if (!v) {
     if (blackstarNativePrimaryEnabled()) return "compatible";
     if (process.env["GEMINI_API_KEY"]) return "gemini";
@@ -116,7 +114,7 @@ function endpointFor(provider: Provider): Endpoint {
     const key = process.env["GEMINI_API_KEY"];
     if (!key) throw new ProviderError("Google Gemini is not configured for this workspace.", 503, false);
     return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      url: "https://generativelanguagemodel.googleapis.com/v1beta/openai/chat/completions",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       kind: "chat",
     };
@@ -405,19 +403,23 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
         .trim(),
       toolCalls: blocks
         .filter((b) => b.type === "tool_use")
-        .map((b) => ({ id: b.id, name: b.name, arguments: b.input ?? {} })),
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          arguments: (b.input ?? {}) as Record<string, unknown>,
+        })),
       usage: { input: json.usage?.input_tokens ?? 0, output: json.usage?.output_tokens ?? 0 },
       provider: args.provider,
       model: args.model,
     };
   }
 
-  const choice = json.choices?.[0]?.message ?? {};
+  const msg = json.choices?.[0]?.message ?? {};
   return {
-    text: choice.content ?? "",
-    toolCalls: (choice.tool_calls ?? []).map((t: any) => ({
+    text: (msg.content ?? "").trim(),
+    toolCalls: (msg.tool_calls ?? []).map((t: any) => ({
       id: t.id,
-      name: t.function?.name ?? "",
+      name: t.function?.name,
       arguments: safeJson(t.function?.arguments),
     })),
     usage: { input: json.usage?.prompt_tokens ?? 0, output: json.usage?.completion_tokens ?? 0 },
@@ -426,111 +428,102 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   };
 }
 
+function safeJson(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string") return (value as Record<string, unknown>) ?? {};
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return {};
+  }
+}
+
 /* ---------------------------------------------------------------------- stream */
 
+/** Streams a single model turn. Yields text deltas, then a `done` event with the
+ * assembled result (including any tool calls) so the caller can continue a loop. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   const res = await send(args, true);
-  if (!res.body) throw new ProviderError("Model provider returned no stream.", 502, true);
+  if (!res.body) throw new ProviderError("The model provider returned an empty stream.", 502, true);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
-  const toolMap = new Map<number, { id: string; name: string; args: string }>();
-  let inputTokens = 0;
-  let outputTokens = 0;
+  const usage = { input: 0, output: 0 };
+  const partialTools = new Map<number, { id: string; name: string; args: string }>();
+  const anthropicTools = new Map<number, { id: string; name: string; args: string }>();
 
   while (true) {
-    const { done, value } = await reader.read();
+    const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payload = trimmed.slice(5).trim();
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
       if (!payload || payload === "[DONE]") continue;
-      let chunk: any;
+
+      let evt: any;
       try {
-        chunk = JSON.parse(payload);
+        evt = JSON.parse(payload);
       } catch {
         continue;
       }
 
       if (args.provider === "anthropic") {
-        if (chunk.type === "content_block_delta") {
-          if (chunk.delta?.type === "text_delta" && chunk.delta.text) {
-            text += chunk.delta.text;
-            yield { type: "text", delta: chunk.delta.text };
-          }
-          if (chunk.delta?.type === "input_json_delta") {
-            const idx = chunk.index ?? 0;
-            const existing = toolMap.get(idx) ?? { id: "", name: "", args: "" };
-            existing.args += chunk.delta.partial_json ?? "";
-            toolMap.set(idx, existing);
-          }
-        }
-        if (chunk.type === "content_block_start" && chunk.content_block?.type === "tool_use") {
-          const idx = chunk.index ?? 0;
-          toolMap.set(idx, {
-            id: chunk.content_block.id ?? "",
-            name: chunk.content_block.name ?? "",
+        if (evt.type === "content_block_start" && evt.content_block?.type === "tool_use") {
+          anthropicTools.set(evt.index, {
+            id: evt.content_block.id,
+            name: evt.content_block.name,
             args: "",
           });
+        } else if (evt.type === "content_block_delta") {
+          if (evt.delta?.type === "text_delta") {
+            text += evt.delta.text;
+            yield { type: "text", delta: evt.delta.text };
+          } else if (evt.delta?.type === "input_json_delta") {
+            const t = anthropicTools.get(evt.index);
+            if (t) t.args += evt.delta.partial_json ?? "";
+          }
+        } else if (evt.type === "message_start") {
+          usage.input += evt.message?.usage?.input_tokens ?? 0;
+        } else if (evt.type === "message_delta") {
+          usage.output += evt.usage?.output_tokens ?? 0;
         }
-        if (chunk.type === "message_start") inputTokens = chunk.message?.usage?.input_tokens ?? inputTokens;
-        if (chunk.type === "message_delta") outputTokens = chunk.usage?.output_tokens ?? outputTokens;
         continue;
       }
 
-      const delta = chunk.choices?.[0]?.delta ?? {};
-      if (typeof delta.content === "string" && delta.content) {
+      const delta = evt.choices?.[0]?.delta;
+      if (delta?.content) {
         text += delta.content;
         yield { type: "text", delta: delta.content };
       }
-      for (const tc of delta.tool_calls ?? []) {
+      for (const tc of delta?.tool_calls ?? []) {
         const idx = tc.index ?? 0;
-        const existing = toolMap.get(idx) ?? { id: "", name: "", args: "" };
-        if (tc.id) existing.id = tc.id;
-        if (tc.function?.name) existing.name = tc.function.name;
-        if (tc.function?.arguments) existing.args += tc.function.arguments;
-        toolMap.set(idx, existing);
+        const current = partialTools.get(idx) ?? { id: tc.id ?? `call_${idx}`, name: "", args: "" };
+        if (tc.id) current.id = tc.id;
+        if (tc.function?.name) current.name = tc.function.name;
+        if (tc.function?.arguments) current.args += tc.function.arguments;
+        partialTools.set(idx, current);
       }
-      if (chunk.usage) {
-        inputTokens = chunk.usage.prompt_tokens ?? inputTokens;
-        outputTokens = chunk.usage.completion_tokens ?? outputTokens;
+      if (evt.usage) {
+        usage.input = evt.usage.prompt_tokens ?? usage.input;
+        usage.output = evt.usage.completion_tokens ?? usage.output;
       }
     }
   }
 
-  const toolCalls = [...toolMap.values()]
+  const collected = args.provider === "anthropic" ? anthropicTools : partialTools;
+  const toolCalls: ToolCall[] = [...collected.values()]
     .filter((t) => t.name)
-    .map((t, index) => ({
-      id: t.id || `tool-${index}`,
-      name: t.name,
-      arguments: safeJson(t.args),
-    }));
+    .map((t) => ({ id: t.id, name: t.name, arguments: safeJson(t.args) }));
+
   if (toolCalls.length) yield { type: "tool_calls", toolCalls };
   yield {
     type: "done",
-    result: {
-      text,
-      toolCalls,
-      usage: { input: inputTokens, output: outputTokens },
-      provider: args.provider,
-      model: args.model,
-    },
+    result: { text: text.trim(), toolCalls, usage, provider: args.provider, model: args.model },
   };
-}
-
-function safeJson(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== "string" || !value.trim()) return {};
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
 }
