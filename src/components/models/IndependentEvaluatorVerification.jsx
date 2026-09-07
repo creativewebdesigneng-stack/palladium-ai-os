@@ -1,0 +1,48 @@
+import { useMutation } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
+import { BadgeCheck, Loader2, Scale, ShieldCheck } from 'lucide-react';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { friendlyMessage } from '@/lib/errors';
+import { verifyFreeLlmEvaluatorRuntime } from '@/lib/evals/freellm-runtime-verification.functions';
+
+export default function IndependentEvaluatorVerification() {
+  const { session } = useWorkspace();
+  const verifyFn = useServerFn(verifyFreeLlmEvaluatorRuntime);
+  const verification = useMutation({ mutationFn: () => verifyFn({ data: {} }) });
+
+  if (session !== 'yes') return null;
+
+  return (
+    <section className="mb-6 rounded-2xl border border-amber-400/20 bg-amber-400/[.035] p-5">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-amber-300" /><h2 className="text-sm font-semibold text-white">Independent evaluator verification</h2></div>
+          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-zinc-400">Runs a tiny bounded request through the dedicated FreeLLM evaluator transport and exact server-configured model. This path is separate from Blackstar's native Qwen serving lane and has no compatible-provider fallback.</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] text-zinc-400"><ShieldCheck className="h-3.5 w-3.5" />Transport evidence only · not certification</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" disabled={verification.isPending} onClick={() => verification.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.08] px-4 py-2.5 text-xs font-medium text-amber-100 disabled:cursor-not-allowed disabled:opacity-40">
+          {verification.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BadgeCheck className="h-3.5 w-3.5" />}
+          {verification.isPending ? 'Verifying evaluator…' : 'Verify independent evaluator'}
+        </button>
+        <p className="text-[10px] text-zinc-500">30-second hard bound. The exact configured FreeLLM model must return the verification marker.</p>
+      </div>
+
+      {verification.error && <p className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(verification.error)}</p>}
+      {verification.data && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <Evidence label="Status" value="VERIFIED" />
+        <Evidence label="Identity" value={`${verification.data.provider}/${verification.data.model}`} />
+        <Evidence label="Latency" value={`${verification.data.latencyMs} ms`} />
+        <Evidence label="Tokens" value={`${verification.data.inputTokens + verification.data.outputTokens}`} />
+        <Evidence label="Marker" value={verification.data.marker} />
+      </div>}
+      {verification.data && <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">This confirms that the independent evaluator transport can execute the exact configured model. It does not certify Astra model quality or create benchmark evidence by itself.</p>}
+    </section>
+  );
+}
+
+function Evidence({ label, value }) {
+  return <div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] uppercase tracking-wide text-zinc-600">{label}</p><p className="mt-1 truncate text-xs font-medium text-amber-200" title={value}>{value}</p></div>;
+}
