@@ -67,6 +67,12 @@ const DEFAULT_MODEL: Record<Provider, string> = {
   compatible: "local-model",
 };
 
+function blackstarNativePrimaryEnabled(): boolean {
+  const value = process.env["BLACKSTAR_NATIVE_PRIMARY"]?.trim().toLowerCase();
+  return (value === "1" || value === "true" || value === "yes" || value === "on")
+    && Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]?.trim());
+}
+
 export function normaliseProvider(value?: string | null): Provider {
   const v = (value ?? "").toLowerCase();
   if (v === "gemini" || v === "google" || v === "google-gemini") return "gemini";
@@ -76,8 +82,10 @@ export function normaliseProvider(value?: string | null): Provider {
   if (v === "deepseek" || v === "deepseek-v3" || v === "deepseek-v3.1") return "deepseek";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
-  // No explicit choice: prefer directly configured low-cost providers first.
+  // No explicit choice: an intentionally activated Blackstar-controlled runtime
+  // is the primary route. External providers remain bounded fallback lanes.
   if (!v) {
+    if (blackstarNativePrimaryEnabled()) return "compatible";
     if (process.env["GEMINI_API_KEY"]) return "gemini";
     if (process.env["GROQ_API_KEY"]) return "groq";
     if (process.env["OPENAI_API_KEY"]) return "openai";
@@ -89,6 +97,10 @@ export function normaliseProvider(value?: string | null): Provider {
 
 export function resolveModel(provider: Provider, model?: string | null): string {
   const m = (model ?? "").trim();
+  if (!m && provider === "compatible" && blackstarNativePrimaryEnabled()) {
+    const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
+    if (nativeModel) return nativeModel;
+  }
   if (!m) return DEFAULT_MODEL[provider];
   // Lovable gateway models are namespaced (`vendor/model`); keep friendly names working.
   if (provider === "lovable" && !m.includes("/")) return DEFAULT_MODEL.lovable;
@@ -102,7 +114,7 @@ function endpointFor(provider: Provider): Endpoint {
     const key = process.env["GEMINI_API_KEY"];
     if (!key) throw new ProviderError("Google Gemini is not configured for this workspace.", 503, false);
     return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      url: "https://generativelanguagemodel.googleapis.com/v1beta/openai/chat/completions",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       kind: "chat",
     };
