@@ -1,6 +1,6 @@
 import { FREELLMAPI_PROFILE } from './freellmapi-profile'
 
-export type ModelProviderId = 'lovable' | 'openai' | 'anthropic' | 'deepseek' | 'compatible'
+export type ModelProviderId = 'lovable' | 'openai' | 'anthropic' | 'deepseek' | 'compatible' | 'freellm'
 
 export type ModelProviderDefinition = {
   id: ModelProviderId
@@ -19,9 +19,17 @@ const MODEL_PROVIDER_DEFINITIONS: readonly ModelProviderDefinition[] = [
     id: 'compatible',
     name: 'Local / OpenAI-compatible',
     defaultModel: 'local-model',
-    integrations: ['Jan', FREELLMAPI_PROFILE.name],
+    integrations: ['Jan'],
     routingNote:
-      'FreeLLMAPI can own its upstream provider pool, quota-aware routing and fallback while PalladiumAI keeps agent routing and outer provider failover.',
+      'Blackstar native/self-hosted inference uses this lane. When native-primary is enabled, the configured BLACKSTAR_NATIVE_MODEL is surfaced as the default.',
+  },
+  {
+    id: 'freellm',
+    name: FREELLMAPI_PROFILE.name,
+    defaultModel: 'freellm-default',
+    integrations: [FREELLMAPI_PROFILE.name],
+    routingNote:
+      'Independent OpenAI-compatible evaluator lane. It uses FREELLMAPI_* server-only configuration and never reuses the Blackstar native compatible endpoint or credentials.',
   },
 ]
 
@@ -33,11 +41,18 @@ function compatibleDefaultModel(): string {
   return 'local-model'
 }
 
+function freeLlmDefaultModel(): string {
+  return process.env['FREELLMAPI_MODEL']?.trim() || 'freellm-default'
+}
+
 export function listModelProviderDefinitions(): readonly ModelProviderDefinition[] {
   const compatibleModel = compatibleDefaultModel()
-  return MODEL_PROVIDER_DEFINITIONS.map((provider) =>
-    provider.id === 'compatible' ? { ...provider, defaultModel: compatibleModel } : provider,
-  )
+  const freeLlmModel = freeLlmDefaultModel()
+  return MODEL_PROVIDER_DEFINITIONS.map((provider) => {
+    if (provider.id === 'compatible') return { ...provider, defaultModel: compatibleModel }
+    if (provider.id === 'freellm') return { ...provider, defaultModel: freeLlmModel }
+    return provider
+  })
 }
 
 export function isModelProviderConfigured(provider: ModelProviderId): boolean {
@@ -45,5 +60,6 @@ export function isModelProviderConfigured(provider: ModelProviderId): boolean {
   if (provider === 'openai') return Boolean(process.env['OPENAI_API_KEY'])
   if (provider === 'anthropic') return Boolean(process.env['ANTHROPIC_API_KEY'])
   if (provider === 'deepseek') return Boolean(process.env['DEEPSEEK_API_KEY'])
+  if (provider === 'freellm') return Boolean(process.env['FREELLMAPI_BASE_URL']?.trim() && process.env['FREELLMAPI_MODEL']?.trim())
   return Boolean(process.env['OPENAI_COMPATIBLE_BASE_URL'])
 }
