@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $proxyScript = Join-Path $PSScriptRoot "blackstar-ollama-bearer-proxy.ps1"
 $runtimeDir = Join-Path $env:LOCALAPPDATA "Blackstar\runtime"
+$tokenSecretPath = Join-Path $runtimeDir "bridge-token.clixml"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
 function Resolve-TailscalePath {
@@ -47,6 +48,26 @@ function Resolve-ProxyPort([int]$RequestedPort) {
   $fallbackPort = Get-FreeLoopbackPort
   Write-Host "Port $RequestedPort is occupied. Using free localhost proxy port $fallbackPort instead..."
   return $fallbackPort
+}
+
+function Save-BridgeToken([string]$Token) {
+  $secure = ConvertTo-SecureString -String $Token -AsPlainText -Force
+  $secure | Export-Clixml -Path $tokenSecretPath
+
+  try {
+    $acl = Get-Acl -Path $tokenSecretPath
+    $acl.SetAccessRuleProtection($true, $false)
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+      $identity,
+      [System.Security.AccessControl.FileSystemRights]::FullControl,
+      [System.Security.AccessControl.AccessControlType]::Allow
+    )
+    $acl.SetAccessRule($rule)
+    Set-Acl -Path $tokenSecretPath -AclObject $acl
+  } catch {
+    Write-Warning "Could not tighten the token file ACL. The token is still DPAPI-encrypted for the current Windows user."
+  }
 }
 
 Write-Host "Blackstar domainless cloud bridge (Tailscale Funnel)"
@@ -97,13 +118,14 @@ $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 try { $rng.GetBytes($random) } finally { if ($rng) { $rng.Dispose() } }
 $token = [Convert]::ToBase64String($random).TrimEnd('=').Replace('+','-').Replace('/','_')
 $env:BLACKSTAR_BRIDGE_TOKEN = $token
+Save-BridgeToken -Token $token
 
 $proxy = $null
 $bridgeReady = $false
 try {
   Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $proxyScript + '"'), "-Port", $ProxyPort
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('\"' + $proxyScript + '\"'), "-Port", $ProxyPort
   ) -WindowStyle Hidden -PassThru
 
   $proxyReady = $false
@@ -146,8 +168,17 @@ try {
     proxy_pid = $proxy.Id
     proxy_port = $ProxyPort
     public_base_url = $publicBase
+    token_secret_path = $tokenSecretPath
     started_at = (Get-Date).ToString("o")
   } | ConvertTo-Json | Set-Content -Path (Join-Path $runtimeDir "bridge.json") -Encoding UTF8
+
+  $clipboardCopied = $false
+  try {
+    Set-Clipboard -Value $token
+    $clipboardCopied = $true
+  } catch {
+    Write-Warning "The bearer token could not be copied to the clipboard automatically. Use copy-blackstar-bridge-token.ps1 to copy it securely."
+  }
 
   $bridgeReady = $true
   Write-Host ""
@@ -155,11 +186,15 @@ try {
   Write-Host ""
   Write-Host "Use these SERVER-ONLY deployment values:"
   Write-Host "OPENAI_COMPATIBLE_BASE_URL=$publicBase/v1"
-  Write-Host "OPENAI_COMPATIBLE_API_KEY=$token"
+  if ($clipboardCopied) {
+    Write-Host "OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>"
+  } else {
+    Write-Host "OPENAI_COMPATIBLE_API_KEY=<stored encrypted; use copy-blackstar-bridge-token.ps1>"
+  }
   Write-Host "BLACKSTAR_NATIVE_MODEL=$Model"
   Write-Host "BLACKSTAR_NATIVE_PRIMARY=true"
   Write-Host ""
-  Write-Warning "Funnel is internet-accessible. Keep the bearer token secret. Ollama itself remains localhost-only; only the restricted bearer proxy is published."
+  Write-Warning "Funnel is internet-accessible. The bearer token is intentionally never printed. Ollama itself remains localhost-only; only the restricted bearer proxy is published."
 } finally {
   if (-not $bridgeReady -and $proxy -and -not $proxy.HasExited) {
     Stop-Process -Id $proxy.Id -Force -ErrorAction SilentlyContinue
