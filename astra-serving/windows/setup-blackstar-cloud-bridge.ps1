@@ -4,7 +4,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $proxyScript = Join-Path $PSScriptRoot "blackstar-ollama-bearer-proxy.ps1"
 $runtimeDir = Join-Path $env:LOCALAPPDATA "Blackstar\runtime"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
@@ -14,7 +13,7 @@ function Resolve-CloudflaredPath {
   if ($cmd) { return $cmd.Source }
   $candidates = @(
     "$env:ProgramFiles\cloudflared\cloudflared.exe",
-    "$env:ProgramFiles(x86)\cloudflared\cloudflared.exe"
+    "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
   )
   foreach ($candidate in $candidates) {
     if ($candidate -and (Test-Path $candidate)) { return $candidate }
@@ -43,6 +42,9 @@ if (-not $cloudflared) {
   }
   Write-Host "Installing Cloudflare cloudflared with winget..."
   & $winget.Source install --id Cloudflare.cloudflared --exact --accept-source-agreements --accept-package-agreements
+  if ($LASTEXITCODE -ne 0) {
+    throw "winget failed to install Cloudflare cloudflared."
+  }
   $cloudflared = Resolve-CloudflaredPath
 }
 if (-not $cloudflared) {
