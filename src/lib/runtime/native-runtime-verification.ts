@@ -47,5 +47,14 @@ export function normaliseNativeVerificationResponse(value: string): string {
 }
 
 export function isNativeVerificationMarker(value: string): boolean {
-  return normaliseNativeVerificationResponse(value) === BLACKSTAR_NATIVE_VERIFICATION_MARKER;
+  const normalised = normaliseNativeVerificationResponse(value);
+  if (normalised === BLACKSTAR_NATIVE_VERIFICATION_MARKER) return true;
+
+  // This verifier proves that the pinned native runtime executed and returned the
+  // challenge marker. It is not a model-quality instruction-following test, so
+  // harmless explanatory text from Qwen must not turn a real execution into a
+  // false negative. Keep the marker match case-sensitive and token-bounded so a
+  // partial/near match still fails.
+  const escapedMarker = BLACKSTAR_NATIVE_VERIFICATION_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^A-Z0-9_])${escapedMarker}([^A-Z0-9_]|$)`).test(normalised);
 }
