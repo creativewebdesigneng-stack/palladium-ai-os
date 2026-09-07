@@ -6,6 +6,17 @@ if (-not (Test-Path $statePath)) {
 }
 
 $state = Get-Content $statePath -Raw | ConvertFrom-Json
+if ([string]$state.transport -eq "tailscale-funnel") {
+  $tailscale = Get-Command tailscale -ErrorAction SilentlyContinue
+  if (-not $tailscale) {
+    $candidate = "$env:ProgramFiles\Tailscale\tailscale.exe"
+    if (Test-Path $candidate) { $tailscale = Get-Item $candidate }
+  }
+  if ($tailscale) {
+    try { & $tailscale.Source funnel reset | Out-Null } catch {}
+  }
+}
+
 foreach ($pidValue in @($state.tunnel_pid, $state.proxy_pid)) {
   if ($pidValue) {
     try {
