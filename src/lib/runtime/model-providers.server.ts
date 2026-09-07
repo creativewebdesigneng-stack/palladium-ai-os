@@ -25,8 +25,19 @@ const MODEL_PROVIDER_DEFINITIONS: readonly ModelProviderDefinition[] = [
   },
 ]
 
+function compatibleDefaultModel(): string {
+  const nativePrimary = process.env['BLACKSTAR_NATIVE_PRIMARY']?.trim().toLowerCase()
+  const enabled = nativePrimary === '1' || nativePrimary === 'true' || nativePrimary === 'yes' || nativePrimary === 'on'
+  const nativeModel = process.env['BLACKSTAR_NATIVE_MODEL']?.trim()
+  if (enabled && nativeModel && process.env['OPENAI_COMPATIBLE_BASE_URL']?.trim()) return nativeModel
+  return 'local-model'
+}
+
 export function listModelProviderDefinitions(): readonly ModelProviderDefinition[] {
-  return MODEL_PROVIDER_DEFINITIONS
+  const compatibleModel = compatibleDefaultModel()
+  return MODEL_PROVIDER_DEFINITIONS.map((provider) =>
+    provider.id === 'compatible' ? { ...provider, defaultModel: compatibleModel } : provider,
+  )
 }
 
 export function isModelProviderConfigured(provider: ModelProviderId): boolean {
