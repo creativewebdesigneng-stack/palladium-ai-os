@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { CheckCircle2, FlaskConical, Loader2, ShieldCheck, Eye } from 'lucide-react';
@@ -32,11 +32,20 @@ export default function AstraCertificationWorkbench() {
   const benchmark = useQuery({ queryKey: ['astra-certification-benchmark', taskClass], queryFn: () => benchmarkFn({ data: { taskClass } }), enabled: session === 'yes', retry: false });
   const status = useQuery({ queryKey: ['astra-certification-status', taskClass], queryFn: () => statusFn({ data: { taskClass } }), enabled: session === 'yes', retry: false });
   const nextCase = useMemo(() => benchmark.data?.cases?.find((entry) => !entry.completed) ?? null, [benchmark.data]);
+  const trustedJudges = useMemo(() => benchmark.data?.trustedJudges?.length ? benchmark.data.trustedJudges : ASTRA_CERTIFICATION_JUDGES, [benchmark.data]);
+  const judgeIsTrusted = useMemo(() => trustedJudges.some((entry) => entry.provider === judge.provider && entry.model === judge.model), [trustedJudges, judge]);
   const judgeIsCandidate = useMemo(() => judgeMatchesCandidate(judge, [reference]), [judge, reference]);
+
+  useEffect(() => {
+    if (judgeIsTrusted || trustedJudges.length === 0) return;
+    const next = trustedJudges[0];
+    setJudge({ provider: next.provider, model: next.model });
+  }, [judgeIsTrusted, trustedJudges]);
 
   const runCase = useMutation({
     mutationFn: async (benchmarkCase) => {
       if (!status.data?.model) throw new Error('Astra serving identity is unavailable.');
+      if (!judgeIsTrusted) throw new Error('Choose a server-approved trusted judge before running certification.');
       if (judgeMatchesCandidate(judge, [reference])) throw new Error('The trusted judge must be different from every candidate model.');
       const run = taskClass === 'vision'
         ? await runVisionFn({ data: { caseId: benchmarkCase.caseId, reference: { provider: reference.provider, model: reference.model.trim() }, judge: { provider: judge.provider, model: judge.model.trim() } } })
@@ -77,7 +86,7 @@ export default function AstraCertificationWorkbench() {
   const total = benchmark.data?.totalCases ?? 20;
   const referenceProviders = taskClass === 'vision' ? VISION_PROVIDERS : TEXT_PROVIDERS;
   const referenceProviderAllowed = referenceProviders.includes(reference.provider);
-  const canRun = supported && referenceProviderAllowed && Boolean(status.data?.model) && Boolean(reference.model.trim()) && Boolean(judge.model.trim()) && !judgeIsCandidate;
+  const canRun = supported && referenceProviderAllowed && judgeIsTrusted && Boolean(status.data?.model) && Boolean(reference.model.trim()) && Boolean(judge.model.trim()) && !judgeIsCandidate;
 
   return (
     <section className="mb-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.035] p-5">
@@ -92,11 +101,13 @@ export default function AstraCertificationWorkbench() {
       <div className="mt-4 grid gap-3 lg:grid-cols-[180px_1fr_1fr]">
         <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Task class<select value={taskClass} onChange={(event) => setTaskClass(event.target.value)} className="input mt-1.5 w-full">{TASK_CLASSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <ProviderModel label={taskClass === 'vision' ? 'Multimodal reference candidate' : 'Reference candidate'} value={reference} onChange={setReference} providers={referenceProviders} />
-        <TrustedJudge value={judge} onChange={setJudge} />
+        <TrustedJudge value={judge} onChange={setJudge} judges={trustedJudges} />
       </div>
 
       {taskClass === 'vision' && supported && <p className="mt-3 inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.05] p-3 text-xs text-violet-200"><Eye className="h-3.5 w-3.5" />Trusted vision mode: each case renders a deterministic PNG on the server, binds its SHA-256 digest, and scores responses against a server-owned ground-truth key.</p>}
+      {taskClass !== 'vision' && trustedJudges.some((entry) => entry.provider === 'freellm') && <p className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-3 text-xs text-emerald-200">The deployment's exact configured FreeLLMAPI model is available as a server-approved independent text judge. Its endpoint and credentials remain separate from Blackstar's native Qwen lane.</p>}
       {!referenceProviderAllowed && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">Choose a reference provider supported by the selected task mode before running certification.</p>}
+      {!judgeIsTrusted && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">Choose a server-approved trusted judge before running certification.</p>}
       {judgeIsCandidate && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">The certification judge must be different from every candidate. Choose another reference model or trusted judge.</p>}
       {(benchmark.isLoading || status.isLoading) && <p className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading trusted suite…</p>}
       {(benchmark.error || status.error) && <p className="mt-4 text-xs text-rose-300">{friendlyMessage(benchmark.error ?? status.error)}</p>}
@@ -126,7 +137,7 @@ export default function AstraCertificationWorkbench() {
 function ProviderModel({ label, value, onChange, providers }) {
   return <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}<div className="mt-1.5 grid grid-cols-[130px_1fr] gap-2"><select value={value.provider} onChange={(event) => onChange({ ...value, provider: event.target.value })} className="input">{providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select><input value={value.model} onChange={(event) => onChange({ ...value, model: event.target.value })} className="input" placeholder="Model ID" /></div></label>;
 }
-function TrustedJudge({ value, onChange }) {
+function TrustedJudge({ value, onChange, judges }) {
   const selected = `${value.provider}::${value.model}`;
-  return <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Trusted independent judge<select value={selected} onChange={(event) => { const next = ASTRA_CERTIFICATION_JUDGES.find((entry) => `${entry.provider}::${entry.model}` === event.target.value); if (next) onChange({ provider: next.provider, model: next.model }); }} className="input mt-1.5 w-full">{ASTRA_CERTIFICATION_JUDGES.map((entry) => <option key={`${entry.provider}/${entry.model}`} value={`${entry.provider}::${entry.model}`}>{entry.label}</option>)}</select></label>;
+  return <label className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Trusted independent judge<select value={selected} onChange={(event) => { const next = judges.find((entry) => `${entry.provider}::${entry.model}` === event.target.value); if (next) onChange({ provider: next.provider, model: next.model }); }} className="input mt-1.5 w-full">{judges.map((entry) => <option key={`${entry.provider}/${entry.model}`} value={`${entry.provider}::${entry.model}`}>{entry.label}</option>)}</select></label>;
 }

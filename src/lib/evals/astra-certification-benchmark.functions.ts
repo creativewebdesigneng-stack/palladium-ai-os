@@ -14,8 +14,15 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
     taskClass: taskClassSchema,
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { getAstraCertificationBenchmarkPlan } = await import('./astra-certification-benchmark.server')
-    return getAstraCertificationBenchmarkPlan({ userId: context.userId, orgId: data.orgId ?? null, taskClass: data.taskClass })
+    const [{ getAstraCertificationBenchmarkPlan }, { listServerApprovedAstraCertificationJudges }] = await Promise.all([
+      import('./astra-certification-benchmark.server'),
+      import('./astra-certification-judge-policy.server'),
+    ])
+    const plan = await getAstraCertificationBenchmarkPlan({ userId: context.userId, orgId: data.orgId ?? null, taskClass: data.taskClass })
+    const trustedJudges = listServerApprovedAstraCertificationJudges()
+      .filter((judge) => data.taskClass !== 'vision' || judge.provider !== 'freellm')
+      .map((judge) => ({ provider: judge.provider, model: judge.model, label: judge.label }))
+    return { ...plan, trustedJudges }
   })
 
 export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' })
