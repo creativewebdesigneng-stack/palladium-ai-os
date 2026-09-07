@@ -3,20 +3,21 @@ import { chatBody } from "../model-gateway.base";
 import { FREELLMAPI_PROFILE } from "../freellmapi-profile";
 
 describe("FreeLLMAPI integration", () => {
-  it("reuses PalladiumAI's OpenAI-compatible provider lane", () => {
+  it("uses a dedicated evaluator lane instead of reusing Blackstar native compatible credentials", () => {
     expect(FREELLMAPI_PROFILE).toMatchObject({
-      id: "freellmapi",
+      id: "freellm",
       protocol: "openai-compatible",
-      palladiumProvider: "compatible",
-      baseUrlEnv: "OPENAI_COMPATIBLE_BASE_URL",
-      apiKeyEnv: "OPENAI_COMPATIBLE_API_KEY",
+      palladiumProvider: "freellm",
+      baseUrlEnv: "FREELLMAPI_BASE_URL",
+      apiKeyEnv: "FREELLMAPI_API_KEY",
+      modelEnv: "FREELLMAPI_MODEL",
       chatPath: "/chat/completions",
       deploymentPathSuffix: "/v1",
       routingOwner: "upstream",
     });
   });
 
-  it("uses the existing OpenAI chat-completions request shape including tools", () => {
+  it("keeps the standard OpenAI chat-completions request shape including tools", () => {
     const body = chatBody(
       {
         provider: "compatible",
@@ -48,9 +49,10 @@ describe("FreeLLMAPI integration", () => {
     });
   });
 
-  it("keeps FreeLLMAPI routing capabilities explicit without adding a second Palladium gateway", () => {
+  it("keeps FreeLLMAPI routing capabilities explicit on the independent evaluator transport", () => {
     expect(FREELLMAPI_PROFILE.capabilities).toEqual(
       expect.arrayContaining([
+        "independent-evaluator-lane",
         "provider-pooling",
         "rate-limit-aware-routing",
         "fallback-routing",
