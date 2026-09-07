@@ -33,9 +33,9 @@ describe("Blackstar native runtime verification", () => {
     expect(target.reason).toMatch(/native-primary/i);
   });
 
-  it("uses a tiny deterministic no-think request with a bounded execution budget", () => {
-    expect(nativeVerificationPrompt()).toBe(`/no_think\nReply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`);
-    expect(BLACKSTAR_NATIVE_VERIFICATION_MAX_TOKENS).toBeLessThanOrEqual(128);
+  it("uses the physically proven Qwen no-think syntax with a bounded budget", () => {
+    expect(nativeVerificationPrompt()).toBe(`Reply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER} /no_think`);
+    expect(BLACKSTAR_NATIVE_VERIFICATION_MAX_TOKENS).toBe(512);
     expect(BLACKSTAR_NATIVE_VERIFICATION_TIMEOUT_MS).toBe(60_000);
   });
 
