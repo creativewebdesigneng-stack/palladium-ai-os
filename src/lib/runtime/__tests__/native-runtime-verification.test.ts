@@ -3,7 +3,9 @@ import {
   BLACKSTAR_NATIVE_VERIFICATION_MARKER,
   BLACKSTAR_NATIVE_VERIFICATION_MAX_TOKENS,
   BLACKSTAR_NATIVE_VERIFICATION_TIMEOUT_MS,
+  isNativeVerificationMarker,
   nativeVerificationPrompt,
+  normaliseNativeVerificationResponse,
   resolveNativeVerificationTarget,
 } from "../native-runtime-verification";
 
@@ -32,8 +34,17 @@ describe("Blackstar native runtime verification", () => {
   });
 
   it("uses a tiny deterministic no-think request with a bounded execution budget", () => {
-    expect(nativeVerificationPrompt()).toBe(`Reply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER} /no_think`);
+    expect(nativeVerificationPrompt()).toBe(`/no_think\nReply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`);
     expect(BLACKSTAR_NATIVE_VERIFICATION_MAX_TOKENS).toBeLessThanOrEqual(128);
     expect(BLACKSTAR_NATIVE_VERIFICATION_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("accepts only the marker after removing harmless Qwen formatting", () => {
+    expect(isNativeVerificationMarker(BLACKSTAR_NATIVE_VERIFICATION_MARKER)).toBe(true);
+    expect(isNativeVerificationMarker(`\"${BLACKSTAR_NATIVE_VERIFICATION_MARKER}\"`)).toBe(true);
+    expect(isNativeVerificationMarker(`\`\`\`text\n${BLACKSTAR_NATIVE_VERIFICATION_MARKER}\n\`\`\``)).toBe(true);
+    expect(isNativeVerificationMarker(`<think>internal reasoning</think>\n${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`)).toBe(true);
+    expect(normaliseNativeVerificationResponse(` <think>x</think> '${BLACKSTAR_NATIVE_VERIFICATION_MARKER}' `)).toBe(BLACKSTAR_NATIVE_VERIFICATION_MARKER);
+    expect(isNativeVerificationMarker(`${BLACKSTAR_NATIVE_VERIFICATION_MARKER} extra`)).toBe(false);
   });
 });
