@@ -39,12 +39,20 @@ describe("Blackstar native runtime verification", () => {
     expect(BLACKSTAR_NATIVE_VERIFICATION_TIMEOUT_MS).toBe(60_000);
   });
 
-  it("accepts only the marker after removing harmless Qwen formatting", () => {
+  it("recognises the native challenge marker through harmless Qwen response formatting", () => {
     expect(isNativeVerificationMarker(BLACKSTAR_NATIVE_VERIFICATION_MARKER)).toBe(true);
     expect(isNativeVerificationMarker(`\"${BLACKSTAR_NATIVE_VERIFICATION_MARKER}\"`)).toBe(true);
     expect(isNativeVerificationMarker(`\`\`\`text\n${BLACKSTAR_NATIVE_VERIFICATION_MARKER}\n\`\`\``)).toBe(true);
     expect(isNativeVerificationMarker(`<think>internal reasoning</think>\n${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`)).toBe(true);
+    expect(isNativeVerificationMarker(`Sure — ${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`)).toBe(true);
+    expect(isNativeVerificationMarker(`${BLACKSTAR_NATIVE_VERIFICATION_MARKER}\nDone.`)).toBe(true);
     expect(normaliseNativeVerificationResponse(` <think>x</think> '${BLACKSTAR_NATIVE_VERIFICATION_MARKER}' `)).toBe(BLACKSTAR_NATIVE_VERIFICATION_MARKER);
-    expect(isNativeVerificationMarker(`${BLACKSTAR_NATIVE_VERIFICATION_MARKER} extra`)).toBe(false);
+  });
+
+  it("still rejects missing, partial, altered, and case-changed markers", () => {
+    expect(isNativeVerificationMarker("GPU ready")).toBe(false);
+    expect(isNativeVerificationMarker("BLACKSTAR_GPU_O")).toBe(false);
+    expect(isNativeVerificationMarker(`${BLACKSTAR_NATIVE_VERIFICATION_MARKER}_EXTRA`)).toBe(false);
+    expect(isNativeVerificationMarker(BLACKSTAR_NATIVE_VERIFICATION_MARKER.toLowerCase())).toBe(false);
   });
 });
