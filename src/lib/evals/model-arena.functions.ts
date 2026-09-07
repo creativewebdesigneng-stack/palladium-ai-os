@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
-import { runChat, runChatPinned, type Provider } from "@/lib/runtime/model-gateway.server";
+import { runChatPinned, type Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
 type ArenaPolicy = {
@@ -192,7 +192,7 @@ export const runModelArena = createServerFn({ method: "POST" })
       const responseRows: ModelEvalResponse[] = [];
       for (const contestant of data.contestants) {
         const started = Date.now();
-        const result = await runChat({
+        const result = await runChatPinned({
           provider: contestant.provider as Provider,
           model: contestant.model,
           messages: [
@@ -201,6 +201,9 @@ export const runModelArena = createServerFn({ method: "POST" })
           ],
           maxTokens: 1600,
         });
+        if (result.provider !== contestant.provider || result.model !== contestant.model) {
+          throw new Error(`Model Arena candidate transport changed identity from ${contestant.provider}/${contestant.model} to ${result.provider}/${result.model}.`);
+        }
         const safeResponse = applyArenaPolicy(result.text, policy, "response");
         const row = {
           run_id: run.id,
@@ -220,8 +223,7 @@ export const runModelArena = createServerFn({ method: "POST" })
       }
 
       const anonymized = responseRows.map((response, index) => `RESPONSE ${index}\n${response.response_text}`).join("\n\n---\n\n");
-      const judgeRunner = data.astraTaskClass ? runChatPinned : runChat;
-      const judgeResult = await judgeRunner({
+      const judgeResult = await runChatPinned({
         provider: data.judge.provider as Provider,
         model: data.judge.model,
         messages: [
@@ -236,8 +238,8 @@ export const runModelArena = createServerFn({ method: "POST" })
         ],
         maxTokens: 1400,
       });
-      if (data.astraTaskClass && (judgeResult.provider !== data.judge.provider || judgeResult.model !== data.judge.model)) {
-        throw new Error("Astra certification judge transport did not preserve the exact requested evaluator identity.");
+      if (judgeResult.provider !== data.judge.provider || judgeResult.model !== data.judge.model) {
+        throw new Error("Model Arena judge transport did not preserve the exact requested evaluator identity.");
       }
       const judged = parseJudgeJson(judgeResult.text);
       const scores = judged.map((score) => {
