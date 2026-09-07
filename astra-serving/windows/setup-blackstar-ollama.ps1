@@ -93,15 +93,18 @@ if ($modelIds -notcontains $Model) {
 Write-Host "Running a real inference smoke test..."
 $body = @{
   model = $Model
-  messages = @(@{ role = "user"; content = "Reply with exactly: BLACKSTAR_READY" })
+  messages = @(@{ role = "user"; content = "Reply with exactly: BLACKSTAR_READY /no_think" })
   temperature = 0
-  max_tokens = 32
+  # Qwen3 can spend completion tokens on its internal reasoning before emitting
+  # message.content. Keep enough headroom that a valid local inference is not
+  # falsely reported as empty on thinking-capable models.
+  max_tokens = 512
 } | ConvertTo-Json -Depth 6
 
-$response = Invoke-RestMethod -Method Post -Uri "$OpenAiBaseUrl/chat/completions" -ContentType "application/json" -Body $body -TimeoutSec 120
+$response = Invoke-RestMethod -Method Post -Uri "$OpenAiBaseUrl/chat/completions" -ContentType "application/json" -Body $body -TimeoutSec 300
 $text = [string]$response.choices[0].message.content
 if (-not $text.Trim()) {
-  throw "The model returned an empty response."
+  throw "The model returned an empty final response. Check the Ollama model output before treating local inference as operational."
 }
 
 Write-Host ""
