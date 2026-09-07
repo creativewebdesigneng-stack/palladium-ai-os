@@ -6,6 +6,7 @@ import {
   BLACKSTAR_NATIVE_VERIFICATION_MARKER,
   BLACKSTAR_NATIVE_VERIFICATION_MAX_TOKENS,
   BLACKSTAR_NATIVE_VERIFICATION_TIMEOUT_MS,
+  isNativeVerificationMarker,
   nativeVerificationPrompt,
   resolveNativeVerificationTarget,
 } from "./native-runtime-verification";
@@ -37,7 +38,7 @@ export const verifyBlackstarNativeRuntime = createServerFn({ method: "POST" })
       if (result.provider !== target.provider || result.model !== target.model) {
         throw new Error(`Native verification transport changed identity from ${target.provider}/${target.model} to ${result.provider}/${result.model}.`);
       }
-      if (result.text.trim() !== BLACKSTAR_NATIVE_VERIFICATION_MARKER) {
+      if (!isNativeVerificationMarker(result.text)) {
         throw new Error("Blackstar native runtime responded, but did not return the required verification marker.");
       }
 
