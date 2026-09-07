@@ -123,9 +123,28 @@ if (-not $tunnelUrl) {
 
 Write-Host "Verifying authenticated remote model discovery..."
 $remoteHeaders = @{ Authorization = "Bearer $token" }
-$remoteModels = Invoke-RestMethod -Method Get -Uri "$tunnelUrl/v1/models" -Headers $remoteHeaders -TimeoutSec 30
-if (@($remoteModels.data | ForEach-Object { $_.id }) -notcontains $Model) {
-  throw "The remote bridge is reachable, but the expected model identity was not returned."
+$remoteReady = $false
+$lastRemoteError = $null
+for ($i = 0; $i -lt 30; $i++) {
+  if ($tunnel.HasExited) { break }
+  try {
+    $remoteModels = Invoke-RestMethod -Method Get -Uri "$tunnelUrl/v1/models" -Headers $remoteHeaders -TimeoutSec 15
+    if (@($remoteModels.data | ForEach-Object { $_.id }) -contains $Model) {
+      $remoteReady = $true
+      break
+    }
+    $lastRemoteError = "The expected model identity was not returned yet."
+  } catch {
+    $lastRemoteError = $_.Exception.Message
+  }
+  Start-Sleep -Seconds 2
+}
+if (-not $remoteReady) {
+  try { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue } catch {}
+  try { Stop-Process -Id $proxy.Id -Force -ErrorAction SilentlyContinue } catch {}
+  $tail = ""
+  if (Test-Path $errLog) { $tail = (Get-Content $errLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n" }
+  throw "The Cloudflare route was published but did not become reachable in time. Last remote error: $lastRemoteError`n$tail"
 }
 
 @{
