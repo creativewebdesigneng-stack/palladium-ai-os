@@ -21,8 +21,20 @@ function Resolve-CloudflaredPath {
   return $null
 }
 
-function Clear-StaleBlackstarProxy([int]$Port) {
-  $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+function Get-FreeLoopbackPort {
+  $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+  try {
+    $listener.Start()
+    return [int]$listener.LocalEndpoint.Port
+  } finally {
+    $listener.Stop()
+  }
+}
+
+function Resolve-ProxyPort([int]$RequestedPort) {
+  $listeners = @(Get-NetTCPConnection -LocalPort $RequestedPort -State Listen -ErrorAction SilentlyContinue)
+  if ($listeners.Count -eq 0) { return $RequestedPort }
+
   foreach ($listener in $listeners) {
     $pidValue = [int]$listener.OwningProcess
     if (-not $pidValue) { continue }
@@ -32,10 +44,16 @@ function Clear-StaleBlackstarProxy([int]$Port) {
       Write-Host "Stopping stale Blackstar proxy process $pidValue from a previous failed bridge attempt..."
       Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
       Start-Sleep -Milliseconds 500
-      continue
     }
-    throw "Port $Port is already in use by process $pidValue. Stop that process or choose a different -ProxyPort before starting the Blackstar bridge."
   }
+
+  $remaining = @(Get-NetTCPConnection -LocalPort $RequestedPort -State Listen -ErrorAction SilentlyContinue)
+  if ($remaining.Count -eq 0) { return $RequestedPort }
+
+  $owners = @($remaining | ForEach-Object { [int]$_.OwningProcess } | Select-Object -Unique)
+  $fallbackPort = Get-FreeLoopbackPort
+  Write-Host "Port $RequestedPort is occupied by process(es) $($owners -join ', '). Using free localhost proxy port $fallbackPort instead..."
+  return $fallbackPort
 }
 
 Write-Host "Blackstar cloud-to-home GPU bridge"
@@ -68,7 +86,7 @@ if (-not $cloudflared) {
   throw "cloudflared executable was not found after installation. Open a new PowerShell window and rerun this script."
 }
 
-Clear-StaleBlackstarProxy -Port $ProxyPort
+$ProxyPort = Resolve-ProxyPort -RequestedPort $ProxyPort
 
 # Windows PowerShell 5.1 runs on .NET Framework, where the static RandomNumberGenerator.Fill API is unavailable.
 # Use the instance API so the same script works on Windows PowerShell 5.1 and modern PowerShell/.NET.
@@ -86,7 +104,7 @@ $proxy = $null
 $tunnel = $null
 $bridgeReady = $false
 try {
-  Write-Host "Starting localhost-only authenticated proxy..."
+  Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
@@ -107,7 +125,7 @@ try {
     } catch {}
   }
   if (-not $proxyReady) {
-    throw "The Blackstar authenticated localhost proxy did not become ready."
+    throw "The Blackstar authenticated localhost proxy did not become ready on port $ProxyPort."
   }
 
   $outLog = Join-Path $runtimeDir "cloudflared.out.log"
