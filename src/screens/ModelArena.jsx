@@ -15,7 +15,8 @@ const DEFAULT_CONTESTANTS = [
   { provider: 'openai', model: 'gpt-5-mini', label: 'Candidate A' },
   { provider: 'deepseek', model: 'deepseek-chat', label: 'Candidate B' },
 ];
-const PROVIDERS = ['openai', 'anthropic', 'groq', 'deepseek', 'lovable', 'compatible'];
+const CANDIDATE_PROVIDERS = ['openai', 'anthropic', 'groq', 'deepseek', 'lovable', 'compatible'];
+const JUDGE_PROVIDERS = [...CANDIDATE_PROVIDERS, 'freellm'];
 
 export default function ModelArena() {
   const { session } = useWorkspace();
@@ -90,7 +91,8 @@ export default function ModelArena() {
     },
   });
 
-  const canRun = name.trim() && prompt.trim() && judge.model.trim() && contestants.length >= 2 && contestants.every((row) => row.model.trim());
+  const judgeCanExecute = judge.provider !== 'freellm' || configured.get('freellm') === true;
+  const canRun = name.trim() && prompt.trim() && judge.model.trim() && judgeCanExecute && contestants.length >= 2 && contestants.every((row) => row.model.trim());
   const scored = useMemo(() => {
     const responses = result.data?.responses ?? [];
     const scores = result.data?.scores ?? [];
@@ -155,7 +157,7 @@ export default function ModelArena() {
           <div className="mt-3 space-y-2">
             {contestants.map((row, index) => (
               <div key={index} className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 md:grid-cols-[140px_1fr_150px_auto]">
-                <ProviderSelect value={row.provider} onChange={(provider) => changeContestantProvider(index, provider)} configured={configured} />
+                <ProviderSelect value={row.provider} onChange={(provider) => changeContestantProvider(index, provider)} configured={configured} providers={CANDIDATE_PROVIDERS} />
                 <input value={row.model} onChange={(e) => updateContestant(index, { model: e.target.value })} className="input" placeholder="Model ID" />
                 <input value={row.label} onChange={(e) => updateContestant(index, { label: e.target.value })} className="input" placeholder="Label" />
                 <button type="button" disabled={contestants.length <= 2} onClick={() => setContestants((rows) => rows.filter((_, i) => i !== index))} className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-zinc-500 transition hover:text-rose-300 disabled:opacity-30" aria-label={`Remove candidate ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
@@ -166,9 +168,11 @@ export default function ModelArena() {
 
           <div className="mt-5 flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-300" /><h3 className="text-xs font-semibold text-white">Independent judge</h3></div>
           <div className="mt-3 grid gap-2 rounded-xl border border-amber-400/15 bg-amber-400/[.03] p-3 md:grid-cols-[140px_1fr]">
-            <ProviderSelect value={judge.provider} onChange={(provider) => setJudge((value) => ({ ...value, provider, model: providerDefaults.get(provider) ?? '' }))} configured={configured} />
+            <ProviderSelect value={judge.provider} onChange={(provider) => setJudge((value) => ({ ...value, provider, model: providerDefaults.get(provider) ?? '' }))} configured={configured} providers={JUDGE_PROVIDERS} />
             <input value={judge.model} onChange={(e) => setJudge((value) => ({ ...value, model: e.target.value }))} className="input" placeholder="Judge model ID" />
           </div>
+          {judge.provider === 'freellm' && !judgeCanExecute && <p className="mt-2 text-[10px] leading-relaxed text-amber-300">FreeLLM is available only as an independent judge and is disabled until FREELLMAPI_BASE_URL and FREELLMAPI_MODEL are configured on this deployment.</p>}
+          {judge.provider === 'freellm' && judgeCanExecute && <p className="mt-2 text-[10px] leading-relaxed text-emerald-300">FreeLLM judge lane is configured. It uses dedicated FREELLMAPI_* server-side transport and does not reuse Blackstar's native Qwen endpoint or credentials.</p>}
 
           {runMutation.error && <div className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(runMutation.error)}</div>}
           <button type="button" disabled={!canRun || runMutation.isPending} onClick={() => runMutation.mutate()} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">
@@ -207,4 +211,4 @@ function Field({ label, children }) { return <label className="block"><span clas
 function Loading({ text }) { return <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />{text}</div>; }
 function ErrorBox({ error }) { return <div className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>; }
 function Status({ status }) { const tone = status === 'completed' ? 'text-emerald-300' : status === 'failed' ? 'text-rose-300' : 'text-amber-300'; return <span className={`text-[10px] font-medium ${tone}`}>{status}</span>; }
-function ProviderSelect({ value, onChange, configured }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="input"><option value="" disabled>Provider</option>{PROVIDERS.map((provider) => <option key={provider} value={provider}>{provider}{configured.has(provider) ? configured.get(provider) ? ' · ready' : ' · not configured' : ''}</option>)}</select>; }
+function ProviderSelect({ value, onChange, configured, providers }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="input"><option value="" disabled>Provider</option>{providers.map((provider) => <option key={provider} value={provider}>{provider}{configured.has(provider) ? configured.get(provider) ? ' · ready' : ' · not configured' : ''}</option>)}</select>; }
