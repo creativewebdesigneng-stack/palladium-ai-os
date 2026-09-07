@@ -51,8 +51,15 @@ if (-not $cloudflared) {
   throw "cloudflared executable was not found after installation. Open a new PowerShell window and rerun this script."
 }
 
+# Windows PowerShell 5.1 runs on .NET Framework, where the static RandomNumberGenerator.Fill API is unavailable.
+# Use the instance API so the same script works on Windows PowerShell 5.1 and modern PowerShell/.NET.
 $random = New-Object byte[] 48
-[System.Security.Cryptography.RandomNumberGenerator]::Fill($random)
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+  $rng.GetBytes($random)
+} finally {
+  if ($rng) { $rng.Dispose() }
+}
 $token = [Convert]::ToBase64String($random).TrimEnd('=').Replace('+','-').Replace('/','_')
 $env:BLACKSTAR_BRIDGE_TOKEN = $token
 
