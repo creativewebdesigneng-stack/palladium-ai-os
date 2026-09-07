@@ -255,6 +255,14 @@ export const runModelArena = createServerFn({ method: "POST" })
       if (judgeResult.provider !== data.judge.provider || judgeResult.model !== data.judge.model) {
         throw new Error("Model Arena judge transport did not preserve the exact requested evaluator identity.");
       }
+      const judgeRouteEvidence = "routedVia" in judgeResult
+        ? {
+            judgeRoutedVia: judgeResult.routedVia,
+            judgeRoutedProvider: judgeResult.routedProvider,
+            judgeRoutedModel: judgeResult.routedModel,
+            judgeFallbackAttempts: judgeResult.fallbackAttempts,
+          }
+        : {};
       const judged = parseJudgeJson(judgeResult.text);
       const scores = judged.map((score) => {
         const response = responseRows[score.index];
@@ -266,7 +274,7 @@ export const runModelArena = createServerFn({ method: "POST" })
           score: score.score,
           verdict: score.verdict ?? null,
           reasoning: score.reasoning ?? null,
-          criteria: { names: criteria, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model },
+          criteria: { names: criteria, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model, ...judgeRouteEvidence },
         };
       });
       if (scores.length !== responseRows.length) throw new Error("The judge did not score every candidate response.");
@@ -315,7 +323,14 @@ export const runModelArena = createServerFn({ method: "POST" })
         targetType: "model_eval_run",
         targetId: run.id,
         status: "success",
-        metadata: { contestants: data.contestants.length, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model, complianceApplied: Boolean(policy), astraTaskClass: data.astraTaskClass ?? null },
+        metadata: {
+          contestants: data.contestants.length,
+          judgeProvider: judgeResult.provider,
+          judgeModel: judgeResult.model,
+          ...judgeRouteEvidence,
+          complianceApplied: Boolean(policy),
+          astraTaskClass: data.astraTaskClass ?? null,
+        },
       });
       return { runId: run.id, responses: responseRows, scores };
     } catch (error) {
