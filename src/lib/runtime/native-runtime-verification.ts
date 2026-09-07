@@ -33,5 +33,19 @@ export function resolveNativeVerificationTarget(env: NodeJS.ProcessEnv = process
 }
 
 export function nativeVerificationPrompt(): string {
-  return `Reply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER} /no_think`;
+  return `/no_think\nReply with exactly ${BLACKSTAR_NATIVE_VERIFICATION_MARKER}`;
+}
+
+export function normaliseNativeVerificationResponse(value: string): string {
+  return value
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^```(?:text)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .trim();
+}
+
+export function isNativeVerificationMarker(value: string): boolean {
+  return normaliseNativeVerificationResponse(value) === BLACKSTAR_NATIVE_VERIFICATION_MARKER;
 }
