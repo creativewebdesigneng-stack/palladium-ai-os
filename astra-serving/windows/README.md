@@ -44,7 +44,36 @@ Ollama's ordinary localhost setup does not require `OPENAI_COMPATIBLE_API_KEY`.
 
 `127.0.0.1` is only correct for a Blackstar server process running on the same Windows PC. Lovable, Vercel, or another cloud deployment cannot reach your PC through its own localhost.
 
-Do **not** expose Ollama's port 11434 directly to the internet. Before cloud Blackstar can use the home GPU, place Ollama behind a separately secured route that provides TLS, authentication and restricted ingress. Then configure the cloud deployment with that secured `/v1` base URL and its server-only credential.
+Do **not** expose Ollama's port 11434 directly to the internet.
+
+For a first cloud-to-home proof of connection, Blackstar includes a temporary authenticated bridge. It keeps Ollama on localhost, starts a second localhost-only bearer-auth proxy, permits only `GET /v1/models` and `POST /v1/chat/completions`, and publishes that proxy through a Cloudflare TLS Quick Tunnel.
+
+From PowerShell at the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-cloud-bridge.ps1
+```
+
+The bridge verifies local Ollama/model discovery first, installs `cloudflared` through `winget` when needed, creates a cryptographically random bearer token, verifies the localhost proxy, creates the TLS tunnel, and finally verifies authenticated model discovery through the public tunnel before printing any deployment values.
+
+On success it prints four **server-only** values:
+
+```dotenv
+OPENAI_COMPATIBLE_BASE_URL=https://<temporary-host>.trycloudflare.com/v1
+OPENAI_COMPATIBLE_API_KEY=<generated-random-bearer-token>
+BLACKSTAR_NATIVE_MODEL=qwen3:8b-q4_K_M
+BLACKSTAR_NATIVE_PRIMARY=true
+```
+
+The bearer token must stay secret and must never be exposed through a `VITE_` variable or committed to Git. Blackstar's existing compatible-provider gateway sends `OPENAI_COMPATIBLE_API_KEY` as an `Authorization: Bearer ...` header, so no separate provider path is created for this bridge.
+
+Stop the temporary bridge with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\stop-blackstar-cloud-bridge.ps1
+```
+
+A `trycloudflare.com` Quick Tunnel is a development bridge, not the final production topology. Once end-to-end Astra inference has been proven, replace it with a named/persistent tunnel or equivalent managed route with stable hostname, managed authentication, rotation, monitoring and restart/service handling. Do not weaken the bearer boundary or publish port 11434 itself.
 
 ## Optional vision experiment
 
@@ -52,4 +81,4 @@ A separate 8B-class Qwen vision model may fit the same card when loaded independ
 
 ## Certification boundary
 
-A successful bootstrap proves only that the model is reachable and can produce inference. It does not create Model Arena runs, attestations or verified evidence. After the local endpoint is operational, use Blackstar's existing evaluation and certification flow to earn task-class routing authority.
+A successful bootstrap or cloud bridge proves only that the model is reachable and can produce inference. It does not create Model Arena runs, attestations or verified evidence. After the local endpoint is operational, use Blackstar's existing evaluation and certification flow to earn task-class routing authority.
