@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
+import { readAstraCertificationFailureStage, safeAstraCertificationStageFailure } from './astra-certification-stage-diagnostics'
 
 const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic'])
 const textTaskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'agentic'])
@@ -9,32 +10,20 @@ const providerSchema = z.enum(['openai', 'groq', 'lovable', 'gemini'])
 const judgeProviderSchema = z.enum(['openai', 'groq'])
 
 function classifyAstraTextCertificationFailure(error: unknown) {
+  const stage = readAstraCertificationFailureStage(error)
+  if (stage) return safeAstraCertificationStageFailure(stage)
+
   const raw = error instanceof Error ? error.message : ''
   const message = raw.toLowerCase()
 
   if (message.includes('serving is not configured') || message.includes('serving identity')) {
     return { code: 'astra_serving_unavailable', message: 'Blackstar Astra serving is not available for this certification case.' } as const
   }
-  if (message.includes('candidate transport changed identity')) {
-    return { code: 'candidate_identity_mismatch', message: 'The Astra candidate runtime changed identity during certification.' } as const
-  }
-  if (message.includes('freellm certification judge routed to')) {
-    return { code: 'evaluator_route_mismatch', message: 'The independent evaluator route did not match the exact pinned upstream identity.' } as const
-  }
   if (message.includes('freellm') && (message.includes('not configured') || message.includes('required for trusted'))) {
     return { code: 'evaluator_not_ready', message: 'The authenticated, route-pinned independent evaluator is not ready for trusted text certification.' } as const
   }
-  if (message.includes('freellmapi') || message.includes('freellm certification judge changed identity')) {
-    return { code: 'evaluator_request_failed', message: 'The independent evaluator failed while scoring this certification case.' } as const
-  }
-  if (message.includes('score format') || message.includes('must score exactly one') || message.includes('invalid astra candidate score')) {
-    return { code: 'judge_response_invalid', message: 'The independent evaluator returned a response that could not be accepted as a trusted certification score.' } as const
-  }
   if (message.includes('unknown astra text certification benchmark case')) {
     return { code: 'benchmark_case_invalid', message: 'The selected server-owned certification case is no longer valid.' } as const
-  }
-  if (message.includes('attest') || message.includes('provenance') || message.includes('signature')) {
-    return { code: 'attestation_failed', message: 'The certification run completed, but trusted provenance attestation did not pass.' } as const
   }
 
   return { code: 'certification_case_failed', message: 'The trusted Astra certification case failed before it could be attested.' } as const
