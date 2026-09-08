@@ -22,6 +22,17 @@ export function astraCertificationStageError(stage: AstraTextCertificationStage)
   return new Error(`${STAGE_PREFIX}${stage}`)
 }
 
+export function candidateFailureStage(error: unknown): AstraTextCertificationStage {
+  if (!error || typeof error !== 'object') return 'candidate_execution'
+  const statusValue = (error as { status?: unknown }).status
+  const status = typeof statusValue === 'number' && Number.isFinite(statusValue) ? statusValue : null
+  if (status === 401 || status === 403) return 'candidate_credentials_rejected'
+  if (status === 429) return 'candidate_rate_limited'
+  if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
+  if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
+  return 'candidate_execution'
+}
+
 export function readAstraCertificationFailureStage(error: unknown): AstraTextCertificationStage | null {
   const message = error instanceof Error ? error.message : ''
   if (!message.startsWith(STAGE_PREFIX)) return null
