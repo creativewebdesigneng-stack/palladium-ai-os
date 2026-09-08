@@ -8,7 +8,7 @@ import {
 } from './astra-certification-execution-profile'
 import { getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass } from './astra-certification-benchmark-suite'
 import { isServerApprovedAstraCertificationJudge } from './astra-certification-judge-policy.server'
-import { runFreeLlmJudge, resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
+import { matchesPinnedFreeLlmRoute, runFreeLlmJudge, resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
@@ -64,8 +64,8 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   if (!benchmarkCase || benchmarkCase.modality !== 'text') throw new Error('Unknown Astra text certification benchmark case.')
 
   const evaluator = resolveFreeLlmEvaluatorConfig()
-  if (!evaluator.configured || !evaluator.baseUrl || !evaluator.apiKey || !evaluator.model || !isServerApprovedAstraCertificationJudge('freellm', evaluator.model)) {
-    throw new Error('An authenticated pinned server-approved FreeLLM evaluator is required for trusted Astra text certification.')
+  if (!evaluator.certificationConfigured || !evaluator.baseUrl || !evaluator.apiKey || !evaluator.model || !evaluator.routedProvider || !evaluator.routedModel || !isServerApprovedAstraCertificationJudge('freellm', evaluator.model)) {
+    throw new Error('An authenticated, fully route-pinned, server-approved FreeLLM evaluator is required for trusted Astra text certification.')
   }
 
   const model = blackstarAstraModelForTaskClass(input.taskClass)
@@ -146,6 +146,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     })
     if (judgeResult.provider !== 'freellm' || judgeResult.model !== evaluator.model) {
       throw new Error(`FreeLLM certification judge changed identity to ${judgeResult.provider}/${judgeResult.model}.`)
+    }
+    if (!matchesPinnedFreeLlmRoute(judgeResult)) {
+      throw new Error(`FreeLLM certification judge routed to ${judgeResult.routedProvider}/${judgeResult.routedModel} instead of the exact pinned upstream ${evaluator.routedProvider}/${evaluator.routedModel}.`)
     }
     const judged = parseSingleJudge(judgeResult.text)
     const score = {
