@@ -52,8 +52,9 @@ export default function AstraCertificationWorkbench() {
 
       if (taskClass !== 'vision') {
         if (!freeLlmJudge) throw new Error('The authenticated FreeLLM evaluator is not configured for trusted text certification.');
-        const attested = await runTextFn({ data: { taskClass, caseId: benchmarkCase.caseId } });
-        return { runId: attested.runId, attested };
+        const outcome = await runTextFn({ data: { taskClass, caseId: benchmarkCase.caseId } });
+        if (!outcome.ok) return { failure: outcome };
+        return { runId: outcome.runId, attested: outcome };
       }
 
       if (!judgeIsTrusted) throw new Error('Choose a server-approved trusted judge before running certification.');
@@ -139,7 +140,8 @@ export default function AstraCertificationWorkbench() {
         </div>
       </>}
       {runCase.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(runCase.error)}</p>}
-      {runCase.data && <p className="mt-3 text-xs text-emerald-300">Trusted case attested from run {runCase.data.runId}.</p>}
+      {runCase.data?.failure && <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200"><p>{runCase.data.failure.message}</p><p className="mt-1 text-[10px] text-rose-300/70">Diagnostic code: <code>{runCase.data.failure.code}</code></p></div>}
+      {runCase.data?.runId && <p className="mt-3 text-xs text-emerald-300">Trusted case attested from run {runCase.data.runId}.</p>}
       {certify.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(certify.error)}</p>}
       {certify.data && <p className="mt-3 text-xs text-emerald-300">Verified evidence issued from {certify.data.sampleCount} trusted cases.</p>}
     </section>
