@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   ASTRA_CERTIFICATION_JUDGES,
+  isPinnedFreeLlmCertificationModel,
   isTrustedAstraCertificationJudge,
   judgeMatchesCandidate,
 } from '../astra-certification-judge-policy'
@@ -16,7 +17,7 @@ afterEach(() => {
 })
 
 describe('Astra certification judge policy', () => {
-  it('accepts only server-owned or exact configured FreeLLM judge identities', () => {
+  it('accepts only server-owned or exact configured pinned FreeLLM judge identities', () => {
     expect(isTrustedAstraCertificationJudge('groq', 'openai/gpt-oss-20b')).toBe(true)
     expect(isTrustedAstraCertificationJudge('openai', 'gpt-5-mini')).toBe(true)
     expect(isTrustedAstraCertificationJudge('deepseek', 'deepseek-chat')).toBe(false)
@@ -29,6 +30,20 @@ describe('Astra certification judge policy', () => {
 
     delete process.env['FREELLMAPI_BASE_URL']
     expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(false)
+  })
+
+  it('rejects FreeLLM virtual routing identities for trusted certification', () => {
+    expect(isPinnedFreeLlmCertificationModel('gemini-2.5-flash')).toBe(true)
+    expect(isPinnedFreeLlmCertificationModel('openai/gpt-oss-20b')).toBe(true)
+    expect(isPinnedFreeLlmCertificationModel('auto')).toBe(false)
+    expect(isPinnedFreeLlmCertificationModel('auto:smart')).toBe(false)
+    expect(isPinnedFreeLlmCertificationModel('fusion')).toBe(false)
+
+    process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
+    process.env['FREELLMAPI_MODEL'] = 'auto'
+    expect(isTrustedAstraCertificationJudge('freellm', 'auto')).toBe(false)
+    process.env['FREELLMAPI_MODEL'] = 'fusion'
+    expect(isTrustedAstraCertificationJudge('freellm', 'fusion')).toBe(false)
   })
 
   it('keeps static approved judges restricted to the established independent providers', () => {

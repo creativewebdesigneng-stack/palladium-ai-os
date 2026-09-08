@@ -9,11 +9,19 @@ export const ASTRA_CERTIFICATION_JUDGES: readonly AstraCertificationJudge[] = [
   { provider: 'openai', model: 'gpt-5-mini', label: 'OpenAI · GPT-5 mini' },
 ] as const
 
+export function isPinnedFreeLlmCertificationModel(model: unknown): model is string {
+  if (typeof model !== 'string') return false
+  const clean = model.trim()
+  if (!clean) return false
+  const lower = clean.toLowerCase()
+  return lower !== 'auto' && !lower.startsWith('auto:') && lower !== 'fusion'
+}
+
 function configuredFreeLlmJudgeModel(): string | null {
   if (typeof process === 'undefined') return null
   const baseUrl = process.env['FREELLMAPI_BASE_URL']?.trim()
   const model = process.env['FREELLMAPI_MODEL']?.trim()
-  return baseUrl && model ? model : null
+  return baseUrl && isPinnedFreeLlmCertificationModel(model) ? model : null
 }
 
 export function isTrustedAstraCertificationJudge(provider: unknown, model: unknown): boolean {

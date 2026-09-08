@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FREELLMAPI_PROFILE } from "../freellmapi-profile";
 import { listModelProviderDefinitions, isModelProviderConfigured } from "../model-providers.server";
-import { resolveFreeLlmEvaluatorConfig } from "../../evals/freellm-evaluator.server";
+import { parseFreeLlmRouteIdentity, resolveFreeLlmEvaluatorConfig } from "../../evals/freellm-evaluator.server";
 
 describe("FreeLLM independent evaluator lane", () => {
   it("uses dedicated server-only environment variables rather than the native compatible lane", () => {
@@ -25,6 +25,24 @@ describe("FreeLLM independent evaluator lane", () => {
       apiKey: "judge-secret",
       model: "judge-model",
     });
+  });
+
+  it("parses the actual upstream provider/model route returned by FreeLLMAPI", () => {
+    const headers = new Headers({
+      "X-Routed-Via": "groq/openai/gpt-oss-20b",
+      "X-Fallback-Attempts": "2",
+    });
+    expect(parseFreeLlmRouteIdentity(headers)).toEqual({
+      routedVia: "groq/openai/gpt-oss-20b",
+      routedProvider: "groq",
+      routedModel: "openai/gpt-oss-20b",
+      fallbackAttempts: 2,
+    });
+  });
+
+  it("rejects missing or malformed routed identity evidence", () => {
+    expect(() => parseFreeLlmRouteIdentity(new Headers())).toThrow(/X-Routed-Via/);
+    expect(() => parseFreeLlmRouteIdentity(new Headers({ "X-Routed-Via": "invalid" }))).toThrow(/X-Routed-Via/);
   });
 
   it("surfaces the dedicated evaluator separately from local compatible inference", () => {

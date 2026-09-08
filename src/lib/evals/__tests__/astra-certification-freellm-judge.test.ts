@@ -24,7 +24,7 @@ describe('Astra FreeLLM trusted certification judge', () => {
     expect(listServerApprovedAstraCertificationJudges().some((judge) => judge.provider === 'freellm')).toBe(false)
   })
 
-  it('surfaces and approves only the exact configured FreeLLM model', () => {
+  it('surfaces and approves only the exact configured pinned FreeLLM model', () => {
     process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
     process.env['FREELLMAPI_API_KEY'] = 'server-only-secret'
     process.env['FREELLMAPI_MODEL'] = 'judge-model'
@@ -33,5 +33,18 @@ describe('Astra FreeLLM trusted certification judge', () => {
     expect(judges).toContainEqual({ provider: 'freellm', model: 'judge-model', label: 'FreeLLMAPI · judge-model' })
     expect(isServerApprovedAstraCertificationJudge('freellm', 'judge-model')).toBe(true)
     expect(isServerApprovedAstraCertificationJudge('freellm', 'wrong-model')).toBe(false)
+  })
+
+  it('never surfaces virtual auto or fusion routes as trusted certification identities', () => {
+    process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
+    process.env['FREELLMAPI_MODEL'] = 'auto'
+    expect(listServerApprovedAstraCertificationJudges().some((judge) => judge.provider === 'freellm')).toBe(false)
+    expect(isServerApprovedAstraCertificationJudge('freellm', 'auto')).toBe(false)
+
+    process.env['FREELLMAPI_MODEL'] = 'auto:smart'
+    expect(listServerApprovedAstraCertificationJudges().some((judge) => judge.provider === 'freellm')).toBe(false)
+
+    process.env['FREELLMAPI_MODEL'] = 'fusion'
+    expect(listServerApprovedAstraCertificationJudges().some((judge) => judge.provider === 'freellm')).toBe(false)
   })
 })
