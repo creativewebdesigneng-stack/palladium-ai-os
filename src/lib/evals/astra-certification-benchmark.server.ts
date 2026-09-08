@@ -10,6 +10,7 @@ import {
   sameAstraCertificationExecutionProfile,
 } from '@/lib/evals/astra-certification-execution-profile'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
+import { matchesPinnedFreeLlmRoute } from '@/lib/evals/freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
@@ -154,7 +155,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (judgeMatchesCandidate(judge, (responses ?? []).map((response: any) => ({ provider: response.provider, model: response.model })))) throw new Error('Astra certification judge must not also be one of the candidate models.')
   if (judge.provider === 'freellm') {
     if (!judge.routedVia || !judge.routedProvider || !judge.routedModel) throw new Error('FreeLLM certification evidence is missing the actual routed provider/model identity.')
-    if (judge.routedModel !== judge.model) throw new Error('FreeLLM certification requires the actual routed model to match the exact pinned judge model.')
+    if (!matchesPinnedFreeLlmRoute({ routedProvider: judge.routedProvider, routedModel: judge.routedModel })) throw new Error('FreeLLM certification requires the actual routed provider/model to match the exact server-pinned upstream identity.')
     if (!isIndependentFreeLlmRouteProvider(judge.routedProvider)) throw new Error('FreeLLM certification requires an independently routed upstream provider, not an automatic, fusion, local or custom evaluator route.')
     if (judge.routedModel === expectedModel) throw new Error('FreeLLM certification judge resolved to the Astra candidate model and is not independent.')
   }
