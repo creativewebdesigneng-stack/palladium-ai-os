@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest'
+import {
+  ASTRA_CERTIFICATION_PROVENANCE_VERSION,
+  buildAstraCertificationExecutionPrompt,
+  hashAstraCertificationExecutionPrompt,
+  resolveAstraCertificationExecutionProfile,
+  sameAstraCertificationExecutionProfile,
+} from './astra-certification-execution-profile'
+
+describe('Astra certification execution profile', () => {
+  it('uses the physically proven bounded no-think profile for text Qwen3 candidates', () => {
+    const profile = resolveAstraCertificationExecutionProfile('reasoning', 'qwen3:8b-q4_K_M')
+    expect(ASTRA_CERTIFICATION_PROVENANCE_VERSION).toBe(4)
+    expect(profile).toEqual({
+      id: 'blackstar-astra-native-qwen3-bounded-v1',
+      maxTokens: 512,
+      timeoutMs: 60_000,
+      reasoningMode: 'disabled',
+      promptSuffix: '/no_think',
+      fallback: false,
+    })
+    expect(buildAstraCertificationExecutionPrompt('Canonical benchmark', profile)).toBe('Canonical benchmark\n\n/no_think')
+  })
+
+  it('keeps vision and non-Qwen models on the exact pinned default profile', () => {
+    const vision = resolveAstraCertificationExecutionProfile('vision', 'qwen3-vl')
+    const other = resolveAstraCertificationExecutionProfile('coding', 'other-compatible-model')
+    for (const profile of [vision, other]) {
+      expect(profile.maxTokens).toBe(1600)
+      expect(profile.timeoutMs).toBe(90_000)
+      expect(profile.promptSuffix).toBeNull()
+      expect(profile.fallback).toBe(false)
+    }
+  })
+
+  it('detects profile and execution-prompt tampering', () => {
+    const profile = resolveAstraCertificationExecutionProfile('general', 'qwen/qwen3.8-27b')
+    expect(sameAstraCertificationExecutionProfile({ ...profile }, profile)).toBe(true)
+    expect(sameAstraCertificationExecutionProfile({ ...profile, timeoutMs: 90_000 }, profile)).toBe(false)
+    expect(hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt('A', profile)))
+      .not.toBe(hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt('B', profile)))
+  })
+})
