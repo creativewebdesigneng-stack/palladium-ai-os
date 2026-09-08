@@ -80,8 +80,8 @@ function classifyCandidateError(error: unknown): AstraTextCertificationStage | n
   if (status === 404) return 'candidate_model_or_chat_route_not_found'
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
-  if (status === 502 || status === 503 || (status !== null && status >= 500)) return 'candidate_upstream_unavailable'
   if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
+  if (status === 502 || status === 503 || (status !== null && status >= 500)) return 'candidate_upstream_unavailable'
 
   const code = typeof value.code === 'string' ? value.code.toUpperCase() : ''
   if (code === 'ECONNREFUSED') return 'candidate_connection_refused'
