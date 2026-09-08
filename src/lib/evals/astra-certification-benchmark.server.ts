@@ -62,9 +62,11 @@ function actualJudgeIdentity(scores: any[]): ActualJudgeIdentity | null {
     }
   }
   if (!provider || !model) return null
-  return provider === 'freellm'
-    ? { provider, model, routedVia: routedVia ?? undefined, routedProvider: routedProvider ?? undefined, routedModel: routedModel ?? undefined }
-    : { provider, model }
+  if (provider === 'freellm') {
+    if (!routedVia || !routedProvider || !routedModel) return null
+    return { provider, model, routedVia, routedProvider, routedModel }
+  }
+  return { provider, model }
 }
 async function assertScopeAccess(scope: Scope) {
   if (!scope.orgId) return
