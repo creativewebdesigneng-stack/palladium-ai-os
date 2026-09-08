@@ -40,15 +40,17 @@ describe('Astra certification stage diagnostics', () => {
     })).toBe('candidate_connection_refused')
     const loop: { cause?: unknown } = {}
     loop.cause = loop
-    expect(candidateFailureStage(loop)).toBe('candidate_execution')
+    expect(candidateFailureStage(loop)).toBe('candidate_runtime_unknown_object')
   })
 
-  it('fails closed for unknown or malformed provider errors', () => {
-    expect(candidateFailureStage(null)).toBe('candidate_execution')
-    expect(candidateFailureStage(new Error('arbitrary secret-bearing text'))).toBe('candidate_execution')
-    expect(candidateFailureStage({ status: '504' })).toBe('candidate_execution')
-    expect(candidateFailureStage({ status: 500 })).toBe('candidate_execution')
-    expect(candidateFailureStage({ name: 'RangeError', message: 'hidden' })).toBe('candidate_execution')
+  it('returns a safe fingerprint for previously generic failures', () => {
+    expect(candidateFailureStage(new Error('arbitrary secret-bearing text'))).toBe('candidate_runtime_error_object')
+    expect(candidateFailureStage({ name: 'RangeError', message: 'hidden' })).toBe('candidate_runtime_range_error')
+    expect(candidateFailureStage({ name: 'AggregateError', message: 'hidden' })).toBe('candidate_runtime_aggregate_error')
+    expect(candidateFailureStage({ status: '504' })).toBe('candidate_runtime_unknown_object')
+    expect(candidateFailureStage({ status: 500 })).toBe('candidate_runtime_unknown_object')
+    expect(candidateFailureStage(null)).toBe('candidate_runtime_non_error')
+    expect(candidateFailureStage('hidden thrown string')).toBe('candidate_runtime_non_error')
   })
 
   it('accepts only Blackstar stage markers for user-visible classification', () => {
@@ -56,8 +58,8 @@ describe('Astra certification stage diagnostics', () => {
       .toBe('candidate_timeout_or_unreachable')
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_connection_refused')))
       .toBe('candidate_connection_refused')
-    expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_response_invalid_json')))
-      .toBe('candidate_response_invalid_json')
+    expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_runtime_error_object')))
+      .toBe('candidate_runtime_error_object')
     expect(readAstraCertificationFailureStage(new Error('arbitrary provider error with token=secret'))).toBeNull()
   })
 })
