@@ -11,6 +11,7 @@ import { isServerApprovedAstraCertificationJudge } from './astra-certification-j
 import { matchesPinnedFreeLlmRoute, runFreeLlmJudge, resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
+import { astraCertificationStageError, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 
@@ -100,10 +101,12 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     judge_model: evaluator.model,
     metadata: runMetadata,
   }).select('id').single()
-  if (runError) throw new Error(runError.message)
+  if (runError || !run?.id) throw astraCertificationStageError('run_persistence')
 
+  let stage: AstraTextCertificationStage = 'candidate_execution'
   try {
     const started = Date.now()
+    stage = 'candidate_execution'
     const candidate = await runChatPinned({
       provider: 'compatible',
       model,
@@ -111,10 +114,13 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       maxTokens: executionProfile.maxTokens,
       timeoutMs: executionProfile.timeoutMs,
     })
+
+    stage = 'candidate_identity'
     if (candidate.provider !== 'compatible' || candidate.model !== model) {
-      throw new Error(`Astra certification candidate transport changed identity to ${candidate.provider}/${candidate.model}.`)
+      throw astraCertificationStageError(stage)
     }
 
+    stage = 'response_persistence'
     const { data: response, error: responseError } = await db.from('model_eval_responses').insert({
       run_id: run.id,
       provider: candidate.provider,
@@ -126,8 +132,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       output_tokens: candidate.usage.output,
       metadata: { astraExecutionProfileId: executionProfile.id },
     }).select('id,provider,model,label,response_text,latency_ms,input_tokens,output_tokens').single()
-    if (responseError) throw new Error(responseError.message)
+    if (responseError || !response?.id) throw astraCertificationStageError(stage)
 
+    stage = 'evaluator_request'
     const judgeResult = await runFreeLlmJudge({
       model: evaluator.model,
       messages: [
@@ -144,12 +151,18 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       maxTokens: 1000,
       timeoutMs: 90_000,
     })
+
+    stage = 'evaluator_identity'
     if (judgeResult.provider !== 'freellm' || judgeResult.model !== evaluator.model) {
-      throw new Error(`FreeLLM certification judge changed identity to ${judgeResult.provider}/${judgeResult.model}.`)
+      throw astraCertificationStageError(stage)
     }
+
+    stage = 'evaluator_route'
     if (!matchesPinnedFreeLlmRoute(judgeResult)) {
-      throw new Error(`FreeLLM certification judge routed to ${judgeResult.routedProvider}/${judgeResult.routedModel} instead of the exact pinned upstream ${evaluator.routedProvider}/${evaluator.routedModel}.`)
+      throw astraCertificationStageError(stage)
     }
+
+    stage = 'judge_response'
     const judged = parseSingleJudge(judgeResult.text)
     const score = {
       run_id: run.id,
@@ -168,9 +181,12 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         judgeFallbackAttempts: judgeResult.fallbackAttempts,
       },
     }
-    const { error: scoreError } = await db.from('model_eval_scores').insert(score)
-    if (scoreError) throw new Error(scoreError.message)
 
+    stage = 'score_persistence'
+    const { error: scoreError } = await db.from('model_eval_scores').insert(score)
+    if (scoreError) throw astraCertificationStageError(stage)
+
+    stage = 'provenance_signing'
     const provenanceSignature = signAstraEvaluationEvidence({
       runId: run.id,
       userId: input.userId,
@@ -195,6 +211,8 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         provenance_signature: provenanceSignature,
       },
     }
+
+    stage = 'run_finalize'
     const { error: completeError } = await db.from('model_eval_runs').update({
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -202,8 +220,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       judge_model: judgeResult.model,
       metadata: completedMetadata,
     }).eq('id', run.id)
-    if (completeError) throw new Error(completeError.message)
+    if (completeError) throw astraCertificationStageError(stage)
 
+    stage = 'attestation'
     const attested = await attestAstraCertificationBenchmarkRun({
       userId: input.userId,
       orgId: input.orgId ?? null,
@@ -223,11 +242,14 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       fallbackAttempts: judgeResult.fallbackAttempts,
     }
   } catch (error) {
+    const diagnostic = error instanceof Error && error.message.startsWith('BLACKSTAR_ASTRA_CERT_STAGE:')
+      ? error
+      : astraCertificationStageError(stage)
     await db.from('model_eval_runs').update({
       status: 'failed',
       completed_at: new Date().toISOString(),
-      metadata: { ...runMetadata, failure: error instanceof Error ? error.message.slice(0, 500) : 'Certification case failed' },
+      metadata: { ...runMetadata, failure_stage: stage },
     }).eq('id', run.id)
-    throw error
+    throw diagnostic
   }
 }
