@@ -11,7 +11,7 @@ import { isServerApprovedAstraCertificationJudge } from './astra-certification-j
 import { matchesPinnedFreeLlmRoute, runFreeLlmJudge, resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
-import { astraCertificationStageError, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
+import { astraCertificationStageError, candidateFailureStage, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 
@@ -52,17 +52,6 @@ async function assertScopeAccess(input: RunInput) {
   const { data, error } = await db.from('organisation_members').select('role').eq('org_id', input.orgId).eq('user_id', input.userId).maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('You do not have access to this workspace.')
-}
-
-export function candidateFailureStage(error: unknown): AstraTextCertificationStage {
-  if (!error || typeof error !== 'object') return 'candidate_execution'
-  const statusValue = (error as { status?: unknown }).status
-  const status = typeof statusValue === 'number' && Number.isFinite(statusValue) ? statusValue : null
-  if (status === 401 || status === 403) return 'candidate_credentials_rejected'
-  if (status === 429) return 'candidate_rate_limited'
-  if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
-  if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
-  return 'candidate_execution'
 }
 
 export async function runTrustedAstraTextCertificationCase(input: RunInput) {
