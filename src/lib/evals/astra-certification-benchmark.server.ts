@@ -10,8 +10,16 @@ import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlac
 type Scope = { userId: string; orgId?: string | null; taskClass: NativeIntelligenceTaskClass }
 type AttestationInput = Scope & { runId: string; caseId: string }
 type AdminDb = { from: (table: string) => any }
+type ActualJudgeIdentity = {
+  provider: string
+  model: string
+  routedVia?: string
+  routedProvider?: string
+  routedModel?: string
+}
 const db = supabaseAdmin as unknown as AdminDb
 const PROVENANCE_VERSION = 3
+const UNTRUSTED_LOCAL_FREELLM_ROUTES = new Set(['ollama', 'custom', 'local', 'compatible', 'freellm'])
 
 function safeEqualHex(a: unknown, b: string): boolean {
   if (typeof a !== 'string' || !/^[a-f0-9]{64}$/i.test(a)) return false
@@ -25,16 +33,38 @@ function stableJson(value: unknown): string {
   const record = value as Record<string, unknown>
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`
 }
-function actualJudgeIdentity(scores: any[]): { provider: string; model: string } | null {
-  let provider: string | null = null; let model: string | null = null
+function actualJudgeIdentity(scores: any[]): ActualJudgeIdentity | null {
+  let provider: string | null = null
+  let model: string | null = null
+  let routedVia: string | null = null
+  let routedProvider: string | null = null
+  let routedModel: string | null = null
   for (const score of scores) {
     if (score.evaluator_type !== 'llm_judge') return null
-    const criteria = metadataObject(score.criteria); const scoreProvider = criteria?.['judgeProvider']; const scoreModel = criteria?.['judgeModel']
+    const criteria = metadataObject(score.criteria)
+    const scoreProvider = criteria?.['judgeProvider']
+    const scoreModel = criteria?.['judgeModel']
     if (typeof scoreProvider !== 'string' || typeof scoreModel !== 'string') return null
-    if (provider === null) provider = scoreProvider; if (model === null) model = scoreModel
+    if (provider === null) provider = scoreProvider
+    if (model === null) model = scoreModel
     if (provider !== scoreProvider || model !== scoreModel) return null
+
+    if (scoreProvider === 'freellm') {
+      const scoreRoutedVia = criteria?.['judgeRoutedVia']
+      const scoreRoutedProvider = criteria?.['judgeRoutedProvider']
+      const scoreRoutedModel = criteria?.['judgeRoutedModel']
+      if (typeof scoreRoutedVia !== 'string' || typeof scoreRoutedProvider !== 'string' || typeof scoreRoutedModel !== 'string') return null
+      if (!scoreRoutedVia.trim() || !scoreRoutedProvider.trim() || !scoreRoutedModel.trim()) return null
+      if (routedVia === null) routedVia = scoreRoutedVia
+      if (routedProvider === null) routedProvider = scoreRoutedProvider
+      if (routedModel === null) routedModel = scoreRoutedModel
+      if (routedVia !== scoreRoutedVia || routedProvider !== scoreRoutedProvider || routedModel !== scoreRoutedModel) return null
+    }
   }
-  return provider && model ? { provider, model } : null
+  if (!provider || !model) return null
+  return provider === 'freellm'
+    ? { provider, model, routedVia: routedVia ?? undefined, routedProvider: routedProvider ?? undefined, routedModel: routedModel ?? undefined }
+    : { provider, model }
 }
 async function assertScopeAccess(scope: Scope) {
   if (!scope.orgId) return
@@ -111,6 +141,12 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (!judge || judge.provider === 'compatible' || judge.model === expectedModel) throw new Error('Astra certification requires a complete independent judge that did not execute through the Astra serving identity.')
   if (!isTrustedAstraCertificationJudge(judge.provider, judge.model)) throw new Error('Astra certification requires a server-approved independent judge identity.')
   if (judgeMatchesCandidate(judge, (responses ?? []).map((response: any) => ({ provider: response.provider, model: response.model })))) throw new Error('Astra certification judge must not also be one of the candidate models.')
+  if (judge.provider === 'freellm') {
+    if (!judge.routedVia || !judge.routedProvider || !judge.routedModel) throw new Error('FreeLLM certification evidence is missing the actual routed provider/model identity.')
+    if (judge.routedModel !== judge.model) throw new Error('FreeLLM certification requires the actual routed model to match the exact pinned judge model.')
+    if (UNTRUSTED_LOCAL_FREELLM_ROUTES.has(judge.routedProvider.trim().toLowerCase())) throw new Error('FreeLLM certification requires an independently routed upstream provider, not a local or custom evaluator route.')
+    if (judge.routedModel === expectedModel) throw new Error('FreeLLM certification judge resolved to the Astra candidate model and is not independent.')
+  }
 
   const baseProvenance: AstraEvaluationProvenanceInput = {
     runId: run.id, userId: run.user_id, orgId: run.org_id, taskClass: input.taskClass, model: expectedModel, prompt: run.prompt,
