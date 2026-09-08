@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyAstraCandidateRouteProbeStatus } from './astra-candidate-route-probe.server'
+import { classifyAstraCandidateRouteProbeStatus } from './astra-candidate-route-probe-diagnostics'
 
 describe('Astra candidate route probe', () => {
   it('maps bounded HTTP status without exposing response text', () => {
