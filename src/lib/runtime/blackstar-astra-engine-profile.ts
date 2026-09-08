@@ -13,6 +13,7 @@ export const BLACKSTAR_ASTRA_ENGINE_PROFILE = {
   baseUrlEnv: 'OPENAI_COMPATIBLE_BASE_URL',
   apiKeyEnv: 'OPENAI_COMPATIBLE_API_KEY',
   modelEnv: 'BLACKSTAR_ASTRA_MODEL',
+  nativeModelEnv: 'BLACKSTAR_NATIVE_MODEL',
   defaultModel: 'blackstar-astra-v0.1',
   groqBootstrapModel: 'qwen/qwen3.8-27b',
   specialistModelEnvs: {
@@ -42,10 +43,21 @@ export function isBlackstarAstraGroqBootstrapConfigured(): boolean {
 }
 
 function baseAstraModel() {
-  return process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
-    || (isBlackstarAstraGroqBootstrapConfigured()
-      ? BLACKSTAR_ASTRA_ENGINE_PROFILE.groqBootstrapModel
-      : BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel)
+  const astraModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
+  if (astraModel) return astraModel
+
+  // When Astra is running on the already-configured Blackstar-controlled native
+  // OpenAI-compatible route, certification must exercise that exact serving
+  // model rather than the synthetic Astra engine id. A dedicated Astra model
+  // still wins when explicitly configured.
+  if (process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim()) {
+    const nativeModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.nativeModelEnv]?.trim()
+    if (nativeModel) return nativeModel
+  }
+
+  return isBlackstarAstraGroqBootstrapConfigured()
+    ? BLACKSTAR_ASTRA_ENGINE_PROFILE.groqBootstrapModel
+    : BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel
 }
 
 export function isBlackstarAstraVisionConfigured(): boolean {
