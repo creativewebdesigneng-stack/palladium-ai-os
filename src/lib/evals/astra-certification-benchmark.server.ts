@@ -2,6 +2,13 @@ import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import { astraCertificationSuiteId, getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass, listAstraCertificationBenchmarkCases } from '@/lib/evals/astra-certification-benchmark-suite'
+import {
+  ASTRA_CERTIFICATION_PROVENANCE_VERSION,
+  buildAstraCertificationExecutionPrompt,
+  hashAstraCertificationExecutionPrompt,
+  resolveAstraCertificationExecutionProfile,
+  sameAstraCertificationExecutionProfile,
+} from '@/lib/evals/astra-certification-execution-profile'
 import { isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
@@ -18,7 +25,7 @@ type ActualJudgeIdentity = {
   routedModel?: string
 }
 const db = supabaseAdmin as unknown as AdminDb
-const PROVENANCE_VERSION = 3
+const PROVENANCE_VERSION = ASTRA_CERTIFICATION_PROVENANCE_VERSION
 const UNTRUSTED_LOCAL_FREELLM_ROUTES = new Set(['ollama', 'custom', 'local', 'compatible', 'freellm'])
 
 function safeEqualHex(a: unknown, b: string): boolean {
@@ -117,7 +124,10 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
 
   const astra = metadataObject(runMetadata['astra_activation'])
   const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
+  const executionProfile = resolveAstraCertificationExecutionProfile(input.taskClass, expectedModel)
+  const executionPromptHash = hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, executionProfile))
   if (astra?.['server_verified'] !== true || astra?.['provenance_version'] !== PROVENANCE_VERSION || astra?.['system_prompt_hash'] !== emptySystemPromptHash || astra?.['task_class'] !== input.taskClass || astra?.['provider'] !== 'compatible' || astra?.['model'] !== expectedModel || astra?.['engine_id'] !== BLACKSTAR_ASTRA_ENGINE_PROFILE.id) throw new Error('Evaluation was not produced by the exact clean Astra benchmark context.')
+  if (!sameAstraCertificationExecutionProfile(astra?.['execution_profile'], executionProfile) || astra?.['execution_prompt_hash'] !== executionPromptHash) throw new Error('Evaluation did not use the exact server-owned Astra certification execution profile.')
   if (input.taskClass === 'vision') {
     const expectedMedia = renderAstraVisionBenchmarkMedia(input.caseId)
     if (astra?.['media_digest'] !== expectedMedia.digest || astra?.['media_type'] !== expectedMedia.mediaType) throw new Error('Vision evaluation media does not match the trusted server-owned benchmark fixture.')
@@ -152,7 +162,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
 
   const baseProvenance: AstraEvaluationProvenanceInput = {
     runId: run.id, userId: run.user_id, orgId: run.org_id, taskClass: input.taskClass, model: expectedModel, prompt: run.prompt,
-    systemPromptHash: emptySystemPromptHash, judgeProvider: run.judge_provider, judgeModel: run.judge_model,
+    systemPromptHash: emptySystemPromptHash, executionProfile, executionPromptHash, judgeProvider: run.judge_provider, judgeModel: run.judge_model,
     criteria: runMetadata['criteria'] ?? null,
     responses: responses.map(({ run_id: _runId, ...response }: any) => response), scores: scores.map(({ run_id: _runId, ...score }: any) => score),
   }
