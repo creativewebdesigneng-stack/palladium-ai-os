@@ -8,6 +8,38 @@ const textTaskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use'
 const providerSchema = z.enum(['openai', 'groq', 'lovable', 'gemini'])
 const judgeProviderSchema = z.enum(['openai', 'groq'])
 
+function classifyAstraTextCertificationFailure(error: unknown) {
+  const raw = error instanceof Error ? error.message : ''
+  const message = raw.toLowerCase()
+
+  if (message.includes('serving is not configured') || message.includes('serving identity')) {
+    return { code: 'astra_serving_unavailable', message: 'Blackstar Astra serving is not available for this certification case.' } as const
+  }
+  if (message.includes('candidate transport changed identity')) {
+    return { code: 'candidate_identity_mismatch', message: 'The Astra candidate runtime changed identity during certification.' } as const
+  }
+  if (message.includes('freellm certification judge routed to')) {
+    return { code: 'evaluator_route_mismatch', message: 'The independent evaluator route did not match the exact pinned upstream identity.' } as const
+  }
+  if (message.includes('freellm') && (message.includes('not configured') || message.includes('required for trusted'))) {
+    return { code: 'evaluator_not_ready', message: 'The authenticated, route-pinned independent evaluator is not ready for trusted text certification.' } as const
+  }
+  if (message.includes('freellmapi') || message.includes('freellm certification judge changed identity')) {
+    return { code: 'evaluator_request_failed', message: 'The independent evaluator failed while scoring this certification case.' } as const
+  }
+  if (message.includes('score format') || message.includes('must score exactly one') || message.includes('invalid astra candidate score')) {
+    return { code: 'judge_response_invalid', message: 'The independent evaluator returned a response that could not be accepted as a trusted certification score.' } as const
+  }
+  if (message.includes('unknown astra text certification benchmark case')) {
+    return { code: 'benchmark_case_invalid', message: 'The selected server-owned certification case is no longer valid.' } as const
+  }
+  if (message.includes('attest') || message.includes('provenance') || message.includes('signature')) {
+    return { code: 'attestation_failed', message: 'The certification run completed, but trusted provenance attestation did not pass.' } as const
+  }
+
+  return { code: 'certification_case_failed', message: 'The trusted Astra certification case failed before it could be attested.' } as const
+}
+
 export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
@@ -34,34 +66,52 @@ export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
     caseId: z.string().trim().min(1).max(120),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { runTrustedAstraTextCertificationCase } = await import('./astra-text-certification-run.server')
-    const result = await runTrustedAstraTextCertificationCase({
-      userId: context.userId,
-      orgId: data.orgId ?? null,
-      taskClass: data.taskClass,
-      caseId: data.caseId,
-    })
-    await writeAudit({
-      userId: context.userId,
-      orgId: data.orgId ?? null,
-      action: 'native_intelligence.astra_text_benchmark_completed',
-      targetType: 'model_eval_run',
-      targetId: result.runId,
-      status: 'success',
-      metadata: {
-        taskClass: result.taskClass,
-        provider: result.provider,
-        model: result.model,
-        suiteId: result.suiteId,
-        caseId: result.caseId,
-        judgeProvider: result.judgeProvider,
-        judgeModel: result.judgeModel,
-        routedProvider: result.routedProvider,
-        routedModel: result.routedModel,
-        fallbackAttempts: result.fallbackAttempts,
-      },
-    })
-    return result
+    try {
+      const { runTrustedAstraTextCertificationCase } = await import('./astra-text-certification-run.server')
+      const result = await runTrustedAstraTextCertificationCase({
+        userId: context.userId,
+        orgId: data.orgId ?? null,
+        taskClass: data.taskClass,
+        caseId: data.caseId,
+      })
+      await writeAudit({
+        userId: context.userId,
+        orgId: data.orgId ?? null,
+        action: 'native_intelligence.astra_text_benchmark_completed',
+        targetType: 'model_eval_run',
+        targetId: result.runId,
+        status: 'success',
+        metadata: {
+          taskClass: result.taskClass,
+          provider: result.provider,
+          model: result.model,
+          suiteId: result.suiteId,
+          caseId: result.caseId,
+          judgeProvider: result.judgeProvider,
+          judgeModel: result.judgeModel,
+          routedProvider: result.routedProvider,
+          routedModel: result.routedModel,
+          fallbackAttempts: result.fallbackAttempts,
+        },
+      })
+      return { ok: true as const, ...result }
+    } catch (error) {
+      const failure = classifyAstraTextCertificationFailure(error)
+      await writeAudit({
+        userId: context.userId,
+        orgId: data.orgId ?? null,
+        action: 'native_intelligence.astra_text_benchmark_failed',
+        targetType: 'astra_certification_case',
+        targetId: data.caseId,
+        status: 'failed',
+        metadata: {
+          taskClass: data.taskClass,
+          caseId: data.caseId,
+          diagnostic_code: failure.code,
+        },
+      })
+      return { ok: false as const, ...failure }
+    }
   })
 
 export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' })
