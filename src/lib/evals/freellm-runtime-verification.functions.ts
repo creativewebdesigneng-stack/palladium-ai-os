@@ -14,8 +14,8 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
-    if (!config.configured || !config.model) {
-      throw new Error('FreeLLMAPI evaluator is not configured on this deployment.')
+    if (!config.configured || !config.baseUrl || !config.apiKey || !config.model) {
+      throw new Error('Authenticated FreeLLMAPI evaluator transport is not configured on this deployment.')
     }
 
     const controller = new AbortController()
