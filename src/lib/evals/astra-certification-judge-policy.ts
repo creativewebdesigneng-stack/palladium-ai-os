@@ -38,7 +38,15 @@ function configuredFreeLlmJudgeModel(): string | null {
   const baseUrl = process.env['FREELLMAPI_BASE_URL']?.trim()
   const apiKey = process.env['FREELLMAPI_API_KEY']?.trim()
   const model = process.env['FREELLMAPI_MODEL']?.trim()
-  return baseUrl && apiKey && isPinnedFreeLlmCertificationModel(model) ? model : null
+  const routedProvider = process.env['FREELLMAPI_ROUTED_PROVIDER']?.trim()
+  const routedModel = process.env['FREELLMAPI_ROUTED_MODEL']?.trim()
+  return baseUrl
+    && apiKey
+    && isPinnedFreeLlmCertificationModel(model)
+    && isIndependentFreeLlmRouteProvider(routedProvider)
+    && isPinnedFreeLlmCertificationModel(routedModel)
+    ? model
+    : null
 }
 
 export function isTrustedAstraCertificationJudge(provider: unknown, model: unknown): boolean {
