@@ -64,8 +64,8 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   if (!benchmarkCase || benchmarkCase.modality !== 'text') throw new Error('Unknown Astra text certification benchmark case.')
 
   const evaluator = resolveFreeLlmEvaluatorConfig()
-  if (!evaluator.configured || !evaluator.model || !isServerApprovedAstraCertificationJudge('freellm', evaluator.model)) {
-    throw new Error('A pinned server-approved FreeLLM evaluator is required for trusted Astra text certification.')
+  if (!evaluator.configured || !evaluator.baseUrl || !evaluator.apiKey || !evaluator.model || !isServerApprovedAstraCertificationJudge('freellm', evaluator.model)) {
+    throw new Error('An authenticated pinned server-approved FreeLLM evaluator is required for trusted Astra text certification.')
   }
 
   const model = blackstarAstraModelForTaskClass(input.taskClass)
