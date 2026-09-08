@@ -18,7 +18,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
   try {
     const response = await fetch(`${base}/models`, {
       method: 'GET',
-      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+      ...(apiKey ? { headers: { Authorization: `Bearer ${apiKey}` } } : {}),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
     return classifyAstraCandidateRouteProbeStatus(response.status)
