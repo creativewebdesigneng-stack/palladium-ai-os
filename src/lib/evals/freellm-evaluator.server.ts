@@ -18,11 +18,16 @@ export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.e
   const baseUrl = env["FREELLMAPI_BASE_URL"]?.trim().replace(/\/+$/, "") || null;
   const apiKey = env["FREELLMAPI_API_KEY"]?.trim() || null;
   const model = env["FREELLMAPI_MODEL"]?.trim() || null;
+  const routedProvider = env["FREELLMAPI_ROUTED_PROVIDER"]?.trim() || null;
+  const routedModel = env["FREELLMAPI_ROUTED_MODEL"]?.trim() || null;
   return {
     configured: Boolean(baseUrl && model),
+    certificationConfigured: Boolean(baseUrl && apiKey && model && routedProvider && routedModel),
     baseUrl,
     apiKey,
     model,
+    routedProvider,
+    routedModel,
   } as const;
 }
 
@@ -40,6 +45,20 @@ export function parseFreeLlmRouteIdentity(headers: Headers): FreeLlmRouteIdentit
   const rawAttempts = Number(headers.get("x-fallback-attempts") ?? 0);
   const fallbackAttempts = Number.isFinite(rawAttempts) && rawAttempts >= 0 ? Math.floor(rawAttempts) : 0;
   return { routedVia, routedProvider, routedModel, fallbackAttempts };
+}
+
+export function matchesPinnedFreeLlmRoute(
+  route: Pick<FreeLlmRouteIdentity, "routedProvider" | "routedModel">,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const config = resolveFreeLlmEvaluatorConfig(env);
+  return Boolean(
+    config.certificationConfigured
+      && config.routedProvider
+      && config.routedModel
+      && route.routedProvider === config.routedProvider
+      && route.routedModel === config.routedModel,
+  );
 }
 
 export async function runFreeLlmJudge(args: {
