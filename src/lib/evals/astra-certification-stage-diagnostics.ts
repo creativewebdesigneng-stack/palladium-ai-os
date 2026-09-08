@@ -12,6 +12,7 @@ export type AstraTextCertificationStage =
   | 'candidate_response_invalid_json'
   | 'candidate_response_shape_invalid'
   | 'candidate_runtime_error_object'
+  | 'candidate_route_reachable_runtime_failure'
   | 'candidate_runtime_range_error'
   | 'candidate_runtime_aggregate_error'
   | 'candidate_runtime_unknown_object'
@@ -141,6 +142,7 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'candidate_response_invalid_json':
     case 'candidate_response_shape_invalid':
     case 'candidate_runtime_error_object':
+    case 'candidate_route_reachable_runtime_failure':
     case 'candidate_runtime_range_error':
     case 'candidate_runtime_aggregate_error':
     case 'candidate_runtime_unknown_object':
@@ -189,6 +191,8 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_response_shape_invalid', message: 'The native Astra endpoint returned JSON that did not match the OpenAI-compatible response shape required by Blackstar certification.' } as const
     case 'candidate_runtime_error_object':
       return { code: 'candidate_runtime_error_object', message: 'The native Astra execution path threw a generic runtime Error before a trusted candidate response completed.' } as const
+    case 'candidate_route_reachable_runtime_failure':
+      return { code: 'candidate_route_reachable_runtime_failure', message: 'The exact native Astra route is reachable and accepted the bounded health probe, but candidate execution still failed inside the runtime before a trusted response completed.' } as const
     case 'candidate_runtime_range_error':
       return { code: 'candidate_runtime_range_error', message: 'The native Astra execution path hit a bounded runtime range error before the candidate request completed.' } as const
     case 'candidate_runtime_aggregate_error':
