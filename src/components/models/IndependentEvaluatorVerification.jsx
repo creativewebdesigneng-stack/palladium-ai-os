@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BadgeCheck, Loader2, Scale, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Loader2, Scale, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { verifyFreeLlmEvaluatorRuntime } from '@/lib/evals/freellm-runtime-verification.functions';
@@ -11,6 +11,9 @@ export default function IndependentEvaluatorVerification() {
   const verification = useMutation({ mutationFn: () => verifyFn({ data: {} }) });
 
   if (session !== 'yes') return null;
+
+  const failed = verification.data && verification.data.verified === false;
+  const passed = verification.data && verification.data.verified === true;
 
   return (
     <section className="mb-6 rounded-2xl border border-amber-400/20 bg-amber-400/[.035] p-5">
@@ -31,7 +34,17 @@ export default function IndependentEvaluatorVerification() {
       </div>
 
       {verification.error && <p className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(verification.error)}</p>}
-      {verification.data && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+      {failed && <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-100">
+        <div className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
+          <div className="min-w-0">
+            <p className="font-medium">Independent evaluator verification failed</p>
+            <p className="mt-1 break-words text-rose-200">{verification.data.message}</p>
+            <p className="mt-2 text-[10px] text-rose-300/80">Diagnostic code: <code>{verification.data.code}</code>{typeof verification.data.latencyMs === 'number' ? ` · ${verification.data.latencyMs} ms` : ''}</p>
+          </div>
+        </div>
+      </div>}
+      {passed && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
         <Evidence label="Status" value="VERIFIED" />
         <Evidence label="Gateway identity" value={`${verification.data.provider}/${verification.data.model}`} />
         <Evidence label="Actual route" value={verification.data.routedVia} />
@@ -39,7 +52,7 @@ export default function IndependentEvaluatorVerification() {
         <Evidence label="Fallback attempts" value={`${verification.data.fallbackAttempts}`} />
         <Evidence label="Marker" value={verification.data.marker} />
       </div>}
-      {verification.data && <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">The actual upstream route was <code className="text-amber-200">{verification.data.routedProvider}/{verification.data.routedModel}</code>. This confirms evaluator transport execution and route provenance only; it does not certify Astra model quality or create benchmark evidence by itself.</p>}
+      {passed && <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">The actual upstream route was <code className="text-amber-200">{verification.data.routedProvider}/{verification.data.routedModel}</code>. This confirms evaluator transport execution and route provenance only; it does not certify Astra model quality or create benchmark evidence by itself.</p>}
     </section>
   );
 }
