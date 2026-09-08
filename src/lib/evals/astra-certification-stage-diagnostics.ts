@@ -1,6 +1,10 @@
 export type AstraTextCertificationStage =
   | 'run_persistence'
   | 'candidate_execution'
+  | 'candidate_timeout_or_unreachable'
+  | 'candidate_credentials_rejected'
+  | 'candidate_rate_limited'
+  | 'candidate_upstream_unavailable'
   | 'candidate_identity'
   | 'response_persistence'
   | 'evaluator_request'
@@ -25,6 +29,10 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
   switch (stage) {
     case 'run_persistence':
     case 'candidate_execution':
+    case 'candidate_timeout_or_unreachable':
+    case 'candidate_credentials_rejected':
+    case 'candidate_rate_limited':
+    case 'candidate_upstream_unavailable':
     case 'candidate_identity':
     case 'response_persistence':
     case 'evaluator_request':
@@ -47,6 +55,14 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'run_persistence_failed', message: 'Blackstar could not create the trusted certification run record.' } as const
     case 'candidate_execution':
       return { code: 'candidate_execution_failed', message: 'The native Astra candidate runtime failed while executing this trusted case.' } as const
+    case 'candidate_timeout_or_unreachable':
+      return { code: 'candidate_timeout_or_unreachable', message: 'The native Astra endpoint did not complete the trusted case within the pinned transport window. The local Qwen bridge may be unreachable or the model may be taking longer than the certification timeout.' } as const
+    case 'candidate_credentials_rejected':
+      return { code: 'candidate_credentials_rejected', message: 'The native Astra endpoint rejected Blackstar runtime authentication. The configured native bridge credential must be rotated or corrected before certification can continue.' } as const
+    case 'candidate_rate_limited':
+      return { code: 'candidate_rate_limited', message: 'The native Astra endpoint rate limited this certification request.' } as const
+    case 'candidate_upstream_unavailable':
+      return { code: 'candidate_upstream_unavailable', message: 'The native Astra bridge responded, but its local model upstream was unavailable while executing this trusted case.' } as const
     case 'candidate_identity':
       return { code: 'candidate_identity_mismatch', message: 'The Astra candidate runtime changed identity during certification.' } as const
     case 'response_persistence':
