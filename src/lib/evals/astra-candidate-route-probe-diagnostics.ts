@@ -15,7 +15,7 @@ export function classifyAstraCandidateRouteProbeStatus(status: number): AstraTex
  * contract; 404 means the configured chat path/model is unavailable.
  */
 export function classifyAstraCandidateChatProbeStatus(status: number): AstraTextCertificationStage {
-  if (status === 400 || status === 422) return 'candidate_response_shape_invalid'
-  if (status === 404) return 'candidate_upstream_unavailable'
+  if (status === 400 || status === 422) return 'candidate_request_rejected'
+  if (status === 404) return 'candidate_model_or_chat_route_not_found'
   return classifyAstraCandidateRouteProbeStatus(status)
 }

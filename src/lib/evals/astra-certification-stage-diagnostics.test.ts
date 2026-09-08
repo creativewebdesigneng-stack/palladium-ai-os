@@ -4,11 +4,15 @@ import { candidateFailureStage, readAstraCertificationFailureStage } from './ast
 // These cases intentionally verify only bounded diagnostics; raw runtime error text must never escape.
 describe('Astra certification stage diagnostics', () => {
   it('classifies cross-bundle shaped provider errors by bounded status', () => {
+    expect(candidateFailureStage({ status: 400, message: 'hidden' })).toBe('candidate_request_rejected')
+    expect(candidateFailureStage({ status: 422 })).toBe('candidate_request_rejected')
+    expect(candidateFailureStage({ status: 404 })).toBe('candidate_model_or_chat_route_not_found')
     expect(candidateFailureStage({ status: 504, message: 'hidden' })).toBe('candidate_timeout_or_unreachable')
     expect(candidateFailureStage({ status: 408 })).toBe('candidate_timeout_or_unreachable')
     expect(candidateFailureStage({ status: 401 })).toBe('candidate_credentials_rejected')
     expect(candidateFailureStage({ status: 403 })).toBe('candidate_credentials_rejected')
     expect(candidateFailureStage({ status: 429 })).toBe('candidate_rate_limited')
+    expect(candidateFailureStage({ status: 500 })).toBe('candidate_upstream_unavailable')
     expect(candidateFailureStage({ status: 502 })).toBe('candidate_upstream_unavailable')
     expect(candidateFailureStage({ status: 503 })).toBe('candidate_upstream_unavailable')
   })
@@ -58,7 +62,6 @@ describe('Astra certification stage diagnostics', () => {
     expect(candidateFailureStage({ name: 'RangeError', message: 'hidden' })).toBe('candidate_runtime_range_error')
     expect(candidateFailureStage({ name: 'AggregateError', message: 'hidden' })).toBe('candidate_runtime_aggregate_error')
     expect(candidateFailureStage({ status: '504' })).toBe('candidate_runtime_unknown_object')
-    expect(candidateFailureStage({ status: 500 })).toBe('candidate_runtime_unknown_object')
     expect(candidateFailureStage(null)).toBe('candidate_runtime_non_error')
     expect(candidateFailureStage('hidden thrown string')).toBe('candidate_runtime_non_error')
   })
@@ -66,6 +69,10 @@ describe('Astra certification stage diagnostics', () => {
   it('accepts only Blackstar stage markers for user-visible classification', () => {
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_timeout_or_unreachable')))
       .toBe('candidate_timeout_or_unreachable')
+    expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_request_rejected')))
+      .toBe('candidate_request_rejected')
+    expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_model_or_chat_route_not_found')))
+      .toBe('candidate_model_or_chat_route_not_found')
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_connection_refused')))
       .toBe('candidate_connection_refused')
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_runtime_error_object')))
