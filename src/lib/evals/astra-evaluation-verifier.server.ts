@@ -8,6 +8,14 @@ import {
   isAstraCertificationTaskClass,
 } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
+  ASTRA_CERTIFICATION_PROVENANCE_VERSION,
+  buildAstraCertificationExecutionPrompt,
+  hashAstraCertificationExecutionPrompt,
+  resolveAstraCertificationExecutionProfile,
+  sameAstraCertificationExecutionProfile,
+  type AstraCertificationExecutionProfile,
+} from '@/lib/evals/astra-certification-execution-profile'
+import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelForTaskClass,
   isBlackstarAstraEngineConfigured,
@@ -63,6 +71,8 @@ export type AstraEvaluationProvenanceInput = {
   model: string
   prompt: string
   systemPromptHash?: string | null
+  executionProfile: AstraCertificationExecutionProfile
+  executionPromptHash: string
   judgeProvider: string | null
   judgeModel: string | null
   criteria: unknown
@@ -81,8 +91,8 @@ type AdminDb = {
 }
 
 const MIN_RUNS = ASTRA_CERTIFICATION_CASE_COUNT
-const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v3'
-const PROVENANCE_VERSION = 3
+const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v4'
+const PROVENANCE_VERSION = ASTRA_CERTIFICATION_PROVENANCE_VERSION
 const astraEvalAdmin = supabaseAdmin as unknown as AdminDb
 
 function stableJson(value: unknown): string {
@@ -119,6 +129,8 @@ function normalizeProvenance(input: AstraEvaluationProvenanceInput) {
     caseId: input.caseId ?? null,
     prompt: input.prompt,
     systemPromptHash: input.systemPromptHash ?? null,
+    executionProfile: input.executionProfile,
+    executionPromptHash: input.executionPromptHash,
     judgeProvider: input.judgeProvider,
     judgeModel: input.judgeModel,
     criteria: input.criteria,
@@ -162,6 +174,12 @@ function validProvenanceSignature(signature: unknown, input: AstraEvaluationProv
 function astraMetadata(run: ArenaRun) {
   const value = run.metadata?.['astra_activation']
   return value && typeof value === 'object' ? value as Record<string, unknown> : null
+}
+
+function expectedExecutionEvidence(taskClass: NativeIntelligenceTaskClass, model: string, prompt: string) {
+  const profile = resolveAstraCertificationExecutionProfile(taskClass, model)
+  const executionPromptHash = hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt(prompt, profile))
+  return { profile, executionPromptHash }
 }
 
 async function assertScopeAccess(scope: Scope) {
@@ -208,6 +226,7 @@ async function matchingRuns(scope: Scope) {
 
   const tagged = ((data ?? []) as ArenaRun[]).filter((run) => {
     const metadata = astraMetadata(run)
+    const expectedExecution = expectedExecutionEvidence(scope.taskClass, model, run.prompt)
     return metadata?.['server_verified'] === true
       && metadata?.['provenance_version'] === PROVENANCE_VERSION
       && metadata?.['task_class'] === scope.taskClass
@@ -215,6 +234,8 @@ async function matchingRuns(scope: Scope) {
       && metadata?.['model'] === model
       && metadata?.['suite_id'] === suiteId
       && metadata?.['system_prompt_hash'] === emptySystemPromptHash
+      && sameAstraCertificationExecutionProfile(metadata?.['execution_profile'], expectedExecution.profile)
+      && metadata?.['execution_prompt_hash'] === expectedExecution.executionPromptHash
       && typeof metadata?.['case_id'] === 'string'
   })
 
@@ -245,6 +266,10 @@ async function matchingRuns(scope: Scope) {
     if (run.prompt !== benchmarkCase.prompt) return false
     if (stableJson(run.metadata?.['criteria'] ?? null) !== stableJson(benchmarkCase.criteria)) return false
 
+    const expectedExecution = expectedExecutionEvidence(scope.taskClass, model, run.prompt)
+    if (!sameAstraCertificationExecutionProfile(metadata?.['execution_profile'], expectedExecution.profile)) return false
+    if (metadata?.['execution_prompt_hash'] !== expectedExecution.executionPromptHash) return false
+
     const runResponses = responses.filter((response) => response.run_id === run.id)
     const runScores = scores.filter((score) => score.run_id === run.id)
     const hasExactAstraResponse = runResponses.some((response) => response.provider === 'compatible' && response.model === model)
@@ -260,6 +285,8 @@ async function matchingRuns(scope: Scope) {
       caseId,
       prompt: run.prompt,
       systemPromptHash: emptySystemPromptHash,
+      executionProfile: expectedExecution.profile,
+      executionPromptHash: expectedExecution.executionPromptHash,
       judgeProvider: run.judge_provider,
       judgeModel: run.judge_model,
       criteria: run.metadata?.['criteria'] ?? null,
@@ -316,6 +343,8 @@ export async function certifyAstraEvaluation(scope: Scope) {
   const benchmarkHash = hash(sourceRuns.map((run) => ({
     caseId: astraMetadata(run)?.['case_id'],
     promptHash: hash(run.prompt),
+    executionProfile: astraMetadata(run)?.['execution_profile'],
+    executionPromptHash: astraMetadata(run)?.['execution_prompt_hash'],
   })))
   const evaluatorHash = hash(sourceRuns.map((run) => ({
     caseId: astraMetadata(run)?.['case_id'],
