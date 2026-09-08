@@ -11,17 +11,60 @@ import {
   isFreeLlmVerificationMarker,
 } from './freellm-runtime-verification'
 
+type FailureCode =
+  | 'not_configured'
+  | 'upstream_connection_refused'
+  | 'upstream_connection_reset'
+  | 'upstream_timeout'
+  | 'upstream_unreachable'
+  | 'upstream_502'
+  | 'credentials_rejected'
+  | 'rate_limited'
+  | 'route_mismatch'
+  | 'route_not_independent'
+  | 'marker_missing'
+  | 'timeout'
+  | 'verification_failed'
+
+function safeFailure(error: unknown, timedOut = false): { code: FailureCode; message: string } {
+  if (timedOut) return { code: 'timeout', message: 'FreeLLM evaluator did not complete verification within 30 seconds.' }
+  const raw = error instanceof Error ? error.message : String(error ?? '')
+  const lower = raw.toLowerCase()
+  if (lower.includes('not fully pinned') || lower.includes('not configured')) return { code: 'not_configured', message: 'Authenticated FreeLLMAPI evaluator transport is not fully pinned on this deployment.' }
+  if (lower.includes('upstream_connection_refused')) return { code: 'upstream_connection_refused', message: 'The local FreeLLM bridge could not connect to the FreeLLMAPI desktop listener.' }
+  if (lower.includes('upstream_connection_reset')) return { code: 'upstream_connection_reset', message: 'The FreeLLMAPI desktop connection was reset while Blackstar was verifying the evaluator.' }
+  if (lower.includes('upstream_timeout')) return { code: 'upstream_timeout', message: 'The FreeLLMAPI desktop or its upstream provider timed out.' }
+  if (lower.includes('upstream_unreachable')) return { code: 'upstream_unreachable', message: 'The FreeLLMAPI desktop listener is unreachable from the local bridge.' }
+  if (lower.includes('evaluator error (502)') || lower.includes('error code: 502')) return { code: 'upstream_502', message: 'The FreeLLM bridge returned HTTP 502 while contacting the evaluator upstream.' }
+  if (lower.includes('credentials')) return { code: 'credentials_rejected', message: 'FreeLLMAPI rejected the evaluator credentials.' }
+  if (lower.includes('rate limiting')) return { code: 'rate_limited', message: 'FreeLLMAPI is rate limiting the evaluator lane.' }
+  if (lower.includes('instead of the exact pinned upstream') || lower.includes('changed identity')) return { code: 'route_mismatch', message: raw.slice(0, 500) }
+  if (lower.includes('independently acceptable upstream provider')) return { code: 'route_not_independent', message: 'FreeLLM did not resolve through an independently acceptable upstream provider.' }
+  if (lower.includes('verification marker')) return { code: 'marker_missing', message: 'FreeLLM responded, but did not return the required verification marker.' }
+  return { code: 'verification_failed', message: 'Independent evaluator verification failed. Check the FreeLLM bridge diagnostic code and local FreeLLMAPI status.' }
+}
+
 export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
+    const started = Date.now()
+
     if (!config.certificationConfigured || !config.baseUrl || !config.apiKey || !config.model || !config.routedProvider || !config.routedModel) {
-      throw new Error('Authenticated FreeLLMAPI evaluator transport is not fully pinned on this deployment.')
+      const failure = safeFailure(new Error('Authenticated FreeLLMAPI evaluator transport is not fully pinned on this deployment.'))
+      await writeAudit({
+        userId: context.userId,
+        action: 'blackstar.freellm_evaluator.verify',
+        targetType: 'model_evaluator',
+        targetId: `freellm/${config.model ?? 'unconfigured'}`,
+        status: 'failed',
+        metadata: { reason_code: failure.code, evidence_scope: 'independent_evaluator_transport', certification: false },
+      })
+      return { verified: false as const, ...failure, certification: false as const }
     }
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort('freellm-verification-timeout'), FREELLM_VERIFICATION_TIMEOUT_MS)
-    const started = Date.now()
 
     try {
       const result = await runFreeLlmJudge({
@@ -87,6 +130,7 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
     } catch (error) {
       const timedOut = controller.signal.aborted
       const latencyMs = Math.max(0, Date.now() - started)
+      const failure = safeFailure(error, timedOut)
       await writeAudit({
         userId: context.userId,
         action: 'blackstar.freellm_evaluator.verify',
@@ -97,13 +141,12 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
           provider: 'freellm',
           model: config.model,
           latency_ms: latencyMs,
-          reason: timedOut ? 'timeout' : error instanceof Error ? error.message.slice(0, 500) : 'unknown',
+          reason_code: failure.code,
           evidence_scope: 'independent_evaluator_transport',
           certification: false,
         },
       })
-      if (timedOut) throw new Error('FreeLLM evaluator did not complete verification within 30 seconds.')
-      throw error
+      return { verified: false as const, ...failure, latencyMs, certification: false as const }
     } finally {
       clearTimeout(timeout)
     }
