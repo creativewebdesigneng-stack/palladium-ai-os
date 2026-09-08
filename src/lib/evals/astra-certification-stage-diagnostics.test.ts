@@ -12,16 +12,26 @@ describe('Astra certification stage diagnostics', () => {
     expect(candidateFailureStage({ status: 503 })).toBe('candidate_upstream_unavailable')
   })
 
+  it('classifies successful-response parse and shape failures without exposing text', () => {
+    expect(candidateFailureStage({ name: 'SyntaxError', message: 'secret body contents' }))
+      .toBe('candidate_response_invalid_json')
+    expect(candidateFailureStage({ name: 'TypeError', message: 'secret object contents' }))
+      .toBe('candidate_response_shape_invalid')
+  })
+
   it('fails closed for unknown or malformed provider errors', () => {
     expect(candidateFailureStage(null)).toBe('candidate_execution')
     expect(candidateFailureStage(new Error('arbitrary secret-bearing text'))).toBe('candidate_execution')
     expect(candidateFailureStage({ status: '504' })).toBe('candidate_execution')
     expect(candidateFailureStage({ status: 500 })).toBe('candidate_execution')
+    expect(candidateFailureStage({ name: 'RangeError', message: 'hidden' })).toBe('candidate_execution')
   })
 
   it('accepts only Blackstar stage markers for user-visible classification', () => {
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_timeout_or_unreachable')))
       .toBe('candidate_timeout_or_unreachable')
+    expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_response_invalid_json')))
+      .toBe('candidate_response_invalid_json')
     expect(readAstraCertificationFailureStage(new Error('arbitrary provider error with token=secret'))).toBeNull()
   })
 })
