@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 import { isIndependentFreeLlmRouteProvider } from './astra-certification-judge-policy'
-import { resolveFreeLlmEvaluatorConfig, runFreeLlmJudge } from './freellm-evaluator.server'
+import { matchesPinnedFreeLlmRoute, resolveFreeLlmEvaluatorConfig, runFreeLlmJudge } from './freellm-evaluator.server'
 import {
   FREELLM_VERIFICATION_MARKER,
   FREELLM_VERIFICATION_MAX_TOKENS,
@@ -15,8 +15,8 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
-    if (!config.configured || !config.baseUrl || !config.apiKey || !config.model) {
-      throw new Error('Authenticated FreeLLMAPI evaluator transport is not configured on this deployment.')
+    if (!config.certificationConfigured || !config.baseUrl || !config.apiKey || !config.model || !config.routedProvider || !config.routedModel) {
+      throw new Error('Authenticated FreeLLMAPI evaluator transport is not fully pinned on this deployment.')
     }
 
     const controller = new AbortController()
@@ -37,8 +37,8 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
       if (result.provider !== 'freellm' || result.model !== config.model) {
         throw new Error(`FreeLLM evaluator verification changed identity to ${result.provider}/${result.model}.`)
       }
-      if (result.routedModel !== result.model) {
-        throw new Error(`FreeLLM evaluator verification routed to ${result.routedModel} instead of the exact pinned model ${result.model}.`)
+      if (!matchesPinnedFreeLlmRoute(result)) {
+        throw new Error(`FreeLLM evaluator verification routed to ${result.routedProvider}/${result.routedModel} instead of the exact pinned upstream ${config.routedProvider}/${config.routedModel}.`)
       }
       if (!isIndependentFreeLlmRouteProvider(result.routedProvider)) {
         throw new Error('FreeLLM evaluator verification did not resolve through an independently acceptable upstream provider.')
