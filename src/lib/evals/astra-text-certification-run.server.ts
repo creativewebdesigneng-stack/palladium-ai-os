@@ -12,6 +12,7 @@ import { matchesPinnedFreeLlmRoute, runFreeLlmJudge, resolveFreeLlmEvaluatorConf
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
 import { astraCertificationStageError, candidateFailureStage, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
+import { probeAstraCandidateRouteAfterGenericError } from './astra-candidate-route-probe.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 
@@ -118,6 +119,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       })
     } catch (error) {
       stage = candidateFailureStage(error)
+      if (stage === 'candidate_runtime_error_object') {
+        stage = await probeAstraCandidateRouteAfterGenericError()
+      }
       throw astraCertificationStageError(stage)
     }
 
