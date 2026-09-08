@@ -1,0 +1,35 @@
+name: Update js-yaml lock
+
+on:
+  push:
+    branches:
+      - blackstar/astra-generic-error-allowlist
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: blackstar/astra-generic-error-allowlist
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Regenerate frozen dependency lock
+        run: bun install --lockfile-only
+      - name: Verify patched js-yaml resolution
+        run: |
+          grep -F '"js-yaml": ["js-yaml@4.3.2"' bun.lock
+          bun audit --audit-level high
+      - name: Commit generated lock and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git rm .github/workflows/update-js-yaml-lock.yml
+          git commit -m "Regenerate lock with patched js-yaml"
+          git push origin HEAD:blackstar/astra-generic-error-allowlist
