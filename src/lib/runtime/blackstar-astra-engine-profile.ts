@@ -44,16 +44,21 @@ export function isBlackstarAstraGroqBootstrapConfigured(): boolean {
 
 function baseAstraModel() {
   const astraModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
-  if (astraModel) return astraModel
+  const nativeRouteConfigured = Boolean(process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim())
+  const nativeModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.nativeModelEnv]?.trim()
 
-  // When Astra is running on the already-configured Blackstar-controlled native
-  // OpenAI-compatible route, certification must exercise that exact serving
-  // model rather than the synthetic Astra engine id. A dedicated Astra model
-  // still wins when explicitly configured.
-  if (process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim()) {
-    const nativeModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.nativeModelEnv]?.trim()
-    if (nativeModel) return nativeModel
+  // `blackstar-astra-v0.1` is the Astra engine identity, not an Ollama model id.
+  // Older deployments may still carry it in BLACKSTAR_ASTRA_MODEL from before
+  // native-model inheritance existed. On the authenticated native route, treat
+  // only that exact legacy placeholder as unset so certification exercises the
+  // already-pinned native model. Any other explicit Astra model remains strict.
+  if (astraModel && !(nativeRouteConfigured
+    && nativeModel
+    && astraModel === BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel)) {
+    return astraModel
   }
+
+  if (nativeRouteConfigured && nativeModel) return nativeModel
 
   return isBlackstarAstraGroqBootstrapConfigured()
     ? BLACKSTAR_ASTRA_ENGINE_PROFILE.groqBootstrapModel
