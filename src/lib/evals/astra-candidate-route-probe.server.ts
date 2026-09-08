@@ -1,7 +1,11 @@
+import { blackstarAstraModelDescriptor } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { candidateFailureStage, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
-import { classifyAstraCandidateRouteProbeStatus } from './astra-candidate-route-probe-diagnostics'
+import {
+  classifyAstraCandidateChatProbeStatus,
+  classifyAstraCandidateRouteProbeStatus,
+} from './astra-candidate-route-probe-diagnostics'
 
-const PROBE_TIMEOUT_MS = 10_000
+const PROBE_TIMEOUT_MS = 20_000
 
 function genericProbeFailure(stage: AstraTextCertificationStage): boolean {
   return stage === 'candidate_runtime_error_object'
@@ -14,14 +18,33 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
   if (!rawBase) return 'candidate_runtime_error_object'
   const base = rawBase.replace(/\/+$/, '')
   const apiKey = process.env['OPENAI_COMPATIBLE_API_KEY']?.trim()
+  const authHeaders = apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
 
   try {
-    const response = await fetch(`${base}/models`, {
+    const routeResponse = await fetch(`${base}/models`, {
       method: 'GET',
-      ...(apiKey ? { headers: { Authorization: `Bearer ${apiKey}` } } : {}),
+      headers: authHeaders,
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    return classifyAstraCandidateRouteProbeStatus(response.status)
+    const routeStage = classifyAstraCandidateRouteProbeStatus(routeResponse.status)
+    if (routeStage !== 'candidate_route_reachable_runtime_failure') return routeStage
+
+    const model = blackstarAstraModelDescriptor().model
+    const chatResponse = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        stream: false,
+        max_tokens: 1,
+      }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    return classifyAstraCandidateChatProbeStatus(chatResponse.status)
   } catch (error) {
     const stage = candidateFailureStage(error)
     return genericProbeFailure(stage) ? 'candidate_network_unreachable' : stage
