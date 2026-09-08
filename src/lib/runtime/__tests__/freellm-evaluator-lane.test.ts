@@ -32,16 +32,26 @@ describe("FreeLLM independent evaluator lane", () => {
     });
   });
 
-  it("parses the actual upstream provider/model route returned by FreeLLMAPI", () => {
+  it("parses the terminal upstream provider/model route returned by FreeLLMAPI", () => {
     const headers = new Headers({
-      "X-Routed-Via": "groq/openai/gpt-oss-20b",
+      "X-Routed-Via": "kilo/nvidia/nemotron-3-super-120b-a12b:free",
       "X-Fallback-Attempts": "2",
     });
     expect(parseFreeLlmRouteIdentity(headers)).toEqual({
-      routedVia: "groq/openai/gpt-oss-20b",
-      routedProvider: "groq",
-      routedModel: "openai/gpt-oss-20b",
+      routedVia: "kilo/nvidia/nemotron-3-super-120b-a12b:free",
+      routedProvider: "nvidia",
+      routedModel: "nemotron-3-super-120b-a12b:free",
       fallbackAttempts: 2,
+    });
+  });
+
+  it("keeps single-hop provider/model identities exact", () => {
+    const headers = new Headers({ "X-Routed-Via": "nvidia/nemotron-3-super-120b-a12b:free" });
+    expect(parseFreeLlmRouteIdentity(headers)).toEqual({
+      routedVia: "nvidia/nemotron-3-super-120b-a12b:free",
+      routedProvider: "nvidia",
+      routedModel: "nemotron-3-super-120b-a12b:free",
+      fallbackAttempts: 0,
     });
   });
 
