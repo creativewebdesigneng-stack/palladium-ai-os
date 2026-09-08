@@ -10,6 +10,8 @@ export type AstraTextCertificationStage =
   | 'candidate_rate_limited'
   | 'candidate_upstream_unavailable'
   | 'candidate_request_rejected'
+  | 'candidate_model_not_found'
+  | 'candidate_chat_route_not_found'
   | 'candidate_model_or_chat_route_not_found'
   | 'candidate_response_invalid_json'
   | 'candidate_response_shape_invalid'
@@ -144,6 +146,8 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'candidate_rate_limited':
     case 'candidate_upstream_unavailable':
     case 'candidate_request_rejected':
+    case 'candidate_model_not_found':
+    case 'candidate_chat_route_not_found':
     case 'candidate_model_or_chat_route_not_found':
     case 'candidate_response_invalid_json':
     case 'candidate_response_shape_invalid':
@@ -193,6 +197,10 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_upstream_unavailable', message: 'The native Astra bridge responded, but its local model upstream was unavailable while executing this trusted case.' } as const
     case 'candidate_request_rejected':
       return { code: 'candidate_request_rejected', message: 'The native Astra chat-completions route is reachable, but rejected the bounded OpenAI-compatible candidate request. The configured request contract must be corrected before certification can continue.' } as const
+    case 'candidate_model_not_found':
+      return { code: 'candidate_model_not_found', message: 'The native Astra endpoint is reachable, but the exact pinned candidate model is not advertised by the configured model route.' } as const
+    case 'candidate_chat_route_not_found':
+      return { code: 'candidate_chat_route_not_found', message: 'The exact pinned Astra candidate model is advertised by the native endpoint, but the configured chat-completions route returned not found.' } as const
     case 'candidate_model_or_chat_route_not_found':
       return { code: 'candidate_model_or_chat_route_not_found', message: 'The native Astra endpoint is reachable, but the pinned candidate model or configured chat-completions route was not found.' } as const
     case 'candidate_response_invalid_json':
