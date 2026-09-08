@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { candidateFailureStage, readAstraCertificationFailureStage } from './astra-certification-stage-diagnostics'
 
+// These cases intentionally verify only bounded diagnostics; raw runtime error text must never escape.
 describe('Astra certification stage diagnostics', () => {
   it('classifies cross-bundle shaped provider errors by bounded status', () => {
     expect(candidateFailureStage({ status: 504, message: 'hidden' })).toBe('candidate_timeout_or_unreachable')
@@ -30,6 +31,15 @@ describe('Astra certification stage diagnostics', () => {
     expect(candidateFailureStage({ code: 'UND_ERR_CONNECT_TIMEOUT' })).toBe('candidate_timeout_or_unreachable')
     expect(candidateFailureStage({ name: 'TimeoutError' })).toBe('candidate_timeout_or_unreachable')
     expect(candidateFailureStage({ name: 'AbortError' })).toBe('candidate_aborted')
+  })
+
+  it('classifies stripped hosting-runtime network messages without surfacing text', () => {
+    expect(candidateFailureStage(new Error('fetch failed'))).toBe('candidate_network_unreachable')
+    expect(candidateFailureStage(new Error('network request failed'))).toBe('candidate_network_unreachable')
+    expect(candidateFailureStage(new Error('socket hang up'))).toBe('candidate_connection_reset')
+    expect(candidateFailureStage(new Error('getaddrinfo ENOTFOUND hidden-host'))).toBe('candidate_network_unreachable')
+    expect(candidateFailureStage(new Error('request timed out for hidden-host'))).toBe('candidate_timeout_or_unreachable')
+    expect(candidateFailureStage(new Error('operation aborted by runtime'))).toBe('candidate_aborted')
   })
 
   it('walks a bounded cause chain and ignores raw error messages', () => {
