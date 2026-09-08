@@ -18,12 +18,17 @@ describe("FreeLLM independent evaluator lane", () => {
       FREELLMAPI_BASE_URL: "https://judge.example/v1/",
       FREELLMAPI_API_KEY: "judge-secret",
       FREELLMAPI_MODEL: "judge-model",
+      FREELLMAPI_ROUTED_PROVIDER: "nvidia",
+      FREELLMAPI_ROUTED_MODEL: "judge-model-upstream",
     });
     expect(config).toEqual({
       configured: true,
+      certificationConfigured: true,
       baseUrl: "https://judge.example/v1",
       apiKey: "judge-secret",
       model: "judge-model",
+      routedProvider: "nvidia",
+      routedModel: "judge-model-upstream",
     });
   });
 

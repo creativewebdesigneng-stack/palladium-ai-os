@@ -9,6 +9,8 @@ import {
 const previousBase = process.env['FREELLMAPI_BASE_URL']
 const previousApiKey = process.env['FREELLMAPI_API_KEY']
 const previousModel = process.env['FREELLMAPI_MODEL']
+const previousRoutedProvider = process.env['FREELLMAPI_ROUTED_PROVIDER']
+const previousRoutedModel = process.env['FREELLMAPI_ROUTED_MODEL']
 
 afterEach(() => {
   if (previousBase == null) delete process.env['FREELLMAPI_BASE_URL']
@@ -17,6 +19,10 @@ afterEach(() => {
   else process.env['FREELLMAPI_API_KEY'] = previousApiKey
   if (previousModel == null) delete process.env['FREELLMAPI_MODEL']
   else process.env['FREELLMAPI_MODEL'] = previousModel
+  if (previousRoutedProvider == null) delete process.env['FREELLMAPI_ROUTED_PROVIDER']
+  else process.env['FREELLMAPI_ROUTED_PROVIDER'] = previousRoutedProvider
+  if (previousRoutedModel == null) delete process.env['FREELLMAPI_ROUTED_MODEL']
+  else process.env['FREELLMAPI_ROUTED_MODEL'] = previousRoutedModel
 })
 
 describe('Astra certification judge policy', () => {
@@ -28,6 +34,8 @@ describe('Astra certification judge policy', () => {
 
     process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
     process.env['FREELLMAPI_MODEL'] = 'independent-judge'
+    process.env['FREELLMAPI_ROUTED_PROVIDER'] = 'nvidia'
+    process.env['FREELLMAPI_ROUTED_MODEL'] = 'independent-judge-upstream'
     delete process.env['FREELLMAPI_API_KEY']
     expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(false)
 
@@ -35,7 +43,7 @@ describe('Astra certification judge policy', () => {
     expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(true)
     expect(isTrustedAstraCertificationJudge('freellm', 'other-model')).toBe(false)
 
-    delete process.env['FREELLMAPI_BASE_URL']
+    delete process.env['FREELLMAPI_ROUTED_MODEL']
     expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(false)
   })
 
@@ -48,6 +56,8 @@ describe('Astra certification judge policy', () => {
 
     process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
     process.env['FREELLMAPI_API_KEY'] = 'test-bridge-token'
+    process.env['FREELLMAPI_ROUTED_PROVIDER'] = 'nvidia'
+    process.env['FREELLMAPI_ROUTED_MODEL'] = 'independent-upstream'
     process.env['FREELLMAPI_MODEL'] = 'auto'
     expect(isTrustedAstraCertificationJudge('freellm', 'auto')).toBe(false)
     process.env['FREELLMAPI_MODEL'] = 'fusion'
