@@ -28,6 +28,15 @@ type RunInput = {
   caseId: string
 }
 
+export type AstraCandidateModelFailureDetail = {
+  expectedModel?: string
+  advertisedModelIds?: string[]
+}
+
+type AstraCertificationDiagnosticError = Error & {
+  astraCandidateModelDiagnostic?: AstraCandidateModelFailureDetail
+}
+
 function parseSingleJudge(raw: string) {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? raw
   const first = fenced.indexOf('[')
@@ -119,13 +128,23 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       })
     } catch (error) {
       stage = candidateFailureStage(error)
+      let candidateModelDiagnostic: AstraCandidateModelFailureDetail | undefined
       if (
         stage === 'candidate_runtime_error_object'
         || stage === 'candidate_model_or_chat_route_not_found'
       ) {
-        stage = await probeAstraCandidateRouteAfterGenericError()
+        const probe = await probeAstraCandidateRouteAfterGenericError()
+        stage = probe.stage
+        if (stage === 'candidate_model_not_found') {
+          candidateModelDiagnostic = {
+            ...(probe.expectedModel ? { expectedModel: probe.expectedModel } : {}),
+            ...(probe.advertisedModelIds?.length ? { advertisedModelIds: probe.advertisedModelIds } : {}),
+          }
+        }
       }
-      throw astraCertificationStageError(stage)
+      const diagnostic = astraCertificationStageError(stage) as AstraCertificationDiagnosticError
+      if (candidateModelDiagnostic) diagnostic.astraCandidateModelDiagnostic = candidateModelDiagnostic
+      throw diagnostic
     }
 
     stage = 'candidate_identity'
