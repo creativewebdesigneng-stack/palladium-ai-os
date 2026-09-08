@@ -9,7 +9,7 @@ import {
   resolveAstraCertificationExecutionProfile,
   sameAstraCertificationExecutionProfile,
 } from '@/lib/evals/astra-certification-execution-profile'
-import { isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
+import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
@@ -26,7 +26,6 @@ type ActualJudgeIdentity = {
 }
 const db = supabaseAdmin as unknown as AdminDb
 const PROVENANCE_VERSION = ASTRA_CERTIFICATION_PROVENANCE_VERSION
-const UNTRUSTED_LOCAL_FREELLM_ROUTES = new Set(['ollama', 'custom', 'local', 'compatible', 'freellm'])
 
 function safeEqualHex(a: unknown, b: string): boolean {
   if (typeof a !== 'string' || !/^[a-f0-9]{64}$/i.test(a)) return false
@@ -156,7 +155,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   if (judge.provider === 'freellm') {
     if (!judge.routedVia || !judge.routedProvider || !judge.routedModel) throw new Error('FreeLLM certification evidence is missing the actual routed provider/model identity.')
     if (judge.routedModel !== judge.model) throw new Error('FreeLLM certification requires the actual routed model to match the exact pinned judge model.')
-    if (UNTRUSTED_LOCAL_FREELLM_ROUTES.has(judge.routedProvider.trim().toLowerCase())) throw new Error('FreeLLM certification requires an independently routed upstream provider, not a local or custom evaluator route.')
+    if (!isIndependentFreeLlmRouteProvider(judge.routedProvider)) throw new Error('FreeLLM certification requires an independently routed upstream provider, not an automatic, fusion, local or custom evaluator route.')
     if (judge.routedModel === expectedModel) throw new Error('FreeLLM certification judge resolved to the Astra candidate model and is not independent.')
   }
 

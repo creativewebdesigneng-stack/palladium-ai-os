@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 
 const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic'])
+const textTaskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'agentic'])
 const providerSchema = z.enum(['openai', 'groq', 'lovable', 'gemini'])
 const judgeProviderSchema = z.enum(['openai', 'groq'])
 
@@ -23,6 +24,44 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
       .filter((judge) => data.taskClass !== 'vision' || judge.provider !== 'freellm')
       .map((judge) => ({ provider: judge.provider, model: judge.model, label: judge.label }))
     return { ...plan, trustedJudges }
+  })
+
+export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    orgId: z.string().uuid().nullish(),
+    taskClass: textTaskClassSchema,
+    caseId: z.string().trim().min(1).max(120),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { runTrustedAstraTextCertificationCase } = await import('./astra-text-certification-run.server')
+    const result = await runTrustedAstraTextCertificationCase({
+      userId: context.userId,
+      orgId: data.orgId ?? null,
+      taskClass: data.taskClass,
+      caseId: data.caseId,
+    })
+    await writeAudit({
+      userId: context.userId,
+      orgId: data.orgId ?? null,
+      action: 'native_intelligence.astra_text_benchmark_completed',
+      targetType: 'model_eval_run',
+      targetId: result.runId,
+      status: 'success',
+      metadata: {
+        taskClass: result.taskClass,
+        provider: result.provider,
+        model: result.model,
+        suiteId: result.suiteId,
+        caseId: result.caseId,
+        judgeProvider: result.judgeProvider,
+        judgeModel: result.judgeModel,
+        routedProvider: result.routedProvider,
+        routedModel: result.routedModel,
+        fallbackAttempts: result.fallbackAttempts,
+      },
+    })
+    return result
   })
 
 export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' })

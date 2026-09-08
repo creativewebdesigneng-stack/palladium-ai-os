@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
+import { isIndependentFreeLlmRouteProvider } from './astra-certification-judge-policy'
 import { resolveFreeLlmEvaluatorConfig, runFreeLlmJudge } from './freellm-evaluator.server'
 import {
   FREELLM_VERIFICATION_MARKER,
@@ -14,8 +15,8 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
-    if (!config.configured || !config.model) {
-      throw new Error('FreeLLMAPI evaluator is not configured on this deployment.')
+    if (!config.configured || !config.baseUrl || !config.apiKey || !config.model) {
+      throw new Error('Authenticated FreeLLMAPI evaluator transport is not configured on this deployment.')
     }
 
     const controller = new AbortController()
@@ -35,6 +36,12 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
 
       if (result.provider !== 'freellm' || result.model !== config.model) {
         throw new Error(`FreeLLM evaluator verification changed identity to ${result.provider}/${result.model}.`)
+      }
+      if (result.routedModel !== result.model) {
+        throw new Error(`FreeLLM evaluator verification routed to ${result.routedModel} instead of the exact pinned model ${result.model}.`)
+      }
+      if (!isIndependentFreeLlmRouteProvider(result.routedProvider)) {
+        throw new Error('FreeLLM evaluator verification did not resolve through an independently acceptable upstream provider.')
       }
       if (!isFreeLlmVerificationMarker(result.text)) {
         throw new Error('FreeLLM evaluator responded, but did not return the required verification marker.')
@@ -57,7 +64,7 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
           verification_marker: FREELLM_VERIFICATION_MARKER,
-          evidence_scope: 'evaluator_transport_only',
+          evidence_scope: 'independent_evaluator_transport',
           certification: false,
         },
       })
@@ -74,7 +81,7 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
         inputTokens: result.usage.input,
         outputTokens: result.usage.output,
         marker: FREELLM_VERIFICATION_MARKER,
-        evidenceScope: 'evaluator_transport_only' as const,
+        evidenceScope: 'independent_evaluator_transport' as const,
         certification: false as const,
       }
     } catch (error) {
@@ -91,7 +98,7 @@ export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
           model: config.model,
           latency_ms: latencyMs,
           reason: timedOut ? 'timeout' : error instanceof Error ? error.message.slice(0, 500) : 'unknown',
-          evidence_scope: 'evaluator_transport_only',
+          evidence_scope: 'independent_evaluator_transport',
           certification: false,
         },
       })
