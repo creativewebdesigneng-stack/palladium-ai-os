@@ -9,6 +9,8 @@ export type AstraTextCertificationStage =
   | 'candidate_credentials_rejected'
   | 'candidate_rate_limited'
   | 'candidate_upstream_unavailable'
+  | 'candidate_request_rejected'
+  | 'candidate_model_or_chat_route_not_found'
   | 'candidate_response_invalid_json'
   | 'candidate_response_shape_invalid'
   | 'candidate_runtime_error_object'
@@ -74,9 +76,11 @@ function classifyCandidateError(error: unknown): AstraTextCertificationStage | n
 
   const value = error as { status?: unknown; name?: unknown; code?: unknown; message?: unknown }
   const status = typeof value.status === 'number' && Number.isFinite(value.status) ? value.status : null
+  if (status === 400 || status === 422) return 'candidate_request_rejected'
+  if (status === 404) return 'candidate_model_or_chat_route_not_found'
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
-  if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
+  if (status === 502 || status === 503 || (status !== null && status >= 500)) return 'candidate_upstream_unavailable'
   if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
 
   const code = typeof value.code === 'string' ? value.code.toUpperCase() : ''
@@ -139,6 +143,8 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'candidate_credentials_rejected':
     case 'candidate_rate_limited':
     case 'candidate_upstream_unavailable':
+    case 'candidate_request_rejected':
+    case 'candidate_model_or_chat_route_not_found':
     case 'candidate_response_invalid_json':
     case 'candidate_response_shape_invalid':
     case 'candidate_runtime_error_object':
@@ -185,6 +191,10 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_rate_limited', message: 'The native Astra endpoint rate limited this certification request.' } as const
     case 'candidate_upstream_unavailable':
       return { code: 'candidate_upstream_unavailable', message: 'The native Astra bridge responded, but its local model upstream was unavailable while executing this trusted case.' } as const
+    case 'candidate_request_rejected':
+      return { code: 'candidate_request_rejected', message: 'The native Astra chat-completions route is reachable, but rejected the bounded OpenAI-compatible candidate request. The configured request contract must be corrected before certification can continue.' } as const
+    case 'candidate_model_or_chat_route_not_found':
+      return { code: 'candidate_model_or_chat_route_not_found', message: 'The native Astra endpoint is reachable, but the pinned candidate model or configured chat-completions route was not found.' } as const
     case 'candidate_response_invalid_json':
       return { code: 'candidate_response_invalid_json', message: 'The native Astra endpoint returned a successful HTTP response that was not valid JSON. The local Qwen bridge or upstream response format must be corrected before certification can continue.' } as const
     case 'candidate_response_shape_invalid':
