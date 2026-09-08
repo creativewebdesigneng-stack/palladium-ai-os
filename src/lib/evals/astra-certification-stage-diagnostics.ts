@@ -5,6 +5,8 @@ export type AstraTextCertificationStage =
   | 'candidate_credentials_rejected'
   | 'candidate_rate_limited'
   | 'candidate_upstream_unavailable'
+  | 'candidate_response_invalid_json'
+  | 'candidate_response_shape_invalid'
   | 'candidate_identity'
   | 'response_persistence'
   | 'evaluator_request'
@@ -30,6 +32,12 @@ export function candidateFailureStage(error: unknown): AstraTextCertificationSta
   if (status === 429) return 'candidate_rate_limited'
   if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
   if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
+
+  const name = typeof (error as { name?: unknown }).name === 'string'
+    ? String((error as { name: string }).name)
+    : ''
+  if (name === 'SyntaxError') return 'candidate_response_invalid_json'
+  if (name === 'TypeError') return 'candidate_response_shape_invalid'
   return 'candidate_execution'
 }
 
@@ -44,6 +52,8 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'candidate_credentials_rejected':
     case 'candidate_rate_limited':
     case 'candidate_upstream_unavailable':
+    case 'candidate_response_invalid_json':
+    case 'candidate_response_shape_invalid':
     case 'candidate_identity':
     case 'response_persistence':
     case 'evaluator_request':
@@ -74,6 +84,10 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_rate_limited', message: 'The native Astra endpoint rate limited this certification request.' } as const
     case 'candidate_upstream_unavailable':
       return { code: 'candidate_upstream_unavailable', message: 'The native Astra bridge responded, but its local model upstream was unavailable while executing this trusted case.' } as const
+    case 'candidate_response_invalid_json':
+      return { code: 'candidate_response_invalid_json', message: 'The native Astra endpoint returned a successful HTTP response that was not valid JSON. The local Qwen bridge or upstream response format must be corrected before certification can continue.' } as const
+    case 'candidate_response_shape_invalid':
+      return { code: 'candidate_response_shape_invalid', message: 'The native Astra endpoint returned JSON that did not match the OpenAI-compatible response shape required by Blackstar certification.' } as const
     case 'candidate_identity':
       return { code: 'candidate_identity_mismatch', message: 'The Astra candidate runtime changed identity during certification.' } as const
     case 'response_persistence':
