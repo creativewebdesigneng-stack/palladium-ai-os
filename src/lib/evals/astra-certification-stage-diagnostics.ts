@@ -2,6 +2,10 @@ export type AstraTextCertificationStage =
   | 'run_persistence'
   | 'candidate_execution'
   | 'candidate_timeout_or_unreachable'
+  | 'candidate_connection_refused'
+  | 'candidate_connection_reset'
+  | 'candidate_network_unreachable'
+  | 'candidate_aborted'
   | 'candidate_credentials_rejected'
   | 'candidate_rate_limited'
   | 'candidate_upstream_unavailable'
@@ -24,20 +28,42 @@ export function astraCertificationStageError(stage: AstraTextCertificationStage)
   return new Error(`${STAGE_PREFIX}${stage}`)
 }
 
-export function candidateFailureStage(error: unknown): AstraTextCertificationStage {
-  if (!error || typeof error !== 'object') return 'candidate_execution'
-  const statusValue = (error as { status?: unknown }).status
-  const status = typeof statusValue === 'number' && Number.isFinite(statusValue) ? statusValue : null
+function classifyCandidateError(error: unknown): AstraTextCertificationStage | null {
+  if (!error || typeof error !== 'object') return null
+
+  const value = error as { status?: unknown; name?: unknown; code?: unknown }
+  const status = typeof value.status === 'number' && Number.isFinite(value.status) ? value.status : null
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
   if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
   if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
 
-  const name = typeof (error as { name?: unknown }).name === 'string'
-    ? String((error as { name: string }).name)
-    : ''
+  const code = typeof value.code === 'string' ? value.code.toUpperCase() : ''
+  if (code === 'ECONNREFUSED') return 'candidate_connection_refused'
+  if (code === 'ECONNRESET' || code === 'UND_ERR_SOCKET') return 'candidate_connection_reset'
+  if (code === 'ENETUNREACH' || code === 'EHOSTUNREACH' || code === 'ENOTFOUND') return 'candidate_network_unreachable'
+  if (code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'UND_ERR_HEADERS_TIMEOUT') {
+    return 'candidate_timeout_or_unreachable'
+  }
+
+  const name = typeof value.name === 'string' ? value.name : ''
   if (name === 'SyntaxError') return 'candidate_response_invalid_json'
   if (name === 'TypeError') return 'candidate_response_shape_invalid'
+  if (name === 'AbortError') return 'candidate_aborted'
+  if (name === 'TimeoutError') return 'candidate_timeout_or_unreachable'
+  return null
+}
+
+export function candidateFailureStage(error: unknown): AstraTextCertificationStage {
+  let current: unknown = error
+  const seen = new Set<object>()
+  for (let depth = 0; depth < 4; depth += 1) {
+    const classified = classifyCandidateError(current)
+    if (classified) return classified
+    if (!current || typeof current !== 'object' || seen.has(current as object)) break
+    seen.add(current as object)
+    current = (current as { cause?: unknown }).cause
+  }
   return 'candidate_execution'
 }
 
@@ -49,6 +75,10 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'run_persistence':
     case 'candidate_execution':
     case 'candidate_timeout_or_unreachable':
+    case 'candidate_connection_refused':
+    case 'candidate_connection_reset':
+    case 'candidate_network_unreachable':
+    case 'candidate_aborted':
     case 'candidate_credentials_rejected':
     case 'candidate_rate_limited':
     case 'candidate_upstream_unavailable':
@@ -78,6 +108,14 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_execution_failed', message: 'The native Astra candidate runtime failed while executing this trusted case.' } as const
     case 'candidate_timeout_or_unreachable':
       return { code: 'candidate_timeout_or_unreachable', message: 'The native Astra endpoint did not complete the trusted case within the pinned transport window. The local Qwen bridge may be unreachable or the model may be taking longer than the certification timeout.' } as const
+    case 'candidate_connection_refused':
+      return { code: 'candidate_connection_refused', message: 'Blackstar reached the native Astra route, but the candidate connection was refused. The local Qwen bridge or Ollama listener is not accepting connections on the expected route.' } as const
+    case 'candidate_connection_reset':
+      return { code: 'candidate_connection_reset', message: 'The native Astra connection was closed before Blackstar received a complete candidate response.' } as const
+    case 'candidate_network_unreachable':
+      return { code: 'candidate_network_unreachable', message: 'The native Astra network route could not be reached from the production certification runtime.' } as const
+    case 'candidate_aborted':
+      return { code: 'candidate_aborted', message: 'The native Astra candidate request was aborted before a trusted response completed.' } as const
     case 'candidate_credentials_rejected':
       return { code: 'candidate_credentials_rejected', message: 'The native Astra endpoint rejected Blackstar runtime authentication. The configured native bridge credential must be rotated or corrected before certification can continue.' } as const
     case 'candidate_rate_limited':
