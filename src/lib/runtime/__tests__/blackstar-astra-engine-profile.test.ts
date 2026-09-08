@@ -33,7 +33,16 @@ describe('Blackstar Astra specialist model profile', () => {
     expect(isBlackstarAstraServingIdentity('compatible', 'qwen3:8b-q4_K_M')).toBe(true)
   })
 
-  it('keeps an explicit Astra base model pinned ahead of the shared native model', () => {
+  it('treats the legacy synthetic Astra engine id as unset on the native route', () => {
+    process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'https://native.example/v1'
+    process.env['BLACKSTAR_NATIVE_MODEL'] = 'qwen3:8b-q4_K_M'
+    process.env['BLACKSTAR_ASTRA_MODEL'] = BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel
+    expect(blackstarAstraModelDescriptor().model).toBe('qwen3:8b-q4_K_M')
+    expect(isBlackstarAstraServingIdentity('compatible', 'qwen3:8b-q4_K_M')).toBe(true)
+    expect(isBlackstarAstraServingIdentity('compatible', BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel)).toBe(false)
+  })
+
+  it('keeps a real explicit Astra base model pinned ahead of the shared native model', () => {
     process.env['OPENAI_COMPATIBLE_BASE_URL'] = 'https://native.example/v1'
     process.env['BLACKSTAR_NATIVE_MODEL'] = 'qwen3:8b-q4_K_M'
     process.env['BLACKSTAR_ASTRA_MODEL'] = 'astra-base-v1'
