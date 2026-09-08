@@ -7,17 +7,20 @@ import {
 } from '../astra-certification-judge-policy'
 
 const previousBase = process.env['FREELLMAPI_BASE_URL']
+const previousApiKey = process.env['FREELLMAPI_API_KEY']
 const previousModel = process.env['FREELLMAPI_MODEL']
 
 afterEach(() => {
   if (previousBase == null) delete process.env['FREELLMAPI_BASE_URL']
   else process.env['FREELLMAPI_BASE_URL'] = previousBase
+  if (previousApiKey == null) delete process.env['FREELLMAPI_API_KEY']
+  else process.env['FREELLMAPI_API_KEY'] = previousApiKey
   if (previousModel == null) delete process.env['FREELLMAPI_MODEL']
   else process.env['FREELLMAPI_MODEL'] = previousModel
 })
 
 describe('Astra certification judge policy', () => {
-  it('accepts only server-owned or exact configured pinned FreeLLM judge identities', () => {
+  it('accepts only server-owned or exact authenticated configured pinned FreeLLM judge identities', () => {
     expect(isTrustedAstraCertificationJudge('groq', 'openai/gpt-oss-20b')).toBe(true)
     expect(isTrustedAstraCertificationJudge('openai', 'gpt-5-mini')).toBe(true)
     expect(isTrustedAstraCertificationJudge('deepseek', 'deepseek-chat')).toBe(false)
@@ -25,6 +28,10 @@ describe('Astra certification judge policy', () => {
 
     process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
     process.env['FREELLMAPI_MODEL'] = 'independent-judge'
+    delete process.env['FREELLMAPI_API_KEY']
+    expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(false)
+
+    process.env['FREELLMAPI_API_KEY'] = 'test-bridge-token'
     expect(isTrustedAstraCertificationJudge('freellm', 'independent-judge')).toBe(true)
     expect(isTrustedAstraCertificationJudge('freellm', 'other-model')).toBe(false)
 
@@ -40,6 +47,7 @@ describe('Astra certification judge policy', () => {
     expect(isPinnedFreeLlmCertificationModel('fusion')).toBe(false)
 
     process.env['FREELLMAPI_BASE_URL'] = 'https://judge.example/v1'
+    process.env['FREELLMAPI_API_KEY'] = 'test-bridge-token'
     process.env['FREELLMAPI_MODEL'] = 'auto'
     expect(isTrustedAstraCertificationJudge('freellm', 'auto')).toBe(false)
     process.env['FREELLMAPI_MODEL'] = 'fusion'
