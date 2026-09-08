@@ -9,6 +9,16 @@ export const ASTRA_CERTIFICATION_JUDGES: readonly AstraCertificationJudge[] = [
   { provider: 'openai', model: 'gpt-5-mini', label: 'OpenAI · GPT-5 mini' },
 ] as const
 
+const UNTRUSTED_FREELLM_ROUTE_PROVIDERS = new Set([
+  'auto',
+  'fusion',
+  'ollama',
+  'custom',
+  'local',
+  'compatible',
+  'freellm',
+])
+
 export function isPinnedFreeLlmCertificationModel(model: unknown): model is string {
   if (typeof model !== 'string') return false
   const clean = model.trim()
@@ -17,11 +27,18 @@ export function isPinnedFreeLlmCertificationModel(model: unknown): model is stri
   return lower !== 'auto' && !lower.startsWith('auto:') && lower !== 'fusion'
 }
 
+export function isIndependentFreeLlmRouteProvider(provider: unknown): provider is string {
+  if (typeof provider !== 'string') return false
+  const clean = provider.trim().toLowerCase()
+  return Boolean(clean) && !UNTRUSTED_FREELLM_ROUTE_PROVIDERS.has(clean)
+}
+
 function configuredFreeLlmJudgeModel(): string | null {
   if (typeof process === 'undefined') return null
   const baseUrl = process.env['FREELLMAPI_BASE_URL']?.trim()
+  const apiKey = process.env['FREELLMAPI_API_KEY']?.trim()
   const model = process.env['FREELLMAPI_MODEL']?.trim()
-  return baseUrl && isPinnedFreeLlmCertificationModel(model) ? model : null
+  return baseUrl && apiKey && isPinnedFreeLlmCertificationModel(model) ? model : null
 }
 
 export function isTrustedAstraCertificationJudge(provider: unknown, model: unknown): boolean {
