@@ -13,7 +13,7 @@ import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
 import { astraCertificationStageError, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
-import { ProviderError, runChatPinned } from '@/lib/runtime/model-gateway.server'
+import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 
 type Db = { from: (table: string) => any }
 const db = supabaseAdmin as unknown as Db
@@ -54,12 +54,14 @@ async function assertScopeAccess(input: RunInput) {
   if (!data) throw new Error('You do not have access to this workspace.')
 }
 
-function candidateFailureStage(error: unknown): AstraTextCertificationStage {
-  if (!(error instanceof ProviderError)) return 'candidate_execution'
-  if (error.status === 401 || error.status === 403) return 'candidate_credentials_rejected'
-  if (error.status === 429) return 'candidate_rate_limited'
-  if (error.status === 502 || error.status === 503) return 'candidate_upstream_unavailable'
-  if (error.status === 504 || error.status === 408) return 'candidate_timeout_or_unreachable'
+export function candidateFailureStage(error: unknown): AstraTextCertificationStage {
+  if (!error || typeof error !== 'object') return 'candidate_execution'
+  const statusValue = (error as { status?: unknown }).status
+  const status = typeof statusValue === 'number' && Number.isFinite(statusValue) ? statusValue : null
+  if (status === 401 || status === 403) return 'candidate_credentials_rejected'
+  if (status === 429) return 'candidate_rate_limited'
+  if (status === 502 || status === 503) return 'candidate_upstream_unavailable'
+  if (status === 504 || status === 408) return 'candidate_timeout_or_unreachable'
   return 'candidate_execution'
 }
 
