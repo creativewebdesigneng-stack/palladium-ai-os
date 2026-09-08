@@ -119,7 +119,10 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       })
     } catch (error) {
       stage = candidateFailureStage(error)
-      if (stage === 'candidate_runtime_error_object') {
+      if (
+        stage === 'candidate_runtime_error_object'
+        || stage === 'candidate_model_or_chat_route_not_found'
+      ) {
         stage = await probeAstraCandidateRouteAfterGenericError()
       }
       throw astraCertificationStageError(stage)

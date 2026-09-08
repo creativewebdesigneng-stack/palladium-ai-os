@@ -3,6 +3,7 @@ import { candidateFailureStage, type AstraTextCertificationStage } from './astra
 import {
   classifyAstraCandidateChatProbeStatus,
   classifyAstraCandidateRouteProbeStatus,
+  isAstraCandidateModelListed,
 } from './astra-candidate-route-probe-diagnostics'
 
 const PROBE_TIMEOUT_MS = 20_000
@@ -30,6 +31,9 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
     if (routeStage !== 'candidate_route_reachable_runtime_failure') return routeStage
 
     const model = blackstarAstraModelDescriptor().model
+    const routePayload = await routeResponse.json().catch(() => null)
+    const modelListed = isAstraCandidateModelListed(routePayload, model)
+
     const chatResponse = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -44,7 +48,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
       }),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    return classifyAstraCandidateChatProbeStatus(chatResponse.status)
+    return classifyAstraCandidateChatProbeStatus(chatResponse.status, modelListed)
   } catch (error) {
     const stage = candidateFailureStage(error)
     return genericProbeFailure(stage) ? 'candidate_network_unreachable' : stage
