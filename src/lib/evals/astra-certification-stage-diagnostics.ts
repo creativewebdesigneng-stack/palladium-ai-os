@@ -33,10 +33,45 @@ export function astraCertificationStageError(stage: AstraTextCertificationStage)
   return new Error(`${STAGE_PREFIX}${stage}`)
 }
 
+function classifyKnownRuntimeMessage(message: unknown): AstraTextCertificationStage | null {
+  if (typeof message !== 'string') return null
+  const normalized = message.trim().toLowerCase()
+  if (!normalized) return null
+
+  // Some hosting runtimes strip status/code/cause from fetch failures and leave
+  // only a generic Error message. Match only known infrastructure phrases and
+  // never return or persist the original message text.
+  if (normalized === 'fetch failed' || normalized === 'network request failed') {
+    return 'candidate_network_unreachable'
+  }
+  if (normalized.includes('socket hang up') || normalized.includes('connection reset')) {
+    return 'candidate_connection_reset'
+  }
+  if (
+    normalized.includes('getaddrinfo') ||
+    normalized.includes('name resolution') ||
+    normalized.includes('dns lookup') ||
+    normalized.includes('host not found')
+  ) {
+    return 'candidate_network_unreachable'
+  }
+  if (
+    normalized.includes('timed out') ||
+    normalized.includes('timeout') ||
+    normalized.includes('deadline exceeded')
+  ) {
+    return 'candidate_timeout_or_unreachable'
+  }
+  if (normalized.includes('aborted') || normalized.includes('aborterror')) {
+    return 'candidate_aborted'
+  }
+  return null
+}
+
 function classifyCandidateError(error: unknown): AstraTextCertificationStage | null {
   if (!error || typeof error !== 'object') return null
 
-  const value = error as { status?: unknown; name?: unknown; code?: unknown }
+  const value = error as { status?: unknown; name?: unknown; code?: unknown; message?: unknown }
   const status = typeof value.status === 'number' && Number.isFinite(value.status) ? value.status : null
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
@@ -50,6 +85,9 @@ function classifyCandidateError(error: unknown): AstraTextCertificationStage | n
   if (code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'UND_ERR_HEADERS_TIMEOUT') {
     return 'candidate_timeout_or_unreachable'
   }
+
+  const messageClass = classifyKnownRuntimeMessage(value.message)
+  if (messageClass) return messageClass
 
   const name = typeof value.name === 'string' ? value.name : ''
   if (name === 'SyntaxError') return 'candidate_response_invalid_json'
