@@ -3779,6 +3779,51 @@ export type Database = {
           },
         ]
       }
+      model_eval_policies: {
+        Row: {
+          apply_to_requests: boolean
+          apply_to_responses: boolean
+          blocked_terms: Json
+          created_at: string
+          enabled: boolean
+          id: string
+          name: string
+          redact_email: boolean
+          redact_phone: boolean
+          redact_secrets: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          apply_to_requests?: boolean
+          apply_to_responses?: boolean
+          blocked_terms?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          redact_email?: boolean
+          redact_phone?: boolean
+          redact_secrets?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          apply_to_requests?: boolean
+          apply_to_responses?: boolean
+          blocked_terms?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          redact_email?: boolean
+          redact_phone?: boolean
+          redact_secrets?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       model_eval_responses: {
         Row: {
           created_at: string
