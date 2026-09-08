@@ -3,6 +3,13 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { runFreeLlmJudge } from "@/lib/evals/freellm-evaluator.server";
+import {
+  ASTRA_CERTIFICATION_PROVENANCE_VERSION,
+  buildAstraCertificationExecutionPrompt,
+  hashAstraCertificationExecutionPrompt,
+  resolveAstraCertificationExecutionProfile,
+  type AstraCertificationExecutionProfile,
+} from "@/lib/evals/astra-certification-execution-profile";
 import { runChatPinned, type Provider } from "@/lib/runtime/model-gateway.server";
 
 type Sb = { from: (table: string) => any };
@@ -152,6 +159,8 @@ export const runModelArena = createServerFn({ method: "POST" })
     let astraActivation: Record<string, unknown> | null = null;
     let astraModel: string | null = null;
     let astraSystemPromptHash: string | null = null;
+    let astraExecutionProfile: AstraCertificationExecutionProfile | null = null;
+    let astraExecutionPromptHash: string | null = null;
     if (data.astraTaskClass) {
       const {
         BLACKSTAR_ASTRA_ENGINE_PROFILE,
@@ -165,10 +174,14 @@ export const runModelArena = createServerFn({ method: "POST" })
       if (!hasExactAstraCandidate) throw new Error("Astra evaluation must include the exact configured Astra serving identity.");
       astraModel = exactModel;
       astraSystemPromptHash = hashAstraEvaluationSystemPrompt(safeSystemPrompt);
+      astraExecutionProfile = resolveAstraCertificationExecutionProfile(data.astraTaskClass, exactModel);
+      astraExecutionPromptHash = hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt(safePrompt, astraExecutionProfile));
       astraActivation = {
         server_verified: false,
-        provenance_version: 3,
+        provenance_version: ASTRA_CERTIFICATION_PROVENANCE_VERSION,
         system_prompt_hash: astraSystemPromptHash,
+        execution_profile: astraExecutionProfile,
+        execution_prompt_hash: astraExecutionPromptHash,
         task_class: data.astraTaskClass,
         provider: "compatible",
         model: exactModel,
@@ -199,14 +212,21 @@ export const runModelArena = createServerFn({ method: "POST" })
       const responseRows: ModelEvalResponse[] = [];
       for (const contestant of data.contestants) {
         const started = Date.now();
+        const isExactAstraCandidate = Boolean(data.astraTaskClass && astraModel && astraExecutionProfile)
+          && contestant.provider === "compatible"
+          && contestant.model === astraModel;
+        const executionPrompt = isExactAstraCandidate
+          ? buildAstraCertificationExecutionPrompt(safePrompt, astraExecutionProfile!)
+          : safePrompt;
         const result = await runChatPinned({
           provider: contestant.provider as Provider,
           model: contestant.model,
           messages: [
             ...(safeSystemPrompt ? [{ role: "system" as const, content: safeSystemPrompt }] : []),
-            { role: "user", content: safePrompt },
+            { role: "user", content: executionPrompt },
           ],
-          maxTokens: 1600,
+          maxTokens: isExactAstraCandidate ? astraExecutionProfile!.maxTokens : 1600,
+          ...(isExactAstraCandidate ? { timeoutMs: astraExecutionProfile!.timeoutMs } : {}),
         });
         if (result.provider !== contestant.provider || result.model !== contestant.model) {
           throw new Error(`Model Arena candidate transport changed identity from ${contestant.provider}/${contestant.model} to ${result.provider}/${result.model}.`);
@@ -221,7 +241,10 @@ export const runModelArena = createServerFn({ method: "POST" })
           latency_ms: Math.max(0, Date.now() - started),
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
-          metadata: { complianceApplied: Boolean(policy) },
+          metadata: {
+            complianceApplied: Boolean(policy),
+            ...(isExactAstraCandidate ? { astraExecutionProfileId: astraExecutionProfile!.id } : {}),
+          },
         };
         const { data: saved, error } = await sb.from("model_eval_responses").insert(row)
           .select("id,provider,model,label,response_text,latency_ms,input_tokens,output_tokens").single();
@@ -282,7 +305,7 @@ export const runModelArena = createServerFn({ method: "POST" })
       if (scoreError) throw new Error(scoreError.message);
 
       let completedMetadata: Record<string, unknown> = runMetadata;
-      if (astraActivation && astraModel && astraSystemPromptHash && data.astraTaskClass) {
+      if (astraActivation && astraModel && astraSystemPromptHash && astraExecutionProfile && astraExecutionPromptHash && data.astraTaskClass) {
         const { signAstraEvaluationEvidence } = await import("@/lib/evals/astra-evaluation-verifier.server");
         const provenanceSignature = signAstraEvaluationEvidence({
           runId: run.id,
@@ -292,6 +315,8 @@ export const runModelArena = createServerFn({ method: "POST" })
           model: astraModel,
           prompt: safePrompt,
           systemPromptHash: astraSystemPromptHash,
+          executionProfile: astraExecutionProfile,
+          executionPromptHash: astraExecutionPromptHash,
           judgeProvider: judgeResult.provider,
           judgeModel: judgeResult.model,
           criteria,
@@ -330,6 +355,7 @@ export const runModelArena = createServerFn({ method: "POST" })
           ...judgeRouteEvidence,
           complianceApplied: Boolean(policy),
           astraTaskClass: data.astraTaskClass ?? null,
+          astraExecutionProfileId: astraExecutionProfile?.id ?? null,
         },
       });
       return { runId: run.id, responses: responseRows, scores };

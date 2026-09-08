@@ -1,5 +1,11 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { getAstraCertificationBenchmarkCase } from './astra-certification-benchmark-suite'
+import {
+  ASTRA_CERTIFICATION_PROVENANCE_VERSION,
+  buildAstraCertificationExecutionPrompt,
+  hashAstraCertificationExecutionPrompt,
+  resolveAstraCertificationExecutionProfile,
+} from './astra-certification-execution-profile'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from './astra-vision-benchmark-media.server'
 import { isTrustedAstraCertificationJudge, judgeMatchesCandidate } from './astra-certification-judge-policy'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
@@ -60,10 +66,13 @@ export async function runTrustedAstraVisionCertificationCase(input: RunInput) {
   const media = renderAstraVisionBenchmarkMedia(input.caseId)
   const groundTruth = getAstraVisionBenchmarkGroundTruth(input.caseId)
   const systemPromptHash = hashAstraEvaluationSystemPrompt(null)
+  const executionProfile = resolveAstraCertificationExecutionProfile('vision', model)
+  const executionPromptHash = hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, executionProfile))
   const runMetadata = {
     criteria: [...benchmarkCase.criteria], complianceApplied: false,
     astra_activation: {
-      server_verified: false, provenance_version: 3, system_prompt_hash: systemPromptHash,
+      server_verified: false, provenance_version: ASTRA_CERTIFICATION_PROVENANCE_VERSION, system_prompt_hash: systemPromptHash,
+      execution_profile: executionProfile, execution_prompt_hash: executionPromptHash,
       task_class: 'vision', provider: 'compatible', model, engine_id: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
       media_digest: media.digest, media_type: media.mediaType,
     },
@@ -83,7 +92,7 @@ export async function runTrustedAstraVisionCertificationCase(input: RunInput) {
         run_id: run.id, provider: result.provider, model: result.model,
         label: candidate.provider === 'compatible' ? 'Blackstar Astra Vision' : 'Reference Vision',
         response_text: result.text, latency_ms: Math.max(0, Date.now() - started), input_tokens: result.usage.input, output_tokens: result.usage.output,
-        metadata: { modality: 'vision', media_digest: media.digest },
+        metadata: { modality: 'vision', media_digest: media.digest, ...(candidate.provider === 'compatible' ? { astraExecutionProfileId: executionProfile.id } : {}) },
       }).select('id,provider,model,response_text,latency_ms,input_tokens,output_tokens').single()
       if (error) throw new Error(error.message)
       responseRows.push(saved)
@@ -113,7 +122,8 @@ export async function runTrustedAstraVisionCertificationCase(input: RunInput) {
 
     const provenanceSignature = signAstraEvaluationEvidence({
       runId: run.id, userId: input.userId, orgId: input.orgId ?? null, taskClass: 'vision', model,
-      prompt: benchmarkCase.prompt, systemPromptHash, judgeProvider: judgeResult.provider, judgeModel: judgeResult.model,
+      prompt: benchmarkCase.prompt, systemPromptHash, executionProfile, executionPromptHash,
+      judgeProvider: judgeResult.provider, judgeModel: judgeResult.model,
       criteria: benchmarkCase.criteria, responses: responseRows, scores,
     })
     const completedMetadata = { ...runMetadata, astra_activation: { ...runMetadata.astra_activation, server_verified: true, provenance_signature: provenanceSignature } }
