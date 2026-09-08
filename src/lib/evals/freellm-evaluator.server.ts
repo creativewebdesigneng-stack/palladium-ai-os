@@ -33,12 +33,12 @@ export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.e
 
 export function parseFreeLlmRouteIdentity(headers: Headers): FreeLlmRouteIdentity {
   const routedVia = headers.get("x-routed-via")?.trim() || "";
-  const slash = routedVia.indexOf("/");
-  if (slash <= 0 || slash === routedVia.length - 1) {
+  const segments = routedVia.split("/").map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length < 2) {
     throw new ProviderError("FreeLLMAPI response did not include a valid X-Routed-Via identity.", 502, false);
   }
-  const routedProvider = routedVia.slice(0, slash).trim();
-  const routedModel = routedVia.slice(slash + 1).trim();
+  const routedProvider = segments.at(-2) || "";
+  const routedModel = segments.at(-1) || "";
   if (!routedProvider || !routedModel) {
     throw new ProviderError("FreeLLMAPI response did not include a valid routed provider/model identity.", 502, false);
   }
