@@ -16,6 +16,34 @@ function Read-Secret([string]$Path) {
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
 }
 
+function Get-SafeBridgeFailure([Exception]$Exception) {
+  $type = $Exception.GetType().FullName
+  $message = [string]$Exception.Message
+  if ($type -match 'TaskCanceledException|TimeoutException' -or $message -match '(?i)timed out|timeout') {
+    return @{ code = 'upstream_timeout'; message = 'FreeLLMAPI did not respond before the local bridge timeout.' }
+  }
+  if ($message -match '(?i)actively refused|connection refused') {
+    return @{ code = 'upstream_connection_refused'; message = 'FreeLLMAPI is not accepting connections on the discovered localhost port.' }
+  }
+  if ($message -match '(?i)forcibly closed|connection reset|unexpected end') {
+    return @{ code = 'upstream_connection_reset'; message = 'The local FreeLLMAPI connection was closed before a complete response was returned.' }
+  }
+  if ($type -match 'HttpRequestException|SocketException') {
+    return @{ code = 'upstream_unreachable'; message = 'The local FreeLLMAPI endpoint could not be reached by the Blackstar bridge.' }
+  }
+  return @{ code = 'bridge_proxy_error'; message = 'The Blackstar FreeLLM bridge failed while forwarding the evaluator request.' }
+}
+
+function Write-JsonFailure($Response, [int]$StatusCode, [string]$Code, [string]$Message) {
+  $payload = @{ error = @{ code = $Code; message = $Message } } | ConvertTo-Json -Compress
+  $bytes = [Text.Encoding]::UTF8.GetBytes($payload)
+  $Response.StatusCode = $StatusCode
+  $Response.ContentType = 'application/json; charset=utf-8'
+  $Response.ContentLength64 = $bytes.Length
+  $Response.OutputStream.Write($bytes, 0, $bytes.Length)
+  $Response.Close()
+}
+
 $bridgeToken = Read-Secret -Path $BridgeTokenSecretPath
 $upstreamKey = Read-Secret -Path $UpstreamKeySecretPath
 $listener = New-Object System.Net.HttpListener
@@ -80,10 +108,9 @@ try {
       $message.Dispose()
       $upstream.Dispose()
     } catch {
-      try {
-        $context.Response.StatusCode = 502
-        $context.Response.Close()
-      } catch {}
+      $safe = Get-SafeBridgeFailure -Exception $_.Exception
+      Write-Warning "FreeLLM bridge request failed: $($safe.code)"
+      try { Write-JsonFailure -Response $context.Response -StatusCode 502 -Code $safe.code -Message $safe.message } catch {}
     }
   }
 } finally {
