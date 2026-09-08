@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { candidateFailureStage, readAstraCertificationFailureStage } from './astra-certification-stage-diagnostics'
 
+// These cases intentionally verify only bounded diagnostics; raw runtime error text must never escape.
 describe('Astra certification stage diagnostics', () => {
   it('classifies cross-bundle shaped provider errors by bounded status', () => {
     expect(candidateFailureStage({ status: 504, message: 'hidden' })).toBe('candidate_timeout_or_unreachable')
