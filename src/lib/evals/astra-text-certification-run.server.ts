@@ -55,7 +55,7 @@ async function assertScopeAccess(input: RunInput) {
 
 export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   await assertScopeAccess(input)
-  if (!isAstraCertificationTaskClass(input.taskClass) || input.taskClass === 'vision') {
+  if (!isAstraCertificationTaskClass(input.taskClass)) {
     throw new Error('This runner only supports trusted Astra text certification task classes.')
   }
   if (!isBlackstarAstraEngineConfigured()) throw new Error('Blackstar Astra serving is not configured on this deployment.')
