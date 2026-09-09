@@ -13,7 +13,7 @@ import type { AstraTextCertificationStage } from './astra-certification-stage-di
 
 const PROBE_TIMEOUT_MS = 20_000
 
-export type AstraCandidateRouteProbeResult = {
+type AstraCandidateRouteProbeResult = {
   stage: AstraTextCertificationStage
   expectedModel?: string
   advertisedModelIds?: string[]
