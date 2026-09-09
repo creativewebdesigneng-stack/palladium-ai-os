@@ -23,6 +23,16 @@ describe('Blackstar Tailscale Funnel bridge', () => {
     expect(setup).toContain('OPENAI_COMPATIBLE_BASE_URL=$publicBase/v1')
   })
 
+  it('makes hidden Windows proxy startup failures diagnosable without printing the bearer token', () => {
+    expect(setup).toContain('-RedirectStandardOutput $proxyStdoutPath')
+    expect(setup).toContain('-RedirectStandardError $proxyStderrPath')
+    expect(setup).toContain('if ($proxy.HasExited) { break }')
+    expect(setup).toContain('Child-process diagnostic: $detail')
+    expect(setup).toContain('$detail.Replace($Token, "<redacted>")')
+    expect(setup).toContain("('\"' + $proxyScript + '\"')")
+    expect(setup).not.toContain("('\\\"' + $proxyScript + '\\\"')")
+  })
+
   it('requires explicit Tailscale sign-in rather than embedding credentials', () => {
     expect(setup).toContain('Tailscale is installed but not signed in')
     expect(setup).not.toMatch(/authkey|tskey-/i)
