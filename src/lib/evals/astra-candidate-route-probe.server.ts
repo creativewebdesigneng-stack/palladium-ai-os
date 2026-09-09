@@ -1,5 +1,6 @@
 'use server'
 
+import { createHash } from 'node:crypto'
 import { blackstarAstraModelDescriptor } from '@/lib/runtime/blackstar-astra-engine-profile'
 import {
   classifyAstraCandidateChatProbeStatus,
@@ -12,20 +13,37 @@ import { classifyAstraCandidateProbeFailure } from './astra-candidate-route-prob
 import type { AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 
 const PROBE_TIMEOUT_MS = 20_000
+const CREDENTIAL_FINGERPRINT_LENGTH = 12
 
 type AstraCandidateRouteProbeResult = {
   stage: AstraTextCertificationStage
   expectedModel?: string
   advertisedModelIds?: string[]
+  credentialFingerprint?: string
 }
 
 function normalizeCompatibleBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
 }
 
+function normalizedApiKey(): string | undefined {
+  return process.env['OPENAI_COMPATIBLE_API_KEY']?.trim() || undefined
+}
+
 function authHeaders(): HeadersInit {
-  const apiKey = process.env['OPENAI_COMPATIBLE_API_KEY']?.trim()
+  const apiKey = normalizedApiKey()
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
+}
+
+function credentialFingerprint(): string | undefined {
+  const apiKey = normalizedApiKey()
+  if (!apiKey) return undefined
+  return createHash('sha256').update(apiKey, 'utf8').digest('hex').slice(0, CREDENTIAL_FINGERPRINT_LENGTH)
+}
+
+function credentialRejectedResult(stage: AstraTextCertificationStage): AstraCandidateRouteProbeResult {
+  const fingerprint = stage === 'candidate_credentials_rejected' ? credentialFingerprint() : undefined
+  return { stage, ...(fingerprint ? { credentialFingerprint: fingerprint } : {}) }
 }
 
 function withTimeout(signal: AbortSignal) {
@@ -52,7 +70,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
       routeTimeout.cleanup()
     }
     const routeStage = classifyAstraCandidateRouteProbeStatus(routeResponse.status)
-    if (routeStage !== 'candidate_route_reachable_runtime_failure') return { stage: routeStage }
+    if (routeStage !== 'candidate_route_reachable_runtime_failure') return credentialRejectedResult(routeStage)
 
     const model = blackstarAstraModelDescriptor().model
     const expectedModel = safeAstraCandidateModelId(model) ?? undefined
@@ -84,6 +102,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
         signal: chatTimeout.signal,
       })
       const stage = classifyAstraCandidateChatProbeStatus(chatResponse.status, modelListed)
+      if (stage === 'candidate_credentials_rejected') return credentialRejectedResult(stage)
       return stage === 'candidate_model_not_found'
         ? { stage, ...(expectedModel ? { expectedModel } : {}), ...(advertisedModelIds.length ? { advertisedModelIds } : {}) }
         : { stage }
