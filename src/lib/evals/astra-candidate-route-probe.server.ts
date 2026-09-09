@@ -1,6 +1,5 @@
 'use server'
 
-import { getEnvAny } from '@/lib/runtime/env'
 import { blackstarAstraModelDescriptor } from '@/lib/runtime/blackstar-astra-engine-profile'
 import {
   classifyAstraCandidateChatProbeStatus,
@@ -24,7 +23,7 @@ function normalizeCompatibleBaseUrl(value: string): string {
 }
 
 function authHeaders(): HeadersInit {
-  const apiKey = getEnvAny('OPENAI_COMPATIBLE_API_KEY')
+  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY?.trim()
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
 }
 
@@ -36,7 +35,7 @@ function withTimeout(signal: AbortSignal) {
 }
 
 export async function probeAstraCandidateRouteAfterGenericError(): Promise<AstraCandidateRouteProbeResult> {
-  const raw = getEnvAny('OPENAI_COMPATIBLE_BASE_URL')
+  const raw = process.env.OPENAI_COMPATIBLE_BASE_URL?.trim()
   if (!raw) return { stage: 'candidate_route_not_configured' as AstraTextCertificationStage }
   const base = normalizeCompatibleBaseUrl(raw)
   try {
