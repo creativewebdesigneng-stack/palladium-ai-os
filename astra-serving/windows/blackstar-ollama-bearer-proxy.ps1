@@ -55,18 +55,7 @@ public static class BlackstarBearerProxy
             while (listener.IsListening)
             {
                 var context = await listener.GetContextAsync().ConfigureAwait(false);
-                Task.Run(async () =>
-                {
-                    await gate.WaitAsync().ConfigureAwait(false);
-                    try
-                    {
-                        await HandleAsync(context, client, token, ollamaBaseUrl.TrimEnd('/'), upstreamTimeoutSeconds).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        gate.Release();
-                    }
-                });
+                ProcessContextAsync(context, client, gate, token, ollamaBaseUrl.TrimEnd('/'), upstreamTimeoutSeconds);
             }
         }
         finally
@@ -76,6 +65,23 @@ public static class BlackstarBearerProxy
             handler.Dispose();
             listener.Stop();
             listener.Close();
+        }
+    }
+
+    private static async void ProcessContextAsync(HttpListenerContext context, HttpClient client, SemaphoreSlim gate, string token, string ollamaBaseUrl, int upstreamTimeoutSeconds)
+    {
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await HandleAsync(context, client, token, ollamaBaseUrl, upstreamTimeoutSeconds).ConfigureAwait(false);
+        }
+        catch
+        {
+            try { context.Response.Abort(); } catch { }
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 
