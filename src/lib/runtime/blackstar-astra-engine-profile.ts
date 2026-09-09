@@ -46,15 +46,16 @@ function baseAstraModel() {
   const astraModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.modelEnv]?.trim()
   const nativeRouteConfigured = Boolean(process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.baseUrlEnv]?.trim())
   const nativeModel = process.env[BLACKSTAR_ASTRA_ENGINE_PROFILE.nativeModelEnv]?.trim()
+  const legacyNativeOverride = astraModel === BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel
+    || astraModel === BLACKSTAR_ASTRA_ENGINE_PROFILE.groqBootstrapModel
 
-  // `blackstar-astra-v0.1` is the Astra engine identity, not an Ollama model id.
-  // Older deployments may still carry it in BLACKSTAR_ASTRA_MODEL from before
-  // native-model inheritance existed. On the authenticated native route, treat
-  // only that exact legacy placeholder as unset so certification exercises the
-  // already-pinned native model. Any other explicit Astra model remains strict.
-  if (astraModel && !(nativeRouteConfigured
-    && nativeModel
-    && astraModel === BLACKSTAR_ASTRA_ENGINE_PROFILE.defaultModel)) {
+  // `blackstar-astra-v0.1` is the Astra engine identity, and the Groq bootstrap
+  // model was only used before a native serving route was configured. Older
+  // deployments may still carry either value in BLACKSTAR_ASTRA_MODEL. On an
+  // authenticated native route with an exact native model pin, treat only these
+  // two known legacy bootstrap identities as unset. Any other explicit Astra
+  // model remains strict and continues to outrank the shared native model.
+  if (astraModel && !(nativeRouteConfigured && nativeModel && legacyNativeOverride)) {
     return astraModel
   }
 
