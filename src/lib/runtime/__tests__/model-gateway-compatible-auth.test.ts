@@ -2,23 +2,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runChat } from "../model-gateway.base";
 
-const originalBaseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
-const originalApiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
+const originalBaseUrl = process.env["OPENAI_COMPATIBLE_BASE_URL"];
+const originalApiKey = process.env["OPENAI_COMPATIBLE_API_KEY"];
 
 afterEach(() => {
-  if (originalBaseUrl === undefined) delete process.env.OPENAI_COMPATIBLE_BASE_URL;
-  else process.env.OPENAI_COMPATIBLE_BASE_URL = originalBaseUrl;
+  if (originalBaseUrl === undefined) delete process.env["OPENAI_COMPATIBLE_BASE_URL"];
+  else process.env["OPENAI_COMPATIBLE_BASE_URL"] = originalBaseUrl;
 
-  if (originalApiKey === undefined) delete process.env.OPENAI_COMPATIBLE_API_KEY;
-  else process.env.OPENAI_COMPATIBLE_API_KEY = originalApiKey;
+  if (originalApiKey === undefined) delete process.env["OPENAI_COMPATIBLE_API_KEY"];
+  else process.env["OPENAI_COMPATIBLE_API_KEY"] = originalApiKey;
 
   vi.restoreAllMocks();
 });
 
 describe("OpenAI-compatible native authentication", () => {
   it("trims surrounding whitespace from the server-only compatible base URL and bearer key", async () => {
-    process.env.OPENAI_COMPATIBLE_BASE_URL = "  https://native.example.test/v1/  \n";
-    process.env.OPENAI_COMPATIBLE_API_KEY = "  native-secret-token\r\n";
+    process.env["OPENAI_COMPATIBLE_BASE_URL"] = "  https://native.example.test/v1/  \n";
+    process.env["OPENAI_COMPATIBLE_API_KEY"] = "  native-secret-token\r\n";
 
     let capturedUrl = "";
     let capturedHeaders = new Headers();
