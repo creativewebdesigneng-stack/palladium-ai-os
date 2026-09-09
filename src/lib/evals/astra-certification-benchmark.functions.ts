@@ -9,6 +9,7 @@ const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'v
 const textTaskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'agentic'])
 const providerSchema = z.enum(['openai', 'groq', 'lovable', 'gemini'])
 const judgeProviderSchema = z.enum(['openai', 'groq'])
+const SAFE_CREDENTIAL_FINGERPRINT = /^[a-f0-9]{12}$/
 
 type CandidateModelDiagnostic = {
   expectedModel?: unknown
@@ -69,6 +70,20 @@ function classifyAstraTextCertificationFailure(error: unknown) {
   return { code: 'certification_case_failed', message: 'The trusted Astra certification case failed before it could be attested.' } as const
 }
 
+async function addSafeCredentialFingerprint<T extends { code: string; message: string }>(failure: T) {
+  if (failure.code !== 'candidate_credentials_rejected') return failure
+  const credential = process.env['OPENAI_COMPATIBLE_API_KEY']?.trim()
+  if (!credential) return failure
+  const { createHash } = await import('node:crypto')
+  const fingerprint = createHash('sha256').update(credential, 'utf8').digest('hex').slice(0, 12)
+  if (!SAFE_CREDENTIAL_FINGERPRINT.test(fingerprint)) return failure
+  return {
+    ...failure,
+    credentialFingerprint: fingerprint,
+    message: `${failure.message} Runtime credential fingerprint: ${fingerprint}.`,
+  }
+}
+
 export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
@@ -125,7 +140,7 @@ export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
       })
       return { ok: true as const, ...result }
     } catch (error) {
-      const failure = classifyAstraTextCertificationFailure(error)
+      const failure = await addSafeCredentialFingerprint(classifyAstraTextCertificationFailure(error))
       await writeAudit({
         userId: context.userId,
         orgId: data.orgId ?? null,
