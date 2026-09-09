@@ -9,6 +9,8 @@ $ErrorActionPreference = "Stop"
 $proxyScript = Join-Path $PSScriptRoot "blackstar-ollama-bearer-proxy.ps1"
 $runtimeDir = Join-Path $env:LOCALAPPDATA "Blackstar\runtime"
 $tokenSecretPath = Join-Path $runtimeDir "bridge-token.clixml"
+$proxyStdoutPath = Join-Path $runtimeDir "native-proxy.stdout.log"
+$proxyStderrPath = Join-Path $runtimeDir "native-proxy.stderr.log"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
 function Resolve-TailscalePath {
@@ -70,6 +72,20 @@ function Save-BridgeToken([string]$Token) {
   } catch {
     Write-Warning "Could not tighten the token file ACL. The token is still DPAPI-encrypted for the current Windows user."
   }
+}
+
+function Read-SafeProxyStartupDetail([string]$Token) {
+  $detail = ""
+  if (Test-Path $proxyStderrPath) {
+    $detail = (Get-Content -Path $proxyStderrPath -Raw -ErrorAction SilentlyContinue).Trim()
+  }
+  if (-not $detail -and (Test-Path $proxyStdoutPath)) {
+    $detail = (Get-Content -Path $proxyStdoutPath -Raw -ErrorAction SilentlyContinue).Trim()
+  }
+  if (-not $detail) { return "No child-process output was captured." }
+  if ($Token) { $detail = $detail.Replace($Token, "<redacted>") }
+  if ($detail.Length -gt 1600) { $detail = $detail.Substring($detail.Length - 1600) }
+  return $detail
 }
 
 Write-Host "Blackstar domainless cloud bridge (Tailscale Funnel)"
@@ -139,23 +155,36 @@ Save-BridgeToken -Token $token
 $proxy = $null
 $bridgeReady = $false
 try {
+  Remove-Item -Path $proxyStdoutPath, $proxyStderrPath -Force -ErrorAction SilentlyContinue
   Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('\"' + $proxyScript + '\"'),
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $proxyScript + '"'),
     "-Port", $ProxyPort,
     "-UpstreamTimeoutSeconds", $UpstreamTimeoutSeconds,
     "-MaxConcurrentRequests", $MaxConcurrentRequests
-  ) -WindowStyle Hidden -PassThru
+  ) -WindowStyle Hidden -RedirectStandardOutput $proxyStdoutPath -RedirectStandardError $proxyStderrPath -PassThru
 
   $proxyReady = $false
+  $lastProxyError = $null
   for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Milliseconds 500
+    if ($proxy.HasExited) { break }
     try {
       $probe = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$ProxyPort/v1/models" -Headers @{ Authorization = "Bearer $token" } -TimeoutSec 3
       if (@($probe.data | ForEach-Object { $_.id }) -contains $Model) { $proxyReady = $true; break }
-    } catch {}
+      $lastProxyError = "Proxy responded but did not advertise the exact model $Model."
+    } catch {
+      $lastProxyError = $_.Exception.Message
+    }
   }
-  if (-not $proxyReady) { throw "The Blackstar authenticated localhost proxy did not become ready." }
+  if (-not $proxyReady) {
+    if ($proxy.HasExited) {
+      $detail = Read-SafeProxyStartupDetail -Token $token
+      throw "The Blackstar authenticated localhost proxy exited during startup (exit code $($proxy.ExitCode)). Child-process diagnostic: $detail"
+    }
+    if (-not $lastProxyError) { $lastProxyError = "No successful readiness response was received." }
+    throw "The Blackstar authenticated localhost proxy stayed running but did not become ready. Last readiness error: $lastProxyError. Startup logs: $proxyStdoutPath and $proxyStderrPath"
+  }
 
   Write-Host "Publishing authenticated proxy through Tailscale Funnel..."
   $funnelOutput = & $tailscale funnel --bg --yes --https=443 "http://127.0.0.1:$ProxyPort" 2>&1
@@ -190,6 +219,8 @@ try {
     upstream_timeout_seconds = $UpstreamTimeoutSeconds
     max_concurrent_requests = $MaxConcurrentRequests
     token_secret_path = $tokenSecretPath
+    proxy_stdout_path = $proxyStdoutPath
+    proxy_stderr_path = $proxyStderrPath
     started_at = (Get-Date).ToString("o")
   } | ConvertTo-Json | Set-Content -Path (Join-Path $runtimeDir "bridge.json") -Encoding UTF8
 
