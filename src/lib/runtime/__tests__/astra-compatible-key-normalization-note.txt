@@ -1,0 +1,1 @@
+Credential normalization test coverage is defined in model-gateway-compatible-auth.test.ts.
