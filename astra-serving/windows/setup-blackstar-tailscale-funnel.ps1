@@ -1,6 +1,8 @@
 param(
   [int]$ProxyPort = 12780,
-  [string]$Model = "qwen3:8b-q4_K_M"
+  [string]$Model = "qwen3:8b-q4_K_M",
+  [int]$UpstreamTimeoutSeconds = 60,
+  [int]$MaxConcurrentRequests = 4
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,6 +84,20 @@ if (@($models.data | ForEach-Object { $_.id }) -notcontains $Model) {
   throw "Ollama is running, but $Model was not returned by /v1/models."
 }
 
+Write-Host "Warming exact native model before publishing the bridge..."
+$warmupBody = @{
+  model = $Model
+  messages = @(@{ role = "user"; content = "Reply with OK. /no_think" })
+  temperature = 0
+  stream = $false
+  max_tokens = 1
+} | ConvertTo-Json -Depth 6
+try {
+  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/v1/chat/completions" -ContentType "application/json" -Body $warmupBody -TimeoutSec 180 | Out-Null
+} catch {
+  throw "Ollama model warmup failed for the exact native model. Fix local inference before publishing the certification bridge."
+}
+
 $tailscale = Resolve-TailscalePath
 if (-not $tailscale) {
   $winget = Get-Command winget -ErrorAction SilentlyContinue
@@ -125,7 +141,10 @@ $bridgeReady = $false
 try {
   Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('\"' + $proxyScript + '\"'), "-Port", $ProxyPort
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('\"' + $proxyScript + '\"'),
+    "-Port", $ProxyPort,
+    "-UpstreamTimeoutSeconds", $UpstreamTimeoutSeconds,
+    "-MaxConcurrentRequests", $MaxConcurrentRequests
   ) -WindowStyle Hidden -PassThru
 
   $proxyReady = $false
@@ -168,6 +187,8 @@ try {
     proxy_pid = $proxy.Id
     proxy_port = $ProxyPort
     public_base_url = $publicBase
+    upstream_timeout_seconds = $UpstreamTimeoutSeconds
+    max_concurrent_requests = $MaxConcurrentRequests
     token_secret_path = $tokenSecretPath
     started_at = (Get-Date).ToString("o")
   } | ConvertTo-Json | Set-Content -Path (Join-Path $runtimeDir "bridge.json") -Encoding UTF8
