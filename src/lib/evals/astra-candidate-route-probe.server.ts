@@ -8,6 +8,7 @@ import {
   safeAstraAdvertisedModelIds,
   safeAstraCandidateModelId,
 } from './astra-candidate-route-probe-diagnostics'
+import { classifyAstraCandidateProbeFailure } from './astra-candidate-route-probe-failure'
 import type { AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 
 const PROBE_TIMEOUT_MS = 20_000
@@ -89,7 +90,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
     } finally {
       chatTimeout.cleanup()
     }
-  } catch {
-    return { stage: 'candidate_network_unreachable' }
+  } catch (error) {
+    return { stage: classifyAstraCandidateProbeFailure(error) }
   }
 }
