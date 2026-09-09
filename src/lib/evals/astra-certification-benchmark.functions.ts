@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
+import { safeAstraCandidateModelId } from './astra-candidate-route-probe-diagnostics'
 import { readAstraCertificationFailureStage, safeAstraCertificationStageFailure } from './astra-certification-stage-diagnostics'
 
 const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic'])
@@ -9,9 +10,48 @@ const textTaskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use'
 const providerSchema = z.enum(['openai', 'groq', 'lovable', 'gemini'])
 const judgeProviderSchema = z.enum(['openai', 'groq'])
 
+type CandidateModelDiagnostic = {
+  expectedModel?: unknown
+  advertisedModelIds?: unknown
+}
+
+function safeCandidateModelDiagnostic(error: unknown) {
+  if (!error || typeof error !== 'object') return null
+  const diagnostic = (error as { astraCandidateModelDiagnostic?: CandidateModelDiagnostic }).astraCandidateModelDiagnostic
+  if (!diagnostic || typeof diagnostic !== 'object') return null
+  const expectedModel = safeAstraCandidateModelId(typeof diagnostic.expectedModel === 'string' ? diagnostic.expectedModel : '') ?? undefined
+  const advertisedModelIds = Array.isArray(diagnostic.advertisedModelIds)
+    ? diagnostic.advertisedModelIds
+      .map((value) => safeAstraCandidateModelId(typeof value === 'string' ? value : ''))
+      .filter((value): value is string => Boolean(value))
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .slice(0, 5)
+    : []
+  if (!expectedModel && !advertisedModelIds.length) return null
+  return { expectedModel, advertisedModelIds }
+}
+
 function classifyAstraTextCertificationFailure(error: unknown) {
   const stage = readAstraCertificationFailureStage(error)
-  if (stage) return safeAstraCertificationStageFailure(stage)
+  if (stage) {
+    const failure = safeAstraCertificationStageFailure(stage)
+    if (stage === 'candidate_model_not_found') {
+      const diagnostic = safeCandidateModelDiagnostic(error)
+      if (diagnostic) {
+        const pinned = diagnostic.expectedModel ? ` Pinned candidate: ${diagnostic.expectedModel}.` : ''
+        const advertised = diagnostic.advertisedModelIds.length
+          ? ` Advertised model IDs: ${diagnostic.advertisedModelIds.join(', ')}.`
+          : ''
+        return {
+          ...failure,
+          message: `${failure.message}${pinned}${advertised}`,
+          ...(diagnostic.expectedModel ? { expectedModel: diagnostic.expectedModel } : {}),
+          ...(diagnostic.advertisedModelIds.length ? { advertisedModelIds: diagnostic.advertisedModelIds } : {}),
+        } as const
+      }
+    }
+    return failure
+  }
 
   const raw = error instanceof Error ? error.message : ''
   const message = raw.toLowerCase()

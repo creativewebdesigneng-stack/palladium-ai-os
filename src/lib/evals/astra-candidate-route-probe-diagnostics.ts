@@ -1,5 +1,52 @@
 import type { AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 
+const MAX_ADVERTISED_MODEL_IDS = 5
+const MAX_MODEL_ID_LENGTH = 128
+const SAFE_MODEL_ID = /^[A-Za-z0-9._:+\/-]+$/
+
+function safeModelId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const id = value.trim()
+  if (!id || id.length > MAX_MODEL_ID_LENGTH || !SAFE_MODEL_ID.test(id)) return null
+  return id
+}
+
+/**
+ * Extract only bounded, identifier-shaped model names from the two supported
+ * /models response formats. Arbitrary response fields, URLs, errors, prompts,
+ * credentials and provider metadata are intentionally ignored.
+ */
+export function safeAstraAdvertisedModelIds(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return []
+  const value = payload as { data?: unknown; models?: unknown }
+  const identifiers: string[] = []
+  const add = (candidate: unknown) => {
+    const id = safeModelId(candidate)
+    if (id && !identifiers.includes(id) && identifiers.length < MAX_ADVERTISED_MODEL_IDS) identifiers.push(id)
+  }
+
+  if (Array.isArray(value.data)) {
+    for (const entry of value.data) {
+      if (!entry || typeof entry !== 'object') continue
+      add((entry as { id?: unknown }).id)
+    }
+  }
+  if (Array.isArray(value.models)) {
+    for (const entry of value.models) {
+      if (!entry || typeof entry !== 'object') continue
+      const item = entry as { name?: unknown; model?: unknown }
+      add(item.name)
+      add(item.model)
+    }
+  }
+
+  return identifiers
+}
+
+export function safeAstraCandidateModelId(model: string): string | null {
+  return safeModelId(model)
+}
+
 export function classifyAstraCandidateRouteProbeStatus(status: number): AstraTextCertificationStage {
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
@@ -13,31 +60,9 @@ export function classifyAstraCandidateRouteProbeStatus(status: number): AstraTex
  * result to a boolean. The response payload itself is never surfaced or stored.
  */
 export function isAstraCandidateModelListed(payload: unknown, model: string): boolean | null {
-  if (!payload || typeof payload !== 'object') return null
-  const target = model.trim()
+  const target = safeAstraCandidateModelId(model)
   if (!target) return null
-  const value = payload as {
-    data?: unknown
-    models?: unknown
-  }
-
-  const identifiers: string[] = []
-  if (Array.isArray(value.data)) {
-    for (const entry of value.data) {
-      if (!entry || typeof entry !== 'object') continue
-      const id = (entry as { id?: unknown }).id
-      if (typeof id === 'string' && id.trim()) identifiers.push(id.trim())
-    }
-  }
-  if (Array.isArray(value.models)) {
-    for (const entry of value.models) {
-      if (!entry || typeof entry !== 'object') continue
-      const item = entry as { name?: unknown; model?: unknown }
-      if (typeof item.name === 'string' && item.name.trim()) identifiers.push(item.name.trim())
-      if (typeof item.model === 'string' && item.model.trim()) identifiers.push(item.model.trim())
-    }
-  }
-
+  const identifiers = safeAstraAdvertisedModelIds(payload)
   if (!identifiers.length) return null
   return identifiers.includes(target)
 }
