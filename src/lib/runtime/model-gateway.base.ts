@@ -162,9 +162,9 @@ function endpointFor(provider: Provider): Endpoint {
     };
   }
   if (provider === "compatible") {
-    const base = process.env["OPENAI_COMPATIBLE_BASE_URL"];
+    const base = process.env["OPENAI_COMPATIBLE_BASE_URL"]?.trim();
     if (!base) throw new ProviderError("No OpenAI-compatible endpoint is configured.", 503, false);
-    const key = process.env["OPENAI_COMPATIBLE_API_KEY"];
+    const key = process.env["OPENAI_COMPATIBLE_API_KEY"]?.trim();
     return {
       url: `${base.replace(/\/+$/, "")}/chat/completions`,
       headers: {
