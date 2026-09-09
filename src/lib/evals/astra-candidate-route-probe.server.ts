@@ -23,7 +23,7 @@ function normalizeCompatibleBaseUrl(value: string): string {
 }
 
 function authHeaders(): HeadersInit {
-  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY?.trim()
+  const apiKey = process.env['OPENAI_COMPATIBLE_API_KEY']?.trim()
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
 }
 
@@ -35,7 +35,7 @@ function withTimeout(signal: AbortSignal) {
 }
 
 export async function probeAstraCandidateRouteAfterGenericError(): Promise<AstraCandidateRouteProbeResult> {
-  const raw = process.env.OPENAI_COMPATIBLE_BASE_URL?.trim()
+  const raw = process.env['OPENAI_COMPATIBLE_BASE_URL']?.trim()
   if (!raw) return { stage: 'candidate_route_not_configured' as AstraTextCertificationStage }
   const base = normalizeCompatibleBaseUrl(raw)
   try {
