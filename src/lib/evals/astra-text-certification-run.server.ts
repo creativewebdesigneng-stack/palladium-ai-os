@@ -132,9 +132,14 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
       if (
         stage === 'candidate_runtime_error_object'
         || stage === 'candidate_model_or_chat_route_not_found'
+        || stage === 'candidate_timeout_or_unreachable'
       ) {
+        const originalStage = stage
         const probe = await probeAstraCandidateRouteAfterGenericError()
-        stage = probe.stage
+        stage = originalStage === 'candidate_timeout_or_unreachable'
+          && probe.stage === 'candidate_route_reachable_runtime_failure'
+          ? 'candidate_generation_timeout'
+          : probe.stage
         if (stage === 'candidate_model_not_found') {
           candidateModelDiagnostic = {
             ...(probe.expectedModel ? { expectedModel: probe.expectedModel } : {}),

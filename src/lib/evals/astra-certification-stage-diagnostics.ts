@@ -2,6 +2,7 @@ export type AstraTextCertificationStage =
   | 'run_persistence'
   | 'candidate_execution'
   | 'candidate_timeout_or_unreachable'
+  | 'candidate_generation_timeout'
   | 'candidate_connection_refused'
   | 'candidate_connection_reset'
   | 'candidate_network_unreachable'
@@ -43,9 +44,6 @@ function classifyKnownRuntimeMessage(message: unknown): AstraTextCertificationSt
   const normalized = message.trim().toLowerCase()
   if (!normalized) return null
 
-  // Some hosting runtimes strip status/code/cause from fetch failures and leave
-  // only a generic Error message. Match only known infrastructure phrases and
-  // never return or persist the original message text.
   if (normalized === 'fetch failed' || normalized === 'network request failed') {
     return 'candidate_network_unreachable'
   }
@@ -138,6 +136,7 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'run_persistence':
     case 'candidate_execution':
     case 'candidate_timeout_or_unreachable':
+    case 'candidate_generation_timeout':
     case 'candidate_connection_refused':
     case 'candidate_connection_reset':
     case 'candidate_network_unreachable':
@@ -181,6 +180,8 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'candidate_execution_failed', message: 'The native Astra candidate runtime failed while executing this trusted case.' } as const
     case 'candidate_timeout_or_unreachable':
       return { code: 'candidate_timeout_or_unreachable', message: 'The native Astra endpoint did not complete the trusted case within the pinned transport window. The local Qwen bridge may be unreachable or the model may be taking longer than the certification timeout.' } as const
+    case 'candidate_generation_timeout':
+      return { code: 'candidate_generation_timeout', message: 'The native Astra route and bounded chat probe are healthy, but Qwen did not complete the full trusted case within the pinned 60-second certification window.' } as const
     case 'candidate_connection_refused':
       return { code: 'candidate_connection_refused', message: 'Blackstar reached the native Astra route, but the candidate connection was refused. The local Qwen bridge or Ollama listener is not accepting connections on the expected route.' } as const
     case 'candidate_connection_reset':
