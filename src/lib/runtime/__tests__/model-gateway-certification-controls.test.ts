@@ -26,6 +26,11 @@ describe('model gateway certification controls', () => {
       max_tokens: 512,
       reasoning_effort: 'low',
     })
+    expect(chatBody({ ...base, model: 'qwen3:8b-q4_K_M', reasoningEffort: 'none' }, false)).toMatchObject({
+      model: 'qwen3:8b-q4_K_M',
+      max_tokens: 512,
+      reasoning_effort: 'none',
+    })
     expect(chatBody(base, false)).not.toHaveProperty('reasoning_effort')
   })
 
