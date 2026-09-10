@@ -1,6 +1,8 @@
 param(
   [int]$ProxyPort = 12780,
   [string]$Model = "qwen3:8b-q4_K_M",
+  [string]$UpstreamBaseUrl = "http://127.0.0.1:11434",
+  [string]$UpstreamApiKeyEnvName = "",
   [int]$UpstreamTimeoutSeconds = 60,
   [int]$MaxConcurrentRequests = 4
 )
@@ -88,30 +90,52 @@ function Read-SafeProxyStartupDetail([string]$Token) {
   return $detail
 }
 
+if (-not [Uri]::IsWellFormedUriString($UpstreamBaseUrl, [UriKind]::Absolute)) {
+  throw "UpstreamBaseUrl must be an absolute HTTP or HTTPS URL."
+}
+$upstreamUri = [Uri]$UpstreamBaseUrl
+if ($upstreamUri.Scheme -ne "http" -and $upstreamUri.Scheme -ne "https") {
+  throw "UpstreamBaseUrl must use HTTP or HTTPS."
+}
+
+$upstreamApiKey = $null
+if ($UpstreamApiKeyEnvName) {
+  $upstreamApiKey = [Environment]::GetEnvironmentVariable($UpstreamApiKeyEnvName, "Process")
+  if (-not $upstreamApiKey) {
+    throw "$UpstreamApiKeyEnvName is not set in this PowerShell process."
+  }
+}
+$upstreamHeaders = @{}
+if ($upstreamApiKey) { $upstreamHeaders.Authorization = "Bearer $upstreamApiKey" }
+
 Write-Host "Blackstar domainless cloud bridge (Tailscale Funnel)"
 Write-Host "Model: $Model"
+Write-Host "Upstream: $UpstreamBaseUrl"
+Write-Host "Upstream authentication: $(if ($upstreamApiKey) { 'configured' } else { 'none' })"
 
 try {
-  $models = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:11434/v1/models" -TimeoutSec 10
+  $models = Invoke-RestMethod -Method Get -Uri "$($UpstreamBaseUrl.TrimEnd('/'))/v1/models" -Headers $upstreamHeaders -TimeoutSec 10
 } catch {
-  throw "Ollama is not reachable on 127.0.0.1:11434. Start Ollama first."
+  throw "The configured local model server is not reachable or rejected authentication at $UpstreamBaseUrl."
 }
 if (@($models.data | ForEach-Object { $_.id }) -notcontains $Model) {
-  throw "Ollama is running, but $Model was not returned by /v1/models."
+  throw "The local model server is running, but $Model was not returned by /v1/models."
 }
 
+$isQwen3 = $Model -match '(^|[\/:._-])qwen3([\/:._-]|$)'
+$warmupPrompt = if ($isQwen3) { "Reply with OK. /no_think" } else { "Reply with OK." }
 Write-Host "Warming exact native model before publishing the bridge..."
 $warmupBody = @{
   model = $Model
-  messages = @(@{ role = "user"; content = "Reply with OK. /no_think" })
+  messages = @(@{ role = "user"; content = $warmupPrompt })
   temperature = 0
   stream = $false
   max_tokens = 1
 } | ConvertTo-Json -Depth 6
 try {
-  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/v1/chat/completions" -ContentType "application/json" -Body $warmupBody -TimeoutSec 180 | Out-Null
+  Invoke-RestMethod -Method Post -Uri "$($UpstreamBaseUrl.TrimEnd('/'))/v1/chat/completions" -Headers $upstreamHeaders -ContentType "application/json" -Body $warmupBody -TimeoutSec 180 | Out-Null
 } catch {
-  throw "Ollama model warmup failed for the exact native model. Fix local inference before publishing the certification bridge."
+  throw "Local model warmup failed for the exact native model. Fix local inference before publishing the certification bridge."
 }
 
 $tailscale = Resolve-TailscalePath
@@ -150,6 +174,7 @@ $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 try { $rng.GetBytes($random) } finally { if ($rng) { $rng.Dispose() } }
 $token = [Convert]::ToBase64String($random).TrimEnd('=').Replace('+','-').Replace('/','_')
 $env:BLACKSTAR_BRIDGE_TOKEN = $token
+if ($upstreamApiKey) { $env:BLACKSTAR_UPSTREAM_API_KEY = $upstreamApiKey } else { Remove-Item Env:BLACKSTAR_UPSTREAM_API_KEY -ErrorAction SilentlyContinue }
 Save-BridgeToken -Token $token
 
 $proxy = $null
@@ -160,6 +185,7 @@ try {
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $proxyScript + '"'),
     "-Port", $ProxyPort,
+    "-UpstreamBaseUrl", ('"' + $UpstreamBaseUrl + '"'),
     "-UpstreamTimeoutSeconds", $UpstreamTimeoutSeconds,
     "-MaxConcurrentRequests", $MaxConcurrentRequests
   ) -WindowStyle Hidden -RedirectStandardOutput $proxyStdoutPath -RedirectStandardError $proxyStderrPath -PassThru
@@ -216,8 +242,11 @@ try {
     proxy_pid = $proxy.Id
     proxy_port = $ProxyPort
     public_base_url = $publicBase
+    upstream_base_url = $UpstreamBaseUrl
+    upstream_auth_configured = [bool]$upstreamApiKey
     upstream_timeout_seconds = $UpstreamTimeoutSeconds
     max_concurrent_requests = $MaxConcurrentRequests
+    model = $Model
     token_secret_path = $tokenSecretPath
     proxy_stdout_path = $proxyStdoutPath
     proxy_stderr_path = $proxyStderrPath
@@ -244,9 +273,10 @@ try {
     Write-Host "OPENAI_COMPATIBLE_API_KEY=<stored encrypted; use copy-blackstar-bridge-token.ps1>"
   }
   Write-Host "BLACKSTAR_NATIVE_MODEL=$Model"
+  Write-Host "BLACKSTAR_ASTRA_MODEL=$Model"
   Write-Host "BLACKSTAR_NATIVE_PRIMARY=true"
   Write-Host ""
-  Write-Warning "Funnel is internet-accessible. The bearer token is intentionally never printed. Ollama itself remains localhost-only; only the restricted bearer proxy is published."
+  Write-Warning "Funnel is internet-accessible. Secrets are intentionally never printed. The inference server itself remains localhost-only; only the restricted bearer proxy is published."
 } finally {
   if (-not $bridgeReady -and $proxy -and -not $proxy.HasExited) {
     Stop-Process -Id $proxy.Id -Force -ErrorAction SilentlyContinue
