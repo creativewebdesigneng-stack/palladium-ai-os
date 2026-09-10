@@ -11,7 +11,7 @@ import { isServerApprovedAstraCertificationJudge } from './astra-certification-j
 import { matchesPinnedFreeLlmRoute, runFreeLlmJudge, resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence } from './astra-evaluation-verifier.server'
 import { attestAstraCertificationBenchmarkRun } from './astra-certification-benchmark.server'
-import { astraCertificationStageError, candidateFailureStage, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
+import { astraCertificationStageError, candidateFailureStage, evaluatorFailureStage, type AstraTextCertificationStage } from './astra-certification-stage-diagnostics'
 import { probeAstraCandidateRouteAfterGenericError } from './astra-candidate-route-probe.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
@@ -174,22 +174,28 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     if (responseError || !response?.id) throw astraCertificationStageError(stage)
 
     stage = 'evaluator_request'
-    const judgeResult = await runFreeLlmJudge({
-      model: evaluator.model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an impartial certification evaluator. Score the single candidate from 0 to 100 against the supplied criteria. Do not reward verbosity. Return ONLY a JSON array with one object containing index, score, verdict and reasoning.',
-        },
-        {
-          role: 'user',
-          content: `TRUSTED BENCHMARK PROMPT\n${benchmarkCase.prompt}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE\nRESPONSE 0\n${candidate.text}`,
-        },
-      ],
-      temperature: 0,
-      maxTokens: 1000,
-      timeoutMs: 90_000,
-    })
+    let judgeResult
+    try {
+      judgeResult = await runFreeLlmJudge({
+        model: evaluator.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an impartial certification evaluator. Score the single candidate from 0 to 100 against the supplied criteria. Do not reward verbosity. Return ONLY a JSON array with one object containing index, score, verdict and reasoning.',
+          },
+          {
+            role: 'user',
+            content: `TRUSTED BENCHMARK PROMPT\n${benchmarkCase.prompt}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE\nRESPONSE 0\n${candidate.text}`,
+          },
+        ],
+        temperature: 0,
+        maxTokens: 1000,
+        timeoutMs: 90_000,
+      })
+    } catch (error) {
+      stage = evaluatorFailureStage(error)
+      throw astraCertificationStageError(stage)
+    }
 
     stage = 'evaluator_identity'
     if (judgeResult.provider !== 'freellm' || judgeResult.model !== evaluator.model) {
