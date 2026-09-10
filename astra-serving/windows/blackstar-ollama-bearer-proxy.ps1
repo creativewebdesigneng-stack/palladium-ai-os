@@ -1,6 +1,7 @@
 param(
   [int]$Port = 12780,
-  [string]$OllamaBaseUrl = "http://127.0.0.1:11434",
+  [Alias("OllamaBaseUrl")]
+  [string]$UpstreamBaseUrl = "http://127.0.0.1:11434",
   [int]$UpstreamTimeoutSeconds = 60,
   [int]$MaxConcurrentRequests = 4
 )
@@ -10,12 +11,23 @@ $token = $env:BLACKSTAR_BRIDGE_TOKEN
 if (-not $token -or $token.Length -lt 32) {
   throw "BLACKSTAR_BRIDGE_TOKEN must be set to a random secret of at least 32 characters."
 }
+if (-not $UpstreamBaseUrl -or -not [Uri]::IsWellFormedUriString($UpstreamBaseUrl, [UriKind]::Absolute)) {
+  throw "UpstreamBaseUrl must be an absolute HTTP or HTTPS URL."
+}
+$upstreamUri = [Uri]$UpstreamBaseUrl
+if ($upstreamUri.Scheme -ne "http" -and $upstreamUri.Scheme -ne "https") {
+  throw "UpstreamBaseUrl must use HTTP or HTTPS."
+}
 if ($UpstreamTimeoutSeconds -lt 1) {
   throw "UpstreamTimeoutSeconds must be at least 1."
 }
 if ($MaxConcurrentRequests -lt 1 -or $MaxConcurrentRequests -gt 16) {
   throw "MaxConcurrentRequests must be between 1 and 16."
 }
+
+# Optional, server-side-only credential for a secured local upstream such as
+# llama-server --api-key. The outer Funnel bearer remains BLACKSTAR_BRIDGE_TOKEN.
+$upstreamApiKey = $env:BLACKSTAR_UPSTREAM_API_KEY
 
 Add-Type -AssemblyName System.Net.Http
 
@@ -30,12 +42,12 @@ using System.Threading.Tasks;
 
 public static class BlackstarBearerProxy
 {
-    public static void Run(string token, int port, string ollamaBaseUrl, int upstreamTimeoutSeconds, int maxConcurrentRequests)
+    public static void Run(string token, int port, string upstreamBaseUrl, string upstreamApiKey, int upstreamTimeoutSeconds, int maxConcurrentRequests)
     {
-        RunAsync(token, port, ollamaBaseUrl, upstreamTimeoutSeconds, maxConcurrentRequests).GetAwaiter().GetResult();
+        RunAsync(token, port, upstreamBaseUrl, upstreamApiKey, upstreamTimeoutSeconds, maxConcurrentRequests).GetAwaiter().GetResult();
     }
 
-    private static async Task RunAsync(string token, int port, string ollamaBaseUrl, int upstreamTimeoutSeconds, int maxConcurrentRequests)
+    private static async Task RunAsync(string token, int port, string upstreamBaseUrl, string upstreamApiKey, int upstreamTimeoutSeconds, int maxConcurrentRequests)
     {
         var listener = new HttpListener();
         listener.Prefixes.Add("http://127.0.0.1:" + port + "/");
@@ -48,14 +60,15 @@ public static class BlackstarBearerProxy
 
         Console.WriteLine("Blackstar bearer proxy listening on 127.0.0.1:" + port);
         Console.WriteLine("Concurrent request limit: " + maxConcurrentRequests);
-        Console.WriteLine("Ollama upstream timeout: " + upstreamTimeoutSeconds + "s");
+        Console.WriteLine("Upstream timeout: " + upstreamTimeoutSeconds + "s");
+        Console.WriteLine("Upstream authentication: " + (String.IsNullOrWhiteSpace(upstreamApiKey) ? "none" : "configured"));
 
         try
         {
             while (listener.IsListening)
             {
                 var context = await listener.GetContextAsync().ConfigureAwait(false);
-                ProcessContextAsync(context, client, gate, token, ollamaBaseUrl.TrimEnd('/'), upstreamTimeoutSeconds);
+                ProcessContextAsync(context, client, gate, token, upstreamBaseUrl.TrimEnd('/'), upstreamApiKey, upstreamTimeoutSeconds);
             }
         }
         finally
@@ -68,12 +81,12 @@ public static class BlackstarBearerProxy
         }
     }
 
-    private static async void ProcessContextAsync(HttpListenerContext context, HttpClient client, SemaphoreSlim gate, string token, string ollamaBaseUrl, int upstreamTimeoutSeconds)
+    private static async void ProcessContextAsync(HttpListenerContext context, HttpClient client, SemaphoreSlim gate, string token, string upstreamBaseUrl, string upstreamApiKey, int upstreamTimeoutSeconds)
     {
         await gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await HandleAsync(context, client, token, ollamaBaseUrl, upstreamTimeoutSeconds).ConfigureAwait(false);
+            await HandleAsync(context, client, token, upstreamBaseUrl, upstreamApiKey, upstreamTimeoutSeconds).ConfigureAwait(false);
         }
         catch
         {
@@ -85,7 +98,7 @@ public static class BlackstarBearerProxy
         }
     }
 
-    private static async Task HandleAsync(HttpListenerContext context, HttpClient client, string token, string ollamaBaseUrl, int upstreamTimeoutSeconds)
+    private static async Task HandleAsync(HttpListenerContext context, HttpClient client, string token, string upstreamBaseUrl, string upstreamApiKey, int upstreamTimeoutSeconds)
     {
         var response = context.Response;
         HttpRequestMessage message = null;
@@ -111,8 +124,12 @@ public static class BlackstarBearerProxy
                 return;
             }
 
-            var target = ollamaBaseUrl + request.Url.PathAndQuery;
+            var target = upstreamBaseUrl + request.Url.PathAndQuery;
             message = new HttpRequestMessage(new HttpMethod(request.HttpMethod), target);
+            if (!String.IsNullOrWhiteSpace(upstreamApiKey))
+            {
+                message.Headers.TryAddWithoutValidation("Authorization", "Bearer " + upstreamApiKey);
+            }
 
             if (request.HasEntityBody)
             {
@@ -218,4 +235,4 @@ public static class BlackstarBearerProxy
 '@
 
 Add-Type -TypeDefinition $source -Language CSharp -ReferencedAssemblies System.Net.Http
-[BlackstarBearerProxy]::Run($token, $Port, $OllamaBaseUrl, $UpstreamTimeoutSeconds, $MaxConcurrentRequests)
+[BlackstarBearerProxy]::Run($token, $Port, $UpstreamBaseUrl, $upstreamApiKey, $UpstreamTimeoutSeconds, $MaxConcurrentRequests)
