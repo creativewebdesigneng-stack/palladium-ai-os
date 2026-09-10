@@ -22,8 +22,23 @@ describe('Astra certification execution profile', () => {
     expect(buildAstraCertificationExecutionPrompt('Canonical benchmark', profile)).toBe('Canonical benchmark\n\n/no_think')
   })
 
-  it('keeps vision and non-Qwen models on the exact pinned default profile', () => {
-    const vision = resolveAstraCertificationExecutionProfile('vision', 'qwen3-vl')
+  it('uses the bounded provider-reasoning profile for text GPT-OSS 20B candidates', () => {
+    for (const model of ['gpt-oss-20b', 'ggml-org/gpt-oss-20b-GGUF']) {
+      const profile = resolveAstraCertificationExecutionProfile('reasoning', model)
+      expect(profile).toEqual({
+        id: 'blackstar-astra-native-gptoss20b-bounded-v1',
+        maxTokens: 512,
+        timeoutMs: 60_000,
+        reasoningMode: 'provider_default',
+        promptSuffix: null,
+        fallback: false,
+      })
+      expect(buildAstraCertificationExecutionPrompt('Canonical benchmark', profile)).toBe('Canonical benchmark')
+    }
+  })
+
+  it('keeps vision and other models on the exact pinned default profile', () => {
+    const vision = resolveAstraCertificationExecutionProfile('vision', 'gpt-oss-20b')
     const other = resolveAstraCertificationExecutionProfile('coding', 'other-compatible-model')
     for (const profile of [vision, other]) {
       expect(profile.maxTokens).toBe(1600)
