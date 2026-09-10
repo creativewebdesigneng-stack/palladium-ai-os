@@ -9,7 +9,8 @@ const docs = readFileSync(resolve(root, 'astra-serving/windows/TAILSCALE_FUNNEL.
 
 describe('Blackstar Tailscale Funnel bridge', () => {
   it('keeps Ollama on localhost and publishes only the bearer proxy', () => {
-    expect(setup).toContain('http://127.0.0.1:11434/v1/models')
+    expect(setup).toContain('[string]$UpstreamBaseUrl = "http://127.0.0.1:11434"')
+    expect(setup).toContain("$($UpstreamBaseUrl.TrimEnd('/'))/v1/models")
     expect(setup).toContain('blackstar-ollama-bearer-proxy.ps1')
     expect(setup).toContain('tailscale funnel')
     expect(setup).not.toMatch(/0\.0\.0\.0:11434/)
