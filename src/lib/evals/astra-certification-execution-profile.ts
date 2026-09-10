@@ -52,7 +52,7 @@ function isQwen3Model(model: string): boolean {
 }
 
 function isGptOss20bModel(model: string): boolean {
-  return /(?:^|[\/:._-])gpt-oss-20b(?:[\/:._-]|$)/i.test(model.trim())
+  return /(?:^|[\/:._-])gpt[-_.]?oss[:._-]?20b(?:[\/:._-]|$)/i.test(model.trim())
 }
 
 export function resolveAstraCertificationExecutionProfile(
