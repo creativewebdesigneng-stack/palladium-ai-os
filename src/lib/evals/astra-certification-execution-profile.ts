@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 
-export const ASTRA_CERTIFICATION_PROVENANCE_VERSION = 4 as const
+export const ASTRA_CERTIFICATION_PROVENANCE_VERSION = 5 as const
 
 export type AstraCertificationExecutionProfile = {
   id: string
   maxTokens: number
   timeoutMs: number
-  reasoningMode: 'provider_default' | 'disabled'
+  reasoningMode: 'provider_default' | 'disabled' | 'low'
   promptSuffix: string | null
   fallback: false
 }
@@ -31,10 +31,10 @@ const BOUNDED_QWEN3_PROFILE: AstraCertificationExecutionProfile = {
 }
 
 const BOUNDED_GPT_OSS_20B_PROFILE: AstraCertificationExecutionProfile = {
-  id: 'blackstar-astra-native-gptoss20b-bounded-v1',
+  id: 'blackstar-astra-native-gptoss20b-bounded-v2',
   maxTokens: 512,
   timeoutMs: 60_000,
-  reasoningMode: 'provider_default',
+  reasoningMode: 'low',
   promptSuffix: null,
   fallback: false,
 }
