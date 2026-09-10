@@ -30,8 +30,21 @@ const BOUNDED_QWEN3_PROFILE: AstraCertificationExecutionProfile = {
   fallback: false,
 }
 
+const BOUNDED_GPT_OSS_20B_PROFILE: AstraCertificationExecutionProfile = {
+  id: 'blackstar-astra-native-gptoss20b-bounded-v1',
+  maxTokens: 512,
+  timeoutMs: 60_000,
+  reasoningMode: 'provider_default',
+  promptSuffix: null,
+  fallback: false,
+}
+
 function isQwen3Model(model: string): boolean {
   return /(?:^|[\/:._-])qwen3(?:[\/:._-]|$)/i.test(model.trim())
+}
+
+function isGptOss20bModel(model: string): boolean {
+  return /(?:^|[\/:._-])gpt-oss-20b(?:[\/:._-]|$)/i.test(model.trim())
 }
 
 export function resolveAstraCertificationExecutionProfile(
@@ -39,6 +52,7 @@ export function resolveAstraCertificationExecutionProfile(
   model: string,
 ): AstraCertificationExecutionProfile {
   if (taskClass !== 'vision' && isQwen3Model(model)) return { ...BOUNDED_QWEN3_PROFILE }
+  if (taskClass !== 'vision' && isGptOss20bModel(model)) return { ...BOUNDED_GPT_OSS_20B_PROFILE }
   return { ...DEFAULT_PINNED_PROFILE }
 }
 
