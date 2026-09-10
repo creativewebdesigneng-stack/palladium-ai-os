@@ -100,7 +100,8 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
   for (const row of data ?? []) {
     const astra = metadataObject(metadataObject(row.metadata)?.['astra_activation'])
     const caseId = typeof astra?.['case_id'] === 'string' ? astra['case_id'] : null
-    const benchmarkCase = caseId ? getAstraCertificationBenchmarkCase(scope.taskClass, caseId) : null
+    if (!caseId) continue
+    const benchmarkCase = getAstraCertificationBenchmarkCase(scope.taskClass, caseId)
     if (!benchmarkCase) continue
 
     const expectedProfile = resolveAstraCertificationExecutionProfile(
