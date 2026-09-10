@@ -2,7 +2,7 @@
 
 Use this path when the Blackstar GPU host does not have its own domain. Tailscale Funnel gives the Windows device a stable HTTPS hostname under the tailnet's `ts.net` domain, so no separately purchased domain or DNS record is required.
 
-Blackstar still keeps Ollama on `127.0.0.1:11434`. Funnel publishes only the existing localhost bearer-auth proxy, whose public API is restricted to `GET /v1/models` and `POST /v1/chat/completions`.
+Blackstar keeps the local OpenAI-compatible inference server bound to localhost. Funnel publishes only the existing localhost bearer-auth proxy, whose public API is restricted to `GET /v1/models` and `POST /v1/chat/completions`.
 
 
 ### GPT-OSS Astra activation
@@ -20,7 +20,7 @@ The local inference server itself must already be serving GPT-OSS under the exac
 ## Prerequisites
 
 - Windows 10 or later.
-- The existing Blackstar Ollama bootstrap has already succeeded.
+- A localhost OpenAI-compatible inference server is already serving the exact Astra candidate model. For GPT-OSS activation, `GET /v1/models` must advertise `gpt-oss-20b`.
 - A Tailscale account. The first sign-in is interactive and cannot be safely automated by Blackstar.
 - Tailscale Funnel enabled for the tailnet. MagicDNS and HTTPS are required by Funnel.
 
@@ -42,6 +42,7 @@ When Windows clipboard support is available, the new bearer token is copied dire
 OPENAI_COMPATIBLE_BASE_URL=https://<device>.<tailnet>.ts.net/v1
 OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>
 BLACKSTAR_NATIVE_MODEL=gpt-oss-20b
+BLACKSTAR_ASTRA_MODEL=gpt-oss-20b
 BLACKSTAR_NATIVE_PRIMARY=true
 ```
 
