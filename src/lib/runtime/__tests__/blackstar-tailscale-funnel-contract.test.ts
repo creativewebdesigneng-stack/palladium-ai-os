@@ -9,9 +9,9 @@ const docs = readFileSync(resolve(root, 'astra-serving/windows/TAILSCALE_FUNNEL.
 
 describe('Blackstar Tailscale Funnel bridge', () => {
   it('defaults Astra bridge activation to the exact GPT-OSS model identity', () => {
-    expect(setup).toContain('[string]$Model = "gpt-oss-20b"')
+    expect(setup).toContain('[string]$Model = "gpt-oss:20b"')
     expect(setup).toContain('if (@($models.data | ForEach-Object { $_.id }) -notcontains $Model)')
-    expect(docs).toContain('BLACKSTAR_NATIVE_MODEL=gpt-oss-20b')
+    expect(docs).toContain('BLACKSTAR_NATIVE_MODEL=gpt-oss:20b')
   })
 
   it('keeps the local model server on localhost and publishes only the bearer proxy', () => {
