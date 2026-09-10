@@ -25,6 +25,11 @@ export type AstraTextCertificationStage =
   | 'candidate_identity'
   | 'response_persistence'
   | 'evaluator_request'
+  | 'evaluator_credentials_rejected'
+  | 'evaluator_rate_limited'
+  | 'evaluator_timeout'
+  | 'evaluator_upstream_unavailable'
+  | 'evaluator_invalid_response'
   | 'evaluator_identity'
   | 'evaluator_route'
   | 'judge_response'
@@ -128,6 +133,20 @@ export function candidateFailureStage(error: unknown): AstraTextCertificationSta
   return unknownCandidateFailureStage(error)
 }
 
+export function evaluatorFailureStage(error: unknown): AstraTextCertificationStage {
+  if (!error || typeof error !== 'object') return 'evaluator_request'
+  const value = error as { status?: unknown; name?: unknown; message?: unknown }
+  const status = typeof value.status === 'number' && Number.isFinite(value.status) ? value.status : null
+  if (status === 401 || status === 403) return 'evaluator_credentials_rejected'
+  if (status === 429) return 'evaluator_rate_limited'
+  if (status === 408 || status === 504) return 'evaluator_timeout'
+  if (status === 502 || status === 503 || (status !== null && status >= 500)) return 'evaluator_upstream_unavailable'
+  const message = typeof value.message === 'string' ? value.message.toLowerCase() : ''
+  if (message.includes('invalid json') || message.includes('empty evaluator response')) return 'evaluator_invalid_response'
+  if (message.includes('timed out') || message.includes('timeout')) return 'evaluator_timeout'
+  return 'evaluator_request'
+}
+
 export function readAstraCertificationFailureStage(error: unknown): AstraTextCertificationStage | null {
   const message = error instanceof Error ? error.message : ''
   if (!message.startsWith(STAGE_PREFIX)) return null
@@ -159,6 +178,11 @@ export function readAstraCertificationFailureStage(error: unknown): AstraTextCer
     case 'candidate_identity':
     case 'response_persistence':
     case 'evaluator_request':
+    case 'evaluator_credentials_rejected':
+    case 'evaluator_rate_limited':
+    case 'evaluator_timeout':
+    case 'evaluator_upstream_unavailable':
+    case 'evaluator_invalid_response':
     case 'evaluator_identity':
     case 'evaluator_route':
     case 'judge_response':
@@ -226,6 +250,16 @@ export function safeAstraCertificationStageFailure(stage: AstraTextCertification
       return { code: 'response_persistence_failed', message: 'Blackstar could not persist the Astra candidate response for certification.' } as const
     case 'evaluator_request':
       return { code: 'evaluator_request_failed', message: 'The independent evaluator failed while scoring this certification case.' } as const
+    case 'evaluator_credentials_rejected':
+      return { code: 'evaluator_credentials_rejected', message: 'The independent evaluator rejected the configured server credential.' } as const
+    case 'evaluator_rate_limited':
+      return { code: 'evaluator_rate_limited', message: 'The independent evaluator rate limited this certification request.' } as const
+    case 'evaluator_timeout':
+      return { code: 'evaluator_timeout', message: 'The independent evaluator did not complete scoring within the trusted timeout window.' } as const
+    case 'evaluator_upstream_unavailable':
+      return { code: 'evaluator_upstream_unavailable', message: 'The independent evaluator route was reachable from Blackstar but its upstream scoring service was unavailable.' } as const
+    case 'evaluator_invalid_response':
+      return { code: 'evaluator_invalid_response', message: 'The independent evaluator responded, but did not return a usable scoring response.' } as const
     case 'evaluator_identity':
       return { code: 'evaluator_identity_mismatch', message: 'The independent evaluator changed its configured identity during certification.' } as const
     case 'evaluator_route':
