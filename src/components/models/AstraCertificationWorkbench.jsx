@@ -16,6 +16,8 @@ import { certifyAstraTaskClass, getAstraCertificationStatus } from '@/lib/evals/
 const TASK_CLASSES = ['general', 'reasoning', 'coding', 'tool_use', 'agentic', 'vision'];
 const VISION_PROVIDERS = ['groq', 'openai', 'lovable', 'gemini'];
 const DEFAULT_JUDGE = ASTRA_CERTIFICATION_JUDGES[0];
+const FAST_QUALIFICATION_CASES = 3;
+const FAST_QUALIFICATION_SCORE = 80;
 
 export default function AstraCertificationWorkbench() {
   const { session } = useWorkspace();
@@ -25,6 +27,7 @@ export default function AstraCertificationWorkbench() {
   const [judge, setJudge] = useState(() => ({ provider: DEFAULT_JUDGE.provider, model: DEFAULT_JUDGE.model }));
   const [activeCaseId, setActiveCaseId] = useState(null);
   const [autoRunProgress, setAutoRunProgress] = useState(null);
+  const [fastQualificationResult, setFastQualificationResult] = useState(null);
   const autoRunStopRequested = useRef(false);
 
   const benchmarkFn = useServerFn(getAstraCertificationBenchmark);
@@ -116,6 +119,108 @@ export default function AstraCertificationWorkbench() {
     },
   });
 
+  const fastQualifyAndCertify = useMutation({
+    mutationFn: async () => {
+      if (taskClass === 'vision') {
+        throw new Error('Fast qualification is currently available for trusted text certification classes.');
+      }
+
+      const remainingCases = (benchmark.data?.cases ?? []).filter((benchmarkCase) => !benchmarkCase.completed);
+      if (!remainingCases.length) {
+        const finalStatus = await statusFn({ data: { taskClass } });
+        if (!finalStatus.readyToCertify) throw new Error('No remaining trusted cases are available, but certification is not ready.');
+        const evidence = await certifyFn({ data: { taskClass } });
+        return { preflightAverage: null, preflightCases: 0, completed: 0, total: 0, evidence };
+      }
+
+      autoRunStopRequested.current = false;
+      setFastQualificationResult(null);
+      const preflightCases = remainingCases.slice(0, FAST_QUALIFICATION_CASES);
+      const scores = [];
+      let completedCount = 0;
+      setAutoRunProgress({ completed: 0, total: remainingCases.length, phase: 'preflight' });
+
+      for (const benchmarkCase of preflightCases) {
+        if (autoRunStopRequested.current) {
+          return { preflightAverage: null, preflightCases: scores.length, completed: completedCount, total: remainingCases.length, stopped: true };
+        }
+        setActiveCaseId(benchmarkCase.caseId);
+        const outcome = await executeTrustedCase(benchmarkCase);
+        if (outcome?.failure) {
+          const error = new Error(outcome.failure.message || 'Trusted certification case failed.');
+          error.cause = outcome.failure;
+          throw error;
+        }
+        const score = Number(outcome?.attested?.score);
+        if (!Number.isFinite(score)) throw new Error('Trusted evaluator did not return a numeric preflight score.');
+        scores.push(score);
+        completedCount += 1;
+        setAutoRunProgress({ completed: completedCount, total: remainingCases.length, phase: 'preflight' });
+        await refreshCertificationState();
+      }
+
+      const preflightAverage = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      setFastQualificationResult({ average: preflightAverage, cases: scores.length, passed: preflightAverage >= FAST_QUALIFICATION_SCORE });
+
+      if (preflightAverage < FAST_QUALIFICATION_SCORE) {
+        return {
+          preflightAverage,
+          preflightCases: scores.length,
+          completed: completedCount,
+          total: remainingCases.length,
+          qualified: false,
+          stopped: false,
+        };
+      }
+
+      const remainingAfterPreflight = remainingCases.slice(preflightCases.length);
+      setAutoRunProgress({ completed: completedCount, total: remainingCases.length, phase: 'full' });
+
+      for (const benchmarkCase of remainingAfterPreflight) {
+        if (autoRunStopRequested.current) {
+          return {
+            preflightAverage,
+            preflightCases: scores.length,
+            completed: completedCount,
+            total: remainingCases.length,
+            qualified: true,
+            stopped: true,
+          };
+        }
+        setActiveCaseId(benchmarkCase.caseId);
+        const outcome = await executeTrustedCase(benchmarkCase);
+        if (outcome?.failure) {
+          const error = new Error(outcome.failure.message || 'Trusted certification case failed.');
+          error.cause = outcome.failure;
+          throw error;
+        }
+        completedCount += 1;
+        setAutoRunProgress({ completed: completedCount, total: remainingCases.length, phase: 'full' });
+        await refreshCertificationState();
+      }
+
+      const finalStatus = await statusFn({ data: { taskClass } });
+      if (!finalStatus.readyToCertify) {
+        throw new Error('Full trusted suite finished but the verifier does not yet consider the current model profile certifiable.');
+      }
+      const evidence = await certifyFn({ data: { taskClass } });
+      return {
+        preflightAverage,
+        preflightCases: scores.length,
+        completed: completedCount,
+        total: remainingCases.length,
+        qualified: true,
+        stopped: false,
+        evidence,
+      };
+    },
+    onSettled: async () => {
+      setActiveCaseId(null);
+      await refreshCertificationState();
+      await queryClient.invalidateQueries({ queryKey: ['model-runtime-overview'] });
+    },
+  });
+
   const certify = useMutation({
     mutationFn: () => certifyFn({ data: { taskClass } }),
     onSuccess: async () => Promise.all([
@@ -163,21 +268,25 @@ export default function AstraCertificationWorkbench() {
 
       {supported && benchmark.data?.cases?.length > 0 && <>
         <div className="mt-4 grid max-h-72 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-4">
-          {benchmark.data.cases.map((benchmarkCase) => <button key={benchmarkCase.caseId} type="button" disabled={benchmarkCase.completed || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => runCase.mutate(benchmarkCase)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[.04] disabled:cursor-not-allowed disabled:opacity-45">
+          {benchmark.data.cases.map((benchmarkCase) => <button key={benchmarkCase.caseId} type="button" disabled={benchmarkCase.completed || !canRun || runCase.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => runCase.mutate(benchmarkCase)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[.04] disabled:cursor-not-allowed disabled:opacity-45">
             <div className="flex items-center gap-2">{benchmarkCase.completed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> : activeCaseId === benchmarkCase.caseId ? <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-300" /> : benchmarkCase.modality === 'vision' ? <Eye className="h-3.5 w-3.5 text-violet-300" /> : <FlaskConical className="h-3.5 w-3.5 text-cyan-300" />}<p className="min-w-0 flex-1 truncate text-[11px] font-medium text-white">{benchmarkCase.name}</p></div>
             <p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-zinc-500">{benchmarkCase.prompt}</p>
           </button>)}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={!nextCase || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => nextCase && runCase.mutate(nextCase)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.08] px-4 py-2.5 text-xs font-medium text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{runCase.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}{runCase.isPending ? 'Running and attesting…' : nextCase ? 'Run next trusted case' : 'All trusted cases complete'}</button>
-          {!autoRunCases.isPending ? <button type="button" disabled={!nextCase || !canRun || runCase.isPending} onClick={() => autoRunCases.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.07] px-4 py-2.5 text-xs font-medium text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" />Auto-run remaining trusted cases</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
-          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending || autoRunCases.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
+          <button type="button" disabled={!nextCase || !canRun || runCase.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => nextCase && runCase.mutate(nextCase)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.08] px-4 py-2.5 text-xs font-medium text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{runCase.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}{runCase.isPending ? 'Running and attesting…' : nextCase ? 'Run next trusted case' : 'All trusted cases complete'}</button>
+          {!fastQualifyAndCertify.isPending ? <button type="button" disabled={taskClass === 'vision' || !nextCase || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => fastQualifyAndCertify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/[.08] px-4 py-2.5 text-xs font-medium text-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />Fast qualify → full certify</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
+          {!autoRunCases.isPending ? <button type="button" disabled={!nextCase || !canRun || runCase.isPending || fastQualifyAndCertify.isPending} onClick={() => autoRunCases.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.07] px-4 py-2.5 text-xs font-medium text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" />Auto-run remaining trusted cases</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
+          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
           {status.data?.model && <span className="text-[10px] text-zinc-500">Astra identity: <code className="text-cyan-200">compatible/{status.data.model}</code></span>}
         </div>
       </>}
       {runCase.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(runCase.error)}</p>}
       {autoRunCases.error && <p className="mt-3 text-xs text-rose-300">Auto-run stopped: {friendlyMessage(autoRunCases.error)}</p>}
+      {fastQualifyAndCertify.error && <p className="mt-3 text-xs text-rose-300">Fast qualification stopped: {friendlyMessage(fastQualifyAndCertify.error)}</p>}
+      {fastQualificationResult && <p className={`mt-3 text-xs ${fastQualificationResult.passed ? 'text-emerald-300' : 'text-amber-300'}`}>Fast qualification: {fastQualificationResult.average.toFixed(1)}/100 across {fastQualificationResult.cases} cases — {fastQualificationResult.passed ? 'passed; continuing full trusted certification.' : 'below 80/100; full certification was skipped.'}</p>}
       {autoRunCases.data && !autoRunCases.isPending && autoRunCases.data.completed > 0 && <p className="mt-3 text-xs text-emerald-300">Auto-run completed {autoRunCases.data.completed}/{autoRunCases.data.total} trusted cases{autoRunCases.data.stopped ? ' before stopping.' : '.'}</p>}
+      {fastQualifyAndCertify.data?.evidence && <p className="mt-3 text-xs text-emerald-300">Fast path completed: verified evidence issued from {fastQualifyAndCertify.data.evidence.sampleCount} trusted cases with score {fastQualifyAndCertify.data.evidence.score == null ? 'pending' : fastQualifyAndCertify.data.evidence.score.toFixed(3)}.</p>}
       {runCase.data?.failure && <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200"><p>{runCase.data.failure.message}</p><p className="mt-1 text-[10px] text-rose-300/70">Diagnostic code: <code>{runCase.data.failure.code}</code></p></div>}
       {runCase.data?.runId && <p className="mt-3 text-xs text-emerald-300">Trusted case attested from run {runCase.data.runId}.</p>}
       {certify.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(certify.error)}</p>}
