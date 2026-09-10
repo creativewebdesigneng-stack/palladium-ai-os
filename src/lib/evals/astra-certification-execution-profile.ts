@@ -8,7 +8,7 @@ export type AstraCertificationExecutionProfile = {
   maxTokens: number
   timeoutMs: number
   reasoningMode: 'provider_default' | 'disabled' | 'low'
-  reasoningEffort: 'low' | null
+  reasoningEffort: 'none' | 'low' | null
   maxAttempts: 1 | 3
   promptSuffix: string | null
   fallback: false
@@ -26,11 +26,11 @@ const DEFAULT_PINNED_PROFILE: AstraCertificationExecutionProfile = {
 }
 
 const BOUNDED_QWEN3_PROFILE: AstraCertificationExecutionProfile = {
-  id: 'blackstar-astra-native-qwen3-bounded-v1',
+  id: 'blackstar-astra-native-qwen3-bounded-v2',
   maxTokens: 512,
   timeoutMs: 60_000,
   reasoningMode: 'disabled',
-  reasoningEffort: null,
+  reasoningEffort: 'none',
   maxAttempts: 1,
   promptSuffix: '/no_think',
   fallback: false,

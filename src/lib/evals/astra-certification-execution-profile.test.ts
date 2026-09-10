@@ -12,11 +12,11 @@ describe('Astra certification execution profile', () => {
     const profile = resolveAstraCertificationExecutionProfile('reasoning', 'qwen3:8b-q4_K_M')
     expect(ASTRA_CERTIFICATION_PROVENANCE_VERSION).toBe(5)
     expect(profile).toEqual({
-      id: 'blackstar-astra-native-qwen3-bounded-v1',
+      id: 'blackstar-astra-native-qwen3-bounded-v2',
       maxTokens: 512,
       timeoutMs: 60_000,
       reasoningMode: 'disabled',
-      reasoningEffort: null,
+      reasoningEffort: 'none',
       maxAttempts: 1,
       promptSuffix: '/no_think',
       fallback: false,
