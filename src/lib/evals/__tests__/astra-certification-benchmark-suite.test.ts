@@ -34,3 +34,17 @@ describe('Astra certification benchmark suite', () => {
     expect(getAstraCertificationBenchmarkCase('vision', cases[0]!.caseId)).toEqual(cases[0])
   })
 })
+
+
+describe('Astra certification current-profile gating contract', () => {
+  it('requires benchmark completion to track the current execution profile in the server plan', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const source = await readFile(
+      new URL('../astra-certification-benchmark.server.ts', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain("astra?.['model'] === expectedModel")
+    expect(source).toContain("sameAstraCertificationExecutionProfile(astra?.['execution_profile'], expectedProfile)")
+    expect(source).toContain("astra?.['execution_prompt_hash'] === expectedPromptHash")
+  })
+})
