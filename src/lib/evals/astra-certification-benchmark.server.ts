@@ -95,9 +95,35 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
   const { data, error } = await query
   if (error) throw new Error(error.message)
   const completedCaseIds = new Set<string>()
+  const expectedModel = blackstarAstraModelForTaskClass(scope.taskClass)
+  const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
   for (const row of data ?? []) {
     const astra = metadataObject(metadataObject(row.metadata)?.['astra_activation'])
-    if (astra?.['server_verified'] === true && astra?.['provenance_version'] === PROVENANCE_VERSION && astra?.['suite_id'] === suiteId && astra?.['system_prompt_hash'] === hashAstraEvaluationSystemPrompt(null) && typeof astra?.['case_id'] === 'string') completedCaseIds.add(astra['case_id'])
+    const caseId = typeof astra?.['case_id'] === 'string' ? astra['case_id'] : null
+    const benchmarkCase = caseId ? getAstraCertificationBenchmarkCase(scope.taskClass, caseId) : null
+    if (!benchmarkCase) continue
+
+    const expectedProfile = resolveAstraCertificationExecutionProfile(
+      scope.taskClass,
+      expectedModel,
+    )
+    const expectedPromptHash = hashAstraCertificationExecutionPrompt(
+      buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, expectedProfile),
+    )
+    if (
+      astra?.['server_verified'] === true
+      && astra?.['provenance_version'] === PROVENANCE_VERSION
+      && astra?.['suite_id'] === suiteId
+      && astra?.['task_class'] === scope.taskClass
+      && astra?.['provider'] === 'compatible'
+      && astra?.['model'] === expectedModel
+      && astra?.['engine_id'] === BLACKSTAR_ASTRA_ENGINE_PROFILE.id
+      && astra?.['system_prompt_hash'] === emptySystemPromptHash
+      && sameAstraCertificationExecutionProfile(astra?.['execution_profile'], expectedProfile)
+      && astra?.['execution_prompt_hash'] === expectedPromptHash
+    ) {
+      completedCaseIds.add(caseId)
+    }
   }
   return {
     taskClass: scope.taskClass, certificationSupported: true, suiteId, completedCases: completedCaseIds.size, totalCases: cases.length,
