@@ -1,1 +1,0 @@
-Astra GPT-OSS 20B certification runtime v2: signed low-reasoning, one-attempt, 60s/512-token, no-fallback execution contract.
