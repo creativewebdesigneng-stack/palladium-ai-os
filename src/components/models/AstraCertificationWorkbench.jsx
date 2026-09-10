@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { CheckCircle2, FlaskConical, Loader2, ShieldCheck, Eye } from 'lucide-react';
@@ -24,6 +24,8 @@ export default function AstraCertificationWorkbench() {
   const [reference, setReference] = useState({ provider: 'openai', model: 'gpt-5-mini' });
   const [judge, setJudge] = useState(() => ({ provider: DEFAULT_JUDGE.provider, model: DEFAULT_JUDGE.model }));
   const [activeCaseId, setActiveCaseId] = useState(null);
+  const [autoRunProgress, setAutoRunProgress] = useState(null);
+  const autoRunStopRequested = useRef(false);
 
   const benchmarkFn = useServerFn(getAstraCertificationBenchmark);
   const statusFn = useServerFn(getAstraCertificationStatus);
@@ -46,39 +48,72 @@ export default function AstraCertificationWorkbench() {
     setJudge({ provider: next.provider, model: next.model });
   }, [taskClass, judgeIsTrusted, trustedJudges]);
 
-  const runCase = useMutation({
-    mutationFn: async (benchmarkCase) => {
-      if (!status.data?.model) throw new Error('Astra serving identity is unavailable.');
+  const executeTrustedCase = async (benchmarkCase) => {
+    if (!status.data?.model) throw new Error('Astra serving identity is unavailable.');
 
-      if (taskClass !== 'vision') {
-        if (!freeLlmJudge) throw new Error('The authenticated FreeLLM evaluator is not configured for trusted text certification.');
-        const outcome = await runTextFn({ data: { taskClass, caseId: benchmarkCase.caseId } });
-        if (!outcome.ok) return { failure: outcome };
-        return { runId: outcome.runId, attested: outcome };
+    if (taskClass !== 'vision') {
+      if (!freeLlmJudge) throw new Error('The authenticated FreeLLM evaluator is not configured for trusted text certification.');
+      const outcome = await runTextFn({ data: { taskClass, caseId: benchmarkCase.caseId } });
+      if (!outcome.ok) return { failure: outcome };
+      return { runId: outcome.runId, attested: outcome };
+    }
+
+    if (!judgeIsTrusted) throw new Error('Choose a server-approved trusted judge before running certification.');
+    if (judgeMatchesCandidate(judge, [reference])) throw new Error('The trusted judge must be different from every candidate model.');
+
+    const run = await runVisionFn({
+      data: {
+        caseId: benchmarkCase.caseId,
+        reference: { provider: reference.provider, model: reference.model.trim() },
+        judge: { provider: judge.provider, model: judge.model.trim() },
+      },
+    });
+    const attested = await attestFn({ data: { taskClass, runId: run.runId, caseId: benchmarkCase.caseId } });
+    return { runId: run.runId, attested };
+  };
+
+  const refreshCertificationState = async () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['astra-certification-benchmark', taskClass] }),
+    queryClient.invalidateQueries({ queryKey: ['astra-certification-status', taskClass] }),
+    queryClient.invalidateQueries({ queryKey: ['model-arena-runs'] }),
+  ]);
+
+  const runCase = useMutation({
+    mutationFn: executeTrustedCase,
+    onMutate: (benchmarkCase) => setActiveCaseId(benchmarkCase.caseId),
+    onSuccess: refreshCertificationState,
+    onSettled: () => setActiveCaseId(null),
+  });
+
+  const autoRunCases = useMutation({
+    mutationFn: async () => {
+      const remainingCases = (benchmark.data?.cases ?? []).filter((benchmarkCase) => !benchmarkCase.completed);
+      if (!remainingCases.length) return { completed: 0, total: 0, stopped: false };
+
+      autoRunStopRequested.current = false;
+      let completedCount = 0;
+      setAutoRunProgress({ completed: 0, total: remainingCases.length });
+
+      for (const benchmarkCase of remainingCases) {
+        if (autoRunStopRequested.current) break;
+        setActiveCaseId(benchmarkCase.caseId);
+        const outcome = await executeTrustedCase(benchmarkCase);
+        if (outcome?.failure) {
+          const error = new Error(outcome.failure.message || 'Trusted certification case failed.');
+          error.cause = outcome.failure;
+          throw error;
+        }
+        completedCount += 1;
+        setAutoRunProgress({ completed: completedCount, total: remainingCases.length });
+        await refreshCertificationState();
       }
 
-      if (!judgeIsTrusted) throw new Error('Choose a server-approved trusted judge before running certification.');
-      if (judgeMatchesCandidate(judge, [reference])) throw new Error('The trusted judge must be different from every candidate model.');
-
-      const run = await runVisionFn({
-        data: {
-          caseId: benchmarkCase.caseId,
-          reference: { provider: reference.provider, model: reference.model.trim() },
-          judge: { provider: judge.provider, model: judge.model.trim() },
-        },
-      });
-      const attested = await attestFn({ data: { taskClass, runId: run.runId, caseId: benchmarkCase.caseId } });
-      return { runId: run.runId, attested };
+      return { completed: completedCount, total: remainingCases.length, stopped: autoRunStopRequested.current };
     },
-    onMutate: (benchmarkCase) => setActiveCaseId(benchmarkCase.caseId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['astra-certification-benchmark', taskClass] }),
-        queryClient.invalidateQueries({ queryKey: ['astra-certification-status', taskClass] }),
-        queryClient.invalidateQueries({ queryKey: ['model-arena-runs'] }),
-      ]);
+    onSettled: async () => {
+      setActiveCaseId(null);
+      await refreshCertificationState();
     },
-    onSettled: () => setActiveCaseId(null),
   });
 
   const certify = useMutation({
@@ -128,18 +163,21 @@ export default function AstraCertificationWorkbench() {
 
       {supported && benchmark.data?.cases?.length > 0 && <>
         <div className="mt-4 grid max-h-72 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-4">
-          {benchmark.data.cases.map((benchmarkCase) => <button key={benchmarkCase.caseId} type="button" disabled={benchmarkCase.completed || !canRun || runCase.isPending} onClick={() => runCase.mutate(benchmarkCase)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[.04] disabled:cursor-not-allowed disabled:opacity-45">
+          {benchmark.data.cases.map((benchmarkCase) => <button key={benchmarkCase.caseId} type="button" disabled={benchmarkCase.completed || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => runCase.mutate(benchmarkCase)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[.04] disabled:cursor-not-allowed disabled:opacity-45">
             <div className="flex items-center gap-2">{benchmarkCase.completed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> : activeCaseId === benchmarkCase.caseId ? <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-300" /> : benchmarkCase.modality === 'vision' ? <Eye className="h-3.5 w-3.5 text-violet-300" /> : <FlaskConical className="h-3.5 w-3.5 text-cyan-300" />}<p className="min-w-0 flex-1 truncate text-[11px] font-medium text-white">{benchmarkCase.name}</p></div>
             <p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-zinc-500">{benchmarkCase.prompt}</p>
           </button>)}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={!nextCase || !canRun || runCase.isPending} onClick={() => nextCase && runCase.mutate(nextCase)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.08] px-4 py-2.5 text-xs font-medium text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{runCase.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}{runCase.isPending ? 'Running and attesting…' : nextCase ? 'Run next trusted case' : 'All trusted cases complete'}</button>
-          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
+          <button type="button" disabled={!nextCase || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => nextCase && runCase.mutate(nextCase)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.08] px-4 py-2.5 text-xs font-medium text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{runCase.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}{runCase.isPending ? 'Running and attesting…' : nextCase ? 'Run next trusted case' : 'All trusted cases complete'}</button>
+          {!autoRunCases.isPending ? <button type="button" disabled={!nextCase || !canRun || runCase.isPending} onClick={() => autoRunCases.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.07] px-4 py-2.5 text-xs font-medium text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" />Auto-run remaining trusted cases</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
+          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending || autoRunCases.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
           {status.data?.model && <span className="text-[10px] text-zinc-500">Astra identity: <code className="text-cyan-200">compatible/{status.data.model}</code></span>}
         </div>
       </>}
       {runCase.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(runCase.error)}</p>}
+      {autoRunCases.error && <p className="mt-3 text-xs text-rose-300">Auto-run stopped: {friendlyMessage(autoRunCases.error)}</p>}
+      {autoRunCases.data && !autoRunCases.isPending && autoRunCases.data.completed > 0 && <p className="mt-3 text-xs text-emerald-300">Auto-run completed {autoRunCases.data.completed}/{autoRunCases.data.total} trusted cases{autoRunCases.data.stopped ? ' before stopping.' : '.'}</p>}
       {runCase.data?.failure && <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200"><p>{runCase.data.failure.message}</p><p className="mt-1 text-[10px] text-rose-300/70">Diagnostic code: <code>{runCase.data.failure.code}</code></p></div>}
       {runCase.data?.runId && <p className="mt-3 text-xs text-emerald-300">Trusted case attested from run {runCase.data.runId}.</p>}
       {certify.error && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(certify.error)}</p>}
