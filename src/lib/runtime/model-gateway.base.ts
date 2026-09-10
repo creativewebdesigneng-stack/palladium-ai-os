@@ -190,6 +190,8 @@ function usesMaxCompletionTokens(provider: Provider, model: string): boolean {
   return provider === "openai" && model.trim().toLowerCase().startsWith("gpt-5");
 }
 
+export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
 export function chatBody(args: RunArgs, stream: boolean) {
   const messages = args.messages.map((m) => {
     if (m.role === "tool") {
@@ -217,6 +219,7 @@ export function chatBody(args: RunArgs, stream: boolean) {
     ...cacheControl.request_fields,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
     ...(args.temperature != null ? { temperature: args.temperature } : {}),
+    ...(args.reasoningEffort ? { reasoning_effort: args.reasoningEffort } : {}),
     ...(args.maxTokens
       ? usesMaxCompletionTokens(args.provider, args.model)
         ? { max_completion_tokens: args.maxTokens }
@@ -296,6 +299,8 @@ export type RunArgs = {
   temperature?: number | null;
   maxTokens?: number | null;
   timeoutMs?: number;
+  reasoningEffort?: ReasoningEffort | null;
+  maxAttempts?: number;
   signal?: AbortSignal;
 };
 
@@ -341,9 +346,10 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
   const ep = endpointFor(args.provider);
   const body = ep.kind === "anthropic" ? anthropicBody(args, stream) : chatBody(args, stream);
   const timeout = args.timeoutMs ?? 90_000;
+  const maxAttempts = Math.min(3, Math.max(1, Math.trunc(args.maxAttempts ?? 3)));
 
   let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const timer = AbortSignal.timeout(timeout);
     const signal = args.signal ? anySignal([args.signal, timer]) : timer;
     try {
@@ -356,12 +362,12 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
       if (res.ok) return res;
       const text = await res.text();
       const err = providerError(res.status, text);
-      if (!err.retryable || attempt === 2) throw err;
+      if (!err.retryable || attempt === maxAttempts - 1) throw err;
       lastError = err;
     } catch (error) {
       if (args.signal?.aborted) throw new ProviderError("Run cancelled.", 499, false);
       if (error instanceof ProviderError && !error.retryable) throw error;
-      if (attempt === 2) {
+      if (attempt === maxAttempts - 1) {
         throw error instanceof ProviderError
           ? error
           : new ProviderError("The model provider did not respond in time.", 504, true);

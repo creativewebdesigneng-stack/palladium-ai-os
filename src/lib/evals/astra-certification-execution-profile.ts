@@ -1,13 +1,15 @@
 import { createHash } from 'node:crypto'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 
-export const ASTRA_CERTIFICATION_PROVENANCE_VERSION = 4 as const
+export const ASTRA_CERTIFICATION_PROVENANCE_VERSION = 5 as const
 
 export type AstraCertificationExecutionProfile = {
   id: string
   maxTokens: number
   timeoutMs: number
-  reasoningMode: 'provider_default' | 'disabled'
+  reasoningMode: 'provider_default' | 'disabled' | 'low'
+  reasoningEffort: 'low' | null
+  maxAttempts: 1 | 3
   promptSuffix: string | null
   fallback: false
 }
@@ -17,6 +19,8 @@ const DEFAULT_PINNED_PROFILE: AstraCertificationExecutionProfile = {
   maxTokens: 1600,
   timeoutMs: 90_000,
   reasoningMode: 'provider_default',
+  reasoningEffort: null,
+  maxAttempts: 3,
   promptSuffix: null,
   fallback: false,
 }
@@ -26,15 +30,19 @@ const BOUNDED_QWEN3_PROFILE: AstraCertificationExecutionProfile = {
   maxTokens: 512,
   timeoutMs: 60_000,
   reasoningMode: 'disabled',
+  reasoningEffort: null,
+  maxAttempts: 1,
   promptSuffix: '/no_think',
   fallback: false,
 }
 
 const BOUNDED_GPT_OSS_20B_PROFILE: AstraCertificationExecutionProfile = {
-  id: 'blackstar-astra-native-gptoss20b-bounded-v1',
+  id: 'blackstar-astra-native-gptoss20b-bounded-v2',
   maxTokens: 512,
   timeoutMs: 60_000,
-  reasoningMode: 'provider_default',
+  reasoningMode: 'low',
+  reasoningEffort: 'low',
+  maxAttempts: 1,
   promptSuffix: null,
   fallback: false,
 }
@@ -77,6 +85,8 @@ export function sameAstraCertificationExecutionProfile(
     && profile['maxTokens'] === expected.maxTokens
     && profile['timeoutMs'] === expected.timeoutMs
     && profile['reasoningMode'] === expected.reasoningMode
+    && profile['reasoningEffort'] === expected.reasoningEffort
+    && profile['maxAttempts'] === expected.maxAttempts
     && profile['promptSuffix'] === expected.promptSuffix
     && profile['fallback'] === false
 }

@@ -125,6 +125,8 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         messages: [{ role: 'user', content: executionPrompt }],
         maxTokens: executionProfile.maxTokens,
         timeoutMs: executionProfile.timeoutMs,
+        reasoningEffort: executionProfile.reasoningEffort,
+        maxAttempts: executionProfile.maxAttempts,
       })
     } catch (error) {
       stage = candidateFailureStage(error)
