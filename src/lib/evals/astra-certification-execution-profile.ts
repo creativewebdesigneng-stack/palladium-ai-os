@@ -26,8 +26,8 @@ const DEFAULT_PINNED_PROFILE: AstraCertificationExecutionProfile = {
 }
 
 const BOUNDED_QWEN3_PROFILE: AstraCertificationExecutionProfile = {
-  id: 'blackstar-astra-native-qwen3-bounded-v2',
-  maxTokens: 512,
+  id: 'blackstar-astra-native-qwen3-bounded-v3',
+  maxTokens: 1024,
   timeoutMs: 60_000,
   reasoningMode: 'disabled',
   reasoningEffort: 'none',
