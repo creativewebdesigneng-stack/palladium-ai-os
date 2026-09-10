@@ -8,7 +8,13 @@ const stop = readFileSync(resolve(root, 'astra-serving/windows/stop-blackstar-cl
 const docs = readFileSync(resolve(root, 'astra-serving/windows/TAILSCALE_FUNNEL.md'), 'utf8')
 
 describe('Blackstar Tailscale Funnel bridge', () => {
-  it('keeps Ollama on localhost and publishes only the bearer proxy', () => {
+  it('defaults Astra bridge activation to the exact GPT-OSS model identity', () => {
+    expect(setup).toContain('[string]$Model = "gpt-oss-20b"')
+    expect(setup).toContain('if (@($models.data | ForEach-Object { $_.id }) -notcontains $Model)')
+    expect(docs).toContain('BLACKSTAR_NATIVE_MODEL=gpt-oss-20b')
+  })
+
+  it('keeps the local model server on localhost and publishes only the bearer proxy', () => {
     expect(setup).toContain('[string]$UpstreamBaseUrl = "http://127.0.0.1:11434"')
     expect(setup).toContain("$($UpstreamBaseUrl.TrimEnd('/'))/v1/models")
     expect(setup).toContain('blackstar-ollama-bearer-proxy.ps1')
