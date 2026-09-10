@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateFailureStage, readAstraCertificationFailureStage } from './astra-certification-stage-diagnostics'
+import { candidateFailureStage, evaluatorFailureStage, readAstraCertificationFailureStage, safeAstraCertificationStageFailure } from './astra-certification-stage-diagnostics'
 
 // These cases intentionally verify only bounded diagnostics; raw runtime error text must never escape.
 describe('Astra certification stage diagnostics', () => {
@@ -82,5 +82,31 @@ describe('Astra certification stage diagnostics', () => {
     expect(readAstraCertificationFailureStage(new Error('BLACKSTAR_ASTRA_CERT_STAGE:candidate_runtime_error_object')))
       .toBe('candidate_runtime_error_object')
     expect(readAstraCertificationFailureStage(new Error('arbitrary provider error with token=secret'))).toBeNull()
+  })
+})
+
+
+describe('Astra evaluator diagnostics', () => {
+  it.each([
+    [401, 'evaluator_credentials_rejected'],
+    [403, 'evaluator_credentials_rejected'],
+    [429, 'evaluator_rate_limited'],
+    [504, 'evaluator_timeout'],
+    [502, 'evaluator_upstream_unavailable'],
+    [503, 'evaluator_upstream_unavailable'],
+  ])('maps evaluator HTTP %s to %s', (status, expected) => {
+    expect(evaluatorFailureStage({ status })).toBe(expected)
+  })
+
+  it('classifies invalid evaluator responses without exposing raw text', () => {
+    expect(evaluatorFailureStage(new Error('FreeLLMAPI returned invalid JSON.'))).toBe('evaluator_invalid_response')
+    expect(evaluatorFailureStage(new Error('FreeLLMAPI returned an empty evaluator response.'))).toBe('evaluator_invalid_response')
+  })
+
+  it('keeps user-visible evaluator diagnostics bounded', () => {
+    expect(safeAstraCertificationStageFailure('evaluator_credentials_rejected')).toEqual({
+      code: 'evaluator_credentials_rejected',
+      message: 'The independent evaluator rejected the configured server credential.',
+    })
   })
 })
