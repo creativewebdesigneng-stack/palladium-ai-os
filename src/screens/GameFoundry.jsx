@@ -68,6 +68,7 @@ export default function GameFoundry() {
   const assets = overview.data?.assets ?? [];
   const canCreateAsset = sourceKind === 'image' ? caps?.assetGeneration?.imageTo3d : sourceKind === 'prompt' ? caps?.assetGeneration?.promptTo3d : caps?.assetGeneration?.modelEnhancement;
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
+  const formats = caps?.assetGeneration?.formats ?? ['glb','gltf','obj','ply','stl','vox'];
 
   return <>
     <PageHeader
@@ -106,7 +107,7 @@ export default function GameFoundry() {
           <Field label="Asset name"><input value={assetName} onChange={(e)=>setAssetName(e.target.value)} className={control} placeholder="Alien rifle" /></Field>
           <Field label="Source"><select value={sourceKind} onChange={(e)=>setSourceKind(e.target.value)} className={control}><option value="prompt">Prompt</option><option value="image">Image URL</option><option value="model">Model URL</option></select></Field>
           <Field label="Engine"><select value={assetEngine} onChange={(e)=>setAssetEngine(e.target.value)} className={control}>{engines.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
-          <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{['glb','gltf','fbx','obj','usd','ply','stl','vox'].map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
+          <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{formats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
           <Field label="Quality"><select value={assetQuality} onChange={(e)=>setAssetQuality(e.target.value)} className={control}><option value="draft">Draft</option><option value="game_ready">Game ready</option><option value="cinematic">Cinematic</option></select></Field>
         </div>
         {sourceKind === 'prompt' ? <Field label="3D prompt"><textarea rows={5} value={assetPrompt} onChange={(e)=>setAssetPrompt(e.target.value)} className={control+' mt-3'} placeholder="A weathered sci-fi rifle, hard-surface PBR, clean topology, game-ready proportions…" /></Field> : <Field label={sourceKind==='image'?'Public reference image URL':'Public model URL'}><input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className={control+' mt-3'} placeholder="https://…" /></Field>}
