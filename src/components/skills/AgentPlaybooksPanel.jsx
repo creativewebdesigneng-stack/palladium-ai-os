@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BookOpenCheck, Download, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
+import { BookOpenCheck, Braces, Download, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Empty, Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { useToast } from '@/components/ui/use-toast';
 import {
+  compileInstalledAgentSkillCapability,
   deleteAgentSkill,
   listAgentSkills,
   setAgentSkillEnabled,
@@ -26,6 +27,7 @@ export default function AgentPlaybooksPanel({ enabled }) {
   const listFn = useServerFn(listAgentSkills);
   const toggleFn = useServerFn(setAgentSkillEnabled);
   const deleteFn = useServerFn(deleteAgentSkill);
+  const compileFn = useServerFn(compileInstalledAgentSkillCapability);
   const installPackFn = useServerFn(installIntegrationPlaybookPack);
 
   const skills = useQuery({
@@ -58,6 +60,12 @@ export default function AgentPlaybooksPanel({ enabled }) {
     },
     onError: (error) =>
       toast({ variant: 'destructive', title: 'Could not delete playbook', description: friendlyMessage(error) }),
+  });
+
+  const compileCapability = useMutation({
+    mutationFn: (id) => compileFn({ data: { id } }),
+    onError: (error) =>
+      toast({ variant: 'destructive', title: 'Could not compile capability', description: friendlyMessage(error) }),
   });
 
   const installPack = useMutation({
@@ -143,6 +151,29 @@ export default function AgentPlaybooksPanel({ enabled }) {
                   )}
                 </div>
 
+                {compileCapability.isSuccess && compileCapability.data?.skillId === skill.id && (
+                  <div className="mt-3 rounded-lg border border-violet-300/15 bg-violet-400/[.05] p-3 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-violet-100">Compiled capability contract</span>
+                      <Badge variant={compileCapability.data.compiled.executable ? 'outline' : 'destructive'}>
+                        {compileCapability.data.compiled.executable ? 'Executable' : 'Blocked'}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(compileCapability.data.compiled.capabilities ?? []).map((capability) => (
+                        <span key={capability} className="rounded-full border border-violet-300/15 px-2 py-0.5 text-violet-100">{capability}</span>
+                      ))}
+                    </div>
+                    {(compileCapability.data.compiled.providerScopes ?? []).length > 0 && (
+                      <p className="mt-2 text-zinc-400">Providers: {compileCapability.data.compiled.providerScopes.join(', ')}</p>
+                    )}
+                    {(compileCapability.data.compiled.blockers ?? []).length > 0 && (
+                      <p className="mt-2 text-amber-300">Blockers: {compileCapability.data.compiled.blockers.join(', ')}</p>
+                    )}
+                    {compileCapability.data.compiled.requiresApproval && <p className="mt-2 text-amber-200">Execution requires approval.</p>}
+                  </div>
+                )}
+
                 {reflected && !skill.enabled && (
                   <div className="mt-3 flex gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 p-2.5 text-xs text-amber-100">
                     <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -150,7 +181,16 @@ export default function AgentPlaybooksPanel({ enabled }) {
                   </div>
                 )}
 
-                <div className="mt-4 flex items-center justify-end gap-2">
+                <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={compileCapability.isPending}
+                    onClick={() => compileCapability.mutate(skill.id)}
+                  >
+                    <Braces className="mr-1.5 h-3.5 w-3.5" />
+                    {compileCapability.isPending && compileCapability.variables === skill.id ? 'Compiling…' : 'Compile capability'}
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
