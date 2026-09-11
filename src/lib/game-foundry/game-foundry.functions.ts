@@ -141,7 +141,14 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     try {
-      const worker = await submitGameFoundryAsset(data);
+      const worker = await submitGameFoundryAsset({
+        sourceKind: data.sourceKind,
+        prompt: data.prompt ?? null,
+        sourceUrl: data.sourceUrl ?? null,
+        outputFormat: data.outputFormat,
+        qualityProfile: data.qualityProfile,
+        targetEngine: data.targetEngine,
+      });
       const terminal = ["completed","failed","cancelled"].includes(worker.status);
       const updated = await sb.from("three_d_jobs").update({
         worker_job_id:worker.workerJobId,
