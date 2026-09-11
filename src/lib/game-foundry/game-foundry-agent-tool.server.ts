@@ -5,6 +5,7 @@ import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
+import { probeGameFoundryConnections } from "./game-foundry-integrations.server";
 import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
 
 type ToolContext = { userId: string; sb: { from: (table: string) => any } };
@@ -18,7 +19,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","generate_required_assets","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package","audit_readiness"] },
+      action: { type:"string", enum:["capabilities","connection_health","list_projects","create_project","plan_project","generate_content","generate_required_assets","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package","audit_readiness"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -49,6 +50,7 @@ async function resolvePreference(ctx: ToolContext) {
 export async function runGameFoundryTool(input: Record<string, unknown>, ctx: ToolContext) {
   const action = text(input,"action",40);
   if (action === "capabilities") return { ...getGameFoundryCapabilities(), gameReadyProcessing:getGameReadyProcessingCapabilities() };
+  if (action === "connection_health") return probeGameFoundryConnections();
   if (action === "list_projects") {
     const result = await ctx.sb.from("game_foundry_projects")
       .select("id,name,target_engine,project_type,quality_profile,status,output_url,preview_url,error_message,created_at,updated_at")
