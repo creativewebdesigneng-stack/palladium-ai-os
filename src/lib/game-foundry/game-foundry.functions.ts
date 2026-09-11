@@ -125,7 +125,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const project = await sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (project.error) throw new Error(project.error.message);
     if (!project.data) throw new Error("Game Foundry project not found.");
@@ -143,6 +143,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
         projectType:project.data.project_type,
         targetEngine:project.data.target_engine,
         qualityProfile:project.data.quality_profile,
+        designSpec:project.data.design_spec,
       });
       const terminal = ["completed","failed","cancelled"].includes(worker.status);
       const updated = await sb.from("game_foundry_projects").update({
