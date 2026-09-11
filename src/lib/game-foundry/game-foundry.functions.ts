@@ -8,6 +8,7 @@ import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
+import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 import {
   getGameFoundryCapabilities,
   getGameReadyProcessingCapabilities,
@@ -40,7 +41,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const [projects, assets] = await Promise.all([
       sb.from("game_foundry_projects")
-        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,export_manifest,handoff_status,handoff_id,handoff_error,handoff_updated_at,source_manifest,source_status,source_error,source_generated_at,created_at,updated_at,completed_at")
+        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,export_manifest,handoff_status,handoff_id,handoff_error,handoff_updated_at,source_manifest,source_status,source_error,source_generated_at,package_manifest,package_status,package_error,package_prepared_at,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(50),
@@ -457,5 +458,42 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
       await sb.from("game_foundry_projects").update({source_status:"failed",source_error:safe,updated_at:new Date().toISOString()})
         .eq("id",data.id).eq("user_id",context.userId).eq("source_status","generating");
       throw new Error(safe);
+    }
+  });
+
+
+export const prepareGameFoundryProjectPackage = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb=context.supabase as unknown as Sb;
+    const project=await sb.from("game_foundry_projects")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,source_manifest,source_status,export_manifest,handoff_status")
+      .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(project.data.source_status!=="generated") throw new Error("Generate the engine source before preparing the project package.");
+    try{
+      const packageManifest=buildGameFoundryProjectPackage({project:project.data});
+      const saved=await sb.from("game_foundry_projects").update({
+        package_manifest:packageManifest,
+        package_status:"prepared",
+        package_error:null,
+        package_prepared_at:new Date().toISOString(),
+        updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId)
+        .select("id,name,target_engine,package_manifest,package_status,package_prepared_at").maybeSingle();
+      if(saved.error) throw new Error(saved.error.message);
+      if(!saved.data) throw new Error("Game Foundry project package could not be prepared.");
+      await writeAudit({userId:context.userId,orgId:null,action:"game_foundry.package_prepared",targetType:"game_foundry_project",targetId:data.id,status:"success",metadata:{targetEngine:project.data.target_engine,sourceFileCount:packageManifest.assembly.sourceFileCount,linkedAssetCount:packageManifest.assembly.linkedAssetCount}});
+      return {
+        ...saved.data,
+        filename:gameFoundryPackageFilename(saved.data.name,saved.data.target_engine),
+      };
+    }catch(error){
+      const message=error instanceof Error?error.message:"Game Foundry package preparation failed.";
+      await sb.from("game_foundry_projects").update({package_status:"failed",package_error:message.slice(0,1000),updated_at:new Date().toISOString()})
+        .eq("id",data.id).eq("user_id",context.userId);
+      throw error;
     }
   });

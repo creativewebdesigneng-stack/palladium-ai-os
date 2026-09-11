@@ -3,6 +3,7 @@ import { getGameFoundryCapabilities, getGameReadyProcessingCapabilities, submitG
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
+import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 
 type ToolContext = { userId: string; sb: { from: (table: string) => any } };
 
@@ -15,7 +16,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","process_asset","generate_project","prepare_handoff","send_handoff"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","process_asset","generate_project","prepare_handoff","send_handoff","prepare_package"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -189,6 +190,22 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
       await ctx.sb.from("three_d_jobs").update({processing_status:"failed",error_message:message.slice(0,1000),updated_at:new Date().toISOString()}).eq("id",assetId).eq("user_id",ctx.userId);
       throw error;
     }
+  }
+  if (action === "prepare_package") {
+    const projectId=text(input,"project_id",60);
+    if (!projectId) throw new Error("prepare_package requires project_id.");
+    const project=await ctx.sb.from("game_foundry_projects")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,source_manifest,source_status,export_manifest")
+      .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(project.data.source_status!=="generated") throw new Error("Generate the engine source before preparing a project package.");
+    const packageManifest=buildGameFoundryProjectPackage({project:project.data});
+    const update=await ctx.sb.from("game_foundry_projects").update({
+      package_manifest:packageManifest,package_status:"prepared",package_error:null,package_prepared_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }).eq("id",projectId).eq("user_id",ctx.userId);
+    if(update.error) throw new Error(update.error.message);
+    return { projectId, filename:gameFoundryPackageFilename(project.data.name,project.data.target_engine), packageManifest };
   }
   if (action === "prepare_handoff") {
     const projectId=text(input,"project_id",60);
