@@ -1,6 +1,6 @@
 param(
   [int]$ProxyPort = 12780,
-  [string]$Model = "gpt-oss-20b",
+  [string]$Model = "gpt-oss:20b",
   [string]$UpstreamBaseUrl = "http://127.0.0.1:11434",
   [string]$UpstreamApiKeyEnvName = "",
   [int]$UpstreamTimeoutSeconds = 60,

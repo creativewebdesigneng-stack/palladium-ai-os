@@ -7,20 +7,20 @@ Blackstar keeps the local OpenAI-compatible inference server bound to localhost.
 
 ### GPT-OSS Astra activation
 
-The bridge now defaults to the exact model identity `gpt-oss-20b`. Blackstar will refuse to publish the bridge unless the configured local OpenAI-compatible server advertises that exact ID from `GET /v1/models` and successfully completes a warm-up request.
+The bridge now defaults to the exact model identity `gpt-oss:20b`. Blackstar will refuse to publish the bridge unless the configured local OpenAI-compatible server advertises that exact ID from `GET /v1/models` and successfully completes a warm-up request.
 
 For a localhost GPT-OSS server listening on port 8080, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-tailscale-funnel.ps1 -Model "gpt-oss-20b" -UpstreamBaseUrl "http://127.0.0.1:8080"
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-tailscale-funnel.ps1 -Model "gpt-oss:20b" -UpstreamBaseUrl "http://127.0.0.1:11434"
 ```
 
-The local inference server itself must already be serving GPT-OSS under the exact ID `gpt-oss-20b`. Do not point Blackstar at a Qwen process and rename it: the model-discovery check is intended to prevent that mismatch.
+The local inference server itself must already be serving GPT-OSS under the exact ID `gpt-oss:20b`. Do not point Blackstar at a Qwen process and rename it: the model-discovery check is intended to prevent that mismatch.
 
 ## Prerequisites
 
 - Windows 10 or later.
-- A localhost OpenAI-compatible inference server is already serving the exact Astra candidate model. For GPT-OSS activation, `GET /v1/models` must advertise `gpt-oss-20b`.
+- A localhost OpenAI-compatible inference server is already serving the exact Astra candidate model. For GPT-OSS activation, `GET /v1/models` must advertise `gpt-oss:20b`.
 - A Tailscale account. The first sign-in is interactive and cannot be safely automated by Blackstar.
 - Tailscale Funnel enabled for the tailnet. MagicDNS and HTTPS are required by Funnel.
 
@@ -41,8 +41,8 @@ When Windows clipboard support is available, the new bearer token is copied dire
 ```dotenv
 OPENAI_COMPATIBLE_BASE_URL=https://<device>.<tailnet>.ts.net/v1
 OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>
-BLACKSTAR_NATIVE_MODEL=gpt-oss-20b
-BLACKSTAR_ASTRA_MODEL=gpt-oss-20b
+BLACKSTAR_NATIVE_MODEL=gpt-oss:20b
+BLACKSTAR_ASTRA_MODEL=gpt-oss:20b
 BLACKSTAR_NATIVE_PRIMARY=true
 ```
 

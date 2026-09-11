@@ -64,3 +64,10 @@ describe('Astra certification execution profile', () => {
       .not.toBe(hashAstraCertificationExecutionPrompt(buildAstraCertificationExecutionPrompt('B', profile)))
   })
 })
+
+
+describe('Ollama GPT-OSS model identity', () => {
+  it('resolves the bounded GPT-OSS profile for the Ollama gpt-oss:20b id', () => {
+    expect(resolveAstraCertificationExecutionProfile('reasoning', 'gpt-oss:20b').id).toBe('blackstar-astra-native-gptoss20b-bounded-v2')
+  })
+})
