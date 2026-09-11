@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getGameFoundryCapabilities,
   submitGameFoundryAsset,
@@ -9,6 +9,7 @@ const originalAsset = process.env['GAME_FOUNDRY_3D_API_URL']
 const originalGame = process.env['GAME_FOUNDRY_GAME_API_URL']
 
 afterEach(() => {
+  vi.restoreAllMocks()
   if (originalAsset === undefined) delete process.env['GAME_FOUNDRY_3D_API_URL']
   else process.env['GAME_FOUNDRY_3D_API_URL'] = originalAsset
   if (originalGame === undefined) delete process.env['GAME_FOUNDRY_GAME_API_URL']
@@ -25,16 +26,23 @@ describe('Blackstar Game Foundry runtime', () => {
     expect(caps.engines.find((engine) => engine.id === 'unity')?.exports).toContain('fbx')
   })
 
-  it('fails closed for prompt-to-3D when no real Game Foundry worker exists', async () => {
+  it('uses the official Blackstar hosted worker for prompt-to-3D when no override exists', async () => {
     delete process.env['GAME_FOUNDRY_3D_API_URL']
-    await expect(submitGameFoundryAsset({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      id: 'job-1',
+      status: 'completed',
+      output_url: 'https://cdn.example.com/crate.glb',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    const result = await submitGameFoundryAsset({
       sourceKind: 'prompt',
       prompt: 'game-ready sci-fi crate',
       sourceUrl: null,
       outputFormat: 'glb',
       qualityProfile: 'game_ready',
       targetEngine: 'unreal',
-    })).rejects.toThrow('GAME_FOUNDRY_3D_API_URL')
+    })
+    expect(result.workerJobId).toBe('job-1')
+    expect(result.provider).toBe('game-foundry-3d')
   })
 
   it('fails closed for full game generation when no build worker exists', async () => {
