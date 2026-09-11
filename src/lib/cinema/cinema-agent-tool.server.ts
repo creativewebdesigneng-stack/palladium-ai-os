@@ -42,9 +42,9 @@ export async function runCinemaStudioTool(input:Record<string,unknown>,ctx:ToolC
     const title=text(input,'title',200)||'Untitled Film'
     const prompt=text(input,'prompt',8000)
     const genre=text(input,'genre',120)||'cinematic drama'
-    const duration=Math.max(1,Math.min(180,Math.round(Number(input.duration_minutes??120))))
-    const aspect=['16:9','2.39:1','1.85:1','9:16','1:1'].includes(String(input.aspect_ratio))?String(input.aspect_ratio):'2.39:1'
-    const quality=['preview','production','cinema'].includes(String(input.quality))?String(input.quality):'cinema'
+    const duration=Math.max(1,Math.min(180,Math.round(Number(input['duration_minutes']??120))))
+    const aspect=['16:9','2.39:1','1.85:1','9:16','1:1'].includes(String(input['aspect_ratio']))?String(input.aspect_ratio):'2.39:1'
+    const quality=['preview','production','cinema'].includes(String(input['quality']))?String(input.quality):'cinema'
     if(prompt.length<10) throw new Error('develop_project requires a film prompt.')
     const {provider,model}=await preference(ctx)
     const messages:ChatMessage[]=[
