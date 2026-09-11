@@ -44,6 +44,6 @@ export function buildGameFoundryWebPreviewDocument(sourceManifest: unknown) {
   if (/<\/body>/i.test(output)) output = output.replace(/<\/body>/i, `${additions}</body>`);
   else output += additions;
 
-  if (Buffer.byteLength(output,"utf8") > MAX_PREVIEW_BYTES) throw new Error("The generated Web preview exceeds Blackstar's 250 KB preview safety limit.");
+  if (new TextEncoder().encode(output).byteLength > MAX_PREVIEW_BYTES) throw new Error("The generated Web preview exceeds Blackstar's 250 KB preview safety limit.");
   return output;
 }
