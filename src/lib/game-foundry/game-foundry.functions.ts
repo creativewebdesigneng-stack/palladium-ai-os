@@ -748,5 +748,5 @@ export const auditGameFoundryProjectReadiness = createServerFn({ method:"POST" }
     if(project.error) throw new Error(project.error.message);
     if(assets.error) throw new Error(assets.error.message);
     if(!project.data) throw new Error("Game Foundry project not found.");
-    return auditGameFoundryReadiness(project.data,assets.data??[]);
+    return { projectId:data.id, ...auditGameFoundryReadiness(project.data,assets.data??[]) };
   });
