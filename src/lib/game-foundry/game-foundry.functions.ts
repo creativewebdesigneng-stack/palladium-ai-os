@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/platform/audit.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
+import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
@@ -41,7 +42,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const [projects, assets] = await Promise.all([
       sb.from("game_foundry_projects")
-        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,export_manifest,handoff_status,handoff_id,handoff_error,handoff_updated_at,source_manifest,source_status,source_error,source_generated_at,package_manifest,package_status,package_error,package_prepared_at,created_at,updated_at,completed_at")
+        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,export_manifest,handoff_status,handoff_id,handoff_error,handoff_updated_at,source_manifest,source_status,source_error,source_generated_at,package_manifest,package_status,package_error,package_prepared_at,content_manifest,content_status,content_error,content_generated_at,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(50),
@@ -403,6 +404,53 @@ export const sendGameFoundryEngineHandoff = createServerFn({ method:"POST" })
   });
 
 
+export const generateGameFoundryContentManifest = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb=context.supabase as unknown as Sb;
+    const claimed=await sb.from("game_foundry_projects")
+      .update({content_status:"generating",content_error:null,updated_at:new Date().toISOString()})
+      .eq("id",data.id).eq("user_id",context.userId)
+      .eq("status","planned").in("content_status",["not_started","failed"])
+      .select("id,name,prompt,target_engine,quality_profile,design_spec").maybeSingle();
+    if(claimed.error) throw new Error(claimed.error.message);
+    if(!claimed.data) throw new Error("Plan the Game Foundry project before generating gameplay content.");
+    const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
+    try{
+      const manifest=await generateGameFoundryContent({
+        name:claimed.data.name,
+        prompt:claimed.data.prompt,
+        targetEngine:claimed.data.target_engine,
+        qualityProfile:claimed.data.quality_profile,
+        designSpec:claimed.data.design_spec,
+        provider,
+        model,
+      });
+      const saved=await sb.from("game_foundry_projects").update({
+        content_manifest:manifest,
+        content_status:"generated",
+        content_error:null,
+        content_generated_at:new Date().toISOString(),
+        updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId).eq("content_status","generating")
+        .select("id,content_manifest,content_status,content_generated_at").maybeSingle();
+      if(saved.error) throw new Error(saved.error.message);
+      if(!saved.data) throw new Error("Game Foundry content generation was interrupted before it could be saved.");
+      await writeAudit({userId:context.userId,orgId:null,action:"game_foundry.content_generated",targetType:"game_foundry_project",targetId:data.id,status:"success",metadata:{provider:manifest.generatedBy.provider,model:manifest.generatedBy.model,scenes:manifest.scenes.length,assets:manifest.assetRequirements.length}});
+      return saved.data;
+    }catch(error){
+      const safe=error instanceof ProviderError&&error.status===503
+        ?"AI provider is not configured."
+        : error instanceof Error&&error.message.startsWith("The AI content compiler returned")
+          ? error.message
+          :"Game Foundry content generation failed. Try again.";
+      await sb.from("game_foundry_projects").update({content_status:"failed",content_error:safe,updated_at:new Date().toISOString()})
+        .eq("id",data.id).eq("user_id",context.userId).eq("content_status","generating");
+      throw new Error(safe);
+    }
+  });
+
 export const generateGameFoundrySource = createServerFn({ method:"POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
@@ -412,7 +460,7 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
       .update({source_status:"generating",source_error:null,updated_at:new Date().toISOString()})
       .eq("id",data.id).eq("user_id",context.userId)
       .eq("status","planned").in("source_status",["not_started","failed"])
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec").maybeSingle();
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,content_manifest,content_status").maybeSingle();
     if(claimed.error) throw new Error(claimed.error.message);
     if(!claimed.data) throw new Error("Plan the Game Foundry project before generating engine source.");
 
@@ -436,6 +484,7 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
           `Quality profile: ${claimed.data.quality_profile}`,
           engineGuidance,
           "This is a Blackstar Game Foundry project. Keep generated code bounded, game-oriented, and compatible with the approved design. Linked 3D assets are managed separately; reference import locations/placeholders rather than inventing binary asset files.",
+          claimed.data.content_status === "generated" ? `Compiled gameplay/world content:\n${JSON.stringify(claimed.data.content_manifest)}` : "No compiled gameplay/world content manifest is available yet; do not invent one as already approved.",
         ].join("\n\n"),
         plan:claimed.data.design_spec,
         provider,
