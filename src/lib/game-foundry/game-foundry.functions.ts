@@ -28,7 +28,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
         .order("created_at",{ascending:false})
         .limit(50),
       sb.from("three_d_jobs")
-        .select("id,project_id,input_name,source_url,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
+        .select("id,project_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(100),
