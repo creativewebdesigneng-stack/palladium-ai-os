@@ -172,3 +172,67 @@ export async function submitGameFoundryProject(input: {
     designSpec: asJson(json.design_spec ?? {}),
   };
 }
+
+
+export type GameReadyProcessingProfile = {
+  generatePbrMaterials: boolean;
+  unwrapUvs: boolean;
+  generateLods: boolean;
+  generateCollision: boolean;
+  optimizeTopology: boolean;
+  rigging: "none" | "auto";
+  animation: "none" | "idle" | "basic";
+  textureResolution: 1024 | 2048 | 4096;
+  targetPolycount: number | null;
+};
+
+export function getGameReadyProcessingCapabilities() {
+  const base = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  return {
+    configured: Boolean(base),
+    provider: base ? "game-foundry-3d" : null,
+    operations: [
+      "pbr_materials",
+      "uv_unwrap",
+      "lod_generation",
+      "collision_generation",
+      "topology_optimization",
+      "auto_rigging",
+      "basic_animation",
+      "validation",
+    ],
+    note: base
+      ? "Processing uses the configured real Game Foundry 3D worker."
+      : "Game-ready post-processing requires GAME_FOUNDRY_3D_API_URL; no local simulated processing is used.",
+  };
+}
+
+export async function submitGameReadyProcessing(input: {
+  sourceUrl: string;
+  targetEngine: GameFoundryEngine;
+  outputFormat: string;
+  profile: GameReadyProcessingProfile;
+}) {
+  const base = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  if (!base) throw new Error("Game-ready 3D processing requires GAME_FOUNDRY_3D_API_URL.");
+  const json = await request(base, process.env["GAME_FOUNDRY_3D_API_TOKEN"], "/v1/assets/process", {
+    method: "POST",
+    body: JSON.stringify({
+      source_url: publicHttpUrl(input.sourceUrl),
+      target_engine: input.targetEngine,
+      output_format: input.outputFormat,
+      processing_profile: input.profile,
+    }),
+  });
+  const workerJobId = String(json.id ?? json.job_id ?? json.run_id ?? "").trim();
+  if (!workerJobId) throw new Error("Game Foundry 3D processor did not return a job id.");
+  return {
+    workerJobId,
+    status: normalizeStatus(json.status),
+    outputUrl: safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url),
+    previewUrl: safeUrl(json.preview_url ?? json.thumbnail_url),
+    errorMessage: typeof json.error === "string" ? json.error.slice(0, 1000) : null,
+    validationReport: asJson(json.validation_report ?? json.validation ?? {}),
+    metadata: asJson(json),
+  };
+}
