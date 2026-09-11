@@ -103,3 +103,37 @@ export async function submitGameFoundryBridgeHandoff(args: {
     status:String(json.status??"queued").toLowerCase(),
   };
 }
+
+
+function normalizeHandoffStatus(value:unknown) {
+  const status=String(value??"").toLowerCase();
+  if(["completed","succeeded","success","done"].includes(status)) return "completed";
+  if(["failed","error"].includes(status)) return "failed";
+  if(["cancelled","canceled"].includes(status)) return "cancelled";
+  if(["running","processing","in_progress","active"].includes(status)) return "running";
+  return "queued";
+}
+
+export async function getGameFoundryBridgeHandoff(args:{engine:GameFoundryEngine;handoffId:string}) {
+  const base=gameFoundryBridgeBase(args.engine);
+  if(!base) throw new Error(`No ${args.engine} Game Foundry bridge is configured.`);
+  const id=args.handoffId.trim();
+  if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry bridge handoff id.");
+  const response=await fetch(`${base}/v1/imports/${encodeURIComponent(id)}`,{
+    method:"GET",
+    headers:process.env["GAME_FOUNDRY_ENGINE_BRIDGE_TOKEN"]?.trim()
+      ? {Authorization:`Bearer ${process.env["GAME_FOUNDRY_ENGINE_BRIDGE_TOKEN"]!.trim()}`}
+      : {},
+    redirect:"error",
+    signal:AbortSignal.timeout(120_000),
+  });
+  const body=await response.text();
+  if(!response.ok) throw new Error(`Game Foundry engine bridge error (${response.status}): ${body.slice(0,300)}`);
+  let json:any;
+  try{json=JSON.parse(body);}catch{throw new Error("Game Foundry engine bridge returned invalid JSON.");}
+  return {
+    handoffId:id,
+    status:normalizeHandoffStatus(json.status),
+    errorMessage:typeof json.error==="string"?json.error.slice(0,1000):null,
+  };
+}
