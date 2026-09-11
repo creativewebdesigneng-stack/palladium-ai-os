@@ -6,6 +6,7 @@ import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server"
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
+import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import {
   getGameFoundryCapabilities,
   getGameReadyProcessingCapabilities,
@@ -38,7 +39,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const [projects, assets] = await Promise.all([
       sb.from("game_foundry_projects")
-        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
+        .select("id,name,prompt,target_engine,project_type,quality_profile,status,design_spec,worker_job_id,output_url,preview_url,error_message,metadata,export_manifest,handoff_status,handoff_id,handoff_error,handoff_updated_at,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(50),
@@ -315,6 +316,85 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         processing_status:"failed",
         error_message:message.slice(0,1000),
         updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId);
+      throw error;
+    }
+  });
+
+
+export const prepareGameFoundryEngineHandoff = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const [project, assets] = await Promise.all([
+      sb.from("game_foundry_projects")
+        .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec")
+        .eq("id",data.id).eq("user_id",context.userId).maybeSingle(),
+      sb.from("three_d_jobs")
+        .select("id,input_name,requested_format,output_url,processed_output_url,target_engine,validation_report,status")
+        .eq("project_id",data.id).eq("user_id",context.userId).eq("status","completed")
+        .order("created_at",{ascending:true}),
+    ]);
+    if (project.error) throw new Error(project.error.message);
+    if (assets.error) throw new Error(assets.error.message);
+    if (!project.data) throw new Error("Game Foundry project not found.");
+    const manifest = buildGameFoundryExportManifest(project.data, assets.data ?? []);
+    const bridgeConfigured = Boolean(gameFoundryBridgeBase(project.data.target_engine));
+    const saved = await sb.from("game_foundry_projects").update({
+      export_manifest:manifest,
+      handoff_status:"prepared",
+      handoff_id:null,
+      handoff_error:null,
+      handoff_updated_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    }).eq("id",data.id).eq("user_id",context.userId)
+      .select("id,export_manifest,handoff_status,target_engine").maybeSingle();
+    if (saved.error) throw new Error(saved.error.message);
+    if (!saved.data) throw new Error("Engine handoff could not be prepared.");
+    await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.handoff_prepared", targetType:"game_foundry_project", targetId:data.id, status:"success", metadata:{ targetEngine:project.data.target_engine, assetCount:manifest.assets.length, bridgeConfigured } });
+    return { ...saved.data, bridgeConfigured };
+  });
+
+export const sendGameFoundryEngineHandoff = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const project = await sb.from("game_foundry_projects")
+      .select("id,target_engine,export_manifest,handoff_status")
+      .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
+    if (project.error) throw new Error(project.error.message);
+    if (!project.data) throw new Error("Game Foundry project not found.");
+    if (project.data.handoff_status !== "prepared" || !project.data.export_manifest || Object.keys(project.data.export_manifest).length === 0) {
+      throw new Error("Prepare the engine handoff manifest before sending it.");
+    }
+    const claimed = await sb.from("game_foundry_projects").update({
+      handoff_status:"queued",handoff_error:null,handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }).eq("id",data.id).eq("user_id",context.userId).eq("handoff_status","prepared").select("id").maybeSingle();
+    if (claimed.error) throw new Error(claimed.error.message);
+    if (!claimed.data) throw new Error("This engine handoff is no longer ready.");
+    try {
+      const result = await submitGameFoundryBridgeHandoff({
+        engine:project.data.target_engine,
+        manifest:project.data.export_manifest,
+        projectId:data.id,
+      });
+      const status = ["completed","running","queued"].includes(result.status) ? result.status : "queued";
+      const update = await sb.from("game_foundry_projects").update({
+        handoff_status:status,
+        handoff_id:result.handoffId,
+        handoff_error:null,
+        handoff_updated_at:new Date().toISOString(),
+        updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId);
+      if (update.error) throw new Error(update.error.message);
+      await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.handoff_sent", targetType:"game_foundry_project", targetId:data.id, status:"success", metadata:{ targetEngine:project.data.target_engine, handoffId:result.handoffId } });
+      return { id:data.id, ...result };
+    } catch (error) {
+      const message=error instanceof Error?error.message:"Engine handoff failed";
+      await sb.from("game_foundry_projects").update({
+        handoff_status:"prepared",handoff_error:message.slice(0,1000),handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId);
       throw error;
     }
