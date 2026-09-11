@@ -17,7 +17,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","generate_required_assets","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -132,6 +132,52 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
         .eq("id",projectId).eq("user_id",ctx.userId).eq("content_status","generating");
       throw error;
     }
+  }
+  if (action === "generate_required_assets") {
+    const projectId=text(input,"project_id",60);
+    if(!projectId) throw new Error("generate_required_assets requires project_id.");
+    const project=await ctx.sb.from("game_foundry_projects")
+      .select("id,name,target_engine,quality_profile,content_manifest,content_status")
+      .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(project.data.content_status!=="generated") throw new Error("Generate the approved gameplay/world content before generating required 3D assets.");
+    const requirements=Array.isArray(project.data.content_manifest?.assetRequirements)?project.data.content_manifest.assetRequirements:[];
+    const supported=new Set(["environment","character","prop","vehicle","weapon"]);
+    const eligible=requirements.filter((item:any)=>item&&typeof item.id==="string"&&typeof item.name==="string"&&typeof item.description==="string"&&supported.has(String(item.kind))).slice(0,6);
+    if(!eligible.length) throw new Error("This content manifest has no supported 3D asset requirements.");
+    const existing=await ctx.sb.from("three_d_jobs").select("content_requirement_id").eq("project_id",projectId).eq("user_id",ctx.userId).not("content_requirement_id","is",null);
+    if(existing.error) throw new Error(existing.error.message);
+    const seen=new Set((existing.data??[]).map((row:any)=>String(row.content_requirement_id)));
+    const pending=eligible.filter((item:any)=>!seen.has(String(item.id)));
+    if(!pending.length) throw new Error("The selected Game Foundry asset requirements already have linked 3D jobs.");
+    const targetEngine=project.data.target_engine;
+    const outputFormat=["unreal","unity"].includes(targetEngine)?"fbx":"glb";
+    const qualityProfile=project.data.quality_profile==="cinematic"?"cinematic":project.data.quality_profile==="prototype"?"draft":"game_ready";
+    const results:any[]=[];
+    for(const requirement of pending){
+      const prompt=`Create a ${requirement.kind} asset for the game project "${project.data.name}". ${requirement.description} Target engine: ${targetEngine}. Quality target: ${qualityProfile}. Produce clean game-ready geometry and physically based material readiness.`;
+      const created=await ctx.sb.from("three_d_jobs").insert({
+        user_id:ctx.userId,project_id:projectId,content_requirement_id:String(requirement.id),input_name:String(requirement.name).slice(0,240),
+        source_url:null,source_kind:"prompt",prompt,workflow:"prompt-to-mesh",requested_format:outputFormat,quality_profile:qualityProfile,target_engine:targetEngine,status:"queued",
+      }).select("id").single();
+      if(created.error) throw new Error(created.error.message);
+      try{
+        const worker=await submitGameFoundryAsset({sourceKind:"prompt",prompt,sourceUrl:null,outputFormat,qualityProfile,targetEngine});
+        const terminal=["completed","failed","cancelled"].includes(worker.status);
+        const update=await ctx.sb.from("three_d_jobs").update({
+          worker_job_id:worker.workerJobId,status:worker.status,output_url:worker.outputUrl,preview_url:worker.previewUrl,error_message:worker.errorMessage,
+          metadata:{provider:worker.provider,response:worker.metadata},completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+        }).eq("id",created.data.id).eq("user_id",ctx.userId);
+        if(update.error) throw new Error(update.error.message);
+        results.push({id:created.data.id,requirementId:String(requirement.id),status:worker.status});
+      }catch(error){
+        const message=error instanceof Error?error.message:"Required 3D asset generation failed";
+        await ctx.sb.from("three_d_jobs").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",created.data.id).eq("user_id",ctx.userId);
+        results.push({id:created.data.id,requirementId:String(requirement.id),status:"failed"});
+      }
+    }
+    return {projectId,results};
   }
   if (action === "create_asset") {
     const name = text(input,"name",240) || "Game asset";
