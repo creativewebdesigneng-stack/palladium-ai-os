@@ -6,6 +6,7 @@ import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server"
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { generateGameFoundryContent } from "./game-foundry-content.server";
+import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
 import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
@@ -727,4 +728,25 @@ export const refreshGameFoundryEngineHandoff = createServerFn({ method:"POST" })
     }).eq("id",data.id).eq("user_id",context.userId);
     if(update.error) throw new Error(update.error.message);
     return {id:data.id,...handoff};
+  });
+
+
+export const auditGameFoundryProjectReadiness = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const [project,assets]=await Promise.all([
+      sb.from("game_foundry_projects")
+        .select("id,name,target_engine,quality_profile,status,design_spec,content_manifest,content_status,source_manifest,source_status,package_manifest,package_status,export_manifest,handoff_status,output_url")
+        .eq("id",data.id).eq("user_id",context.userId).maybeSingle(),
+      sb.from("three_d_jobs")
+        .select("id,content_requirement_id,status,output_url,processed_output_url,processing_status,validation_report")
+        .eq("project_id",data.id).eq("user_id",context.userId)
+        .order("created_at",{ascending:true}),
+    ]);
+    if(project.error) throw new Error(project.error.message);
+    if(assets.error) throw new Error(assets.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    return auditGameFoundryReadiness(project.data,assets.data??[]);
   });
