@@ -17,6 +17,15 @@ function cleanBase(value: string | undefined) {
   return (value || "").trim().replace(/\/+$/, "");
 }
 
+function normalizeStatus(value: unknown) {
+  const status = String(value ?? "").toLowerCase();
+  if (["completed","succeeded","success","done"].includes(status)) return "completed";
+  if (["failed","error"].includes(status)) return "failed";
+  if (["cancelled","canceled"].includes(status)) return "cancelled";
+  if (["running","processing","in_progress","active"].includes(status)) return "running";
+  return "queued";
+}
+
 export function getGameFoundryCapabilities() {
   const assetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
@@ -27,6 +36,7 @@ export function getGameFoundryCapabilities() {
       imageTo3d: Boolean(assetWorker || modly),
       modelEnhancement: Boolean(assetWorker),
       configuredProvider: assetWorker ? "game-foundry-3d" : modly ? "modly-compatible" : null,
+      formats: assetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : ["glb","gltf","obj","ply","stl","vox"],
     },
     gameGeneration: {
       configured: Boolean(gameWorker),
@@ -119,7 +129,7 @@ export async function submitGameFoundryAsset(input: {
   if (!workerJobId) throw new Error("Game Foundry 3D worker did not return a job id.");
   return {
     workerJobId,
-    status: String(json.status ?? "queued").toLowerCase(),
+    status: normalizeStatus(json.status),
     outputUrl: safeUrl(json.output_url ?? json.asset_url),
     previewUrl: safeUrl(json.preview_url ?? json.thumbnail_url),
     errorMessage: typeof json.error === "string" ? json.error.slice(0,1000) : null,
@@ -152,7 +162,7 @@ export async function submitGameFoundryProject(input: {
   if (!workerJobId) throw new Error("Game Foundry game worker did not return a job id.");
   return {
     workerJobId,
-    status: String(json.status ?? "queued").toLowerCase(),
+    status: normalizeStatus(json.status),
     outputUrl: safeUrl(json.output_url ?? json.project_url),
     previewUrl: safeUrl(json.preview_url ?? json.play_url),
     errorMessage: typeof json.error === "string" ? json.error.slice(0,1000) : null,
