@@ -147,7 +147,7 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
         if(videoKeys.has(`${shot.id}:${segmentIndex}`)) continue
         let mappingId:string|null=null
         try{
-          const seconds=durations[segmentIndex]
+          const seconds=durations[segmentIndex]!
           const mapping=await sb.from('cinema_shot_renders').insert({
             user_id:context.userId,cinema_project_id:data.projectId,scene_id:data.sceneId,shot_id:shot.id,stage:'video',segment_index:segmentIndex,
             duration_seconds:seconds,provider:'ltx',status:'queued',metadata:{sceneTitle:scene.title,shot,segmentIndex,segmentCount:durations.length}
