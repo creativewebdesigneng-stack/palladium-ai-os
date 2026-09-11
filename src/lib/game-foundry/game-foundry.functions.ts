@@ -517,7 +517,7 @@ export const prepareGameFoundryProjectPackage = createServerFn({ method:"POST" }
   .handler(async ({ data, context }) => {
     const sb=context.supabase as unknown as Sb;
     const project=await sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,source_manifest,source_status,export_manifest,handoff_status")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,content_manifest,source_manifest,source_status,export_manifest,handoff_status")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if(project.error) throw new Error(project.error.message);
     if(!project.data) throw new Error("Game Foundry project not found.");
