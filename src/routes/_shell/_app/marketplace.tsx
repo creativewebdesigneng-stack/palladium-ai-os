@@ -4,9 +4,9 @@ import Screen from "@/screens/Marketplace";
 export const Route = createFileRoute("/_shell/_app/marketplace")({
   head: () => ({
     meta: [
-      { title: "Marketplace — PalladiumAI" },
+      { title: "Marketplace — Blackstar" },
       { name: "description", content: "Install capabilities, templates and integrations." },
-      { property: "og:title", content: "Marketplace — PalladiumAI" },
+      { property: "og:title", content: "Marketplace — Blackstar" },
       { property: "og:description", content: "Install capabilities, templates and integrations." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -20,7 +20,7 @@ export default function Marketplace() {
 
   return (
     <>
-      <PageHeader eyebrow="Marketplace" title="Marketplace" description="Discover AI agents built and published by the PalladiumAI community." action={headerActions} />
+      <PageHeader eyebrow="Marketplace" title="Marketplace" description="Discover AI agents built and published by the Blackstar community." action={headerActions} />
       <ListingBrowser />
     </>
   );
