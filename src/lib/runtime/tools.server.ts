@@ -19,6 +19,7 @@ import { APP_STUDIO_TOOL_DEF, runAppStudioTool } from "@/lib/app-studio/app-stud
 import { VOXEL_STUDIO_TOOL_DEF, runVoxelStudioTool } from "@/lib/voxel/voxel-agent-tool.server";
 import { THREE_D_STUDIO_TOOL_DEF, runThreeDStudioTool } from "@/lib/three-d/three-d-agent-tool.server";
 import { GAME_FOUNDRY_TOOL_DEF, runGameFoundryTool } from "@/lib/game-foundry/game-foundry-agent-tool.server";
+import { CINEMA_STUDIO_TOOL_DEF, runCinemaStudioTool } from "@/lib/cinema/cinema-agent-tool.server";
 import { SHORT_VIDEO_TOOL_DEF, runShortVideoTool } from "@/lib/media/short-video-agent-tool.server";
 import {
   BLACKSTAR_ASTRA_VISION_TOOL_DEF,
@@ -46,6 +47,7 @@ const LOCAL_TOOL_DEFS = [
   VOXEL_STUDIO_TOOL_DEF,
   THREE_D_STUDIO_TOOL_DEF,
   GAME_FOUNDRY_TOOL_DEF,
+  CINEMA_STUDIO_TOOL_DEF,
   SHORT_VIDEO_TOOL_DEF,
   BLACKSTAR_ASTRA_VISION_TOOL_DEF,
   BLACKSTAR_ASTRA_ASYNC_WORKFLOW_TOOL_DEF,
@@ -64,6 +66,7 @@ export const TOOL_SLUGS = [
   "voxel_studio",
   "three_d_studio",
   "game_foundry",
+  "cinema_studio",
   "short_video",
   "astra_vision",
   "astra_async_workflow",
@@ -80,6 +83,7 @@ export const TOOL_MANIFEST = [
   { slug: "voxel_studio", description: VOXEL_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "three_d_studio", description: THREE_D_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "game_foundry", description: GAME_FOUNDRY_TOOL_DEF.description, sensitive: false },
+  { slug: "cinema_studio", description: CINEMA_STUDIO_TOOL_DEF.description, sensitive: false },
   { slug: "short_video", description: SHORT_VIDEO_TOOL_DEF.description, sensitive: false },
   { slug: "astra_vision", description: BLACKSTAR_ASTRA_VISION_TOOL_DEF.description, sensitive: false },
   { slug: "astra_async_workflow", description: BLACKSTAR_ASTRA_ASYNC_WORKFLOW_TOOL_DEF.description, sensitive: false },
@@ -223,6 +227,8 @@ export async function executeTool(
                     ? await runThreeDStudioTool(input, { userId: ctx.userId, sb: ctx.sb })
                     : name === "game_foundry"
                       ? await runGameFoundryTool(input, { userId: ctx.userId, sb: ctx.sb })
+                    : name === "cinema_studio"
+                      ? await runCinemaStudioTool(input, { userId: ctx.userId, sb: ctx.sb })
                     : name === "short_video"
                       ? await runShortVideoTool(input, { userId: ctx.userId, sb: ctx.sb })
                       : name === "astra_vision"
