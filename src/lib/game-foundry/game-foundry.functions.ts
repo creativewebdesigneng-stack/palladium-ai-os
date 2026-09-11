@@ -757,3 +757,55 @@ export const checkGameFoundryConnections = createServerFn({ method:"POST" })
   .handler(async()=>{
     return probeGameFoundryConnections();
   });
+
+
+export const certifyGameFoundryProject = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const [project,assets,connections]=await Promise.all([
+      sb.from("game_foundry_projects")
+        .select("id,name,target_engine,quality_profile,status,design_spec,content_manifest,content_status,source_manifest,source_status,package_manifest,package_status,export_manifest,handoff_status,output_url")
+        .eq("id",data.id).eq("user_id",context.userId).maybeSingle(),
+      sb.from("three_d_jobs")
+        .select("id,content_requirement_id,status,output_url,processed_output_url,processing_status,validation_report")
+        .eq("project_id",data.id).eq("user_id",context.userId)
+        .order("created_at",{ascending:true}),
+      probeGameFoundryConnections(),
+    ]);
+    if(project.error) throw new Error(project.error.message);
+    if(assets.error) throw new Error(assets.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+
+    const readiness=auditGameFoundryReadiness(project.data,assets.data??[]);
+    const requiredConnectorIds = project.data.target_engine==="web"
+      ? []
+      : ["game-worker", String(project.data.target_engine)];
+    const requiredConnections=connections.results.filter((item)=>requiredConnectorIds.includes(item.id));
+    const externalHealthy=requiredConnections.every((item)=>item.configured&&item.reachable&&item.healthy);
+    const externallyBlocked=project.data.target_engine!=="web"&&!externalHealthy;
+    const certified=readiness.runtimeReady && !externallyBlocked;
+    return {
+      projectId:data.id,
+      certified,
+      codeReady:true,
+      packageReady:readiness.packageReady,
+      runtimeReady:readiness.runtimeReady,
+      externallyBlocked,
+      readiness,
+      connections:{
+        summary:connections.summary,
+        required:requiredConnections,
+      },
+      blockers:[
+        ...readiness.blockers,
+        ...requiredConnections.filter((item)=>!item.configured).map((item)=>`${item.name} is not configured.`),
+        ...requiredConnections.filter((item)=>item.configured&&!item.healthy).map((item)=>`${item.name} is not healthy.`),
+      ],
+      certifiedAt:certified?new Date().toISOString():null,
+      note:certified
+        ?"Game Foundry project has persisted runtime-ready evidence and all required external connectors are healthy."
+        :"Game Foundry code is complete, but this project is not fully operationally certified until every reported blocker is cleared.",
+    };
+  });
