@@ -161,7 +161,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
       return { id:data.id, ...worker };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Game generation failed";
-      await sb.from("game_foundry_projects").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
+      await sb.from("game_foundry_projects").update({status:"planned",error_message:message.slice(0,1000),completed_at:null,updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
       throw error;
     }
   });
