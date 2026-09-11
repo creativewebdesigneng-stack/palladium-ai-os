@@ -7,12 +7,15 @@ import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
-import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
+import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 import {
   getGameFoundryCapabilities,
   getGameReadyProcessingCapabilities,
+  getGameFoundryAssetJob,
+  getGameFoundryProjectJob,
+  getGameReadyProcessingJob,
   submitGameFoundryAsset,
   submitGameFoundryProject,
   submitGameReadyProcessing,
@@ -160,7 +163,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
         preview_url:worker.previewUrl,
         error_message:worker.errorMessage,
         design_spec:project.data.design_spec,
-        metadata:{ ...(worker.metadata && typeof worker.metadata === "object" && !Array.isArray(worker.metadata) ? worker.metadata : {}), worker_design_spec:worker.designSpec },
+        metadata:{ provider:worker.provider, response:worker.metadata, worker_design_spec:worker.designSpec },
         completed_at:terminal ? new Date().toISOString() : null,
         updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId);
@@ -239,7 +242,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
         output_url:worker.outputUrl,
         preview_url:worker.previewUrl,
         error_message:worker.errorMessage,
-        metadata:worker.metadata,
+        metadata:{ provider:worker.provider, response:worker.metadata },
         completed_at:terminal ? new Date().toISOString() : null,
         updated_at:new Date().toISOString(),
       }).eq("id",created.data.id).eq("user_id",context.userId);
@@ -307,7 +310,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         preview_url:worker.previewUrl ?? asset.data.preview_url,
         error_message:worker.errorMessage,
         validation_report:worker.validationReport,
-        metadata:worker.metadata,
+        metadata:{ provider:worker.provider, response:worker.metadata },
         updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId);
       if (update.error) throw new Error(update.error.message);
