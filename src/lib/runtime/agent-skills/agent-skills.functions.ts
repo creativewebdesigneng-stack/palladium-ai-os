@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { prepareAgentSkillPackage } from "./skill-package";
+import { compileAgentSkillCapability } from "./capability-compiler";
+import { createPalladiumAiHubRegistry } from "@/lib/ai-hub/registry";
 import { createSkillCandidateFromVerifiedExperience } from "./skill-reflection.server";
 
 type Sb = { from: (table: string) => any };
@@ -156,4 +158,56 @@ export const deleteAgentSkill = createServerFn({ method: "POST" })
       metadata: { name: row.name },
     });
     return { ok: true };
+  });
+
+
+export const compileInstalledAgentSkillCapability = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: skill, error } = await sb
+      .from("agent_skills")
+      .select("id,user_id,files")
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error || !skill) throw new Error("That skill is not available to you.");
+
+    const fileMap = skill.files && typeof skill.files === "object" && !Array.isArray(skill.files)
+      ? skill.files as Record<string, unknown>
+      : {};
+    const files = Object.entries(fileMap)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+      .map(([path, content]) => ({ path, content }));
+    const prepared = prepareAgentSkillPackage(files, { acknowledgeRisk: true });
+
+    const { data: tools, error: toolsError } = await sb
+      .from("tools")
+      .select("slug,is_active")
+      .eq("is_active", true)
+      .limit(500);
+    if (toolsError) throw new Error("Could not inspect the live tool catalogue.");
+
+    const providers = createPalladiumAiHubRegistry()
+      .listProviders()
+      .filter((provider) => provider.enabled)
+      .map((provider) => provider.id);
+    const toolSlugs = (tools ?? [])
+      .map((tool: { slug?: unknown }) => typeof tool.slug === "string" ? tool.slug : "")
+      .filter(Boolean);
+
+    const compiled = compileAgentSkillCapability(prepared, {
+      tools: toolSlugs,
+      providers,
+    });
+
+    return {
+      skillId: skill.id,
+      compiled,
+      inventory: {
+        toolCount: toolSlugs.length,
+        providerCount: providers.length,
+      },
+    };
   });
