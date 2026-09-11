@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Box, Gamepad2, Image as ImageIcon, Loader2, Play, Sparkles, UploadCloud } from 'lucide-react';
+import { Box, FileUp, Gamepad2, Image as ImageIcon, Loader2, Play, Sparkles, UploadCloud } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
 import { Failed, Empty } from '@/components/business/live';
 import { useToast } from '@/components/ui/use-toast';
+import { uploadGameFoundrySource } from '@/lib/game-foundry/uploadGameFoundrySource';
+import GameFoundryModelViewer from '@/components/game-foundry/GameFoundryModelViewer';
 import {
   createGameFoundryAsset,
   createGameFoundryProject,
@@ -37,6 +39,7 @@ export default function GameFoundry() {
   const [sourceKind,setSourceKind] = useState('prompt');
   const [assetPrompt,setAssetPrompt] = useState('');
   const [sourceUrl,setSourceUrl] = useState('');
+  const [sourceFile,setSourceFile] = useState(null);
   const [format,setFormat] = useState('glb');
   const [assetQuality,setAssetQuality] = useState('game_ready');
   const [assetEngine,setAssetEngine] = useState('unreal');
@@ -55,11 +58,20 @@ export default function GameFoundry() {
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'Game generation could not start',description:friendlyMessage(error)}); },
   });
   const createAsset = useMutation({
-    mutationFn:()=>createAssetFn({data:{
-      projectId:null,inputName:assetName,sourceKind,prompt:sourceKind==='prompt'?assetPrompt:null,
-      sourceUrl:sourceKind==='prompt'?null:sourceUrl,outputFormat:format,qualityProfile:assetQuality,targetEngine:assetEngine,
-    }}),
-    onSuccess:async()=>{ setAssetName(''); setAssetPrompt(''); setSourceUrl(''); await refresh(); toast({title:'3D asset generation submitted'}); },
+    mutationFn:async()=>{
+      let storagePath = null;
+      if (sourceKind !== 'prompt' && sourceFile) {
+        const uploaded = await uploadGameFoundrySource(sourceFile);
+        storagePath = uploaded.storagePath;
+      }
+      return createAssetFn({data:{
+        projectId:null,inputName:assetName,sourceKind,prompt:sourceKind==='prompt'?assetPrompt:null,
+        sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl,
+        storagePath,
+        outputFormat:format,qualityProfile:assetQuality,targetEngine:assetEngine,
+      }});
+    },
+    onSuccess:async()=>{ setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'3D asset generation could not start',description:friendlyMessage(error)}); },
   });
 
@@ -67,6 +79,7 @@ export default function GameFoundry() {
   const projects = overview.data?.projects ?? [];
   const assets = overview.data?.assets ?? [];
   const canCreateAsset = sourceKind === 'image' ? caps?.assetGeneration?.imageTo3d : sourceKind === 'prompt' ? caps?.assetGeneration?.promptTo3d : caps?.assetGeneration?.modelEnhancement;
+  const hasAssetSource = sourceKind === 'prompt' ? Boolean(assetPrompt.trim()) : Boolean(sourceFile || sourceUrl.trim());
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
   const formats = caps?.assetGeneration?.formats ?? ['glb','gltf','obj','ply','stl','vox'];
 
@@ -110,8 +123,8 @@ export default function GameFoundry() {
           <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{formats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
           <Field label="Quality"><select value={assetQuality} onChange={(e)=>setAssetQuality(e.target.value)} className={control}><option value="draft">Draft</option><option value="game_ready">Game ready</option><option value="cinematic">Cinematic</option></select></Field>
         </div>
-        {sourceKind === 'prompt' ? <Field label="3D prompt"><textarea rows={5} value={assetPrompt} onChange={(e)=>setAssetPrompt(e.target.value)} className={control+' mt-3'} placeholder="A weathered sci-fi rifle, hard-surface PBR, clean topology, game-ready proportions…" /></Field> : <Field label={sourceKind==='image'?'Public reference image URL':'Public model URL'}><input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className={control+' mt-3'} placeholder="https://…" /></Field>}
-        <button disabled={!canCreateAsset || !assetName.trim() || createAsset.isPending || (sourceKind==='prompt'?!assetPrompt.trim():!sourceUrl.trim())} onClick={()=>createAsset.mutate()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{createAsset.isPending?<Loader2 className="h-4 w-4 animate-spin"/>:sourceKind==='image'?<ImageIcon className="h-4 w-4"/>:<UploadCloud className="h-4 w-4"/>}Generate asset</button>
+        {sourceKind === 'prompt' ? <Field label="3D prompt"><textarea rows={5} value={assetPrompt} onChange={(e)=>setAssetPrompt(e.target.value)} className={control+' mt-3'} placeholder="A weathered sci-fi rifle, hard-surface PBR, clean topology, game-ready proportions…" /></Field> : <div className="mt-3 grid gap-3"><Field label={sourceKind==='image'?'Upload reference image':'Upload existing 3D model'}><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-cyan-300/20 bg-cyan-400/[.03] px-3 py-3 text-xs text-zinc-300"><FileUp className="h-4 w-4 text-cyan-300"/><span className="min-w-0 flex-1 truncate">{sourceFile?.name || (sourceKind==='image'?'Choose PNG/JPG/WEBP/AVIF up to 100 MB':'Choose GLB/glTF/FBX/OBJ/USD/PLY/STL/VOX up to 100 MB')}</span><input type="file" className="hidden" accept={sourceKind==='image'?'.png,.jpg,.jpeg,.webp,.avif':'.glb,.gltf,.fbx,.obj,.usd,.usdz,.ply,.stl,.vox'} onChange={(e)=>setSourceFile(e.target.files?.[0] ?? null)} /></label></Field><div className="text-center text-[10px] uppercase tracking-[.2em] text-zinc-700">or</div><Field label={sourceKind==='image'?'Public reference image URL':'Public model URL'}><input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className={control} placeholder="https://…" /></Field></div>}
+        <button disabled={!canCreateAsset || !assetName.trim() || createAsset.isPending || !hasAssetSource} onClick={()=>createAsset.mutate()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{createAsset.isPending?<Loader2 className="h-4 w-4 animate-spin"/>:sourceKind==='image'?<ImageIcon className="h-4 w-4"/>:<UploadCloud className="h-4 w-4"/>}Generate asset</button>
         {!canCreateAsset && <p className="mt-2 text-xs text-amber-300">{sourceKind==='prompt'?'Prompt-to-3D requires GAME_FOUNDRY_3D_API_URL.':sourceKind==='model'?'Model enhancement requires GAME_FOUNDRY_3D_API_URL.':'No real image-to-3D worker is configured.'}</p>}
       </section>
     </div>
@@ -127,7 +140,7 @@ export default function GameFoundry() {
         {projects.map((project)=><div key={project.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{project.name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(project.project_type)} · {labelize(project.target_engine)} · {labelize(project.quality_profile)}</p></div><Status value={project.status}/></div><p className="mt-2 line-clamp-2 text-xs text-zinc-400">{project.prompt}</p>{project.error_message&&<p className="mt-2 text-xs text-rose-300">{project.error_message}</p>}<div className="mt-3 flex flex-wrap gap-2">{project.status==='draft'&&<button disabled={!caps?.gameGeneration?.configured || generateProject.isPending} onClick={()=>generateProject.mutate(project.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/20 px-2.5 py-1.5 text-xs text-violet-200 disabled:opacity-40"><Play className="h-3.5 w-3.5"/>Generate game</button>}{project.preview_url&&<a href={project.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Play preview</a>}{project.output_url&&<a href={project.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open project output</a>}</div></div>)}
       </History>
       <History title="3D assets" icon={Box} empty="No Game Foundry 3D assets yet.">
-        {assets.map((asset)=><div key={asset.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{asset.input_name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(asset.source_kind)} · {asset.requested_format?.toUpperCase()} · {labelize(asset.target_engine)}</p></div><Status value={asset.status}/></div>{asset.error_message&&<p className="mt-2 text-xs text-rose-300">{asset.error_message}</p>}<div className="mt-3 flex gap-2">{asset.preview_url&&<a href={asset.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Preview</a>}{asset.output_url&&<a href={asset.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open asset</a>}</div></div>)}
+        {assets.map((asset)=><div key={asset.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{asset.input_name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(asset.source_kind)} · {asset.requested_format?.toUpperCase()} · {labelize(asset.target_engine)}</p></div><Status value={asset.status}/></div>{asset.error_message&&<p className="mt-2 text-xs text-rose-300">{asset.error_message}</p>}{asset.output_url&&['glb','gltf'].includes(String(asset.requested_format).toLowerCase())&&<div className="mt-3"><GameFoundryModelViewer url={asset.output_url} label={asset.input_name}/></div>}<div className="mt-3 flex gap-2">{asset.preview_url&&<a href={asset.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Preview</a>}{asset.output_url&&<a href={asset.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open asset</a>}</div></div>)}
       </History>
     </div>
   </>;

@@ -28,7 +28,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
         .order("created_at",{ascending:false})
         .limit(50),
       sb.from("three_d_jobs")
-        .select("id,project_id,input_name,source_url,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
+        .select("id,project_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(100),
@@ -112,12 +112,13 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     sourceKind,
     prompt:z.string().trim().max(10_000).nullable().optional(),
     sourceUrl:z.string().url().max(4000).nullable().optional(),
+    storagePath:z.string().trim().max(500).nullable().optional(),
     outputFormat,
     qualityProfile:assetQuality,
     targetEngine:engine,
   }).superRefine((value,ctx)=>{
     if (value.sourceKind === "prompt" && !value.prompt?.trim()) ctx.addIssue({code:"custom",path:["prompt"],message:"Prompt-to-3D requires a prompt."});
-    if (value.sourceKind !== "prompt" && !value.sourceUrl) ctx.addIssue({code:"custom",path:["sourceUrl"],message:"Image/model workflows require a public source URL."});
+    if (value.sourceKind !== "prompt" && !value.sourceUrl && !value.storagePath) ctx.addIssue({code:"custom",path:["sourceUrl"],message:"Image/model workflows require an uploaded source or public source URL."});
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -126,11 +127,24 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
       if (owner.error) throw new Error(owner.error.message);
       if (!owner.data) throw new Error("Game Foundry project not found.");
     }
+    let resolvedSourceUrl = data.sourceUrl ?? null;
+    if (data.storagePath) {
+      const expectedPrefix = `${context.userId}/`;
+      if (!data.storagePath.startsWith(expectedPrefix)) throw new Error("Uploaded source path is not owned by this account.");
+      const storageClient = (context.supabase as any).storage;
+      const { data: signed, error: signedError } = await storageClient
+        .from("game-foundry")
+        .createSignedUrl(data.storagePath, 300);
+      if (signedError || !signed?.signedUrl) throw new Error("Could not prepare the private Game Foundry source for generation.");
+      resolvedSourceUrl = signed.signedUrl;
+    }
+
     const created = await sb.from("three_d_jobs").insert({
       user_id:context.userId,
       project_id:data.projectId ?? null,
       input_name:data.inputName,
       source_url:data.sourceUrl ?? null,
+      source_storage_path:data.storagePath ?? null,
       source_kind:data.sourceKind,
       prompt:data.prompt?.trim() || null,
       workflow:`${data.sourceKind}-to-mesh`,
@@ -144,7 +158,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
       const worker = await submitGameFoundryAsset({
         sourceKind: data.sourceKind,
         prompt: data.prompt ?? null,
-        sourceUrl: data.sourceUrl ?? null,
+        sourceUrl: resolvedSourceUrl,
         outputFormat: data.outputFormat,
         qualityProfile: data.qualityProfile,
         targetEngine: data.targetEngine,
