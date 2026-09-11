@@ -62,3 +62,36 @@ export async function getCinemaRender(id:string) {
   const json=JSON.parse(raw)
   return {status:String(json.status ?? 'queued'),outputUrl:typeof json.output_url==='string'?json.output_url:null,errorMessage:typeof json.error==='string'?json.error.slice(0,1000):null,metadata:{stage:json.stage ?? null,progress:json.progress ?? null}}
 }
+
+
+export async function submitCinemaMasterAssembly(input:{
+  projectId:string;
+  title:string;
+  aspectRatio:CinemaAspect;
+  quality:CinemaQuality;
+  manifest:unknown;
+}) {
+  const url=base()
+  if(!url) throw new Error('Cinema master assembly requires CINEMA_STUDIO_WORKER_URL.')
+  const response=await fetch(`${url}/v1/films/assemble`,{
+    method:'POST',
+    headers:headers(),
+    redirect:'manual',
+    signal:AbortSignal.timeout(120_000),
+    body:JSON.stringify({
+      workflow:'blackstar-cinema-master-assembly',
+      project_id:input.projectId,
+      title:input.title,
+      aspect_ratio:input.aspectRatio,
+      quality:input.quality,
+      manifest:input.manifest,
+    })
+  })
+  const raw=await response.text()
+  if(!response.ok) throw new Error(`Cinema master worker rejected assembly (${response.status}): ${raw.slice(0,400)}`)
+  let json:any
+  try{json=JSON.parse(raw)}catch{throw new Error('Cinema master worker returned invalid JSON.')}
+  const id=String(json.id??json.job_id??'').trim()
+  if(!id) throw new Error('Cinema master worker did not return a job id.')
+  return {workerJobId:id,status:String(json.status??'queued'),outputUrl:typeof json.output_url==='string'?json.output_url:null}
+}
