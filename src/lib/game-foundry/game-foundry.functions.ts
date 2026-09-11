@@ -152,8 +152,8 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
         output_url:worker.outputUrl,
         preview_url:worker.previewUrl,
         error_message:worker.errorMessage,
-        design_spec:worker.designSpec,
-        metadata:worker.metadata,
+        design_spec:project.data.design_spec,
+        metadata:{ ...(worker.metadata && typeof worker.metadata === "object" && !Array.isArray(worker.metadata) ? worker.metadata : {}), worker_design_spec:worker.designSpec },
         completed_at:terminal ? new Date().toISOString() : null,
         updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId);
