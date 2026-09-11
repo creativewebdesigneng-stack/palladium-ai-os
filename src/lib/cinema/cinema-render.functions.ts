@@ -162,7 +162,8 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
             shot.audioPrompt?`Audio intent: ${shot.audioPrompt}.`:'',
             `This is segment ${segmentIndex+1} of ${durations.length} for the same shot. Preserve the supplied source-frame identity, composition, wardrobe, location, lighting and prop continuity. Maintain natural temporal motion and avoid cuts inside this segment.`
           ].filter(Boolean).join(' ')
-          const media=await createMediaJob(sb,context.userId,{provider:'ltx',prompt,aspectRatio:project.data.aspect_ratio==='2.39:1'||project.data.aspect_ratio==='1.85:1'?'16:9':project.data.aspect_ratio,sourceUrl:keyframeByShot.get(String(shot.id))!,durationSeconds:seconds,metadata:{cinemaProjectId:data.projectId,sceneId:data.sceneId,shotId:shot.id,stage:'video',segmentIndex}})
+          const projectAspect=String(project.data.aspect_ratio)
+          const media=await createMediaJob(sb,context.userId,{provider:'ltx',prompt,aspectRatio:projectAspect==='2.39:1'||projectAspect==='1.85:1'?'16:9':projectAspect,sourceUrl:keyframeByShot.get(String(shot.id))!,durationSeconds:seconds,metadata:{cinemaProjectId:data.projectId,sceneId:data.sceneId,shotId:shot.id,stage:'video',segmentIndex}})
           const update=await sb.from('cinema_shot_renders').update({media_job_id:media.mediaJobId,status:media.status,output_url:media.outputUrl,completed_at:completedAt(media.status),updated_at:new Date().toISOString()}).eq('id',mappingId).eq('user_id',context.userId)
           if(update.error) throw new Error(update.error.message)
           results.push({shotId:shot.id,segmentIndex,renderId:mappingId,status:media.status})
