@@ -25,6 +25,7 @@ export function buildGameFoundryProjectPackage(input: {
     project_type:string;
     quality_profile:string;
     design_spec:unknown;
+    content_manifest?:unknown;
     source_manifest:unknown;
     export_manifest:unknown;
   };
@@ -50,6 +51,7 @@ export function buildGameFoundryProjectPackage(input: {
       qualityProfile:input.project.quality_profile,
     },
     design:input.project.design_spec && typeof input.project.design_spec === "object" ? input.project.design_spec : {},
+    content:input.project.content_manifest && typeof input.project.content_manifest === "object" ? input.project.content_manifest : {},
     source:{
       summary:typeof source.summary === "string" ? source.summary : "",
       files,
