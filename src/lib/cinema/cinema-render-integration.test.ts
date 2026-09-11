@@ -16,7 +16,8 @@ describe('Cinema shot rendering integration',()=>{
     expect(functions).toContain("provider:'seedream'")
     expect(functions).toContain("provider:'ltx'")
     expect(functions).toContain('submitGenerativeMediaJob')
-    expect(functions).toContain('sourceUrl:keyframeByShot.get')
+    expect(functions).toContain('const keyframeUrl=String(keyframeByShot.get')
+    expect(functions).toContain('sourceUrl:keyframeUrl')
   })
   it('prevents duplicate project scene shot stage segments',()=>{
     expect(migration).toContain('cinema_shot_renders_unique_segment')
