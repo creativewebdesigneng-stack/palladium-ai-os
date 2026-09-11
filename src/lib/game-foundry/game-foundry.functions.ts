@@ -270,7 +270,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const asset = await sb.from("three_d_jobs")
-      .select("id,user_id,status,output_url,requested_format,target_engine,processing_status")
+      .select("id,user_id,status,output_url,preview_url,requested_format,target_engine,processing_status")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (asset.error) throw new Error(asset.error.message);
     if (!asset.data) throw new Error("Game Foundry asset not found.");
