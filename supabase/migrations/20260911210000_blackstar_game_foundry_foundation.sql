@@ -30,6 +30,11 @@ alter table public.three_d_jobs
 
 alter table public.three_d_jobs alter column source_url drop not null;
 
+alter table public.three_d_jobs drop constraint if exists three_d_jobs_requested_format_check;
+alter table public.three_d_jobs
+  add constraint three_d_jobs_requested_format_check
+  check (requested_format in ('glb','gltf','fbx','obj','usd','ply','stl','vox'));
+
 create index if not exists game_foundry_projects_user_created_idx on public.game_foundry_projects(user_id, created_at desc);
 create index if not exists three_d_jobs_project_idx on public.three_d_jobs(project_id, created_at desc);
 
