@@ -7,7 +7,7 @@ import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
-import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
+import { getGameFoundryIntegrations, probeGameFoundryConnections } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
@@ -749,4 +749,11 @@ export const auditGameFoundryProjectReadiness = createServerFn({ method:"POST" }
     if(assets.error) throw new Error(assets.error.message);
     if(!project.data) throw new Error("Game Foundry project not found.");
     return { projectId:data.id, ...auditGameFoundryReadiness(project.data,assets.data??[]) };
+  });
+
+
+export const checkGameFoundryConnections = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async()=>{
+    return probeGameFoundryConnections();
   });
