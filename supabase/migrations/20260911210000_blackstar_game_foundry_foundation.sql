@@ -40,6 +40,9 @@ create index if not exists three_d_jobs_project_idx on public.three_d_jobs(proje
 
 alter table public.game_foundry_projects enable row level security;
 
+revoke all privileges on table public.game_foundry_projects from anon;
+grant select, insert, update, delete on table public.game_foundry_projects to authenticated;
+
 drop policy if exists "game_foundry_projects_owner_all" on public.game_foundry_projects;
 create policy "game_foundry_projects_owner_all"
   on public.game_foundry_projects
