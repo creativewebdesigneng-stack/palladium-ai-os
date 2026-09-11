@@ -19,7 +19,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","connection_health","list_projects","create_project","plan_project","generate_content","generate_required_assets","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package","audit_readiness"] },
+      action: { type:"string", enum:["capabilities","connection_health","list_projects","create_project","plan_project","generate_content","generate_required_assets","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package","audit_readiness","certify_project"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -331,6 +331,31 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
     }).eq("id",projectId).eq("user_id",ctx.userId);
     if(update.error) throw new Error(update.error.message);
     return {projectId,...handoff};
+  }
+  if (action === "certify_project") {
+    const projectId=text(input,"project_id",60);
+    if(!projectId) throw new Error("certify_project requires project_id.");
+    const [project,assets,connections]=await Promise.all([
+      ctx.sb.from("game_foundry_projects")
+        .select("id,name,target_engine,quality_profile,status,design_spec,content_manifest,content_status,source_manifest,source_status,package_manifest,package_status,export_manifest,handoff_status,output_url")
+        .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle(),
+      ctx.sb.from("three_d_jobs")
+        .select("id,content_requirement_id,status,output_url,processed_output_url,processing_status,validation_report")
+        .eq("project_id",projectId).eq("user_id",ctx.userId).order("created_at",{ascending:true}),
+      probeGameFoundryConnections(),
+    ]);
+    if(project.error) throw new Error(project.error.message);
+    if(assets.error) throw new Error(assets.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    const readiness=auditGameFoundryReadiness(project.data,assets.data??[]);
+    const requiredIds=project.data.target_engine==="web"?[]:["game-worker",String(project.data.target_engine)];
+    const required=connections.results.filter((item)=>requiredIds.includes(item.id));
+    const externalHealthy=required.every((item)=>item.configured&&item.reachable&&item.healthy);
+    const externallyBlocked=project.data.target_engine!=="web"&&!externalHealthy;
+    return {
+      projectId,certified:readiness.runtimeReady&&!externallyBlocked,codeReady:true,packageReady:readiness.packageReady,
+      runtimeReady:readiness.runtimeReady,externallyBlocked,readiness,connections:{summary:connections.summary,required},
+    };
   }
   if (action === "audit_readiness") {
     const projectId=text(input,"project_id",60);
