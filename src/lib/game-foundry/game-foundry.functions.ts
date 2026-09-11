@@ -7,8 +7,10 @@ import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import {
   getGameFoundryCapabilities,
+  getGameReadyProcessingCapabilities,
   submitGameFoundryAsset,
   submitGameFoundryProject,
+  submitGameReadyProcessing,
 } from "./game-foundry-runtime.server";
 
 type Sb = { from: (table: string) => any };
@@ -40,14 +42,14 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
         .order("created_at",{ascending:false})
         .limit(50),
       sb.from("three_d_jobs")
-        .select("id,project_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at")
+        .select("id,project_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,processing_profile,validation_report,processed_output_url,processing_worker_job_id,processing_status,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(100),
     ]);
     if (projects.error) throw new Error(projects.error.message);
     if (assets.error) throw new Error(assets.error.message);
-    return { capabilities:getGameFoundryCapabilities(), projects:projects.data ?? [], assets:assets.data ?? [] };
+    return { capabilities:{ ...getGameFoundryCapabilities(), gameReadyProcessing:getGameReadyProcessingCapabilities() }, projects:projects.data ?? [], assets:assets.data ?? [] };
   });
 
 export const createGameFoundryProject = createServerFn({ method:"POST" })
@@ -242,6 +244,77 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Asset generation failed";
       await sb.from("three_d_jobs").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",created.data.id).eq("user_id",context.userId);
+      throw error;
+    }
+  });
+
+
+const gameReadyProfile = z.object({
+  generatePbrMaterials: z.boolean().default(true),
+  unwrapUvs: z.boolean().default(true),
+  generateLods: z.boolean().default(true),
+  generateCollision: z.boolean().default(true),
+  optimizeTopology: z.boolean().default(true),
+  rigging: z.enum(["none","auto"]).default("none"),
+  animation: z.enum(["none","idle","basic"]).default("none"),
+  textureResolution: z.union([z.literal(1024),z.literal(2048),z.literal(4096)]).default(2048),
+  targetPolycount: z.number().int().min(500).max(5_000_000).nullable().default(null),
+});
+
+export const processGameFoundryAsset = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id:z.string().uuid(),
+    profile:gameReadyProfile,
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const asset = await sb.from("three_d_jobs")
+      .select("id,user_id,status,output_url,requested_format,target_engine,processing_status")
+      .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
+    if (asset.error) throw new Error(asset.error.message);
+    if (!asset.data) throw new Error("Game Foundry asset not found.");
+    if (asset.data.status !== "completed" || !asset.data.output_url) throw new Error("The source asset must complete before game-ready processing.");
+    if (!["not_started","failed"].includes(String(asset.data.processing_status))) throw new Error("This asset is already being processed.");
+
+    const claimed = await sb.from("three_d_jobs").update({
+      processing_status:"queued",
+      processing_profile:data.profile,
+      validation_report:{},
+      processed_output_url:null,
+      processing_worker_job_id:null,
+      updated_at:new Date().toISOString(),
+    }).eq("id",data.id).eq("user_id",context.userId).in("processing_status",["not_started","failed"]).select("id").maybeSingle();
+    if (claimed.error) throw new Error(claimed.error.message);
+    if (!claimed.data) throw new Error("This asset is no longer ready for processing.");
+
+    try {
+      const worker = await submitGameReadyProcessing({
+        sourceUrl:String(asset.data.output_url),
+        targetEngine:asset.data.target_engine,
+        outputFormat:String(asset.data.requested_format),
+        profile:data.profile,
+      });
+      const update = await sb.from("three_d_jobs").update({
+        processing_status:worker.status,
+        processing_worker_job_id:worker.workerJobId,
+        processed_output_url:worker.outputUrl,
+        preview_url:worker.previewUrl ?? asset.data.preview_url,
+        error_message:worker.errorMessage,
+        validation_report:worker.validationReport,
+        metadata:worker.metadata,
+        updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId);
+      if (update.error) throw new Error(update.error.message);
+      await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.asset_processed", targetType:"three_d_job", targetId:data.id, status:"success", metadata:{ targetEngine:asset.data.target_engine, format:asset.data.requested_format } });
+      return { id:data.id, ...worker };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Game-ready processing failed";
+      await sb.from("three_d_jobs").update({
+        processing_status:"failed",
+        error_message:message.slice(0,1000),
+        updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId);
       throw error;
     }
   });
