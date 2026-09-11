@@ -12,6 +12,7 @@ import GameFoundryModelViewer from '@/components/game-foundry/GameFoundryModelVi
 import GameFoundryWebPreview from '@/components/game-foundry/GameFoundryWebPreview';
 import {
   auditGameFoundryProjectReadiness,
+  checkGameFoundryConnections,
   createGameFoundryAsset,
   createGameFoundryProject,
   generateGameFoundryProject,
@@ -39,6 +40,7 @@ export default function GameFoundry() {
   const { toast } = useToast();
   const overviewFn = useServerFn(getGameFoundryOverview);
   const auditReadinessFn = useServerFn(auditGameFoundryProjectReadiness);
+  const checkConnectionsFn = useServerFn(checkGameFoundryConnections);
   const createProjectFn = useServerFn(createGameFoundryProject);
   const generateProjectFn = useServerFn(generateGameFoundryProject);
   const generateContentFn = useServerFn(generateGameFoundryContentManifest);
@@ -73,6 +75,10 @@ export default function GameFoundry() {
   const overview = useQuery({ queryKey:['game-foundry'], queryFn:()=>overviewFn(), enabled:session==='yes', retry:false });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
 
+  const checkConnections = useMutation({
+    mutationFn:()=>checkConnectionsFn(),
+    onError:(error)=>toast({variant:'destructive',title:'Connection health check failed',description:friendlyMessage(error)}),
+  });
   const auditReadiness = useMutation({
     mutationFn:(id)=>auditReadinessFn({data:{id}}),
     onError:(error)=>toast({variant:'destructive',title:'Readiness audit failed',description:friendlyMessage(error)}),
@@ -224,7 +230,8 @@ export default function GameFoundry() {
     </div>
 
     <section className="mt-4 rounded-2xl border border-white/10 bg-white/[.025] p-5">
-      <div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Network className="h-4 w-4"/></span><div><h2 className="text-sm font-semibold text-white">Engine & DCC integrations</h2><p className="mt-1 text-xs text-zinc-500">Blackstar reports a bridge as connected only when a dedicated endpoint is actually configured; otherwise it offers compatible export formats.</p></div></div>
+      <div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Network className="h-4 w-4"/></span><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-white">Engine & DCC integrations</h2><p className="mt-1 text-xs text-zinc-500">Blackstar reports a bridge as connected only when a dedicated endpoint is actually configured; otherwise it offers compatible export formats.</p></div><button onClick={()=>checkConnections.mutate()} disabled={checkConnections.isPending} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 disabled:opacity-40">{checkConnections.isPending?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>}Check connections</button></div>
+      {checkConnections.data&&<div className="mt-3 rounded-xl border border-white/[.06] bg-black/20 p-3"><div className="flex flex-wrap gap-2 text-[10px] text-zinc-500"><span>{checkConnections.data.summary.configured}/{checkConnections.data.summary.total} configured</span><span>·</span><span>{checkConnections.data.summary.reachable} reachable</span><span>·</span><span>{checkConnections.data.summary.healthy} healthy</span></div><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checkConnections.data.results.map((item)=><div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/[.05] px-2.5 py-2"><div><p className="text-[11px] text-zinc-300">{item.name}</p><p className="text-[10px] text-zinc-600">{item.configured?(item.healthy?'Healthy':item.reachable?`Reachable · HTTP ${item.httpStatus}`:'Configured · unreachable'):'Not configured'}</p></div><span className={`h-2 w-2 rounded-full ${item.healthy?'bg-emerald-400':item.reachable?'bg-amber-400':item.configured?'bg-rose-400':'bg-zinc-700'}`}/></div>)}</div></div>}
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{integrations.map((item)=><div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-white">{item.name}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] ${item.bridgeConfigured?'border-emerald-400/20 text-emerald-300':'border-white/10 text-zinc-500'}`}>{item.bridgeConfigured?'Bridge configured':'Export only'}</span></div><p className="mt-1 text-[11px] text-zinc-500">{item.mechanism}</p><p className="mt-2 text-[11px] text-zinc-400">{item.formats.join(' · ')}</p></div>)}</div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{engineCards.map((item)=><div key={item.id} className="rounded-xl border border-white/[.06] bg-white/[.015] p-3"><p className="text-xs font-medium text-zinc-200">{labelize(item.id)}</p><p className="mt-1 text-[10px] text-zinc-500">{item.exports.join(' · ')}</p></div>)}</div>
     </section>
