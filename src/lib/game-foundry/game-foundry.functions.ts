@@ -50,7 +50,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
         .order("created_at",{ascending:false})
         .limit(50),
       sb.from("three_d_jobs")
-        .select("id,project_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,processing_profile,validation_report,processed_output_url,processing_worker_job_id,processing_status,created_at,updated_at,completed_at")
+        .select("id,project_id,content_requirement_id,input_name,source_url,source_storage_path,source_kind,prompt,workflow,requested_format,quality_profile,target_engine,status,worker_job_id,output_url,preview_url,error_message,metadata,processing_profile,validation_report,processed_output_url,processing_worker_job_id,processing_status,created_at,updated_at,completed_at")
         .eq("user_id", context.userId)
         .order("created_at",{ascending:false})
         .limit(100),
@@ -254,6 +254,90 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
       await sb.from("three_d_jobs").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",created.data.id).eq("user_id",context.userId);
       throw error;
     }
+  });
+
+
+export const generateGameFoundryRequiredAssets = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({id:z.string().uuid(),limit:z.number().int().min(1).max(8).default(6)}).parse(input))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const project=await sb.from("game_foundry_projects")
+      .select("id,name,target_engine,quality_profile,content_manifest,content_status")
+      .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(project.data.content_status!=="generated") throw new Error("Generate the approved gameplay/world content before generating required 3D assets.");
+
+    const requirements=Array.isArray(project.data.content_manifest?.assetRequirements)
+      ? project.data.content_manifest.assetRequirements
+      : [];
+    const supportedKinds=new Set(["environment","character","prop","vehicle","weapon"]);
+    const rank:Record<string,number>={critical:0,high:1,medium:2,low:3};
+    const eligible=requirements
+      .filter((item:any)=>item&&typeof item.id==="string"&&typeof item.name==="string"&&typeof item.description==="string"&&supportedKinds.has(String(item.kind)))
+      .sort((a:any,b:any)=>(rank[String(a.priority)]??9)-(rank[String(b.priority)]??9))
+      .slice(0,data.limit);
+    if(!eligible.length) throw new Error("This content manifest has no supported 3D asset requirements.");
+
+    const existing=await sb.from("three_d_jobs")
+      .select("content_requirement_id")
+      .eq("project_id",data.id).eq("user_id",context.userId)
+      .not("content_requirement_id","is",null);
+    if(existing.error) throw new Error(existing.error.message);
+    const existingIds=new Set((existing.data??[]).map((row:any)=>String(row.content_requirement_id)));
+    const pending=eligible.filter((item:any)=>!existingIds.has(String(item.id)));
+    if(!pending.length) throw new Error("The selected Game Foundry asset requirements already have linked 3D jobs.");
+
+    const targetEngine=project.data.target_engine;
+    const outputFormat=["unreal","unity"].includes(targetEngine)?"fbx":"glb";
+    const qualityProfile=project.data.quality_profile==="cinematic"?"cinematic":project.data.quality_profile==="prototype"?"draft":"game_ready";
+    const results:any[]=[];
+
+    for(const requirement of pending){
+      const prompt=[
+        `Create a ${requirement.kind} asset for the game project "${project.data.name}".`,
+        String(requirement.description),
+        `Target engine: ${targetEngine}.`,
+        `Quality target: ${qualityProfile}.`,
+        "Produce clean game-ready geometry, appropriate topology and physically based material readiness. Do not add logos, text or unrelated objects unless the requirement asks for them.",
+      ].join(" ");
+      const created=await sb.from("three_d_jobs").insert({
+        user_id:context.userId,
+        project_id:data.id,
+        content_requirement_id:String(requirement.id),
+        input_name:String(requirement.name).slice(0,240),
+        source_url:null,
+        source_kind:"prompt",
+        prompt,
+        workflow:"prompt-to-mesh",
+        requested_format:outputFormat,
+        quality_profile:qualityProfile,
+        target_engine:targetEngine,
+        status:"queued",
+      }).select("id").single();
+      if(created.error) throw new Error(created.error.message);
+      try{
+        const worker=await submitGameFoundryAsset({
+          sourceKind:"prompt",prompt,sourceUrl:null,outputFormat,qualityProfile,targetEngine,
+        });
+        const terminal=["completed","failed","cancelled"].includes(worker.status);
+        const update=await sb.from("three_d_jobs").update({
+          worker_job_id:worker.workerJobId,status:worker.status,output_url:worker.outputUrl,preview_url:worker.previewUrl,
+          error_message:worker.errorMessage,metadata:{provider:worker.provider,response:worker.metadata},
+          completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+        }).eq("id",created.data.id).eq("user_id",context.userId);
+        if(update.error) throw new Error(update.error.message);
+        results.push({id:created.data.id,requirementId:String(requirement.id),name:String(requirement.name),status:worker.status});
+      }catch(error){
+        const message=error instanceof Error?error.message:"Required 3D asset generation failed";
+        await sb.from("three_d_jobs").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+          .eq("id",created.data.id).eq("user_id",context.userId);
+        results.push({id:created.data.id,requirementId:String(requirement.id),name:String(requirement.name),status:"failed",error:message});
+      }
+    }
+    await writeAudit({userId:context.userId,orgId:null,action:"game_foundry.required_assets_submitted",targetType:"game_foundry_project",targetId:data.id,status:"success",metadata:{requested:pending.length,submitted:results.length,targetEngine}});
+    return {projectId:data.id,results};
   });
 
 
