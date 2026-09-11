@@ -144,6 +144,7 @@ export async function submitGameFoundryProject(input: {
   projectType: string;
   targetEngine: GameFoundryEngine;
   qualityProfile: GameFoundryQuality;
+  designSpec?: Json;
 }) {
   const base = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
   if (!base) throw new Error("Full game generation requires GAME_FOUNDRY_GAME_API_URL.");
@@ -156,6 +157,7 @@ export async function submitGameFoundryProject(input: {
       project_type: input.projectType,
       target_engine: input.targetEngine,
       quality_profile: input.qualityProfile,
+      design_spec: input.designSpec ?? {},
     }),
   });
   const workerJobId = String(json.id ?? json.job_id ?? json.run_id ?? "").trim();
