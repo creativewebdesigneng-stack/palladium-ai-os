@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/platform/audit.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
+import { getGameFoundryIntegrations } from "./game-foundry-integrations.server";
 import {
   getGameFoundryCapabilities,
   getGameReadyProcessingCapabilities,
@@ -49,7 +50,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
     ]);
     if (projects.error) throw new Error(projects.error.message);
     if (assets.error) throw new Error(assets.error.message);
-    return { capabilities:{ ...getGameFoundryCapabilities(), gameReadyProcessing:getGameReadyProcessingCapabilities() }, projects:projects.data ?? [], assets:assets.data ?? [] };
+    return { capabilities:{ ...getGameFoundryCapabilities(), gameReadyProcessing:getGameReadyProcessingCapabilities(), integrations:getGameFoundryIntegrations() }, projects:projects.data ?? [], assets:assets.data ?? [] };
   });
 
 export const createGameFoundryProject = createServerFn({ method:"POST" })
