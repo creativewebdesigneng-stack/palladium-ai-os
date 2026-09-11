@@ -2,6 +2,7 @@ import type { ToolDef } from "@/lib/runtime/model-gateway.server";
 import { getGameFoundryCapabilities, getGameReadyProcessingCapabilities, submitGameFoundryAsset, submitGameFoundryProject, submitGameReadyProcessing } from "./game-foundry-runtime.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
+import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 
 type ToolContext = { userId: string; sb: { from: (table: string) => any } };
 
@@ -14,7 +15,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","process_asset","generate_project"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","process_asset","generate_project","prepare_handoff","send_handoff"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -188,6 +189,44 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
       await ctx.sb.from("three_d_jobs").update({processing_status:"failed",error_message:message.slice(0,1000),updated_at:new Date().toISOString()}).eq("id",assetId).eq("user_id",ctx.userId);
       throw error;
     }
+  }
+  if (action === "prepare_handoff") {
+    const projectId=text(input,"project_id",60);
+    if (!projectId) throw new Error("prepare_handoff requires project_id.");
+    const [project, assets] = await Promise.all([
+      ctx.sb.from("game_foundry_projects")
+        .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec")
+        .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle(),
+      ctx.sb.from("three_d_jobs")
+        .select("id,input_name,requested_format,output_url,processed_output_url,target_engine,validation_report,status")
+        .eq("project_id",projectId).eq("user_id",ctx.userId).eq("status","completed").order("created_at",{ascending:true}),
+    ]);
+    if (project.error) throw new Error(project.error.message);
+    if (assets.error) throw new Error(assets.error.message);
+    if (!project.data) throw new Error("Game Foundry project not found.");
+    const manifest=buildGameFoundryExportManifest(project.data,assets.data??[]);
+    const update=await ctx.sb.from("game_foundry_projects").update({
+      export_manifest:manifest,handoff_status:"prepared",handoff_id:null,handoff_error:null,handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }).eq("id",projectId).eq("user_id",ctx.userId);
+    if(update.error) throw new Error(update.error.message);
+    return { projectId,manifest,bridgeConfigured:Boolean(gameFoundryBridgeBase(project.data.target_engine)) };
+  }
+  if (action === "send_handoff") {
+    const projectId=text(input,"project_id",60);
+    if (!projectId) throw new Error("send_handoff requires project_id.");
+    const project=await ctx.sb.from("game_foundry_projects")
+      .select("id,target_engine,export_manifest,handoff_status")
+      .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(project.data.handoff_status!=="prepared"||!project.data.export_manifest||Object.keys(project.data.export_manifest).length===0) throw new Error("Prepare the engine handoff before sending it.");
+    const result=await submitGameFoundryBridgeHandoff({engine:project.data.target_engine,manifest:project.data.export_manifest,projectId});
+    const status=["completed","running","queued"].includes(result.status)?result.status:"queued";
+    const update=await ctx.sb.from("game_foundry_projects").update({
+      handoff_status:status,handoff_id:result.handoffId,handoff_error:null,handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }).eq("id",projectId).eq("user_id",ctx.userId);
+    if(update.error) throw new Error(update.error.message);
+    return {projectId,...result};
   }
   if (action === "generate_project") {
     const projectId=text(input,"project_id",60);
