@@ -13,8 +13,14 @@ const ENGINE_EXPORTS: Record<GameFoundryEngine, string[]> = {
   blender: ["glb","gltf","fbx","obj","usd"],
 };
 
+const BLACKSTAR_HOSTED_3D_WORKER = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
+
 function cleanBase(value: string | undefined) {
   return (value || "").trim().replace(/\/+$/, "");
+}
+
+function promptWorkerBase() {
+  return cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]) || BLACKSTAR_HOSTED_3D_WORKER;
 }
 
 function normalizeStatus(value: unknown) {
@@ -27,16 +33,17 @@ function normalizeStatus(value: unknown) {
 }
 
 export function getGameFoundryCapabilities() {
-  const assetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const assetWorker = promptWorkerBase();
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
-  const modly = cleanBase(process.env["MODLY_API_URL"]) || "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
+  const modly = cleanBase(process.env["MODLY_API_URL"]) || BLACKSTAR_HOSTED_3D_WORKER;
   return {
     assetGeneration: {
-      promptTo3d: Boolean(assetWorker),
+      promptTo3d: true,
       imageTo3d: Boolean(assetWorker || modly),
-      modelEnhancement: Boolean(assetWorker),
-      configuredProvider: assetWorker ? "game-foundry-3d" : modly ? "modly-compatible" : null,
-      formats: assetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : ["glb","gltf","obj","ply","stl","vox"],
+      modelEnhancement: Boolean(configuredAssetWorker),
+      configuredProvider: configuredAssetWorker ? "game-foundry-3d" : "blackstar-hosted-3d",
+      formats: configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : ["glb","gltf","obj","ply","stl","vox"],
     },
     gameGeneration: {
       configured: Boolean(gameWorker),
@@ -51,7 +58,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Capabilities are reported only when a real worker or existing Blackstar 3D provider is configured. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
+    note: "Prompt-to-3D uses Blackstar's hosted 3D execution node by default. GAME_FOUNDRY_3D_API_URL overrides it for a private/custom worker. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
   };
 }
 
@@ -92,7 +99,7 @@ async function request(base: string, token: string | undefined, path: string, in
   const headers = new Headers(init.headers);
   headers.set("Content-Type","application/json");
   if (token?.trim()) headers.set("Authorization",`Bearer ${token.trim()}`);
-  const response = await fetch(`${base}${path}`, { ...init, headers, redirect:"error", signal:AbortSignal.timeout(120_000) });
+  const response = await fetch(`${base}${path}`, { ...init, headers, redirect:"manual", signal:AbortSignal.timeout(120_000) });
   const text = await response.text();
   if (!response.ok) throw new Error(`Game Foundry worker error (${response.status}): ${text.slice(0,300)}`);
   try { return JSON.parse(text); } catch { throw new Error("Game Foundry worker returned invalid JSON."); }
@@ -106,15 +113,16 @@ export async function submitGameFoundryAsset(input: {
   qualityProfile: "draft" | "game_ready" | "cinematic";
   targetEngine: GameFoundryEngine;
 }) {
-  const assetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  const token = process.env["GAME_FOUNDRY_3D_API_TOKEN"];
+  const configuredAssetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const assetBase = input.sourceKind === "prompt" ? promptWorkerBase() : configuredAssetBase;
+  const token = configuredAssetBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined;
   if (input.sourceKind === "image" && !assetBase) {
     const { submitThreeDJob } = await import("./../three-d/three-d-runtime.server");
     if (!input.sourceUrl) throw new Error("A public image URL is required.");
     const fallback = await submitThreeDJob({ sourceUrl: input.sourceUrl, outputFormat: input.outputFormat });
     return { ...fallback, provider:"modly-compatible" as const };
   }
-  if (!assetBase) throw new Error(`${input.sourceKind === "prompt" ? "Prompt-to-3D" : "Model enhancement"} requires GAME_FOUNDRY_3D_API_URL.`);
+  if (!assetBase) throw new Error("Model enhancement requires GAME_FOUNDRY_3D_API_URL.");
   const body = {
     source_kind: input.sourceKind,
     prompt: input.prompt?.trim() || null,
@@ -147,9 +155,9 @@ export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly
     const result=await getThreeDJob(id);
     return { ...result, provider:"modly-compatible" as const };
   }
-  const base=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  if(!base) throw new Error("Game Foundry 3D worker is not configured.");
-  const json=await request(base,process.env["GAME_FOUNDRY_3D_API_TOKEN"],`/v1/assets/jobs/${encodeURIComponent(id)}`,{method:"GET"});
+  const configuredBase=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const base=configuredBase || promptWorkerBase();
+  const json=await request(base,configuredBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined,`/v1/assets/jobs/${encodeURIComponent(id)}`,{method:"GET"});
   return {
     workerJobId:id,
     status:normalizeStatus(json.status),
