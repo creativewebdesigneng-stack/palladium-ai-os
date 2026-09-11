@@ -111,7 +111,8 @@ export async function submitGameFoundryAsset(input: {
   if (input.sourceKind === "image" && !assetBase) {
     const { submitThreeDJob } = await import("./../three-d/three-d-runtime.server");
     if (!input.sourceUrl) throw new Error("A public image URL is required.");
-    return submitThreeDJob({ sourceUrl: input.sourceUrl, outputFormat: input.outputFormat });
+    const fallback = await submitThreeDJob({ sourceUrl: input.sourceUrl, outputFormat: input.outputFormat });
+    return { ...fallback, provider:"modly-compatible" as const };
   }
   if (!assetBase) throw new Error(`${input.sourceKind === "prompt" ? "Prompt-to-3D" : "Model enhancement"} requires GAME_FOUNDRY_3D_API_URL.`);
   const body = {
@@ -134,6 +135,29 @@ export async function submitGameFoundryAsset(input: {
     previewUrl: safeUrl(json.preview_url ?? json.thumbnail_url),
     errorMessage: typeof json.error === "string" ? json.error.slice(0,1000) : null,
     metadata: asJson(json),
+    provider:"game-foundry-3d" as const,
+  };
+}
+
+export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly-compatible"|"game-foundry-3d") {
+  const id=workerJobId.trim();
+  if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry asset worker id.");
+  if(provider==="modly-compatible"){
+    const { getThreeDJob } = await import("./../three-d/three-d-runtime.server");
+    const result=await getThreeDJob(id);
+    return { ...result, provider:"modly-compatible" as const };
+  }
+  const base=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  if(!base) throw new Error("Game Foundry 3D worker is not configured.");
+  const json=await request(base,process.env["GAME_FOUNDRY_3D_API_TOKEN"],`/v1/assets/jobs/${encodeURIComponent(id)}`,{method:"GET"});
+  return {
+    workerJobId:id,
+    status:normalizeStatus(json.status),
+    outputUrl:safeUrl(json.output_url ?? json.asset_url),
+    previewUrl:safeUrl(json.preview_url ?? json.thumbnail_url),
+    errorMessage:typeof json.error==="string"?json.error.slice(0,1000):null,
+    metadata:asJson(json),
+    provider:"game-foundry-3d" as const,
   };
 }
 
@@ -170,6 +194,24 @@ export async function submitGameFoundryProject(input: {
     errorMessage: typeof json.error === "string" ? json.error.slice(0,1000) : null,
     metadata: asJson(json),
     designSpec: asJson(json.design_spec ?? {}),
+    provider:"game-foundry-game" as const,
+  };
+}
+
+export async function getGameFoundryProjectJob(workerJobId:string) {
+  const id=workerJobId.trim();
+  if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry game worker id.");
+  const base=cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
+  if(!base) throw new Error("Game Foundry game worker is not configured.");
+  const json=await request(base,process.env["GAME_FOUNDRY_GAME_API_TOKEN"],`/v1/games/jobs/${encodeURIComponent(id)}`,{method:"GET"});
+  return {
+    workerJobId:id,
+    status:normalizeStatus(json.status),
+    outputUrl:safeUrl(json.output_url ?? json.project_url),
+    previewUrl:safeUrl(json.preview_url ?? json.play_url),
+    errorMessage:typeof json.error==="string"?json.error.slice(0,1000):null,
+    metadata:asJson(json),
+    provider:"game-foundry-game" as const,
   };
 }
 
@@ -234,5 +276,24 @@ export async function submitGameReadyProcessing(input: {
     errorMessage: typeof json.error === "string" ? json.error.slice(0, 1000) : null,
     validationReport: asJson(json.validation_report ?? json.validation ?? {}),
     metadata: asJson(json),
+    provider:"game-foundry-3d" as const,
+  };
+}
+
+export async function getGameReadyProcessingJob(workerJobId:string) {
+  const id=workerJobId.trim();
+  if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry processing worker id.");
+  const base=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  if(!base) throw new Error("Game Foundry 3D worker is not configured.");
+  const json=await request(base,process.env["GAME_FOUNDRY_3D_API_TOKEN"],`/v1/assets/process/${encodeURIComponent(id)}`,{method:"GET"});
+  return {
+    workerJobId:id,
+    status:normalizeStatus(json.status),
+    outputUrl:safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url),
+    previewUrl:safeUrl(json.preview_url ?? json.thumbnail_url),
+    errorMessage:typeof json.error==="string"?json.error.slice(0,1000):null,
+    validationReport:asJson(json.validation_report ?? json.validation ?? {}),
+    metadata:asJson(json),
+    provider:"game-foundry-3d" as const,
   };
 }
