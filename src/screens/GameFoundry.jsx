@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Box, FileUp, Gamepad2, Image as ImageIcon, Loader2, Play, Sparkles, UploadCloud } from 'lucide-react';
+import { Box, FileUp, Gamepad2, Image as ImageIcon, Loader2, Network, Play, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
@@ -14,6 +14,7 @@ import {
   createGameFoundryProject,
   generateGameFoundryProject,
   planGameFoundryProject,
+  processGameFoundryAsset,
   getGameFoundryOverview,
 } from '@/lib/game-foundry/game-foundry.functions';
 
@@ -30,6 +31,7 @@ export default function GameFoundry() {
   const generateProjectFn = useServerFn(generateGameFoundryProject);
   const planProjectFn = useServerFn(planGameFoundryProject);
   const createAssetFn = useServerFn(createGameFoundryAsset);
+  const processAssetFn = useServerFn(processGameFoundryAsset);
 
   const [name,setName] = useState('');
   const [prompt,setPrompt] = useState('');
@@ -64,6 +66,15 @@ export default function GameFoundry() {
     onSuccess:async()=>{ await refresh(); toast({title:'Game generation submitted'}); },
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'Game generation could not start',description:friendlyMessage(error)}); },
   });
+  const processAsset = useMutation({
+    mutationFn:(id)=>processAssetFn({data:{id,profile:{
+      generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,
+      rigging:'none',animation:'none',textureResolution:2048,targetPolycount:null,
+    }}}),
+    onSuccess:async()=>{ await refresh(); toast({title:'Game-ready processing submitted'}); },
+    onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'Game-ready processing failed',description:friendlyMessage(error)}); },
+  });
+
   const createAsset = useMutation({
     mutationFn:async()=>{
       let storagePath = null;
@@ -88,6 +99,7 @@ export default function GameFoundry() {
   const canCreateAsset = sourceKind === 'image' ? caps?.assetGeneration?.imageTo3d : sourceKind === 'prompt' ? caps?.assetGeneration?.promptTo3d : caps?.assetGeneration?.modelEnhancement;
   const hasAssetSource = sourceKind === 'prompt' ? Boolean(assetPrompt.trim()) : Boolean(sourceFile || sourceUrl.trim());
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
+  const integrations = useMemo(()=>caps?.integrations ?? [],[caps]);
   const formats = caps?.assetGeneration?.formats ?? ['glb','gltf','obj','ply','stl','vox'];
 
   return <>
@@ -137,9 +149,9 @@ export default function GameFoundry() {
     </div>
 
     <section className="mt-4 rounded-2xl border border-white/10 bg-white/[.025] p-5">
-      <h2 className="text-sm font-semibold text-white">Engine & DCC targets</h2>
-      <p className="mt-1 text-xs text-zinc-500">Blackstar distinguishes compatible export formats from genuine plugin/bridge integrations.</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{engineCards.map((item)=><div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-sm font-medium text-white">{labelize(item.id)}</p><p className="mt-1 text-[11px] text-zinc-500">{item.integration}</p><p className="mt-2 text-[11px] text-zinc-400">{item.exports.join(' · ')}</p></div>)}</div>
+      <div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Network className="h-4 w-4"/></span><div><h2 className="text-sm font-semibold text-white">Engine & DCC integrations</h2><p className="mt-1 text-xs text-zinc-500">Blackstar reports a bridge as connected only when a dedicated endpoint is actually configured; otherwise it offers compatible export formats.</p></div></div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{integrations.map((item)=><div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-white">{item.name}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] ${item.bridgeConfigured?'border-emerald-400/20 text-emerald-300':'border-white/10 text-zinc-500'}`}>{item.bridgeConfigured?'Bridge configured':'Export only'}</span></div><p className="mt-1 text-[11px] text-zinc-500">{item.mechanism}</p><p className="mt-2 text-[11px] text-zinc-400">{item.formats.join(' · ')}</p></div>)}</div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{engineCards.map((item)=><div key={item.id} className="rounded-xl border border-white/[.06] bg-white/[.015] p-3"><p className="text-xs font-medium text-zinc-200">{labelize(item.id)}</p><p className="mt-1 text-[10px] text-zinc-500">{item.exports.join(' · ')}</p></div>)}</div>
     </section>
 
     <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -147,7 +159,7 @@ export default function GameFoundry() {
         {projects.map((project)=><div key={project.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{project.name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(project.project_type)} · {labelize(project.target_engine)} · {labelize(project.quality_profile)}</p></div><Status value={project.status}/></div><p className="mt-2 line-clamp-2 text-xs text-zinc-400">{project.prompt}</p>{project.design_spec?.concept&&<div className="mt-3 rounded-lg border border-cyan-300/10 bg-cyan-400/[.025] p-3"><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-cyan-300/60">Compiled game design</p><p className="mt-1 text-xs text-zinc-300">{project.design_spec.concept}</p><div className="mt-2 grid gap-2 md:grid-cols-2">{project.design_spec.coreLoop?.slice(0,3).map((item)=><div key={item} className="rounded-md border border-white/[.06] bg-black/20 px-2 py-1.5 text-[11px] text-zinc-400">{item}</div>)}</div></div>}{project.error_message&&<p className="mt-2 text-xs text-rose-300">{project.error_message}</p>}<div className="mt-3 flex flex-wrap gap-2">{['draft','failed'].includes(project.status)&&<button disabled={planProject.isPending} onClick={()=>planProject.mutate(project.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/20 px-2.5 py-1.5 text-xs text-cyan-200 disabled:opacity-40"><Sparkles className="h-3.5 w-3.5"/>Generate design plan</button>}{project.status==='planned'&&<button disabled={!caps?.gameGeneration?.configured || generateProject.isPending} onClick={()=>generateProject.mutate(project.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/20 px-2.5 py-1.5 text-xs text-violet-200 disabled:opacity-40"><Play className="h-3.5 w-3.5"/>Build game</button>}{project.preview_url&&<a href={project.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Play preview</a>}{project.output_url&&<a href={project.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open project output</a>}</div></div>)}
       </History>
       <History title="3D assets" icon={Box} empty="No Game Foundry 3D assets yet.">
-        {assets.map((asset)=><div key={asset.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{asset.input_name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(asset.source_kind)} · {asset.requested_format?.toUpperCase()} · {labelize(asset.target_engine)}</p></div><Status value={asset.status}/></div>{asset.error_message&&<p className="mt-2 text-xs text-rose-300">{asset.error_message}</p>}{asset.output_url&&['glb','gltf'].includes(String(asset.requested_format).toLowerCase())&&<div className="mt-3"><GameFoundryModelViewer url={asset.output_url} label={asset.input_name}/></div>}<div className="mt-3 flex gap-2">{asset.preview_url&&<a href={asset.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Preview</a>}{asset.output_url&&<a href={asset.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open asset</a>}</div></div>)}
+        {assets.map((asset)=><div key={asset.id} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-white">{asset.input_name}</p><p className="mt-1 text-xs text-zinc-500">{labelize(asset.source_kind)} · {asset.requested_format?.toUpperCase()} · {labelize(asset.target_engine)}</p></div><div className="flex gap-1"><Status value={asset.status}/>{asset.processing_status&&asset.processing_status!=='not_started'&&<Status value={asset.processing_status}/>}</div></div>{asset.error_message&&<p className="mt-2 text-xs text-rose-300">{asset.error_message}</p>}{(asset.processed_output_url||asset.output_url)&&['glb','gltf'].includes(String(asset.requested_format).toLowerCase())&&<div className="mt-3"><GameFoundryModelViewer url={asset.processed_output_url||asset.output_url} label={asset.input_name}/></div>}{asset.validation_report&&Object.keys(asset.validation_report).length>0&&<div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-400/15 bg-emerald-400/[.04] p-2.5 text-[11px] text-emerald-200"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0"/><span>Validation report returned by the configured processor.</span></div>}<div className="mt-3 flex flex-wrap gap-2">{asset.status==='completed'&&asset.output_url&&['not_started','failed'].includes(asset.processing_status||'not_started')&&<button disabled={!caps?.gameReadyProcessing?.configured||processAsset.isPending} onClick={()=>processAsset.mutate(asset.id)} className="rounded-lg border border-cyan-300/20 px-2.5 py-1.5 text-xs text-cyan-200 disabled:opacity-40">Make game-ready</button>}{asset.preview_url&&<a href={asset.preview_url} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-xs text-emerald-300">Preview</a>}{asset.processed_output_url&&<a href={asset.processed_output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-cyan-300/20 px-2.5 py-1.5 text-xs text-cyan-200">Open processed asset</a>}{asset.output_url&&<a href={asset.output_url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300">Open source output</a>}</div></div>)}
       </History>
     </div>
   </>;
