@@ -1,5 +1,7 @@
 import type { ToolDef } from "@/lib/runtime/model-gateway.server";
 import { getGameFoundryCapabilities, submitGameFoundryAsset, submitGameFoundryProject } from "./game-foundry-runtime.server";
+import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
+import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 
 type ToolContext = { userId: string; sb: { from: (table: string) => any } };
 
@@ -12,7 +14,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","create_asset","generate_project"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","generate_project"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -29,6 +31,15 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
 
 function text(input: Record<string,unknown>, key: string, max: number) {
   return typeof input[key] === "string" ? String(input[key]).trim().slice(0,max) : "";
+}
+
+async function resolvePreference(ctx: ToolContext) {
+  let stored: { default_provider?: unknown; default_model?: unknown } | null = null;
+  try {
+    const result = await ctx.sb.from("user_ai_preferences").select("default_provider,default_model").eq("user_id",ctx.userId).maybeSingle();
+    if (!result.error) stored = result.data;
+  } catch {}
+  return resolveAssistantModelPreference(stored);
 }
 
 export async function runGameFoundryTool(input: Record<string, unknown>, ctx: ToolContext) {
@@ -56,6 +67,41 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
     }).select("id,name,status").single();
     if (created.error) throw new Error(created.error.message);
     return created.data;
+  }
+  if (action === "plan_project") {
+    const projectId = text(input,"project_id",60);
+    if (!projectId) throw new Error("plan_project requires project_id.");
+    const claimed = await ctx.sb.from("game_foundry_projects")
+      .update({status:"planning",error_message:null,updated_at:new Date().toISOString()})
+      .eq("id",projectId).eq("user_id",ctx.userId).in("status",["draft","failed"])
+      .select("id,name,prompt,target_engine,project_type,quality_profile").maybeSingle();
+    if (claimed.error) throw new Error(claimed.error.message);
+    if (!claimed.data) throw new Error("This Game Foundry project is not ready for planning.");
+    const { provider, model } = await resolvePreference(ctx);
+    try {
+      const design = await generateGameFoundryDesign({
+        name:claimed.data.name,
+        prompt:claimed.data.prompt,
+        projectType:claimed.data.project_type,
+        targetEngine:claimed.data.target_engine,
+        qualityProfile:claimed.data.quality_profile,
+        provider,
+        model,
+      });
+      const saved = await ctx.sb.from("game_foundry_projects")
+        .update({design_spec:design,status:"planned",error_message:null,updated_at:new Date().toISOString()})
+        .eq("id",projectId).eq("user_id",ctx.userId).eq("status","planning")
+        .select("id,name,status,design_spec").maybeSingle();
+      if (saved.error) throw new Error(saved.error.message);
+      if (!saved.data) throw new Error("Game Foundry planning was interrupted before the design could be saved.");
+      return saved.data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Game Foundry planning failed.";
+      await ctx.sb.from("game_foundry_projects")
+        .update({status:"failed",error_message:message.slice(0,1000),updated_at:new Date().toISOString()})
+        .eq("id",projectId).eq("user_id",ctx.userId).eq("status","planning");
+      throw error;
+    }
   }
   if (action === "create_asset") {
     const name = text(input,"name",240) || "Game asset";
@@ -104,17 +150,18 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
     const projectId=text(input,"project_id",60);
     if (!projectId) throw new Error("generate_project requires project_id.");
     const project=await ctx.sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile").eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status").eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
     if (project.error) throw new Error(project.error.message);
     if (!project.data) throw new Error("Game Foundry project not found.");
+    if (project.data.status !== "planned" || !project.data.design_spec || Object.keys(project.data.design_spec).length === 0) throw new Error("Plan the Game Foundry project before generation.");
     const worker=await submitGameFoundryProject({
       projectId:project.data.id,name:project.data.name,prompt:project.data.prompt,projectType:project.data.project_type,
-      targetEngine:project.data.target_engine,qualityProfile:project.data.quality_profile,
+      targetEngine:project.data.target_engine,qualityProfile:project.data.quality_profile,designSpec:project.data.design_spec,
     });
     const terminal=["completed","failed","cancelled"].includes(worker.status);
     const update=await ctx.sb.from("game_foundry_projects").update({
       status:worker.status,worker_job_id:worker.workerJobId,output_url:worker.outputUrl,preview_url:worker.previewUrl,error_message:worker.errorMessage,
-      design_spec:worker.designSpec,metadata:worker.metadata,completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+      design_spec:project.data.design_spec,metadata:{ ...(worker.metadata && typeof worker.metadata === "object" && !Array.isArray(worker.metadata) ? worker.metadata : {}), worker_design_spec:worker.designSpec },completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
     }).eq("id",projectId).eq("user_id",ctx.userId);
     if (update.error) throw new Error(update.error.message);
     return { id:projectId,...worker };
