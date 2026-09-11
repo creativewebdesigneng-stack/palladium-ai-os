@@ -2,6 +2,7 @@ import type { ToolDef } from "@/lib/runtime/model-gateway.server";
 import { getGameFoundryCapabilities, getGameReadyProcessingCapabilities, submitGameFoundryAsset, submitGameFoundryProject, submitGameReadyProcessing } from "./game-foundry-runtime.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
+import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 
@@ -16,7 +17,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","create_asset","process_asset","generate_project","prepare_handoff","send_handoff","prepare_package"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","create_asset","process_asset","generate_project","prepare_handoff","send_handoff","prepare_package"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -102,6 +103,33 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
       await ctx.sb.from("game_foundry_projects")
         .update({status:"failed",error_message:message.slice(0,1000),updated_at:new Date().toISOString()})
         .eq("id",projectId).eq("user_id",ctx.userId).eq("status","planning");
+      throw error;
+    }
+  }
+  if (action === "generate_content") {
+    const projectId=text(input,"project_id",60);
+    if (!projectId) throw new Error("generate_content requires project_id.");
+    const claimed=await ctx.sb.from("game_foundry_projects")
+      .update({content_status:"generating",content_error:null,updated_at:new Date().toISOString()})
+      .eq("id",projectId).eq("user_id",ctx.userId).eq("status","planned").in("content_status",["not_started","failed"])
+      .select("id,name,prompt,target_engine,quality_profile,design_spec").maybeSingle();
+    if(claimed.error) throw new Error(claimed.error.message);
+    if(!claimed.data) throw new Error("Plan the Game Foundry project before generating gameplay content.");
+    const {provider,model}=await resolvePreference(ctx);
+    try{
+      const manifest=await generateGameFoundryContent({
+        name:claimed.data.name,prompt:claimed.data.prompt,targetEngine:claimed.data.target_engine,
+        qualityProfile:claimed.data.quality_profile,designSpec:claimed.data.design_spec,provider,model,
+      });
+      const update=await ctx.sb.from("game_foundry_projects").update({
+        content_manifest:manifest,content_status:"generated",content_error:null,content_generated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+      }).eq("id",projectId).eq("user_id",ctx.userId).eq("content_status","generating");
+      if(update.error) throw new Error(update.error.message);
+      return {projectId,manifest};
+    }catch(error){
+      const message=error instanceof Error?error.message:"Game Foundry content generation failed.";
+      await ctx.sb.from("game_foundry_projects").update({content_status:"failed",content_error:message.slice(0,1000),updated_at:new Date().toISOString()})
+        .eq("id",projectId).eq("user_id",ctx.userId).eq("content_status","generating");
       throw error;
     }
   }
@@ -195,7 +223,7 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
     const projectId=text(input,"project_id",60);
     if (!projectId) throw new Error("prepare_package requires project_id.");
     const project=await ctx.sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,source_manifest,source_status,export_manifest")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,content_manifest,source_manifest,source_status,export_manifest")
       .eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
     if(project.error) throw new Error(project.error.message);
     if(!project.data) throw new Error("Game Foundry project not found.");
