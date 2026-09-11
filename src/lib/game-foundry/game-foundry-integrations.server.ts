@@ -72,7 +72,7 @@ export async function probeGameFoundryConnections(){
       const response=await fetch(`${base}/health`,{
         method:"GET",
         headers:token?{Authorization:`Bearer ${token}`}:{},
-        redirect:"error",
+        redirect:"manual",
         signal:AbortSignal.timeout(8000),
       });
       results.push({
