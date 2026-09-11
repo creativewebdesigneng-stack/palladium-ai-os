@@ -49,6 +49,8 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
     const qualityProfile = text(input,"quality_profile",40) || "game_ready";
     if (!name || !prompt) throw new Error("create_project requires name and prompt.");
     if (!ENGINES.includes(targetEngine as any)) throw new Error("Unsupported target engine.");
+    if (!["prototype","game_ready","cinematic"].includes(qualityProfile)) throw new Error("Unsupported project quality profile.");
+    if (!["game","environment","character","prop","vehicle","asset_pack"].includes(projectType)) throw new Error("Unsupported project type.");
     const created = await ctx.sb.from("game_foundry_projects").insert({
       user_id:ctx.userId,name,prompt,project_type:projectType,target_engine:targetEngine,quality_profile:qualityProfile,status:"draft",
     }).select("id,name,status").single();
