@@ -135,7 +135,17 @@ $warmupBody = @{
 try {
   Invoke-RestMethod -Method Post -Uri "$($UpstreamBaseUrl.TrimEnd('/'))/v1/chat/completions" -Headers $upstreamHeaders -ContentType "application/json" -Body $warmupBody -TimeoutSec 180 | Out-Null
 } catch {
-  throw "Local model warmup failed for the exact native model. Fix local inference before publishing the certification bridge."
+  $statusCode = $null
+  try {
+    if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+      $statusCode = [int]$_.Exception.Response.StatusCode
+    }
+  } catch {}
+  $safeMessage = [string]$_.Exception.Message
+  if ($upstreamApiKey) { $safeMessage = $safeMessage.Replace($upstreamApiKey, "<redacted>") }
+  if ($safeMessage.Length -gt 1200) { $safeMessage = $safeMessage.Substring(0, 1200) }
+  $statusDetail = if ($statusCode) { " HTTP $statusCode." } else { "" }
+  throw "Local model warmup failed for the exact native model.$statusDetail Diagnostic: $safeMessage"
 }
 
 $tailscale = Resolve-TailscalePath
