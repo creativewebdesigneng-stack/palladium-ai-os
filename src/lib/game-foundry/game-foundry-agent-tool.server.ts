@@ -1,9 +1,9 @@
 import type { ToolDef } from "@/lib/runtime/model-gateway.server";
-import { getGameFoundryCapabilities, getGameReadyProcessingCapabilities, submitGameFoundryAsset, submitGameFoundryProject, submitGameReadyProcessing } from "./game-foundry-runtime.server";
+import { getGameFoundryCapabilities, getGameReadyProcessingCapabilities, getGameFoundryAssetJob, getGameFoundryProjectJob, getGameReadyProcessingJob, submitGameFoundryAsset, submitGameFoundryProject, submitGameReadyProcessing } from "./game-foundry-runtime.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { generateGameFoundryDesign } from "./game-foundry-plan.server";
 import { generateGameFoundryContent } from "./game-foundry-content.server";
-import { buildGameFoundryExportManifest, gameFoundryBridgeBase, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
+import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 
 type ToolContext = { userId: string; sb: { from: (table: string) => any } };
@@ -17,7 +17,7 @@ export const GAME_FOUNDRY_TOOL_DEF: ToolDef = {
   parameters: {
     type: "object",
     properties: {
-      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","create_asset","process_asset","generate_project","prepare_handoff","send_handoff","prepare_package"] },
+      action: { type:"string", enum:["capabilities","list_projects","create_project","plan_project","generate_content","create_asset","process_asset","refresh_asset","generate_project","refresh_project","prepare_handoff","send_handoff","refresh_handoff","prepare_package"] },
       project_id: { type:"string" },
       name: { type:"string", maxLength:240 },
       prompt: { type:"string", maxLength:20000 },
@@ -218,6 +218,70 @@ export async function runGameFoundryTool(input: Record<string, unknown>, ctx: To
       await ctx.sb.from("three_d_jobs").update({processing_status:"failed",error_message:message.slice(0,1000),updated_at:new Date().toISOString()}).eq("id",assetId).eq("user_id",ctx.userId);
       throw error;
     }
+  }
+  if (action === "refresh_asset") {
+    const assetId=text(input,"project_id",60);
+    if(!assetId) throw new Error("refresh_asset requires the asset id in project_id.");
+    const asset=await ctx.sb.from("three_d_jobs")
+      .select("id,status,worker_job_id,preview_url,metadata,processing_status,processing_worker_job_id")
+      .eq("id",assetId).eq("user_id",ctx.userId).maybeSingle();
+    if(asset.error) throw new Error(asset.error.message);
+    if(!asset.data) throw new Error("Game Foundry asset not found.");
+    let generation=null;
+    if(["queued","running"].includes(String(asset.data.status))&&asset.data.worker_job_id){
+      const provider=asset.data.metadata?.provider==="game-foundry-3d"?"game-foundry-3d":"modly-compatible";
+      generation=await getGameFoundryAssetJob(String(asset.data.worker_job_id),provider);
+      const terminal=["completed","failed","cancelled"].includes(generation.status);
+      const update=await ctx.sb.from("three_d_jobs").update({
+        status:generation.status,output_url:generation.outputUrl,preview_url:generation.previewUrl,error_message:generation.errorMessage,
+        metadata:{provider:generation.provider,response:generation.metadata},completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+      }).eq("id",assetId).eq("user_id",ctx.userId);
+      if(update.error) throw new Error(update.error.message);
+    }
+    let processing=null;
+    if(["queued","running"].includes(String(asset.data.processing_status))&&asset.data.processing_worker_job_id){
+      processing=await getGameReadyProcessingJob(String(asset.data.processing_worker_job_id));
+      const update=await ctx.sb.from("three_d_jobs").update({
+        processing_status:processing.status,processed_output_url:processing.outputUrl,preview_url:processing.previewUrl??asset.data.preview_url,
+        error_message:processing.errorMessage,validation_report:processing.validationReport,
+        metadata:{provider:processing.provider,response:processing.metadata},updated_at:new Date().toISOString(),
+      }).eq("id",assetId).eq("user_id",ctx.userId);
+      if(update.error) throw new Error(update.error.message);
+    }
+    if(!generation&&!processing) throw new Error("This Game Foundry asset has no active worker job to refresh.");
+    return {assetId,generation,processing};
+  }
+  if (action === "refresh_project") {
+    const projectId=text(input,"project_id",60);
+    if(!projectId) throw new Error("refresh_project requires project_id.");
+    const project=await ctx.sb.from("game_foundry_projects")
+      .select("id,status,worker_job_id").eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(!["queued","running"].includes(String(project.data.status))||!project.data.worker_job_id) throw new Error("This Game Foundry project has no active game worker job.");
+    const worker=await getGameFoundryProjectJob(String(project.data.worker_job_id));
+    const terminal=["completed","failed","cancelled"].includes(worker.status);
+    const update=await ctx.sb.from("game_foundry_projects").update({
+      status:worker.status,output_url:worker.outputUrl,preview_url:worker.previewUrl,error_message:worker.errorMessage,
+      metadata:{provider:worker.provider,response:worker.metadata},completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+    }).eq("id",projectId).eq("user_id",ctx.userId);
+    if(update.error) throw new Error(update.error.message);
+    return {projectId,...worker};
+  }
+  if (action === "refresh_handoff") {
+    const projectId=text(input,"project_id",60);
+    if(!projectId) throw new Error("refresh_handoff requires project_id.");
+    const project=await ctx.sb.from("game_foundry_projects")
+      .select("id,target_engine,handoff_status,handoff_id").eq("id",projectId).eq("user_id",ctx.userId).maybeSingle();
+    if(project.error) throw new Error(project.error.message);
+    if(!project.data) throw new Error("Game Foundry project not found.");
+    if(!["queued","running"].includes(String(project.data.handoff_status))||!project.data.handoff_id) throw new Error("This Game Foundry project has no active engine handoff.");
+    const handoff=await getGameFoundryBridgeHandoff({engine:project.data.target_engine,handoffId:String(project.data.handoff_id)});
+    const update=await ctx.sb.from("game_foundry_projects").update({
+      handoff_status:handoff.status,handoff_error:handoff.errorMessage,handoff_updated_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }).eq("id",projectId).eq("user_id",ctx.userId);
+    if(update.error) throw new Error(update.error.message);
+    return {projectId,...handoff};
   }
   if (action === "prepare_package") {
     const projectId=text(input,"project_id",60);
