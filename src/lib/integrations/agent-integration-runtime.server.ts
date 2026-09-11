@@ -15,6 +15,7 @@ import {
 } from "./integration-adapters.server";
 import { instagramIntegrationAdapter } from "./instagram-integration-adapter.server";
 import { threadsIntegrationAdapter } from "./threads-integration-adapter.server";
+import { linkedinIntegrationAdapter } from "./linkedin-integration-adapter.server";
 import {
   YOUTUBE_VIDEO_ACTION,
   YOUTUBE_VIDEO_INPUT_SCHEMA,
@@ -84,6 +85,7 @@ export type IntegrationExecutionResult = {
 const EXTENSION_ADAPTERS: readonly IntegrationAdapter[] = [
   instagramIntegrationAdapter,
   threadsIntegrationAdapter,
+  linkedinIntegrationAdapter,
 ];
 
 function runtimeAdapters(): readonly IntegrationAdapter[] {
@@ -93,6 +95,7 @@ function runtimeAdapters(): readonly IntegrationAdapter[] {
 function runtimeAdapterById(id: string, provider?: string): IntegrationAdapter | undefined {
   if (id === "direct_oauth" && provider === "instagram") return instagramIntegrationAdapter;
   if (id === "direct_oauth" && provider === "threads") return threadsIntegrationAdapter;
+  if (id === "direct_oauth" && provider === "linkedin") return linkedinIntegrationAdapter;
   return integrationAdapterById(id) ?? EXTENSION_ADAPTERS.find((adapter) => adapter.id === id);
 }
 
