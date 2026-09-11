@@ -417,14 +417,15 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
 
     const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
     try{
-      const engineGuidance = {
+      const engineGuidanceByTarget: Record<string,string> = {
         unity:"Generate a bounded Unity starter using C# scripts and text project/config files only. Do not emit binary scenes, prefabs, packages, Library output or credentials.",
         unreal:"Generate a bounded Unreal Engine starter using C++ source, headers, Build.cs/Target.cs and text config only. Do not claim Blueprint assets, .uasset files or compiled binaries exist.",
         godot:"Generate a bounded Godot starter using GDScript, .tscn/.tres text resources and project.godot where useful.",
         web:"Generate a bounded playable web-game starter using browser-native TypeScript/JavaScript, HTML and CSS with no vendored dependencies.",
         blender:"Generate a bounded Blender-oriented starter using Python automation/scripts and text configuration only. Do not claim a .blend binary was created.",
         generic:"Generate a portable game prototype source starter using text source/config files only.",
-      }[claimed.data.target_engine as keyof typeof engineGuidance];
+      };
+      const engineGuidance = engineGuidanceByTarget[String(claimed.data.target_engine)] ?? engineGuidanceByTarget["generic"]!;
       const source=await generateBuilderSourceManifest({
         title:claimed.data.name,
         prompt:[
