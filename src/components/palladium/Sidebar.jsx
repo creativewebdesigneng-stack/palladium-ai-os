@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, BrainCircuit, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Mic2, Settings2, Clapperboard, Table2, Dumbbell, Zap,
+  FileText, Layers3, Search, FlaskConical, Mic2, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -28,6 +28,7 @@ const WORKFORCE = [
   ['Voice Studio', '/voice-studio', Mic2],
   ['Media Studio', '/media-studio', Clapperboard],
   ['3D Studio', '/three-d-studio', Blocks],
+  ['Game Foundry', '/game-foundry', Gamepad2],
   ['Agent Workspaces', '/agent-workspaces', Layers3],
   ['Agents', '/agents', Bot],
   ['Agent Builder', '/agent-builder', Hammer],
