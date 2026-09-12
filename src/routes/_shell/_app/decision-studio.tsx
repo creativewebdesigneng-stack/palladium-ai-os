@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 import DecisionStudio from '@/screens/DecisionStudio';
 
+function SpatialPage() {
+ return <div className="blackstar-core-page blackstar-audit-page"><DecisionStudio /></div>;
+}
+
 export const Route = createFileRoute('/_shell/_app/decision-studio')({
   head: () => ({
     meta: [
@@ -12,5 +16,5 @@ export const Route = createFileRoute('/_shell/_app/decision-studio')({
       { name: 'twitter:card', content: 'summary_large_image' },
     ],
   }),
-  component: DecisionStudio,
+  component: SpatialPage,
 });
