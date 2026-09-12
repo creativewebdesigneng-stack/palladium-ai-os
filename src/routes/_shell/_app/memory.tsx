@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/Memory";
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-secondary-page blackstar-memory"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/memory")({
   head: () => ({
     meta: [
-      { title: "Memory — PalladiumAI" },
+      { title: "Memory — Blackstar" },
       { name: "description", content: "Long-term organisational memory for your workforce." },
-      { property: "og:title", content: "Memory — PalladiumAI" },
+      { property: "og:title", content: "Memory — Blackstar" },
       {
         property: "og:description",
         content: "Long-term organisational memory for your workforce.",
@@ -15,5 +19,5 @@ export const Route = createFileRoute("/_shell/_app/memory")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: SpatialPage,
 });
