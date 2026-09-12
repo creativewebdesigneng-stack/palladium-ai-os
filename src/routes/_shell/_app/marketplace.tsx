@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/Marketplace";
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-longtail-page blackstar-market"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/marketplace")({
   head: () => ({
     meta: [
@@ -12,5 +16,5 @@ export const Route = createFileRoute("/_shell/_app/marketplace")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: SpatialPage,
 });
