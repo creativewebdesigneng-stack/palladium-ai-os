@@ -5,12 +5,15 @@ const original=process.env['CINEMA_STUDIO_WORKER_URL']
 afterEach(()=>{vi.restoreAllMocks(); if(original===undefined) delete process.env['CINEMA_STUDIO_WORKER_URL']; else process.env['CINEMA_STUDIO_WORKER_URL']=original})
 
 describe('Blackstar Cinema Studio',()=>{
- it('supports feature-length targets without claiming an unconfigured renderer',()=>{
+ it('supports feature-length targets with hosted mastering without claiming a direct renderer',()=>{
   delete process.env['CINEMA_STUDIO_WORKER_URL']
   const c=getCinemaCapabilities()
   expect(CINEMA_MAX_DURATION_MINUTES).toBeGreaterThanOrEqual(120)
   expect(c.maxDurationMinutes).toBe(180)
-  expect(c.configured).toBe(false)
+  expect(c.configured).toBe(true)
+  expect(c.renderConfigured).toBe(false)
+  expect(c.masterConfigured).toBe(true)
+  expect(c.masterProvider).toBe('blackstar-hosted-master')
   expect(c.continuity).toContain('character')
  })
  it('submits a scene-based long-form render contract to a configured worker',async()=>{

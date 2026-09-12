@@ -2,11 +2,16 @@ export type CinemaQuality = 'preview' | 'production' | 'cinema'
 export type CinemaAspect = '16:9' | '2.39:1' | '1.85:1' | '9:16' | '1:1'
 
 export const CINEMA_MAX_DURATION_MINUTES = 180
+export const BLACKSTAR_CINEMA_MASTER_WORKER_URL = 'https://blackstar-auto-editor-worker-0kjxvk.v2.appdeploy.ai'
 
 export function getCinemaCapabilities() {
-  const url = (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim()
+  const renderUrl = (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim()
+  const masterUrl = (process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim() || BLACKSTAR_CINEMA_MASTER_WORKER_URL
   return {
-    configured: Boolean(url),
+    configured: Boolean(masterUrl),
+    renderConfigured: Boolean(renderUrl),
+    masterConfigured: Boolean(masterUrl),
+    masterProvider: renderUrl ? 'configured-cinema-worker' : 'blackstar-hosted-master',
     maxDurationMinutes: CINEMA_MAX_DURATION_MINUTES,
     workflow: 'blackstar-cinema-studio',
     stages: ['treatment','screenplay','shot-plan','visual-generation','voice','music','assembly','master'],
@@ -14,9 +19,9 @@ export function getCinemaCapabilities() {
     qualities: ['preview','production','cinema'] as CinemaQuality[],
     continuity: ['character','wardrobe','location','prop','camera','colour'],
     outputs: ['mp4','mov'],
-    note: url
-      ? 'Long-form cinema jobs are rendered as scene/shot graphs by the configured worker and assembled into a final master.'
-      : 'Planning is available through Blackstar. Final long-form rendering requires CINEMA_STUDIO_WORKER_URL; Blackstar does not fabricate rendered films.',
+    note: renderUrl
+      ? 'Long-form cinema jobs may use the configured Cinema renderer; completed shot segments can be assembled by the configured or Blackstar-hosted master worker.'
+      : 'Planning, shot rendering through the configured image/video providers, and final assembly of completed shot segments are available. Direct one-shot text-to-film rendering remains disabled until CINEMA_STUDIO_WORKER_URL is configured.',
   }
 }
 
@@ -29,6 +34,7 @@ function publicUrl(value: string) {
 }
 
 function base() { return (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim().replace(/\/+$/,'') }
+function masterBase() { return ((process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim() || base() || BLACKSTAR_CINEMA_MASTER_WORKER_URL).replace(/\/+$/,'') }
 function token() { return (process.env['CINEMA_STUDIO_WORKER_TOKEN'] ?? '').trim() }
 function headers() { return token() ? {'content-type':'application/json',authorization:`Bearer ${token()}`} : {'content-type':'application/json'} }
 
@@ -71,8 +77,7 @@ export async function submitCinemaMasterAssembly(input:{
   quality:CinemaQuality;
   manifest:unknown;
 }) {
-  const url=base()
-  if(!url) throw new Error('Cinema master assembly requires CINEMA_STUDIO_WORKER_URL.')
+  const url=masterBase()
   const response=await fetch(`${url}/v1/films/assemble`,{
     method:'POST',
     headers:headers(),

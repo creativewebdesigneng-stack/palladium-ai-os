@@ -10,13 +10,16 @@ describe('Cinema master integration',()=>{
     expect(functions).toContain("if(!manifest.ready) throw new Error")
     expect(functions).toContain('submitCinemaMasterAssembly')
   })
-  it('keeps final mastering behind the external Cinema worker boundary',()=>{
-    expect(runtime).toContain('Cinema master assembly requires CINEMA_STUDIO_WORKER_URL.')
+  it('uses the hosted Blackstar master worker while retaining an override',()=>{
+    expect(runtime).toContain('BLACKSTAR_CINEMA_MASTER_WORKER_URL')
+    expect(runtime).toContain("CINEMA_STUDIO_MASTER_WORKER_URL")
     expect(runtime).toContain('/v1/films/assemble')
   })
-  it('surfaces readiness without pretending the worker is online',()=>{
+  it('keeps direct text-to-film distinct from evidence-based final assembly',()=>{
+    expect(runtime).toContain('renderConfigured')
+    expect(runtime).toContain('masterConfigured')
     expect(panel).toContain('Audit master')
     expect(panel).toContain('Assemble feature film')
-    expect(panel).toContain('CINEMA_STUDIO_WORKER_URL is required only for final assembly')
+    expect(panel).toContain('Blackstar Cinema mastering is online')
   })
 })
