@@ -37,3 +37,14 @@ describe('Seedream provider precedence',()=>{
     expect(resolveSeedreamProvider()).toBe('worker');
   });
 });
+
+
+describe('fal runtime diagnostics',()=>{
+  it('reports fal key visibility without exposing the secret',()=>{
+    process.env['FAL_API_KEY']='alias-key';
+    delete process.env['FAL_KEY'];
+    const capabilities=getGenerativeMediaCapabilities();
+    expect(capabilities.diagnostics.falKeyVisible).toBe(true);
+    expect(JSON.stringify(capabilities)).not.toContain('alias-key');
+  });
+});
