@@ -6,6 +6,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import PageHeader from '@/components/palladium/PageHeader';
 import FinanceKnowledgeHub from '@/components/finance/FinanceKnowledgeHub';
 import FinanceDocumentInspector from '@/components/finance/FinanceDocumentInspector';
+import FinancePortfolio from '@/components/finance/FinancePortfolio';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -87,6 +88,7 @@ export default function Finance() {
 
 
       <FinanceKnowledgeHub />
+      <div className="mt-5"><FinancePortfolio /></div>
       <div className="mt-5"><FinanceDocumentInspector /></div>
 
       {session === 'no' && <Failed message="Sign in to view your finance ledger." />}
