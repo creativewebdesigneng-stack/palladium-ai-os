@@ -6,11 +6,12 @@ import { isSignedIn } from '@/lib/authUiState';
 
 function Mark() {
   return (
-    <span className="relative grid h-9 w-9 shrink-0 place-items-center" aria-hidden="true">
-      <span className="absolute h-8 w-8 rounded-full border border-violet-300/25 shadow-[0_0_28px_rgba(124,58,237,.25)]" />
-      <span className="absolute h-4 w-4 rounded-full bg-[#030306] shadow-[0_0_18px_rgba(167,139,250,.55)]" />
-      <span className="absolute h-px w-9 rotate-45 bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
-      <span className="absolute h-px w-9 -rotate-45 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+    <span className="blackstar-brand-core relative grid h-10 w-10 shrink-0 place-items-center" aria-hidden="true">
+      <span className="blackstar-brand-orbit blackstar-brand-orbit-one" />
+      <span className="blackstar-brand-orbit blackstar-brand-orbit-two" />
+      <span className="blackstar-brand-center" />
+      <span className="blackstar-brand-cross blackstar-brand-cross-a" />
+      <span className="blackstar-brand-cross blackstar-brand-cross-b" />
     </span>
   );
 }
@@ -31,7 +32,7 @@ export default function PublicNav() {
   ];
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[.07] bg-[#030306]/76 shadow-[0_12px_40px_rgba(0,0,0,.16)] backdrop-blur-2xl">
+    <header className="blackstar-public-nav fixed inset-x-0 top-0 z-50">
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3" aria-label="Blackstar home">
           <Mark />
