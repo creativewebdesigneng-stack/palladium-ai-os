@@ -23,8 +23,9 @@ describe('Cinema shot rendering integration',()=>{
     expect(migration).toContain('cinema_shot_renders_unique_segment')
   })
   it('surfaces real worker readiness and render evidence rather than fake outputs',()=>{
-    expect(screen).toContain('Seedream worker required for keyframes')
-    expect(screen).toContain('LTX worker required for video segments')
+    expect(screen).toContain('Blackstar server cannot see a fal credential')
+    expect(screen).toContain('Seedream provider unavailable for keyframes')
+    expect(screen).toContain('LTX provider unavailable for video segments')
     expect(screen).toContain('Generate keyframes')
     expect(screen).toContain('Generate video')
   })
