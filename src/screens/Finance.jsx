@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Receipt, Plus, Trash2 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PageHeader from '@/components/palladium/PageHeader';
+import FinanceKnowledgeHub from '@/components/finance/FinanceKnowledgeHub';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -71,8 +72,8 @@ export default function Finance() {
     <>
       <PageHeader
         eyebrow="Workspace"
-        title="Finance Centre"
-        description="Recorded transactions only. Revenue, expenses and profit are computed from your ledger — nothing here is projected."
+        title="Finance Hub"
+        description="Your Blackstar finance workspace for recorded cash flow, planning tools, trusted guidance, financial education and business/personal finance resources."
         action={
           <button
             onClick={() => setForm(EMPTY_FORM)}
@@ -82,6 +83,9 @@ export default function Finance() {
           </button>
         }
       />
+
+
+      <FinanceKnowledgeHub />
 
       {session === 'no' && <Failed message="Sign in to view your finance ledger." />}
       {session === 'yes' && finance.isLoading && <Loading />}
