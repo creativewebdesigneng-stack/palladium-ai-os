@@ -15,6 +15,10 @@ function ModelArenaWithCertification() {
   );
 }
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-longtail-page blackstar-modelarena"><ModelArenaWithCertification /></div>;
+}
+
 export const Route = createFileRoute('/_shell/_app/model-arena')({
-  component: ModelArenaWithCertification,
+  component: SpatialPage,
 });
