@@ -54,6 +54,24 @@ describe('Cinema shot compiler',()=>{
   it('accepts a bounded shot plan with valid scene characters',()=>{
     expect(parseCinemaShotPlan(JSON.stringify(plan),'s1',120,['mara']).shots).toHaveLength(4)
   })
+  it('normalizes optional AI shot-plan omissions before strict validation',()=>{
+    const incomplete={sceneId:'s1',shots:[
+      {id:'s1-sh1',durationSeconds:'30',action:'Mara studies the console',characterIds:['mara']},
+      {id:'s1-sh2',durationSeconds:30,framing:'close',camera:'locked close-up',action:'signal waveform appears',visualPrompt:'close portrait of Mara lit by cyan instrument glow',characterIds:['mara']},
+      {id:'s1-sh3',durationSeconds:30,framing:'insert',camera:'macro push',action:'waveform resolves',visualPrompt:'instrument waveform cinematic insert',characterIds:[]},
+      {id:'s1-sh4',durationSeconds:30,framing:'medium',camera:'slow orbit',action:'Mara reacts',visualPrompt:'Mara reacting on deep-space bridge',characterIds:['mara']}
+    ]}
+    const parsed=parseCinemaShotPlan(JSON.stringify(incomplete),'s1',120,['mara'])
+    expect(parsed.shots).toHaveLength(4)
+    expect(parsed.shots[0]?.durationSeconds).toBe(30)
+    expect(parsed.shots[0]?.dialogue).toBe('')
+    expect(parsed.shots[0]?.visualPrompt.length).toBeGreaterThan(10)
+    expect(parsed.shots[0]?.continuityNotes).toEqual([])
+    expect(parsed.validation.length).toBeGreaterThan(0)
+  })
+  it('reports the exact path when required shot structure is still invalid',()=>{
+    expect(()=>parseCinemaShotPlan(JSON.stringify({sceneId:'s1',shots:[{id:'s1-sh1'}]}),'s1',120,['mara'])).toThrow('shots.0.durationSeconds')
+  })
   it('rejects invalid shot character references',()=>{
     const bad={...plan,shots:[{...plan.shots[0],characterIds:['other']},...plan.shots.slice(1)]}
     expect(()=>parseCinemaShotPlan(JSON.stringify(bad),'s1',120,['mara'])).toThrow('invalid character reference')
