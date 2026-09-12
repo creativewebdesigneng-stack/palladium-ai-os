@@ -1,16 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/AIAppBuilder";
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-longtail-page blackstar-aibuilder"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/ai-builder")({
   head: () => ({
     meta: [
-      { title: "AI app builder — PalladiumAI" },
+      { title: "AI app builder — Blackstar" },
       { name: "description", content: "Review app-builder availability and production runtime requirements." },
-      { property: "og:title", content: "AI app builder — PalladiumAI" },
+      { property: "og:title", content: "AI app builder — Blackstar" },
       { property: "og:description", content: "Review app-builder availability and production runtime requirements." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: SpatialPage,
 });
