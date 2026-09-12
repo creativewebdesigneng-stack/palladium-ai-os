@@ -14,8 +14,7 @@ export function resolveSeedreamProvider(){
 
 function config(provider: Provider) {
   if (provider === 'seedream') {
-    const falKeyVisible=Boolean(getFalServerKey());
-  return {
+    return {
       url: (process.env['SEEDREAM_WORKER_URL'] ?? '').replace(/\/$/, ''),
       token: process.env['SEEDREAM_WORKER_TOKEN'] ?? '',
       kind: 'image' as const,
@@ -79,6 +78,7 @@ function outputUrl(result: JsonObject): string | null {
 export function getGenerativeMediaCapabilities() {
   const seedream = config('seedream');
   const ltx = config('ltx');
+  const falKeyVisible=Boolean(getFalServerKey());
   return {
     diagnostics:{falKeyVisible},
     seedream: {
