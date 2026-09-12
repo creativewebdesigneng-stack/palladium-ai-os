@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Banknote, BookOpen, Building2, Calculator, CreditCard, ExternalLink,
-  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards, Target, Home, BriefcaseBusiness, TrendingUp, Scale, Gauge,
+  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards, Target, Home, BriefcaseBusiness, TrendingUp, Scale, Gauge, Umbrella, Percent,
 } from 'lucide-react';
 
 const TOPICS = [
@@ -110,6 +110,12 @@ export default function FinanceKnowledgeHub() {
   const [variableCosts, setVariableCosts] = useState('9000');
   const [fixedCosts, setFixedCosts] = useState('8000');
   const [cashReserve, setCashReserve] = useState('40000');
+  const [pensionPot, setPensionPot] = useState('50000');
+  const [pensionMonthly, setPensionMonthly] = useState('500');
+  const [pensionReturn, setPensionReturn] = useState('4');
+  const [pensionYears, setPensionYears] = useState('25');
+  const [taxableIncome, setTaxableIncome] = useState('50000');
+  const [taxReserveRate, setTaxReserveRate] = useState('25');
 
   const savings = useMemo(() => {
     const p = Math.max(0, Number(monthly) || 0);
@@ -159,6 +165,22 @@ export default function FinanceKnowledgeHub() {
     const runway = fixed > 0 ? cash / fixed : null;
     return { netWorth: assetValue - debtValue, grossProfit, operatingProfit, grossMargin, operatingMargin, runway };
   }, [assets, liabilities, revenue, variableCosts, fixedCosts, cashReserve]);
+
+  const retirement = useMemo(() => {
+    const start = Math.max(0, Number(pensionPot) || 0);
+    const monthly = Math.max(0, Number(pensionMonthly) || 0);
+    const n = Math.max(1, Math.round((Number(pensionYears) || 0) * 12));
+    const r = Math.max(0, Number(pensionReturn) || 0) / 100 / 12;
+    const startGrowth = start * Math.pow(1 + r, n);
+    const contributions = r === 0 ? monthly * n : monthly * ((Math.pow(1 + r, n) - 1) / r);
+    return { projected: startGrowth + contributions, paid: start + monthly * n };
+  }, [pensionPot, pensionMonthly, pensionReturn, pensionYears]);
+
+  const taxReserve = useMemo(() => {
+    const income = Math.max(0, Number(taxableIncome) || 0);
+    const rate = Math.min(100, Math.max(0, Number(taxReserveRate) || 0));
+    return { income, rate, reserve: income * rate / 100 };
+  }, [taxableIncome, taxReserveRate]);
 
   return (
     <div className="mt-5 space-y-5">
