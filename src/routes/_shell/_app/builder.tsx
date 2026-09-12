@@ -11,16 +11,20 @@ function BuilderRoute() {
   );
 }
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-longtail-page blackstar-builder"><BuilderRoute /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/builder")({
   head: () => ({
     meta: [
-      { title: "Builder — PalladiumAI" },
-      { name: "description", content: "Build, validate and deploy production applications with native PalladiumAI services and reusable app blueprints." },
-      { property: "og:title", content: "Builder — PalladiumAI" },
-      { property: "og:description", content: "Build, validate and deploy production applications with native PalladiumAI services and reusable app blueprints." },
+      { title: "Builder — Blackstar" },
+      { name: "description", content: "Build, validate and deploy production applications with native Blackstar services and reusable app blueprints." },
+      { property: "og:title", content: "Builder — Blackstar" },
+      { property: "og:description", content: "Build, validate and deploy production applications with native Blackstar services and reusable app blueprints." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: BuilderRoute,
+  component: SpatialPage,
 });
