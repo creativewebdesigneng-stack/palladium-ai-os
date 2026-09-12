@@ -81,10 +81,10 @@ export function getGenerativeMediaCapabilities() {
     ltx: {
       configured: Boolean(ltx.url || hasDirectLtx23Provider()),
       kind: ltx.kind,
-      workflows: ['text-to-video', 'image-to-video', 'audio-video'],
-      aspectRatios: ['16:9', '9:16', '1:1'],
+      workflows: ltx.url ? ['text-to-video', 'image-to-video', 'audio-video'] : ['image-to-video'],
+      aspectRatios: ltx.url ? ['16:9', '9:16', '1:1'] : ['16:9', '9:16'],
       durationSeconds: [3, 5, 8, 10],
-      note: 'LTX-compatible generation is delegated to a GPU worker because model weights and CUDA dependencies do not belong in the PalladiumAI web runtime.',
+      note: ltx.url ? 'LTX generation uses the configured worker.' : hasDirectLtx23Provider() ? 'LTX video segments use fal LTX-2.3 server-side; provider minimum durations are trimmed to Blackstar logical timing during mastering.' : 'LTX video generation requires FAL_KEY or LTX_WORKER_URL on the server.',
     },
   };
 }
