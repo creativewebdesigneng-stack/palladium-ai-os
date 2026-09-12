@@ -137,6 +137,7 @@ export async function submitGenerativeMediaJob(input: {
 
 export async function getGenerativeMediaJob(provider: Provider, workerJobId: string) {
   const cfg = config(provider);
+  if (provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) return getDirectLtx23(workerJobId);
   if (!cfg.url) throw new Error(`${provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const response = await fetch(`${cfg.url}/jobs/${encodeURIComponent(workerJobId)}`, {
     method: 'GET',
