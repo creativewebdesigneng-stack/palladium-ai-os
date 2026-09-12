@@ -37,6 +37,12 @@ function shotPlan(project:any,sceneId:string){
 
 function completedAt(status:string){return ['completed','failed','cancelled'].includes(status)?new Date().toISOString():null}
 
+export function cinemaRenderReuseAction(status:string|null|undefined){
+  if(status==='completed'||status==='queued'||status==='running') return 'reuse' as const
+  if(status==='failed'||status==='cancelled') return 'retry' as const
+  return 'create' as const
+}
+
 async function createMediaJob(sb:Sb,userId:string,input:{
   provider:'seedream'|'ltx';prompt:string;aspectRatio:string;sourceUrl?:string|null;durationSeconds?:number|null;metadata:any
 }){
@@ -85,21 +91,33 @@ export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middlewa
     if(!project.data) throw new Error('Cinema project not found.')
     if(project.data.status!=='planned') throw new Error('Compile the Cinema production before rendering shots.')
     const {scene,plan}=shotPlan(project.data,data.sceneId)
-    const existing=await sb.from('cinema_shot_renders').select('shot_id').eq('cinema_project_id',data.projectId).eq('scene_id',data.sceneId).eq('stage','keyframe').eq('user_id',context.userId)
+    const existing=await sb.from('cinema_shot_renders').select('id,shot_id,status,output_url,media_job_id').eq('cinema_project_id',data.projectId).eq('scene_id',data.sceneId).eq('stage','keyframe').eq('user_id',context.userId)
     if(existing.error) throw new Error(existing.error.message)
-    const seen=new Set((existing.data??[]).map((row:any)=>String(row.shot_id)))
-    const shots=plan.shots.filter((shot:any)=>!seen.has(String(shot.id))).slice(0,data.limit)
-    if(!shots.length) throw new Error('The selected Cinema shots already have keyframe render jobs.')
+    const existingByShot=new Map((existing.data??[]).map((row:any)=>[String(row.shot_id),row]))
+    const shots=plan.shots.slice(0,data.limit)
     const results=[]
     for(const shot of shots){
-      let mappingId:string|null=null
+      const prior:any=existingByShot.get(String(shot.id))
+      if(prior&&cinemaRenderReuseAction(String(prior.status))==='reuse'){
+        results.push({shotId:shot.id,renderId:prior.id,status:prior.status,reused:true,outputUrl:prior.output_url??null})
+        continue
+      }
+      let mappingId:string|null=prior?.id??null
       try{
-        const mapping=await sb.from('cinema_shot_renders').insert({
-          user_id:context.userId,cinema_project_id:data.projectId,scene_id:data.sceneId,shot_id:shot.id,stage:'keyframe',segment_index:0,
-          duration_seconds:null,provider:'seedream',status:'queued',metadata:{sceneTitle:scene.title,shot}
-        }).select('id').single()
-        if(mapping.error) throw new Error(mapping.error.message)
-        mappingId=mapping.data.id
+        if(mappingId){
+          const reset=await sb.from('cinema_shot_renders').update({
+            media_job_id:null,status:'queued',output_url:null,error_message:null,completed_at:null,updated_at:new Date().toISOString(),
+            metadata:{sceneTitle:scene.title,shot,retryOfStatus:prior?.status??null}
+          }).eq('id',mappingId).eq('user_id',context.userId)
+          if(reset.error) throw new Error(reset.error.message)
+        }else{
+          const mapping=await sb.from('cinema_shot_renders').insert({
+            user_id:context.userId,cinema_project_id:data.projectId,scene_id:data.sceneId,shot_id:shot.id,stage:'keyframe',segment_index:0,
+            duration_seconds:null,provider:'seedream',status:'queued',metadata:{sceneTitle:scene.title,shot}
+          }).select('id').single()
+          if(mapping.error) throw new Error(mapping.error.message)
+          mappingId=mapping.data.id
+        }
         const prompt=[
           shot.visualPrompt,
           `Framing: ${shot.framing}.`,
@@ -132,9 +150,9 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
     if(!project.data) throw new Error('Cinema project not found.')
     if(project.data.status!=='planned') throw new Error('Compile the Cinema production before rendering shots.')
     const {scene,plan}=shotPlan(project.data,data.sceneId)
-    const existing=await sb.from('cinema_shot_renders').select('shot_id,stage,segment_index').eq('cinema_project_id',data.projectId).eq('scene_id',data.sceneId).eq('user_id',context.userId)
+    const existing=await sb.from('cinema_shot_renders').select('id,shot_id,stage,segment_index,status,output_url,media_job_id').eq('cinema_project_id',data.projectId).eq('scene_id',data.sceneId).eq('user_id',context.userId)
     if(existing.error) throw new Error(existing.error.message)
-    const videoKeys=new Set((existing.data??[]).filter((row:any)=>row.stage==='video').map((row:any)=>`${row.shot_id}:${row.segment_index}`))
+    const videoByKey=new Map((existing.data??[]).filter((row:any)=>row.stage==='video').map((row:any)=>[`${row.shot_id}:${row.segment_index}`,row]))
     const keyframes=await sb.from('cinema_shot_renders').select('shot_id,status,output_url').eq('cinema_project_id',data.projectId).eq('scene_id',data.sceneId).eq('stage','keyframe').eq('user_id',context.userId)
     if(keyframes.error) throw new Error(keyframes.error.message)
     const keyframeByShot=new Map((keyframes.data??[]).filter((row:any)=>row.status==='completed'&&row.output_url).map((row:any)=>[String(row.shot_id),String(row.output_url)]))
@@ -144,16 +162,29 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
     for(const shot of eligible){
       const durations=cinemaSegmentDurations(Number(shot.durationSeconds))
       for(let segmentIndex=0;segmentIndex<durations.length;segmentIndex++){
-        if(videoKeys.has(`${shot.id}:${segmentIndex}`)) continue
-        let mappingId:string|null=null
+        const key=`${shot.id}:${segmentIndex}`
+        const prior:any=videoByKey.get(key)
+        if(prior&&cinemaRenderReuseAction(String(prior.status))==='reuse'){
+          results.push({shotId:shot.id,segmentIndex,renderId:prior.id,status:prior.status,reused:true,outputUrl:prior.output_url??null})
+          continue
+        }
+        let mappingId:string|null=prior?.id??null
         try{
           const seconds=durations[segmentIndex]!
-          const mapping=await sb.from('cinema_shot_renders').insert({
-            user_id:context.userId,cinema_project_id:data.projectId,scene_id:data.sceneId,shot_id:shot.id,stage:'video',segment_index:segmentIndex,
-            duration_seconds:seconds,provider:'ltx',status:'queued',metadata:{sceneTitle:scene.title,shot,segmentIndex,segmentCount:durations.length}
-          }).select('id').single()
-          if(mapping.error) throw new Error(mapping.error.message)
-          mappingId=mapping.data.id
+          if(mappingId){
+            const reset=await sb.from('cinema_shot_renders').update({
+              media_job_id:null,status:'queued',output_url:null,error_message:null,completed_at:null,updated_at:new Date().toISOString(),
+              metadata:{sceneTitle:scene.title,shot,segmentIndex,segmentCount:durations.length,retryOfStatus:prior?.status??null}
+            }).eq('id',mappingId).eq('user_id',context.userId)
+            if(reset.error) throw new Error(reset.error.message)
+          }else{
+            const mapping=await sb.from('cinema_shot_renders').insert({
+              user_id:context.userId,cinema_project_id:data.projectId,scene_id:data.sceneId,shot_id:shot.id,stage:'video',segment_index:segmentIndex,
+              duration_seconds:seconds,provider:'ltx',status:'queued',metadata:{sceneTitle:scene.title,shot,segmentIndex,segmentCount:durations.length}
+            }).select('id').single()
+            if(mapping.error) throw new Error(mapping.error.message)
+            mappingId=mapping.data.id
+          }
           const prompt=[
             shot.visualPrompt,
             `Action: ${shot.action}.`,
