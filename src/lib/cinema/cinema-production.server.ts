@@ -80,9 +80,82 @@ function strictJson(text:string,label:string){
   try{return JSON.parse(cleaned)}catch{throw new Error(`The AI cinema ${label} compiler returned invalid JSON.`)}
 }
 
+function normalizeProductionManifest(value:unknown){
+  if(!value||typeof value!=='object'||Array.isArray(value)) return value
+  const input=value as Record<string,unknown>
+  const title=typeof input.title==='string'&&input.title.trim()?input.title.trim():'Untitled Cinema Production'
+  const visual=input.visualBible&&typeof input.visualBible==='object'&&!Array.isArray(input.visualBible)?input.visualBible as Record<string,unknown>:{}
+  const sound=input.soundBible&&typeof input.soundBible==='object'&&!Array.isArray(input.soundBible)?input.soundBible as Record<string,unknown>:{}
+  const characters=Array.isArray(input.characters)?input.characters.map((item,index)=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)) return item
+    const row=item as Record<string,unknown>
+    const name=typeof row.name==='string'&&row.name.trim()?row.name.trim():`Character ${index+1}`
+    return {
+      ...row,
+      role:typeof row.role==='string'&&row.role.trim()?row.role:`${name} character role`,
+      appearance:typeof row.appearance==='string'&&row.appearance.trim()?row.appearance:`${name} appearance continuity to be preserved`,
+      wardrobe:Array.isArray(row.wardrobe)?row.wardrobe:[],
+      voice:typeof row.voice==='string'&&row.voice.trim()?row.voice:`${name} consistent production voice`,
+      continuity:Array.isArray(row.continuity)?row.continuity:[],
+    }
+  }):input.characters
+  const locations=Array.isArray(input.locations)?input.locations.map((item,index)=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)) return item
+    const row=item as Record<string,unknown>
+    const name=typeof row.name==='string'&&row.name.trim()?row.name.trim():`Location ${index+1}`
+    return {
+      ...row,
+      description:typeof row.description==='string'&&row.description.trim()?row.description:`${name} production location`,
+      lighting:typeof row.lighting==='string'&&row.lighting.trim()?row.lighting:'Physically motivated cinematic lighting',
+      palette:Array.isArray(row.palette)?row.palette:[],
+      continuity:Array.isArray(row.continuity)?row.continuity:[],
+    }
+  }):input.locations
+  const scenes=Array.isArray(input.scenes)?input.scenes.map(item=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)) return item
+    const row=item as Record<string,unknown>
+    const purpose=typeof row.purpose==='string'&&row.purpose.trim()?row.purpose:'Advance the approved story and character arc'
+    return {
+      ...row,
+      characterIds:Array.isArray(row.characterIds)?row.characterIds:[],
+      beats:Array.isArray(row.beats)&&row.beats.length>0?row.beats:[purpose],
+      visualIntent:typeof row.visualIntent==='string'&&row.visualIntent.trim()?row.visualIntent:'Preserve the approved visual bible and scene continuity',
+      audioIntent:typeof row.audioIntent==='string'&&row.audioIntent.trim()?row.audioIntent:'Preserve dialogue clarity, ambience and approved sound continuity',
+    }
+  }):input.scenes
+  return {
+    ...input,
+    title,
+    logline:typeof input.logline==='string'&&input.logline.trim().length>=20?input.logline:`Production plan for ${title}, preserving the approved story, characters and cinematic continuity.`,
+    theme:typeof input.theme==='string'&&input.theme.trim()?input.theme:'Character, consequence and continuity',
+    visualBible:{
+      camera:typeof visual.camera==='string'&&visual.camera.trim()?visual.camera:'Cinematic coverage motivated by story and performance',
+      lensLanguage:typeof visual.lensLanguage==='string'&&visual.lensLanguage.trim()?visual.lensLanguage:'Consistent lens language appropriate to each scene',
+      lighting:typeof visual.lighting==='string'&&visual.lighting.trim()?visual.lighting:'Physically motivated cinematic lighting',
+      colour:typeof visual.colour==='string'&&visual.colour.trim()?visual.colour:'Consistent cinematic colour palette',
+      motion:typeof visual.motion==='string'&&visual.motion.trim()?visual.motion:'Controlled camera movement motivated by story',
+      texture:typeof visual.texture==='string'&&visual.texture.trim()?visual.texture:'Cohesive cinematic image texture',
+    },
+    soundBible:{
+      dialogue:typeof sound.dialogue==='string'&&sound.dialogue.trim()?sound.dialogue:'Natural dialogue with clear production intelligibility',
+      ambience:typeof sound.ambience==='string'&&sound.ambience.trim()?sound.ambience:'Continuous location-specific ambience',
+      music:typeof sound.music==='string'&&sound.music.trim()?sound.music:'Score supports story without overpowering dialogue',
+      effects:typeof sound.effects==='string'&&sound.effects.trim()?sound.effects:'Physically grounded production sound effects',
+    },
+    characters,
+    locations,
+    scenes,
+    validation:Array.isArray(input.validation)&&input.validation.length>0?input.validation:['Blackstar normalized optional production-manifest fields before validation.'],
+  }
+}
+
 export function parseCinemaProductionManifest(text:string,targetDurationMinutes:number){
-  const parsed=productionSchema.safeParse(strictJson(text,'production'))
-  if(!parsed.success) throw new Error('The AI cinema production compiler returned an incomplete manifest.')
+  const parsed=productionSchema.safeParse(normalizeProductionManifest(strictJson(text,'production')))
+  if(!parsed.success){
+    const issue=parsed.error.issues[0]
+    const path=issue?.path?.length?issue.path.join('.'):'manifest'
+    throw new Error(`The AI cinema production compiler returned an incomplete manifest at ${path}.`)
+  }
   const charIds=new Set(parsed.data.characters.map(x=>x.id))
   const locationIds=new Set(parsed.data.locations.map(x=>x.id))
   const sceneIds=new Set<string>()
