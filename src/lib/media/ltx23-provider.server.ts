@@ -27,7 +27,7 @@ function videoUrl(result:JsonObject){
     : null
 }
 
-export function hasDirectLtx23Provider(){return Boolean(process.env['FAL_KEY'])}
+export function hasDirectLtx23Provider(){return Boolean((process.env['FAL_KEY']??'').trim())}
 
 export async function submitDirectLtx23(input:{prompt:string;sourceUrl:string;aspectRatio:string;durationSeconds:number}){
   const requestedDurationSeconds=Math.max(1,Math.round(input.durationSeconds))
