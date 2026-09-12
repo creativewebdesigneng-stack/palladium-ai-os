@@ -53,14 +53,15 @@ describe("Nango management provisioning", () => {
 
     const results = await provisionNangoIntegrations();
 
-    expect(results).toHaveLength(9);
-    expect(results[0]).toMatchObject({ id: "github", status: "existing" });
-    expect(results.slice(1).every((result) => result.status === "created")).toBe(true);
+    expect(results).toHaveLength(10);
+    expect(results.find((result) => result.id === "github")).toMatchObject({ id: "github", status: "existing" });
+    expect(results.filter((result) => result.id !== "github").every((result) => result.status === "created")).toBe(true);
     const createCalls = fetchMock.mock.calls.filter(([, init]) => init?.method === "POST");
-    expect(createCalls).toHaveLength(8);
+    expect(createCalls).toHaveLength(9);
     expect(
       createCalls.map(([, init]) => JSON.parse(String(init?.body))).map((body) => body.unique_key),
     ).toEqual([
+      "blackstar-gocardless-banking",
       "palladium-google",
       "palladium-microsoft",
       "palladium-slack",

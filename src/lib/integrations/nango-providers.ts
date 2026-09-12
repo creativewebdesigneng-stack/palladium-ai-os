@@ -1,5 +1,13 @@
 export const NANGO_PROVIDERS = [
   {
+    id: "gocardless-bank-account-data",
+    name: "GoCardless Bank Account Data",
+    category: "banking",
+    env: "NANGO_GOCARDLESS_BANKING_INTEGRATION_ID",
+    defaultIntegrationId: "blackstar-gocardless-banking",
+    probe: { path: "/api/v2/institutions/?country=gb", label: "0.name" },
+  },
+  {
     id: "github",
     name: "GitHub",
     category: "developer",
