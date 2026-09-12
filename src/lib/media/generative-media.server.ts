@@ -7,7 +7,7 @@ type JsonObject = Record<string, unknown>;
 function config(provider: Provider) {
   if (provider === 'seedream') {
     return {
-      url: (process.env['SEEDREAM_WORKER_URL'] ?? 'https://blackstar-cinema-keyframe-worker-y3s7rg.v2.appdeploy.ai').replace(/\/$/, ''),
+      url: (process.env['SEEDREAM_WORKER_URL'] ?? 'https://blackstar-cinema-keyframe-worker-y3s7rg.v2.appdeploy.ai/api').replace(/\/$/, ''),
       token: process.env['SEEDREAM_WORKER_TOKEN'] ?? '',
       kind: 'image' as const,
     };
