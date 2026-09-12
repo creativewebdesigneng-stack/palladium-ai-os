@@ -19,6 +19,23 @@ describe('Cinema production compiler',()=>{
     expect(parsed.scenes[0]?.locationId).toBe('bridge')
     expect(parsed.characters[0]?.id).toBe('mara')
   })
+  it('normalizes optional AI manifest omissions before strict validation',()=>{
+    const incomplete={
+      ...production,
+      visualBible:{camera:'restrained'},
+      soundBible:{dialogue:'intimate'},
+      characters:[{id:'mara',name:'Mara',appearance:'short dark hair and flight suit'}],
+      locations:[{id:'bridge',name:'Bridge'}],
+      scenes:[{...production.scenes[0],beats:undefined,visualIntent:undefined,audioIntent:undefined}],
+      validation:undefined,
+    }
+    const parsed=parseCinemaProductionManifest(JSON.stringify(incomplete),2)
+    expect(parsed.characters[0]?.wardrobe).toEqual([])
+    expect(parsed.locations[0]?.lighting).toBeTruthy()
+    expect(parsed.scenes[0]?.beats.length).toBeGreaterThan(0)
+    expect(parsed.visualBible.lighting).toBeTruthy()
+    expect(parsed.validation.length).toBeGreaterThan(0)
+  })
   it('rejects invalid continuity references',()=>{
     expect(()=>parseCinemaProductionManifest(JSON.stringify({...production,scenes:[{...production.scenes[0],characterIds:['missing']}]}),2)).toThrow('invalid scene character reference')
   })
