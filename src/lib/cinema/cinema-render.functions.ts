@@ -37,6 +37,12 @@ function shotPlan(project:any,sceneId:string){
 
 function completedAt(status:string){return ['completed','failed','cancelled'].includes(status)?new Date().toISOString():null}
 
+export function cinemaRenderReuseAction(status:string|null|undefined){
+  if(status==='completed'||status==='queued'||status==='running') return 'reuse' as const
+  if(status==='failed'||status==='cancelled') return 'retry' as const
+  return 'create' as const
+}
+
 async function createMediaJob(sb:Sb,userId:string,input:{
   provider:'seedream'|'ltx';prompt:string;aspectRatio:string;sourceUrl?:string|null;durationSeconds?:number|null;metadata:any
 }){
@@ -92,7 +98,7 @@ export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middlewa
     const results=[]
     for(const shot of shots){
       const prior:any=existingByShot.get(String(shot.id))
-      if(prior&&['completed','queued','running'].includes(String(prior.status))){
+      if(prior&&cinemaRenderReuseAction(String(prior.status))==='reuse'){
         results.push({shotId:shot.id,renderId:prior.id,status:prior.status,reused:true,outputUrl:prior.output_url??null})
         continue
       }
@@ -158,7 +164,7 @@ export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).midd
       for(let segmentIndex=0;segmentIndex<durations.length;segmentIndex++){
         const key=`${shot.id}:${segmentIndex}`
         const prior:any=videoByKey.get(key)
-        if(prior&&['completed','queued','running'].includes(String(prior.status))){
+        if(prior&&cinemaRenderReuseAction(String(prior.status))==='reuse'){
           results.push({shotId:shot.id,segmentIndex,renderId:prior.id,status:prior.status,reused:true,outputUrl:prior.output_url??null})
           continue
         }
