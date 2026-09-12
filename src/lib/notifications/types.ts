@@ -98,6 +98,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A payment could not be collected.",
   },
   {
+    type: "finance.threshold_triggered",
+    label: "Finance threshold triggered",
+    category: "billing",
+    severity: "warning",
+    desc: "A configured Finance Hub threshold was crossed using verified Blackstar data.",
+  },
+  {
     type: "usage.limit_approaching",
     label: "Usage approaching limit",
     category: "billing",
