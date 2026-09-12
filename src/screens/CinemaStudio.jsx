@@ -18,7 +18,7 @@ export default function CinemaStudio(){
  const shots=useMutation({mutationFn:({id,sceneId})=>shotsFn({data:{id,sceneId}}),onSuccess:()=>qc.invalidateQueries({queryKey:['cinema-studio']})})
  const render=useMutation({mutationFn:()=>createFn({data:{title,prompt,screenplay:blueprint,durationMinutes:Number(duration),aspectRatio:aspect,quality,references:refs.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}})})
  const cap=overview.data?.capabilities, projects=overview.data?.projects ?? []
- return <><PageHeader eyebrow="Blackstar Creative Intelligence" title="Blackstar Cinema Studio" description="Prompt an original film concept, develop its screenplay and shot architecture, preserve production continuity, and submit long-form scene-based renders to a cinema execution worker."/>
+ return <div className="blackstar-core-page blackstar-cinema"><PageHeader eyebrow="Blackstar Creative Intelligence" title="Blackstar Cinema Studio" description="Prompt an original film concept, develop its screenplay and shot architecture, preserve production continuity, and submit long-form scene-based renders to a cinema execution worker."/>
  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,.9fr)]">
  <section className="rounded-[24px] border border-white/10 bg-black/40 p-5"><div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-violet-300"/><h2 className="text-sm font-semibold text-white">Film Director</h2></div>
  <p className="mt-2 text-xs text-white/40">Describe an original movie, episode, trailer or cinematic sequence. Blackstar develops a long-form production blueprint rather than pretending a single video-model call can generate a coherent feature film.</p>
