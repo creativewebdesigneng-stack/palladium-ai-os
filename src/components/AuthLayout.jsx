@@ -12,10 +12,12 @@ function BlackstarMark() {
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050507] px-4 py-10 text-zinc-100">
-      <div aria-hidden className="absolute inset-0 -z-10 opacity-55"><SpaceBackground intensity="low" /></div>
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,.13),transparent_38%),linear-gradient(180deg,transparent_0%,rgba(0,0,0,.36)_100%)]" />
-      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-35 bg-[linear-gradient(rgba(255,255,255,.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]" />
+    <div className="blackstar-auth-space relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020204] px-4 py-10 text-zinc-100">
+      <div aria-hidden className="absolute inset-0 -z-20 opacity-60"><SpaceBackground intensity="low" /></div>
+      <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-a" />
+      <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-b" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,.14),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(0,0,0,.46)_100%)]" />
+      <div aria-hidden className="blackstar-auth-grid pointer-events-none absolute inset-0" />
 
       <div className="relative w-full max-w-md">
         <div className="mb-8 text-center">
@@ -35,7 +37,7 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
           {subtitle && <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-white/45">{subtitle}</p>}
         </div>
 
-        <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-black/45 p-7 shadow-[0_28px_90px_rgba(0,0,0,.42)] backdrop-blur-2xl sm:p-8">
+        <div className="blackstar-auth-card relative overflow-hidden rounded-[26px] border border-white/[.09] p-7 backdrop-blur-2xl sm:p-8">
           <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/45 to-transparent" />
           <div aria-hidden className="pointer-events-none absolute right-[-5rem] top-[-5rem] h-40 w-40 rounded-full bg-violet-500/10 blur-[70px]" />
           <div className="relative">{children}</div>

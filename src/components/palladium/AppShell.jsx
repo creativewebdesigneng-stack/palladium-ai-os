@@ -28,13 +28,21 @@ export default function AppShell() {
 
   return (
     <UpgradeProvider>
-      <div className="relative min-h-screen overflow-x-hidden bg-[#030306] text-zinc-100">
-        <div aria-hidden className="fixed inset-0 -z-30 bg-[#030306]" />
-        <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 opacity-45">
-          <SpaceBackground intensity="subtle" />
+      <div className="blackstar-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100">
+        <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-40 opacity-55">
+          <SpaceBackground intensity="low" />
         </div>
-        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_72%_8%,rgba(124,58,237,.10),transparent_26%),radial-gradient(circle_at_30%_90%,rgba(99,102,241,.06),transparent_30%)]" />
-        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(rgba(255,255,255,.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.012)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]" />
+        <div aria-hidden className="blackstar-spatial-field fixed inset-0 -z-30">
+          <span className="blackstar-orb blackstar-orb-a" />
+          <span className="blackstar-orb blackstar-orb-b" />
+          <span className="blackstar-orb blackstar-orb-c" />
+          <span className="blackstar-orbit blackstar-orbit-a" />
+          <span className="blackstar-orbit blackstar-orbit-b" />
+          <span className="blackstar-horizon" />
+        </div>
+        <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20" />
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_70%_8%,rgba(139,92,246,.10),transparent_25%),radial-gradient(circle_at_28%_82%,rgba(56,189,248,.045),transparent_28%)]" />
 
         <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} />
         <div className={`transition-all duration-300 ${collapsed ? 'md:pl-20' : 'md:pl-64'}`}>
@@ -46,9 +54,11 @@ export default function AppShell() {
             openAssistant={() => setAssistantPanel(true)}
             unread={unread}
           />
-          <main className="relative mx-auto max-w-[1680px] p-4 lg:p-7 xl:p-8">
-            <div aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-32 bg-gradient-to-b from-violet-500/[.025] to-transparent blur-3xl" />
-            <PageTransition><Outlet /></PageTransition>
+          <main className="blackstar-stage relative mx-auto max-w-[1740px] p-4 lg:p-7 xl:p-8">
+            <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-40 bg-gradient-to-b from-violet-500/[.035] via-violet-500/[.01] to-transparent blur-3xl" />
+            <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
+            <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
+            <div className="relative z-10"><PageTransition><Outlet /></PageTransition></div>
           </main>
         </div>
         {mobileOpen && <button className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm md:hidden" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
