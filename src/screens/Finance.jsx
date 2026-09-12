@@ -8,6 +8,7 @@ import FinanceKnowledgeHub from '@/components/finance/FinanceKnowledgeHub';
 import FinanceDocumentInspector from '@/components/finance/FinanceDocumentInspector';
 import FinancePortfolio from '@/components/finance/FinancePortfolio';
 import FinanceAlerts from '@/components/finance/FinanceAlerts';
+import FinanceReceivables from '@/components/finance/FinanceReceivables';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -90,6 +91,7 @@ export default function Finance() {
 
       <FinanceKnowledgeHub />
       <div className="mt-5"><FinancePortfolio /></div>
+      <div className="mt-5"><FinanceReceivables /></div>
       <div className="mt-5"><FinanceAlerts /></div>
       <div className="mt-5"><FinanceDocumentInspector /></div>
 
