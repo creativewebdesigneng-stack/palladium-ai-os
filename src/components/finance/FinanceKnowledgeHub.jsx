@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Banknote, BookOpen, Building2, Calculator, CreditCard, ExternalLink,
-  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards,
+  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards, Target, Home, BriefcaseBusiness,
 } from 'lucide-react';
 
 const TOPICS = [
@@ -98,6 +98,12 @@ export default function FinanceKnowledgeHub() {
   const [loan, setLoan] = useState('20000');
   const [loanRate, setLoanRate] = useState('7');
   const [loanYears, setLoanYears] = useState('5');
+  const [income, setIncome] = useState('3500');
+  const [essential, setEssential] = useState('1800');
+  const [otherSpend, setOtherSpend] = useState('700');
+  const [mortgageAmount, setMortgageAmount] = useState('250000');
+  const [mortgageRate, setMortgageRate] = useState('4.5');
+  const [mortgageYears, setMortgageYears] = useState('25');
 
   const savings = useMemo(() => {
     const p = Math.max(0, Number(monthly) || 0);
@@ -115,6 +121,23 @@ export default function FinanceKnowledgeHub() {
     const total = payment * n;
     return { payment, total, interest: Math.max(0, total - principal) };
   }, [loan, loanRate, loanYears]);
+
+  const budget = useMemo(() => {
+    const net = Math.max(0, Number(income) || 0);
+    const needs = Math.max(0, Number(essential) || 0);
+    const wants = Math.max(0, Number(otherSpend) || 0);
+    const available = net - needs - wants;
+    const rate = net > 0 ? (available / net) * 100 : 0;
+    return { net, needs, wants, available, rate };
+  }, [income, essential, otherSpend]);
+
+  const mortgage = useMemo(() => {
+    const principal = Math.max(0, Number(mortgageAmount) || 0);
+    const n = Math.max(1, Math.round((Number(mortgageYears) || 0) * 12));
+    const r = Math.max(0, Number(mortgageRate) || 0) / 100 / 12;
+    const payment = r === 0 ? principal / n : principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    return { payment, total: payment * n };
+  }, [mortgageAmount, mortgageRate, mortgageYears]);
 
   return (
     <div className="mt-5 space-y-5">
