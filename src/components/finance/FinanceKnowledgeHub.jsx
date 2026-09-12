@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Banknote, BookOpen, Building2, Calculator, CreditCard, ExternalLink,
-  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards, Target, Home, BriefcaseBusiness,
+  Landmark, LineChart, PiggyBank, Receipt, ShieldCheck, WalletCards, Target, Home, BriefcaseBusiness, TrendingUp, Scale, Gauge,
 } from 'lucide-react';
 
 const TOPICS = [
@@ -104,6 +104,12 @@ export default function FinanceKnowledgeHub() {
   const [mortgageAmount, setMortgageAmount] = useState('250000');
   const [mortgageRate, setMortgageRate] = useState('4.5');
   const [mortgageYears, setMortgageYears] = useState('25');
+  const [assets, setAssets] = useState('150000');
+  const [liabilities, setLiabilities] = useState('65000');
+  const [revenue, setRevenue] = useState('25000');
+  const [variableCosts, setVariableCosts] = useState('9000');
+  const [fixedCosts, setFixedCosts] = useState('8000');
+  const [cashReserve, setCashReserve] = useState('40000');
 
   const savings = useMemo(() => {
     const p = Math.max(0, Number(monthly) || 0);
@@ -138,6 +144,21 @@ export default function FinanceKnowledgeHub() {
     const payment = r === 0 ? principal / n : principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     return { payment, total: payment * n };
   }, [mortgageAmount, mortgageRate, mortgageYears]);
+
+  const intelligence = useMemo(() => {
+    const assetValue = Math.max(0, Number(assets) || 0);
+    const debtValue = Math.max(0, Number(liabilities) || 0);
+    const sales = Math.max(0, Number(revenue) || 0);
+    const variable = Math.max(0, Number(variableCosts) || 0);
+    const fixed = Math.max(0, Number(fixedCosts) || 0);
+    const cash = Math.max(0, Number(cashReserve) || 0);
+    const grossProfit = sales - variable;
+    const operatingProfit = grossProfit - fixed;
+    const grossMargin = sales > 0 ? grossProfit / sales * 100 : 0;
+    const operatingMargin = sales > 0 ? operatingProfit / sales * 100 : 0;
+    const runway = fixed > 0 ? cash / fixed : null;
+    return { netWorth: assetValue - debtValue, grossProfit, operatingProfit, grossMargin, operatingMargin, runway };
+  }, [assets, liabilities, revenue, variableCosts, fixedCosts, cashReserve]);
 
   return (
     <div className="mt-5 space-y-5">
