@@ -249,3 +249,290 @@ body::before {
 .memory-brain-links line { animation: memory-brain-flow 7s linear infinite; }
 .memory-brain-links.is-active line { animation-duration: 2.2s; stroke-opacity: 1; }
 .memory-brain-pulse { animation: memory-brain-pulse 1.6s cubic-bezier(.16,1,.3,1) forwards; transform-origin: 50px 50px; }
+
+
+/* Blackstar 3D platform system — shared by every authenticated page */
+:root {
+  --blackstar-depth-bg: rgba(7, 7, 12, .68);
+  --blackstar-depth-edge: rgba(255,255,255,.075);
+  --blackstar-violet: 139, 92, 246;
+  --blackstar-cyan: 56, 189, 248;
+}
+
+.blackstar-shell {
+  isolation: isolate;
+  perspective: 1600px;
+  perspective-origin: 50% 18%;
+}
+
+.blackstar-spatial-field {
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+.blackstar-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(2px);
+  opacity: .58;
+  box-shadow: inset -28px -38px 70px rgba(0,0,0,.62), inset 18px 14px 42px rgba(255,255,255,.025), 0 0 90px rgba(139,92,246,.08);
+  animation: blackstar-orb-drift 28s ease-in-out infinite alternate;
+}
+.blackstar-orb::after {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: inherit;
+  border: 1px solid rgba(196,181,253,.09);
+  box-shadow: inset 0 0 50px rgba(139,92,246,.08);
+}
+.blackstar-orb-a {
+  width: 460px; height: 460px; right: -120px; top: 8%;
+  background: radial-gradient(circle at 32% 28%, rgba(196,181,253,.15), rgba(91,33,182,.075) 35%, rgba(3,3,8,.12) 66%, transparent 73%);
+}
+.blackstar-orb-b {
+  width: 310px; height: 310px; left: 15%; top: 58%;
+  background: radial-gradient(circle at 35% 28%, rgba(125,211,252,.10), rgba(59,130,246,.045) 38%, transparent 72%);
+  animation-delay: -11s;
+}
+.blackstar-orb-c {
+  width: 190px; height: 190px; left: 45%; top: 12%;
+  background: radial-gradient(circle at 34% 28%, rgba(221,214,254,.10), rgba(139,92,246,.04) 42%, transparent 70%);
+  animation-delay: -19s;
+}
+.blackstar-orbit {
+  position: absolute;
+  border: 1px solid rgba(167,139,250,.065);
+  border-radius: 50%;
+  transform: rotateX(68deg) rotateZ(-14deg);
+  box-shadow: 0 0 80px rgba(139,92,246,.025);
+}
+.blackstar-orbit-a { width: 740px; height: 310px; right: -160px; top: 18%; }
+.blackstar-orbit-b { width: 520px; height: 220px; left: 2%; bottom: 2%; border-color: rgba(56,189,248,.045); }
+.blackstar-horizon {
+  position: absolute;
+  left: -10%; right: -10%; bottom: 7%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139,92,246,.11), rgba(255,255,255,.08), rgba(56,189,248,.08), transparent);
+  box-shadow: 0 -20px 80px rgba(139,92,246,.06);
+  transform: rotateX(70deg);
+}
+@keyframes blackstar-orb-drift {
+  0% { transform: translate3d(-1.5%, -1%, -20px) scale(.98); }
+  100% { transform: translate3d(3%, 2.5%, 30px) scale(1.05); }
+}
+
+.blackstar-perspective-grid {
+  top: 44%;
+  bottom: -28%;
+  background-image:
+    linear-gradient(rgba(139,92,246,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,92,246,.045) 1px, transparent 1px);
+  background-size: 66px 66px;
+  transform-origin: 50% 0;
+  transform: perspective(900px) rotateX(68deg) scale(1.45);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.78) 20%, rgba(0,0,0,.15) 76%, transparent 100%);
+  opacity: .42;
+}
+
+.blackstar-stage {
+  transform-style: preserve-3d;
+}
+.blackstar-depth-rail {
+  position: absolute;
+  top: 22px; bottom: 24px; width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(139,92,246,.09) 16%, rgba(255,255,255,.035) 52%, transparent);
+  opacity: .7;
+}
+.blackstar-depth-rail-left { left: 8px; }
+.blackstar-depth-rail-right { right: 8px; }
+
+.blackstar-topbar {
+  border-bottom: 1px solid rgba(255,255,255,.065);
+  background: linear-gradient(180deg, rgba(8,8,14,.88), rgba(5,5,10,.72));
+  backdrop-filter: blur(26px) saturate(1.2);
+  -webkit-backdrop-filter: blur(26px) saturate(1.2);
+  box-shadow: 0 18px 55px rgba(0,0,0,.26), inset 0 -1px 0 rgba(139,92,246,.035);
+}
+.blackstar-topbar-sheen {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 0 22%, rgba(255,255,255,.018) 44%, transparent 62%);
+}
+.blackstar-command {
+  border: 1px solid rgba(255,255,255,.075);
+  background: linear-gradient(180deg, rgba(255,255,255,.037), rgba(255,255,255,.014));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 12px 34px rgba(0,0,0,.2);
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.blackstar-command:hover {
+  transform: translateY(-1px);
+  border-color: rgba(167,139,250,.18);
+  background: linear-gradient(180deg, rgba(139,92,246,.065), rgba(255,255,255,.016));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 40px rgba(0,0,0,.25), 0 0 32px rgba(139,92,246,.035);
+}
+
+.blackstar-sidebar {
+  border-right: 1px solid rgba(255,255,255,.07);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(139,92,246,.09), transparent 23%),
+    linear-gradient(180deg, rgba(8,8,14,.965), rgba(4,4,8,.94));
+  backdrop-filter: blur(28px) saturate(1.15);
+  -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  box-shadow: 22px 0 70px rgba(0,0,0,.28), inset -1px 0 0 rgba(139,92,246,.035);
+}
+.blackstar-sidebar::after {
+  content:"";
+  position:absolute;
+  inset:0 0 0 auto;
+  width:1px;
+  background:linear-gradient(to bottom,transparent,rgba(167,139,250,.16) 18%,rgba(255,255,255,.035) 56%,transparent);
+  pointer-events:none;
+}
+.blackstar-sidebar-brand-glow {
+  position:absolute; left:16px; top:10px; width:90px; height:45px;
+  background:radial-gradient(circle,rgba(139,92,246,.12),transparent 68%);
+  filter:blur(15px); pointer-events:none;
+}
+.blackstar-nav-item {
+  position: relative;
+  transform: translateZ(0);
+  transition: transform .22s ease, background .22s ease, box-shadow .22s ease, color .22s ease;
+}
+.blackstar-nav-item:hover {
+  transform: translate3d(2px,-1px,0);
+  background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(139,92,246,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 9px 24px rgba(0,0,0,.15);
+}
+.blackstar-nav-item.is-active {
+  background: linear-gradient(100deg, rgba(139,92,246,.17), rgba(139,92,246,.055));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), inset 3px 0 0 rgba(167,139,250,.55), 0 12px 30px rgba(0,0,0,.19);
+}
+.blackstar-nav-item.is-active::after {
+  content:"";
+  position:absolute; right:9px; top:50%; width:5px; height:5px; border-radius:50%;
+  background:rgb(196 181 253);
+  transform:translateY(-50%);
+  box-shadow:0 0 12px rgba(196,181,253,.8);
+}
+.blackstar-usage-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.04), rgba(139,92,246,.025));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 16px 32px rgba(0,0,0,.18);
+}
+.blackstar-usage-card:hover {
+  border-color: rgba(167,139,250,.2);
+  transform: translateY(-1px);
+}
+
+.blackstar-brand-core {
+  transform-style: preserve-3d;
+  animation: blackstar-brand-float 7s ease-in-out infinite;
+}
+.blackstar-brand-orbit {
+  position:absolute; border-radius:50%; border:1px solid rgba(196,181,253,.27);
+  box-shadow:0 0 18px rgba(139,92,246,.10);
+}
+.blackstar-brand-orbit-one { width:34px; height:34px; transform:rotateX(62deg) rotateZ(24deg); }
+.blackstar-brand-orbit-two { width:28px; height:28px; transform:rotateY(62deg) rotateZ(-28deg); border-color:rgba(125,211,252,.17); }
+.blackstar-brand-center {
+  position:absolute; width:13px; height:13px; border-radius:50%;
+  background:radial-gradient(circle at 36% 32%,rgba(255,255,255,.30),rgba(139,92,246,.20) 28%,#020204 66%);
+  box-shadow:0 0 20px rgba(167,139,250,.48), inset 0 0 8px rgba(255,255,255,.08);
+}
+.blackstar-brand-cross {
+  position:absolute; width:39px; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(196,181,253,.6),transparent);
+}
+.blackstar-brand-cross-a { transform:rotate(45deg); }
+.blackstar-brand-cross-b { transform:rotate(-45deg); opacity:.55; }
+@keyframes blackstar-brand-float { 0%,100%{transform:translateY(0) rotateZ(0)} 50%{transform:translateY(-1.5px) rotateZ(2deg)} }
+
+.blackstar-page-header {
+  transform-style: preserve-3d;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.05), rgba(255,255,255,.012) 50%, rgba(139,92,246,.025)),
+    rgba(5,5,10,.54);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 22px 60px rgba(0,0,0,.24), 0 0 70px rgba(139,92,246,.025);
+}
+.blackstar-page-header::after {
+  content:"";
+  position:absolute; inset:auto 5% -22px 5%; height:30px;
+  background:radial-gradient(ellipse,rgba(139,92,246,.11),transparent 68%);
+  filter:blur(18px); pointer-events:none;
+}
+.blackstar-page-header-glow {
+  position:absolute; width:360px; height:220px; right:-80px; top:-120px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.11),rgba(56,189,248,.025) 43%,transparent 70%);
+  filter:blur(6px);
+}
+.blackstar-page-header-grid {
+  position:absolute; inset:0; opacity:.18;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:38px 38px;
+  mask-image:linear-gradient(90deg,transparent,black 55%,transparent);
+}
+
+.blackstar-panel {
+  transform-style: preserve-3d;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.046), rgba(255,255,255,.012) 48%, rgba(139,92,246,.018)),
+    rgba(5,5,10,.48);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(139,92,246,.025), 0 20px 48px rgba(0,0,0,.22);
+  transition: transform .3s cubic-bezier(.22,1,.36,1), border-color .3s, box-shadow .3s;
+}
+.blackstar-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(167,139,250,.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.065), 0 28px 68px rgba(0,0,0,.28), 0 0 44px rgba(139,92,246,.025);
+}
+.blackstar-panel-highlight {
+  position:absolute; left:8%; right:8%; top:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(196,181,253,.30),rgba(255,255,255,.12),transparent);
+}
+.blackstar-panel-depth {
+  position:absolute; inset:auto 8% -22px 8%; height:36px; border-radius:50%;
+  background:rgba(0,0,0,.38); filter:blur(18px); opacity:.7;
+}
+
+.blackstar-metric-card {
+  transform-style: preserve-3d;
+  background: linear-gradient(145deg, rgba(255,255,255,.05), rgba(255,255,255,.012) 48%, rgba(139,92,246,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 17px 40px rgba(0,0,0,.22);
+  transition: transform .32s cubic-bezier(.22,1,.36,1), box-shadow .32s, border-color .32s;
+}
+.blackstar-metric-card:hover {
+  transform: translate3d(0,-5px,18px) rotateX(1.2deg);
+  border-color: rgba(167,139,250,.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 28px 65px rgba(0,0,0,.31), 0 0 42px rgba(139,92,246,.04);
+}
+.blackstar-metric-beam {
+  position:absolute; width:130px; height:130px; right:-45px; top:-58px; border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.10),transparent 68%); filter:blur(2px);
+}
+.blackstar-metric-floor {
+  position:absolute; left:10%; right:10%; bottom:-18px; height:24px;
+  background:radial-gradient(ellipse,rgba(139,92,246,.08),transparent 70%); filter:blur(12px);
+}
+
+/* Make legacy/local page surfaces inherit the new dimensional system too. */
+.blackstar-stage :is(.rounded-xl,.rounded-2xl,.rounded-3xl)[class*="border"][class*="bg-"] {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 16px 42px rgba(0,0,0,.16);
+}
+.blackstar-stage :is(button,a)[class*="rounded"][class*="bg-violet"] {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 9px 24px rgba(109,40,217,.20);
+}
+.blackstar-stage input,
+.blackstar-stage textarea,
+.blackstar-stage select {
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.018);
+}
+
+@media (max-width: 767px) {
+  .blackstar-perspective-grid { opacity:.24; transform: perspective(700px) rotateX(72deg) scale(1.65); }
+  .blackstar-orb-a { width:320px; height:320px; right:-170px; }
+  .blackstar-orb-b { width:210px; height:210px; left:-80px; }
+  .blackstar-page-header { border-radius:20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blackstar-orb, .blackstar-brand-core { animation:none !important; }
+  .blackstar-metric-card:hover, .blackstar-panel:hover, .blackstar-nav-item:hover { transform:none; }
+}
