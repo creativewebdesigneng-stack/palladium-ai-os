@@ -97,8 +97,12 @@ export async function submitGenerativeMediaJob(input: {
   durationSeconds?: number | null;
 }) {
   const cfg = config(input.provider);
-  if (!cfg.url) throw new Error(`${input.provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const sourceUrl = publicUrl(input.sourceUrl);
+  if (input.provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) {
+    if (!sourceUrl) throw new Error('LTX-2.3 image-to-video requires a completed keyframe URL.');
+    return submitDirectLtx23({ prompt: input.prompt, sourceUrl, aspectRatio: input.aspectRatio, durationSeconds: input.durationSeconds ?? 5 });
+  }
+  if (!cfg.url) throw new Error(`${input.provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const body = input.provider === 'seedream'
     ? {
         workflow: sourceUrl ? 'image-edit' : 'text-to-image',
