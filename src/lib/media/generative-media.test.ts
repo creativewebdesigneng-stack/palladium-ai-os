@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { getGenerativeMediaCapabilities } from './generative-media.server';
+
+const originalFalKey=process.env['FAL_KEY'];
+afterEach(()=>{if(originalFalKey===undefined) delete process.env['FAL_KEY']; else process.env['FAL_KEY']=originalFalKey;});
 
 describe('generative media runtime', () => {
   it('exposes bounded Seedream image workflows', () => {
+    process.env['FAL_KEY']='test-key';
     const capabilities = getGenerativeMediaCapabilities();
     expect(capabilities.seedream.kind).toBe('image');
     expect(capabilities.seedream.configured).toBe(true);
