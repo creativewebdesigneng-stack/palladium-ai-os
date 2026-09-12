@@ -171,9 +171,55 @@ export function parseCinemaProductionManifest(text:string,targetDurationMinutes:
   return parsed.data
 }
 
+function normalizeShotPlan(value:unknown,sceneId:string){
+  if(!value||typeof value!=='object'||Array.isArray(value)) return value
+  const input=value as Record<string,unknown>
+  const shots=Array.isArray(input['shots'])?input['shots'].map((item,index)=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)) return item
+    const row=item as Record<string,unknown>
+    const rawDuration=row['durationSeconds']
+    const durationSeconds=typeof rawDuration==='number'
+      ? rawDuration
+      : typeof rawDuration==='string'&&rawDuration.trim()&&Number.isFinite(Number(rawDuration))
+        ? Number(rawDuration)
+        : rawDuration
+    const action=typeof row['action']==='string'&&row['action'].trim()?row['action']:`Approved scene action for shot ${index+1}`
+    const framing=typeof row['framing']==='string'&&row['framing'].trim()?row['framing']:'cinematic medium coverage'
+    const camera=typeof row['camera']==='string'&&row['camera'].trim()?row['camera']:'controlled story-motivated camera'
+    return {
+      ...row,
+      id:typeof row['id']==='string'&&row['id'].trim()?row['id']:`${sceneId}-shot-${index+1}`,
+      durationSeconds,
+      framing,
+      camera,
+      action,
+      dialogue:typeof row['dialogue']==='string'?row['dialogue']:'',
+      visualPrompt:typeof row['visualPrompt']==='string'&&row['visualPrompt'].trim().length>=10
+        ? row['visualPrompt']
+        : `${framing}; ${camera}; ${action}; preserve approved scene, character, wardrobe, location, lighting and colour continuity`,
+      negativePrompt:typeof row['negativePrompt']==='string'?row['negativePrompt']:'',
+      audioPrompt:typeof row['audioPrompt']==='string'?row['audioPrompt']:'',
+      characterIds:Array.isArray(row['characterIds'])?row['characterIds']:[],
+      continuityNotes:Array.isArray(row['continuityNotes'])?row['continuityNotes']:[],
+    }
+  }):input['shots']
+  return {
+    ...input,
+    sceneId:typeof input['sceneId']==='string'&&input['sceneId'].trim()?input['sceneId']:sceneId,
+    shots,
+    validation:Array.isArray(input['validation'])&&input['validation'].length>0
+      ? input['validation']
+      : ['Blackstar normalized optional shot-plan fields before validation.'],
+  }
+}
+
 export function parseCinemaShotPlan(text:string,sceneId:string,sceneDurationSeconds:number,characterIds:string[]){
-  const parsed=shotPlanSchema.safeParse(strictJson(text,'shot'))
-  if(!parsed.success) throw new Error('The AI cinema shot compiler returned an incomplete shot plan.')
+  const parsed=shotPlanSchema.safeParse(normalizeShotPlan(strictJson(text,'shot'),sceneId))
+  if(!parsed.success){
+    const issue=parsed.error.issues[0]
+    const path=issue?.path?.length?issue.path.join('.'):'shotPlan'
+    throw new Error(`The AI cinema shot compiler returned an incomplete shot plan at ${path}.`)
+  }
   if(parsed.data.sceneId!==sceneId) throw new Error('The AI cinema shot compiler returned the wrong scene id.')
   const allowed=new Set(characterIds)
   if(parsed.data.shots.some(shot=>shot.characterIds.some(id=>!allowed.has(id)))) throw new Error('The AI cinema shot compiler returned an invalid character reference.')
