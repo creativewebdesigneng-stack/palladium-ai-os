@@ -1,0 +1,1 @@
+import{createFileRoute}from"@tanstack/react-router";import LegalHub from"@/screens/LegalHub";export const Route=createFileRoute("/_app/legal-hub")({component:LegalHub});
