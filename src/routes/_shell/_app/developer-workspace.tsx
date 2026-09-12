@@ -5,6 +5,10 @@ function SpatialPage() {
   return <div className="blackstar-core-page blackstar-secondary-page blackstar-developer"><Screen /></div>;
 }
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-secondary-page blackstar-developer"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/developer-workspace")({
   head: () => ({
     meta: [
