@@ -6,12 +6,17 @@ export const BLACKSTAR_CINEMA_MASTER_WORKER_URL = 'https://blackstar-auto-editor
 
 export function getCinemaCapabilities() {
   const renderUrl = (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim()
-  const masterUrl = (process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim() || BLACKSTAR_CINEMA_MASTER_WORKER_URL
+  const configuredMasterUrl = (process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim()
+  const masterUrl = configuredMasterUrl || renderUrl || BLACKSTAR_CINEMA_MASTER_WORKER_URL
   return {
     configured: Boolean(masterUrl),
     renderConfigured: Boolean(renderUrl),
     masterConfigured: Boolean(masterUrl),
-    masterProvider: renderUrl ? 'configured-cinema-worker' : 'blackstar-hosted-master',
+    masterProvider: configuredMasterUrl
+      ? 'configured-master-worker'
+      : renderUrl
+        ? 'configured-cinema-worker'
+        : 'blackstar-hosted-master',
     maxDurationMinutes: CINEMA_MAX_DURATION_MINUTES,
     workflow: 'blackstar-cinema-studio',
     stages: ['treatment','screenplay','shot-plan','visual-generation','voice','music','assembly','master'],
@@ -68,7 +73,6 @@ export async function getCinemaRender(id:string) {
   const json=JSON.parse(raw)
   return {status:String(json.status ?? 'queued'),outputUrl:typeof json.output_url==='string'?json.output_url:null,errorMessage:typeof json.error==='string'?json.error.slice(0,1000):null,metadata:{stage:json.stage ?? null,progress:json.progress ?? null}}
 }
-
 
 export async function submitCinemaMasterAssembly(input:{
   projectId:string;
