@@ -5,6 +5,13 @@ import { getDirectSeedream, hasDirectSeedreamProvider, submitDirectSeedream } fr
 type Provider = 'seedream' | 'ltx';
 type JsonObject = Record<string, unknown>;
 
+export function resolveSeedreamProvider(){
+  const forceWorker=(process.env['SEEDREAM_PROVIDER']??'').trim().toLowerCase()==='worker';
+  if(hasDirectSeedreamProvider()&&!forceWorker) return 'direct' as const;
+  const workerUrl=(process.env['SEEDREAM_WORKER_URL']??'').trim();
+  return workerUrl ? 'worker' as const : hasDirectSeedreamProvider() ? 'direct' as const : 'unconfigured' as const;
+}
+
 function config(provider: Provider) {
   if (provider === 'seedream') {
     return {
@@ -73,11 +80,11 @@ export function getGenerativeMediaCapabilities() {
   const ltx = config('ltx');
   return {
     seedream: {
-      configured: Boolean(seedream.url || hasDirectSeedreamProvider()),
+      configured: resolveSeedreamProvider()!=='unconfigured',
       kind: seedream.kind,
       workflows: ['text-to-image', 'image-edit', 'multi-image-composite'],
       aspectRatios: ['1:1', '4:5', '3:4', '16:9', '9:16', '21:9'],
-      note: seedream.url ? 'Cinema keyframes use the configured Seedream-compatible worker.' : hasDirectSeedreamProvider() ? 'Cinema keyframes use fal Seedream server-side through Blackstar\'s FAL_KEY.' : 'Seedream keyframes require FAL_KEY or SEEDREAM_WORKER_URL on the server.',
+      note: resolveSeedreamProvider()==='direct' ? 'Cinema keyframes use fal Seedream server-side through Blackstar\'s FAL_KEY.' : resolveSeedreamProvider()==='worker' ? 'Cinema keyframes use the configured Seedream-compatible worker because SEEDREAM_PROVIDER=worker.' : 'Seedream keyframes require FAL_KEY or SEEDREAM_WORKER_URL on the server.',
     },
     ltx: {
       configured: Boolean(ltx.url || hasDirectLtx23Provider()),
@@ -99,7 +106,7 @@ export async function submitGenerativeMediaJob(input: {
 }) {
   const cfg = config(input.provider);
   const sourceUrl = publicUrl(input.sourceUrl);
-  if (input.provider === 'seedream' && !cfg.url && hasDirectSeedreamProvider()) {
+  if (input.provider === 'seedream' && resolveSeedreamProvider()==='direct') {
     if (sourceUrl) throw new Error('Direct Seedream fallback currently supports text-to-image keyframes only.');
     return submitDirectSeedream({ prompt: input.prompt, aspectRatio: input.aspectRatio });
   }
@@ -142,7 +149,7 @@ export async function submitGenerativeMediaJob(input: {
 
 export async function getGenerativeMediaJob(provider: Provider, workerJobId: string) {
   const cfg = config(provider);
-  if (provider === 'seedream' && !cfg.url && hasDirectSeedreamProvider()) return getDirectSeedream(workerJobId);
+  if (provider === 'seedream' && resolveSeedreamProvider()==='direct') return getDirectSeedream(workerJobId);
   if (provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) return getDirectLtx23(workerJobId);
   if (!cfg.url) throw new Error(`${provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const response = await fetch(`${cfg.url}/jobs/${encodeURIComponent(workerJobId)}`, {
