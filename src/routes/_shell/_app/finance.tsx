@@ -8,10 +8,10 @@ function SpatialPage() {
 export const Route = createFileRoute("/_shell/_app/finance")({
   head: () => ({
     meta: [
-      { title: "Finance — Blackstar" },
-      { name: "description", content: "Cashflow, invoices and forecasting with AI." },
-      { property: "og:title", content: "Finance — Blackstar" },
-      { property: "og:description", content: "Cashflow, invoices and forecasting with AI." },
+      { title: "Finance Hub — Blackstar" },
+      { name: "description", content: "Ledger, planning calculators, personal and business finance education, and trusted financial resources." },
+      { property: "og:title", content: "Finance Hub — Blackstar" },
+      { property: "og:description", content: "Ledger, planning calculators, personal and business finance education, and trusted financial resources." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
