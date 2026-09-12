@@ -1,6 +1,6 @@
 import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
 import { getDirectLtx23, hasDirectLtx23Provider, submitDirectLtx23 } from '@/lib/media/ltx23-provider.server';
-import { getDirectSeedream, hasDirectSeedreamProvider, submitDirectSeedream } from '@/lib/media/seedream-provider.server';
+import { getDirectSeedream, getFalServerKey, hasDirectSeedreamProvider, submitDirectSeedream } from '@/lib/media/seedream-provider.server';
 
 type Provider = 'seedream' | 'ltx';
 type JsonObject = Record<string, unknown>;
@@ -14,7 +14,8 @@ export function resolveSeedreamProvider(){
 
 function config(provider: Provider) {
   if (provider === 'seedream') {
-    return {
+    const falKeyVisible=Boolean(getFalServerKey());
+  return {
       url: (process.env['SEEDREAM_WORKER_URL'] ?? '').replace(/\/$/, ''),
       token: process.env['SEEDREAM_WORKER_TOKEN'] ?? '',
       kind: 'image' as const,
@@ -79,8 +80,10 @@ export function getGenerativeMediaCapabilities() {
   const seedream = config('seedream');
   const ltx = config('ltx');
   return {
+    diagnostics:{falKeyVisible},
     seedream: {
       configured: resolveSeedreamProvider()!=='unconfigured',
+      provider:resolveSeedreamProvider(),
       kind: seedream.kind,
       workflows: ['text-to-image', 'image-edit', 'multi-image-composite'],
       aspectRatios: ['1:1', '4:5', '3:4', '16:9', '9:16', '21:9'],
@@ -88,6 +91,7 @@ export function getGenerativeMediaCapabilities() {
     },
     ltx: {
       configured: Boolean(ltx.url || hasDirectLtx23Provider()),
+      provider:ltx.url?'worker':hasDirectLtx23Provider()?'direct':'unconfigured',
       kind: ltx.kind,
       workflows: ltx.url ? ['text-to-video', 'image-to-video', 'audio-video'] : ['image-to-video'],
       aspectRatios: ltx.url ? ['16:9', '9:16', '1:1'] : ['16:9', '9:16'],
