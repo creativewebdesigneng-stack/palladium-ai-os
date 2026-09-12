@@ -5,6 +5,7 @@ describe('generative media runtime', () => {
   it('exposes bounded Seedream image workflows', () => {
     const capabilities = getGenerativeMediaCapabilities();
     expect(capabilities.seedream.kind).toBe('image');
+    expect(capabilities.seedream.configured).toBe(true);
     expect(capabilities.seedream.workflows).toEqual(['text-to-image', 'image-edit', 'multi-image-composite']);
     expect(capabilities.seedream.aspectRatios).toContain('16:9');
   });
