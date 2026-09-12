@@ -8,7 +8,7 @@ import Footer from '@/components/site/Footer';
 
 export default function AIToolsPublic() {
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-tools min-h-screen overflow-hidden bg-[#020204] text-zinc-100">
       <PublicNav />
 
       {/* Hero */}
@@ -28,7 +28,7 @@ export default function AIToolsPublic() {
             <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent"> AI tool.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-zinc-400">
-            Browse models, agents, coding, research, writing, images, video, audio, automation and business tools — all available inside PalladiumAI.
+            Browse models, agents, coding, research, writing, images, video, audio, automation and business tools — all available inside Blackstar.
           </p>
         </SectionReveal>
       </section>

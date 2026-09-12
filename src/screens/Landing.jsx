@@ -17,7 +17,7 @@ const pillars = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen overflow-hidden bg-[#030306] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-landing min-h-screen overflow-hidden bg-[#020204] text-zinc-100">
       <PublicNav />
 
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-24">

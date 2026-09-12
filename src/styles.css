@@ -896,3 +896,101 @@ body::before {
     transform:none;
   }
 }
+
+
+/* Public Blackstar 3D site */
+.blackstar-public-nav {
+  border-bottom:1px solid rgba(255,255,255,.065);
+  background:linear-gradient(180deg,rgba(7,7,12,.88),rgba(4,4,9,.70));
+  backdrop-filter:blur(26px) saturate(1.18);
+  -webkit-backdrop-filter:blur(26px) saturate(1.18);
+  box-shadow:0 18px 55px rgba(0,0,0,.24),inset 0 -1px 0 rgba(139,92,246,.03);
+}
+.blackstar-public-nav::after {
+  content:"";
+  position:absolute;left:12%;right:12%;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(167,139,250,.14),rgba(255,255,255,.04),transparent);
+  pointer-events:none;
+}
+
+.blackstar-public-page {
+  position:relative;
+  isolation:isolate;
+  perspective:1700px;
+}
+.blackstar-public-page::before {
+  content:"";
+  position:fixed;inset:0;z-index:-4;pointer-events:none;
+  background:
+    radial-gradient(circle at 15% 8%,rgba(139,92,246,.09),transparent 24%),
+    radial-gradient(circle at 84% 14%,rgba(56,189,248,.045),transparent 24%),
+    #020204;
+}
+.blackstar-public-page::after {
+  content:"";
+  position:fixed;left:-10%;right:-10%;bottom:-24%;height:68%;z-index:-3;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(139,92,246,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(139,92,246,.04) 1px,transparent 1px);
+  background-size:64px 64px;
+  transform-origin:50% 0;
+  transform:perspective(900px) rotateX(68deg) scale(1.45);
+  mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.72) 25%,transparent 88%);
+  opacity:.38;
+}
+
+.blackstar-public-page section {
+  transform-style:preserve-3d;
+}
+.blackstar-public-page .blackstar-panel,
+.blackstar-public-page :is(section,div)[class*="rounded-3xl"][class*="border"],
+.blackstar-public-page :is(section,div)[class*="rounded-2xl"][class*="border"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 24px 64px rgba(0,0,0,.22);
+}
+.blackstar-public-page .blackstar-panel:hover,
+.blackstar-public-page :is(section,div)[class*="rounded-3xl"][class*="border"]:hover {
+  transform:translate3d(0,-4px,16px);
+  border-color:rgba(167,139,250,.16);
+}
+
+.blackstar-public-landing section:first-of-type::after {
+  content:"";
+  position:absolute;
+  width:560px;height:560px;left:50%;top:31%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  border:1px solid rgba(167,139,250,.065);
+  box-shadow:
+    0 0 110px rgba(139,92,246,.055),
+    inset 0 0 90px rgba(139,92,246,.025);
+  pointer-events:none;
+}
+.blackstar-public-landing .blackstar-mark {
+  filter:drop-shadow(0 18px 35px rgba(139,92,246,.24));
+}
+
+.blackstar-public-pricing :is(section,div)[class*="rounded"][class*="border"],
+.blackstar-public-tools :is(section,div)[class*="rounded"][class*="border"] {
+  background-image:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.008) 54%,rgba(139,92,246,.018));
+}
+
+.blackstar-public-tools section:first-of-type::before,
+.blackstar-public-pricing section:first-of-type::before {
+  content:"";
+  position:absolute;
+  left:50%;top:18%;width:420px;height:180px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(ellipse,rgba(139,92,246,.10),transparent 68%);
+  filter:blur(26px);
+  pointer-events:none;
+}
+
+@media (max-width:900px){
+  .blackstar-public-page::after{opacity:.22}
+  .blackstar-public-landing section:first-of-type::after{width:360px;height:360px}
+  .blackstar-public-page .blackstar-panel:hover,
+  .blackstar-public-page :is(section,div)[class*="rounded-3xl"][class*="border"]:hover{transform:none}
+}
