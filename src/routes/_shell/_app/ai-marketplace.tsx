@@ -5,6 +5,10 @@ function SpatialPage() {
   return <div className="blackstar-core-page blackstar-longtail-page blackstar-aimarket"><Screen /></div>;
 }
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-longtail-page blackstar-aimarket"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/ai-marketplace")({
   head: () => ({
     meta: [
