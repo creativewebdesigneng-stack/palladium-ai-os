@@ -1,8 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { getGenerativeMediaCapabilities, resolveSeedreamProvider } from './generative-media.server';
 
-const originalFalKey=process.env['FAL_KEY'];
-afterEach(()=>{if(originalFalKey===undefined) delete process.env['FAL_KEY']; else process.env['FAL_KEY']=originalFalKey;});
+const originalEnv={
+  FAL_KEY:process.env['FAL_KEY'],
+  FAL_API_KEY:process.env['FAL_API_KEY'],
+  FAL_API_TOKEN:process.env['FAL_API_TOKEN'],
+  SEEDREAM_WORKER_URL:process.env['SEEDREAM_WORKER_URL'],
+  SEEDREAM_PROVIDER:process.env['SEEDREAM_PROVIDER'],
+};
+afterEach(()=>{
+  for(const [key,value] of Object.entries(originalEnv)){
+    if(value===undefined) delete process.env[key];
+    else process.env[key]=value;
+  }
+});
 
 describe('generative media runtime', () => {
   it('exposes bounded Seedream image workflows', () => {
@@ -35,5 +46,16 @@ describe('Seedream provider precedence',()=>{
     process.env['SEEDREAM_WORKER_URL']='https://custom-worker.example.com';
     process.env['SEEDREAM_PROVIDER']='worker';
     expect(resolveSeedreamProvider()).toBe('worker');
+  });
+});
+
+
+describe('fal runtime diagnostics',()=>{
+  it('reports fal key visibility without exposing the secret',()=>{
+    process.env['FAL_API_KEY']='alias-key';
+    delete process.env['FAL_KEY'];
+    const capabilities=getGenerativeMediaCapabilities();
+    expect(capabilities.diagnostics.falKeyVisible).toBe(true);
+    expect(JSON.stringify(capabilities)).not.toContain('alias-key');
   });
 });

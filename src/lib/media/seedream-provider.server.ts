@@ -3,9 +3,13 @@ type JsonObject=Record<string,unknown>
 export const SEEDREAM_MODEL='fal-ai/bytedance/seedream/v4/text-to-image'
 const BASE='https://queue.fal.run/fal-ai/bytedance/seedream/v4/text-to-image'
 
+export function getFalServerKey(){
+  return (process.env['FAL_KEY']??process.env['FAL_API_KEY']??process.env['FAL_API_TOKEN']??'').trim()
+}
+
 function headers(){
-  const key=(process.env['FAL_KEY']??'').trim()
-  if(!key) throw new Error('Seedream generation requires FAL_KEY.')
+  const key=getFalServerKey()
+  if(!key) throw new Error('Seedream generation requires FAL_KEY, FAL_API_KEY or FAL_API_TOKEN.')
   return {Authorization:`Key ${key}`,'Content-Type':'application/json'}
 }
 
@@ -25,7 +29,7 @@ function imageUrl(result:JsonObject){
     : null
 }
 
-export function hasDirectSeedreamProvider(){return Boolean((process.env['FAL_KEY']??'').trim())}
+export function hasDirectSeedreamProvider(){return Boolean(getFalServerKey())}
 
 export async function submitDirectSeedream(input:{prompt:string;aspectRatio:string}){
   const response=await fetch(BASE,{
