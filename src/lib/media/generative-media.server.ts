@@ -79,7 +79,7 @@ export function getGenerativeMediaCapabilities() {
       note: 'Cinema keyframes use Blackstar\'s hosted managed image-generation worker by default. SEEDREAM_WORKER_URL can override it with a Seedream-compatible execution node when exact provider-specific rendering is required.',
     },
     ltx: {
-      configured: Boolean(ltx.url),
+      configured: Boolean(ltx.url || hasDirectLtx23Provider()),
       kind: ltx.kind,
       workflows: ['text-to-video', 'image-to-video', 'audio-video'],
       aspectRatios: ['16:9', '9:16', '1:1'],
