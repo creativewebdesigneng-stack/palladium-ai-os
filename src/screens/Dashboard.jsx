@@ -76,7 +76,7 @@ export default function Dashboard() {
   const loading = isLoadingAuth || (isAuthenticated && isLoading);
 
   return (
-    <>
+    <div className="blackstar-core-page blackstar-dashboard">
       <PageHeader
         eyebrow="Blackstar Command"
         title="Intelligence Overview"
@@ -235,6 +235,6 @@ export default function Dashboard() {
           <Link to="/notifications" className="mt-3 flex items-center gap-1 text-xs text-violet-300">Open attention queue <ArrowRight className="h-3 w-3" /></Link>
         </Panel>
       </div>
-    </>
+    </div>
   );
 }

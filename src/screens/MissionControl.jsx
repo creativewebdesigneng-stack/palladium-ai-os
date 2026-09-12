@@ -358,7 +358,7 @@ export default function MissionControl() {
   }
 
   return (
-    <>
+    <div className="blackstar-core-page blackstar-mission">
       <PageHeader
         eyebrow="Blackstar Operations"
         title="Mission Control"
@@ -395,6 +395,6 @@ export default function MissionControl() {
       </div>
 
       <AgentBuilder open={builder.open} initial={builder.initial} saving={agentMutation.isPending} onClose={() => setBuilder({ open: false, initial: null })} onSave={(value) => agentMutation.mutate(value)} />
-    </>
+    </div>
   );
 }

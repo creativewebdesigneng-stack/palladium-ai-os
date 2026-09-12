@@ -125,7 +125,7 @@ export default function Workforce() {
   );
 
   return (
-    <>
+    <div className="blackstar-core-page blackstar-workforce">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-45"><NeuralNetworkBackground intensity="low" /></div>
       <PageHeader eyebrow="Blackstar Workforce OS" title="Autonomous Workforce" description="Deploy, organise, govern and supervise your AI workforce as one coordinated intelligence network." action={headerActions} />
 
@@ -190,6 +190,6 @@ export default function Workforce() {
       </AnimatePresence>
 
       <CreateDepartmentModal open={deptOpen} onClose={() => { setDeptOpen(false); setEditTeam(null); }} onSubmit={handleSaveDepartment} agents={agents} team={editTeam} />
-    </>
+    </div>
   );
 }
