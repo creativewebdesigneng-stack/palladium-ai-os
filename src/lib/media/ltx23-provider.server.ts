@@ -7,9 +7,13 @@ export function ltx23ProviderDuration(seconds:number){
   return n<=6?6:n<=8?8:10
 }
 
+function getFalServerKey(){
+  return (process.env['FAL_KEY']??process.env['FAL_API_KEY']??process.env['FAL_API_TOKEN']??'').trim()
+}
+
 function headers(){
-  const key=process.env['FAL_KEY']??''
-  if(!key) throw new Error('LTX generation requires FAL_KEY.')
+  const key=getFalServerKey()
+  if(!key) throw new Error('LTX generation requires FAL_KEY, FAL_API_KEY or FAL_API_TOKEN.')
   return {Authorization:`Key ${key}`,'Content-Type':'application/json'}
 }
 
@@ -27,7 +31,7 @@ function videoUrl(result:JsonObject){
     : null
 }
 
-export function hasDirectLtx23Provider(){return Boolean((process.env['FAL_KEY']??'').trim())}
+export function hasDirectLtx23Provider(){return Boolean(getFalServerKey())}
 
 export async function submitDirectLtx23(input:{prompt:string;sourceUrl:string;aspectRatio:string;durationSeconds:number}){
   const requestedDurationSeconds=Math.max(1,Math.round(input.durationSeconds))
