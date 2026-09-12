@@ -6,7 +6,7 @@ type JsonObject = Record<string, unknown>;
 function config(provider: Provider) {
   if (provider === 'seedream') {
     return {
-      url: (process.env['SEEDREAM_WORKER_URL'] ?? '').replace(/\/$/, ''),
+      url: (process.env['SEEDREAM_WORKER_URL'] ?? 'https://blackstar-cinema-keyframe-worker-y3s7rg.v2.appdeploy.ai').replace(/\/$/, ''),
       token: process.env['SEEDREAM_WORKER_TOKEN'] ?? '',
       kind: 'image' as const,
     };
@@ -75,7 +75,7 @@ export function getGenerativeMediaCapabilities() {
       kind: seedream.kind,
       workflows: ['text-to-image', 'image-edit', 'multi-image-composite'],
       aspectRatios: ['1:1', '4:5', '3:4', '16:9', '9:16', '21:9'],
-      note: 'Seedream-compatible generation is delegated to a separately deployed worker. PalladiumAI keeps prompts, job ownership and audit state; provider credentials stay server-side.',
+      note: 'Cinema keyframes use Blackstar\'s hosted managed image-generation worker by default. SEEDREAM_WORKER_URL can override it with a Seedream-compatible execution node when exact provider-specific rendering is required.',
     },
     ltx: {
       configured: Boolean(ltx.url),
