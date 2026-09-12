@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getGenerativeMediaCapabilities } from './generative-media.server';
+import { getGenerativeMediaCapabilities, resolveSeedreamProvider } from './generative-media.server';
 
 const originalFalKey=process.env['FAL_KEY'];
 afterEach(()=>{if(originalFalKey===undefined) delete process.env['FAL_KEY']; else process.env['FAL_KEY']=originalFalKey;});
@@ -19,5 +19,21 @@ describe('generative media runtime', () => {
     expect(capabilities.ltx.kind).toBe('video');
     expect(capabilities.ltx.workflows).toContain('image-to-video');
     expect(capabilities.ltx.durationSeconds).toEqual([3, 5, 8, 10]);
+  });
+});
+
+
+describe('Seedream provider precedence',()=>{
+  it('prefers direct fal when FAL_KEY exists even if a stale worker URL is set',()=>{
+    process.env['FAL_KEY']='test-key';
+    process.env['SEEDREAM_WORKER_URL']='https://legacy-worker.example.com';
+    delete process.env['SEEDREAM_PROVIDER'];
+    expect(resolveSeedreamProvider()).toBe('direct');
+  });
+  it('uses a custom worker only when explicitly forced',()=>{
+    process.env['FAL_KEY']='test-key';
+    process.env['SEEDREAM_WORKER_URL']='https://custom-worker.example.com';
+    process.env['SEEDREAM_PROVIDER']='worker';
+    expect(resolveSeedreamProvider()).toBe('worker');
   });
 });
