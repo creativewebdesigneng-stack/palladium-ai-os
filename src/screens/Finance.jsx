@@ -5,6 +5,7 @@ import { Receipt, Plus, Trash2 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PageHeader from '@/components/palladium/PageHeader';
 import FinanceKnowledgeHub from '@/components/finance/FinanceKnowledgeHub';
+import FinanceDocumentInspector from '@/components/finance/FinanceDocumentInspector';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -86,6 +87,7 @@ export default function Finance() {
 
 
       <FinanceKnowledgeHub />
+      <div className="mt-5"><FinanceDocumentInspector /></div>
 
       {session === 'no' && <Failed message="Sign in to view your finance ledger." />}
       {session === 'yes' && finance.isLoading && <Loading />}
