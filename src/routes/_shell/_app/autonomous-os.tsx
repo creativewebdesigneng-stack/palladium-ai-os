@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/AutonomousOS";
 
+function SpatialPage() {
+ return <div className="blackstar-core-page blackstar-audit-page"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/autonomous-os")({
   head: () => ({
     meta: [
@@ -12,5 +16,5 @@ export const Route = createFileRoute("/_shell/_app/autonomous-os")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Screen,
+  component: SpatialPage,
 });
