@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Screen from "@/screens/SocialOperations";
 
+function SpatialPage() {
+  return <div className="blackstar-core-page blackstar-secondary-page blackstar-social"><Screen /></div>;
+}
+
 export const Route = createFileRoute("/_shell/_app/social-operations")({
   head: () => ({
     meta: [
@@ -11,5 +15,5 @@ export const Route = createFileRoute("/_shell/_app/social-operations")({
       { property: "og:type", content: "website" },
     ],
   }),
-  component: Screen,
+  component: SpatialPage,
 });
