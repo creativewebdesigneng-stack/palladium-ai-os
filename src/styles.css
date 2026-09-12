@@ -745,3 +745,154 @@ body::before {
     transform:none;
   }
 }
+
+
+/* Product-page spatial scenes */
+.blackstar-media,
+.blackstar-threed,
+.blackstar-game,
+.blackstar-crm,
+.blackstar-finance,
+.blackstar-settings,
+.blackstar-admin {
+  perspective: 1800px;
+}
+
+.blackstar-media::before {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(236,72,153,.07), transparent 22%),
+    radial-gradient(circle at 82% 12%, rgba(139,92,246,.08), transparent 28%);
+}
+.blackstar-threed::before {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(56,189,248,.07), transparent 23%),
+    radial-gradient(circle at 84% 12%, rgba(139,92,246,.08), transparent 28%);
+}
+.blackstar-game::before {
+  background:
+    radial-gradient(circle at 20% 8%, rgba(34,197,94,.045), transparent 21%),
+    radial-gradient(circle at 84% 10%, rgba(139,92,246,.085), transparent 28%);
+}
+.blackstar-crm::before,
+.blackstar-finance::before {
+  background:
+    radial-gradient(circle at 18% 7%, rgba(16,185,129,.045), transparent 22%),
+    radial-gradient(circle at 82% 12%, rgba(99,102,241,.07), transparent 27%);
+}
+.blackstar-settings::before,
+.blackstar-admin::before {
+  background:
+    radial-gradient(circle at 18% 7%, rgba(148,163,184,.035), transparent 21%),
+    radial-gradient(circle at 82% 12%, rgba(139,92,246,.065), transparent 27%);
+}
+
+.blackstar-media :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-threed :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-game :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-crm :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-finance :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-settings :is(section,article,div)[class*="rounded-2xl"][class*="border"],
+.blackstar-admin :is(section,article,div)[class*="rounded-2xl"][class*="border"] {
+  background-image:
+    linear-gradient(145deg, rgba(255,255,255,.038), rgba(255,255,255,.009) 52%, rgba(139,92,246,.016));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 20px 52px rgba(0,0,0,.20);
+  transform-style: preserve-3d;
+}
+
+.blackstar-media :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-threed :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-game :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-crm :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-finance :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-settings :is(section,article)[class*="rounded"][class*="border"]:hover,
+.blackstar-admin :is(section,article)[class*="rounded"][class*="border"]:hover {
+  transform: translate3d(0,-3px,14px);
+  border-color: rgba(167,139,250,.14);
+}
+
+.blackstar-media video,
+.blackstar-media img,
+.blackstar-threed canvas,
+.blackstar-threed img,
+.blackstar-game canvas,
+.blackstar-game img {
+  border-radius: 16px;
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.30),
+    0 0 45px rgba(139,92,246,.035);
+}
+
+.blackstar-threed canvas,
+.blackstar-game canvas {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(139,92,246,.055), transparent 42%),
+    rgba(3,3,8,.72);
+}
+
+.blackstar-media :is(input,textarea,select),
+.blackstar-threed :is(input,textarea,select),
+.blackstar-game :is(input,textarea,select),
+.blackstar-crm :is(input,textarea,select),
+.blackstar-finance :is(input,textarea,select),
+.blackstar-settings :is(input,textarea,select),
+.blackstar-admin :is(input,textarea,select) {
+  background: linear-gradient(180deg, rgba(0,0,0,.40), rgba(7,7,13,.55));
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,.34),
+    0 1px 0 rgba(255,255,255,.018);
+}
+
+.blackstar-media :is(button,a)[class*="bg-"],
+.blackstar-threed :is(button,a)[class*="bg-"],
+.blackstar-game :is(button,a)[class*="bg-"],
+.blackstar-crm :is(button,a)[class*="bg-"],
+.blackstar-finance :is(button,a)[class*="bg-"],
+.blackstar-settings :is(button,a)[class*="bg-"],
+.blackstar-admin :is(button,a)[class*="bg-"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    0 10px 24px rgba(0,0,0,.18);
+}
+
+.blackstar-finance table,
+.blackstar-crm table,
+.blackstar-admin table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.blackstar-finance thead,
+.blackstar-crm thead,
+.blackstar-admin thead {
+  background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008));
+}
+.blackstar-finance tbody tr,
+.blackstar-crm tbody tr,
+.blackstar-admin tbody tr {
+  transition: background .2s ease, transform .2s ease;
+}
+.blackstar-finance tbody tr:hover,
+.blackstar-crm tbody tr:hover,
+.blackstar-admin tbody tr:hover {
+  background: rgba(139,92,246,.028);
+}
+
+.blackstar-settings [role="tablist"],
+.blackstar-admin [role="tablist"] {
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 12px 28px rgba(0,0,0,.16);
+}
+
+@media (max-width: 900px) {
+  .blackstar-media :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-threed :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-game :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-crm :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-finance :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-settings :is(section,article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-admin :is(section,article)[class*="rounded"][class*="border"]:hover {
+    transform:none;
+  }
+}
