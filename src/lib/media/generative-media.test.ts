@@ -13,7 +13,7 @@ describe('generative media runtime', () => {
   it('exposes bounded LTX synchronized video workflows', () => {
     const capabilities = getGenerativeMediaCapabilities();
     expect(capabilities.ltx.kind).toBe('video');
-    expect(capabilities.ltx.workflows).toEqual(['text-to-video', 'image-to-video', 'audio-video']);
+    expect(capabilities.ltx.workflows).toContain('image-to-video');
     expect(capabilities.ltx.durationSeconds).toEqual([3, 5, 8, 10]);
   });
 });

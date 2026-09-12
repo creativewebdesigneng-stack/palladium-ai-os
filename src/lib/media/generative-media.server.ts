@@ -1,4 +1,5 @@
 import { normalizeMediaJobStatus } from '@/lib/media/media-utils';
+import { getDirectLtx23, hasDirectLtx23Provider, submitDirectLtx23 } from '@/lib/media/ltx23-provider.server';
 
 type Provider = 'seedream' | 'ltx';
 type JsonObject = Record<string, unknown>;
@@ -78,12 +79,12 @@ export function getGenerativeMediaCapabilities() {
       note: 'Cinema keyframes use Blackstar\'s hosted managed image-generation worker by default. SEEDREAM_WORKER_URL can override it with a Seedream-compatible execution node when exact provider-specific rendering is required.',
     },
     ltx: {
-      configured: Boolean(ltx.url),
+      configured: Boolean(ltx.url || hasDirectLtx23Provider()),
       kind: ltx.kind,
-      workflows: ['text-to-video', 'image-to-video', 'audio-video'],
-      aspectRatios: ['16:9', '9:16', '1:1'],
+      workflows: ltx.url ? ['text-to-video', 'image-to-video', 'audio-video'] : ['image-to-video'],
+      aspectRatios: ltx.url ? ['16:9', '9:16', '1:1'] : ['16:9', '9:16'],
       durationSeconds: [3, 5, 8, 10],
-      note: 'LTX-compatible generation is delegated to a GPU worker because model weights and CUDA dependencies do not belong in the PalladiumAI web runtime.',
+      note: ltx.url ? 'LTX generation uses the configured worker.' : hasDirectLtx23Provider() ? 'LTX video segments use fal LTX-2.3 server-side; provider minimum durations are trimmed to Blackstar logical timing during mastering.' : 'LTX video generation requires FAL_KEY or LTX_WORKER_URL on the server.',
     },
   };
 }
@@ -96,8 +97,12 @@ export async function submitGenerativeMediaJob(input: {
   durationSeconds?: number | null;
 }) {
   const cfg = config(input.provider);
-  if (!cfg.url) throw new Error(`${input.provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const sourceUrl = publicUrl(input.sourceUrl);
+  if (input.provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) {
+    if (!sourceUrl) throw new Error('LTX-2.3 image-to-video requires a completed keyframe URL.');
+    return submitDirectLtx23({ prompt: input.prompt, sourceUrl, aspectRatio: input.aspectRatio, durationSeconds: input.durationSeconds ?? 5 });
+  }
+  if (!cfg.url) throw new Error(`${input.provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const body = input.provider === 'seedream'
     ? {
         workflow: sourceUrl ? 'image-edit' : 'text-to-image',
@@ -132,6 +137,7 @@ export async function submitGenerativeMediaJob(input: {
 
 export async function getGenerativeMediaJob(provider: Provider, workerJobId: string) {
   const cfg = config(provider);
+  if (provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) return getDirectLtx23(workerJobId);
   if (!cfg.url) throw new Error(`${provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
   const response = await fetch(`${cfg.url}/jobs/${encodeURIComponent(workerJobId)}`, {
     method: 'GET',
