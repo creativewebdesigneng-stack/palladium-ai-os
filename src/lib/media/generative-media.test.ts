@@ -1,8 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { getGenerativeMediaCapabilities, resolveSeedreamProvider } from './generative-media.server';
 
-const originalFalKey=process.env['FAL_KEY'];
-afterEach(()=>{if(originalFalKey===undefined) delete process.env['FAL_KEY']; else process.env['FAL_KEY']=originalFalKey;});
+const originalEnv={
+  FAL_KEY:process.env['FAL_KEY'],
+  FAL_API_KEY:process.env['FAL_API_KEY'],
+  FAL_API_TOKEN:process.env['FAL_API_TOKEN'],
+  SEEDREAM_WORKER_URL:process.env['SEEDREAM_WORKER_URL'],
+  SEEDREAM_PROVIDER:process.env['SEEDREAM_PROVIDER'],
+};
+afterEach(()=>{
+  for(const [key,value] of Object.entries(originalEnv)){
+    if(value===undefined) delete process.env[key];
+    else process.env[key]=value;
+  }
+});
 
 describe('generative media runtime', () => {
   it('exposes bounded Seedream image workflows', () => {
