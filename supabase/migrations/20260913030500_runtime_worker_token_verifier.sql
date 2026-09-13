@@ -29,7 +29,8 @@ begin
 end;
 $$;
 
-revoke all on function public.verify_runtime_worker_token(text, text) from public;
+revoke all on function public.verify_runtime_worker_token(text, text)
+  from public, anon, authenticated, service_role;
 grant execute on function public.verify_runtime_worker_token(text, text) to anon, service_role;
 
 -- Token hashes no longer need to be readable through PostgREST by any API role.
