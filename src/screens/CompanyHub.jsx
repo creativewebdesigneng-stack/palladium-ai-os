@@ -1,3 +1,6 @@
+import CompanyRiskCenter from '@/components/company/CompanyRiskCenter';
+import CompanyCorporateDevelopment from '@/components/company/CompanyCorporateDevelopment';
+import CompanyPeopleOps from '@/components/company/CompanyPeopleOps';
 import CompanyResourceCenter from '@/components/company/CompanyResourceCenter';
 import CompanyCommandIntelligence from '@/components/company/CompanyCommandIntelligence';
 import CompanyPlaybooks from '@/components/company/CompanyPlaybooks';
@@ -93,6 +96,9 @@ export default function CompanyHub(){
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
   <CompanyPlaybooks />
+  <CompanyPeopleOps />
+  <CompanyCorporateDevelopment />
+  <CompanyRiskCenter />
   <CompanyResourceCenter />
   <CompanyWorkspace />
 
