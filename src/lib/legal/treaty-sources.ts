@@ -38,6 +38,19 @@ export const TREATY_SOURCE_PROFILES: TreatySourceProfile[] = [
     coverageNote: "Database records and treaty texts should be checked together, especially for amendments, territorial extensions, reservations and termination.",
   },
   {
+    id: "ie",
+    jurisdiction: "Ireland",
+    scope: "International agreements published in the Irish Treaty Series and treaty-practice material from the Department of Foreign Affairs",
+    officialHosts: ["gov.ie", "dfa.ie"],
+    gateways: [
+      { name: "Irish Treaty Series Search Facility", url: "https://www.gov.ie/en/department-of-foreign-affairs/services/irish-treaty-series-search-facility/", scope: "Official Irish Treaty Series search and published treaty texts" },
+      { name: "Ireland — Treaties and international law", url: "https://www.gov.ie/en/department-of-foreign-affairs/publications/treaties/", scope: "Official treaty process, consent-to-be-bound and domestic-incorporation guidance" },
+    ],
+    statusChecks: ["signature", "consent to be bound", "ratification / accession where applicable", "entry into force for Ireland", "Irish Treaty Series publication", "reservations / declarations", "termination / amendment", "domestic incorporation"],
+    domesticEffectNote: "Ireland follows a dualist approach: treaty terms do not become part of domestic law merely because Ireland is internationally bound; incorporation by or under an Act of the Oireachtas must be checked.",
+    coverageNote: "The Irish Treaty Series is an official publication source but historical coverage varies. Verify the operative instrument, party/depositary status, amendments and any implementing Irish law before drawing a domestic-law conclusion.",
+  },
+  {
     id: "eu",
     jurisdiction: "European Union",
     scope: "EU founding treaties and international agreements recorded in EUR-Lex",
@@ -84,6 +97,32 @@ export const TREATY_SOURCE_PROFILES: TreatySourceProfile[] = [
     statusChecks: ["treaty versus non-binding arrangement", "NZ adherence status", "treaty status", "entry into force", "reservations / declarations", "termination", "implementing legislation"],
     domesticEffectNote: "A binding international obligation does not, by itself, prove that its provisions are directly enforceable in New Zealand domestic law.",
     coverageNote: "Keep legally binding treaties separate from political or administrative arrangements that are expressly recorded as non-binding.",
+  },
+  {
+    id: "jp",
+    jurisdiction: "Japan",
+    scope: "Treaties concluded by Japan and treaty materials published by the Ministry of Foreign Affairs",
+    officialHosts: ["mofa.go.jp"],
+    gateways: [
+      { name: "Japan MOFA Treaty Database", url: "https://www3.mofa.go.jp/mofaj/gaiko/treaty/", scope: "Official Ministry of Foreign Affairs treaty-data search for treaties concluded by Japan" },
+      { name: "Japan MOFA — International Law and Treaties", url: "https://www.mofa.go.jp/mofaj/gaiko/treaty/", scope: "Treaties submitted to the Diet and related official materials" },
+    ],
+    statusChecks: ["treaty text", "signature / conclusion", "Diet submission where applicable", "entry into force for Japan", "party / counterpart", "amendments / protocols", "termination", "official-gazette publication"],
+    domesticEffectNote: "A treaty record or entry-into-force date does not by itself answer how a provision operates in Japanese domestic law; constitutional, statutory and implementing-law questions require separate analysis.",
+    coverageNote: "MOFA states that, if its treaty database differs from the Official Gazette, the Official Gazette prevails. PDF/HTML differences and translations should therefore be checked against the legally authoritative publication for consequential use.",
+  },
+  {
+    id: "br",
+    jurisdiction: "Brazil",
+    scope: "International acts concluded by Brazil and recorded by the Ministry of Foreign Affairs Concórdia system",
+    officialHosts: ["concordia.itamaraty.gov.br", "gov.br", "itamaraty.gov.br"],
+    gateways: [
+      { name: "Concórdia — Brazil international acts", url: "https://concordia.itamaraty.gov.br/", scope: "Ministry of Foreign Affairs database of Brazil's international acts, treaty documents and status metadata" },
+      { name: "Brazil Government — Concórdia API catalogue", url: "https://www.gov.br/conecta/catalogo/apis/servicos-para-o-portal-concordia", scope: "Government description of Concórdia data, statuses and official document links" },
+    ],
+    statusChecks: ["instrument text", "date of signature / celebration", "Brazil status", "legislative / executive processing", "entry into force", "promulgation", "termination / suspension / replacement", "Diário Oficial publication"],
+    domesticEffectNote: "An international act recorded as signed or in force for Brazil does not by itself establish its domestic legal effect. Promulgation, constitutional process and applicable implementing rules must be verified.",
+    coverageNote: "Concórdia is an official Ministry of Foreign Affairs research source, but its own portal states that its records do not replace information published in the Diário Oficial da União. Verify operative publication and status before relying on the record.",
   },
 ];
 
