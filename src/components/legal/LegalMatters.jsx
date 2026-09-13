@@ -24,6 +24,7 @@ export default function LegalMatters(){
       <select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} className="rounded-xl border border-white/10 bg-[#101116] px-3 py-2 text-xs text-white"><option>open</option><option>review</option><option>closed</option></select>
       <textarea required value={form.question} onChange={e=>setForm({...form,question:e.target.value})} placeholder="Legal question / research issue" className="min-h-20 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white md:col-span-2 xl:col-span-3"/>
       <button disabled={busy} className="inline-flex items-center justify-center gap-1 rounded-xl border border-amber-300/15 px-3 py-2 text-xs text-amber-100"><Plus className="h-3.5 w-3.5"/>Create matter</button>
+      <textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Working notes / facts to verify (optional)" className="min-h-16 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white md:col-span-2 xl:col-span-4"/>
     </form>
     {error&&<p className="mt-3 text-xs text-rose-300">{error}</p>}
     <div className="mt-4 grid gap-3 xl:grid-cols-2">
