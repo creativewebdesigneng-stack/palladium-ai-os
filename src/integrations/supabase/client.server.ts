@@ -27,24 +27,56 @@ function cleanSecretKey(value: unknown): string | null {
   return cleaned.startsWith("sb_secret_") ? cleaned : null;
 }
 
+function uniqueSecretKeys(values: unknown[]): string[] {
+  const keys = values
+    .map(cleanSecretKey)
+    .filter((value): value is string => Boolean(value));
+  return [...new Set(keys)];
+}
+
+function secretKeysFromParsedCollection(parsed: unknown): string[] {
+  if (typeof parsed === "string") return uniqueSecretKeys([parsed]);
+  if (Array.isArray(parsed)) return uniqueSecretKeys(parsed);
+  if (!parsed || typeof parsed !== "object") return [];
+
+  const record = parsed as Record<string, unknown>;
+  const candidates: unknown[] = [];
+  if ("default" in record) candidates.push(record["default"]);
+  for (const [name, value] of Object.entries(record)) {
+    if (name === "default") continue;
+    candidates.push(value);
+  }
+  return uniqueSecretKeys(candidates);
+}
+
+/**
+ * Vercel/Supabase integrations have used more than one serialization for a
+ * secret-key collection over time. Accept only explicitly privileged
+ * `sb_secret_...` values while supporting the safe shapes we can identify:
+ * direct string, JSON string, JSON array/object, and comma/newline/semicolon lists.
+ */
 function secretKeysFromCollection(raw: string | undefined): string[] {
-  if (!raw) return [];
+  const trimmed = raw?.trim();
+  if (!trimmed) return [];
+
+  const direct = cleanSecretKey(trimmed);
+  if (direct) return [direct];
+
+  try {
+    return secretKeysFromParsedCollection(JSON.parse(trimmed) as unknown);
+  } catch {
+    return uniqueSecretKeys(trimmed.split(/[\n,;]+/));
+  }
+}
+
+function defaultSecretFromCollection(raw: string | undefined): string | null {
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-
-    const record = parsed as Record<string, unknown>;
-    const candidates: string[] = [];
-    const preferred = cleanSecretKey(record["default"]);
-    if (preferred) candidates.push(preferred);
-    for (const [name, value] of Object.entries(record)) {
-      if (name === "default") continue;
-      const key = cleanSecretKey(value);
-      if (key) candidates.push(key);
-    }
-    return [...new Set(candidates)];
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return cleanSecretKey((parsed as Record<string, unknown>)["default"]);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -77,9 +109,11 @@ export function resolveSupabaseAdminKeyCandidates(
 
 /**
  * Resolve the preferred privileged key for compatibility with callers/tests that
- * only need one credential. Ambiguous named collections do not outrank the legacy
- * fallback; the runtime fetch layer can still try those named keys safely if the
- * preferred credential is rejected by Supabase.
+ * only need one credential. A named `default` collection key wins; otherwise a
+ * legacy service-role key still outranks an ambiguous multi-key collection. If no
+ * legacy key exists, the first explicitly privileged collection candidate is a safe
+ * bootstrap because the rotation-aware fetch will try every candidate on an
+ * explicit `Invalid API key` rejection.
  */
 export function resolveSupabaseAdminKey(
   env: SupabaseAdminEnvironment = process.env,
@@ -88,19 +122,13 @@ export function resolveSupabaseAdminKey(
   if (directSecret) return { key: directSecret, source: "SUPABASE_SECRET_KEY" };
 
   const collection = secretKeysFromCollection(env["SUPABASE_SECRET_KEYS"]);
+  const collectionDefault = defaultSecretFromCollection(env["SUPABASE_SECRET_KEYS"]);
+  if (collectionDefault) return { key: collectionDefault, source: "SUPABASE_SECRET_KEYS" };
   if (collection.length === 1) return { key: collection[0]!, source: "SUPABASE_SECRET_KEYS" };
-  if (collection.length > 1) {
-    try {
-      const parsed = JSON.parse(env["SUPABASE_SECRET_KEYS"] ?? "{}") as Record<string, unknown>;
-      const preferred = cleanSecretKey(parsed["default"]);
-      if (preferred) return { key: preferred, source: "SUPABASE_SECRET_KEYS" };
-    } catch {
-      // Malformed collections fall through to the legacy compatibility key.
-    }
-  }
 
   const legacy = env["SUPABASE_SERVICE_ROLE_KEY"]?.trim();
   if (legacy) return { key: legacy, source: "SUPABASE_SERVICE_ROLE_KEY" };
+  if (collection.length > 1) return { key: collection[0]!, source: "SUPABASE_SECRET_KEYS" };
 
   return null;
 }
@@ -163,6 +191,11 @@ export function createSupabaseAdminFetch(
         return response;
       }
     }
+
+    console.error("[Supabase] All configured privileged API key candidates were rejected.", {
+      candidateCount: candidates.length,
+      sources: [...new Set(candidates.map((candidate) => candidate.source))],
+    });
     return lastResponse ?? fetchImpl(input, init);
   };
 }

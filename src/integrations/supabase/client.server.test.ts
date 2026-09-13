@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseAdminFetch,
   resolveSupabaseAdminKey,
   resolveSupabaseAdminKeyCandidates,
   type SupabaseAdminKey,
 } from "./client.server";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("Supabase admin key resolution", () => {
   it("prefers the direct modern secret key over every legacy source", () => {
@@ -44,6 +48,31 @@ describe("Supabase admin key resolution", () => {
       key: "sb_secret_automations_test",
       source: "SUPABASE_SECRET_KEYS",
     });
+  });
+
+  it("accepts direct, JSON-string, JSON-array and delimited secret collections", () => {
+    for (const raw of [
+      "sb_secret_direct_collection_test",
+      JSON.stringify("sb_secret_json_string_test"),
+      JSON.stringify(["sb_secret_array_test", "sb_publishable_ignored"]),
+      "sb_secret_delimited_one_test, sb_secret_delimited_two_test\nsb_publishable_ignored",
+    ]) {
+      const candidates = resolveSupabaseAdminKeyCandidates({ SUPABASE_SECRET_KEYS: raw });
+      expect(candidates.length).toBeGreaterThan(0);
+      expect(candidates.every((candidate) => candidate.key.startsWith("sb_secret_"))).toBe(true);
+      expect(candidates.every((candidate) => candidate.source === "SUPABASE_SECRET_KEYS")).toBe(true);
+    }
+  });
+
+  it("uses the first explicit collection candidate only when no legacy fallback exists", () => {
+    expect(
+      resolveSupabaseAdminKey({
+        SUPABASE_SECRET_KEYS: JSON.stringify([
+          "sb_secret_primary_test",
+          "sb_secret_secondary_test",
+        ]),
+      }),
+    ).toEqual({ key: "sb_secret_primary_test", source: "SUPABASE_SECRET_KEYS" });
   });
 
   it("falls back to the legacy service-role key when modern configuration is malformed or ambiguous", () => {
@@ -184,5 +213,25 @@ describe("Supabase admin key failover fetch", () => {
       expect(result.status).toBe(response.status);
       expect(calls).toBe(1);
     }
+  });
+
+  it("reports only redacted source metadata after all privileged candidates are rejected", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ message: "Invalid API key" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+
+    const adminFetch = createSupabaseAdminFetch(candidates, fetchImpl);
+    const response = await adminFetch("https://example.supabase.co/rest/v1/workflow_runs");
+    expect(response.status).toBe(401);
+
+    const serialized = JSON.stringify(error.mock.calls);
+    expect(serialized).toContain("candidateCount");
+    expect(serialized).toContain("SUPABASE_SECRET_KEY");
+    expect(serialized).toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(serialized).not.toContain("sb_secret_stale_test");
+    expect(serialized).not.toContain("legacy-service-role-test");
   });
 });
