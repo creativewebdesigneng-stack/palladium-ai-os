@@ -66,3 +66,33 @@ export function calculateDrawdown(equityCurve: number[]): number {
 
   return maxDrawdown;
 }
+
+export function calculateMaximumLoss(quantity: number, entryPrice: number, stopPrice: number): number {
+  const qty = finitePositive(quantity);
+  const unitRisk = calculateUnitRisk(entryPrice, stopPrice);
+  return qty && unitRisk ? qty * unitRisk : 0;
+}
+
+export function calculatePercentageReturn(
+  side: 'long' | 'short',
+  entryPrice: number,
+  exitPrice: number | null | undefined,
+): number | null {
+  const entry = finitePositive(entryPrice);
+  const exit = exitPrice == null ? 0 : finitePositive(exitPrice);
+  if (!entry || !exit) return null;
+  const delta = side === 'short' ? entry - exit : exit - entry;
+  return (delta / entry) * 100;
+}
+
+export function calculatePositionExposure(quantity: number, price: number): number {
+  const qty = finitePositive(quantity);
+  const px = finitePositive(price);
+  return qty && px ? qty * px : 0;
+}
+
+export function calculateExposurePercent(exposure: number, portfolioValue: number): number {
+  const gross = finiteNonNegative(exposure);
+  const portfolio = finitePositive(portfolioValue);
+  return portfolio ? (gross / portfolio) * 100 : 0;
+}

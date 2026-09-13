@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Calculator, ShieldAlert, Target } from 'lucide-react';
 import {
+  calculateExposurePercent,
   calculatePositionSize,
   calculateRiskAmount,
   calculateRiskReward,
@@ -43,7 +44,7 @@ export default function TradingRiskLab() {
     const units = calculatePositionSize(account, riskPct, entry, stop);
     const notional = units * entry;
     const rewardRisk = calculateRiskReward(entry, stop, target);
-    const notionalPct = account > 0 ? (notional / account) * 100 : 0;
+    const notionalPct = calculateExposurePercent(notional, account);
     return { riskBudget, unitRisk, units, notional, rewardRisk, notionalPct };
   }, [form]);
 
