@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolveSupabaseAdminKey } from "./client.server";
+import {
+  createSupabaseAdminFetch,
+  resolveSupabaseAdminKey,
+  resolveSupabaseAdminKeyCandidates,
+  type SupabaseAdminKey,
+} from "./client.server";
 
 describe("Supabase admin key resolution", () => {
   it("prefers the direct modern secret key over every legacy source", () => {
@@ -75,5 +80,109 @@ describe("Supabase admin key resolution", () => {
         SUPABASE_SECRET_KEYS: JSON.stringify({ default: "sb_publishable_public_only" }),
       }),
     ).toBeNull();
+  });
+
+  it("collects all explicitly configured privileged candidates in deterministic order and deduplicates them", () => {
+    expect(
+      resolveSupabaseAdminKeyCandidates({
+        SUPABASE_SECRET_KEY: "sb_secret_direct_test",
+        SUPABASE_SECRET_KEYS: JSON.stringify({
+          default: "sb_secret_direct_test",
+          automations: "sb_secret_automations_test",
+          ignored: "sb_publishable_public_only",
+        }),
+        SUPABASE_SERVICE_ROLE_KEY: "legacy-service-role-test",
+      }),
+    ).toEqual([
+      { key: "sb_secret_direct_test", source: "SUPABASE_SECRET_KEY" },
+      { key: "sb_secret_automations_test", source: "SUPABASE_SECRET_KEYS" },
+      { key: "legacy-service-role-test", source: "SUPABASE_SERVICE_ROLE_KEY" },
+    ]);
+  });
+});
+
+describe("Supabase admin key failover fetch", () => {
+  const candidates: SupabaseAdminKey[] = [
+    { key: "sb_secret_stale_test", source: "SUPABASE_SECRET_KEY" },
+    { key: "legacy-service-role-test", source: "SUPABASE_SERVICE_ROLE_KEY" },
+  ];
+
+  it("retries once with the next configured privileged key only after Supabase rejects the API key", async () => {
+    const seen: Array<{ apikey: string | null; authorization: string | null }> = [];
+    let call = 0;
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      seen.push({
+        apikey: headers.get("apikey"),
+        authorization: headers.get("Authorization"),
+      });
+      call += 1;
+      if (call === 1) {
+        return new Response(JSON.stringify({ message: "Invalid API key" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify([{ id: "ok" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const adminFetch = createSupabaseAdminFetch(candidates, fetchImpl);
+    const response = await adminFetch("https://example.supabase.co/rest/v1/workflow_runs", {
+      headers: { Authorization: "Bearer sb_secret_stale_test" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seen).toEqual([
+      { apikey: "sb_secret_stale_test", authorization: null },
+      {
+        apikey: "legacy-service-role-test",
+        authorization: "Bearer legacy-service-role-test",
+      },
+    ]);
+  });
+
+  it("caches the accepted fallback candidate for later requests", async () => {
+    const seen: string[] = [];
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const key = new Headers(init?.headers).get("apikey") ?? "";
+      seen.push(key);
+      if (key === "sb_secret_stale_test") {
+        return new Response(JSON.stringify({ message: "Invalid API key" }), { status: 401 });
+      }
+      return new Response("[]", { status: 200 });
+    }) as typeof fetch;
+
+    const adminFetch = createSupabaseAdminFetch(candidates, fetchImpl);
+    await adminFetch("https://example.supabase.co/rest/v1/workflow_runs");
+    await adminFetch("https://example.supabase.co/rest/v1/workflow_runs");
+
+    expect(seen).toEqual([
+      "sb_secret_stale_test",
+      "legacy-service-role-test",
+      "legacy-service-role-test",
+    ]);
+  });
+
+  it("does not replay a request for unrelated 401 responses or server errors", async () => {
+    for (const response of [
+      new Response(JSON.stringify({ message: "Unauthorized" }), { status: 401 }),
+      new Response(JSON.stringify({ message: "Database unavailable" }), { status: 500 }),
+    ]) {
+      let calls = 0;
+      const fetchImpl = (async () => {
+        calls += 1;
+        return response.clone();
+      }) as typeof fetch;
+      const adminFetch = createSupabaseAdminFetch(candidates, fetchImpl);
+      const result = await adminFetch("https://example.supabase.co/rest/v1/workflow_runs", {
+        method: "POST",
+        body: "{}",
+      });
+      expect(result.status).toBe(response.status);
+      expect(calls).toBe(1);
+    }
   });
 });
