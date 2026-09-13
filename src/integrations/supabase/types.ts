@@ -2372,6 +2372,135 @@ export type Database = {
         }
         Relationships: []
       }
+      cinema_projects: {
+        Row: {
+          aspect_ratio: string
+          blueprint: string | null
+          continuity_bible: Json
+          created_at: string
+          error_message: string | null
+          genre: string
+          id: string
+          production_manifest: Json
+          prompt: string
+          quality: string
+          status: string
+          target_duration_minutes: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio: string
+          blueprint?: string | null
+          continuity_bible?: Json
+          created_at?: string
+          error_message?: string | null
+          genre: string
+          id?: string
+          production_manifest?: Json
+          prompt: string
+          quality: string
+          status?: string
+          target_duration_minutes: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          blueprint?: string | null
+          continuity_bible?: Json
+          created_at?: string
+          error_message?: string | null
+          genre?: string
+          id?: string
+          production_manifest?: Json
+          prompt?: string
+          quality?: string
+          status?: string
+          target_duration_minutes?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cinema_shot_renders: {
+        Row: {
+          cinema_project_id: string
+          completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          media_job_id: string | null
+          metadata: Json
+          output_url: string | null
+          provider: string
+          scene_id: string
+          segment_index: number
+          shot_id: string
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cinema_project_id: string
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          media_job_id?: string | null
+          metadata?: Json
+          output_url?: string | null
+          provider: string
+          scene_id: string
+          segment_index?: number
+          shot_id: string
+          stage: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cinema_project_id?: string
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          media_job_id?: string | null
+          metadata?: Json
+          output_url?: string | null
+          provider?: string
+          scene_id?: string
+          segment_index?: number
+          shot_id?: string
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cinema_shot_renders_cinema_project_id_fkey"
+            columns: ["cinema_project_id"]
+            isOneToOne: false
+            referencedRelation: "cinema_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cinema_shot_renders_media_job_id_fkey"
+            columns: ["media_job_id"]
+            isOneToOne: false
+            referencedRelation: "media_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_workspaces: {
         Row: {
           connection_ref: string | null
@@ -2920,6 +3049,117 @@ export type Database = {
           scheduled_for?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      game_foundry_projects: {
+        Row: {
+          completed_at: string | null
+          content_error: string | null
+          content_generated_at: string | null
+          content_manifest: Json
+          content_status: string
+          created_at: string
+          design_spec: Json
+          error_message: string | null
+          export_manifest: Json
+          handoff_error: string | null
+          handoff_id: string | null
+          handoff_status: string
+          handoff_updated_at: string | null
+          id: string
+          metadata: Json
+          name: string
+          output_url: string | null
+          package_error: string | null
+          package_manifest: Json
+          package_prepared_at: string | null
+          package_status: string
+          preview_url: string | null
+          project_type: string
+          prompt: string
+          quality_profile: string
+          source_error: string | null
+          source_generated_at: string | null
+          source_manifest: Json
+          source_status: string
+          status: string
+          target_engine: string
+          updated_at: string
+          user_id: string
+          worker_job_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          content_error?: string | null
+          content_generated_at?: string | null
+          content_manifest?: Json
+          content_status?: string
+          created_at?: string
+          design_spec?: Json
+          error_message?: string | null
+          export_manifest?: Json
+          handoff_error?: string | null
+          handoff_id?: string | null
+          handoff_status?: string
+          handoff_updated_at?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          output_url?: string | null
+          package_error?: string | null
+          package_manifest?: Json
+          package_prepared_at?: string | null
+          package_status?: string
+          preview_url?: string | null
+          project_type?: string
+          prompt?: string
+          quality_profile?: string
+          source_error?: string | null
+          source_generated_at?: string | null
+          source_manifest?: Json
+          source_status?: string
+          status?: string
+          target_engine?: string
+          updated_at?: string
+          user_id?: string
+          worker_job_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          content_error?: string | null
+          content_generated_at?: string | null
+          content_manifest?: Json
+          content_status?: string
+          created_at?: string
+          design_spec?: Json
+          error_message?: string | null
+          export_manifest?: Json
+          handoff_error?: string | null
+          handoff_id?: string | null
+          handoff_status?: string
+          handoff_updated_at?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          output_url?: string | null
+          package_error?: string | null
+          package_manifest?: Json
+          package_prepared_at?: string | null
+          package_status?: string
+          preview_url?: string | null
+          project_type?: string
+          prompt?: string
+          quality_profile?: string
+          source_error?: string | null
+          source_generated_at?: string | null
+          source_manifest?: Json
+          source_status?: string
+          status?: string
+          target_engine?: string
+          updated_at?: string
+          user_id?: string
+          worker_job_id?: string | null
         }
         Relationships: []
       }
@@ -6553,6 +6793,7 @@ export type Database = {
       three_d_jobs: {
         Row: {
           completed_at: string | null
+          content_requirement_id: string | null
           created_at: string
           error_message: string | null
           id: string
@@ -6560,16 +6801,28 @@ export type Database = {
           metadata: Json
           output_url: string | null
           preview_url: string | null
+          processed_output_url: string | null
+          processing_profile: Json
+          processing_status: string
+          processing_worker_job_id: string | null
+          project_id: string | null
+          prompt: string | null
+          quality_profile: string
           requested_format: string
-          source_url: string
+          source_kind: string
+          source_storage_path: string | null
+          source_url: string | null
           status: string
+          target_engine: string
           updated_at: string
           user_id: string
+          validation_report: Json
           worker_job_id: string | null
           workflow: string
         }
         Insert: {
           completed_at?: string | null
+          content_requirement_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
@@ -6577,16 +6830,28 @@ export type Database = {
           metadata?: Json
           output_url?: string | null
           preview_url?: string | null
+          processed_output_url?: string | null
+          processing_profile?: Json
+          processing_status?: string
+          processing_worker_job_id?: string | null
+          project_id?: string | null
+          prompt?: string | null
+          quality_profile?: string
           requested_format?: string
-          source_url: string
+          source_kind?: string
+          source_storage_path?: string | null
+          source_url?: string | null
           status?: string
+          target_engine?: string
           updated_at?: string
           user_id?: string
+          validation_report?: Json
           worker_job_id?: string | null
           workflow?: string
         }
         Update: {
           completed_at?: string | null
+          content_requirement_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
@@ -6594,15 +6859,34 @@ export type Database = {
           metadata?: Json
           output_url?: string | null
           preview_url?: string | null
+          processed_output_url?: string | null
+          processing_profile?: Json
+          processing_status?: string
+          processing_worker_job_id?: string | null
+          project_id?: string | null
+          prompt?: string | null
+          quality_profile?: string
           requested_format?: string
-          source_url?: string
+          source_kind?: string
+          source_storage_path?: string | null
+          source_url?: string | null
           status?: string
+          target_engine?: string
           updated_at?: string
           user_id?: string
+          validation_report?: Json
           worker_job_id?: string | null
           workflow?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "three_d_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "game_foundry_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tool_executions: {
         Row: {
