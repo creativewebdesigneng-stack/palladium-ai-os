@@ -62,7 +62,7 @@ describe("legal document analysis guardrails", () => {
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("not legal advice");
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("Never invent");
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("not located");
-    expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("does not mean the full document lacks");
+    expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("not located\" never means the full document lacks the provision");
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("Do not declare a clause valid");
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("Do not invent statutes");
     expect(LEGAL_DOCUMENT_SYSTEM_INSTRUCTIONS).toContain("Legal research required");
