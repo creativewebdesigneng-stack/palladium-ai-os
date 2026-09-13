@@ -55,6 +55,7 @@ const BUSINESS = [
   ['Product Analytics', '/product-analytics', LineChart],
   ['Business Intelligence', '/business-intelligence', LineChart],
   ['Finance Hub', '/finance', Banknote],
+  ['Trading Hub', '/trading-hub', LineChart],
   ['Legal Hub', '/legal-hub', Scale],
   ['Quant Studio', '/quant-studio', LineChart],
   ['Commerce Studio', '/commerce-studio', Store],
