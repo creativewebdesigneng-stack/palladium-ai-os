@@ -7,6 +7,8 @@ import CompanyStrategyRoom from '@/components/company/CompanyStrategyRoom';
 import CompanyKPIDashboard from '@/components/company/CompanyKPIDashboard';
 import CompanyOrganisationMap from '@/components/company/CompanyOrganisationMap';
 import CompanySupplierRisk from '@/components/company/CompanySupplierRisk';
+import CompanyBoardRoom from '@/components/company/CompanyBoardRoom';
+import CompanyResilienceMap from '@/components/company/CompanyResilienceMap';
 import { Link } from 'react-router-dom';
 import {
   Building2, Users, Bot, Workflow, Contact, Megaphone, Banknote, Scale, BarChart3,
@@ -92,8 +94,10 @@ export default function CompanyHub(){
 
   <CompanyStrategyRoom />
   <CompanyKPIDashboard />
+  <CompanyBoardRoom />
   <CompanyOrganisationMap />
   <CompanySupplierRisk />
+  <CompanyResilienceMap />
   <CompanyHealthAssessment />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
