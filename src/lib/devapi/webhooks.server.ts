@@ -29,6 +29,16 @@ type DeliveryAttempt = {
   durationMs: number;
 };
 
+type SupabaseResultError = {
+  code?: string | null;
+} | null | undefined;
+
+function assertWebhookDatabaseSuccess(error: SupabaseResultError, operation: string): void {
+  if (!error) return;
+  const code = typeof error.code === "string" && error.code.trim() ? error.code.trim() : null;
+  throw new Error(code ? `${operation} failed (${code})` : `${operation} failed`);
+}
+
 /** Pure helper so retry timing is regression-testable. */
 export function webhookRetryDelayMs(attemptsCompleted: number): number | null {
   if (attemptsCompleted >= MAX_ATTEMPTS) return null;
@@ -57,9 +67,11 @@ export async function dispatchWebhookEvent(args: DispatchArgs): Promise<{ delive
       .eq("is_active", true)
       .contains("events", [args.event]);
 
-    const { data: hooks } = args.orgId
+    const hookResult = args.orgId
       ? await query.eq("org_id", args.orgId)
       : await query.eq("user_id", args.userId);
+    assertWebhookDatabaseSuccess(hookResult.error, "Webhook subscription lookup");
+    const hooks = hookResult.data;
 
     if (!hooks?.length) return { delivered: 0 };
 
@@ -124,7 +136,7 @@ async function sendEnvelope(
 
 async function updateHookHealth(admin: any, hook: any, succeeded: boolean) {
   const nextFailures = succeeded ? 0 : (Number(hook.failure_count) || 0) + 1;
-  await admin
+  const { error } = await admin
     .from("webhooks")
     .update({
       last_delivery_at: new Date().toISOString(),
@@ -133,6 +145,7 @@ async function updateHookHealth(admin: any, hook: any, succeeded: boolean) {
       is_active: succeeded || nextFailures < 20,
     })
     .eq("id", hook.id);
+  assertWebhookDatabaseSuccess(error, "Webhook health update");
 }
 
 async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boolean> {
@@ -146,7 +159,7 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
   const now = new Date().toISOString();
   const nextAttemptAt = attempt.succeeded ? null : retryTimestamp(1);
 
-  await admin.from("webhook_deliveries").insert({
+  const { error: insertError } = await admin.from("webhook_deliveries").insert({
     webhook_id: hook.id,
     user_id: hook.user_id,
     org_id: hook.org_id ?? null,
@@ -162,6 +175,7 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
     next_attempt_at: nextAttemptAt,
     dead_lettered_at: null,
   });
+  assertWebhookDatabaseSuccess(insertError, "Webhook delivery record insert");
 
   await updateHookHealth(admin, hook, attempt.succeeded);
   return attempt.succeeded;
@@ -172,14 +186,17 @@ async function deliver(admin: any, hook: any, args: DispatchArgs): Promise<boole
  * a short lease before network I/O, so concurrent workers cannot normally send
  * the same retry. If a worker crashes, the lease expires and the row is due
  * again rather than becoming stuck forever.
+ *
+ * Database failures are deliberately propagated. The dedicated scheduler must
+ * never report a healthy 200 when its privileged database access is unavailable.
  */
-async function processDueWebhookRetriesWithAdmin(
+export async function processDueWebhookRetriesWithAdmin(
   admin: any,
   limit = 10,
 ): Promise<{ retried: number; delivered: number; deadLettered: number }> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit) || 10));
   const now = new Date().toISOString();
-  const { data: due } = await admin
+  const dueResult = await admin
     .from("webhook_deliveries")
     .select("id,webhook_id,user_id,org_id,event,payload,status,attempts,next_attempt_at,dead_lettered_at")
     .eq("status", "failed")
@@ -188,6 +205,8 @@ async function processDueWebhookRetriesWithAdmin(
     .lte("next_attempt_at", now)
     .order("next_attempt_at", { ascending: true })
     .limit(safeLimit);
+  assertWebhookDatabaseSuccess(dueResult.error, "Webhook retry queue read");
+  const due = dueResult.data;
 
   let retried = 0;
   let delivered = 0;
@@ -200,7 +219,7 @@ async function processDueWebhookRetriesWithAdmin(
     // Claim with an expiring lease. Equality on the previous due timestamp makes
     // the update first-writer-wins across concurrent retry processors.
     const leaseUntil = new Date(Date.now() + CLAIM_LEASE_MS).toISOString();
-    const { data: claimed } = await admin
+    const claimResult = await admin
       .from("webhook_deliveries")
       .update({ next_attempt_at: leaseUntil })
       .eq("id", row.id)
@@ -209,20 +228,24 @@ async function processDueWebhookRetriesWithAdmin(
       .is("dead_lettered_at", null)
       .select("id")
       .maybeSingle();
+    assertWebhookDatabaseSuccess(claimResult.error, "Webhook retry claim");
+    const claimed = claimResult.data;
     if (!claimed) continue;
 
-    const { data: hook } = await admin
+    const hookResult = await admin
       .from("webhooks")
       .select("id,url,signing_secret,is_active,user_id,org_id,failure_count,delivery_count")
       .eq("id", row.webhook_id)
       .maybeSingle();
+    assertWebhookDatabaseSuccess(hookResult.error, "Webhook retry subscription lookup");
+    const hook = hookResult.data;
 
     const attempts = Math.max(1, Number(row.attempts) || 1) + 1;
     retried += 1;
 
     if (!hook?.signing_secret || hook.is_active === false) {
       const deadAt = new Date().toISOString();
-      await admin
+      const { error: deadLetterError } = await admin
         .from("webhook_deliveries")
         .update({
           attempts,
@@ -232,6 +255,7 @@ async function processDueWebhookRetriesWithAdmin(
           error: !hook ? "Webhook no longer exists" : "Webhook is inactive or its signing secret was revoked",
         })
         .eq("id", row.id);
+      assertWebhookDatabaseSuccess(deadLetterError, "Webhook retry dead-letter update");
       deadLettered += 1;
       continue;
     }
@@ -244,7 +268,7 @@ async function processDueWebhookRetriesWithAdmin(
     const exhausted = !attempt.succeeded && attempts >= MAX_ATTEMPTS;
     const nextAttemptAt = attempt.succeeded || exhausted ? null : retryTimestamp(attempts);
 
-    await admin
+    const { error: retryUpdateError } = await admin
       .from("webhook_deliveries")
       .update({
         status: attempt.succeeded ? "delivered" : "failed",
@@ -258,6 +282,7 @@ async function processDueWebhookRetriesWithAdmin(
         dead_lettered_at: exhausted ? attemptedAt : null,
       })
       .eq("id", row.id);
+    assertWebhookDatabaseSuccess(retryUpdateError, "Webhook retry result update");
 
     await updateHookHealth(admin, hook, attempt.succeeded);
     if (attempt.succeeded) delivered += 1;
@@ -267,15 +292,10 @@ async function processDueWebhookRetriesWithAdmin(
   return { retried, delivered, deadLettered };
 }
 
-/** Reusable entry point for a deployment cron/scheduler. Never throws. */
+/** Reusable entry point for the protected deployment cron/scheduler. */
 export async function processDueWebhookRetries(
   limit = 10,
 ): Promise<{ retried: number; delivered: number; deadLettered: number }> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    return await processDueWebhookRetriesWithAdmin(supabaseAdmin as any, limit);
-  } catch (error) {
-    console.error("[webhooks] retry processing failed", error);
-    return { retried: 0, delivered: 0, deadLettered: 0 };
-  }
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return processDueWebhookRetriesWithAdmin(supabaseAdmin as any, limit);
 }
