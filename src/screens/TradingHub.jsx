@@ -8,6 +8,7 @@ import {
 import FinanceEconomicData from '@/components/finance/FinanceEconomicData';
 import FinancePortfolio from '@/components/finance/FinancePortfolio';
 import TradingRiskLab from '@/components/trading/TradingRiskLab';
+import TradingWorkspace from '@/components/trading/TradingWorkspace';
 import {
   GLOBAL_TRADING_VENUES,
   TRADER_WORKFLOWS,
@@ -29,12 +30,13 @@ const CAPABILITY_MAP = [
   ['Markets & exchanges', 'Live', 'Official venue directory, market taxonomy and session context are available in this hub.'],
   ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped.'],
   ['Macro context', 'Live', 'Verified Bank of England economic data is embedded below; additional verified providers can be added without fabricating values.'],
-  ['Risk & position sizing', 'Live', 'Deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
+  ['Risk & position sizing', 'Live', 'Tested deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
+  ['Watchlists & journal', 'Live', 'Persistent owner-scoped watchlists and structured trade journals are protected by row-level security.'],
+  ['Paper simulations', 'Live', 'Persistent user-entered hypothetical trade simulations with deterministic P&L and no broker side effects.'],
   ['Strategy backtesting', 'Live', 'Quant Studio already runs deterministic tests using real historical return observations.'],
   ['Primary-source research', 'Live', 'Official exchanges, regulators and central-bank gateways plus Blackstar Web Intelligence.'],
-  ['Watchlists & screeners', 'Foundation', 'Designed as a governed market-data layer; live price/ranking claims remain disabled until a verified provider is connected.'],
+  ['Market screeners', 'Foundation', 'Live price/ranking claims remain disabled until a verified market-data provider is connected.'],
   ['Economic calendar', 'Foundation', 'Calendar workflows can be added from authoritative event feeds; this page does not invent release times.'],
-  ['Paper trading & journal', 'Foundation', 'Simulation and journaling are part of the Trading Hub roadmap; live brokerage is intentionally separated from research.'],
   ['Broker execution', 'Controlled', 'Only through explicitly connected integrations, scoped permissions, user approvals and provider-side controls.'],
 ];
 
@@ -69,7 +71,7 @@ export default function TradingHub() {
           <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl">Global Trading Hub</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, exchanges, asset classes, macro research, portfolio context, risk planning and systematic strategy testing—connected to Blackstar's existing Finance, Quant, research and governed execution systems.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, exchanges, asset classes, macro research, portfolio context, risk planning, private watchlists, paper simulation, journaling and systematic strategy testing—connected to Blackstar's existing Finance, Quant, research and governed execution systems.</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <HeroMetric label="Asset classes" value={String(TRADING_ASSET_CLASSES.length)} />
@@ -104,6 +106,7 @@ export default function TradingHub() {
 
       <FinanceEconomicData />
       <TradingRiskLab />
+      <TradingWorkspace />
       <FinancePortfolio />
 
       <section className="rounded-[24px] border border-white/[.08] bg-white/[.02] p-5 md:p-6">
