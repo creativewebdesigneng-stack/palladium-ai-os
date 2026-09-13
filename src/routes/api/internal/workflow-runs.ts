@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { processDueLegalAutomation } from "@/lib/legal/legal-automation.server";
 import { processDuePersonalReminders } from "@/lib/mission/personal-reminders.server";
 import { processDueAutonomousGoals } from "@/lib/runtime/autonomous-os.scheduler.server";
 import { processQueuedWorkflowRuns } from "@/lib/runtime/workflow-queue.server";
@@ -6,13 +7,13 @@ import { processResumableAgentRuns } from "@/lib/runtime/run-resume-worker.serve
 import { isValidRuntimeWorkerToken } from "@/lib/runtime/runtime-worker-auth.server";
 
 /**
- * Scheduler endpoint for durable workflow, autonomous-goal, agent-resume and reminder execution.
+ * Scheduler endpoint for durable workflow, autonomous-goal, agent-resume, reminder and Legal Hub execution.
  *
  * Configure a deployment scheduler to POST here with:
  *   Authorization: Bearer <WORKFLOW_RUNNER_CRON_SECRET>
  *
- * The caller cannot choose a workflow, user, agent, goal, run id or reminder. The
- * worker only claims rows already persisted in Blackstar's durable queues.
+ * The caller cannot choose a workflow, user, agent, goal, run id, reminder or legal
+ * record. The worker only claims rows already persisted in Blackstar's durable queues.
  */
 export const Route = createFileRoute("/api/internal/workflow-runs")({
   server: {
@@ -29,12 +30,14 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         const limit = Number.isFinite(requested)
           ? Math.max(1, Math.min(4, Math.trunc(requested)))
           : 2;
-        const [workflows, reminders, agentResumes, autonomousGoals] = await Promise.all([
-          processQueuedWorkflowRuns(limit),
-          processDuePersonalReminders(Math.max(10, limit * 5)),
-          processResumableAgentRuns(limit),
-          processDueAutonomousGoals(Math.min(2, limit)),
-        ]);
+        const [workflows, reminders, agentResumes, autonomousGoals, legalAutomation] =
+          await Promise.all([
+            processQueuedWorkflowRuns(limit),
+            processDuePersonalReminders(Math.max(10, limit * 5)),
+            processResumableAgentRuns(limit),
+            processDueAutonomousGoals(Math.min(2, limit)),
+            processDueLegalAutomation(Math.min(2, limit)),
+          ]);
         return json(
           {
             ok: true,
@@ -42,6 +45,7 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
             reminders,
             agent_resumes: agentResumes,
             autonomous_goals: autonomousGoals,
+            legal_automation: legalAutomation,
           },
           200,
         );
