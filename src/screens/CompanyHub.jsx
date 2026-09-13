@@ -12,6 +12,7 @@ import CompanyResilienceMap from '@/components/company/CompanyResilienceMap';
 import CompanyCompetitiveMap from '@/components/company/CompanyCompetitiveMap';
 import CompanyTransformationRoadmap from '@/components/company/CompanyTransformationRoadmap';
 import CompanyFinancialHealth from '@/components/company/CompanyFinancialHealth';
+import CompanyAIWorkforceOrchestrator from '@/components/company/CompanyAIWorkforceOrchestrator';
 import { Link } from 'react-router-dom';
 import {
   Building2, Users, Bot, Workflow, Contact, Megaphone, Banknote, Scale, BarChart3,
@@ -104,6 +105,7 @@ export default function CompanyHub(){
   <CompanyResilienceMap />
   <CompanyCompetitiveMap />
   <CompanyTransformationRoadmap />
+  <CompanyAIWorkforceOrchestrator />
   <CompanyHealthAssessment />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
