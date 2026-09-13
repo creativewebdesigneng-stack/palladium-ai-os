@@ -10,6 +10,7 @@ import {
   calculateRiskReward,
   calculateSimulationPnl,
   calculateUnitRisk,
+  summarizeManualPortfolioExposure,
 } from './trading-risk';
 
 describe('trading risk calculations', () => {
@@ -56,6 +57,37 @@ describe('trading risk calculations', () => {
     expect(calculatePositionExposure(25, 80)).toBe(2000);
     expect(calculateExposurePercent(2000, 10_000)).toBe(20);
     expect(calculateExposurePercent(2000, 0)).toBe(0);
+  });
+
+  it('summarises manual holdings without mixing currencies', () => {
+    const summary = summarizeManualPortfolioExposure([
+      { symbol: 'AAA', asset_type: 'stock', manual_value: 600, currency: 'GBP' },
+      { symbol: 'BBB', asset_type: 'etf', manual_value: 400, currency: 'GBP' },
+      { symbol: 'CCC', asset_type: 'stock', manual_value: 500, currency: 'USD' },
+      { symbol: 'DDD', asset_type: 'bond', manual_value: null, currency: 'USD' },
+    ]);
+
+    expect(summary).toHaveLength(2);
+    expect(summary[0]).toMatchObject({
+      currency: 'GBP',
+      total: 1000,
+      valuedCount: 2,
+      unvaluedCount: 0,
+      largestSymbol: 'AAA',
+      largestPercent: 60,
+    });
+    expect(summary[0].assetExposure).toEqual([
+      { assetType: 'stock', value: 600, percent: 60 },
+      { assetType: 'etf', value: 400, percent: 40 },
+    ]);
+    expect(summary[1]).toMatchObject({
+      currency: 'USD',
+      total: 500,
+      valuedCount: 1,
+      unvaluedCount: 1,
+      largestSymbol: 'CCC',
+      largestPercent: 100,
+    });
   });
 
   it('calculates maximum peak-to-trough drawdown percentage', () => {
