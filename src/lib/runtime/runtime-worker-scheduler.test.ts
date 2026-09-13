@@ -5,6 +5,13 @@ const migration = readFileSync(
   new URL("../../../supabase/migrations/20260913024500_runtime_worker_scheduler.sql", import.meta.url),
   "utf8",
 );
+const privilegeMigration = readFileSync(
+  new URL(
+    "../../../supabase/migrations/20260913025500_runtime_worker_credential_privileges.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const auth = readFileSync(new URL("./runtime-worker-auth.server.ts", import.meta.url), "utf8");
 const workflowRoute = readFileSync(
   new URL("../../routes/api/internal/workflow-runs.ts", import.meta.url),
@@ -37,12 +44,19 @@ describe("authoritative runtime scheduler", () => {
 });
 
 describe("runtime worker credential isolation", () => {
-  it("keeps the credential table server-only", () => {
+  it("keeps the credential table server-only and service-role read-only", () => {
     expect(migration).toContain("alter table public.runtime_worker_credentials enable row level security");
     expect(migration).toContain(
-      "revoke all on public.runtime_worker_credentials from public, anon, authenticated",
+      "revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role",
     );
     expect(migration).toContain("grant select on public.runtime_worker_credentials to service_role");
+    expect(privilegeMigration).toContain(
+      "revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role",
+    );
+    expect(privilegeMigration).toContain(
+      "grant select on public.runtime_worker_credentials to service_role",
+    );
+    expect(privilegeMigration).not.toMatch(/grant (insert|update|delete|truncate|trigger|references)/i);
   });
 
   it("generates tokens inside Postgres and stores only hashes outside Vault", () => {

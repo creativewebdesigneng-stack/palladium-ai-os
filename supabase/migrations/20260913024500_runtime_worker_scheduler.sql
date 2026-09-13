@@ -17,7 +17,7 @@ create table if not exists public.runtime_worker_credentials (
 );
 
 alter table public.runtime_worker_credentials enable row level security;
-revoke all on public.runtime_worker_credentials from public, anon, authenticated;
+revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role;
 grant select on public.runtime_worker_credentials to service_role;
 
 do $$
