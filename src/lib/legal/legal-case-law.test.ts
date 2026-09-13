@@ -76,7 +76,7 @@ describe("case-law source authority controls", () => {
     expect(getCaseLawProfile("Germany")?.coverageNote).toContain("authoritative German decision");
     expect(getCaseLawProfile("Japan")?.coverageNote).toContain("explicitly unofficial");
     expect(getCaseLawProfile("United Arab Emirates")?.coverageNote).toContain("DIFC/ADGM");
-    expect(getCaseLawProfile("France")?.coverageNote).toContain("administrative-law questions");
+    expect(getCaseLawProfile("France")?.coverageNote).toContain("Administrative-law questions");
     expect(getCaseLawProfile("Brazil")?.coverageNote).toContain("other superior courts");
     expect(getCaseLawProfile("Mexico")?.coverageNote).toContain("binding status");
   });
