@@ -29,6 +29,13 @@ function text(value: unknown, fallback = "Not recorded"): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function markdownLinkLabel(value: unknown, fallback: string): string {
+  return text(value, fallback)
+    .replace(/\r?\n/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/([\[\]()])/g, "\\$1");
+}
+
 function formatDate(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) return "Not recorded";
   const parsed = new Date(value);
@@ -71,7 +78,7 @@ export function buildLegalProfessionalHandoffPacket(input: {
     for (const source of run.sources ?? []) {
       const url = safeSourceUrl(source.url);
       if (!url || uniqueSources.has(url)) continue;
-      uniqueSources.set(url, { title: text(source.title, new URL(url).hostname), url });
+      uniqueSources.set(url, { title: markdownLinkLabel(source.title, new URL(url).hostname), url });
     }
   }
 
@@ -137,7 +144,7 @@ export function buildLegalProfessionalHandoffPacket(input: {
       for (const source of run.sources ?? []) {
         const url = safeSourceUrl(source.url);
         if (!url || runSources.has(url)) continue;
-        runSources.set(url, { title: text(source.title, new URL(url).hostname), url });
+        runSources.set(url, { title: markdownLinkLabel(source.title, new URL(url).hostname), url });
       }
       if (!runSources.size) {
         lines.push("No valid HTTP(S) source records were saved with this run.", "");
