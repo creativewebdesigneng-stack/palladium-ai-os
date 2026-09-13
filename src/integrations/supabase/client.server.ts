@@ -34,13 +34,13 @@ function secretKeyFromCollection(raw: string | undefined): string | null {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
 
     const record = parsed as Record<string, unknown>;
-    const preferred = cleanSecretKey(record.default);
+    const preferred = cleanSecretKey(record["default"]);
     if (preferred) return preferred;
 
     const candidates = Object.values(record)
       .map(cleanSecretKey)
       .filter((value): value is string => Boolean(value));
-    return candidates.length === 1 ? candidates[0] : null;
+    return candidates.length === 1 ? candidates[0]! : null;
   } catch {
     return null;
   }
