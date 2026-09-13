@@ -80,15 +80,15 @@ export function parseAlphaVantageSeries(
   const series = locateSeries(record);
   if (!series) throw new Error("Market provider returned no daily price series for this symbol.");
 
-  const candles = Object.entries(series).map(([time, row]) => {
+  const candles: TradingCandle[] = Object.entries(series).flatMap(([time, row]) => {
     const open = numberFrom(row, "1. open", "1a. open");
     const high = numberFrom(row, "2. high", "2a. high");
     const low = numberFrom(row, "3. low", "3a. low");
     const close = numberFrom(row, "4. close", "4a. close");
     const volume = numberFrom(row, "5. volume", "5. volume");
-    if (open === null || high === null || low === null || close === null) return null;
-    return { time, open, high, low, close, volume } satisfies TradingCandle;
-  }).filter((row): row is TradingCandle => Boolean(row));
+    if (open === null || high === null || low === null || close === null) return [];
+    return [{ time, open, high, low, close, volume }];
+  });
 
   candles.sort((a, b) => a.time.localeCompare(b.time));
   if (!candles.length) throw new Error("Market provider returned no usable OHLC observations.");
