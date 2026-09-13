@@ -8,6 +8,21 @@ import { marketAlertCooldownElapsed, marketThresholdTriggered } from './trading-
 
 type Sb = { from: (table: string) => any };
 
+type TradingAlertEvaluationResult = {
+  id: string;
+  name: string;
+  status: 'triggered' | 'clear' | 'unavailable';
+  reason?: string;
+  provider?: string;
+  value?: number;
+  threshold?: number;
+  operator?: 'above' | 'below';
+  symbol?: string;
+  asOf?: string;
+  freshness?: string;
+  notified?: boolean;
+};
+
 type TradingAlertRow = {
   id: string;
   user_id: string;
@@ -139,7 +154,7 @@ export const evaluateTradingMarketAlerts = createServerFn({ method: 'POST' })
       return pending;
     };
 
-    const results: Array<Record<string, unknown>> = [];
+    const results: TradingAlertEvaluationResult[] = [];
     let triggeredCount = 0;
     let unavailableCount = 0;
     let notificationCount = 0;
