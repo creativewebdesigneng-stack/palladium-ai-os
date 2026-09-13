@@ -21,6 +21,21 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
 
+function cleanPublishableKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  return cleaned.startsWith("sb_publishable_") ? cleaned : null;
+}
+
+export function resolveSupabasePublishableKey(
+  env: SupabaseAdminEnvironment = process.env,
+): string | null {
+  return (
+    cleanPublishableKey(env["SUPABASE_PUBLISHABLE_KEY"]) ??
+    cleanPublishableKey(env["VITE_SUPABASE_PUBLISHABLE_KEY"])
+  );
+}
+
 function cleanSecretKey(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const cleaned = value.trim();
@@ -143,7 +158,12 @@ async function isRejectedApiKey(response: Response): Promise<boolean> {
   }
 }
 
-function headersForAdminKey(input: RequestInfo | URL, init: RequestInit | undefined, key: string) {
+function headersForAdminKey(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  candidate: SupabaseAdminKey,
+  publishableKey: string | null,
+) {
   const headers = new Headers(
     typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
   );
@@ -153,8 +173,19 @@ function headersForAdminKey(input: RequestInfo | URL, init: RequestInit | undefi
   // the SDK's API-key Authorization header on every attempt so a rejected candidate
   // cannot leak into the fallback request.
   headers.delete("Authorization");
-  headers.set("apikey", key);
-  if (!isNewSupabaseApiKey(key)) headers.set("Authorization", `Bearer ${key}`);
+
+  if (!isNewSupabaseApiKey(candidate.key)) {
+    // Legacy service-role credentials are JWTs as well as legacy API keys. Supabase's
+    // Data API accepts a current publishable key for the application-level `apikey`
+    // header while authorization is determined independently from the Bearer JWT.
+    // This lets a still-trusted legacy service-role JWT survive an API-key rotation
+    // without promoting the publishable key or weakening the service-role boundary.
+    headers.set("apikey", publishableKey ?? candidate.key);
+    headers.set("Authorization", `Bearer ${candidate.key}`);
+    return headers;
+  }
+
+  headers.set("apikey", candidate.key);
   return headers;
 }
 
@@ -167,6 +198,7 @@ function headersForAdminKey(input: RequestInfo | URL, init: RequestInit | undefi
 export function createSupabaseAdminFetch(
   candidates: SupabaseAdminKey[],
   fetchImpl: typeof fetch = fetch,
+  publishableKey: string | null = null,
 ): typeof fetch {
   let activeIndex = 0;
 
@@ -183,7 +215,7 @@ export function createSupabaseAdminFetch(
       if (!candidate) continue;
       const response = await fetchImpl(input, {
         ...init,
-        headers: headersForAdminKey(input, init, candidate.key),
+        headers: headersForAdminKey(input, init, candidate, publishableKey),
       });
       lastResponse = response;
       if (!(await isRejectedApiKey(response))) {
@@ -204,6 +236,7 @@ function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env["SUPABASE_URL"];
   const candidates = resolveSupabaseAdminKeyCandidates();
   const preferred = resolveSupabaseAdminKey();
+  const publishableKey = resolveSupabasePublishableKey();
 
   if (!SUPABASE_URL || !preferred || !candidates.length) {
     const missing = [
@@ -219,7 +252,7 @@ function createSupabaseAdminClient() {
 
   return createClient<Database>(SUPABASE_URL, preferred.key, {
     global: {
-      fetch: createSupabaseAdminFetch(candidates),
+      fetch: createSupabaseAdminFetch(candidates, fetch, publishableKey),
     },
     auth: {
       storage: undefined,
