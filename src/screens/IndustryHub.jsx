@@ -9,6 +9,8 @@ import IndustryBenchmarking from '@/components/industry/IndustryBenchmarking';
 import SupplierIntelligence from '@/components/industry/SupplierIntelligence';
 import OpportunityPortfolio from '@/components/industry/OpportunityPortfolio';
 import TransformationRoadmap from '@/components/industry/TransformationRoadmap';
+import IndustryDisruptionRadar from '@/components/industry/IndustryDisruptionRadar';
+import SpecialistSectorPacks from '@/components/industry/SpecialistSectorPacks';
 import { Building2, Factory, BriefcaseBusiness, HeartPulse, Landmark, Cpu, Truck, Wheat, Zap, FlaskConical, Film, ShoppingCart, GraduationCap, Hammer, Plane, ShieldCheck, Search, Rocket, Workflow, BarChart3, Globe2, Scale, Banknote, Users } from 'lucide-react';
 
 const industries = [
@@ -68,6 +70,8 @@ export default function IndustryHub() {
       <IndustryBenchmarking />
       <SupplierIntelligence />
       <OpportunityPortfolio />
+      <IndustryDisruptionRadar />
+      <SpecialistSectorPacks />
       <TransformationRoadmap />
       <IndustryWorkspace />
 
