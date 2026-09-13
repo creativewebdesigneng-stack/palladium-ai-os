@@ -23,7 +23,7 @@ describe("runtime worker publishable verifier", () => {
     ).resolves.toBe(true);
 
     expect(fetchImpl).toHaveBeenCalledOnce();
-    const [url, init] = fetchImpl.mock.calls[0];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as Parameters<typeof fetch>;
     expect(url).toBe("https://example.supabase.co/rest/v1/rpc/verify_runtime_worker_token");
     expect(init?.method).toBe("POST");
     expect(init?.headers).toEqual({
