@@ -21,6 +21,8 @@ describe("case-law source authority controls", () => {
     ).toBe(false);
     expect(hostMatchesCaseLawSource("https://www2.scjn.gob.mx/case", ["scjn.gob.mx"])).toBe(true);
     expect(hostMatchesCaseLawSource("https://scjn.gob.mx.example.org/case", ["scjn.gob.mx"])).toBe(false);
+    expect(hostMatchesCaseLawSource("https://new.kenyalaw.org/judgments/", ["new.kenyalaw.org"])).toBe(true);
+    expect(hostMatchesCaseLawSource("https://new.kenyalaw.org.example.com/judgments/", ["new.kenyalaw.org"])).toBe(false);
   });
 
   it("ranks official judicial evidence before discovery-only sources", () => {
@@ -57,19 +59,23 @@ describe("case-law source authority controls", () => {
       "Ireland",
       "France",
       "Germany",
+      "Spain",
+      "Italy",
       "India",
       "Singapore",
       "Hong Kong SAR",
       "Japan",
       "South Korea",
       "South Africa",
+      "Kenya",
       "Brazil",
       "Mexico",
       "United Arab Emirates",
     ];
-    expect(CASE_LAW_SOURCES.length).toBeGreaterThanOrEqual(19);
+    expect(CASE_LAW_SOURCES.length).toBeGreaterThanOrEqual(22);
     for (const jurisdiction of expected) expect(getCaseLawProfile(jurisdiction)).not.toBeNull();
     expect(getCaseLawProfile("Switzerland")).toBeNull();
+    expect(getCaseLawProfile("Saudi Arabia")).toBeNull();
   });
 
   it("preserves language, court-scope and federal/local boundaries for new profiles", () => {
@@ -79,6 +85,9 @@ describe("case-law source authority controls", () => {
     expect(getCaseLawProfile("France")?.coverageNote).toContain("Administrative-law questions");
     expect(getCaseLawProfile("Brazil")?.coverageNote).toContain("other superior courts");
     expect(getCaseLawProfile("Mexico")?.coverageNote).toContain("binding status");
+    expect(getCaseLawProfile("Spain")?.coverageNote).toContain("Tribunal Constitucional");
+    expect(getCaseLawProfile("Italy")?.coverageNote).toContain("lower-court coverage");
+    expect(getCaseLawProfile("Kenya")?.coverageNote).toContain("does not by itself determine precedential weight");
   });
 
   it("keeps the model from upgrading search evidence into unverified binding authority", () => {
