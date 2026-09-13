@@ -1,12 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
-import {
-  buildAlphaVantageUrl,
-  normaliseTradingSymbol,
-  parseAlphaVantageSeries,
-  type TradingMarketKind,
-} from "./market-data";
+import { normaliseTradingSymbol, type TradingMarketKind } from "./market-data";
+import { loadTradingMarketSeriesFromProvider } from "./market-data.server";
 
 const KINDS = new Set<TradingMarketKind>(["equity", "fx", "crypto"]);
 
@@ -20,38 +16,24 @@ export const getTradingMarketSeries = createServerFn({ method: "POST" })
     return { kind, symbol: normalised.display };
   })
   .handler(async ({ data, context }) => {
-    const apiKey = String(process.env["ALPHA_VANTAGE_API_KEY"] ?? "").trim();
-    if (!apiKey) {
-      return {
-        configured: false as const,
-        provider: "alpha-vantage" as const,
-        message: "Connect ALPHA_VANTAGE_API_KEY on the server to load provider market data.",
-      };
-    }
-
     try {
-      const request = buildAlphaVantageUrl(data.kind, data.symbol, apiKey);
-      const response = await fetch(request.url, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (!response.ok) throw new Error(`Market provider returned HTTP ${response.status}.`);
-      const payload = await response.json();
-      const series = parseAlphaVantageSeries(payload, data.kind, request.displaySymbol);
+      const result = await loadTradingMarketSeriesFromProvider(data.kind, data.symbol);
+      if (!result.configured) return result;
+
       await writeAudit({
         userId: context.userId,
         action: "trading.market_series.read",
         targetType: "market_data",
         status: "success",
         metadata: {
-          provider: series.provider,
+          provider: result.series.provider,
           kind: data.kind,
-          symbol: request.displaySymbol,
-          observations: series.candles.length,
-          asOf: series.asOf,
+          symbol: result.series.symbol,
+          observations: result.series.candles.length,
+          asOf: result.series.asOf,
         },
       });
-      return { configured: true as const, series };
+      return result;
     } catch (error) {
       await writeAudit({
         userId: context.userId,
