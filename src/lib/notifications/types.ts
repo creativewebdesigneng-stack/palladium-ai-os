@@ -84,6 +84,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A reminder you scheduled in Mission Control is due.",
   },
   {
+    type: "legal.regulatory_review_signal",
+    label: "Regulatory review signal",
+    category: "system",
+    severity: "warning",
+    desc: "A Legal Hub regulatory watch retrieved a different public evidence set and should be reviewed; this does not establish that the law changed.",
+  },
+  {
     type: "subscription.changed",
     label: "Subscription changed",
     category: "billing",
