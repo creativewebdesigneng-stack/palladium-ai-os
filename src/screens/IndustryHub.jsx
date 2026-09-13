@@ -1,3 +1,4 @@
+import IndustryOperatingSystem from '@/components/industry/IndustryOperatingSystem';
 import { Building2, Factory, BriefcaseBusiness, HeartPulse, Landmark, Cpu, Truck, Wheat, Zap, FlaskConical, Film, ShoppingCart, GraduationCap, Hammer, Plane, ShieldCheck, Search, Rocket, Workflow, BarChart3, Globe2, Scale, Banknote, Users } from 'lucide-react';
 
 const industries = [
@@ -47,6 +48,8 @@ export default function IndustryHub() {
         <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[.18em] text-zinc-500">Industry coverage</p><h2 className="mt-1 text-xl font-semibold text-white">Cross-sector intelligence library</h2></div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{industries.map(([name, Icon, description]) => <article key={name} className="blackstar-panel rounded-2xl border border-white/[.07] bg-black/25 p-5"><div className="flex items-center gap-3"><div className="rounded-xl border border-violet-400/15 bg-violet-400/[.06] p-2.5"><Icon className="h-5 w-5 text-violet-300" /></div><h3 className="font-medium text-white">{name}</h3></div><p className="mt-3 text-sm leading-6 text-zinc-500">{description}</p></article>)}</div>
       </section>
+
+      <IndustryOperatingSystem />
 
       <section>
         <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[.18em] text-zinc-500">What Blackstar can do</p><h2 className="mt-1 text-xl font-semibold text-white">Industry operating capabilities</h2></div>
