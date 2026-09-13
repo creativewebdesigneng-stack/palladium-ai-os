@@ -32,6 +32,7 @@ import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as TwoFactorRouteImport } from './routes/two-factor'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AppLegalHubRouteImport } from './routes/_app/legal-hub'
 import { Route as ShellAppRouteImport } from './routes/_shell/_app'
 import { Route as LegalIndexRouteImport } from './routes/legal.index'
 import { Route as LegalSlugRouteImport } from './routes/legal.$slug'
@@ -57,6 +58,7 @@ import { Route as ShellAppBuilderRouteImport } from './routes/_shell/_app/builde
 import { Route as ShellAppBusinessAutomationRouteImport } from './routes/_shell/_app/business-automation'
 import { Route as ShellAppBusinessIntelligenceRouteImport } from './routes/_shell/_app/business-intelligence'
 import { Route as ShellAppChatRouteImport } from './routes/_shell/_app/chat'
+import { Route as ShellAppCinemaStudioRouteImport } from './routes/_shell/_app/cinema-studio'
 import { Route as ShellAppCodeExplorerRouteImport } from './routes/_shell/_app/code-explorer'
 import { Route as ShellAppCommerceStudioRouteImport } from './routes/_shell/_app/commerce-studio'
 import { Route as ShellAppComputerControlRouteImport } from './routes/_shell/_app/computer-control'
@@ -77,6 +79,7 @@ import { Route as ShellAppFilesRouteImport } from './routes/_shell/_app/files'
 import { Route as ShellAppFilesAnalysisRouteImport } from './routes/_shell/_app/files-analysis'
 import { Route as ShellAppFinanceRouteImport } from './routes/_shell/_app/finance'
 import { Route as ShellAppFitnessStudioRouteImport } from './routes/_shell/_app/fitness-studio'
+import { Route as ShellAppGameFoundryRouteImport } from './routes/_shell/_app/game-foundry'
 import { Route as ShellAppHtmlStudioRouteImport } from './routes/_shell/_app/html-studio'
 import { Route as ShellAppIntegrationsRouteImport } from './routes/_shell/_app/integrations'
 import { Route as ShellAppKnowledgeRouteImport } from './routes/_shell/_app/knowledge'
@@ -274,6 +277,11 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AppLegalHubRoute = AppLegalHubRouteImport.update({
+  id: '/_app/legal-hub',
+  path: '/legal-hub',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellAppRoute = ShellAppRouteImport.update({
   id: '/_app',
   getParentRoute: () => ShellRoute,
@@ -402,6 +410,11 @@ const ShellAppChatRoute = ShellAppChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppCinemaStudioRoute = ShellAppCinemaStudioRouteImport.update({
+  id: '/cinema-studio',
+  path: '/cinema-studio',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppCodeExplorerRoute = ShellAppCodeExplorerRouteImport.update({
   id: '/code-explorer',
   path: '/code-explorer',
@@ -501,6 +514,11 @@ const ShellAppFinanceRoute = ShellAppFinanceRouteImport.update({
 const ShellAppFitnessStudioRoute = ShellAppFitnessStudioRouteImport.update({
   id: '/fitness-studio',
   path: '/fitness-studio',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppGameFoundryRoute = ShellAppGameFoundryRouteImport.update({
+  id: '/game-foundry',
+  path: '/game-foundry',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppHtmlStudioRoute = ShellAppHtmlStudioRouteImport.update({
@@ -945,6 +963,7 @@ export interface FileRoutesByFullPath {
   '/two-factor': typeof TwoFactorRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/legal-hub': typeof AppLegalHubRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/studio-app/$appId': typeof StudioAppAppIdRoute
   '/legal/': typeof LegalIndexRoute
@@ -969,6 +988,7 @@ export interface FileRoutesByFullPath {
   '/business-automation': typeof ShellAppBusinessAutomationRoute
   '/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
   '/chat': typeof ShellAppChatRoute
+  '/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/code-explorer': typeof ShellAppCodeExplorerRoute
   '/commerce-studio': typeof ShellAppCommerceStudioRoute
   '/computer-control': typeof ShellAppComputerControlRoute
@@ -989,6 +1009,7 @@ export interface FileRoutesByFullPath {
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/game-foundry': typeof ShellAppGameFoundryRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
@@ -1093,6 +1114,7 @@ export interface FileRoutesByTo {
   '/two-factor': typeof TwoFactorRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/legal-hub': typeof AppLegalHubRoute
   '/legal/$slug': typeof LegalSlugRoute
   '/studio-app/$appId': typeof StudioAppAppIdRoute
   '/legal': typeof LegalIndexRoute
@@ -1117,6 +1139,7 @@ export interface FileRoutesByTo {
   '/business-automation': typeof ShellAppBusinessAutomationRoute
   '/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
   '/chat': typeof ShellAppChatRoute
+  '/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/code-explorer': typeof ShellAppCodeExplorerRoute
   '/commerce-studio': typeof ShellAppCommerceStudioRoute
   '/computer-control': typeof ShellAppComputerControlRoute
@@ -1137,6 +1160,7 @@ export interface FileRoutesByTo {
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/game-foundry': typeof ShellAppGameFoundryRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
@@ -1243,6 +1267,7 @@ export interface FileRoutesById {
   '/two-factor': typeof TwoFactorRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/_app/legal-hub': typeof AppLegalHubRoute
   '/_shell/_app': typeof ShellAppRouteWithChildren
   '/legal/$slug': typeof LegalSlugRoute
   '/studio-app/$appId': typeof StudioAppAppIdRoute
@@ -1268,6 +1293,7 @@ export interface FileRoutesById {
   '/_shell/_app/business-automation': typeof ShellAppBusinessAutomationRoute
   '/_shell/_app/business-intelligence': typeof ShellAppBusinessIntelligenceRoute
   '/_shell/_app/chat': typeof ShellAppChatRoute
+  '/_shell/_app/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/_shell/_app/code-explorer': typeof ShellAppCodeExplorerRoute
   '/_shell/_app/commerce-studio': typeof ShellAppCommerceStudioRoute
   '/_shell/_app/computer-control': typeof ShellAppComputerControlRoute
@@ -1288,6 +1314,7 @@ export interface FileRoutesById {
   '/_shell/_app/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/_shell/_app/finance': typeof ShellAppFinanceRoute
   '/_shell/_app/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/_shell/_app/game-foundry': typeof ShellAppGameFoundryRoute
   '/_shell/_app/html-studio': typeof ShellAppHtmlStudioRoute
   '/_shell/_app/integrations': typeof ShellAppIntegrationsRoute
   '/_shell/_app/knowledge': typeof ShellAppKnowledgeRoute
@@ -1394,6 +1421,7 @@ export interface FileRouteTypes {
     | '/two-factor'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/legal-hub'
     | '/legal/$slug'
     | '/studio-app/$appId'
     | '/legal/'
@@ -1418,6 +1446,7 @@ export interface FileRouteTypes {
     | '/business-automation'
     | '/business-intelligence'
     | '/chat'
+    | '/cinema-studio'
     | '/code-explorer'
     | '/commerce-studio'
     | '/computer-control'
@@ -1438,6 +1467,7 @@ export interface FileRouteTypes {
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
+    | '/game-foundry'
     | '/html-studio'
     | '/integrations'
     | '/knowledge'
@@ -1542,6 +1572,7 @@ export interface FileRouteTypes {
     | '/two-factor'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/legal-hub'
     | '/legal/$slug'
     | '/studio-app/$appId'
     | '/legal'
@@ -1566,6 +1597,7 @@ export interface FileRouteTypes {
     | '/business-automation'
     | '/business-intelligence'
     | '/chat'
+    | '/cinema-studio'
     | '/code-explorer'
     | '/commerce-studio'
     | '/computer-control'
@@ -1586,6 +1618,7 @@ export interface FileRouteTypes {
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
+    | '/game-foundry'
     | '/html-studio'
     | '/integrations'
     | '/knowledge'
@@ -1691,6 +1724,7 @@ export interface FileRouteTypes {
     | '/two-factor'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/_app/legal-hub'
     | '/_shell/_app'
     | '/legal/$slug'
     | '/studio-app/$appId'
@@ -1716,6 +1750,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/business-automation'
     | '/_shell/_app/business-intelligence'
     | '/_shell/_app/chat'
+    | '/_shell/_app/cinema-studio'
     | '/_shell/_app/code-explorer'
     | '/_shell/_app/commerce-studio'
     | '/_shell/_app/computer-control'
@@ -1736,6 +1771,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/files-analysis'
     | '/_shell/_app/finance'
     | '/_shell/_app/fitness-studio'
+    | '/_shell/_app/game-foundry'
     | '/_shell/_app/html-studio'
     | '/_shell/_app/integrations'
     | '/_shell/_app/knowledge'
@@ -1842,6 +1878,7 @@ export interface RootRouteChildren {
   TwoFactorRoute: typeof TwoFactorRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AppLegalHubRoute: typeof AppLegalHubRoute
   LegalSlugRoute: typeof LegalSlugRoute
   StudioAppAppIdRoute: typeof StudioAppAppIdRoute
   LegalIndexRoute: typeof LegalIndexRoute
@@ -2027,6 +2064,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/legal-hub': {
+      id: '/_app/legal-hub'
+      path: '/legal-hub'
+      fullPath: '/legal-hub'
+      preLoaderRoute: typeof AppLegalHubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/_app': {
       id: '/_shell/_app'
       path: ''
@@ -2202,6 +2246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppChatRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/cinema-studio': {
+      id: '/_shell/_app/cinema-studio'
+      path: '/cinema-studio'
+      fullPath: '/cinema-studio'
+      preLoaderRoute: typeof ShellAppCinemaStudioRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/code-explorer': {
       id: '/_shell/_app/code-explorer'
       path: '/code-explorer'
@@ -2340,6 +2391,13 @@ declare module '@tanstack/react-router' {
       path: '/fitness-studio'
       fullPath: '/fitness-studio'
       preLoaderRoute: typeof ShellAppFitnessStudioRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/game-foundry': {
+      id: '/_shell/_app/game-foundry'
+      path: '/game-foundry'
+      fullPath: '/game-foundry'
+      preLoaderRoute: typeof ShellAppGameFoundryRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/html-studio': {
@@ -2925,6 +2983,7 @@ interface ShellAppRouteChildren {
   ShellAppBusinessAutomationRoute: typeof ShellAppBusinessAutomationRoute
   ShellAppBusinessIntelligenceRoute: typeof ShellAppBusinessIntelligenceRoute
   ShellAppChatRoute: typeof ShellAppChatRoute
+  ShellAppCinemaStudioRoute: typeof ShellAppCinemaStudioRoute
   ShellAppCodeExplorerRoute: typeof ShellAppCodeExplorerRoute
   ShellAppCommerceStudioRoute: typeof ShellAppCommerceStudioRoute
   ShellAppComputerControlRoute: typeof ShellAppComputerControlRoute
@@ -2945,6 +3004,7 @@ interface ShellAppRouteChildren {
   ShellAppFilesAnalysisRoute: typeof ShellAppFilesAnalysisRoute
   ShellAppFinanceRoute: typeof ShellAppFinanceRoute
   ShellAppFitnessStudioRoute: typeof ShellAppFitnessStudioRoute
+  ShellAppGameFoundryRoute: typeof ShellAppGameFoundryRoute
   ShellAppHtmlStudioRoute: typeof ShellAppHtmlStudioRoute
   ShellAppIntegrationsRoute: typeof ShellAppIntegrationsRoute
   ShellAppKnowledgeRoute: typeof ShellAppKnowledgeRoute
@@ -3029,6 +3089,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppBusinessAutomationRoute: ShellAppBusinessAutomationRoute,
   ShellAppBusinessIntelligenceRoute: ShellAppBusinessIntelligenceRoute,
   ShellAppChatRoute: ShellAppChatRoute,
+  ShellAppCinemaStudioRoute: ShellAppCinemaStudioRoute,
   ShellAppCodeExplorerRoute: ShellAppCodeExplorerRoute,
   ShellAppCommerceStudioRoute: ShellAppCommerceStudioRoute,
   ShellAppComputerControlRoute: ShellAppComputerControlRoute,
@@ -3049,6 +3110,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppFilesAnalysisRoute: ShellAppFilesAnalysisRoute,
   ShellAppFinanceRoute: ShellAppFinanceRoute,
   ShellAppFitnessStudioRoute: ShellAppFitnessStudioRoute,
+  ShellAppGameFoundryRoute: ShellAppGameFoundryRoute,
   ShellAppHtmlStudioRoute: ShellAppHtmlStudioRoute,
   ShellAppIntegrationsRoute: ShellAppIntegrationsRoute,
   ShellAppKnowledgeRoute: ShellAppKnowledgeRoute,
@@ -3185,6 +3247,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AppLegalHubRoute: AppLegalHubRoute,
   LegalSlugRoute: LegalSlugRoute,
   StudioAppAppIdRoute: StudioAppAppIdRoute,
   LegalIndexRoute: LegalIndexRoute,
