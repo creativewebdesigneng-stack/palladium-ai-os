@@ -10,7 +10,7 @@ type SupabaseAdminKeySource =
   | "SUPABASE_SECRET_KEYS"
   | "SUPABASE_SERVICE_ROLE_KEY";
 
-type SupabaseAdminKey = {
+export type SupabaseAdminKey = {
   key: string;
   source: SupabaseAdminKeySource;
 };
@@ -27,29 +27,59 @@ function cleanSecretKey(value: unknown): string | null {
   return cleaned.startsWith("sb_secret_") ? cleaned : null;
 }
 
-function secretKeyFromCollection(raw: string | undefined): string | null {
-  if (!raw) return null;
+function secretKeysFromCollection(raw: string | undefined): string[] {
+  if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
 
     const record = parsed as Record<string, unknown>;
+    const candidates: string[] = [];
     const preferred = cleanSecretKey(record["default"]);
-    if (preferred) return preferred;
-
-    const candidates = Object.values(record)
-      .map(cleanSecretKey)
-      .filter((value): value is string => Boolean(value));
-    return candidates.length === 1 ? candidates[0]! : null;
+    if (preferred) candidates.push(preferred);
+    for (const [name, value] of Object.entries(record)) {
+      if (name === "default") continue;
+      const key = cleanSecretKey(value);
+      if (key) candidates.push(key);
+    }
+    return [...new Set(candidates)];
   } catch {
-    return null;
+    return [];
   }
 }
 
 /**
- * Resolve the privileged server key without ever logging or returning key material
- * beyond this server-only module. Prefer Supabase's rotatable modern secret-key
- * variables, while retaining the legacy service-role key as a compatibility fallback.
+ * Resolve every privileged server key Blackstar has been explicitly configured
+ * with, in preferred order. This lets the server survive a staged Supabase key
+ * rotation without exposing or persisting any key material elsewhere.
+ */
+export function resolveSupabaseAdminKeyCandidates(
+  env: SupabaseAdminEnvironment = process.env,
+): SupabaseAdminKey[] {
+  const candidates: SupabaseAdminKey[] = [];
+  const directSecret = cleanSecretKey(env["SUPABASE_SECRET_KEY"]);
+  if (directSecret) candidates.push({ key: directSecret, source: "SUPABASE_SECRET_KEY" });
+
+  for (const key of secretKeysFromCollection(env["SUPABASE_SECRET_KEYS"])) {
+    candidates.push({ key, source: "SUPABASE_SECRET_KEYS" });
+  }
+
+  const legacy = env["SUPABASE_SERVICE_ROLE_KEY"]?.trim();
+  if (legacy) candidates.push({ key: legacy, source: "SUPABASE_SERVICE_ROLE_KEY" });
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    if (seen.has(candidate.key)) return false;
+    seen.add(candidate.key);
+    return true;
+  });
+}
+
+/**
+ * Resolve the preferred privileged key for compatibility with callers/tests that
+ * only need one credential. Ambiguous named collections do not outrank the legacy
+ * fallback; the runtime fetch layer can still try those named keys safely if the
+ * preferred credential is rejected by Supabase.
  */
 export function resolveSupabaseAdminKey(
   env: SupabaseAdminEnvironment = process.env,
@@ -57,8 +87,17 @@ export function resolveSupabaseAdminKey(
   const directSecret = cleanSecretKey(env["SUPABASE_SECRET_KEY"]);
   if (directSecret) return { key: directSecret, source: "SUPABASE_SECRET_KEY" };
 
-  const collectionSecret = secretKeyFromCollection(env["SUPABASE_SECRET_KEYS"]);
-  if (collectionSecret) return { key: collectionSecret, source: "SUPABASE_SECRET_KEYS" };
+  const collection = secretKeysFromCollection(env["SUPABASE_SECRET_KEYS"]);
+  if (collection.length === 1) return { key: collection[0]!, source: "SUPABASE_SECRET_KEYS" };
+  if (collection.length > 1) {
+    try {
+      const parsed = JSON.parse(env["SUPABASE_SECRET_KEYS"] ?? "{}") as Record<string, unknown>;
+      const preferred = cleanSecretKey(parsed["default"]);
+      if (preferred) return { key: preferred, source: "SUPABASE_SECRET_KEYS" };
+    } catch {
+      // Malformed collections fall through to the legacy compatibility key.
+    }
+  }
 
   const legacy = env["SUPABASE_SERVICE_ROLE_KEY"]?.trim();
   if (legacy) return { key: legacy, source: "SUPABASE_SERVICE_ROLE_KEY" };
@@ -66,37 +105,77 @@ export function resolveSupabaseAdminKey(
   return null;
 }
 
-function createSupabaseFetch(supabaseKey: string): typeof fetch {
-  return (input, init) => {
-    const headers = new Headers(
-      typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
-    );
+async function isRejectedApiKey(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false;
+  try {
+    const text = (await response.clone().text()).slice(0, 1000).toLowerCase();
+    return text.includes("invalid api key");
+  } catch {
+    return false;
+  }
+}
 
-    if (init?.headers) {
-      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+function headersForAdminKey(input: RequestInfo | URL, init: RequestInit | undefined, key: string) {
+  const headers = new Headers(
+    typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
+  );
+  if (init?.headers) new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+
+  // This is a server-only elevated client and never carries a user session. Replace
+  // the SDK's API-key Authorization header on every attempt so a rejected candidate
+  // cannot leak into the fallback request.
+  headers.delete("Authorization");
+  headers.set("apikey", key);
+  if (!isNewSupabaseApiKey(key)) headers.set("Authorization", `Bearer ${key}`);
+  return headers;
+}
+
+/**
+ * Supabase key-rotation-aware fetch. A fallback is attempted only when Supabase
+ * explicitly reports `Invalid API key` with HTTP 401. Application/RLS/server
+ * errors are returned unchanged, so non-idempotent writes are never replayed after
+ * an authenticated response.
+ */
+export function createSupabaseAdminFetch(
+  candidates: SupabaseAdminKey[],
+  fetchImpl: typeof fetch = fetch,
+): typeof fetch {
+  let activeIndex = 0;
+
+  return async (input, init) => {
+    if (!candidates.length) return fetchImpl(input, init);
+    const order = [
+      activeIndex,
+      ...candidates.map((_, index) => index).filter((index) => index !== activeIndex),
+    ];
+
+    let lastResponse: Response | null = null;
+    for (const index of order) {
+      const candidate = candidates[index];
+      if (!candidate) continue;
+      const response = await fetchImpl(input, {
+        ...init,
+        headers: headersForAdminKey(input, init, candidate.key),
+      });
+      lastResponse = response;
+      if (!(await isRejectedApiKey(response))) {
+        activeIndex = index;
+        return response;
+      }
     }
-
-    // New Supabase API keys are opaque strings, not bearer JWTs.
-    if (
-      isNewSupabaseApiKey(supabaseKey) &&
-      headers.get("Authorization") === `Bearer ${supabaseKey}`
-    ) {
-      headers.delete("Authorization");
-    }
-
-    headers.set("apikey", supabaseKey);
-    return fetch(input, { ...init, headers });
+    return lastResponse ?? fetchImpl(input, init);
   };
 }
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env["SUPABASE_URL"];
-  const resolvedKey = resolveSupabaseAdminKey();
+  const candidates = resolveSupabaseAdminKeyCandidates();
+  const preferred = resolveSupabaseAdminKey();
 
-  if (!SUPABASE_URL || !resolvedKey) {
+  if (!SUPABASE_URL || !preferred || !candidates.length) {
     const missing = [
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!resolvedKey
+      ...(!preferred || !candidates.length
         ? ["SUPABASE_SECRET_KEY/SUPABASE_SECRET_KEYS/SUPABASE_SERVICE_ROLE_KEY"]
         : []),
     ];
@@ -105,9 +184,9 @@ function createSupabaseAdminClient() {
     throw new Error(message);
   }
 
-  return createClient<Database>(SUPABASE_URL, resolvedKey.key, {
+  return createClient<Database>(SUPABASE_URL, preferred.key, {
     global: {
-      fetch: createSupabaseFetch(resolvedKey.key),
+      fetch: createSupabaseAdminFetch(candidates),
     },
     auth: {
       storage: undefined,
