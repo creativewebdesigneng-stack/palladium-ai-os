@@ -1,3 +1,4 @@
+import CompanyCommandIntelligence from '@/components/company/CompanyCommandIntelligence';
 import CompanyPlaybooks from '@/components/company/CompanyPlaybooks';
 import CompanyGrowthLab from '@/components/company/CompanyGrowthLab';
 import CompanyAIWorkforceBlueprint from '@/components/company/CompanyAIWorkforceBlueprint';
@@ -87,6 +88,7 @@ export default function CompanyHub(){
   </section>
 
   <CompanyHealthAssessment />
+  <CompanyCommandIntelligence />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
   <CompanyPlaybooks />
