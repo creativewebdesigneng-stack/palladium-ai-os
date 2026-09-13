@@ -15,4 +15,4 @@ Blackstar's Company Hub is application-complete when the exact release candidate
 
 The Company Hub reuses Blackstar's existing Finance, CRM, BI, Legal, Industry, AI Workforce, agents and workflow systems. It must not duplicate execution engines or represent user-entered planning metrics as live or audited company data.
 
-High-stakes legal, financial, security, employment or regulated decisions remain subject to their specialist controls and human approval requirements.
+Core Company Hub financial-health calculations are implemented as deterministic shared functions with unit tests. High-stakes legal, financial, security, employment or regulated decisions remain subject to their specialist controls and human approval requirements.
