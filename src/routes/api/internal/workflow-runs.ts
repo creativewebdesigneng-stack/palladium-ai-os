@@ -30,25 +30,33 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         const limit = Number.isFinite(requested)
           ? Math.max(1, Math.min(4, Math.trunc(requested)))
           : 2;
-        const [workflows, reminders, agentResumes, autonomousGoals, legalAutomation] =
-          await Promise.all([
-            processQueuedWorkflowRuns(limit),
-            processDuePersonalReminders(Math.max(10, limit * 5)),
-            processResumableAgentRuns(limit),
-            processDueAutonomousGoals(Math.min(2, limit)),
-            processDueLegalAutomation(Math.min(2, limit)),
-          ]);
-        return json(
-          {
-            ok: true,
-            ...workflows,
-            reminders,
-            agent_resumes: agentResumes,
-            autonomous_goals: autonomousGoals,
-            legal_automation: legalAutomation,
-          },
-          200,
-        );
+
+        try {
+          const [workflows, reminders, agentResumes, autonomousGoals, legalAutomation] =
+            await Promise.all([
+              processQueuedWorkflowRuns(limit),
+              processDuePersonalReminders(Math.max(10, limit * 5)),
+              processResumableAgentRuns(limit),
+              processDueAutonomousGoals(Math.min(2, limit)),
+              processDueLegalAutomation(Math.min(2, limit)),
+            ]);
+          return json(
+            {
+              ok: true,
+              ...workflows,
+              reminders,
+              agent_resumes: agentResumes,
+              autonomous_goals: autonomousGoals,
+              legal_automation: legalAutomation,
+            },
+            200,
+          );
+        } catch (error) {
+          console.error("[runtime-worker] workflow processing unavailable", {
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          });
+          return json({ ok: false, error: "Worker unavailable" }, 503);
+        }
       },
     },
   },
