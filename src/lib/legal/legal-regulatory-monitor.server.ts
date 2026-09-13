@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { searchPublicWeb, type WebSource } from "@/lib/ai/web-access.server";
 import { notifyWithOutcome } from "@/lib/notifications/notify.server";
 
@@ -76,6 +75,7 @@ async function reviewSignalAlreadyRecorded(args: {
   watchId: string;
   fingerprint: string;
 }): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as unknown as Sb;
   const { data } = await db
     .from("notifications")
