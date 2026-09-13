@@ -11,7 +11,13 @@ import {
   saveTradingWatchlist,
   saveTradingWatchlistItem,
 } from '@/lib/trading/trading-workspace.functions';
-import { calculateSimulationPnl } from '@/lib/trading/trading-risk';
+import {
+  calculateMaximumLoss,
+  calculatePercentageReturn,
+  calculatePositionExposure,
+  calculateRiskReward,
+  calculateSimulationPnl,
+} from '@/lib/trading/trading-risk';
 
 const TABS = [
   ['watchlists', 'Watchlists', Eye],
@@ -24,6 +30,14 @@ const inputClass = 'rounded-xl border border-white/10 bg-black/25 px-3 py-2 text
 const buttonClass = 'inline-flex items-center justify-center gap-1.5 rounded-xl border border-violet-300/15 bg-violet-400/[.07] px-3 py-2 text-xs text-violet-100 transition hover:bg-violet-400/[.11] disabled:cursor-not-allowed disabled:opacity-50';
 
 const emptyWorkspace = { watchlists: [], watchlistItems: [], journal: [], simulations: [] };
+
+function parseTags(value) {
+  return String(value || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 20);
+}
+
+function optionalNumber(value) {
+  return value === '' || value == null ? undefined : Number(value);
+}
 
 function formatMoney(value, currency = 'GBP') {
   try {
@@ -42,9 +56,9 @@ export default function TradingWorkspace() {
   const [error, setError] = useState('');
 
   const [watchlistForm, setWatchlistForm] = useState({ name: '', description: '' });
-  const [itemForm, setItemForm] = useState({ symbol: '', name: '', market: '', asset_type: 'stock', notes: '' });
-  const [simulationForm, setSimulationForm] = useState({ symbol: '', side: 'long', quantity: '1', entry_price: '', exit_price: '', currency: 'GBP', status: 'planned', thesis: '', notes: '' });
-  const [journalForm, setJournalForm] = useState({ symbol: '', side: 'neutral', status: 'planned', thesis: '', plan: '', outcome: '', lessons: '', tags: '' });
+  const [itemForm, setItemForm] = useState({ symbol: '', name: '', market: '', asset_type: 'stock', thesis: '', tags: '', watch_level: '', target_level: '', notes: '' });
+  const [simulationForm, setSimulationForm] = useState({ symbol: '', side: 'long', quantity: '1', asset_type: 'stock', market: '', entry_price: '', stop_price: '', target_price: '', exit_price: '', currency: 'GBP', status: 'planned', strategy: '', thesis: '', tags: '', notes: '' });
+  const [journalForm, setJournalForm] = useState({ simulation_id: '', symbol: '', side: 'neutral', status: 'planned', setup: '', catalyst: '', thesis: '', entry_reasoning: '', risk_plan: '', strategy: '', plan: '', discipline_notes: '', mistakes: '', outcome: '', lessons: '', tags: '' });
 
   async function load(preferredWatchlistId) {
     try {
@@ -103,8 +117,8 @@ export default function TradingWorkspace() {
     event.preventDefault();
     if (!selectedWatchlistId) return;
     await run(async () => {
-      await saveTradingWatchlistItem({ data: { ...itemForm, watchlist_id: selectedWatchlistId } });
-      setItemForm({ symbol: '', name: '', market: '', asset_type: 'stock', notes: '' });
+      await saveTradingWatchlistItem({ data: { ...itemForm, watchlist_id: selectedWatchlistId, tags: parseTags(itemForm.tags), watch_level: optionalNumber(itemForm.watch_level), target_level: optionalNumber(itemForm.target_level) } });
+      setItemForm({ symbol: '', name: '', market: '', asset_type: 'stock', thesis: '', tags: '', watch_level: '', target_level: '', notes: '' });
       await load(selectedWatchlistId);
     });
   }
@@ -124,10 +138,13 @@ export default function TradingWorkspace() {
           ...simulationForm,
           quantity: Number(simulationForm.quantity),
           entry_price: Number(simulationForm.entry_price),
-          exit_price: simulationForm.exit_price === '' ? undefined : Number(simulationForm.exit_price),
+          stop_price: optionalNumber(simulationForm.stop_price),
+          target_price: optionalNumber(simulationForm.target_price),
+          exit_price: optionalNumber(simulationForm.exit_price),
+          tags: parseTags(simulationForm.tags),
         },
       });
-      setSimulationForm({ symbol: '', side: 'long', quantity: '1', entry_price: '', exit_price: '', currency: 'GBP', status: 'planned', thesis: '', notes: '' });
+      setSimulationForm({ symbol: '', side: 'long', quantity: '1', asset_type: 'stock', market: '', entry_price: '', stop_price: '', target_price: '', exit_price: '', currency: 'GBP', status: 'planned', strategy: '', thesis: '', tags: '', notes: '' });
       await load(selectedWatchlistId);
     });
   }
@@ -145,11 +162,12 @@ export default function TradingWorkspace() {
       await saveTradingJournalEntry({
         data: {
           ...journalForm,
+          simulation_id: journalForm.simulation_id || undefined,
           symbol: journalForm.symbol.trim() || undefined,
-          tags: journalForm.tags.split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 20),
+          tags: parseTags(journalForm.tags),
         },
       });
-      setJournalForm({ symbol: '', side: 'neutral', status: 'planned', thesis: '', plan: '', outcome: '', lessons: '', tags: '' });
+      setJournalForm({ simulation_id: '', symbol: '', side: 'neutral', status: 'planned', setup: '', catalyst: '', thesis: '', entry_reasoning: '', risk_plan: '', strategy: '', plan: '', discipline_notes: '', mistakes: '', outcome: '', lessons: '', tags: '' });
       await load(selectedWatchlistId);
     });
   }
@@ -216,6 +234,7 @@ export default function TradingWorkspace() {
         save={saveJournal}
         remove={removeJournal}
         rows={workspace.journal}
+        simulations={workspace.simulations}
       />}
     </section>
   );
