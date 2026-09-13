@@ -1,3 +1,4 @@
+import CompanyAIWorkforceBlueprint from '@/components/company/CompanyAIWorkforceBlueprint';
 import CompanyHealthAssessment from '@/components/company/CompanyHealthAssessment';
 import CompanyWorkspace from '@/components/company/CompanyWorkspace';
 import { Link } from 'react-router-dom';
@@ -84,6 +85,7 @@ export default function CompanyHub(){
   </section>
 
   <CompanyHealthAssessment />
+  <CompanyAIWorkforceBlueprint />
   <CompanyWorkspace />
 
   <section className="grid gap-4 lg:grid-cols-3">
