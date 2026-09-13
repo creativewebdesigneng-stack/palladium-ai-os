@@ -96,10 +96,16 @@ describe("runtime worker credential isolation", () => {
       expect(sql).toMatch(
         /revoke all on function public\.verify_runtime_worker_token\(text, text\)[\s\S]*from public, anon, authenticated, service_role;/i,
       );
-      expect(sql).toContain(
-        "grant execute on function public.verify_runtime_worker_token(text, text) to anon, service_role",
+
+      const grant = sql.match(
+        /grant execute on function public\.verify_runtime_worker_token\(text, text\) to ([^;]+);/i,
       );
-      expect(sql).not.toMatch(/grant execute[\s\S]*authenticated/i);
+      const grantedRoles = grant?.[1]
+        ?.split(",")
+        .map((role) => role.trim())
+        .filter(Boolean);
+
+      expect(grantedRoles).toEqual(["anon", "service_role"]);
     }
   });
 
