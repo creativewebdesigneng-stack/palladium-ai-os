@@ -19,6 +19,8 @@ describe("case-law source authority controls", () => {
         "caselaw.nationalarchives.gov.uk",
       ]),
     ).toBe(false);
+    expect(hostMatchesCaseLawSource("https://www2.scjn.gob.mx/case", ["scjn.gob.mx"])).toBe(true);
+    expect(hostMatchesCaseLawSource("https://scjn.gob.mx.example.org/case", ["scjn.gob.mx"])).toBe(false);
   });
 
   it("ranks official judicial evidence before discovery-only sources", () => {
@@ -50,6 +52,35 @@ describe("case-law source authority controls", () => {
     expect(queries.join(" ")).toContain('"410 U.S. 113"');
   });
 
+  it("expands court-source intelligence across major legal systems without pretending universal coverage", () => {
+    const expected = [
+      "Ireland",
+      "France",
+      "Germany",
+      "India",
+      "Singapore",
+      "Hong Kong SAR",
+      "Japan",
+      "South Korea",
+      "South Africa",
+      "Brazil",
+      "Mexico",
+      "United Arab Emirates",
+    ];
+    expect(CASE_LAW_SOURCES.length).toBeGreaterThanOrEqual(19);
+    for (const jurisdiction of expected) expect(getCaseLawProfile(jurisdiction)).not.toBeNull();
+    expect(getCaseLawProfile("Switzerland")).toBeNull();
+  });
+
+  it("preserves language, court-scope and federal/local boundaries for new profiles", () => {
+    expect(getCaseLawProfile("Germany")?.coverageNote).toContain("authoritative German decision");
+    expect(getCaseLawProfile("Japan")?.coverageNote).toContain("explicitly unofficial");
+    expect(getCaseLawProfile("United Arab Emirates")?.coverageNote).toContain("DIFC/ADGM");
+    expect(getCaseLawProfile("France")?.coverageNote).toContain("Administrative-law questions");
+    expect(getCaseLawProfile("Brazil")?.coverageNote).toContain("other superior courts");
+    expect(getCaseLawProfile("Mexico")?.coverageNote).toContain("binding status");
+  });
+
   it("keeps the model from upgrading search evidence into unverified binding authority", () => {
     expect(CASE_LAW_SYSTEM_INSTRUCTIONS).toContain("Never invent a case name");
     expect(CASE_LAW_SYSTEM_INSTRUCTIONS).toContain("not by itself proof that a decision is binding");
@@ -65,6 +96,7 @@ describe("case-law source authority controls", () => {
       expect(profile.officialHosts.length).toBeGreaterThan(0);
       expect(profile.gateways.length).toBeGreaterThan(0);
       expect(profile.gateways.every((gateway) => gateway.url.startsWith("https://"))).toBe(true);
+      expect(profile.coverageNote.length).toBeGreaterThan(40);
     }
   });
 });
