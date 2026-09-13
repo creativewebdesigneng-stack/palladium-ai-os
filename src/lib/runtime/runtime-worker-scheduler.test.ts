@@ -19,6 +19,13 @@ const verifierMigration = readFileSync(
   ),
   "utf8",
 );
+const verifierPrivilegeMigration = readFileSync(
+  new URL(
+    "../../../supabase/migrations/20260913031000_runtime_worker_verifier_privileges.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const auth = readFileSync(new URL("./runtime-worker-auth.server.ts", import.meta.url), "utf8");
 const workflowRoute = readFileSync(
   new URL("../../routes/api/internal/workflow-runs.ts", import.meta.url),
@@ -82,12 +89,18 @@ describe("runtime worker credential isolation", () => {
     expect(verifierMigration).toContain("length(supplied_token) < 32");
     expect(verifierMigration).toContain("worker_name not in ('workflow_runner', 'webhook_retry')");
     expect(verifierMigration).toContain("extensions.digest(supplied_token, 'sha256')");
-    expect(verifierMigration).toContain(
-      "revoke all on function public.verify_runtime_worker_token(text, text) from public",
-    );
-    expect(verifierMigration).toContain(
-      "grant execute on function public.verify_runtime_worker_token(text, text) to anon, service_role",
-    );
+  });
+
+  it("revokes default function grants before allowing only required API roles", () => {
+    for (const sql of [verifierMigration, verifierPrivilegeMigration]) {
+      expect(sql).toMatch(
+        /revoke all on function public\.verify_runtime_worker_token\(text, text\)[\s\S]*from public, anon, authenticated, service_role;/i,
+      );
+      expect(sql).toContain(
+        "grant execute on function public.verify_runtime_worker_token(text, text) to anon, service_role",
+      );
+      expect(sql).not.toMatch(/grant execute[\s\S]*authenticated/i);
+    }
   });
 
   it("uses the isolated verifier RPC instead of reading token hashes in application code", () => {
