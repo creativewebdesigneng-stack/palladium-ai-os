@@ -1,4 +1,5 @@
 import IndustryOperatingSystem from '@/components/industry/IndustryOperatingSystem';
+import IndustrySourceGateway from '@/components/industry/IndustrySourceGateway';
 import { Building2, Factory, BriefcaseBusiness, HeartPulse, Landmark, Cpu, Truck, Wheat, Zap, FlaskConical, Film, ShoppingCart, GraduationCap, Hammer, Plane, ShieldCheck, Search, Rocket, Workflow, BarChart3, Globe2, Scale, Banknote, Users } from 'lucide-react';
 
 const industries = [
@@ -50,6 +51,7 @@ export default function IndustryHub() {
       </section>
 
       <IndustryOperatingSystem />
+      <IndustrySourceGateway />
 
       <section>
         <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[.18em] text-zinc-500">What Blackstar can do</p><h2 className="mt-1 text-xl font-semibold text-white">Industry operating capabilities</h2></div>
