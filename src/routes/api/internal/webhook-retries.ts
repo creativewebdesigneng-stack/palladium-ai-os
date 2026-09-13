@@ -26,8 +26,16 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
         const limit = Number.isFinite(requested)
           ? Math.max(1, Math.min(50, Math.trunc(requested)))
           : 20;
-        const result = await processDueWebhookRetries(limit);
-        return json({ ok: true, ...result }, 200);
+
+        try {
+          const result = await processDueWebhookRetries(limit);
+          return json({ ok: true, ...result }, 200);
+        } catch (error) {
+          console.error("[runtime-worker] webhook retry processing unavailable", {
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          });
+          return json({ ok: false, error: "Worker unavailable" }, 503);
+        }
       },
     },
   },
