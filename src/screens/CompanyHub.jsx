@@ -1,3 +1,4 @@
+import CompanyWorkspace from '@/components/company/CompanyWorkspace';
 import { Link } from 'react-router-dom';
 import {
   Building2, Users, Bot, Workflow, Contact, Megaphone, Banknote, Scale, BarChart3,
@@ -80,6 +81,8 @@ export default function CompanyHub(){
    <h2 className="mt-1 text-xl font-semibold text-white">Use Blackstar's existing execution engines</h2>
    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{systems.map(([name,path,Icon,text])=><Link key={path} to={path} className="group rounded-2xl border border-white/[.07] bg-white/[.02] p-4 transition hover:border-cyan-300/20"><div className="flex items-center gap-3"><div className="rounded-xl border border-cyan-300/10 bg-cyan-300/[.04] p-2"><Icon className="h-4 w-4 text-cyan-300"/></div><h3 className="text-sm font-medium text-white group-hover:text-cyan-100">{name}</h3></div><p className="mt-3 text-xs leading-5 text-zinc-500">{text}</p></Link>)}</div>
   </section>
+
+  <CompanyWorkspace />
 
   <section className="grid gap-4 lg:grid-cols-3">
    <Callout icon={Network} title="Connected company context" text="Company Hub should become the place where objectives, operating context, risks, priorities and AI-worker assignments meet—while specialist data stays in the specialist system that already owns it."/>
