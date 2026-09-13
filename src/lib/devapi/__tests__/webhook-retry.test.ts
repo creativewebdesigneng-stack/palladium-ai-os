@@ -27,7 +27,7 @@ describe("webhook retry schedule", () => {
     for (const method of ["select", "eq", "is", "not", "lte", "order"]) {
       chain[method] = () => chain;
     }
-    chain.limit = async () => ({
+    chain["limit"] = async () => ({
       data: null,
       error: {
         code: "PGRST301",
