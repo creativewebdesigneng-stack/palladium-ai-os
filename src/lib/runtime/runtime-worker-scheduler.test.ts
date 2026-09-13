@@ -12,6 +12,13 @@ const privilegeMigration = readFileSync(
   ),
   "utf8",
 );
+const verifierMigration = readFileSync(
+  new URL(
+    "../../../supabase/migrations/20260913030500_runtime_worker_token_verifier.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const auth = readFileSync(new URL("./runtime-worker-auth.server.ts", import.meta.url), "utf8");
 const workflowRoute = readFileSync(
   new URL("../../routes/api/internal/workflow-runs.ts", import.meta.url),
@@ -44,19 +51,18 @@ describe("authoritative runtime scheduler", () => {
 });
 
 describe("runtime worker credential isolation", () => {
-  it("keeps the credential table server-only and service-role read-only", () => {
+  it("keeps the credential table RLS-protected and removes direct API-role access after cutover", () => {
     expect(migration).toContain("alter table public.runtime_worker_credentials enable row level security");
-    expect(migration).toContain(
-      "revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role",
-    );
-    expect(migration).toContain("grant select on public.runtime_worker_credentials to service_role");
     expect(privilegeMigration).toContain(
       "revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role",
     );
     expect(privilegeMigration).toContain(
       "grant select on public.runtime_worker_credentials to service_role",
     );
-    expect(privilegeMigration).not.toMatch(/grant (insert|update|delete|truncate|trigger|references)/i);
+    expect(verifierMigration).toContain(
+      "revoke all on public.runtime_worker_credentials from public, anon, authenticated, service_role",
+    );
+    expect(verifierMigration).not.toMatch(/grant select on public\.runtime_worker_credentials/i);
   });
 
   it("generates tokens inside Postgres and stores only hashes outside Vault", () => {
@@ -69,12 +75,29 @@ describe("runtime worker credential isolation", () => {
     expect(migration).not.toMatch(/Bearer [A-Za-z0-9_-]{32,}/);
   });
 
-  it("matches the application's hash fallback without exposing a plaintext database token", () => {
-    expect(auth).toContain('.from("runtime_worker_credentials")');
-    expect(auth).toContain('.select("token_sha256,enabled")');
-    expect(auth).toContain("safeEqual(sha256(supplied), row.token_sha256)");
-    expect(migration).toContain("token_sha256 text not null");
-    expect(migration).not.toContain("token_plaintext");
+  it("verifies bearer tokens through a boolean SECURITY DEFINER function", () => {
+    expect(verifierMigration).toContain("function public.verify_runtime_worker_token");
+    expect(verifierMigration).toContain("security definer");
+    expect(verifierMigration).toContain("set search_path = ''");
+    expect(verifierMigration).toContain("length(supplied_token) < 32");
+    expect(verifierMigration).toContain("worker_name not in ('workflow_runner', 'webhook_retry')");
+    expect(verifierMigration).toContain("extensions.digest(supplied_token, 'sha256')");
+    expect(verifierMigration).toContain(
+      "revoke all on function public.verify_runtime_worker_token(text, text) from public",
+    );
+    expect(verifierMigration).toContain(
+      "grant execute on function public.verify_runtime_worker_token(text, text) to anon, service_role",
+    );
+  });
+
+  it("uses the isolated verifier RPC instead of reading token hashes in application code", () => {
+    expect(auth).toContain('db.rpc("verify_runtime_worker_token"');
+    expect(auth).toContain("worker_name: name");
+    expect(auth).toContain("supplied_token: supplied");
+    expect(auth).not.toContain('.from("runtime_worker_credentials")');
+    expect(auth).not.toContain('select("token_sha256,enabled")');
+    expect(auth).toContain("database verifier unavailable");
+    expect(auth).not.toMatch(/console\.(?:warn|error)\([^\n]*supplied/);
   });
 
   it("reads bearer material from Vault only at scheduled execution time", () => {

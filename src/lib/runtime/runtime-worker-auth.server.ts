@@ -1,11 +1,6 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 
 type WorkerCredentialName = "workflow_runner" | "webhook_retry";
-
-type CredentialRow = {
-  token_sha256: string;
-  enabled: boolean;
-};
 
 const ENV_BY_NAME: Record<WorkerCredentialName, string> = {
   workflow_runner: "WORKFLOW_RUNNER_CRON_SECRET",
@@ -18,8 +13,12 @@ function safeEqual(left: string, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function sha256(value: string) {
-  return createHash("sha256").update(value).digest("hex");
+function safeErrorCode(error: unknown) {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code ?? "unknown")
+      : "unknown";
+  return code.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) || "unknown";
 }
 
 export async function isValidRuntimeWorkerToken(
@@ -33,15 +32,22 @@ export async function isValidRuntimeWorkerToken(
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as unknown as {
-    from: (table: string) => any;
+    rpc: (
+      fn: string,
+      args: { worker_name: WorkerCredentialName; supplied_token: string },
+    ) => Promise<{ data: unknown; error: unknown }>;
   };
-  const { data, error } = await db
-    .from("runtime_worker_credentials")
-    .select("token_sha256,enabled")
-    .eq("name", name)
-    .maybeSingle();
-  const row = data as CredentialRow | null;
+  const { data, error } = await db.rpc("verify_runtime_worker_token", {
+    worker_name: name,
+    supplied_token: supplied,
+  });
 
-  if (error || !row?.enabled || typeof row.token_sha256 !== "string") return false;
-  return safeEqual(sha256(supplied), row.token_sha256);
+  if (error) {
+    console.warn(
+      `[runtime-worker-auth] database verifier unavailable for ${name}; code=${safeErrorCode(error)}`,
+    );
+    return false;
+  }
+
+  return data === true;
 }
