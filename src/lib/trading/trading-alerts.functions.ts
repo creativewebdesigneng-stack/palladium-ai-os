@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { normaliseTradingSymbol, type TradingMarketKind } from './market-data';
 import { loadTradingMarketSeriesFromProvider } from './market-data.server';
+import { marketAlertCooldownElapsed, marketThresholdTriggered } from './trading-alerts';
 
 type Sb = { from: (table: string) => any };
 
@@ -41,10 +42,6 @@ const idSchema = z.object({ id: z.string().uuid() });
 
 function normaliseAlertSymbol(kind: TradingMarketKind, symbol: string) {
   return normaliseTradingSymbol(kind, symbol).display;
-}
-
-function triggerMatches(operator: 'above' | 'below', value: number, threshold: number) {
-  return operator === 'above' ? value > threshold : value < threshold;
 }
 
 function providerKey(kind: TradingMarketKind, symbol: string) {
@@ -173,9 +170,8 @@ export const evaluateTradingMarketAlerts = createServerFn({ method: 'POST' })
 
         const value = Number(candle.close);
         const threshold = Number(alert.threshold);
-        const triggered = triggerMatches(alert.operator, value, threshold);
-        const cooldownMs = Number(alert.cooldown_minutes || 1_440) * 60_000;
-        const cooldownElapsed = !alert.last_triggered_at || Date.now() - new Date(alert.last_triggered_at).getTime() >= cooldownMs;
+        const triggered = marketThresholdTriggered(alert.operator, value, threshold);
+        const cooldownElapsed = marketAlertCooldownElapsed(alert.last_triggered_at, Number(alert.cooldown_minutes || 1_440));
         let notified = false;
         let lastTriggeredAt = alert.last_triggered_at;
 
