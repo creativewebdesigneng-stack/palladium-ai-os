@@ -10,6 +10,7 @@ import FinancePortfolio from '@/components/finance/FinancePortfolio';
 import PaperTradingDesk from '@/components/trading/PaperTradingDesk';
 import TradingAIDesk from '@/components/trading/TradingAIDesk';
 import TradingMarketTerminal from '@/components/trading/TradingMarketTerminal';
+import TradingPortfolioRisk from '@/components/trading/TradingPortfolioRisk';
 import TradingRiskLab from '@/components/trading/TradingRiskLab';
 import TradingWorkspace from '@/components/trading/TradingWorkspace';
 import {
@@ -35,7 +36,7 @@ const CAPABILITY_MAP = [
   ['AI Market Desk', 'Live', 'Authenticated, source-backed specialist research through Blackstar model routing with evidence, bull/bear cases, invalidation, risk and confidence.'],
   ['Paper trading & journal', 'Paper-live', 'Quick market/limit simulation plus persistent owner-scoped paper simulations and a structured journal. None of these surfaces can contact a broker.'],
   ['Persistent watchlists', 'Live', 'Owner-scoped watchlists and instrument research notes are stored behind authenticated server functions and row-level security.'],
-  ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped.'],
+  ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped; trading risk context groups manual exposure by currency without inventing live valuations.'],
   ['Macro context', 'Live', 'Verified Bank of England economic data is embedded below; additional verified providers can be added without fabricating values.'],
   ['Risk & position sizing', 'Live', 'Tested deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
   ['Strategy backtesting', 'Live', 'Quant Studio already runs deterministic tests using real historical return observations.'],
@@ -116,6 +117,7 @@ export default function TradingHub() {
 
       <FinanceEconomicData />
       <TradingRiskLab />
+      <TradingPortfolioRisk />
       <FinancePortfolio />
 
       <section className="rounded-[24px] border border-white/[.08] bg-white/[.02] p-5 md:p-6">

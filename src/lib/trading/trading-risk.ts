@@ -96,3 +96,83 @@ export function calculateExposurePercent(exposure: number, portfolioValue: numbe
   const portfolio = finitePositive(portfolioValue);
   return portfolio ? (gross / portfolio) * 100 : 0;
 }
+
+export type ManualPortfolioHolding = {
+  symbol?: string | null;
+  asset_type?: string | null;
+  manual_value?: number | string | null;
+  currency?: string | null;
+};
+
+export type ManualPortfolioExposureSummary = {
+  currency: string;
+  total: number;
+  valuedCount: number;
+  unvaluedCount: number;
+  largestSymbol: string | null;
+  largestValue: number;
+  largestPercent: number;
+  assetExposure: Array<{ assetType: string; value: number; percent: number }>;
+};
+
+export function summarizeManualPortfolioExposure(
+  holdings: ManualPortfolioHolding[],
+): ManualPortfolioExposureSummary[] {
+  const groups = new Map<string, {
+    total: number;
+    valuedCount: number;
+    unvaluedCount: number;
+    largestSymbol: string | null;
+    largestValue: number;
+    assets: Map<string, number>;
+  }>();
+
+  for (const holding of holdings) {
+    const currency = (holding.currency || 'UNKNOWN').toUpperCase();
+    const current = groups.get(currency) ?? {
+      total: 0,
+      valuedCount: 0,
+      unvaluedCount: 0,
+      largestSymbol: null,
+      largestValue: 0,
+      assets: new Map<string, number>(),
+    };
+    const raw = Number(holding.manual_value);
+    const hasValue = holding.manual_value != null && Number.isFinite(raw) && raw >= 0;
+    if (!hasValue) {
+      current.unvaluedCount += 1;
+      groups.set(currency, current);
+      continue;
+    }
+
+    const value = finiteNonNegative(raw);
+    current.total += value;
+    current.valuedCount += 1;
+    if (value > current.largestValue) {
+      current.largestValue = value;
+      current.largestSymbol = holding.symbol || null;
+    }
+    const assetType = holding.asset_type || 'other';
+    current.assets.set(assetType, (current.assets.get(assetType) ?? 0) + value);
+    groups.set(currency, current);
+  }
+
+  return [...groups.entries()]
+    .map(([currency, group]) => ({
+      currency,
+      total: group.total,
+      valuedCount: group.valuedCount,
+      unvaluedCount: group.unvaluedCount,
+      largestSymbol: group.largestSymbol,
+      largestValue: group.largestValue,
+      largestPercent: calculateExposurePercent(group.largestValue, group.total),
+      assetExposure: [...group.assets.entries()]
+        .map(([assetType, value]) => ({
+          assetType,
+          value,
+          percent: calculateExposurePercent(value, group.total),
+        }))
+        .sort((a, b) => b.value - a.value),
+    }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
