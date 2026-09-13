@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Building2, Save, Trash2, Bot, Target, ShieldAlert } from 'lucide-react';
 import { deleteCompanyWorkspace, listCompanyWorkspaces, saveCompanyWorkspace } from '@/lib/company/company-workspaces.functions';
 
-const blank={name:'',industry:'',stage:'build',geography:'',mission:'',company_context:'',objectives:[],priorities:[],risks:[],department_plan:{},ai_workforce_plan:[],notes:''};
+const blank={name:'',industry:'',stage:'build',geography:'',mission:'',company_context:'',objectives:[],priorities:[],risks:[],department_plan:{},ai_workforce_plan:[],kpis:[],decisions:[],leadership_cadence:{},opportunities:[],notes:''};
 const parseList=(v)=>String(v||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,50);
+const parseObjects=(v,key='name')=>parseList(v).map(name=>({[key]:name}));
+const objectLines=(arr,key='name')=>(arr||[]).map(x=>typeof x==='string'?x:x?.[key]||'').filter(Boolean).join('\n');
 
 export default function CompanyWorkspace(){
  const [items,setItems]=useState([]),[form,setForm]=useState(blank),[error,setError]=useState('');
@@ -24,9 +26,16 @@ export default function CompanyWorkspace(){
     <Area label="Objectives (one per line)" value={form.objectives.join('\n')} set={v=>setForm({...form,objectives:parseList(v)})}/>
     <Area label="Current priorities (one per line)" value={form.priorities.join('\n')} set={v=>setForm({...form,priorities:parseList(v)})}/>
     <Area label="Key risks (one per line)" value={form.risks.join('\n')} set={v=>setForm({...form,risks:parseList(v)})}/>
+    <div className="grid gap-3 md:grid-cols-2">
+      <Area label="AI worker roles (one per line)" value={objectLines(form.ai_workforce_plan,'role')} set={v=>setForm({...form,ai_workforce_plan:parseObjects(v,'role')})}/>
+      <Area label="Company KPIs (one per line)" value={objectLines(form.kpis,'name')} set={v=>setForm({...form,kpis:parseObjects(v,'name')})}/>
+      <Area label="Material decisions (one per line)" value={objectLines(form.decisions,'decision')} set={v=>setForm({...form,decisions:parseObjects(v,'decision')})}/>
+      <Area label="Opportunities (one per line)" value={objectLines(form.opportunities,'name')} set={v=>setForm({...form,opportunities:parseObjects(v,'name')})}/>
+    </div>
+    <Area label="Working notes" value={form.notes} set={v=>setForm({...form,notes:v})}/>
     <button disabled={!form.name.trim()} onClick={save} className="flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[.06] px-4 py-2 text-xs text-emerald-100 disabled:opacity-40"><Save className="h-3.5 w-3.5"/>{form.id?'Update':'Save'} company workspace</button>
    </div>
-   <div className="space-y-2">{items.length===0?<div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No company workspaces saved yet.</div>:items.map(x=><article key={x.id} className="rounded-2xl border border-white/[.07] bg-white/[.02] p-4"><div className="flex items-start justify-between gap-3"><button onClick={()=>setForm({...blank,...x})} className="min-w-0 text-left"><h3 className="truncate text-sm font-medium text-white hover:text-emerald-200">{x.name}</h3><p className="mt-1 text-xs text-zinc-600">{x.industry||'Unspecified industry'}{x.stage?' · '+x.stage:''}{x.geography?' · '+x.geography:''}</p></button><button onClick={()=>remove(x.id)} className="text-zinc-700 hover:text-rose-300" aria-label="Delete company workspace"><Trash2 className="h-4 w-4"/></button></div><div className="mt-3 grid grid-cols-3 gap-2"><Metric icon={Target} label="Objectives" value={x.objectives?.length||0}/><Metric icon={Bot} label="AI plan" value={x.ai_workforce_plan?.length||0}/><Metric icon={ShieldAlert} label="Risks" value={x.risks?.length||0}/></div>{x.priorities?.length>0&&<p className="mt-3 line-clamp-2 text-xs leading-5 text-zinc-500">{x.priorities.join(' · ')}</p>}</article>)}</div>
+   <div className="space-y-2">{items.length===0?<div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No company workspaces saved yet.</div>:items.map(x=><article key={x.id} className="rounded-2xl border border-white/[.07] bg-white/[.02] p-4"><div className="flex items-start justify-between gap-3"><button onClick={()=>setForm({...blank,...x})} className="min-w-0 text-left"><h3 className="truncate text-sm font-medium text-white hover:text-emerald-200">{x.name}</h3><p className="mt-1 text-xs text-zinc-600">{x.industry||'Unspecified industry'}{x.stage?' · '+x.stage:''}{x.geography?' · '+x.geography:''}</p></button><button onClick={()=>remove(x.id)} className="text-zinc-700 hover:text-rose-300" aria-label="Delete company workspace"><Trash2 className="h-4 w-4"/></button></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5"><Metric icon={Target} label="Objectives" value={x.objectives?.length||0}/><Metric icon={Bot} label="AI plan" value={x.ai_workforce_plan?.length||0}/><Metric icon={ShieldAlert} label="Risks" value={x.risks?.length||0}/><Metric icon={Target} label="KPIs" value={x.kpis?.length||0}/><Metric icon={Target} label="Decisions" value={x.decisions?.length||0}/></div>{x.priorities?.length>0&&<p className="mt-3 line-clamp-2 text-xs leading-5 text-zinc-500">{x.priorities.join(' · ')}</p>}</article>)}</div>
   </div>
  </section>
 }
