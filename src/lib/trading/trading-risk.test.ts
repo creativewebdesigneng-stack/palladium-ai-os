@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateDrawdown,
+  calculateExposurePercent,
+  calculateMaximumLoss,
+  calculatePercentageReturn,
+  calculatePositionExposure,
   calculatePositionSize,
   calculateRiskAmount,
   calculateRiskReward,
@@ -35,6 +39,23 @@ describe('trading risk calculations', () => {
     expect(calculateSimulationPnl('long', 10, 100, 105)).toBe(50);
     expect(calculateSimulationPnl('short', 10, 100, 95)).toBe(50);
     expect(calculateSimulationPnl('long', 10, 100, null)).toBeNull();
+  });
+
+  it('calculates maximum loss from quantity and stop distance', () => {
+    expect(calculateMaximumLoss(100, 50, 48)).toBe(200);
+    expect(calculateMaximumLoss(100, 50, 50)).toBe(0);
+  });
+
+  it('calculates percentage return for long and short simulations', () => {
+    expect(calculatePercentageReturn('long', 100, 110)).toBeCloseTo(10);
+    expect(calculatePercentageReturn('short', 100, 90)).toBeCloseTo(10);
+    expect(calculatePercentageReturn('long', 100, null)).toBeNull();
+  });
+
+  it('calculates position and portfolio exposure deterministically', () => {
+    expect(calculatePositionExposure(25, 80)).toBe(2000);
+    expect(calculateExposurePercent(2000, 10_000)).toBe(20);
+    expect(calculateExposurePercent(2000, 0)).toBe(0);
   });
 
   it('calculates maximum peak-to-trough drawdown percentage', () => {
