@@ -34,16 +34,16 @@ const CAPABILITY_MAP = [
   ['Markets & exchanges', 'Live', 'Official venue directory, market taxonomy and session context are available in this hub.'],
   ['Market charts & indicators', 'Provider-ready', 'Daily equity/ETF, FX and crypto market-series adapter plus deterministic SMA, EMA, RSI, ATR and Bollinger calculations. Provider data is never relabelled as live when it is not.'],
   ['AI Market Desk', 'Live', 'Authenticated, source-backed specialist research through Blackstar model routing with evidence, bull/bear cases, invalidation, risk and confidence.'],
-  ['Paper trading & journal', 'Paper-live', 'Quick market/limit simulation plus persistent owner-scoped paper simulations and a structured journal. None of these surfaces can contact a broker.'],
+  ['Paper trading & journal', 'Paper-live', 'Persistent owner-scoped paper simulations and structured journaling are operational. The separate quick calculator below is deliberately session-only and cannot contact a broker.'],
   ['Persistent watchlists', 'Live', 'Owner-scoped watchlists and instrument research notes are stored behind authenticated server functions and row-level security.'],
   ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped; trading risk context groups manual exposure by currency without inventing live valuations.'],
   ['Macro context', 'Live', 'Verified Bank of England economic data is embedded below; additional verified providers can be added without fabricating values.'],
   ['Risk & position sizing', 'Live', 'Tested deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
   ['Strategy backtesting', 'Live', 'Quant Studio already runs deterministic tests using real historical return observations.'],
   ['Primary-source research', 'Live', 'Official exchanges, regulators and central-bank gateways plus Blackstar Web Intelligence.'],
-  ['Market screeners', 'Foundation', 'Ranked movers and screener claims remain disabled until a verified market-data feed supports the required coverage and freshness.'],
-  ['Economic calendar', 'Foundation', 'Calendar workflows can be added from authoritative event feeds; this page does not invent release times.'],
-  ['Broker execution', 'Controlled', 'Only through explicitly connected integrations, scoped permissions, user approvals and provider-side controls.'],
+  ['Market screeners', 'Provider-gated', 'Ranked movers and broad-universe screener claims remain disabled until a verified market-data feed supports the required coverage and freshness. This is an external data dependency, not missing local execution logic.'],
+  ['Economic calendar', 'Provider-gated', 'Authoritative event-feed integration remains provider-dependent. Blackstar will not invent release times or silently substitute model-generated dates.'],
+  ['Broker execution', 'Provider-gated', 'Real-money execution is intentionally unavailable until an authenticated broker/exchange connector exists behind scoped permissions, approvals and provider-side controls.'],
 ];
 
 export default function TradingHub() {
@@ -150,7 +150,7 @@ export default function TradingHub() {
         <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-300" /><h2 className="font-medium text-white">Trading stack status</h2></div>
         <p className="mt-1 text-xs text-zinc-500">This distinguishes operational capabilities from provider-dependent foundations so the interface never fabricates live-market functionality.</p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-white/[.07]">
-          {CAPABILITY_MAP.map(([name, status, description], index) => <div key={name} className={`grid gap-2 p-3 md:grid-cols-[180px_100px_minmax(0,1fr)] md:items-center ${index ? 'border-t border-white/[.06]' : ''}`}><p className="text-xs font-medium text-white">{name}</p><span className={`w-fit rounded-full border px-2 py-1 text-[9px] uppercase tracking-[.1em] ${status === 'Live' ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-200' : status === 'Controlled' ? 'border-amber-300/15 bg-amber-300/[.05] text-amber-100' : status === 'Paper-live' ? 'border-fuchsia-300/15 bg-fuchsia-300/[.05] text-fuchsia-100' : 'border-cyan-300/15 bg-cyan-300/[.05] text-cyan-100'}`}>{status}</span><p className="text-[11px] leading-5 text-zinc-500">{description}</p></div>)}
+          {CAPABILITY_MAP.map(([name, status, description], index) => <div key={name} className={`grid gap-2 p-3 md:grid-cols-[180px_100px_minmax(0,1fr)] md:items-center ${index ? 'border-t border-white/[.06]' : ''}`}><p className="text-xs font-medium text-white">{name}</p><span className={`w-fit rounded-full border px-2 py-1 text-[9px] uppercase tracking-[.1em] ${status === 'Live' ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-200' : status === 'Controlled' ? 'border-amber-300/15 bg-amber-300/[.05] text-amber-100' : status === 'Paper-live' ? 'border-fuchsia-300/15 bg-fuchsia-300/[.05] text-fuchsia-100' : status === 'Provider-gated' ? 'border-amber-300/15 bg-amber-300/[.05] text-amber-100' : 'border-cyan-300/15 bg-cyan-300/[.05] text-cyan-100'}`}>{status}</span><p className="text-[11px] leading-5 text-zinc-500">{description}</p></div>)}
         </div>
       </section>
 
