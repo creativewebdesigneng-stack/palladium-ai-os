@@ -2,7 +2,6 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
-import { notifyWithOutcome } from '@/lib/notifications/notify.server';
 import { normaliseTradingSymbol, type TradingMarketKind } from './market-data';
 import { loadTradingMarketSeriesFromProvider } from './market-data.server';
 
@@ -183,6 +182,7 @@ export const evaluateTradingMarketAlerts = createServerFn({ method: 'POST' })
         if (triggered) {
           triggeredCount += 1;
           if (cooldownElapsed) {
+            const { notifyWithOutcome } = await import('@/lib/notifications/notify.server');
             const outcome = await notifyWithOutcome({
               userId: context.userId,
               type: 'trading.market_observation_threshold',
