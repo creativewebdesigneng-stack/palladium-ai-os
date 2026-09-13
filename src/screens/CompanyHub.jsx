@@ -5,6 +5,8 @@ import CompanyHealthAssessment from '@/components/company/CompanyHealthAssessmen
 import CompanyWorkspace from '@/components/company/CompanyWorkspace';
 import CompanyStrategyRoom from '@/components/company/CompanyStrategyRoom';
 import CompanyKPIDashboard from '@/components/company/CompanyKPIDashboard';
+import CompanyOrganisationMap from '@/components/company/CompanyOrganisationMap';
+import CompanySupplierRisk from '@/components/company/CompanySupplierRisk';
 import { Link } from 'react-router-dom';
 import {
   Building2, Users, Bot, Workflow, Contact, Megaphone, Banknote, Scale, BarChart3,
@@ -90,6 +92,8 @@ export default function CompanyHub(){
 
   <CompanyStrategyRoom />
   <CompanyKPIDashboard />
+  <CompanyOrganisationMap />
+  <CompanySupplierRisk />
   <CompanyHealthAssessment />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
