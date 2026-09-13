@@ -109,12 +109,15 @@ describe("runtime worker credential isolation", () => {
     }
   });
 
-  it("uses the isolated verifier RPC instead of reading token hashes in application code", () => {
-    expect(auth).toContain('db.rpc("verify_runtime_worker_token"');
+  it("uses only the least-privileged boolean verifier RPC in application code", () => {
+    expect(auth).toContain("rest/v1/rpc/verify_runtime_worker_token");
+    expect(auth).toContain("apikey: config.publishableKey");
     expect(auth).toContain("worker_name: name");
     expect(auth).toContain("supplied_token: supplied");
+    expect(auth).not.toContain("supabaseAdmin");
     expect(auth).not.toContain('.from("runtime_worker_credentials")');
     expect(auth).not.toContain('select("token_sha256,enabled")');
+    expect(auth).not.toContain('headers: { Authorization:');
     expect(auth).toContain("database verifier unavailable");
     expect(auth).not.toMatch(/console\.(?:warn|error)\([^\n]*supplied/);
   });
