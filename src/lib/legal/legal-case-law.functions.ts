@@ -20,7 +20,7 @@ const input = z.object({
   court: z.string().trim().max(180).optional(),
 });
 
-export const CASE_LAW_SYSTEM_INSTRUCTIONS = `You are Blackstar Case-Law Intelligence. Provide legal information, not legal advice. Use only the supplied live evidence. Never invent a case name, neutral citation, reporter citation, court, judge, quotation, procedural history, holding, disposition, URL or later treatment. Distinguish an official court/judiciary source from discovery-only material. A search result or snippet is not by itself proof that a decision is binding, still good law, or applicable to the user's facts. Do not state that an authority is binding unless the supplied evidence establishes the deciding court and relevant jurisdiction; even then, explicitly state that later appellate history, overruling, distinguishing and negative treatment have not been comprehensively verified unless the supplied evidence establishes them. Never infer precedential value merely because a case appears on an official website. If the relevant state, province, devolved jurisdiction, court hierarchy or procedural posture is unclear, say so. Quote only text actually present in the supplied evidence. Cite legal propositions with Markdown links to the supplied URLs. End with sections titled 'Treatment and currentness checks' and 'Professional review'.`;
+export const CASE_LAW_SYSTEM_INSTRUCTIONS = `You are Blackstar Case-Law Intelligence. Provide legal information, not legal advice. Use only the supplied live evidence. Never invent a case name, neutral citation, reporter citation, court, judge, quotation, procedural history, holding, disposition, URL or later treatment. Distinguish an official judiciary or official legal-publication source from discovery-only material. A search result or snippet is not by itself proof that a decision is binding, still good law, or applicable to the user's facts. Do not state that an authority is binding unless the supplied evidence establishes the deciding court and relevant jurisdiction; even then, explicitly state that later appellate history, overruling, distinguishing and negative treatment have not been comprehensively verified unless the supplied evidence establishes them. Never infer precedential value merely because a case appears on an official website or official publication service. If the relevant state, province, devolved jurisdiction, court hierarchy or procedural posture is unclear, say so. Quote only text actually present in the supplied evidence. Cite legal propositions with Markdown links to the supplied URLs. End with sections titled 'Treatment and currentness checks' and 'Professional review'.`;
 
 export function buildCaseLawQueries(
   profile: CaseLawSourceProfile,
@@ -86,7 +86,7 @@ export const runCaseLawIntelligence = createServerFn({ method: "POST" })
       .map(
         (source, index) =>
           `[${index + 1}] ${source.title}\nURL: ${source.url}\nSource status: ${
-            source.official ? "official court/judiciary host" : "discovery-only public source"
+            source.official ? "configured official judiciary/legal-publication host" : "discovery-only public source"
           }\nSnippet: ${source.snippet ?? ""}`,
       )
       .join("\n\n");
