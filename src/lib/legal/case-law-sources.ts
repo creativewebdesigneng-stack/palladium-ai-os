@@ -112,6 +112,29 @@ export const CASE_LAW_SOURCES: CaseLawSourceProfile[] = [
     coverageNote: "This profile covers constitutional-court material only. Germany has separate federal supreme courts by subject. English translations are informational; verify the authoritative German decision and exact legal effect.",
   },
   {
+    id: "es",
+    jurisdiction: "Spain",
+    scope: "Spanish judicial decisions published through the General Council of the Judiciary CENDOJ jurisprudence service",
+    hierarchy: ["Tribunal Supremo", "Audiencia Nacional", "Tribunales Superiores de Justicia", "Audiencias Provinciales", "Other courts where CENDOJ publishes decisions"],
+    officialHosts: ["poderjudicial.es"],
+    gateways: [
+      { name: "CGPJ / CENDOJ — Buscador de Jurisprudencia", url: "https://www.poderjudicial.es/cgpj/es/Servicios/Jurisprudencia/Buscador-de-Jurisprudencia", scope: "Official free public access to judgments and other resolutions from configured Spanish courts" },
+    ],
+    coverageNote: "CENDOJ publication identifies judicial provenance but does not by itself establish precedential weight or later treatment. Constitutional Court material requires the Tribunal Constitucional source, and EU-law questions may also require CJEU authority.",
+  },
+  {
+    id: "it",
+    jurisdiction: "Italy",
+    scope: "Italian Corte Suprema di Cassazione decisions and jurisprudence services",
+    hierarchy: ["Corte Suprema di Cassazione", "Courts of appeal", "Tribunals / first-instance courts", "Specialised jurisdictions where separately competent"],
+    officialHosts: ["cortedicassazione.it", "italgiure.giustizia.it"],
+    gateways: [
+      { name: "Corte di Cassazione — Online services", url: "https://www.cortedicassazione.it/it/altri_servizi.page", scope: "Official links to SentenzeWeb, ItalgiureWeb and Court of Cassation research services" },
+      { name: "SentenzeWeb", url: "https://www.italgiure.giustizia.it/sncass/", scope: "Court of Cassation judgment search" },
+    ],
+    coverageNote: "This configured source is strongest for Court of Cassation material and does not imply complete lower-court coverage. Verify the section, decision type, official text, later treatment and whether constitutional, administrative or EU authority also governs the issue.",
+  },
+  {
     id: "in",
     jurisdiction: "India",
     scope: "Supreme Court of India judgments and official Supreme Court Reports search",
@@ -178,6 +201,17 @@ export const CASE_LAW_SOURCES: CaseLawSourceProfile[] = [
       { name: "Constitutional Court Repository", url: "https://collections.concourt.org.za/handle/20.500.12144/1", scope: "Constitutional Court cases and judgments" },
     ],
     coverageNote: "This configured official source covers the Constitutional Court. Supreme Court of Appeal, High Court and specialist-court issues require their own authoritative source checks. Verify later treatment and the precise constitutional or statutory issue decided.",
+  },
+  {
+    id: "ke",
+    jurisdiction: "Kenya",
+    scope: "Kenyan judicial decisions published by the National Council for Law Reporting through Kenya Law",
+    hierarchy: ["Supreme Court", "Court of Appeal", "High Court", "Employment and Labour Relations Court", "Environment and Land Court", "Subordinate courts"],
+    officialHosts: ["new.kenyalaw.org"],
+    gateways: [
+      { name: "Kenya Law — Case Law", url: "https://new.kenyalaw.org/judgments/", scope: "Official Kenya Law repository of published judicial decisions across superior and subordinate courts" },
+    ],
+    coverageNote: "Kenya Law is the official law-reporting source, but online publication does not by itself determine precedential weight, appeal status or whether a decision remains current. Verify court hierarchy, citation, later treatment and any constitutional or statutory changes.",
   },
   {
     id: "br",
