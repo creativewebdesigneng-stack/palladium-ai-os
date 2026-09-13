@@ -1,0 +1,16 @@
+import { useMemo, useState } from 'react';
+import { Calculator, TrendingUp, WalletCards, Gauge, Users } from 'lucide-react';
+
+const n=(v)=>Number.isFinite(Number(v))?Number(v):0;
+export default function CompanyGrowthLab(){
+ const [revenue,setRevenue]=useState('1000000'),[grossProfit,setGrossProfit]=useState('400000'),[customers,setCustomers]=useState('100'),[newCustomers,setNewCustomers]=useState('20'),[salesSpend,setSalesSpend]=useState('50000'),[headcount,setHeadcount]=useState('20');
+ const m=useMemo(()=>{const r=n(revenue),gp=n(grossProfit),c=n(customers),nc=n(newCustomers),ss=n(salesSpend),hc=n(headcount);return{
+  grossMargin:r>0?gp/r*100:0,revenuePerCustomer:c>0?r/c:0,cac:nc>0?ss/nc:0,revenuePerEmployee:hc>0?r/hc:0
+ }},[revenue,grossProfit,customers,newCustomers,salesSpend,headcount]);
+ return <section className="rounded-[26px] border border-white/[.08] bg-black/25 p-5 lg:p-6"><div className="flex items-center gap-2 text-fuchsia-300"><Calculator className="h-4 w-4"/><span className="text-xs font-semibold uppercase tracking-[.16em]">Company growth lab</span></div><h2 className="mt-2 text-xl font-semibold text-white">Simple deterministic company economics</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-500">Use assumptions to explore operating economics, then move deeper finance work into Finance Hub. Outputs are scenarios, not forecasts.</p>
+ <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6"><Field label="Revenue" value={revenue} set={setRevenue}/><Field label="Gross profit" value={grossProfit} set={setGrossProfit}/><Field label="Customers" value={customers} set={setCustomers}/><Field label="New customers" value={newCustomers} set={setNewCustomers}/><Field label="Sales/marketing spend" value={salesSpend} set={setSalesSpend}/><Field label="Headcount" value={headcount} set={setHeadcount}/></div>
+ <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Metric icon={Gauge} label="Gross margin" value={m.grossMargin.toFixed(1)+'%'}/><Metric icon={WalletCards} label="Revenue / customer" value={m.revenuePerCustomer.toLocaleString(undefined,{maximumFractionDigits:0})}/><Metric icon={TrendingUp} label="Illustrative CAC" value={m.cac.toLocaleString(undefined,{maximumFractionDigits:0})}/><Metric icon={Users} label="Revenue / employee" value={m.revenuePerEmployee.toLocaleString(undefined,{maximumFractionDigits:0})}/></div>
+ <p className="mt-4 text-[10px] leading-4 text-zinc-600">This simplified lab excludes tax, timing, churn, financing, attribution, seasonality, working capital and accounting-policy differences.</p></section>
+}
+function Field({label,value,set}){return <label className="rounded-xl border border-white/[.07] bg-black/25 p-3"><span className="text-[9px] uppercase tracking-[.08em] text-zinc-700">{label}</span><input inputMode="decimal" value={value} onChange={e=>set(e.target.value)} className="mt-2 w-full bg-transparent text-sm text-white outline-none"/></label>}
+function Metric({icon:Icon,label,value}){return <div className="rounded-2xl border border-white/[.07] bg-white/[.02] p-4"><Icon className="h-4 w-4 text-fuchsia-300"/><p className="mt-2 text-[10px] uppercase tracking-[.09em] text-zinc-700">{label}</p><p className="mt-1 text-xl font-semibold text-white">{value}</p></div>}
