@@ -62,8 +62,7 @@ describe("legal professional handoff packet", () => {
   });
 
   it("states the legal-information boundary explicitly", () => {
-    expect(LEGAL_HANDOFF_NOTICE).toContain("not legal advice");
-    expect(LEGAL_HANDOFF_NOTICE).toContain("not a determination");
+    expect(LEGAL_HANDOFF_NOTICE).toContain("not legal advice or a determination");
     expect(LEGAL_HANDOFF_NOTICE).toContain("qualified lawyer");
     expect(LEGAL_HANDOFF_NOTICE).toContain("case-law treatment");
     expect(LEGAL_HANDOFF_NOTICE).toContain("treaty status and domestic effect");
