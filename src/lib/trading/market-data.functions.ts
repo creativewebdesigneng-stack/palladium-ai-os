@@ -20,7 +20,7 @@ export const getTradingMarketSeries = createServerFn({ method: "POST" })
     return { kind, symbol: normalised.display };
   })
   .handler(async ({ data, context }) => {
-    const apiKey = String(process.env.ALPHA_VANTAGE_API_KEY ?? "").trim();
+    const apiKey = String(process.env["ALPHA_VANTAGE_API_KEY"] ?? "").trim();
     if (!apiKey) {
       return {
         configured: false as const,
