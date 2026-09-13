@@ -11,6 +11,9 @@ create table if not exists public.industry_workspaces (
   risks jsonb not null default '[]'::jsonb,
   roadmap jsonb not null default '[]'::jsonb,
   notes text,
+  benchmark jsonb not null default '{}'::jsonb,
+  supplier_assessments jsonb not null default '[]'::jsonb,
+  disruption_signals jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
