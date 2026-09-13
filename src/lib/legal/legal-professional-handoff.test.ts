@@ -29,6 +29,7 @@ describe("legal professional handoff packet", () => {
       sources: [
         { title: "Official source", url: "https://www.legislation.gov.uk/example" },
         { title: "Duplicate official source", url: "https://www.legislation.gov.uk/example" },
+        { title: "Injected](javascript:alert(1))", url: "https://example.org/safe-evidence" },
         { title: "Unsafe", url: "javascript:alert(1)" },
       ],
     },
@@ -50,12 +51,14 @@ describe("legal professional handoff packet", () => {
     expect(packet).toContain("does not certify legal correctness or replace professional advice");
   });
 
-  it("keeps saved research and evidence links without introducing a new AI conclusion", () => {
+  it("keeps saved research and unique safe evidence links without introducing a new AI conclusion", () => {
     const packet = buildLegalProfessionalHandoffPacket({ matter, runs, generatedAt: new Date("2026-09-13T02:00:00Z") });
     expect(packet).toContain("Research output based on supplied live evidence.");
-    expect(packet).toContain("https://www.legislation.gov.uk/example");
     expect(packet.match(/https:\/\/www\.legislation\.gov\.uk\/example/g)?.length).toBe(2);
-    expect(packet).not.toContain("javascript:alert(1)");
+    expect(packet.match(/https:\/\/example\.org\/safe-evidence/g)?.length).toBe(2);
+    expect(packet).not.toContain("javascript:alert(1)]");
+    expect(packet).not.toContain("](javascript:alert(1))");
+    expect(packet).toContain("Injected\\]\\(javascript:alert\\(1\\)\\)");
   });
 
   it("states the legal-information boundary explicitly", () => {
