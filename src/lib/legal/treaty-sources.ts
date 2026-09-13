@@ -124,6 +124,19 @@ export const TREATY_SOURCE_PROFILES: TreatySourceProfile[] = [
     domesticEffectNote: "An international act recorded as signed or in force for Brazil does not by itself establish its domestic legal effect. Promulgation, constitutional process and applicable implementing rules must be verified.",
     coverageNote: "Concórdia is an official Ministry of Foreign Affairs research source, but its own portal states that its records do not replace information published in the Diário Oficial da União. Verify operative publication and status before relying on the record.",
   },
+  {
+    id: "mx",
+    jurisdiction: "Mexico",
+    scope: "Treaties celebrated by Mexico and indexed in the Secretaría de Relaciones Exteriores virtual treaty library",
+    officialHosts: ["cja.sre.gob.mx", "sre.gob.mx", "gob.mx"],
+    gateways: [
+      { name: "SRE — Biblioteca Virtual de Tratados Internacionales", url: "https://cja.sre.gob.mx/tratadosmexico/buscador", scope: "Official foreign-ministry search of current and non-current treaties celebrated by Mexico" },
+      { name: "SRE — Tratados Internacionales Celebrados por México", url: "https://cja.sre.gob.mx/tratadosmexico/inicio", scope: "Official treaty-library entry point and search guidance" },
+    ],
+    statusChecks: ["instrument text", "adoption / signature date", "counterparty", "current / non-current classification", "ratification / accession where applicable", "entry into force for Mexico", "reservations / declarations", "termination / replacement", "Diario Oficial de la Federación publication"],
+    domesticEffectNote: "The SRE treaty library is an official research source, but its entries do not themselves create legal effects for official proceedings. Operative status, constitutional process, implementing law and Diario Oficial publication must be verified separately.",
+    coverageNote: "The SRE library expressly states that the treaties displayed are informational and create no legal effects for official proceedings. Treat the database as a discovery and status aid, then verify the legally operative treaty text, party/depositary record and official Mexican publication.",
+  },
 ];
 
 export function getTreatySourceProfile(jurisdiction: string): TreatySourceProfile | null {

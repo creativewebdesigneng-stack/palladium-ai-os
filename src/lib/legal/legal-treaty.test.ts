@@ -13,6 +13,8 @@ describe("treaty intelligence authority and status controls", () => {
     expect(hostMatchesTreatySource("https://treaties.un.org.example.com/fake", ["treaties.un.org"])).toBe(false);
     expect(hostMatchesTreatySource("https://www3.mofa.go.jp/mofaj/gaiko/treaty/", ["mofa.go.jp"])).toBe(true);
     expect(hostMatchesTreatySource("https://mofa.go.jp.example.com/fake", ["mofa.go.jp"])).toBe(false);
+    expect(hostMatchesTreatySource("https://cja.sre.gob.mx/tratadosmexico/buscador", ["cja.sre.gob.mx"])).toBe(true);
+    expect(hostMatchesTreatySource("https://cja.sre.gob.mx.example.com/fake", ["cja.sre.gob.mx"])).toBe(false);
   });
 
   it("ranks configured official treaty evidence ahead of discovery-only material", () => {
@@ -42,11 +44,11 @@ describe("treaty intelligence authority and status controls", () => {
   });
 
   it("adds verified government treaty sources without claiming universal national coverage", () => {
-    expect(TREATY_SOURCE_PROFILES.length).toBeGreaterThanOrEqual(9);
+    expect(TREATY_SOURCE_PROFILES.length).toBeGreaterThanOrEqual(10);
     expect(getTreatySourceProfile("Ireland")).not.toBeNull();
     expect(getTreatySourceProfile("Japan")).not.toBeNull();
     expect(getTreatySourceProfile("Brazil")).not.toBeNull();
-    expect(getTreatySourceProfile("Mexico")).toBeNull();
+    expect(getTreatySourceProfile("Mexico")).not.toBeNull();
   });
 
   it("preserves publication and domestic-effect boundaries from the official source systems", () => {
@@ -54,6 +56,9 @@ describe("treaty intelligence authority and status controls", () => {
     expect(getTreatySourceProfile("Ireland")?.domesticEffectNote).toContain("Act of the Oireachtas");
     expect(getTreatySourceProfile("Japan")?.coverageNote).toContain("Official Gazette prevails");
     expect(getTreatySourceProfile("Brazil")?.coverageNote).toContain("do not replace information published in the Diário Oficial da União");
+    expect(getTreatySourceProfile("Mexico")?.coverageNote).toContain("informational and create no legal effects");
+    expect(getTreatySourceProfile("Mexico")?.domesticEffectNote).toContain("do not themselves create legal effects");
+    expect(getTreatySourceProfile("Mexico")?.domesticEffectNote).toContain("Diario Oficial");
   });
 
   it("does not equate signature, general entry into force, or status records with current domestic binding effect", () => {
