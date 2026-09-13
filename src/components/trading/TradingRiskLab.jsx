@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Calculator, ShieldAlert, Target } from 'lucide-react';
+import {
+  calculatePositionSize,
+  calculateRiskAmount,
+  calculateRiskReward,
+  calculateUnitRisk,
+} from '@/lib/trading/trading-risk';
 
 const fieldClass = 'mt-1 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none transition focus:border-violet-400/40';
 
@@ -32,12 +38,11 @@ export default function TradingRiskLab() {
     const entry = Math.max(0, n(form.entry));
     const stop = Math.max(0, n(form.stop));
     const target = Math.max(0, n(form.target));
-    const riskBudget = account * (riskPct / 100);
-    const unitRisk = Math.abs(entry - stop);
-    const units = unitRisk > 0 ? riskBudget / unitRisk : 0;
+    const riskBudget = calculateRiskAmount(account, riskPct);
+    const unitRisk = calculateUnitRisk(entry, stop);
+    const units = calculatePositionSize(account, riskPct, entry, stop);
     const notional = units * entry;
-    const rewardPerUnit = Math.abs(target - entry);
-    const rewardRisk = unitRisk > 0 ? rewardPerUnit / unitRisk : 0;
+    const rewardRisk = calculateRiskReward(entry, stop, target);
     const notionalPct = account > 0 ? (notional / account) * 100 : 0;
     return { riskBudget, unitRisk, units, notional, rewardRisk, notionalPct };
   }, [form]);
