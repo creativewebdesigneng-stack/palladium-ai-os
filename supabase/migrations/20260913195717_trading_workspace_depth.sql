@@ -1,3 +1,4 @@
+-- Deepens the existing owner-scoped Trading Hub workspace; it does not add broker execution or live-price storage.
 alter table public.trading_watchlist_items
   add column if not exists thesis text,
   add column if not exists tags text[] not null default '{}'::text[],
