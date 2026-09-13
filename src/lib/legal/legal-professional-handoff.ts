@@ -133,15 +133,16 @@ export function buildLegalProfessionalHandoffPacket(input: {
         "#### Sources saved with this run",
         "",
       );
-      const sources = run.sources ?? [];
-      if (!sources.length) {
-        lines.push("No source records were saved with this run.", "");
+      const runSources = new Map<string, { title: string; url: string }>();
+      for (const source of run.sources ?? []) {
+        const url = safeSourceUrl(source.url);
+        if (!url || runSources.has(url)) continue;
+        runSources.set(url, { title: text(source.title, new URL(url).hostname), url });
+      }
+      if (!runSources.size) {
+        lines.push("No valid HTTP(S) source records were saved with this run.", "");
       } else {
-        sources.forEach((source) => {
-          const url = safeSourceUrl(source.url);
-          if (!url) return;
-          lines.push(`- [${text(source.title, new URL(url).hostname)}](${url})`);
-        });
+        for (const source of runSources.values()) lines.push(`- [${source.title}](${source.url})`);
         lines.push("");
       }
     });
