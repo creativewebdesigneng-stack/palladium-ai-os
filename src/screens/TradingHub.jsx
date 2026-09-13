@@ -11,6 +11,7 @@ import PaperTradingDesk from '@/components/trading/PaperTradingDesk';
 import TradingAIDesk from '@/components/trading/TradingAIDesk';
 import TradingMarketTerminal from '@/components/trading/TradingMarketTerminal';
 import TradingRiskLab from '@/components/trading/TradingRiskLab';
+import TradingWorkspace from '@/components/trading/TradingWorkspace';
 import {
   GLOBAL_TRADING_VENUES,
   TRADER_WORKFLOWS,
@@ -32,13 +33,14 @@ const CAPABILITY_MAP = [
   ['Markets & exchanges', 'Live', 'Official venue directory, market taxonomy and session context are available in this hub.'],
   ['Market charts & indicators', 'Provider-ready', 'Daily equity/ETF, FX and crypto market-series adapter plus deterministic SMA, EMA, RSI, ATR and Bollinger calculations. Provider data is never relabelled as live when it is not.'],
   ['AI Market Desk', 'Live', 'Authenticated, source-backed specialist research through Blackstar model routing with evidence, bull/bear cases, invalidation, risk and confidence.'],
-  ['Paper trading & journal', 'Paper-live', 'Market and limit-order simulation, session journal and mark-to-market P&L. It cannot contact a broker.'],
+  ['Paper trading & journal', 'Paper-live', 'Quick market/limit simulation plus persistent owner-scoped paper simulations and a structured journal. None of these surfaces can contact a broker.'],
+  ['Persistent watchlists', 'Live', 'Owner-scoped watchlists and instrument research notes are stored behind authenticated server functions and row-level security.'],
   ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped.'],
   ['Macro context', 'Live', 'Verified Bank of England economic data is embedded below; additional verified providers can be added without fabricating values.'],
-  ['Risk & position sizing', 'Live', 'Deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
+  ['Risk & position sizing', 'Live', 'Tested deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
   ['Strategy backtesting', 'Live', 'Quant Studio already runs deterministic tests using real historical return observations.'],
   ['Primary-source research', 'Live', 'Official exchanges, regulators and central-bank gateways plus Blackstar Web Intelligence.'],
-  ['Watchlists & screeners', 'Foundation', 'The market-data adapter is now available; persistent watchlists, ranked screeners and movers remain the next data-product layer.'],
+  ['Market screeners', 'Foundation', 'Ranked movers and screener claims remain disabled until a verified market-data feed supports the required coverage and freshness.'],
   ['Economic calendar', 'Foundation', 'Calendar workflows can be added from authoritative event feeds; this page does not invent release times.'],
   ['Broker execution', 'Controlled', 'Only through explicitly connected integrations, scoped permissions, user approvals and provider-side controls.'],
 ];
@@ -74,7 +76,7 @@ export default function TradingHub() {
           <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl">Global Trading Hub</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, charts, exchanges, AI research, portfolio context, paper execution, risk planning and systematic strategy testing—connected to Blackstar's Finance, Quant, research and governed execution systems.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, charts, exchanges, AI research, portfolio context, private watchlists, paper simulation, journaling, risk planning and systematic strategy testing—connected to Blackstar's Finance, Quant, research and governed execution systems.</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <HeroMetric label="Asset classes" value={String(TRADING_ASSET_CLASSES.length)} />
@@ -98,6 +100,7 @@ export default function TradingHub() {
       <TradingMarketTerminal />
       <TradingAIDesk />
       <PaperTradingDesk />
+      <TradingWorkspace />
 
       <section className="rounded-[24px] border border-white/[.08] bg-white/[.02] p-5 md:p-6">
         <div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-violet-300" /><h2 className="font-medium text-white">Market universe</h2></div>
