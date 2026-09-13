@@ -76,7 +76,7 @@ describe('trading risk calculations', () => {
       largestSymbol: 'AAA',
       largestPercent: 60,
     });
-    expect(summary[0].assetExposure).toEqual([
+    expect(summary[0]?.assetExposure).toEqual([
       { assetType: 'stock', value: 600, percent: 60 },
       { assetType: 'etf', value: 400, percent: 40 },
     ]);
