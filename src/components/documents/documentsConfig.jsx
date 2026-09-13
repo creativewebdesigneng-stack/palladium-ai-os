@@ -33,6 +33,7 @@ export const SOURCE_LABEL = {
   ai_rewrite: 'AI rewrite',
   ai_translate: 'AI translation',
   ai_analyse: 'AI analysis',
+  ai_legal_analysis: 'Legal analysis',
 };
 
 // Transforms that run against the currently selected persisted document.
