@@ -91,6 +91,20 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A Legal Hub regulatory watch retrieved a different public evidence set and should be reviewed; this does not establish that the law changed.",
   },
   {
+    type: "legal.compliance_review_due",
+    label: "Compliance review date reached",
+    category: "system",
+    severity: "warning",
+    desc: "A review date saved in a Legal Hub compliance record has arrived or passed; this is a review reminder, not a legal conclusion.",
+  },
+  {
+    type: "legal.recorded_date_review_due",
+    label: "Recorded legal date reached",
+    category: "system",
+    severity: "warning",
+    desc: "A date saved on a Legal Hub rights or obligations working record has arrived or passed; Blackstar does not determine that it is a statutory deadline or that a breach occurred.",
+  },
+  {
     type: "subscription.changed",
     label: "Subscription changed",
     category: "billing",
