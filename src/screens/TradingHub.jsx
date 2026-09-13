@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import FinanceEconomicData from '@/components/finance/FinanceEconomicData';
 import FinancePortfolio from '@/components/finance/FinancePortfolio';
+import PaperTradingDesk from '@/components/trading/PaperTradingDesk';
+import TradingAIDesk from '@/components/trading/TradingAIDesk';
+import TradingMarketTerminal from '@/components/trading/TradingMarketTerminal';
 import TradingRiskLab from '@/components/trading/TradingRiskLab';
 import {
   GLOBAL_TRADING_VENUES,
@@ -27,14 +30,16 @@ const STACK = [
 
 const CAPABILITY_MAP = [
   ['Markets & exchanges', 'Live', 'Official venue directory, market taxonomy and session context are available in this hub.'],
+  ['Market charts & indicators', 'Provider-ready', 'Daily equity/ETF, FX and crypto market-series adapter plus deterministic SMA, EMA, RSI, ATR and Bollinger calculations. Provider data is never relabelled as live when it is not.'],
+  ['AI Market Desk', 'Live', 'Authenticated, source-backed specialist research through Blackstar model routing with evidence, bull/bear cases, invalidation, risk and confidence.'],
+  ['Paper trading & journal', 'Paper-live', 'Market and limit-order simulation, session journal and mark-to-market P&L. It cannot contact a broker.'],
   ['Portfolio & holdings', 'Live', 'Blackstar Finance holdings are embedded below and remain owner-scoped.'],
   ['Macro context', 'Live', 'Verified Bank of England economic data is embedded below; additional verified providers can be added without fabricating values.'],
   ['Risk & position sizing', 'Live', 'Deterministic risk-budget, stop-distance, notional and reward/risk calculations.'],
   ['Strategy backtesting', 'Live', 'Quant Studio already runs deterministic tests using real historical return observations.'],
   ['Primary-source research', 'Live', 'Official exchanges, regulators and central-bank gateways plus Blackstar Web Intelligence.'],
-  ['Watchlists & screeners', 'Foundation', 'Designed as a governed market-data layer; live price/ranking claims remain disabled until a verified provider is connected.'],
+  ['Watchlists & screeners', 'Foundation', 'The market-data adapter is now available; persistent watchlists, ranked screeners and movers remain the next data-product layer.'],
   ['Economic calendar', 'Foundation', 'Calendar workflows can be added from authoritative event feeds; this page does not invent release times.'],
-  ['Paper trading & journal', 'Foundation', 'Simulation and journaling are part of the Trading Hub roadmap; live brokerage is intentionally separated from research.'],
   ['Broker execution', 'Controlled', 'Only through explicitly connected integrations, scoped permissions, user approvals and provider-side controls.'],
 ];
 
@@ -69,16 +74,16 @@ export default function TradingHub() {
           <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl">Global Trading Hub</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, exchanges, asset classes, macro research, portfolio context, risk planning and systematic strategy testing—connected to Blackstar's existing Finance, Quant, research and governed execution systems.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">A trader-facing command centre for global markets, charts, exchanges, AI research, portfolio context, paper execution, risk planning and systematic strategy testing—connected to Blackstar's Finance, Quant, research and governed execution systems.</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <HeroMetric label="Asset classes" value={String(TRADING_ASSET_CLASSES.length)} />
               <HeroMetric label="Official venues" value={String(GLOBAL_TRADING_VENUES.length)} />
-              <HeroMetric label="Authority gateways" value={String(TRADING_AUTHORITIES.length)} />
+              <HeroMetric label="AI desk roles" value="6" />
               <HeroMetric label="Workflow stages" value={String(TRADER_WORKFLOWS.length)} />
             </div>
           </div>
-          <div className="mt-5 flex gap-2 rounded-2xl border border-amber-300/15 bg-amber-400/[.04] p-3 text-xs leading-5 text-amber-100/80"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>Trading and investing can result in substantial losses. Blackstar separates research, planning and simulation from live execution. Market information must be verified against current primary/provider data, and this hub does not present its research output as personalised investment advice.</span></div>
+          <div className="mt-5 flex gap-2 rounded-2xl border border-amber-300/15 bg-amber-400/[.04] p-3 text-xs leading-5 text-amber-100/80"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>Trading and investing can result in substantial losses. Blackstar separates research, planning and paper simulation from live execution. Market information must be verified against current primary/provider data, and this hub does not present its research output as personalised investment advice.</span></div>
         </div>
       </section>
 
@@ -89,6 +94,10 @@ export default function TradingHub() {
           {STACK.map((item) => <Link key={item.title} to={item.href} className="group rounded-2xl border border-white/[.07] bg-black/20 p-4 transition hover:-translate-y-0.5 hover:border-violet-300/20 hover:bg-white/[.025]"><div className="flex items-start justify-between gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl border border-white/[.07] bg-white/[.035]"><item.icon className="h-4 w-4 text-violet-300" /></span><span className="rounded-full border border-emerald-400/15 bg-emerald-400/[.06] px-2 py-1 text-[9px] uppercase tracking-[.12em] text-emerald-200">{item.status}</span></div><h3 className="mt-3 text-sm font-medium text-white">{item.title}</h3><p className="mt-1 text-xs leading-5 text-zinc-500">{item.description}</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] text-zinc-600 transition group-hover:text-violet-300">Open workspace <ArrowRight className="h-3 w-3" /></span></Link>)}
         </div>
       </section>
+
+      <TradingMarketTerminal />
+      <TradingAIDesk />
+      <PaperTradingDesk />
 
       <section className="rounded-[24px] border border-white/[.08] bg-white/[.02] p-5 md:p-6">
         <div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-violet-300" /><h2 className="font-medium text-white">Market universe</h2></div>
@@ -136,14 +145,14 @@ export default function TradingHub() {
         <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-300" /><h2 className="font-medium text-white">Trading stack status</h2></div>
         <p className="mt-1 text-xs text-zinc-500">This distinguishes operational capabilities from provider-dependent foundations so the interface never fabricates live-market functionality.</p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-white/[.07]">
-          {CAPABILITY_MAP.map(([name, status, description], index) => <div key={name} className={`grid gap-2 p-3 md:grid-cols-[180px_90px_minmax(0,1fr)] md:items-center ${index ? 'border-t border-white/[.06]' : ''}`}><p className="text-xs font-medium text-white">{name}</p><span className={`w-fit rounded-full border px-2 py-1 text-[9px] uppercase tracking-[.1em] ${status === 'Live' ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-200' : status === 'Controlled' ? 'border-amber-300/15 bg-amber-300/[.05] text-amber-100' : 'border-cyan-300/15 bg-cyan-300/[.05] text-cyan-100'}`}>{status}</span><p className="text-[11px] leading-5 text-zinc-500">{description}</p></div>)}
+          {CAPABILITY_MAP.map(([name, status, description], index) => <div key={name} className={`grid gap-2 p-3 md:grid-cols-[180px_100px_minmax(0,1fr)] md:items-center ${index ? 'border-t border-white/[.06]' : ''}`}><p className="text-xs font-medium text-white">{name}</p><span className={`w-fit rounded-full border px-2 py-1 text-[9px] uppercase tracking-[.1em] ${status === 'Live' ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-200' : status === 'Controlled' ? 'border-amber-300/15 bg-amber-300/[.05] text-amber-100' : status === 'Paper-live' ? 'border-fuchsia-300/15 bg-fuchsia-300/[.05] text-fuchsia-100' : 'border-cyan-300/15 bg-cyan-300/[.05] text-cyan-100'}`}>{status}</span><p className="text-[11px] leading-5 text-zinc-500">{description}</p></div>)}
         </div>
       </section>
 
       <section className="grid gap-3 md:grid-cols-3">
         <InfoCard icon={Search} title="Evidence before opinion">Separate current observed data, primary disclosures, analyst interpretation, model output and user assumptions. Preserve timestamps and source provenance when decisions may be consequential.</InfoCard>
         <InfoCard icon={ShieldCheck} title="Risk before execution">Size exposure, define invalidation and understand liquidity, leverage, margin and gap risk before an order reaches any broker or venue.</InfoCard>
-        <InfoCard icon={Landmark} title="Governed execution">Broker connections belong behind Blackstar's integration permissions, approvals and audit trail. This research page never silently places or represents an order as executed.</InfoCard>
+        <InfoCard icon={Landmark} title="Governed execution">Broker connections belong behind Blackstar's integration permissions, approvals and audit trail. Paper simulation and research never silently place or represent a real order as executed.</InfoCard>
       </section>
     </div>
   );
