@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, BrainCircuit, Hammer, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Scale, Mic2, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn,
+  FileText, Layers3, Search, FlaskConical, Scale, Factory, Mic2, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -57,6 +57,7 @@ const BUSINESS = [
   ['Finance Hub', '/finance', Banknote],
   ['Trading Hub', '/trading-hub', LineChart],
   ['Legal Hub', '/legal-hub', Scale],
+  ['Industry Hub', '/industry-hub', Factory],
   ['Quant Studio', '/quant-studio', LineChart],
   ['Commerce Studio', '/commerce-studio', Store],
   ['CRM', '/crm', Contact],
