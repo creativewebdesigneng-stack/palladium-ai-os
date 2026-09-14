@@ -7,7 +7,31 @@ import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } fro
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
-type Row = Record<string, any>;
+type Row = Record<string, any> & {
+  customer_email: any;
+  customer_phone: any;
+  item_id: any;
+  on_hand: any;
+  reserved: any;
+  name: any;
+  sku: any;
+  barcode: any;
+  category: any;
+  description: any;
+  id: any;
+  item_type: any;
+  sale_price: any;
+  currency: any;
+  service_duration_minutes: any;
+  metadata: any;
+  track_inventory: any;
+  status: any;
+  can_create_bookings: any;
+  can_reschedule_bookings: any;
+  can_cancel_bookings: any;
+  can_create_followups: any;
+  can_send_communications: any;
+};
 
 const uuid = z.string().uuid();
 const nullableUuid = z.union([uuid, z.literal(''), z.null()]).optional();
@@ -107,7 +131,7 @@ function normalizeEmail(value: string | null | undefined) {
   return (value ?? '').trim().toLowerCase();
 }
 
-function customerMatches(row: Row | null, input: { customer_email?: string; customer_phone?: string }) {
+function customerMatches(row: Row | null, input: { customer_email?: string | undefined; customer_phone?: string | undefined }) {
   if (!row) return false;
   const suppliedEmail = normalizeEmail(input.customer_email);
   const suppliedPhone = normalizePhone(input.customer_phone);
