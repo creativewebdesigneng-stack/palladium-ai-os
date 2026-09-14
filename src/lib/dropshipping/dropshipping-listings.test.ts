@@ -7,19 +7,22 @@ const item={
 };
 
 describe('dropshipping listing drafts',()=>{
-  it('builds a grounded internal-only listing prompt from persisted evidence',()=>{
-    const prompt=buildListingDraftPrompt(item,'shopify','en-GB','Tone: concise.');
+  it('builds a grounded internal-only listing prompt within the assistant input budget',()=>{
+    const prompt=buildListingDraftPrompt({...item,description:'x'.repeat(12000)},'shopify','en-GB','Tone: concise.');
     expect(prompt).toMatch(/INTERNAL DRAFT/);
     expect(prompt).toContain('Compression Packing Cubes');
     expect(prompt).toContain('https://example.com/source');
     expect(prompt).toMatch(/Do not invent sales volume/);
     expect(prompt).toMatch(/human approval/i);
+    expect(prompt.length).toBeLessThanOrEqual(3900);
   });
 
-  it('blocks listing generation when persisted compliance says the product is blocked',()=>{
+  it('blocks listing generation when a product is compliance-blocked or rejected',()=>{
     const blocked={...item,metadata:{...item.metadata,lifecycle_stage:'blocked',compliance:{allowed:false,status:'blocked'}}};
+    const rejected={...item,metadata:{...item.metadata,lifecycle_stage:'rejected'}};
     expect(isDropshipProductBlocked(blocked)).toBe(true);
-    expect(()=>buildListingDraftPrompt(blocked,'ebay')).toThrow(/Blocked products/i);
+    expect(isDropshipProductBlocked(rejected)).toBe(true);
+    expect(()=>buildListingDraftPrompt(blocked,'ebay')).toThrow(/Blocked or rejected products/i);
   });
 
   it('preserves existing metadata and channel drafts when saving a new draft',()=>{
