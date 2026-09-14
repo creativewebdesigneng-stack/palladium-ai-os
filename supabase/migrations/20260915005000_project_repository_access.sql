@@ -83,30 +83,50 @@ using (
   )
 );
 
--- A collaborator can see only their own grant. Project owners/managers can
--- inspect all grants on projects they manage.
+-- Collaborator policy checks use a narrowly scoped helper to avoid recursive
+-- RLS evaluation between projects and project_collaborators.
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated;
+
+create or replace function private.can_manage_project(target_project_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select
+    (select auth.uid()) is not null
+    and exists (
+      select 1
+      from public.projects p
+      where p.id = target_project_id
+        and (
+          (p.org_id is null and p.user_id = (select auth.uid()))
+          or (
+            p.org_id is not null
+            and exists (
+              select 1
+              from public.organisation_members om
+              where om.org_id = p.org_id
+                and om.user_id = (select auth.uid())
+                and om.role in ('owner','admin')
+            )
+          )
+        )
+    );
+$$;
+
+revoke all on function private.can_manage_project(uuid) from public;
+grant execute on function private.can_manage_project(uuid) to authenticated;
+
 create policy "project_collaborators_select_scope" on public.project_collaborators
 for select to authenticated
 using (
   user_id = (select auth.uid())
-  or exists (
-    select 1
-    from public.projects p
-    where p.id = project_collaborators.project_id
-      and (
-        (p.org_id is null and p.user_id = (select auth.uid()))
-        or (
-          p.org_id is not null
-          and exists (
-            select 1
-            from public.organisation_members om
-            where om.org_id = p.org_id
-              and om.user_id = (select auth.uid())
-              and om.role in ('owner','admin')
-          )
-        )
-      )
-  )
+  or added_by = (select auth.uid())
+  or private.can_manage_project(project_id)
 );
 
 create policy "project_collaborators_insert_scope" on public.project_collaborators
@@ -114,74 +134,22 @@ for insert to authenticated
 with check (
   added_by = (select auth.uid())
   and user_id <> (select auth.uid())
-  and exists (
-    select 1
-    from public.projects p
-    where p.id = project_collaborators.project_id
-      and (
-        (p.org_id is null and p.user_id = (select auth.uid()))
-        or (
-          p.org_id is not null
-          and exists (
-            select 1
-            from public.organisation_members om
-            where om.org_id = p.org_id
-              and om.user_id = (select auth.uid())
-              and om.role in ('owner','admin')
-          )
-        )
-      )
-  )
+  and private.can_manage_project(project_id)
 );
 
 create policy "project_collaborators_update_scope" on public.project_collaborators
 for update to authenticated
-using (
-  exists (
-    select 1
-    from public.projects p
-    where p.id = project_collaborators.project_id
-      and (
-        (p.org_id is null and p.user_id = (select auth.uid()))
-        or (
-          p.org_id is not null
-          and exists (
-            select 1
-            from public.organisation_members om
-            where om.org_id = p.org_id
-              and om.user_id = (select auth.uid())
-              and om.role in ('owner','admin')
-          )
-        )
-      )
-  )
-)
+using (private.can_manage_project(project_id))
 with check (
   user_id <> (select auth.uid())
+  and private.can_manage_project(project_id)
 );
 
 create policy "project_collaborators_delete_scope" on public.project_collaborators
 for delete to authenticated
 using (
   user_id = (select auth.uid())
-  or exists (
-    select 1
-    from public.projects p
-    where p.id = project_collaborators.project_id
-      and (
-        (p.org_id is null and p.user_id = (select auth.uid()))
-        or (
-          p.org_id is not null
-          and exists (
-            select 1
-            from public.organisation_members om
-            where om.org_id = p.org_id
-              and om.user_id = (select auth.uid())
-              and om.role in ('owner','admin')
-          )
-        )
-      )
-  )
+  or private.can_manage_project(project_id)
 );
 
 -- Stars can be read on public projects or projects the current user can already
