@@ -6,6 +6,7 @@ const adminSb = supabaseAdmin as unknown as AdminSb;
 
 type CommunicationRow = {
   id: string;
+  user_id: string;
   channel: 'sms' | 'whatsapp' | 'voice' | string;
   status: string;
   delivered_at: string | null;
@@ -83,7 +84,7 @@ export async function processRetailTwilioStatus(params: URLSearchParams) {
 
   const { data, error } = await adminSb
     .from('retail_customer_communications')
-    .select('id,channel,status,delivered_at,metadata')
+    .select('id,user_id,channel,status,delivered_at,metadata')
     .eq('provider', 'twilio')
     .eq('provider_message_id', providerSid)
     .maybeSingle();
@@ -103,8 +104,9 @@ export async function processRetailTwilioStatus(params: URLSearchParams) {
     ? [errorCode ? `Twilio ${errorCode}` : 'Twilio delivery failed', errorMessage].filter(Boolean).join(': ').slice(0, 1800)
     : null;
 
+  const priorMetadata = existingMetadata(row.metadata);
   const metadata = {
-    ...existingMetadata(row.metadata),
+    ...priorMetadata,
     provider_status: providerStatus,
     status_callback_received_at: now,
     delivery_confirmed: deliveryConfirmed || Boolean(row.delivered_at),
@@ -126,11 +128,30 @@ export async function processRetailTwilioStatus(params: URLSearchParams) {
     .eq('provider_message_id', providerSid);
   if (updateError) throw new Error(updateError.message);
 
+  const bookingReminderId = typeof priorMetadata['retail_booking_reminder_id'] === 'string'
+    ? priorMetadata['retail_booking_reminder_id']
+    : '';
+  if (bookingReminderId) {
+    const { error: reminderError } = await adminSb
+      .from('retail_booking_reminders')
+      .update({
+        status: failed ? 'failed' : 'sent',
+        next_attempt_at: null,
+        last_error: lastError,
+        updated_at: now,
+      })
+      .eq('id', bookingReminderId)
+      .eq('user_id', row.user_id)
+      .eq('provider_message_id', providerSid);
+    if (reminderError) throw new Error(reminderError.message);
+  }
+
   return {
     accepted: true,
     matched: true,
     provider_status: providerStatus,
     delivery_confirmed: deliveryConfirmed || Boolean(row.delivered_at),
     failed,
+    booking_reminder_reconciled: Boolean(bookingReminderId),
   };
 }
