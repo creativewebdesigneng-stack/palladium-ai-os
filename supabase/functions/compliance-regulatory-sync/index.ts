@@ -279,6 +279,7 @@ Deno.serve(async (req: Request) => {
     .from("compliance_regulatory_sources")
     .select("*")
     .eq("active", true)
+    .eq("automation_ready", true)
     .lte("next_check_at", now)
     .order("next_check_at", { ascending: true })
     .limit(MAX_SOURCES_PER_RUN);
