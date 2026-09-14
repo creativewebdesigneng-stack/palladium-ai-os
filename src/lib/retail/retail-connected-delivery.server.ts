@@ -2,6 +2,9 @@ import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { executeApprovedAction } from '@/lib/integrations/approved-action.server';
 import { parseRetailEmailPayload, retailProviderMessageId } from './retail-connected-delivery';
 
+type AdminSb = { from: (table: string) => any };
+const adminSb = supabaseAdmin as unknown as AdminSb;
+
 type RetailActionRow = {
   id: string;
   user_id: string;
@@ -45,7 +48,7 @@ function payloadChannel(value: unknown): string {
 export async function getRetailExternalDeliveryCapabilities(
   userId: string,
 ): Promise<RetailExternalDeliveryCapabilities> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await adminSb
     .from('integrations')
     .select('provider')
     .eq('user_id', userId)
@@ -71,7 +74,7 @@ async function failClaimedAction(
 ): Promise<RetailConnectedExecutionResult> {
   const now = new Date().toISOString();
   if (communicationId) {
-    await supabaseAdmin
+    await adminSb
       .from('retail_customer_communications')
       .update({
         status: 'failed',
@@ -82,7 +85,7 @@ async function failClaimedAction(
       .eq('id', communicationId)
       .eq('user_id', userId);
   }
-  await supabaseAdmin
+  await adminSb
     .from('retail_reception_actions')
     .update({ status: 'failed', last_error: reason.slice(0, 1800), executed_at: now, updated_at: now })
     .eq('id', actionId)
@@ -113,7 +116,7 @@ export async function tryExecuteRetailConnectedCommunication(
   userId: string,
   actionId: string,
 ): Promise<RetailConnectedExecutionResult | null> {
-  const { data: preview, error: previewError } = await supabaseAdmin
+  const { data: preview, error: previewError } = await adminSb
     .from('retail_reception_actions')
     .select('id,user_id,workspace_id,profile_id,call_id,appointment_id,order_id,action_type,status,payload')
     .eq('id', actionId)
@@ -127,7 +130,7 @@ export async function tryExecuteRetailConnectedCommunication(
   }
 
   const claimedAt = new Date().toISOString();
-  const { data: claimed, error: claimError } = await supabaseAdmin
+  const { data: claimed, error: claimError } = await adminSb
     .from('retail_reception_actions')
     .update({ status: 'executing', last_error: null, updated_at: claimedAt })
     .eq('id', actionId)
@@ -150,7 +153,7 @@ export async function tryExecuteRetailConnectedCommunication(
 
   const action = claimed as RetailActionRow;
   if (action.profile_id) {
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data: profile, error: profileError } = await adminSb
       .from('retail_reception_profiles')
       .select('id,active,can_send_communications')
       .eq('id', action.profile_id)
@@ -173,7 +176,7 @@ export async function tryExecuteRetailConnectedCommunication(
     );
   }
 
-  const { data: communication, error: communicationError } = await supabaseAdmin
+  const { data: communication, error: communicationError } = await adminSb
     .from('retail_customer_communications')
     .insert({
       user_id: userId,
@@ -230,7 +233,7 @@ export async function tryExecuteRetailConnectedCommunication(
 
   const completedAt = new Date().toISOString();
   const providerMessageId = retailProviderMessageId(delivery.result);
-  const { error: communicationFinalizeError } = await supabaseAdmin
+  const { error: communicationFinalizeError } = await adminSb
     .from('retail_customer_communications')
     .update({
       status: 'sent',
@@ -250,7 +253,7 @@ export async function tryExecuteRetailConnectedCommunication(
     .eq('user_id', userId)
     .eq('status', 'ready');
 
-  const { error: actionFinalizeError } = await supabaseAdmin
+  const { error: actionFinalizeError } = await adminSb
     .from('retail_reception_actions')
     .update({ status: 'executed', executed_at: completedAt, last_error: null, updated_at: completedAt })
     .eq('id', actionId)
