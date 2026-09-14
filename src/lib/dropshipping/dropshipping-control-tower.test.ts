@@ -29,7 +29,7 @@ describe('Dropshipping operations control tower',()=>{
     expect(result.metrics.openReturns).toBe(1);
     expect(result.metrics.criticalStockRisks).toBe(1);
     expect(result.metrics.openReorders).toBe(1);
-    expect(result.alerts[0].severity).toBe('critical');
+    expect(result.alerts.at(0)?.severity).toBe('critical');
     expect(result.alerts.map(a=>a.kind)).toEqual(expect.arrayContaining(['tracking-missing','delivery-delay','supplier-stock-risk','return-open']));
   });
 
