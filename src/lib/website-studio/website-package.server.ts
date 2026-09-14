@@ -2,9 +2,16 @@ import { Buffer } from 'node:buffer';
 import { createHash, randomBytes } from 'node:crypto';
 import { buildWebsiteProjectManifest } from '@/lib/website-studio/website-project';
 import { buildDeploymentAssetManifest, deploymentAssetPath, rewriteWebsiteAssetReferences } from '@/lib/website-studio/website-assets';
+import { buildWebsiteCmsRuntimePackage } from '@/lib/website-studio/website-cms-runtime.server';
 
 export type WebsitePackageFile={file:string;data:string;encoding:'utf-8'|'base64'};
-export type WebsiteRuntimePackage={files:WebsitePackageFile[];privateAssetCount:number;formRuntimeTokenHash:string|null};
+export type WebsiteRuntimePackage={
+  files:WebsitePackageFile[];
+  privateAssetCount:number;
+  formRuntimeTokenHash:string|null;
+  cmsCollectionCount:number;
+  cmsPublishedItemCount:number;
+};
 
 type RuntimeForm={name:string;fields:string[]};
 
@@ -70,6 +77,7 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
   const hasRuntimeForms=runtimeForms(configuredForms).length>0;
   const formToken=hasRuntimeForms?randomBytes(32).toString('base64url'):'';
   const formRuntimeTokenHash=formToken?createHash('sha256').update(formToken).digest('hex'):null;
+  const cms=await buildWebsiteCmsRuntimePackage(sb,project);
 
   const manifest=buildWebsiteProjectManifest({
     name:project.name,
@@ -77,7 +85,9 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
     framework:project.framework||'html',
     html:rewriteWebsiteAssetReferences(project.html||'',deploymentAssets),
     css:rewriteWebsiteAssetReferences(project.css||'',deploymentAssets),
-    javascript:rewriteWebsiteAssetReferences(project.javascript||'',deploymentAssets)+formRuntime(project.id,formToken,configuredForms),
+    javascript:rewriteWebsiteAssetReferences(project.javascript||'',deploymentAssets)
+      +formRuntime(project.id,formToken,configuredForms)
+      +cms.javascript,
     pages:Array.isArray(project.pages)?project.pages.map((page:any)=>({
       ...page,
       ...(typeof page?.html==='string'?{html:rewriteWebsiteAssetReferences(page.html,deploymentAssets)}:{}),
@@ -93,6 +103,7 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
     data:JSON.stringify(buildDeploymentAssetManifest(deploymentAssets),null,2),
     encoding:'utf-8',
   });
+  files.push(...cms.files);
 
   let totalPrivateBytes=0;
   let privateAssetCount=0;
@@ -112,5 +123,11 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
     });
   }
 
-  return {files,privateAssetCount,formRuntimeTokenHash};
+  return {
+    files,
+    privateAssetCount,
+    formRuntimeTokenHash,
+    cmsCollectionCount:cms.collectionCount,
+    cmsPublishedItemCount:cms.publishedItemCount,
+  };
 }
