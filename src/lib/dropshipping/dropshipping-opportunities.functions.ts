@@ -97,3 +97,66 @@ export const updateDropshippingOpportunityStatus=createServerFn({method:'POST'})
     if(error)throw new Error(error.message);
     return out;
   });
+
+
+const snapshotSchema=z.object({
+  opportunity_id:uuid,
+  reason:z.enum(['manual','ai_recheck','promotion','status_change']).default('manual'),
+  evidence_urls:z.array(z.union([z.string(),z.object({url:z.string(),label:z.string().optional()})])).max(12).optional(),
+  research_report:z.string().trim().max(30000).nullish(),
+});
+
+async function loadOwnedOpportunity(sb:Sb,userId:string,id:string){
+  const {data,error}=await sb.from('dropshipping_opportunities')
+    .select('id,user_id,opportunity_score,demand_score,search_momentum,competition_score,margin_score,supplier_score,compliance_risk,evidence_urls')
+    .eq('id',id).eq('user_id',userId).maybeSingle();
+  if(error)throw new Error(error.message);
+  if(!data)throw new Error('Dropshipping opportunity not found.');
+  return data;
+}
+
+export const listDropshippingOpportunitySnapshots=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>z.object({opportunity_id:uuid.optional()}).parse(value??{}))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    let query=sb.from('dropshipping_opportunity_snapshots').select('*').eq('user_id',context.userId).order('checked_at',{ascending:false}).limit(500);
+    if(data.opportunity_id)query=query.eq('opportunity_id',data.opportunity_id);
+    const {data:rows,error}=await query;
+    if(error)throw new Error(error.message);
+    return rows??[];
+  });
+
+export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>snapshotSchema.parse(value))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const opportunity=await loadOwnedOpportunity(sb,context.userId,data.opportunity_id);
+    const suppliedEvidence=normalizeOpportunityEvidence(data.evidence_urls??[]);
+    const existingEvidence=normalizeOpportunityEvidence(opportunity.evidence_urls??[]);
+    const evidence=normalizeOpportunityEvidence([...suppliedEvidence,...existingEvidence]);
+    const checkedAt=new Date().toISOString();
+    const {data:out,error}=await sb.from('dropshipping_opportunity_snapshots').insert({
+      user_id:context.userId,
+      opportunity_id:opportunity.id,
+      reason:data.reason,
+      opportunity_score:opportunity.opportunity_score,
+      demand_score:opportunity.demand_score,
+      search_momentum:opportunity.search_momentum,
+      competition_score:opportunity.competition_score,
+      margin_score:opportunity.margin_score,
+      supplier_score:opportunity.supplier_score,
+      compliance_risk:opportunity.compliance_risk,
+      evidence_urls:evidence,
+      source_count:suppliedEvidence.length,
+      research_report:data.research_report||null,
+      checked_at:checkedAt,
+    }).select().single();
+    if(error)throw new Error(error.message);
+    const {error:updateError}=await sb.from('dropshipping_opportunities')
+      .update({last_checked_at:checkedAt,updated_at:checkedAt})
+      .eq('id',opportunity.id).eq('user_id',context.userId);
+    if(updateError)throw new Error(updateError.message);
+    return out;
+  });
