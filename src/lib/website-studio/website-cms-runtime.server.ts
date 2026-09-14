@@ -25,8 +25,7 @@ export function normalizeWebsiteCmsCollectionKey(value:unknown):string{
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g,'-')
-    .replace(/^-+|-+$/g,'')
-    .slice(0,80);
+    .slice(0,120);
 }
 
 export function configuredWebsiteCmsCollectionKeys(appConfig:unknown):string[]{
@@ -60,7 +59,7 @@ function publicItem(value:unknown):PublicCmsItem{
 
 function cmsRuntime(keys:string[]):string{
   if(keys.length===0)return '';
-  return `\n;(()=>{\nconst script=document.currentScript;\nconst base=script instanceof HTMLScriptElement&&script.src?new URL('.',script.src):new URL('./',location.href);\nconst configured=${JSON.stringify(keys)};\nconst cache=new Map();\nconst normalize=(value)=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);\nconst read=async(path)=>{if(cache.has(path))return cache.get(path);const promise=fetch(new URL(path,base),{headers:{accept:'application/json'}}).then(async(response)=>{if(!response.ok)throw new Error('cms_runtime_unavailable');return response.json();});cache.set(path,promise);try{return await promise}catch(error){cache.delete(path);throw error}};\nconst list=async(key)=>{const normalized=normalize(key);if(!normalized||!configured.includes(normalized))throw new Error('cms_collection_not_configured');const payload=await read('site/cms/'+encodeURIComponent(normalized)+'.json');return Array.isArray(payload?.items)?payload.items:[];};\nconst get=async(key,slug)=>{const items=await list(key);const normalized=String(slug||'').trim();return items.find((item)=>String(item?.slug||'')===normalized)||null;};\nwindow.BlackstarCMS=Object.freeze({version:1,collections:Object.freeze([...configured]),index:()=>read('site/cms/index.json'),list,get});\ndocument.dispatchEvent(new CustomEvent('blackstar:cms-ready',{detail:{collections:[...configured]}}));\n})();\n`;
+  return `\n;(()=>{\nconst script=document.currentScript;\nconst base=script instanceof HTMLScriptElement&&script.src?new URL('.',script.src):new URL('./',location.href);\nconst configured=${JSON.stringify(keys)};\nconst cache=new Map();\nconst normalize=(value)=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,120);\nconst read=async(path)=>{if(cache.has(path))return cache.get(path);const promise=fetch(new URL(path,base),{headers:{accept:'application/json'}}).then(async(response)=>{if(!response.ok)throw new Error('cms_runtime_unavailable');return response.json();});cache.set(path,promise);try{return await promise}catch(error){cache.delete(path);throw error}};\nconst list=async(key)=>{const normalized=normalize(key);if(!normalized||!configured.includes(normalized))throw new Error('cms_collection_not_configured');const payload=await read('site/cms/'+encodeURIComponent(normalized)+'.json');return Array.isArray(payload?.items)?payload.items:[];};\nconst get=async(key,slug)=>{const items=await list(key);const normalized=String(slug||'').trim();return items.find((item)=>String(item?.slug||'')===normalized)||null;};\nwindow.BlackstarCMS=Object.freeze({version:1,collections:Object.freeze([...configured]),index:()=>read('site/cms/index.json'),list,get});\ndocument.dispatchEvent(new CustomEvent('blackstar:cms-ready',{detail:{collections:[...configured]}}));\n})();\n`;
 }
 
 export async function buildWebsiteCmsRuntimePackage(sb:CmsSb,project:any):Promise<WebsiteCmsRuntimePackage>{
