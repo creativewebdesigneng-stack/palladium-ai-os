@@ -21,7 +21,7 @@ describe('Dropshipping governed listing approval contract',()=>{
 
   it('invalidates a pending approval before persisting revised listing copy',()=>{
     const expiry=functions.indexOf("status:'expired'");
-    const save=functions.indexOf('withListingDraftMetadata');
+    const save=functions.indexOf('const nextMetadata=withListingDraftMetadata');
     expect(expiry).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(expiry);
     expect(functions).toContain('The linked Dropshipping Hub listing draft was revised before approval.');
