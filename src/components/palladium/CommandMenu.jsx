@@ -28,6 +28,7 @@ const PAGES = [
   ['Developer', '/developer-workspace', Code2],
   ['Analytics', '/analytics', BarChart3],
   ['Finance Hub', '/finance', CreditCard],
+  ['Retail Hub', '/retail-hub', Store],
   ['Trading Hub', '/trading-hub', BarChart3],
   ['Quant Studio', '/quant-studio', BarChart3],
   ['Notifications', '/notifications', Bell],
@@ -45,6 +46,7 @@ const QUICK_ACTIONS = [
   { title: 'Create new project', href: '/projects', icon: FolderKanban },
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
+  { title: 'Open Retail Hub', href: '/retail-hub', icon: Store },
   { title: 'Manage team members', href: '/team', icon: Users },
 ];
 
