@@ -16,6 +16,29 @@ const pathSchema = z.string().trim().min(1).max(500).refine(
 );
 const roleSchema = z.enum(["viewer", "contributor", "maintainer"]);
 
+async function requireRepositoryManager(sb: Sb, projectId: string, userId: string) {
+  const { data: project, error } = await sb.from("projects")
+    .select("id,user_id,org_id")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!project) throw new Error("Repository not found or access denied.");
+  if (!project.org_id) {
+    if (project.user_id !== userId) throw new Error("Only the repository owner can manage collaborators.");
+    return project;
+  }
+  const { data: membership, error: membershipError } = await sb.from("organisation_members")
+    .select("role")
+    .eq("org_id", project.org_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (membershipError) throw new Error(membershipError.message);
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    throw new Error("Only workspace owners and admins can manage repository collaborators.");
+  }
+  return project;
+}
+
 export const getRepositoryOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ projectId: projectIdSchema }).parse(input))
@@ -157,11 +180,27 @@ export const listRepositoryCollaborators = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ projectId: projectIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { data: collaborators, error } = await sb.rpc("project_repository_list_collaborators", {
-      p_project_id: data.projectId,
-    });
+    await requireRepositoryManager(sb, data.projectId, context.userId);
+    const { data: collaborators, error } = await sb.from("project_collaborators")
+      .select("user_id,role,created_at")
+      .eq("project_id", data.projectId)
+      .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return collaborators ?? [];
+    const ids = (collaborators ?? []).map((row: { user_id: string }) => row.user_id);
+    if (!ids.length) return [];
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id,email,full_name")
+      .in("id", ids);
+    if (profileError) throw new Error(profileError.message);
+    const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+    return (collaborators ?? []).map((row: any) => ({
+      ...row,
+      email: profileMap.get(row.user_id)?.email ?? null,
+      full_name: profileMap.get(row.user_id)?.full_name ?? null,
+    }));
   });
 
 export const addRepositoryCollaborator = createServerFn({ method: "POST" })
@@ -175,22 +214,37 @@ export const addRepositoryCollaborator = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { data: collaborator, error } = await sb.rpc("project_repository_add_collaborator_by_email", {
-      p_project_id: data.projectId,
-      p_email: data.email,
-      p_role: data.role,
-    });
+    const project = await requireRepositoryManager(sb, data.projectId, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: target, error: targetError } = await supabaseAdmin
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("email", data.email.toLowerCase())
+      .maybeSingle();
+    if (targetError) throw new Error(targetError.message);
+    if (!target) throw new Error("No Blackstar account uses that email address yet.");
+    if (target.id === context.userId) throw new Error("The repository owner already has access.");
+
+    const { data: collaborator, error } = await sb.from("project_collaborators")
+      .upsert({
+        project_id: data.projectId,
+        user_id: target.id,
+        role: data.role,
+        added_by: context.userId,
+      }, { onConflict: "project_id,user_id" })
+      .select("user_id,role,created_at")
+      .single();
     if (error) throw new Error(error.message);
 
     await writeAudit({
       userId: context.userId,
-      orgId: null,
+      orgId: project.org_id,
       action: "project_repository_collaborator_added",
       targetType: "project",
       targetId: data.projectId,
-      metadata: { role: data.role },
+      metadata: { collaboratorUserId: target.id, role: data.role },
     });
-    return Array.isArray(collaborator) ? collaborator[0] : collaborator;
+    return { ...collaborator, email: target.email, full_name: target.full_name };
   });
 
 export const updateRepositoryCollaborator = createServerFn({ method: "POST" })
@@ -204,6 +258,7 @@ export const updateRepositoryCollaborator = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    const project = await requireRepositoryManager(sb, data.projectId, context.userId);
     const { data: row, error } = await sb.from("project_collaborators")
       .update({ role: data.role })
       .eq("project_id", data.projectId)
@@ -213,7 +268,7 @@ export const updateRepositoryCollaborator = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await writeAudit({
       userId: context.userId,
-      orgId: null,
+      orgId: project.org_id,
       action: "project_repository_collaborator_updated",
       targetType: "project",
       targetId: data.projectId,
@@ -229,6 +284,7 @@ export const removeRepositoryCollaborator = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    const project = await requireRepositoryManager(sb, data.projectId, context.userId);
     const { error } = await sb.from("project_collaborators")
       .delete()
       .eq("project_id", data.projectId)
@@ -236,7 +292,7 @@ export const removeRepositoryCollaborator = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await writeAudit({
       userId: context.userId,
-      orgId: null,
+      orgId: project.org_id,
       action: "project_repository_collaborator_removed",
       targetType: "project",
       targetId: data.projectId,
