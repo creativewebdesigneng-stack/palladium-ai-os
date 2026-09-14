@@ -36,8 +36,11 @@ begin
   if p_project_id is null
      or p_form_key is null
      or char_length(trim(p_form_key)) not between 1 and 120
+     or p_identity_hash is null
      or p_identity_hash !~ '^[0-9a-f]{64}$'
+     or p_limit is null
      or p_limit not between 1 and 1000
+     or p_window_seconds is null
      or p_window_seconds not between 10 and 3600 then
     raise exception 'invalid rate limit parameters' using errcode = '22023';
   end if;
