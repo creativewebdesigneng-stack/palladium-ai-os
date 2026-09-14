@@ -232,6 +232,67 @@ export const executeRetailReceptionAction = createServerFn({ method: 'POST' })
     return out as { action_id: string; status: string; action_type?: string; target_id?: string | null; reason?: string; communication_id?: string; delivered?: boolean | null };
   });
 
+export const retryRetailReceptionAction = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: original, error: actionError } = await sb.from('retail_reception_actions')
+      .select('id,workspace_id,profile_id,call_id,appointment_id,order_id,source,action_type,status,summary,payload')
+      .eq('id', data.id)
+      .eq('user_id', context.userId)
+      .maybeSingle();
+    if (actionError) throw new Error(actionError.message);
+    if (!original) throw new Error('Retail receptionist action not found.');
+    if (original.status !== 'failed') throw new Error('Only failed Retail receptionist actions can be retried.');
+
+    const { data: communications, error: communicationError } = await sb.from('retail_customer_communications')
+      .select('id,status,provider,provider_message_id,metadata')
+      .eq('action_id', data.id)
+      .eq('user_id', context.userId);
+    if (communicationError) throw new Error(communicationError.message);
+
+    const providerMayHaveAccepted = (communications ?? []).some((row: any) => {
+      const metadata = row?.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? row.metadata as Record<string, unknown>
+        : {};
+      return Boolean(row?.provider_message_id) || metadata['provider_accepted'] === true;
+    });
+    if (providerMayHaveAccepted) {
+      throw new Error('This action cannot be retried automatically because a provider may already have accepted it. Review the communication receipt before creating a new send.');
+    }
+
+    const { data: retry, error: retryError } = await sb.from('retail_reception_actions').insert({
+      user_id: context.userId,
+      workspace_id: original.workspace_id,
+      profile_id: original.profile_id,
+      call_id: original.call_id,
+      appointment_id: original.appointment_id,
+      order_id: original.order_id,
+      source: 'staff',
+      action_type: original.action_type,
+      status: 'pending_review',
+      summary: `Retry of failed action ${original.id}: ${original.summary}`.slice(0, 2000),
+      payload: original.payload ?? {},
+    }).select().single();
+    if (retryError) throw new Error(retryError.message);
+
+    await writeAudit({
+      userId: context.userId,
+      action: 'retail.reception_action.retry_queued',
+      targetType: 'retail_reception_action',
+      targetId: retry.id,
+      status: 'success',
+      metadata: {
+        originalActionId: original.id,
+        actionType: original.action_type,
+        priorCommunicationCount: (communications ?? []).length,
+      },
+    });
+
+    return { id: String(retry.id), status: String(retry.status), original_action_id: String(original.id) };
+  });
+
 export const saveRetailCustomerCommunication = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((value: unknown) => communicationSchema.parse(value))
