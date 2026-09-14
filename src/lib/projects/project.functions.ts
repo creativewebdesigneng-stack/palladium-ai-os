@@ -10,6 +10,7 @@ type ResourceType = "agent" | "workflow";
 const scopeSchema = z.object({ orgId: z.string().uuid().nullish() });
 const statusSchema = z.enum(["active", "paused", "completed", "archived"]);
 const prioritySchema = z.enum(["low", "normal", "high", "urgent"]);
+const visibilitySchema = z.enum(["private", "public"]);
 const resourceTypeSchema = z.enum(["agent", "workflow"]);
 
 async function requireOrgMember(sb: Sb, orgId: string, userId: string) {
