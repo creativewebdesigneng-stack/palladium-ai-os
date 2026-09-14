@@ -63,6 +63,7 @@ const BUSINESS = [
   ['Company Hub', '/company-hub', Building2],
   ['Quant Studio', '/quant-studio', LineChart],
   ['Commerce Studio', '/commerce-studio', Store],
+  ['Dropshipping Hub', '/dropshipping-hub', Rocket],
   ['CRM', '/crm', Contact],
   ['CRM Studio', '/crm-studio', Settings2],
   ['WhatsApp CRM', '/whatsapp-crm', MessageCircle],
