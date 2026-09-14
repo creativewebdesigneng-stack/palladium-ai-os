@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {assessPublishReadiness} from './website-publish';
 
 const base={name:'Site',slug:'site',html:'<html><body></body></html>',css:'',pages:[{path:'/'}],qualityScore:90,saved:true};
+const auth={enabled:true,providers:['email'],supabaseUrl:'https://site-project.supabase.co',publishableKey:'sb_publishable_123456789012345678901234567890'};
 
 describe('publish readiness',()=>{
   it('is ready for a saved static site that clears quality',()=>{
@@ -17,13 +18,19 @@ describe('publish readiness',()=>{
     expect(result.checks.find(check=>check.id==='backend')?.ok).toBe(true);
   });
 
-  it('still blocks generated-site authentication until its runtime is provisioned',()=>{
-    const result=assessPublishReadiness({
-      ...base,
-      appConfig:{auth:{enabled:true,providers:['email']}},
-    });
+  it('allows generated-site authentication only after its site-scoped runtime is provisioned',()=>{
+    const ready=assessPublishReadiness({...base,appConfig:{auth}});
+    expect(ready.ready).toBe(true);
+    expect(ready.checks.find(check=>check.id==='backend')?.ok).toBe(true);
+
+    const blocked=assessPublishReadiness({...base,appConfig:{auth:{enabled:true,providers:['email']}}});
+    expect(blocked.ready).toBe(false);
+    expect(blocked.checks.find(check=>check.id==='backend')?.ok).toBe(false);
+  });
+
+  it('rejects secret credentials rather than treating them as publishable auth configuration',()=>{
+    const result=assessPublishReadiness({...base,appConfig:{auth:{...auth,publishableKey:'sb_secret_forbidden'}}});
     expect(result.ready).toBe(false);
-    expect(result.checks.find(check=>check.id==='backend')?.ok).toBe(false);
   });
 
   it('blocks duplicate normalized page routes',()=>{
