@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MAX_SOURCES_PER_RUN = 12;
 const MAX_RESPONSE_BYTES = 2_000_000;
 const FETCH_TIMEOUT_MS = 15_000;
+const SCHEDULER_CREDENTIAL = "compliance_regulatory_sync";
 const ALLOWED_HOSTS = new Set([
   "handbook.fca.org.uk",
   "www.legislation.gov.uk",
@@ -28,6 +29,32 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function safeEqualHex(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+}
+
+function bearerToken(req: Request): string {
+  const value = req.headers.get("authorization") || "";
+  const match = /^Bearer\s+(.+)$/i.exec(value.trim());
+  return match?.[1]?.trim() || "";
+}
+
+async function schedulerAuthorized(supabase: any, req: Request): Promise<boolean> {
+  const token = bearerToken(req);
+  if (token.length < 32 || token.length > 512) return false;
+  const suppliedHash = await sha256(token);
+  const { data, error } = await supabase
+    .from("compliance_scheduler_credentials")
+    .select("token_sha256,enabled")
+    .eq("name", SCHEDULER_CREDENTIAL)
+    .maybeSingle();
+  if (error || !data?.enabled || typeof data.token_sha256 !== "string") return false;
+  return safeEqualHex(data.token_sha256, suppliedHash);
+}
+
 function normalizedText(input: string): string {
   return input
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
@@ -46,14 +73,12 @@ function normalizedText(input: string): string {
 
 function safeOfficialUrl(raw: string): URL {
   const url = new URL(raw);
-  if (url.protocol !== "https:" || !ALLOWED_HOSTS.has(url.hostname.toLowerCase())) {
-    throw new Error("source_host_not_allowlisted");
-  }
+  if (url.protocol !== "https:" || !ALLOWED_HOSTS.has(url.hostname.toLowerCase())) throw new Error("source_host_not_allowlisted");
   return url;
 }
 
 function monitorUrl(source: any): URL {
-  if (source.adapter === "fca_handbook") return safeOfficialUrl("https://handbook.fca.org.uk/latest-news");
+  if (source.adapter === "fca_handbook") return safeOfficialUrl("https://handbook.fca.org.uk/index.html");
   return safeOfficialUrl(String(source.api_url || source.canonical_url));
 }
 
@@ -247,6 +272,8 @@ Deno.serve(async (req: Request) => {
   if (!url || !secret) return response({ error: "runtime_not_configured" }, 503);
 
   const supabase = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!(await schedulerAuthorized(supabase, req))) return response({ error: "unauthorized" }, 401);
+
   const now = new Date().toISOString();
   const { data: sources, error } = await supabase
     .from("compliance_regulatory_sources")
