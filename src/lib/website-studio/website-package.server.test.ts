@@ -14,8 +14,8 @@ function createPackageSupabase(){
   return {sb,update};
 }
 
-describe('Website Studio form runtime packaging',()=>{
-  it('creates an unactivated scoped token and wires deterministic public form states and field allowlists',async()=>{
+describe('Website Studio runtime packaging',()=>{
+  it('creates an unactivated scoped form token and deterministic public form states',async()=>{
     const {sb,update}=createPackageSupabase();
     const result=await buildWebsiteRuntimePackage(sb,{
       id:'11111111-1111-4111-8111-111111111111',name:'Forms',slug:'forms',framework:'html',
@@ -24,7 +24,7 @@ describe('Website Studio form runtime packaging',()=>{
       app_config:{forms:[{name:'contact',fields:[{name:'email',required:true},{name:'message'}]}]},
     });
 
-    const script=result.files.find((file)=>file.file==='script.js')?.data||'';
+    const script=result.files.find(file=>file.file==='script.js')?.data||'';
     expect(script).toContain('website-studio-form-submit');
     expect(script).toContain('11111111-1111-4111-8111-111111111111');
     expect(script).toContain('contact');
@@ -38,9 +38,9 @@ describe('Website Studio form runtime packaging',()=>{
     expect(script).toContain('sourceUrl:location.href');
     expect(script).toContain('blackstar:form-success');
     expect(script).toContain('blackstar:form-error');
-
     expect(result.formRuntimeTokenHash).toMatch(/^[0-9a-f]{64}$/);
     expect(script).not.toContain(String(result.formRuntimeTokenHash));
+    expect(result.authRuntimeEnabled).toBe(false);
     expect(update).not.toHaveBeenCalled();
   });
 
@@ -56,35 +56,49 @@ describe('Website Studio form runtime packaging',()=>{
       design_tokens:{},brief:{},app_config:{forms:[{name:'contact',fields:['email']}]},
     });
 
-    const script=result.files.find((file)=>file.file==='script.js')?.data||'';
-    const contact=result.files.find((file)=>file.file==='contact/index.html')?.data||'';
+    const script=result.files.find(file=>file.file==='script.js')?.data||'';
+    const contact=result.files.find(file=>file.file==='contact/index.html')?.data||'';
     expect(script.match(/website-studio-form-submit/g)?.length).toBe(1);
     expect(contact).toContain('/script.js');
-    expect(result.files.filter((file)=>file.file==='script.js')).toHaveLength(1);
+    expect(result.files.filter(file=>file.file==='script.js')).toHaveLength(1);
     expect(result.formRuntimeTokenHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('packages provisioned auth into the same shared script used by Vercel and GitHub',async()=>{
+    const {sb}=createPackageSupabase();
+    const result=await buildWebsiteRuntimePackage(sb,{
+      id:'44444444-4444-4444-8444-444444444444',name:'Members',slug:'members',framework:'html',html:'<html><body></body></html>',css:'',javascript:'',pages:[],design_tokens:{},brief:{},
+      app_config:{auth:{enabled:true,providers:['email','github'],supabaseUrl:'https://site-project.supabase.co',publishableKey:'sb_publishable_123456789012345678901234567890',redirectPath:'/account'}},
+    });
+    const script=result.files.find(file=>file.file==='script.js')?.data||'';
+    expect(result.authRuntimeEnabled).toBe(true);
+    expect(result.authProviders).toEqual(['email','github']);
+    expect(script).toContain('BlackstarAuth');
+    expect(script).toContain('signInWithPassword');
+    expect(script).toContain('signInWithOAuth');
+    expect(script).toContain('site-project.supabase.co');
+    expect(script).toContain('sb_publishable_');
+    expect(script).not.toContain('sb_secret_');
   });
 
   it('fails closed for explicitly managed forms whose key is not configured',async()=>{
     const {sb}=createPackageSupabase();
     const result=await buildWebsiteRuntimePackage(sb,{
-      id:'33333333-3333-4333-8333-333333333333',name:'Forms',slug:'forms',framework:'html',
-      html:'<form data-blackstar-form="unknown"></form>',css:'',javascript:'',pages:[],design_tokens:{},brief:{},
-      app_config:{forms:[{name:'contact'}]},
+      id:'33333333-3333-4333-8333-333333333333',name:'Forms',slug:'forms',framework:'html',html:'<form data-blackstar-form="unknown"></form>',css:'',javascript:'',pages:[],design_tokens:{},brief:{},app_config:{forms:[{name:'contact'}]},
     });
-    const script=result.files.find((file)=>file.file==='script.js')?.data||'';
+    const script=result.files.find(file=>file.file==='script.js')?.data||'';
     expect(script).toContain('This form is not configured for public submission.');
     expect(script).toContain("reason:'form_not_configured'");
   });
 
-  it('does not provision a token when the project has no configured forms',async()=>{
+  it('does not provision form or auth runtime when neither is configured',async()=>{
     const update=vi.fn();
-    const sb:any={
-      from:(table:string)=>table==='website_studio_assets'?{select:()=>({eq:async()=>({data:[],error:null})})}:{update},
-      storage:{from:()=>({download:vi.fn()})},
-    };
+    const sb:any={from:(table:string)=>table==='website_studio_assets'?{select:()=>({eq:async()=>({data:[],error:null})})}:{update},storage:{from:()=>({download:vi.fn()})}};
     const result=await buildWebsiteRuntimePackage(sb,{id:'p',name:'Static',slug:'static',framework:'html',html:'',css:'',javascript:'console.log(1)',pages:[],design_tokens:{},brief:{},app_config:{}});
-    expect(result.files.find((file)=>file.file==='script.js')?.data).toBe('console.log(1)');
+    expect(result.files.find(file=>file.file==='script.js')?.data).toBe('console.log(1)');
     expect(result.formRuntimeTokenHash).toBeNull();
+    expect(result.authRuntimeEnabled).toBe(false);
+    expect(result.authProviders).toEqual([]);
     expect(update).not.toHaveBeenCalled();
   });
 });
