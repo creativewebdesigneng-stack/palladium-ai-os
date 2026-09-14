@@ -490,3 +490,100 @@ export const createRepositoryRelease = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return release;
   });
+
+
+export const listRepositoryPullRequests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      projectId: projectIdSchema,
+      status: z.enum(["open", "merged", "closed"]).optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let q = sb.from("project_repository_pull_requests")
+      .select("id,pr_number,source_branch,target_branch,title,body,status,created_by,merged_by,created_at,updated_at,merged_at")
+      .eq("project_id", data.projectId)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (data.status) q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const createRepositoryPullRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      projectId: projectIdSchema,
+      sourceBranch: branchSchema,
+      targetBranch: branchSchema,
+      title: z.string().trim().min(1).max(240),
+      body: z.string().trim().max(20_000).nullish(),
+    }).refine((value) => value.sourceBranch !== value.targetBranch, {
+      message: "Source and target branches must differ.",
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: pr, error } = await sb.from("project_repository_pull_requests")
+      .insert({
+        project_id: data.projectId,
+        source_branch: data.sourceBranch,
+        target_branch: data.targetBranch,
+        title: data.title,
+        body: data.body ?? null,
+        created_by: context.userId,
+      })
+      .select("id,pr_number,source_branch,target_branch,title,status,created_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return pr;
+  });
+
+export const setRepositoryPullRequestStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      projectId: projectIdSchema,
+      pullRequestId: z.string().uuid(),
+      status: z.enum(["open", "closed"]),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: pr, error } = await sb.from("project_repository_pull_requests")
+      .update({ status: data.status, updated_at: new Date().toISOString() })
+      .eq("project_id", data.projectId)
+      .eq("id", data.pullRequestId)
+      .neq("status", "merged")
+      .select("id,pr_number,status,updated_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return pr;
+  });
+
+export const mergeRepositoryPullRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ projectId: projectIdSchema, pullRequestId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: commitId, error } = await sb.rpc("project_repository_merge_pull_request", {
+      p_project_id: data.projectId,
+      p_pull_request_id: data.pullRequestId,
+    });
+    if (error) throw new Error(error.message);
+    await writeAudit({
+      userId: context.userId,
+      orgId: null,
+      action: "project_repository_pull_request_merged",
+      targetType: "project",
+      targetId: data.projectId,
+      metadata: { pullRequestId: data.pullRequestId, commitId },
+    });
+    return { commitId };
+  });
