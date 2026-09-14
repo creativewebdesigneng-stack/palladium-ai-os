@@ -15,6 +15,7 @@ import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishP
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
+import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
