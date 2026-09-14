@@ -46,6 +46,17 @@ function runtimeConfig() {
   });
 }
 
+function statusCallbackUrl() {
+  const origin = process.env.APP_ORIGIN?.trim();
+  if (!origin) return undefined;
+  try {
+    const url = new URL('/api/public/retail/twilio-status', origin);
+    return url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getRetailTwilioRuntimeCapabilities(): RetailTwilioCapabilities {
   return getRetailTwilioCapabilities(runtimeConfig());
 }
@@ -167,6 +178,7 @@ export async function tryExecuteRetailTwilioCommunication(
     return failAction(userId, actionId, error instanceof Error ? error.message : 'Retail carrier payload is invalid.');
   }
 
+  const callbackUrl = statusCallbackUrl();
   const { data: communication, error: communicationError } = await adminSb
     .from('retail_customer_communications')
     .insert({
@@ -190,6 +202,7 @@ export async function tryExecuteRetailTwilioCommunication(
         provider_delivery_required: true,
         provider_accepted: false,
         delivery_confirmed: false,
+        status_callback_configured: Boolean(callbackUrl),
         execution_claimed_at: claimedAt,
         ...(payload.channel === 'voice' ? { voice_mode: 'outbound_notification', interactive_receptionist: false } : {}),
       },
@@ -205,7 +218,7 @@ export async function tryExecuteRetailTwilioCommunication(
   let response: Response;
   let responseBody: Record<string, unknown> = {};
   try {
-    const request = buildRetailTwilioRequest(config, payload);
+    const request = buildRetailTwilioRequest(config, payload, callbackUrl);
     const auth = Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64');
     response = await fetch(request.url, {
       method: 'POST',
@@ -248,6 +261,7 @@ export async function tryExecuteRetailTwilioCommunication(
         provider_accepted: true,
         provider_status: providerStatus || 'accepted',
         delivery_confirmed: false,
+        status_callback_configured: Boolean(callbackUrl),
         execution_claimed_at: claimedAt,
         provider_accepted_at: acceptedAt,
         ...(payload.channel === 'voice' ? { voice_mode: 'outbound_notification', interactive_receptionist: false } : {}),
@@ -288,6 +302,8 @@ export async function tryExecuteRetailTwilioCommunication(
     provider_status: providerStatus || 'accepted',
     communication_id: communicationId,
     provider: 'twilio',
-    reason: 'Twilio accepted the request. Final recipient delivery has not yet been confirmed.',
+    reason: callbackUrl
+      ? 'Twilio accepted the request. Blackstar will update the ledger when the signed delivery-status callback arrives.'
+      : 'Twilio accepted the request. Final recipient delivery has not been confirmed because APP_ORIGIN is not configured for signed status callbacks.',
   };
 }
