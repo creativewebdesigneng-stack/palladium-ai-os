@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildListingDraftPrompt,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {assessListingPublicationReadiness,buildListingDraftPrompt,isDropshipProductBlocked,selectListingPublicationCapability,withListingDraftMetadata} from './dropshipping-listings';
 
 const item={
   name:'Compression Packing Cubes',sku:'TRAVEL-01',category:'Travel accessories',description:'Validated candidate from supplier research.',sale_price:39.99,currency:'GBP',
@@ -39,5 +39,34 @@ describe('dropshipping listing drafts',()=>{
   it('caps stored generated text',()=>{
     const metadata=withListingDraftMetadata({}, {channel:'shopify',text:'x'.repeat(20000)});
     expect(metadata.listing_drafts['shopify']?.text).toHaveLength(16000);
+  });
+  it('fails closed before marketplace publication until validation, fact checks and a deployed governed write are ready',()=>{
+    const validated={...item,metadata:{...item.metadata,lifecycle_stage:'validated'}};
+    const capability={provider:'etsy',action:'etsy_draft_listing_create',deployed:true,requiresApproval:true,risk:'medium' as const};
+    expect(assessListingPublicationReadiness({item:validated,channel:'etsy',unresolvedFactChecks:0,capabilities:[capability]})).toMatchObject({
+      readyForApproval:true,status:'ready-for-approval',requiresApproval:true,capability,
+    });
+
+    expect(assessListingPublicationReadiness({item:validated,channel:'etsy',unresolvedFactChecks:2,capabilities:[capability]})).toMatchObject({
+      readyForApproval:false,status:'needs-fact-checks',
+    });
+
+    expect(assessListingPublicationReadiness({item:validated,channel:'etsy',unresolvedFactChecks:0,capabilities:[]})).toMatchObject({
+      readyForApproval:false,status:'needs-connection',
+    });
+
+    const researching={...item,metadata:{...item.metadata,lifecycle_stage:'researching'}};
+    expect(assessListingPublicationReadiness({item:researching,channel:'shopify',capabilities:[{provider:'shopify',action:'product_update',deployed:true,requiresApproval:true}]})).toMatchObject({
+      readyForApproval:false,status:'needs-validation',
+    });
+  });
+
+  it('ignores read-only, undeployed and unrelated provider actions when selecting a publication capability',()=>{
+    expect(selectListingPublicationCapability([
+      {provider:'etsy',action:'etsy_shop_listings_list',deployed:true,requiresApproval:false},
+      {provider:'etsy',action:'etsy_listing_update',deployed:false,requiresApproval:true},
+      {provider:'etsy',action:'etsy_shop_receipts_update',deployed:true,requiresApproval:true},
+      {provider:'etsy',action:'etsy_listing_update',deployed:true,requiresApproval:true},
+    ])?.action).toBe('etsy_listing_update');
   });
 });
