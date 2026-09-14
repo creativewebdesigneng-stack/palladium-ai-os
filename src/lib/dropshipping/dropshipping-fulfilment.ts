@@ -18,10 +18,10 @@ export function providerCanFulfilDropship(provider:string){
 }
 
 export function orderLineItemIds(order:Row){
-  const rows=Array.isArray(order.line_items)?order.line_items:[];
+  const rows=Array.isArray(order['line_items'])?order['line_items']:[];
   return [...new Set(rows.map(raw=>{
     const item=record(raw);
-    return text(item.item_id)||text(item.catalog_item_id)||text(item.product_id);
+    return text(item['item_id'])||text(item['catalog_item_id'])||text(item['product_id']);
   }).filter(Boolean))];
 }
 
@@ -29,9 +29,9 @@ export function orderHasDropshipProduct(order:Row,catalog:Row[]){
   const ids=new Set(orderLineItemIds(order));
   if(!ids.size)return false;
   return catalog.some(item=>{
-    const id=text(item.id);
-    const metadata=record(item.metadata);
-    return ids.has(id)&&(metadata.source==='dropshipping-hub'||metadata.businessModel==='dropshipping'||metadata.business_model==='dropshipping');
+    const id=text(item['id']);
+    const metadata=record(item['metadata']);
+    return ids.has(id)&&(metadata['source']==='dropshipping-hub'||metadata['businessModel']==='dropshipping'||metadata['business_model']==='dropshipping');
   });
 }
 
