@@ -12,6 +12,7 @@ import WebsiteAssetLibrary from '@/components/website-studio/WebsiteAssetLibrary
 import WebsiteProjectFiles from '@/components/website-studio/WebsiteProjectFiles';
 import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
 import WebsiteFormInbox from '@/components/website-studio/WebsiteFormInbox';
+import WebsiteFormRuntime from '@/components/website-studio/WebsiteFormRuntime';
 import WebsiteCmsManager from '@/components/website-studio/WebsiteCmsManager';
 import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
@@ -184,6 +185,7 @@ export default function WebsiteStudio(){
         <WebsiteAssetLibrary projectId={draft.id}/>
         <WebsiteProjectFiles project={draft}/>
         <WebsiteAppScaffold config={draft.app_config||{}} setConfig={(app_config)=>setDraft({...draft,app_config})}/>
+        <WebsiteFormRuntime projectId={draft.id}/>
         <WebsiteFormInbox projectId={draft.id}/>
         <WebsiteCmsManager project={draft}/>
         <WebsiteDeveloperTools project={draft} busy={busy} onRepair={(prompt)=>runAiIteration(prompt)}/>
