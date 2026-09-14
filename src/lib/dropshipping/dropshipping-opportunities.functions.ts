@@ -45,7 +45,7 @@ export const listDropshippingOpportunities=createServerFn({method:'POST'})
 
 export const saveDropshippingOpportunity=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
-  .inputValidator((value:unknown)=>opportunitySchema.parse(value))
+  .validator((value:unknown)=>opportunitySchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     await assertWorkspace(sb,context.userId,data.workspace_id);
@@ -90,7 +90,7 @@ export const saveDropshippingOpportunity=createServerFn({method:'POST'})
 
 export const updateDropshippingOpportunityStatus=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
-  .inputValidator((value:unknown)=>z.object({id:uuid,status:z.enum(['watching','testing','winner','paused','rejected'])}).parse(value))
+  .validator((value:unknown)=>z.object({id:uuid,status:z.enum(['watching','testing','winner','paused','rejected'])}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     const {data:out,error}=await sb.from('dropshipping_opportunities').update({status:data.status,updated_at:new Date().toISOString()}).eq('id',data.id).eq('user_id',context.userId).select().single();
