@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Facebook,Footer,Instagram,Linkedin,Plus,RefreshCw,Trash2} from 'lucide-react';
+import {LayoutTemplate,Plus,RefreshCw,Trash2} from 'lucide-react';
 import {buildFallbackPageHtml,setPageHtml} from '@/lib/website-studio/website-page-documents';
 import {normalizePagePath} from '@/lib/website-studio/website-pages';
 import {upsertWebsiteFooter,upsertWebsiteFooterCss} from '@/lib/website-studio/website-footer';
@@ -42,7 +42,7 @@ export default function WebsiteFooterBuilder({project,setProject}){
 
   return <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><div className="flex items-center gap-2 text-cyan-300"><Footer className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Shared footer</span></div><p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-500">Define site-wide footer content once and apply it consistently across every route. Re-applying updates the marked footer block rather than duplicating it.</p></div>
+      <div><div className="flex items-center gap-2 text-cyan-300"><LayoutTemplate className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Shared footer</span></div><p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-500">Define site-wide footer content once and apply it consistently across every route. Re-applying updates the marked footer block rather than duplicating it.</p></div>
       <button onClick={apply} className="flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[.05] px-3 py-2 text-xs text-cyan-100"><RefreshCw className="h-3.5 w-3.5"/>Apply to all pages</button>
     </div>
 
