@@ -19,7 +19,7 @@ import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPub
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
 import { resolvePageHtml } from '@/lib/website-studio/website-page-documents';
-import { normalizePagePath } from '@/lib/website-studio/website-pages';
+import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
@@ -107,7 +107,7 @@ export default function WebsiteStudio(){
         css:draft.css||'',
         javascript:draft.javascript||'',
       }});
-      setDraft({...draft,html:result.html,css:result.css,javascript:result.javascript,pages:result.pages,design_tokens:result.designTokens});
+      setDraft({...draft,html:result.html,css:result.css,javascript:result.javascript,pages:normalizeWebsitePageSet(result.pages),design_tokens:result.designTokens});
       setAiMeta({provider:result.provider,model:result.model,summary:result.summary});
       if(!instructionOverride)setAiInstruction('');
       setNotice('AI iteration applied in the editor. Review the preview and save when ready.');
