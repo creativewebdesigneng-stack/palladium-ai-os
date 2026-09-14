@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {addWebsitePage,normalizePagePath,removeWebsitePage} from './website-pages';
+describe('website pages',()=>{it('normalizes routes',()=>{expect(normalizePagePath(' About Us ')).toBe('/about-us');expect(normalizePagePath('/')).toBe('/')});it('adds unique routes and protects home',()=>{const pages=addWebsitePage([{name:'Home',path:'/'}],'About Us');expect(pages.map(p=>p.path)).toEqual(['/','/about-us']);expect(removeWebsitePage(pages,'/')).toEqual(pages);});});

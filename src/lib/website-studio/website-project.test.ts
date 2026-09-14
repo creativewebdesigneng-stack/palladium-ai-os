@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {buildWebsiteProjectManifest,websiteManifestTree} from './website-project';
+describe('website project manifest',()=>{it('packages the core site into deterministic files',()=>{const m=buildWebsiteProjectManifest({name:'Acme',slug:'acme',framework:'html',html:'<main/>',css:'body{}',javascript:'',pages:[],designTokens:{theme:'dark'},brief:{goal:'sell'}});expect(m.files.find(f=>f.path==='index.html')?.content).toBe('<main/>');expect(websiteManifestTree(m)).toContain('site/design-tokens.json');});});

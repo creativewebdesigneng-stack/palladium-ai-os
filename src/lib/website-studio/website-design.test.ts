@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {designTokensToCss,upsertDesignTokenCss} from './website-design';
+describe('website design tokens',()=>{it('serializes visual tokens',()=>{expect(designTokensToCss({accent:'#123456'})).toContain('--ws-accent:#123456')});it('inserts one token block',()=>{const first=upsertDesignTokenCss('body{}',{radius:'10px'});const second=upsertDesignTokenCss(first,{radius:'20px'});expect((second.match(/BLACKSTAR_DESIGN_TOKENS \*\//g)||[])).toHaveLength(1);expect(second).toContain('--ws-radius:20px')});});
