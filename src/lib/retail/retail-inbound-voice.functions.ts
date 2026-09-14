@@ -66,6 +66,14 @@ async function restoreEndpointClaim(snapshot: EndpointSnapshot | null, claimedId
   }).eq('id', snapshot.id).eq('user_id', userId);
 }
 
+async function releasePairingClaim(pairingId: string, userId: string, claimedAt: string) {
+  await adminSb.from('retail_reception_voice_pairings')
+    .update({ consumed_at: null, updated_at: new Date().toISOString() })
+    .eq('id', pairingId)
+    .eq('user_id', userId)
+    .eq('consumed_at', claimedAt);
+}
+
 export const getRetailInboundVoiceConfig = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
@@ -196,6 +204,15 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
 
     const proof = await verifyRetailInboundPairing(pairing.data.provider_phone_sid, privatePairing.data.token_hash);
     const claimAt = new Date().toISOString();
+    const pairingClaim = await adminSb.from('retail_reception_voice_pairings')
+      .update({ consumed_at: claimAt, updated_at: claimAt })
+      .eq('id', pairing.data.id)
+      .eq('user_id', context.userId)
+      .is('consumed_at', null)
+      .select('id').maybeSingle();
+    if (pairingClaim.error) throw new Error(pairingClaim.error.message);
+    if (!pairingClaim.data) throw new Error('This Retail inbound voice pairing has already been claimed.');
+
     const previous = existingSid.data ? existingSid.data as EndpointSnapshot : null;
     const claimRow = {
       user_id: context.userId,
@@ -218,6 +235,7 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
       : await adminSb.from('retail_reception_voice_endpoints').insert(claimRow)
           .select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single();
     if (claimed.error || !claimed.data) {
+      await releasePairingClaim(pairing.data.id, context.userId, claimAt);
       throw new Error(claimed.error?.message || 'Retail inbound phone number could not be reserved.');
     }
 
@@ -226,6 +244,7 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
       verified = await configureRetailTwilioIncomingNumber(pairing.data.provider_phone_sid);
     } catch (error) {
       await restoreEndpointClaim(previous, claimed.data.id, context.userId);
+      await releasePairingClaim(pairing.data.id, context.userId, claimAt);
       throw error;
     }
 
@@ -246,17 +265,8 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
     if (activated.error || !activated.data) {
       try { await detachRetailTwilioIncomingNumber(pairing.data.provider_phone_sid); } catch { /* fail closed in DB even if carrier detach also fails */ }
       await restoreEndpointClaim(previous, claimed.data.id, context.userId);
+      await releasePairingClaim(pairing.data.id, context.userId, claimAt);
       throw new Error(activated.error?.message || 'Retail inbound phone number could not be activated after provider configuration.');
-    }
-
-    const consumed = await adminSb.from('retail_reception_voice_pairings')
-      .update({ consumed_at: activatedAt, updated_at: activatedAt })
-      .eq('id', pairing.data.id).eq('user_id', context.userId).is('consumed_at', null)
-      .select('id').maybeSingle();
-    if (consumed.error || !consumed.data) {
-      try { await detachRetailTwilioIncomingNumber(pairing.data.provider_phone_sid); } catch { /* endpoint is rolled back below */ }
-      await restoreEndpointClaim(previous, claimed.data.id, context.userId);
-      throw new Error(consumed.error?.message || 'Retail inbound pairing could not be finalized.');
     }
 
     await writeAudit({
