@@ -40,6 +40,7 @@ export function buildCatalogReadInputTemplate(schema:unknown){
 type Candidate={sourceId:string|null;name:string;sku:string|null;category:string|null;description:string|null;vendor:string|null;price:number|null;currency:string|null;inventory:number|null;url:string|null;raw:Record<string,unknown>};
 const asObject=(v:unknown)=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:null;
 const str=(...values:unknown[])=>{for(const value of values){if(typeof value==='string'&&value.trim())return value.trim().slice(0,5000)}return null};
+const id=(...values:unknown[])=>{for(const value of values){if(typeof value==='string'&&value.trim())return value.trim().slice(0,300);if(typeof value==='number'&&Number.isFinite(value))return String(value)}return null};
 const num=(...values:unknown[])=>{for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null};
 
 function candidateFrom(row:Record<string,unknown>):Candidate|null{
@@ -48,14 +49,14 @@ function candidateFrom(row:Record<string,unknown>):Candidate|null{
   const money=asObject(row.price)||asObject(row.shopMoney)||asObject(asObject(row.currentTotalPriceSet)?.shopMoney);
   const price=num(row.price,row.amount,money?.amount);
   return {
-    sourceId:str(row.id,row.product_id,row.listing_id,row.sku),
+    sourceId:id(row.id,row.product_id,row.listing_id,row.sku),
     name:name.slice(0,180),
     sku:str(row.sku,row.SKU),
     category:str(row.productType,row.product_type,row.category,row.taxonomy_path),
     description:str(row.description,row.descriptionHtml,row.description_html),
     vendor:str(row.vendor,row.brand,row.shop_name),
     price,
-    currency:str(row.currency,row.currencyCode,money?.currencyCode),
+    currency:str(row.currency,row.currencyCode,money?.currencyCode,money?.currency_code),
     inventory:num(row.inventoryQuantity,row.totalInventory,row.quantity,row.stock),
     url:str(row.url,row.web_url,row.listing_url),
     raw:Object.fromEntries(Object.entries(row).slice(0,80)),
