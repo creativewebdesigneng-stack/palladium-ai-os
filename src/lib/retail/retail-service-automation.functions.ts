@@ -1,6 +1,11 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { writeAudit } from '@/lib/platform/audit.server';
+import {
+  getRetailExternalDeliveryCapabilities,
+  tryExecuteRetailConnectedCommunication,
+} from '@/lib/retail/retail-connected-delivery.server';
 import { getVoiceRuntimeCapabilities } from '@/lib/voice/voice-runtime.server';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
@@ -85,6 +90,7 @@ export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const wid = data.workspace_id;
+    const externalDelivery = await getRetailExternalDeliveryCapabilities(context.userId);
     const queries = await Promise.all([
       sb.from('retail_reception_profiles').select('*').eq('workspace_id', wid).order('updated_at', { ascending: false }),
       sb.from('retail_reception_actions').select('*').eq('workspace_id', wid).order('created_at', { ascending: false }).limit(200),
@@ -108,7 +114,7 @@ export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
       calls,
       catalog,
       voice: getVoiceRuntimeCapabilities(),
-      externalDelivery: { sms: false, email: false, whatsapp: false, voice: false },
+      externalDelivery,
     };
   });
 
@@ -198,6 +204,25 @@ export const executeRetailReceptionAction = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
+    const connected = await tryExecuteRetailConnectedCommunication(context.userId, data.id);
+    if (connected) {
+      await writeAudit({
+        userId: context.userId,
+        action: 'retail.communication.connected_delivery',
+        targetType: 'retail_reception_action',
+        targetId: data.id,
+        status: connected.delivered ? 'success' : 'failed',
+        metadata: {
+          provider: connected.provider ?? null,
+          delivered: connected.delivered,
+          communicationId: connected.communication_id ?? null,
+          executionStatus: connected.status,
+          reason: connected.reason ?? null,
+        },
+      });
+      return connected;
+    }
+
     const sb = context.supabase as unknown as Sb;
     const { data: out, error } = await sb.rpc('retail_execute_reception_action', { p_action_id: data.id });
     if (error) throw new Error(error.message);
