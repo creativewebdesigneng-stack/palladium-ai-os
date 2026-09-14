@@ -74,15 +74,21 @@ describe('Website Studio generated form token lifecycle',()=>{
     expect(migrationSource.indexOf("if v_target like 'github:%' then")).toBeGreaterThan(migrationSource.indexOf("v_pending_hash := v_slot ->> 'pending_hash'"));
   });
 
-  it('stages Vercel before deployment and promotes only after verified readiness',()=>{
-    const vercelStage=publisherSource.indexOf('await stageWebsiteStudioFormDeploymentToken');
+  it('pre-stages Vercel, binds to the exact deployment id, then promotes only after verified readiness',()=>{
+    const firstStage=publisherSource.indexOf('await stageWebsiteStudioFormDeploymentToken');
     const vercelCreated=publisherSource.indexOf('const created=await createVercelDeployment');
+    const secondStage=publisherSource.indexOf('await stageWebsiteStudioFormDeploymentToken',firstStage+1);
+    const deploymentRecord=publisherSource.indexOf("deployment_id:created.id");
     const vercelReady=publisherSource.indexOf('if(verified.verified)');
     const vercelPromote=publisherSource.indexOf('await promoteWebsiteStudioFormDeploymentToken');
-    expect(vercelStage).toBeGreaterThan(-1);
-    expect(vercelCreated).toBeGreaterThan(vercelStage);
-    expect(vercelReady).toBeGreaterThan(vercelCreated);
+    expect(firstStage).toBeGreaterThan(-1);
+    expect(vercelCreated).toBeGreaterThan(firstStage);
+    expect(secondStage).toBeGreaterThan(vercelCreated);
+    expect(deploymentRecord).toBeGreaterThan(secondStage);
+    expect(vercelReady).toBeGreaterThan(deploymentRecord);
     expect(vercelPromote).toBeGreaterThan(vercelReady);
+    expect(publisherSource).toContain('stagingRef:created.id');
+    expect(publisherSource).toContain('hasStagedWebsiteStudioFormDeploymentToken(project.form_deployment_tokens,formTokenTarget,deployment.id)');
   });
 
   it('stages GitHub after commit creation, switches the ref, then promotes',()=>{
