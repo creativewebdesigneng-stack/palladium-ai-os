@@ -70,7 +70,8 @@ export const readDropshippingFulfilmentEvidence=createServerFn({method:'POST'})
 
     const evidenceResult=boundedEvidenceResult(outcome.result);
     const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
-    const inserted=await supabaseAdmin.from('dropshipping_fulfilment_evidence').insert({
+    const admin=supabaseAdmin as unknown as Sb;
+    const inserted=await admin.from('dropshipping_fulfilment_evidence').insert({
       user_id:context.userId,
       workspace_id:data.workspace_id,
       order_id:data.order_id,
@@ -111,7 +112,8 @@ export const reconcileDropshippingFulfilmentEvidence=createServerFn({method:'POS
     }
 
     const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
-    const evidenceResult=await supabaseAdmin.from('dropshipping_fulfilment_evidence')
+    const admin=supabaseAdmin as unknown as Sb;
+    const evidenceResult=await admin.from('dropshipping_fulfilment_evidence')
       .select('id,user_id,workspace_id,order_id,provider,action,transport,result,observed_at,reconciled_at')
       .eq('id',data.evidence_id)
       .eq('user_id',context.userId)
@@ -136,7 +138,7 @@ export const reconcileDropshippingFulfilmentEvidence=createServerFn({method:'POS
     const saved=await sb.from('retail_orders').update(update).eq('id',data.order_id).eq('workspace_id',data.workspace_id).eq('user_id',context.userId).select('id,order_number,fulfilment_status,carrier,tracking_number,fulfilled_at,updated_at').single();
     if(saved.error)throw new Error(saved.error.message);
 
-    const marked=await supabaseAdmin.from('dropshipping_fulfilment_evidence').update({reconciled_at:now}).eq('id',data.evidence_id).eq('user_id',context.userId).is('reconciled_at',null);
+    const marked=await admin.from('dropshipping_fulfilment_evidence').update({reconciled_at:now}).eq('id',data.evidence_id).eq('user_id',context.userId).is('reconciled_at',null);
     if(marked.error)throw new Error(marked.error.message);
 
     return {order:saved.data,evidence:{id:evidence.id,provider:evidence.provider,action:evidence.action,observed_at:evidence.observed_at,reconciled_at:now}};
