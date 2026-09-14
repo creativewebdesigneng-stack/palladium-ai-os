@@ -61,8 +61,9 @@ export function assessChannelCompliance(input:{channel:DropshipChannel;fulfilmen
   if(input.channel==='amazon'&&['retailer-arbitrage','marketplace-arbitrage'].includes(input.fulfilmentModel)){allowed=false;reasons.push('Amazon fulfilment must preserve seller-of-record responsibilities; retailer/marketplace arbitrage is blocked by Blackstar guardrails.');}
   if(input.channel==='etsy'){
     const podOk=input.fulfilmentModel==='pod'&&input.originalDesign===true&&input.productionPartnerDisclosed===true;
-    const allowedModel=input.fulfilmentModel==='owned-stock'||podOk;
-    if(!allowedModel){allowed=false;reasons.push('Etsy is not a generic ready-made dropshipping channel. Use original designs with a disclosed production partner/POD or another Etsy-permitted model.');}
+    const creatorStockOk=input.fulfilmentModel==='owned-stock'&&input.originalDesign===true;
+    const allowedModel=podOk||creatorStockOk;
+    if(!allowedModel){allowed=false;reasons.push('Etsy is not a generic ready-made dropshipping or resale channel. Blackstar only marks original-design creator stock, or original designs fulfilled by a disclosed production partner/POD, as eligible in this workflow. Other Etsy-permitted categories need separate policy review.');}
   }
   if(!reasons.length)reasons.push('No channel-specific blocker detected by the current rule set; listing still requires provider and product-policy checks.');
   return {allowed,status:allowed?'eligible':'blocked',requiresHumanReview:!allowed||input.channel==='etsy'||input.channel==='amazon'||input.channel==='ebay',reasons};
