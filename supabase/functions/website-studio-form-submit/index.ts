@@ -200,19 +200,19 @@ Deno.serve(async(req:Request)=>{
 
     const userAgent=text(req.headers.get("user-agent"),256)||"unknown";
     const address=requestAddress(req);
-    const globalIdentity=await hex(`global:${projectId}:${formKey.toLowerCase()}`);
     const clientIdentity=await hex(`client:${projectId}:${formKey.toLowerCase()}:${address}:${userAgent}`);
-
-    const globalLimit=await consumeRateLimit(supabase,projectId,formKey,globalIdentity,FORM_RATE_LIMIT);
-    if(globalLimit.error)return json({error:"rate_limit_unavailable"},503);
-    if(!globalLimit.allowed){
-      return json({error:"rate_limited",retryAfterSeconds:globalLimit.retryAfter},429,{"Retry-After":String(globalLimit.retryAfter||RATE_WINDOW_SECONDS)});
-    }
+    const globalIdentity=await hex(`global:${projectId}:${formKey.toLowerCase()}`);
 
     const clientLimit=await consumeRateLimit(supabase,projectId,formKey,clientIdentity,CLIENT_RATE_LIMIT);
     if(clientLimit.error)return json({error:"rate_limit_unavailable"},503);
     if(!clientLimit.allowed){
       return json({error:"rate_limited",retryAfterSeconds:clientLimit.retryAfter},429,{"Retry-After":String(clientLimit.retryAfter||RATE_WINDOW_SECONDS)});
+    }
+
+    const globalLimit=await consumeRateLimit(supabase,projectId,formKey,globalIdentity,FORM_RATE_LIMIT);
+    if(globalLimit.error)return json({error:"rate_limit_unavailable"},503);
+    if(!globalLimit.allowed){
+      return json({error:"rate_limited",retryAfterSeconds:globalLimit.retryAfter},429,{"Retry-After":String(globalLimit.retryAfter||RATE_WINDOW_SECONDS)});
     }
 
     const allowedFields=configuredFieldNames(configuredForm);
