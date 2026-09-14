@@ -18,6 +18,20 @@ const adminSb = supabaseAdmin as unknown as Sb;
 const uuid = z.string().uuid();
 const phoneSid = z.string().regex(/^PN[0-9a-fA-F]{32}$/);
 
+type EndpointSnapshot = {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  profile_id: string;
+  provider: string;
+  phone_number: string;
+  provider_phone_sid: string;
+  active: boolean;
+  webhook_configured: boolean;
+  last_verified_at: string | null;
+  metadata: unknown;
+};
+
 async function requireWorkspace(sb: Sb, userId: string, workspaceId: string) {
   const { data, error } = await sb.from('retail_workspaces').select('id').eq('id', workspaceId).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(error.message);
@@ -31,6 +45,25 @@ async function requireProfile(sb: Sb, userId: string, workspaceId: string, profi
   if (error) throw new Error(error.message);
   if (!data) throw new Error('Retail receptionist profile not found.');
   if (!data.active) throw new Error('Retail receptionist profile must be active before connecting a phone number.');
+}
+
+async function restoreEndpointClaim(snapshot: EndpointSnapshot | null, claimedId: string, userId: string) {
+  if (!snapshot) {
+    await adminSb.from('retail_reception_voice_endpoints').delete().eq('id', claimedId).eq('user_id', userId);
+    return;
+  }
+  await adminSb.from('retail_reception_voice_endpoints').update({
+    workspace_id: snapshot.workspace_id,
+    profile_id: snapshot.profile_id,
+    provider: snapshot.provider,
+    phone_number: snapshot.phone_number,
+    provider_phone_sid: snapshot.provider_phone_sid,
+    active: snapshot.active,
+    webhook_configured: snapshot.webhook_configured,
+    last_verified_at: snapshot.last_verified_at,
+    metadata: snapshot.metadata,
+    updated_at: new Date().toISOString(),
+  }).eq('id', snapshot.id).eq('user_id', userId);
 }
 
 export const getRetailInboundVoiceConfig = createServerFn({ method: 'POST' })
@@ -136,17 +169,21 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
     await requireProfile(sb, context.userId, pairing.data.workspace_id, pairing.data.profile_id);
 
     const existingSid = await adminSb.from('retail_reception_voice_endpoints')
-      .select('id,user_id,workspace_id,profile_id')
+      .select('id,user_id,workspace_id,profile_id,provider,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at,metadata')
       .eq('provider', 'twilio').eq('provider_phone_sid', pairing.data.provider_phone_sid).maybeSingle();
     if (existingSid.error) throw new Error(existingSid.error.message);
     if (existingSid.data && existingSid.data.user_id !== context.userId) throw new Error('This Twilio number is already bound to another Blackstar owner.');
     if (existingSid.data && existingSid.data.workspace_id !== pairing.data.workspace_id) throw new Error('This Twilio number is already bound to another Retail workspace.');
 
     const existingProfile = await adminSb.from('retail_reception_voice_endpoints')
-      .select('id,user_id,provider_phone_sid')
+      .select('id,user_id,workspace_id,provider_phone_sid')
       .eq('profile_id', pairing.data.profile_id).maybeSingle();
     if (existingProfile.error) throw new Error(existingProfile.error.message);
     if (existingProfile.data && existingProfile.data.user_id !== context.userId) throw new Error('Receptionist endpoint ownership mismatch.');
+    if (existingProfile.data && existingProfile.data.workspace_id !== pairing.data.workspace_id) throw new Error('Receptionist endpoint workspace mismatch.');
+    if (existingProfile.data && existingProfile.data.provider_phone_sid !== pairing.data.provider_phone_sid) {
+      throw new Error('Disconnect the receptionist profile from its current phone number before pairing another number.');
+    }
 
     const privatePairing = await adminSb.from('retail_reception_voice_pairings')
       .select('token_hash')
@@ -157,33 +194,70 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
     if (privatePairing.error) throw new Error(privatePairing.error.message);
     if (!privatePairing.data?.token_hash) throw new Error('Retail inbound voice pairing secret is unavailable.');
 
-    await verifyRetailInboundPairing(pairing.data.provider_phone_sid, privatePairing.data.token_hash);
-    const verified = await configureRetailTwilioIncomingNumber(pairing.data.provider_phone_sid);
-
-    const now = new Date().toISOString();
-    const row = {
+    const proof = await verifyRetailInboundPairing(pairing.data.provider_phone_sid, privatePairing.data.token_hash);
+    const claimAt = new Date().toISOString();
+    const previous = existingSid.data ? existingSid.data as EndpointSnapshot : null;
+    const claimRow = {
       user_id: context.userId,
       workspace_id: pairing.data.workspace_id,
       profile_id: pairing.data.profile_id,
       provider: 'twilio',
-      phone_number: verified.phone_number,
-      provider_phone_sid: verified.sid,
-      active: true,
-      webhook_configured: true,
-      last_verified_at: now,
-      metadata: { source: 'retail_inbound_voice_verified_pairing' },
-      updated_at: now,
+      phone_number: proof.phone_number,
+      provider_phone_sid: proof.sid,
+      active: false,
+      webhook_configured: false,
+      last_verified_at: claimAt,
+      metadata: { source: 'retail_inbound_voice_verified_pairing', state: 'provider_configuration_pending' },
+      updated_at: claimAt,
     };
 
-    const targetId = existingSid.data?.id ?? existingProfile.data?.id ?? null;
-    const saved = targetId
-      ? await adminSb.from('retail_reception_voice_endpoints').update(row).eq('id', targetId).eq('user_id', context.userId).select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single()
-      : await adminSb.from('retail_reception_voice_endpoints').insert(row).select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single();
-    if (saved.error) throw new Error(saved.error.message);
+    const claimed = existingSid.data
+      ? await adminSb.from('retail_reception_voice_endpoints').update(claimRow)
+          .eq('id', existingSid.data.id).eq('user_id', context.userId)
+          .select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single()
+      : await adminSb.from('retail_reception_voice_endpoints').insert(claimRow)
+          .select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single();
+    if (claimed.error || !claimed.data) {
+      throw new Error(claimed.error?.message || 'Retail inbound phone number could not be reserved.');
+    }
 
-    await adminSb.from('retail_reception_voice_pairings')
-      .update({ consumed_at: now, updated_at: now })
-      .eq('id', pairing.data.id).eq('user_id', context.userId).is('consumed_at', null);
+    let verified;
+    try {
+      verified = await configureRetailTwilioIncomingNumber(pairing.data.provider_phone_sid);
+    } catch (error) {
+      await restoreEndpointClaim(previous, claimed.data.id, context.userId);
+      throw error;
+    }
+
+    const activatedAt = new Date().toISOString();
+    const activated = await adminSb.from('retail_reception_voice_endpoints').update({
+      phone_number: verified.phone_number,
+      active: true,
+      webhook_configured: true,
+      last_verified_at: activatedAt,
+      metadata: { source: 'retail_inbound_voice_verified_pairing', state: 'active' },
+      updated_at: activatedAt,
+    }).eq('id', claimed.data.id)
+      .eq('user_id', context.userId)
+      .eq('provider_phone_sid', verified.sid)
+      .eq('active', false)
+      .select('id,workspace_id,profile_id,phone_number,provider_phone_sid,active,webhook_configured,last_verified_at').single();
+
+    if (activated.error || !activated.data) {
+      try { await detachRetailTwilioIncomingNumber(pairing.data.provider_phone_sid); } catch { /* fail closed in DB even if carrier detach also fails */ }
+      await restoreEndpointClaim(previous, claimed.data.id, context.userId);
+      throw new Error(activated.error?.message || 'Retail inbound phone number could not be activated after provider configuration.');
+    }
+
+    const consumed = await adminSb.from('retail_reception_voice_pairings')
+      .update({ consumed_at: activatedAt, updated_at: activatedAt })
+      .eq('id', pairing.data.id).eq('user_id', context.userId).is('consumed_at', null)
+      .select('id').maybeSingle();
+    if (consumed.error || !consumed.data) {
+      try { await detachRetailTwilioIncomingNumber(pairing.data.provider_phone_sid); } catch { /* endpoint is rolled back below */ }
+      await restoreEndpointClaim(previous, claimed.data.id, context.userId);
+      throw new Error(consumed.error?.message || 'Retail inbound pairing could not be finalized.');
+    }
 
     await writeAudit({
       userId: context.userId,
@@ -191,9 +265,9 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
       targetType: 'retail_reception_profile',
       targetId: pairing.data.profile_id,
       status: 'success',
-      metadata: { workspaceId: pairing.data.workspace_id, endpointId: saved.data.id, phoneNumber: verified.phone_number, pairingId: pairing.data.id },
+      metadata: { workspaceId: pairing.data.workspace_id, endpointId: activated.data.id, phoneNumber: verified.phone_number, pairingId: pairing.data.id },
     });
-    return saved.data;
+    return activated.data;
   });
 
 export const disconnectRetailInboundVoice = createServerFn({ method: 'POST' })
