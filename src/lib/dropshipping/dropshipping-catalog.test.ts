@@ -16,7 +16,7 @@ describe('Dropshipping connected catalog',()=>{
   });
   it('normalises Etsy-like listings',()=>{
     const items=extractDropshippingCatalogCandidates({results:[{listing_id:42,title:'Original Poster',price:{amount:24,currency_code:'GBP'},quantity:5}]});
-    expect(items[0]?.name).toBe('Original Poster'); expect(items[0]?.inventory).toBe(5);
+    expect(items[0]).toMatchObject({sourceId:'42',name:'Original Poster',inventory:5,currency:'GBP'});
   });
   it('rejects credential-shaped catalog input',()=>{
     expect(()=>assertNoCatalogCredentials({query:'travel',api_key:'nope'})).toThrow(/Credentials belong/i);
