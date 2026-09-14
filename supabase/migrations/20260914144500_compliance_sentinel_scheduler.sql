@@ -14,6 +14,24 @@ alter table public.compliance_scheduler_credentials enable row level security;
 revoke all on table public.compliance_scheduler_credentials from anon, authenticated;
 grant select on table public.compliance_scheduler_credentials to service_role;
 
+drop policy if exists compliance_scheduler_credentials_service_role on public.compliance_scheduler_credentials;
+create policy compliance_scheduler_credentials_service_role
+  on public.compliance_scheduler_credentials
+  for select
+  to service_role
+  using (true);
+
+-- Sync telemetry is intentionally invisible to normal app users and writable by the worker only.
+revoke all on table public.compliance_sync_runs from anon, authenticated;
+grant select, insert, update on table public.compliance_sync_runs to service_role;
+drop policy if exists compliance_sync_runs_service_role on public.compliance_sync_runs;
+create policy compliance_sync_runs_service_role
+  on public.compliance_sync_runs
+  for all
+  to service_role
+  using (true)
+  with check (true);
+
 do $$
 declare
   v_token text;
