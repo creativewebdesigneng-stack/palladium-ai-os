@@ -23,6 +23,7 @@ import WebsiteDomainManager from '@/components/website-studio/WebsiteDomainManag
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
 import WebsiteNavigationBuilder from '@/components/website-studio/WebsiteNavigationBuilder';
+import WebsiteFooterBuilder from '@/components/website-studio/WebsiteFooterBuilder';
 import { resolvePageHtml, setPageHtml } from '@/lib/website-studio/website-page-documents';
 import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
@@ -173,6 +174,7 @@ export default function WebsiteStudio(){
         <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
         <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
+        <WebsiteFooterBuilder project={draft} setProject={setDraft}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsiteSectionInspector project={draft} setProject={setDraft} activePath={previewPagePath}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
