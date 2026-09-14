@@ -5,8 +5,18 @@ import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
+import {
+  hasStagedWebsiteStudioFormDeploymentToken,
+  promoteWebsiteStudioFormDeploymentToken,
+  stageWebsiteStudioFormDeploymentToken,
+  vercelFormTokenTarget,
+} from '@/lib/website-studio/website-form-deployment-tokens.server';
 
-type Sb={from:(table:string)=>any;storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}}};
+type Sb={
+  from:(table:string)=>any;
+  rpc:(name:string,args:Record<string,unknown>)=>Promise<{error:{message:string}|null}>;
+  storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}};
+};
 type PublishTarget='preview'|'production';
 type DeploymentState={id:string;url:string;readyState:string|null};
 
@@ -38,7 +48,6 @@ function backendDependencies(appConfig:unknown){
     hasAuth:Boolean(auth['enabled']),
   };
 }
-
 
 async function vercelFetchJson(url:string,token:string,init?:RequestInit):Promise<{ok:boolean;status:number;payload:Record<string,unknown>}>{
   const controller=new AbortController();
@@ -178,6 +187,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
     }
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
+    const formTokenTarget=vercelFormTokenTarget(data.target);
 
     try{
       const created=await createVercelDeployment({
@@ -188,6 +198,13 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         target:data.target,
       });
 
+      await stageWebsiteStudioFormDeploymentToken(sb,{
+        projectId:data.projectId,
+        target:formTokenTarget,
+        tokenHash:packaged.formRuntimeTokenHash,
+        deploymentRef:created.id,
+      });
+
       const {error:idError}=await sb.from('website_studio_projects').update({
         deployment_provider:'vercel',
         deployment_id:created.id,
@@ -196,7 +213,16 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       if(idError)throw new Error(idError.message);
 
       const verified=await waitForVercelReady(token,teamId,created);
-      if(verified.verified)await markDeploymentReady(sb,data.projectId,data.target,verified.deployment);
+      if(verified.verified){
+        await markDeploymentReady(sb,data.projectId,data.target,verified.deployment);
+        if(packaged.formRuntimeTokenHash){
+          await promoteWebsiteStudioFormDeploymentToken(sb,{
+            projectId:data.projectId,
+            target:formTokenTarget,
+            deploymentRef:created.id,
+          });
+        }
+      }
 
       await writeAudit({
         userId:context.userId,
@@ -204,7 +230,12 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         targetType:'website_studio_project',
         targetId:data.projectId,
         status:'success',
-        metadata:{provider:'vercel',target:data.target,deployment_id:created.id,ready_state:verified.deployment.readyState,verified_ready:verified.verified,promoted_private_assets:packaged.privateAssetCount},
+        metadata:{
+          provider:'vercel',target:data.target,deployment_id:created.id,
+          ready_state:verified.deployment.readyState,verified_ready:verified.verified,
+          promoted_private_assets:packaged.privateAssetCount,
+          form_runtime_token_activated:Boolean(packaged.formRuntimeTokenHash&&verified.verified),
+        },
       });
 
       return {
@@ -236,18 +267,30 @@ export const verifyWebsiteStudioDeployment=createServerFn({method:'POST'})
     const {configured,token,teamId}=publisherConfig();
     if(!configured)throw new Error('Website Studio Vercel publishing is not configured on this deployment.');
 
-    const {data:project,error}=await sb.from('website_studio_projects').select('id,deployment_provider,deployment_id').eq('id',data.projectId).maybeSingle();
+    const {data:project,error}=await sb.from('website_studio_projects')
+      .select('id,deployment_provider,deployment_id,form_deployment_tokens')
+      .eq('id',data.projectId)
+      .maybeSingle();
     if(error)throw new Error(error.message);
     if(!project?.deployment_id||project.deployment_provider!=='vercel')throw new Error('No Vercel deployment is recorded for this project.');
 
     const deployment=await getVercelDeployment(token,teamId,project.deployment_id);
     if(terminalFailure(deployment.readyState))throw new Error(`Vercel deployment ended in state ${deployment.readyState}.`);
     const verified=deployment.readyState==='READY';
-    if(verified)await markDeploymentReady(sb,data.projectId,data.target,deployment);
+    if(verified){
+      await markDeploymentReady(sb,data.projectId,data.target,deployment);
+      const formTokenTarget=vercelFormTokenTarget(data.target);
+      if(hasStagedWebsiteStudioFormDeploymentToken(project.form_deployment_tokens,formTokenTarget,deployment.id)){
+        await promoteWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          deploymentRef:deployment.id,
+        });
+      }
+    }
 
     return {provider:'vercel',target:data.target,url:deployment.url,deploymentId:deployment.id,readyState:deployment.readyState,verified};
   });
-
 
 function domainStateFromPayload(domain:string,payload:Record<string,unknown>){
   const verification=Array.isArray(payload['verification'])?payload['verification']:[];
