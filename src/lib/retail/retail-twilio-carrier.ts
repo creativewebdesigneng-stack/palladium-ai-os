@@ -85,7 +85,11 @@ export function escapeTwimlText(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
-export function buildRetailTwilioRequest(config: RetailTwilioConfig, payload: RetailTwilioPayload) {
+export function buildRetailTwilioRequest(
+  config: RetailTwilioConfig,
+  payload: RetailTwilioPayload,
+  statusCallbackUrl?: string,
+) {
   if (payload.channel === 'voice') {
     if (!config.voiceFromNumber) throw new Error('twilio_voice_not_configured');
     const body = new URLSearchParams({
@@ -93,6 +97,11 @@ export function buildRetailTwilioRequest(config: RetailTwilioConfig, payload: Re
       From: config.voiceFromNumber,
       Twiml: `<Response><Say>${escapeTwimlText(payload.body)}</Say></Response>`,
     });
+    if (statusCallbackUrl) {
+      body.set('StatusCallback', statusCallbackUrl);
+      body.set('StatusCallbackMethod', 'POST');
+      for (const event of ['initiated','ringing','answered','completed']) body.append('StatusCallbackEvent', event);
+    }
     return {
       url: `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Calls.json`,
       body,
@@ -117,6 +126,7 @@ export function buildRetailTwilioRequest(config: RetailTwilioConfig, payload: Re
     body.set('To', payload.recipient);
     body.set('Body', payload.body);
   }
+  if (statusCallbackUrl) body.set('StatusCallback', statusCallbackUrl);
 
   return {
     url: `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json`,
