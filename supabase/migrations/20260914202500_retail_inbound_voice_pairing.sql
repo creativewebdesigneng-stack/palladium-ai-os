@@ -8,7 +8,7 @@ create table public.retail_reception_voice_pairings (
   profile_id uuid not null references public.retail_reception_profiles(id) on delete cascade,
   provider text not null default 'twilio' check (provider = 'twilio'),
   provider_phone_sid text not null check (provider_phone_sid ~ '^PN[0-9A-Fa-f]{32}$'),
-  token_hash text not null check (char_length(token_hash) = 64),
+  token_hash text not null check (token_hash ~ '^[0-9a-f]{64}$'),
   expires_at timestamptz not null,
   consumed_at timestamptz,
   created_at timestamptz not null default now(),
@@ -33,7 +33,8 @@ alter table public.retail_reception_voice_pairings enable row level security;
 alter table public.retail_reception_voice_pairings force row level security;
 
 revoke all on table public.retail_reception_voice_pairings from public, anon, authenticated;
-grant select on table public.retail_reception_voice_pairings to authenticated;
+grant select(id, user_id, workspace_id, profile_id, provider, provider_phone_sid, expires_at, consumed_at, created_at, updated_at)
+  on table public.retail_reception_voice_pairings to authenticated;
 grant all on table public.retail_reception_voice_pairings to service_role;
 
 create policy retail_reception_voice_pairings_select_own
