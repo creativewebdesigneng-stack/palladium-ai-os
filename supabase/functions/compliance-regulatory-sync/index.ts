@@ -174,7 +174,7 @@ async function syncOne(supabase: any, source: any) {
       await supabase.from("compliance_sync_runs").update({ status: "skipped", finished_at: new Date().toISOString(), diagnostics: { reason: "adapter_not_verified" } }).eq("id", run.id);
       return { sourceId: source.id, status: "skipped", reason: "adapter_not_verified" };
     }
-    if (!["fca_handbook", "official_web"].includes(source.adapter)) {
+    if (!["fca_handbook", "official_web", "official_feed"].includes(source.adapter)) {
       await supabase.from("compliance_sync_runs").update({ status: "skipped", finished_at: new Date().toISOString(), diagnostics: { reason: "adapter_not_deployed", adapter: source.adapter } }).eq("id", run.id);
       return { sourceId: source.id, status: "skipped", reason: "adapter_not_deployed" };
     }
