@@ -10,6 +10,8 @@ export type ListingDraftRecord={
   requires_approval:true;
 };
 
+export type ListingDraftMetadata=Record<string,unknown>&{listing_drafts:Record<string,ListingDraftRecord>};
+
 type CatalogLike={
   name:string;
   sku?:string|null;
@@ -24,15 +26,15 @@ type CatalogLike={
 const clean=(value:unknown,max=4000)=>typeof value==='string'?value.trim().slice(0,max):'';
 const json=(value:unknown,max=7000)=>JSON.stringify(value??null).slice(0,max);
 
-export function isDropshipProductBlocked(item:CatalogLike){
+export function isDropshipProductBlocked(item:CatalogLike):boolean{
   const metadata=item.metadata??{};
   const compliance=metadata['compliance'];
   const stage=metadata['lifecycle_stage'];
-  return stage==='blocked'||(compliance&&typeof compliance==='object'&&(compliance as Record<string,unknown>)['allowed']===false);
+  return stage==='blocked'||stage==='rejected'||Boolean(compliance&&typeof compliance==='object'&&(compliance as Record<string,unknown>)['allowed']===false);
 }
 
 export function buildListingDraftPrompt(item:CatalogLike,channel:DropshipChannel,locale='en-GB',notes=''){
-  if(isDropshipProductBlocked(item))throw new Error('Blocked products cannot enter the listing-draft flow until compliance is resolved.');
+  if(isDropshipProductBlocked(item))throw new Error('Blocked or rejected products cannot enter the listing-draft flow until the product decision is resolved.');
   const metadata=item.metadata??{};
   const evidence=metadata['evidence'];
   const economics=metadata['unit_economics'];
@@ -58,10 +60,10 @@ export function buildListingDraftPrompt(item:CatalogLike,channel:DropshipChannel
   return prompt.slice(0,3900);
 }
 
-export function withListingDraftMetadata(metadata:Record<string,unknown>|null|undefined,input:{channel:DropshipChannel;text:string;provider?:string;model?:string;generatedAt?:string}){
+export function withListingDraftMetadata(metadata:Record<string,unknown>|null|undefined,input:{channel:DropshipChannel;text:string;provider?:string;model?:string;generatedAt?:string}):ListingDraftMetadata{
   const existing=metadata??{};
   const currentDrafts=existing['listing_drafts'];
-  const drafts=currentDrafts&&typeof currentDrafts==='object'&&!Array.isArray(currentDrafts)?currentDrafts as Record<string,unknown>:{};
+  const drafts=(currentDrafts&&typeof currentDrafts==='object'&&!Array.isArray(currentDrafts)?currentDrafts:{}) as Record<string,ListingDraftRecord>;
   const record:ListingDraftRecord={
     text:input.text.trim().slice(0,16000),
     channel:input.channel,
