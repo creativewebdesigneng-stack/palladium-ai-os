@@ -3,6 +3,16 @@ import CompanyGrowthLab from '@/components/company/CompanyGrowthLab';
 import CompanyAIWorkforceBlueprint from '@/components/company/CompanyAIWorkforceBlueprint';
 import CompanyHealthAssessment from '@/components/company/CompanyHealthAssessment';
 import CompanyWorkspace from '@/components/company/CompanyWorkspace';
+import CompanyStrategyRoom from '@/components/company/CompanyStrategyRoom';
+import CompanyKPIDashboard from '@/components/company/CompanyKPIDashboard';
+import CompanyOrganisationMap from '@/components/company/CompanyOrganisationMap';
+import CompanySupplierRisk from '@/components/company/CompanySupplierRisk';
+import CompanyBoardRoom from '@/components/company/CompanyBoardRoom';
+import CompanyResilienceMap from '@/components/company/CompanyResilienceMap';
+import CompanyCompetitiveMap from '@/components/company/CompanyCompetitiveMap';
+import CompanyTransformationRoadmap from '@/components/company/CompanyTransformationRoadmap';
+import CompanyFinancialHealth from '@/components/company/CompanyFinancialHealth';
+import CompanyAIWorkforceOrchestrator from '@/components/company/CompanyAIWorkforceOrchestrator';
 import { Link } from 'react-router-dom';
 import {
   Building2, Users, Bot, Workflow, Contact, Megaphone, Banknote, Scale, BarChart3,
@@ -86,6 +96,16 @@ export default function CompanyHub(){
    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{systems.map(([name,path,Icon,text])=><Link key={path} to={path} className="group rounded-2xl border border-white/[.07] bg-white/[.02] p-4 transition hover:border-cyan-300/20"><div className="flex items-center gap-3"><div className="rounded-xl border border-cyan-300/10 bg-cyan-300/[.04] p-2"><Icon className="h-4 w-4 text-cyan-300"/></div><h3 className="text-sm font-medium text-white group-hover:text-cyan-100">{name}</h3></div><p className="mt-3 text-xs leading-5 text-zinc-500">{text}</p></Link>)}</div>
   </section>
 
+  <CompanyStrategyRoom />
+  <CompanyKPIDashboard />
+  <CompanyFinancialHealth />
+  <CompanyBoardRoom />
+  <CompanyOrganisationMap />
+  <CompanySupplierRisk />
+  <CompanyResilienceMap />
+  <CompanyCompetitiveMap />
+  <CompanyTransformationRoadmap />
+  <CompanyAIWorkforceOrchestrator />
   <CompanyHealthAssessment />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
