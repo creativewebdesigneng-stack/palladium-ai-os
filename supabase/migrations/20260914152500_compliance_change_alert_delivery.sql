@@ -172,7 +172,7 @@ declare
   v_pref_in_app boolean;
   v_pref_min_severity text;
   v_pref_muted text[];
-  v_notification_inserted boolean;
+  v_notification_count integer;
 begin
   select r.id as regulation_id,
          r.title,
@@ -203,6 +203,7 @@ begin
        and (coalesce(cardinality(a.domains), 0) = 0 or a.domains && coalesce(v_reg.domains, '{}'::text[]))
        and public.compliance_severity_rank(new.severity) >= public.compliance_severity_rank(a.minimum_severity)
   loop
+    v_review_id := null;
     insert into public.compliance_change_reviews (
       user_id, profile_id, change_id, alert_id, status, metadata
     ) values (
@@ -254,7 +255,6 @@ begin
       continue;
     end if;
 
-    v_notification_inserted := false;
     insert into public.notifications (
       user_id, kind, severity, title, body, link, metadata
     ) values (
@@ -276,8 +276,8 @@ begin
     )
     on conflict do nothing;
 
-    get diagnostics v_notification_inserted = row_count;
-    if v_notification_inserted then
+    get diagnostics v_notification_count = row_count;
+    if v_notification_count > 0 then
       update public.compliance_alerts
          set last_notified_at = now()
        where id = v_alert.id;
