@@ -38,3 +38,11 @@ export function watchlistBand(score:number){
   const value=clamp(score)??0;
   return value>=75?'priority':value>=55?'test':value>=35?'watch':'weak';
 }
+
+
+export function scoreTrend(current:number|null|undefined,previous:number|null|undefined){
+  if(current==null||previous==null||!Number.isFinite(current)||!Number.isFinite(previous))return {delta:null,direction:'unknown' as const};
+  const delta=round(current-previous);
+  if(Math.abs(delta)<2)return {delta,direction:'stable' as const};
+  return {delta,direction:delta>0?'rising' as const:'falling' as const};
+}
