@@ -160,3 +160,27 @@ export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'
     if(updateError)throw new Error(updateError.message);
     return out;
   });
+
+
+export const updateDropshippingOpportunityMonitor=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>z.object({
+    id:uuid,
+    enabled:z.boolean(),
+    interval_hours:z.coerce.number().int().min(1).max(168).default(24),
+  }).parse(value))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const nextCheck=data.enabled?new Date().toISOString():null;
+    const {data:out,error}=await sb.from('dropshipping_opportunities').update({
+      monitor_enabled:data.enabled,
+      monitor_interval_hours:data.interval_hours,
+      next_check_at:nextCheck,
+      claimed_at:null,
+      monitor_attempts:0,
+      monitor_last_error:null,
+      updated_at:new Date().toISOString(),
+    }).eq('id',data.id).eq('user_id',context.userId).select().single();
+    if(error)throw new Error(error.message);
+    return out;
+  });
