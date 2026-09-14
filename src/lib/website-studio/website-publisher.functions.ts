@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
@@ -6,8 +7,8 @@ import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
 import {
-  hasStagedWebsiteStudioFormDeploymentToken,
   promoteWebsiteStudioFormDeploymentToken,
+  stagedWebsiteStudioFormDeploymentTokenRef,
   stageWebsiteStudioFormDeploymentToken,
   vercelFormTokenTarget,
 } from '@/lib/website-studio/website-form-deployment-tokens.server';
@@ -188,21 +189,24 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
     const formTokenTarget=vercelFormTokenTarget(data.target);
+    const formTokenStagingRef=packaged.formRuntimeTokenHash?`vercel-${randomUUID()}`:'';
 
     try{
+      if(packaged.formRuntimeTokenHash){
+        await stageWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          tokenHash:packaged.formRuntimeTokenHash,
+          stagingRef:formTokenStagingRef,
+        });
+      }
+
       const created=await createVercelDeployment({
         token,
         teamId,
         name:project.slug,
         files:packaged.files,
         target:data.target,
-      });
-
-      await stageWebsiteStudioFormDeploymentToken(sb,{
-        projectId:data.projectId,
-        target:formTokenTarget,
-        tokenHash:packaged.formRuntimeTokenHash,
-        deploymentRef:created.id,
       });
 
       const {error:idError}=await sb.from('website_studio_projects').update({
@@ -219,7 +223,8 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
           await promoteWebsiteStudioFormDeploymentToken(sb,{
             projectId:data.projectId,
             target:formTokenTarget,
-            deploymentRef:created.id,
+            stagingRef:formTokenStagingRef,
+            activeRef:created.id,
           });
         }
       }
@@ -280,11 +285,13 @@ export const verifyWebsiteStudioDeployment=createServerFn({method:'POST'})
     if(verified){
       await markDeploymentReady(sb,data.projectId,data.target,deployment);
       const formTokenTarget=vercelFormTokenTarget(data.target);
-      if(hasStagedWebsiteStudioFormDeploymentToken(project.form_deployment_tokens,formTokenTarget,deployment.id)){
+      const stagedRef=stagedWebsiteStudioFormDeploymentTokenRef(project.form_deployment_tokens,formTokenTarget);
+      if(stagedRef){
         await promoteWebsiteStudioFormDeploymentToken(sb,{
           projectId:data.projectId,
           target:formTokenTarget,
-          deploymentRef:deployment.id,
+          stagingRef:stagedRef,
+          activeRef:deployment.id,
         });
       }
     }
