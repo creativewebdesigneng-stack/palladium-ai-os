@@ -97,6 +97,7 @@ begin
     raise exception 'Website Studio project not found' using errcode = '42501';
   end if;
 
+  v_tokens := coalesce(v_tokens, '{}'::jsonb);
   v_slot := coalesce(v_tokens -> v_target, '{}'::jsonb);
   if coalesce(v_slot ->> 'pending_ref', '') <> v_ref then
     raise exception 'staged deployment token does not match this deployment' using errcode = '22023';
@@ -107,9 +108,17 @@ begin
     raise exception 'no staged deployment token exists' using errcode = '22023';
   end if;
 
+  if v_target like 'github:%' then
+    select coalesce(jsonb_object_agg(entry.key, entry.value), '{}'::jsonb)
+      into v_tokens
+      from jsonb_each(v_tokens) as entry(key, value)
+     where entry.key not like 'github:%'
+        or entry.key = v_target;
+  end if;
+
   update public.website_studio_projects p
      set form_deployment_tokens = jsonb_set(
-       coalesce(p.form_deployment_tokens, '{}'::jsonb),
+       v_tokens,
        array[v_target],
        (
          v_slot - 'pending_hash' - 'pending_ref' - 'pending_at'
