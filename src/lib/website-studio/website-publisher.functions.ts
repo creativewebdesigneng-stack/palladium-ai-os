@@ -5,7 +5,6 @@ import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { buildWebsiteProjectManifest } from '@/lib/website-studio/website-project';
 import { writeAudit } from '@/lib/platform/audit.server';
-import { Buffer } from 'node:buffer';
 import { buildDeploymentAssetManifest, deploymentAssetPath, rewriteWebsiteAssetReferences } from '@/lib/website-studio/website-assets';
 
 type Sb={from:(table:string)=>any;storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}}};
@@ -210,6 +209,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       if(blob.size>26_214_400)throw new Error(`Asset "${asset.name}" exceeds the 25 MB Website Studio publishing limit.`);
       totalPrivateBytes+=blob.size;
       if(totalPrivateBytes>52_428_800)throw new Error('Private uploaded assets exceed the 50 MB per-deployment publishing limit.');
+      const {Buffer}=await import('node:buffer');
       const buffer=Buffer.from(await blob.arrayBuffer());
       deployFiles.push({
         file:deploymentAssetPath(asset),
