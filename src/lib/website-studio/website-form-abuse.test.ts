@@ -14,6 +14,7 @@ describe('Website Studio public form abuse controls',()=>{
     expect(functionSource).toContain('rate_limited');
     expect(functionSource).toContain('"Retry-After"');
     expect(functionSource).toContain(',429,');
+    expect(functionSource.indexOf('const clientLimit=await consumeRateLimit')).toBeLessThan(functionSource.indexOf('const globalLimit=await consumeRateLimit'));
   });
 
   it('keeps rate-limit persistence inaccessible to public browser roles',()=>{
