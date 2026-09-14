@@ -206,14 +206,17 @@ export const executeRetailReceptionAction = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const connected = await tryExecuteRetailConnectedCommunication(context.userId, data.id);
     if (connected) {
+      const providerAccepted = Boolean(connected.provider_accepted);
       await writeAudit({
         userId: context.userId,
         action: 'retail.communication.connected_delivery',
         targetType: 'retail_reception_action',
         targetId: data.id,
-        status: connected.delivered ? 'success' : 'failed',
+        status: connected.delivered || providerAccepted ? 'success' : 'failed',
         metadata: {
           provider: connected.provider ?? null,
+          providerAccepted,
+          providerStatus: connected.provider_status ?? null,
           delivered: connected.delivered,
           communicationId: connected.communication_id ?? null,
           executionStatus: connected.status,
