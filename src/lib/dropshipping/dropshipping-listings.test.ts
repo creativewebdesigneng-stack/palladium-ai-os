@@ -28,14 +28,16 @@ describe('dropshipping listing drafts',()=>{
   it('preserves existing metadata and channel drafts when saving a new draft',()=>{
     const first=withListingDraftMetadata(item.metadata,{channel:'shopify',text:'Shopify draft',provider:'groq',model:'model-a',generatedAt:'2026-09-14T16:00:00.000Z'});
     const second=withListingDraftMetadata(first,{channel:'ebay',text:'eBay draft',provider:'groq',model:'model-a',generatedAt:'2026-09-14T16:01:00.000Z'});
-    expect(second.source).toBe('dropshipping-hub');
-    expect(second.listing_drafts.shopify.text).toBe('Shopify draft');
-    expect(second.listing_drafts.ebay.text).toBe('eBay draft');
-    expect(second.listing_drafts.ebay.requires_approval).toBe(true);
+    const shopifyDraft=second.listing_drafts['shopify'];
+    const ebayDraft=second.listing_drafts['ebay'];
+    expect(second['source']).toBe('dropshipping-hub');
+    expect(shopifyDraft?.text).toBe('Shopify draft');
+    expect(ebayDraft?.text).toBe('eBay draft');
+    expect(ebayDraft?.requires_approval).toBe(true);
   });
 
   it('caps stored generated text',()=>{
     const metadata=withListingDraftMetadata({}, {channel:'shopify',text:'x'.repeat(20000)});
-    expect(metadata.listing_drafts.shopify.text).toHaveLength(16000);
+    expect(metadata.listing_drafts['shopify']?.text).toHaveLength(16000);
   });
 });
