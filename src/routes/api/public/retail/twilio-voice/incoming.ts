@@ -5,9 +5,13 @@ export const Route = createFileRoute('/api/public/retail/twilio-voice/incoming')
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { processRetailTwilioVoiceIncoming, verifyRetailTwilioVoiceRequest, retailTwilioVoicePaths } =
-            await import('@/lib/retail/retail-inbound-voice.server');
+          const [{ processRetailTwilioVoiceIncoming, verifyRetailTwilioVoiceRequest, retailTwilioVoicePaths }, { assertRetailInboundSessionIdentity }] =
+            await Promise.all([
+              import('@/lib/retail/retail-inbound-voice.server'),
+              import('@/lib/retail/retail-inbound-session-guard.server'),
+            ]);
           const params = await verifyRetailTwilioVoiceRequest(request, retailTwilioVoicePaths.incoming);
+          await assertRetailInboundSessionIdentity(params);
           return processRetailTwilioVoiceIncoming(params);
         } catch (error) {
           const status = typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number' ? error.status : 500;
