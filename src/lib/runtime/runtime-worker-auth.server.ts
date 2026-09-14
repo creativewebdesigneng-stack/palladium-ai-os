@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-type WorkerCredentialName = "workflow_runner" | "webhook_retry";
+type WorkerCredentialName = "workflow_runner" | "webhook_retry" | "dropshipping_monitor";
 
 type RuntimeWorkerVerifierConfig = {
   supabaseUrl: string;
@@ -15,6 +15,7 @@ type RuntimeWorkerVerifierOptions = {
 const ENV_BY_NAME: Record<WorkerCredentialName, string> = {
   workflow_runner: "WORKFLOW_RUNNER_CRON_SECRET",
   webhook_retry: "WEBHOOK_RETRY_CRON_SECRET",
+  dropshipping_monitor: "DROPSHIPPING_MONITOR_CRON_SECRET",
 };
 
 function safeEqual(left: string, right: string) {
