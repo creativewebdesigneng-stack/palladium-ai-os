@@ -32,6 +32,30 @@ create policy compliance_sync_runs_service_role
   using (true)
   with check (true);
 
+-- Cover foreign-key access paths used by applicability, evidence, controls, findings and history.
+create index if not exists compliance_alerts_profile_fk_idx on public.compliance_alerts(profile_id);
+create index if not exists compliance_applicability_profile_fk_idx on public.compliance_applicability(profile_id);
+create index if not exists compliance_applicability_regulation_fk_idx on public.compliance_applicability(regulation_id);
+create index if not exists compliance_assessments_profile_fk_idx on public.compliance_assessments(profile_id);
+create index if not exists compliance_control_mappings_control_fk_idx on public.compliance_control_mappings(control_id);
+create index if not exists compliance_control_mappings_obligation_fk_idx on public.compliance_control_mappings(obligation_id);
+create index if not exists compliance_controls_profile_fk_idx on public.compliance_controls(profile_id);
+create index if not exists compliance_evidence_assessment_fk_idx on public.compliance_evidence(assessment_id);
+create index if not exists compliance_evidence_control_fk_idx on public.compliance_evidence(control_id);
+create index if not exists compliance_evidence_obligation_fk_idx on public.compliance_evidence(obligation_id);
+create index if not exists compliance_evidence_user_fk_idx on public.compliance_evidence(user_id);
+create index if not exists compliance_findings_assessment_fk_idx on public.compliance_findings(assessment_id);
+create index if not exists compliance_findings_control_fk_idx on public.compliance_findings(control_id);
+create index if not exists compliance_findings_obligation_fk_idx on public.compliance_findings(obligation_id);
+create index if not exists compliance_findings_profile_fk_idx on public.compliance_findings(profile_id);
+create index if not exists compliance_obligations_profile_fk_idx on public.compliance_obligations(profile_id);
+create index if not exists compliance_obligations_regulation_fk_idx on public.compliance_obligations(regulation_id);
+create index if not exists compliance_obligations_version_fk_idx on public.compliance_obligations(regulation_version_id);
+create index if not exists compliance_regulations_current_version_fk_idx on public.compliance_regulations(current_version_id);
+create index if not exists compliance_changes_current_version_fk_idx on public.compliance_regulatory_changes(current_version_id);
+create index if not exists compliance_changes_previous_version_fk_idx on public.compliance_regulatory_changes(previous_version_id);
+create index if not exists compliance_changes_regulation_fk_idx on public.compliance_regulatory_changes(regulation_id);
+
 do $$
 declare
   v_token text;
