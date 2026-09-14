@@ -10,6 +10,7 @@ import {
 } from './website-form-deployment-tokens.server';
 
 const migrationSource=readFileSync(new URL('../../../supabase/migrations/20260914134000_website_studio_form_deployment_tokens.sql',import.meta.url),'utf8');
+const hardeningMigrationSource=readFileSync(new URL('../../../supabase/migrations/20260914141000_website_studio_form_token_invoker_hardening.sql',import.meta.url),'utf8');
 const edgeSource=readFileSync(new URL('../../../supabase/functions/website-studio-form-submit/index.ts',import.meta.url),'utf8');
 const publisherSource=readFileSync(new URL('./website-publisher.functions.ts',import.meta.url),'utf8');
 const githubSource=readFileSync(new URL('./website-github.functions.ts',import.meta.url),'utf8');
@@ -65,6 +66,14 @@ describe('Website Studio generated form token lifecycle',()=>{
     expect(migrationSource).toContain("'^(vercel:(preview|production)|github:[0-9a-f]{64})$'");
     expect(migrationSource).toContain('to authenticated;');
     expect(migrationSource).toContain('from public, anon, service_role;');
+  });
+
+  it('runs lifecycle RPCs as the authenticated caller rather than with elevated definer privileges',()=>{
+    expect(hardeningMigrationSource).toContain('website_studio_stage_form_deployment_token(uuid, text, text, text)\n  security invoker;');
+    expect(hardeningMigrationSource).toContain('website_studio_promote_form_deployment_token(uuid, text, text, text)\n  security invoker;');
+    expect(hardeningMigrationSource).toContain('from public, anon, service_role;');
+    expect(hardeningMigrationSource).toContain('to authenticated;');
+    expect(hardeningMigrationSource).not.toContain('security definer');
   });
 
   it('revokes superseded GitHub target slots only when a replacement is promoted',()=>{
