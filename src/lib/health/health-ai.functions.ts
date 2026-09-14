@@ -24,7 +24,7 @@ const emergencyPatterns = [
   /\b(suicid|kill myself|end my life|self[- ]harm)\b/i,
 ];
 
-function emergencyMatch(text: string) {
+export function matchesHealthEmergencySignal(text: string) {
   return emergencyPatterns.some((pattern) => pattern.test(text));
 }
 
@@ -52,7 +52,7 @@ export const runHealthCoachInquiry = createServerFn({ method: 'POST' })
   .inputValidator((value: unknown) => inquirySchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    if (emergencyMatch(data.question)) {
+    if (matchesHealthEmergencySignal(data.question)) {
       await writeAudit({
         userId: context.userId, action: 'health.coach.emergency_escalation',
         targetType: 'health_profile', targetId: context.userId, status: 'success',
