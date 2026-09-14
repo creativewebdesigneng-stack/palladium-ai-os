@@ -67,7 +67,7 @@ begin
    limit 1;
 
   if v_token is null then
-    v_token := encode(gen_random_bytes(48), 'hex');
+    v_token := encode(extensions.gen_random_bytes(48), 'hex');
     perform vault.create_secret(
       v_token,
       'blackstar_compliance_sentinel_scheduler_token',
