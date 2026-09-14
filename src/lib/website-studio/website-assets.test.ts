@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {deploymentAssetPath,rewriteWebsiteAssetReferences,safeAssetFilename} from './website-assets';
+describe('website deployment assets',()=>{it('creates stable safe paths',()=>{expect(safeAssetFilename('Hero Image (Final).png')).toBe('Hero-Image-Final-.png');expect(deploymentAssetPath({id:'abc',name:'Hero.png'})).toBe('assets/abc-Hero.png')});it('rewrites Blackstar asset references',()=>{expect(rewriteWebsiteAssetReferences('<img src="blackstar-asset://a1">',[{id:'a1',name:'hero.png'}])).toContain('/assets/a1-hero.png')});});
