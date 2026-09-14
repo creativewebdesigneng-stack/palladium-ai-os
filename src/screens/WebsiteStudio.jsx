@@ -19,6 +19,8 @@ import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPub
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
 import WebsiteNavigationBuilder from '@/components/website-studio/WebsiteNavigationBuilder';
+import WebsiteComponentManager from '@/components/website-studio/WebsiteComponentManager';
+import WebsiteFooterBuilder from '@/components/website-studio/WebsiteFooterBuilder';
 import { resolvePageHtml, setPageHtml } from '@/lib/website-studio/website-page-documents';
 import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
@@ -60,6 +62,16 @@ export default function WebsiteStudio(){
 
   const preview=useMemo(()=>documentForPreview(draft,previewPagePath),[draft,previewPagePath]);
   const quality=useMemo(()=>assessWebsiteQuality(draft.html||'',draft.css||''),[draft.html,draft.css]);
+  const activePagePath=normalizePagePath(previewPagePath);
+  const activePage=useMemo(()=>{
+    const pages=Array.isArray(draft.pages)?draft.pages:[];
+    return pages.find(page=>normalizePagePath(page?.path||'/')===activePagePath)||pages[0]||{name:'Home',path:'/'};
+  },[draft.pages,activePagePath]);
+  const activePageHtml=useMemo(()=>resolvePageHtml(draft.name||'Website',draft.html||'',activePage),[draft.name,draft.html,activePage]);
+  const setActivePageHtml=(html)=>{
+    if(activePagePath==='/')setDraft(current=>({...current,html}));
+    else setDraft(current=>({...current,pages:setPageHtml(Array.isArray(current.pages)?current.pages:[],activePagePath,html)}));
+  };
 
   const createFromPrompt=()=>{
     if(!draft.name.trim())return setError('Give the website a project name first.');
@@ -156,6 +168,7 @@ export default function WebsiteStudio(){
           <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2 text-cyan-300"><Blocks className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Visual block library</span></div><span className="rounded-full border border-cyan-300/15 px-2.5 py-1 text-[10px] text-cyan-200">Target: {normalizePagePath(previewPagePath)}</span></div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{WEBSITE_BLOCKS.map(block=><button key={block.id} onClick={()=>addBlock(block.id)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:border-cyan-300/20"><p className="text-xs font-medium text-white">{block.name}</p><p className="mt-1 text-[10px] text-zinc-600">{block.category}</p></button>)}</div>
         </section>
+        <WebsiteComponentManager html={activePageHtml} setHtml={setActivePageHtml} pagePath={activePagePath}/>
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
           <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-amber-300"><History className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Revision history</span></div><button disabled={!draft.id||busy} onClick={saveRevision} className="rounded-lg border border-amber-300/20 px-2.5 py-1.5 text-[10px] text-amber-200 disabled:opacity-40">Save restore point</button></div>
@@ -165,6 +178,7 @@ export default function WebsiteStudio(){
         <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
         <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
+        <WebsiteFooterBuilder name={draft.name||'Website'} brief={draft.brief||{}} setBrief={(brief)=>setDraft({...draft,brief})} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
