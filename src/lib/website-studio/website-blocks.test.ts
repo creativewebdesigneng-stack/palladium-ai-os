@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendWebsiteBlock,
+  createWebsiteBlockMarkup,
   deleteWebsiteBlock,
   duplicateWebsiteBlock,
   listWebsiteBlockInstances,
@@ -18,19 +19,22 @@ describe('website blocks',()=>{
     expect(out.indexOf('Ready to get started?')).toBeLessThan(out.indexOf('</main>'));
   });
   it('lists, duplicates, moves and deletes managed blocks while preserving custom html',()=>{
-    let html='<main><p>intro</p></main>';
-    html=appendWebsiteBlock(html,'features-3');
-    html=appendWebsiteBlock(html,'cta');
+    const firstMarkup=createWebsiteBlockMarkup('features-3','features-one');
+    const secondMarkup=createWebsiteBlockMarkup('cta','cta-one');
+    const html=`<main>${firstMarkup}\n<p id="custom">hand-written content</p>\n${secondMarkup}</main>`;
     const blocks=listWebsiteBlockInstances(html);
-    expect(blocks).toHaveLength(2);
-    const first=blocks[0]!;
-    const second=blocks[1]!;
-    html=html.replace(second.html+'</nonsense>',second.html+'</nonsense>');
-    const duplicated=duplicateWebsiteBlock(html,first.instanceId);
+    expect(blocks.map(block=>block.instanceId)).toEqual(['features-one','cta-one']);
+
+    const duplicated=duplicateWebsiteBlock(html,'features-one');
     expect(listWebsiteBlockInstances(duplicated)).toHaveLength(3);
-    const moved=moveWebsiteBlock(duplicated,first.instanceId,1);
-    expect(moved).toContain('<p>intro</p>');
-    const deleted=deleteWebsiteBlock(moved,first.instanceId);
-    expect(listWebsiteBlockInstances(deleted).some(item=>item.instanceId===first.instanceId)).toBe(false);
+    expect(duplicated).toContain('hand-written content');
+
+    const moved=moveWebsiteBlock(html,'features-one',1);
+    expect(moved.indexOf('cta-one')).toBeLessThan(moved.indexOf('features-one'));
+    expect(moved).toContain('<p id="custom">hand-written content</p>');
+
+    const deleted=deleteWebsiteBlock(moved,'features-one');
+    expect(listWebsiteBlockInstances(deleted).some(item=>item.instanceId==='features-one')).toBe(false);
+    expect(deleted).toContain('hand-written content');
   });
 });
