@@ -75,3 +75,79 @@ export function withListingDraftMetadata(metadata:Record<string,unknown>|null|un
   };
   return {...existing,listing_drafts:{...drafts,[input.channel]:record}};
 }
+
+
+export type ListingPublicationCapability={
+  provider:string;
+  action:string;
+  description?:string;
+  deployed:boolean;
+  requiresApproval:boolean;
+  risk?:'low'|'medium'|'high'|string;
+};
+
+export type ListingPublicationReadiness={
+  readyForApproval:boolean;
+  status:'blocked'|'needs-validation'|'needs-fact-checks'|'needs-connection'|'ready-for-approval';
+  blockers:string[];
+  capability:ListingPublicationCapability|null;
+  requiresApproval:true;
+};
+
+const PUBLICATION_ACTION_HINT=/(?:listing|product|offer).*(?:create|update|publish|activate)|(?:create|update|publish|activate).*(?:listing|product|offer)/i;
+
+function lifecycleStage(item:CatalogLike){
+  const value=item.metadata?.['lifecycle_stage'];
+  return typeof value==='string'?value:'';
+}
+
+export function selectListingPublicationCapability(
+  capabilities:readonly ListingPublicationCapability[],
+):ListingPublicationCapability|null{
+  return capabilities.find((capability)=>
+    capability.deployed
+    && capability.requiresApproval
+    && PUBLICATION_ACTION_HINT.test(capability.action)
+  )??null;
+}
+
+export function assessListingPublicationReadiness(input:{
+  item:CatalogLike;
+  channel:DropshipChannel;
+  unresolvedFactChecks?:number;
+  capabilities?:readonly ListingPublicationCapability[];
+}):ListingPublicationReadiness{
+  const blockers:string[]=[];
+  if(isDropshipProductBlocked(input.item)){
+    blockers.push('Product compliance or lifecycle state blocks publication.');
+  }
+
+  const stage=lifecycleStage(input.item);
+  if(stage&&!['validated','testing'].includes(stage)){
+    blockers.push(`Product lifecycle stage "${stage}" is not approved for marketplace publication.`);
+  }
+
+  const factChecks=Math.max(0,Math.trunc(Number(input.unresolvedFactChecks??0)||0));
+  if(factChecks>0){
+    blockers.push(`${factChecks} listing fact check${factChecks===1?'':'s'} remain unresolved.`);
+  }
+
+  const capability=selectListingPublicationCapability(input.capabilities??[]);
+  if(!capability){
+    blockers.push(`No deployed approval-gated listing write capability is connected for ${input.channel}.`);
+  }
+
+  let status:ListingPublicationReadiness['status']='ready-for-approval';
+  if(blockers.some((value)=>/compliance or lifecycle state blocks/i.test(value)))status='blocked';
+  else if(blockers.some((value)=>/lifecycle stage/i.test(value)))status='needs-validation';
+  else if(blockers.some((value)=>/fact check/i.test(value)))status='needs-fact-checks';
+  else if(blockers.length)status='needs-connection';
+
+  return {
+    readyForApproval:blockers.length===0,
+    status,
+    blockers,
+    capability,
+    requiresApproval:true,
+  };
+}
