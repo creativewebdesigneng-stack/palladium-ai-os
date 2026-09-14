@@ -1,7 +1,8 @@
 import {useMemo,useState} from 'react';
 import {Eye,EyeOff,Paintbrush,SlidersHorizontal,WandSparkles} from 'lucide-react';
 import {applyWebsiteSectionContract,normalizeSections,updateWebsiteSection,websiteSectionContractCss} from '@/lib/website-studio/website-sections';
-import {normalizePagePath,resolvePageHtml,setPageHtml} from '@/lib/website-studio/website-page-documents';
+import {resolvePageHtml,setPageHtml} from '@/lib/website-studio/website-page-documents';
+import {normalizePagePath} from '@/lib/website-studio/website-pages';
 
 export default function WebsiteSectionInspector({project,setProject,activePath}){
   const pages=Array.isArray(project.pages)?project.pages:[];
