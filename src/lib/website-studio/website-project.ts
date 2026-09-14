@@ -1,3 +1,4 @@
+import { pageOutputPath, resolvePageHtml, type WebsitePageDocument } from './website-page-documents';
 import { buildWebsiteRobots, buildWebsiteSitemap } from './website-seo';
 export type WebsiteProjectFile={path:string;content:string;kind:'html'|'css'|'javascript'|'json'|'text'};
 export type WebsiteProjectManifest={version:1;name:string;slug:string;framework:string;files:WebsiteProjectFile[]};
@@ -12,6 +13,13 @@ export function buildWebsiteProjectManifest(input:{
     {path:'robots.txt',content:robots,kind:'text'},
     ...(sitemap?[{path:'sitemap.xml',content:sitemap,kind:'text'} as WebsiteProjectFile]:[]),
   ];
+  const pageFiles=(input.pages as WebsitePageDocument[])
+    .filter(page=>String(page.path||'/')!=='/')
+    .map(page=>({
+      path:pageOutputPath(String(page.path||'/')),
+      content:resolvePageHtml(input.name,input.html||'',page),
+      kind:'html' as const,
+    }));
   return {
     version:1,
     name:input.name,
@@ -21,6 +29,7 @@ export function buildWebsiteProjectManifest(input:{
       {path:'index.html',content:input.html||'',kind:'html'},
       {path:'styles.css',content:input.css||'',kind:'css'},
       {path:'script.js',content:input.javascript||'',kind:'javascript'},
+      ...pageFiles,
       {path:'site/pages.json',content:JSON.stringify(input.pages||[],null,2),kind:'json'},
       {path:'site/design-tokens.json',content:JSON.stringify(input.designTokens||{},null,2),kind:'json'},
       {path:'site/brief.json',content:JSON.stringify(input.brief||{},null,2),kind:'json'},
