@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {buildWebsiteRepairPrompt,diagnoseWebsiteProject} from './website-diagnostics';
+describe('website diagnostics',()=>{it('flags unsafe dynamic JavaScript',()=>{const d=diagnoseWebsiteProject('<html><body></body></html>','', 'eval("x")');expect(d.some(x=>x.id==='unsafe-js')).toBe(true)});it('builds an AI repair prompt',()=>{const d=diagnoseWebsiteProject('<body></body>','','');expect(buildWebsiteRepairPrompt(d)).toContain('Fix the following')});});

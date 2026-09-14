@@ -14,6 +14,8 @@ import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
 import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
+import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
+import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
@@ -73,8 +75,9 @@ export default function WebsiteStudio(){
   const saveRevision=async()=>{if(!draft.id)return setError('Save the website project before creating revisions.');setBusy(true);try{await createWebsiteStudioRevision({data:{projectId:draft.id,label:'Revision '+new Date().toLocaleString(),snapshot:snapshot()}});await loadRevisions(draft.id);setNotice('Revision saved.')}catch(e){setError(e instanceof Error?e.message:'Could not save revision.')}finally{setBusy(false)}};
   const restoreRevision=(revision)=>{setDraft({...draft,...revision.snapshot,id:draft.id,design_tokens:revision.snapshot.design_tokens||{}});setNotice('Revision restored into the editor. Save the project to persist it.')};
   const addBlock=(blockId)=>setDraft({...draft,html:appendWebsiteBlock(draft.html||'',blockId)});
-  const runAiIteration=async()=>{
-    if(aiInstruction.trim().length<5)return setError('Describe what you want Blackstar to change.');
+  const runAiIteration=async(instructionOverride='')=>{
+    const instruction=String(instructionOverride||aiInstruction).trim();
+    if(instruction.length<5)return setError('Describe what you want Blackstar to change.');
     setBusy(true);setError('');setNotice('');
     try{
       if(draft.id){
@@ -82,7 +85,7 @@ export default function WebsiteStudio(){
       }
       const result=await generateWebsiteIteration({data:{
         projectId:draft.id??undefined,
-        instruction:aiInstruction,
+        instruction,
         name:draft.name||'Website',
         brief:draft.brief||{},
         pages:draft.pages||[],
@@ -93,7 +96,7 @@ export default function WebsiteStudio(){
       }});
       setDraft({...draft,html:result.html,css:result.css,javascript:result.javascript,pages:result.pages,design_tokens:result.designTokens});
       setAiMeta({provider:result.provider,model:result.model,summary:result.summary});
-      setAiInstruction('');
+      if(!instructionOverride)setAiInstruction('');
       setNotice('AI iteration applied in the editor. Review the preview and save when ready.');
       if(draft.id)await loadRevisions(draft.id);
     }catch(e){setError(e instanceof Error?e.message:'Could not generate website iteration.')}finally{setBusy(false)}
@@ -121,7 +124,7 @@ export default function WebsiteStudio(){
           <div className="flex items-center gap-2 text-violet-300"><Sparkles className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">AI website iteration</span></div>
           <p className="mt-2 text-xs leading-5 text-zinc-500">Ask Blackstar to redesign, add pages or sections, improve responsiveness, refine copy structure, or change the visual system. Saved projects get an automatic restore point before each AI change.</p>
           <textarea value={aiInstruction} onChange={e=>setAiInstruction(e.target.value)} rows={3} placeholder="Example: Make this a premium architecture studio site with a full-screen hero, projects grid, dark editorial typography and mobile navigation." className="mt-3 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white outline-none"/>
-          <div className="mt-3 flex flex-wrap items-center gap-2"><button disabled={busy||aiInstruction.trim().length<5} onClick={runAiIteration} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"><Sparkles className="h-3.5 w-3.5"/>Generate change</button>{aiMeta&&<span className="text-[10px] text-zinc-600">{aiMeta.provider} · {aiMeta.model} · {aiMeta.summary}</span>}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2"><button disabled={busy||aiInstruction.trim().length<5} onClick={()=>runAiIteration()} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"><Sparkles className="h-3.5 w-3.5"/>Generate change</button>{aiMeta&&<span className="text-[10px] text-zinc-600">{aiMeta.provider} · {aiMeta.model} · {aiMeta.summary}</span>}</div>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
