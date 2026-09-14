@@ -18,7 +18,8 @@ import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperT
 import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
-import { resolvePageHtml } from '@/lib/website-studio/website-page-documents';
+import WebsiteNavigationBuilder from '@/components/website-studio/WebsiteNavigationBuilder';
+import { resolvePageHtml, setPageHtml } from '@/lib/website-studio/website-page-documents';
 import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
@@ -87,7 +88,18 @@ export default function WebsiteStudio(){
   const snapshot=()=>({name:draft.name,slug:draft.slug,prompt:draft.prompt,brief:draft.brief||{},pages:draft.pages||[],design_tokens:draft.design_tokens||draft.designTokens||{},app_config:draft.app_config||{},git_config:draft.git_config||{},html:draft.html||'',css:draft.css||'',javascript:draft.javascript||'',framework:draft.framework||'html',status:draft.status||'draft'});
   const saveRevision=async()=>{if(!draft.id)return setError('Save the website project before creating revisions.');setBusy(true);try{await createWebsiteStudioRevision({data:{projectId:draft.id,label:'Revision '+new Date().toLocaleString(),snapshot:snapshot()}});await loadRevisions(draft.id);setNotice('Revision saved.')}catch(e){setError(e instanceof Error?e.message:'Could not save revision.')}finally{setBusy(false)}};
   const restoreRevision=(revision)=>{setDraft({...draft,...revision.snapshot,id:draft.id,design_tokens:revision.snapshot.design_tokens||{}});setNotice('Revision restored into the editor. Save the project to persist it.')};
-  const addBlock=(blockId)=>setDraft({...draft,html:appendWebsiteBlock(draft.html||'',blockId)});
+  const addBlock=(blockId)=>{
+    const activePath=normalizePagePath(previewPagePath);
+    if(activePath==='/'){
+      setDraft({...draft,html:appendWebsiteBlock(draft.html||'',blockId)});
+      return;
+    }
+    const pages=Array.isArray(draft.pages)?draft.pages:[];
+    const page=pages.find(item=>normalizePagePath(item?.path||'/')===activePath);
+    if(!page)return setError('Select a valid page before adding a block.');
+    const html=resolvePageHtml(draft.name||'Website',draft.html||'',page);
+    setDraft({...draft,pages:setPageHtml(pages,activePath,appendWebsiteBlock(html,blockId))});
+  };
   const runAiIteration=async(instructionOverride='')=>{
     const instruction=String(instructionOverride||aiInstruction).trim();
     if(instruction.length<5)return setError('Describe what you want Blackstar to change.');
@@ -141,7 +153,7 @@ export default function WebsiteStudio(){
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
-          <div className="flex items-center gap-2 text-cyan-300"><Blocks className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Visual block library</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2 text-cyan-300"><Blocks className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Visual block library</span></div><span className="rounded-full border border-cyan-300/15 px-2.5 py-1 text-[10px] text-cyan-200">Target: {normalizePagePath(previewPagePath)}</span></div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{WEBSITE_BLOCKS.map(block=><button key={block.id} onClick={()=>addBlock(block.id)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:border-cyan-300/20"><p className="text-xs font-medium text-white">{block.name}</p><p className="mt-1 text-[10px] text-zinc-600">{block.category}</p></button>)}</div>
         </section>
 
@@ -152,6 +164,7 @@ export default function WebsiteStudio(){
 
         <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
+        <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
