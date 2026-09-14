@@ -84,6 +84,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A reminder you scheduled in Mission Control is due.",
   },
   {
+    type: "retail.booking_reminder",
+    label: "Retail booking reminder",
+    category: "system",
+    severity: "info",
+    desc: "A booking reminder scheduled in Retail Hub is due. External SMS, email, WhatsApp and voice delivery require a configured provider.",
+  },
+  {
     type: "legal.regulatory_review_signal",
     label: "Regulatory review signal",
     category: "system",
