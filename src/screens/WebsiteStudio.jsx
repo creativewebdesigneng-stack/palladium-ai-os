@@ -15,6 +15,7 @@ import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishP
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
+import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
