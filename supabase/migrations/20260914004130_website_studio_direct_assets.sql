@@ -95,3 +95,9 @@ alter table public.website_studio_assets
     or
     (storage_path is not null and char_length(storage_path) between 1 and 4000)
   );
+
+
+create index if not exists website_studio_assets_user_idx
+  on public.website_studio_assets(user_id);
+create index if not exists website_studio_revisions_user_idx
+  on public.website_studio_revisions(user_id);
