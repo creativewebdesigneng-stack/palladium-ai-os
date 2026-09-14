@@ -3,6 +3,7 @@ import DropshippingHub from '@/screens/DropshippingHub';
 import DropshippingGrowthLab from '@/screens/DropshippingGrowthLab';
 import DropshippingProductPipeline from '@/screens/DropshippingProductPipeline';
 import DropshippingListingWorkbench from '@/screens/DropshippingListingWorkbench';
+import DropshippingControlTower from '@/screens/DropshippingControlTower';
 
 function DropshippingHubRoute(){
   return <>
@@ -10,6 +11,7 @@ function DropshippingHubRoute(){
     <DropshippingGrowthLab/>
     <DropshippingProductPipeline/>
     <DropshippingListingWorkbench/>
+    <DropshippingControlTower/>
   </>;
 }
 
