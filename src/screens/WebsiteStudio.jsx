@@ -5,6 +5,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import { createWebsiteSeed } from '@/lib/website-studio/website-seed';
 import { createWebsiteStudioRevision, deleteWebsiteStudioProject, listWebsiteStudioProjects, listWebsiteStudioRevisions, saveWebsiteStudioProject } from '@/lib/website-studio/website-studio.functions';
 import { appendWebsiteBlock, WEBSITE_BLOCKS } from '@/lib/website-studio/website-blocks';
+import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
@@ -35,6 +36,7 @@ export default function WebsiteStudio(){
   useEffect(()=>{void loadRevisions(draft.id)},[draft.id]);
 
   const preview=useMemo(()=>documentForPreview(draft),[draft]);
+  const quality=useMemo(()=>assessWebsiteQuality(draft.html||'',draft.css||''),[draft.html,draft.css]);
 
   const createFromPrompt=()=>{
     if(!draft.name.trim())return setError('Give the website a project name first.');
