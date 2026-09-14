@@ -17,6 +17,11 @@ function record(value:unknown):Record<string,unknown>{
   return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
 }
 
+async function sha256(value:string){
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+
 function channelAllowsProvider(channel:string,provider:string){
   const target=DROPSHIP_CHANNEL_TARGETS.find(row=>row.id===channel);
   if(!target||target.native)return false;
@@ -114,6 +119,27 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     });
 
     if(!channelAllowsProvider(data.channel,prepared.provider))throw new Error('The live integration resolved to a provider outside the selected channel.');
+    if(!prepared.requiresApproval)throw new Error('The selected provider capability is not marked approval-required, so Blackstar will not use it for listing publication.');
+
+    const draftGeneratedAt=typeof draft['generated_at']==='string'?draft['generated_at']:'';
+    const approvalFingerprint=await sha256(JSON.stringify({provider:prepared.provider,action:prepared.action,transport:prepared.transport,input:prepared.input,itemId:item.id,channel:data.channel,draftGeneratedAt}));
+    const existingResult=await sb.from('approval_requests')
+      .select('id,status,execution_status,execution_error,title,summary,risk_level,created_at')
+      .eq('user_id',context.userId)
+      .eq('action_type','nango_dynamic_action')
+      .eq('details->>dropshipping_approval_fingerprint',approvalFingerprint)
+      .in('status',['pending','approved'])
+      .order('created_at',{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(existingResult.error)throw new Error(existingResult.error.message);
+    if(existingResult.data?.status==='pending'){
+      return {approval:existingResult.data,provider:prepared.provider,action:prepared.action,transport:prepared.transport,lane:prepared.lane,requiresApproval:true as const,reused:true as const};
+    }
+    if(existingResult.data?.status==='approved'){
+      if(existingResult.data.execution_status==='failed')throw new Error('This exact listing action was already approved but failed. Retry the immutable approved action from Mission Control instead of creating a duplicate approval.');
+      throw new Error('This exact saved listing revision has already been approved. Save a new listing revision before requesting another publication.');
+    }
 
     const title=`Publish ${item.name} to ${data.channel}`.slice(0,200);
     const summary=`Approve the exact ${prepared.action} provider payload for this persisted dropshipping listing draft. Blackstar will execute it once through the pinned ${prepared.transport} transport.`.slice(0,500);
@@ -126,8 +152,9 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
       dropshipping_item_id:item.id,
       dropshipping_workspace_id:item.workspace_id,
       dropshipping_channel:data.channel,
-      listing_draft_generated_at:typeof draft['generated_at']==='string'?draft['generated_at']:null,
+      listing_draft_generated_at:draftGeneratedAt||null,
       listing_draft_requires_approval:true,
+      dropshipping_approval_fingerprint:approvalFingerprint,
     };
 
     const {data:approval,error}=await sb.from('approval_requests').insert({
@@ -166,5 +193,6 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
       transport:prepared.transport,
       lane:prepared.lane,
       requiresApproval:true as const,
+      reused:false as const,
     };
   });
