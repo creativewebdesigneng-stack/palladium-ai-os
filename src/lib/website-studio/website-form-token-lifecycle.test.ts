@@ -36,7 +36,11 @@ describe('Website Studio generated form token lifecycle',()=>{
   });
 
   it('stages and promotes through the narrow owner-scoped RPCs',async()=>{
-    const rpc=vi.fn(async()=>({error:null}));
+    const calls:Array<[string,Record<string,unknown>]> = [];
+    const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>{
+      calls.push([name,args]);
+      return {error:null};
+    });
     const sb={rpc};
     await stageWebsiteStudioFormDeploymentToken(sb,{
       projectId:'11111111-1111-4111-8111-111111111111',target:'vercel:production',tokenHash:'b'.repeat(64),stagingRef:'stage_123',
@@ -44,12 +48,12 @@ describe('Website Studio generated form token lifecycle',()=>{
     await promoteWebsiteStudioFormDeploymentToken(sb,{
       projectId:'11111111-1111-4111-8111-111111111111',target:'vercel:production',stagingRef:'stage_123',activeRef:'dpl_123',
     });
-    expect(rpc.mock.calls.map((call)=>call[0])).toEqual([
+    expect(calls.map((call)=>call[0])).toEqual([
       'website_studio_stage_form_deployment_token',
       'website_studio_promote_form_deployment_token',
     ]);
-    expect(rpc.mock.calls[0]?.[1]).toMatchObject({p_staging_ref:'stage_123'});
-    expect(rpc.mock.calls[1]?.[1]).toMatchObject({p_staging_ref:'stage_123',p_active_ref:'dpl_123'});
+    expect(calls[0]?.[1]).toMatchObject({p_staging_ref:'stage_123'});
+    expect(calls[1]?.[1]).toMatchObject({p_staging_ref:'stage_123',p_active_ref:'dpl_123'});
   });
 
   it('keeps prior active tokens until a matching staged deployment is promoted',()=>{
