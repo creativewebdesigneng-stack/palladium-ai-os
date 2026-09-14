@@ -58,6 +58,7 @@ const BUSINESS = [
   ['Finance Hub', '/finance', Banknote],
   ['Trading Hub', '/trading-hub', LineChart],
   ['Legal Hub', '/legal-hub', Scale],
+  ['Compliance Sentinel', '/compliance-sentinel', ShieldCheck],
   ['Industry Hub', '/industry-hub', Factory],
   ['Company Hub', '/company-hub', Building2],
   ['Quant Studio', '/quant-studio', LineChart],
