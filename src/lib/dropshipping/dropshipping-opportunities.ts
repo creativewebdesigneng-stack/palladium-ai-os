@@ -1,5 +1,5 @@
 export type OpportunityEvidence={url:string;label?:string};
-export type OpportunityScores={demand?:number|null;searchMomentum?:number|null;competition?:number|null;margin?:number|null;supplier?:number|null;complianceRisk?:number|null};
+export type OpportunityScores={demand?:number|null|undefined;searchMomentum?:number|null|undefined;competition?:number|null|undefined;margin?:number|null|undefined;supplier?:number|null|undefined;complianceRisk?:number|null|undefined};
 
 const clamp=(value:number|null|undefined)=>value==null?null:Math.max(0,Math.min(100,Number.isFinite(value)?value:0));
 const round=(value:number)=>Math.round(value*100)/100;
@@ -20,14 +20,14 @@ export function normalizeOpportunityEvidence(values:unknown):OpportunityEvidence
   const out:OpportunityEvidence[]=[];
   for(const value of values.slice(0,12)){
     const record=value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
-    const raw=typeof value==='string'?value:typeof record?.url==='string'?record.url:'';
+    const raw=typeof value==='string'?value:typeof record?.['url']==='string'?record['url']:'';
     if(!raw)continue;
     try{
       const url=new URL(raw.trim());
       if(!['http:','https:'].includes(url.protocol))continue;
       const normalized=url.toString().slice(0,2000);
       if(out.some(row=>row.url===normalized))continue;
-      const label=typeof record?.label==='string'?record.label.trim().slice(0,200):undefined;
+      const label=typeof record?.['label']==='string'?record['label'].trim().slice(0,200):undefined;
       out.push(label?{url:normalized,label}:{url:normalized});
     }catch{}
   }
