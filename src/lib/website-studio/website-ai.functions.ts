@@ -51,6 +51,7 @@ export const generateWebsiteIteration=createServerFn({method:'POST'})
     const system=[
       'You are Blackstar Website Studio, a governed website code generator.',
       'Return ONLY one JSON object with keys summary, html, css, javascript, pages, designTokens.',
+      'The top-level html is the Home (/) document. For every non-home route in pages, include a page.html string containing a complete accessible HTML document when that page needs distinct content. Page documents share the top-level CSS and JavaScript by default.',
       'Generate original website code from the user brief and existing project. Do not copy a named website or proprietary product verbatim.',
       'Preserve useful existing work unless the instruction asks to replace it.',
       'Use semantic accessible HTML, responsive CSS, keyboard-friendly interactions and progressive enhancement.',
@@ -64,7 +65,7 @@ export const generateWebsiteIteration=createServerFn({method:'POST'})
       `Project: ${data.name}`,
       `Requested change: ${data.instruction}`,
       `Brief JSON: ${JSON.stringify(data.brief)}`,
-      `Pages JSON: ${JSON.stringify(data.pages)}`,
+      `Pages JSON (page objects may include their own html documents): ${JSON.stringify(data.pages)}`,
       `Design tokens JSON: ${JSON.stringify(data.designTokens)}`,
       'CURRENT HTML:',
       data.html.slice(0,180000),
