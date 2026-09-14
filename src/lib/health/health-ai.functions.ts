@@ -6,7 +6,7 @@ import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 
-type Sb = { from: (table: string) => any };
+type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 
 const inquirySchema = z.object({
   question: z.string().trim().min(1).max(5000),
