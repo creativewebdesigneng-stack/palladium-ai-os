@@ -17,7 +17,7 @@ export const getDropshippingCatalogReadCapabilities=createServerFn({method:'POST
   .inputValidator((value:unknown)=>z.object({provider:z.string().trim().min(1).max(80)}).parse(value))
   .handler(async({data,context})=>{
     const rows=await safeCapabilities(context.userId,data.provider);
-    return rows.map(row=>({provider:row.provider,action:row.action,description:row.description,risk:row.risk,requiresApproval:row.requiresApproval,deployed:row.deployed,inputSchema:row.inputSchema,transport:row.transport,lane:row.lane}));
+    return rows.map(row=>({provider:row.provider,action:row.action,description:row.description,risk:row.risk,requiresApproval:row.requiresApproval,deployed:row.deployed,inputSchema:JSON.parse(JSON.stringify(row.inputSchema??{})),transport:row.transport,lane:row.lane}));
   });
 
 export const executeDropshippingCatalogRead=createServerFn({method:'POST'})
