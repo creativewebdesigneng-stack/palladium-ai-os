@@ -7,6 +7,9 @@ import { writeAudit } from '@/lib/platform/audit.server';
 import { recordUsage } from '@/lib/platform/entitlements.server';
 
 type Sb={from:(t:string)=>any};
+type JsonPrimitive=string|number|boolean|null;
+type JsonValue=JsonPrimitive|JsonValue[]|{[key:string]:JsonValue};
+type WebsiteIterationResult={summary:string;html:string;css:string;javascript:string;pages:Array<{[key:string]:JsonValue}>;designTokens:{[key:string]:JsonValue};provider:string;model:string};
 
 const inputSchema=z.object({
   projectId:z.string().uuid().optional(),
@@ -25,11 +28,11 @@ const outputSchema=z.object({
   html:z.string().max(250000),
   css:z.string().max(250000),
   javascript:z.string().max(250000),
-  pages:z.array(z.record(z.string(),z.unknown())).max(100),
-  designTokens:z.record(z.string(),z.unknown()),
+  pages:z.array(z.record(z.string(),z.json())).max(100),
+  designTokens:z.record(z.string(),z.json()),
 });
 
-function parseJsonPayload(text:string){
+function parseJsonPayload(text:string):Omit<WebsiteIterationResult,'provider'|'model'>{
   const cleaned=text.trim().replace(/^\`\`\`(?:json)?\s*/i,'').replace(/\s*\`\`\`$/,'');
   const start=cleaned.indexOf('{');
   const end=cleaned.lastIndexOf('}');
@@ -40,7 +43,7 @@ function parseJsonPayload(text:string){
 export const generateWebsiteIteration=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>inputSchema.parse(v))
-  .handler(async({data,context})=>{
+  .handler(async({data,context}):Promise<WebsiteIterationResult>=>{
     const sb=context.supabase as unknown as Sb;
     const pref=await sb.from('user_ai_preferences').select('default_provider,default_model').eq('user_id',context.userId).maybeSingle();
     const {provider,model,source}=resolveAssistantModelPreference(pref.error?null:pref.data);
@@ -77,10 +80,10 @@ export const generateWebsiteIteration=createServerFn({method:'POST'})
       if(!result.text.trim()) throw new Error('Website generator returned an empty response.');
       const generated=parseJsonPayload(result.text);
       await recordUsage({userId:context.userId,metric:'assistant_message',quantity:1,metadata:{surface:'website_studio',provider:result.provider,model:result.model,preference_source:source}});
-      await writeAudit({userId:context.userId,action:'website_studio.ai_iteration.generate',targetType:'website_studio_project',targetId:data.projectId??undefined,status:'success',metadata:{provider:result.provider,model:result.model}});
+      await writeAudit({userId:context.userId,action:'website_studio.ai_iteration.generate',targetType:'website_studio_project',...(data.projectId?{targetId:data.projectId}:{}),status:'success',metadata:{provider:result.provider,model:result.model}});
       return {...generated,provider:result.provider,model:result.model};
     }catch(error){
-      await writeAudit({userId:context.userId,action:'website_studio.ai_iteration.generate',targetType:'website_studio_project',targetId:data.projectId??undefined,status:'failed',metadata:{provider,model,error:error instanceof Error?error.message.slice(0,300):'unknown'}});
+      await writeAudit({userId:context.userId,action:'website_studio.ai_iteration.generate',targetType:'website_studio_project',...(data.projectId?{targetId:data.projectId}:{}),status:'failed',metadata:{provider,model,error:error instanceof Error?error.message.slice(0,300):'unknown'}});
       throw new Error(error instanceof Error?error.message:'Website generation failed.');
     }
   });
