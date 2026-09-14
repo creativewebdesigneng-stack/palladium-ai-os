@@ -4,6 +4,7 @@ import { buildWebsiteProjectManifest } from '@/lib/website-studio/website-projec
 import { buildDeploymentAssetManifest, deploymentAssetPath, rewriteWebsiteAssetReferences } from '@/lib/website-studio/website-assets';
 
 export type WebsitePackageFile={file:string;data:string;encoding:'utf-8'|'base64'};
+export type WebsiteRuntimePackage={files:WebsitePackageFile[];privateAssetCount:number;formRuntimeTokenHash:string|null};
 
 type RuntimeForm={name:string;fields:string[]};
 
@@ -58,7 +59,7 @@ type PackageSb={
   storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}};
 };
 
-export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promise<{files:WebsitePackageFile[];privateAssetCount:number}>{
+export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promise<WebsiteRuntimePackage>{
   const {data:assets,error:assetError}=await sb.from('website_studio_assets')
     .select('id,name,source_url,storage_path')
     .eq('project_id',project.id);
@@ -66,15 +67,9 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
   const deploymentAssets=Array.isArray(assets)?assets:[];
 
   const configuredForms=Array.isArray(project.app_config?.forms)?project.app_config.forms:[];
-  let formToken='';
-  if(runtimeForms(configuredForms).length>0){
-    formToken=randomBytes(32).toString('base64url');
-    const formSubmitTokenHash=createHash('sha256').update(formToken).digest('hex');
-    const {error:tokenError}=await sb.from('website_studio_projects')
-      .update({form_submit_token_hash:formSubmitTokenHash,updated_at:new Date().toISOString()})
-      .eq('id',project.id);
-    if(tokenError)throw new Error(`Could not provision the public form runtime: ${tokenError.message}`);
-  }
+  const hasRuntimeForms=runtimeForms(configuredForms).length>0;
+  const formToken=hasRuntimeForms?randomBytes(32).toString('base64url'):'';
+  const formRuntimeTokenHash=formToken?createHash('sha256').update(formToken).digest('hex'):null;
 
   const manifest=buildWebsiteProjectManifest({
     name:project.name,
@@ -117,5 +112,5 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
     });
   }
 
-  return {files,privateAssetCount};
+  return {files,privateAssetCount,formRuntimeTokenHash};
 }

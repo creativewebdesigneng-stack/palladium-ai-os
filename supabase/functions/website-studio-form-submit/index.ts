@@ -39,6 +39,15 @@ function safeEqualHex(left:string,right:string):boolean{
   return difference===0;
 }
 
+function deploymentTokenMatches(value:unknown,suppliedHash:string):boolean{
+  const tokens=asRecord(value);
+  return Object.values(tokens).some((entry)=>{
+    const slot=asRecord(entry);
+    const activeHash=slot["active_hash"];
+    return typeof activeHash==="string"&&/^[0-9a-f]{64}$/.test(activeHash)&&safeEqualHex(activeHash,suppliedHash);
+  });
+}
+
 function fieldName(value:unknown):string{
   if(typeof value==="string")return value.trim().slice(0,MAX_FIELD_NAME_LENGTH);
   const record=asRecord(value);
@@ -182,13 +191,15 @@ Deno.serve(async(req:Request)=>{
     const supabase=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
     const suppliedHash=await hex(token);
     const {data:project,error:projectError}=await supabase.from("website_studio_projects")
-      .select("id,status,form_submit_token_hash,app_config")
+      .select("id,status,form_submit_token_hash,form_deployment_tokens,app_config")
       .eq("id",projectId)
       .maybeSingle();
 
     if(projectError||!project)return json({error:"project_not_found"},404);
     if(project.status!=="published")return json({error:"project_not_published"},409);
-    if(!project.form_submit_token_hash||!safeEqualHex(String(project.form_submit_token_hash),suppliedHash)){
+    const legacyTokenMatches=typeof project.form_submit_token_hash==="string"
+      &&safeEqualHex(project.form_submit_token_hash,suppliedHash);
+    if(!legacyTokenMatches&&!deploymentTokenMatches(project.form_deployment_tokens,suppliedHash)){
       return json({error:"invalid_token"},403);
     }
 

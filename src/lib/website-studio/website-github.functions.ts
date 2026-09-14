@@ -2,10 +2,16 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
+import {
+  githubFormTokenTarget,
+  promoteWebsiteStudioFormDeploymentToken,
+  stageWebsiteStudioFormDeploymentToken,
+} from '@/lib/website-studio/website-form-deployment-tokens.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb={
   from:(table:string)=>any;
+  rpc:(name:string,args:Record<string,unknown>)=>Promise<{error:{message:string}|null}>;
   storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}};
 };
 
@@ -125,9 +131,11 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
     const git={...asRecord(project.git_config),...data.gitConfig};
     const {owner,repo}=parseRepository(git['repository']);
     assertAllowedRepository(owner,repo,allowedRepositories);
+    const repository=`${owner}/${repo}`;
     const branch=cleanBranch(git['branch']);
     const rootPath=cleanRootPath(git['rootPath']);
     const packageResult=await buildWebsiteRuntimePackage(sb,project);
+    const formTokenTarget=githubFormTokenTarget(repository,branch,rootPath);
 
     try{
       const ref=await githubJson(token,`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(branch)}`);
@@ -169,16 +177,34 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
       const commitSha=typeof commit['sha']==='string'?commit['sha']:'';
       if(!commitSha)throw new Error('GitHub did not return a commit SHA.');
 
+      if(packageResult.formRuntimeTokenHash){
+        await stageWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          tokenHash:packageResult.formRuntimeTokenHash,
+          stagingRef:commitSha,
+        });
+      }
+
       await githubJson(token,`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`,{
         method:'PATCH',
         body:JSON.stringify({sha:commitSha,force:false}),
       });
 
+      if(packageResult.formRuntimeTokenHash){
+        await promoteWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          stagingRef:commitSha,
+          activeRef:commitSha,
+        });
+      }
+
       const nextGit={
         ...git,
         connected:true,
         provider:'github',
-        repository:`${owner}/${repo}`,
+        repository,
         branch,
         rootPath,
         lastSyncedCommit:commitSha,
@@ -193,12 +219,16 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
         targetType:'website_studio_project',
         targetId:data.projectId,
         status:'success',
-        metadata:{repository:`${owner}/${repo}`,branch,root_path:rootPath||null,commit_sha:commitSha,file_count:packageResult.files.length},
+        metadata:{
+          repository,branch,root_path:rootPath||null,commit_sha:commitSha,
+          file_count:packageResult.files.length,
+          form_runtime_token_activated:Boolean(packageResult.formRuntimeTokenHash),
+        },
       });
 
       return {
         provider:'github',
-        repository:`${owner}/${repo}`,
+        repository,
         branch,
         rootPath,
         commitSha,
@@ -213,7 +243,7 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
         targetType:'website_studio_project',
         targetId:data.projectId,
         status:'failed',
-        metadata:{repository:`${owner}/${repo}`,branch,error:error instanceof Error?error.message.slice(0,300):'unknown'},
+        metadata:{repository,branch,error:error instanceof Error?error.message.slice(0,300):'unknown'},
       });
       throw new Error(error instanceof Error?error.message:'GitHub sync failed.');
     }

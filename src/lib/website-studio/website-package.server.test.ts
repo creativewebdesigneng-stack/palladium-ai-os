@@ -2,7 +2,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {buildWebsiteRuntimePackage} from './website-package.server';
 
 function createPackageSupabase(){
-  const update=vi.fn((row:Record<string,unknown>)=>({eq:vi.fn(async()=>({error:null,row}))}));
+  const update=vi.fn();
   const sb:any={
     from:(table:string)=>{
       if(table==='website_studio_assets')return {select:()=>({eq:async()=>({data:[],error:null})})};
@@ -15,7 +15,7 @@ function createPackageSupabase(){
 }
 
 describe('Website Studio form runtime packaging',()=>{
-  it('provisions a scoped token and wires deterministic public form states and field allowlists',async()=>{
+  it('creates an unactivated scoped token and wires deterministic public form states and field allowlists',async()=>{
     const {sb,update}=createPackageSupabase();
     const result=await buildWebsiteRuntimePackage(sb,{
       id:'11111111-1111-4111-8111-111111111111',name:'Forms',slug:'forms',framework:'html',
@@ -39,10 +39,9 @@ describe('Website Studio form runtime packaging',()=>{
     expect(script).toContain('blackstar:form-success');
     expect(script).toContain('blackstar:form-error');
 
-    expect(update).toHaveBeenCalledTimes(1);
-    const row=update.mock.calls[0]?.[0];
-    expect(row?.['form_submit_token_hash']).toMatch(/^[0-9a-f]{64}$/);
-    expect(script).not.toContain(String(row?.['form_submit_token_hash']||''));
+    expect(result.formRuntimeTokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(script).not.toContain(String(result.formRuntimeTokenHash));
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('uses one shared script runtime for multi-page packages',async()=>{
@@ -62,6 +61,7 @@ describe('Website Studio form runtime packaging',()=>{
     expect(script.match(/website-studio-form-submit/g)?.length).toBe(1);
     expect(contact).toContain('/script.js');
     expect(result.files.filter((file)=>file.file==='script.js')).toHaveLength(1);
+    expect(result.formRuntimeTokenHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('fails closed for explicitly managed forms whose key is not configured',async()=>{
@@ -84,6 +84,7 @@ describe('Website Studio form runtime packaging',()=>{
     };
     const result=await buildWebsiteRuntimePackage(sb,{id:'p',name:'Static',slug:'static',framework:'html',html:'',css:'',javascript:'console.log(1)',pages:[],design_tokens:{},brief:{},app_config:{}});
     expect(result.files.find((file)=>file.file==='script.js')?.data).toBe('console.log(1)');
+    expect(result.formRuntimeTokenHash).toBeNull();
     expect(update).not.toHaveBeenCalled();
   });
 });
