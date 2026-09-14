@@ -16,6 +16,10 @@ const workspace=z.object({
  risks:z.array(z.string().trim().min(1).max(500)).max(50).default([]),
  department_plan:z.record(z.string(),z.unknown()).default({}),
  ai_workforce_plan:z.array(z.record(z.string(),z.unknown())).max(100).default([]),
+ kpis:z.array(z.record(z.string(),z.unknown())).max(200).default([]),
+ decisions:z.array(z.record(z.string(),z.unknown())).max(200).default([]),
+ leadership_cadence:z.record(z.string(),z.unknown()).default({}),
+ opportunities:z.array(z.record(z.string(),z.unknown())).max(200).default([]),
  notes:z.string().trim().max(12000).optional(),
 });
 export const listCompanyWorkspaces=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
@@ -23,7 +27,7 @@ export const listCompanyWorkspaces=createServerFn({method:'POST'}).middleware([r
 });
 export const saveCompanyWorkspace=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>workspace.parse(v)).handler(async({data,context})=>{
  const sb=context.supabase as unknown as Sb;
- const row={name:data.name,industry:data.industry||null,stage:data.stage||null,geography:data.geography||null,mission:data.mission||null,company_context:data.company_context||null,objectives:data.objectives,priorities:data.priorities,risks:data.risks,department_plan:data.department_plan,ai_workforce_plan:data.ai_workforce_plan,notes:data.notes||null,updated_at:new Date().toISOString()};
+ const row={name:data.name,industry:data.industry||null,stage:data.stage||null,geography:data.geography||null,mission:data.mission||null,company_context:data.company_context||null,objectives:data.objectives,priorities:data.priorities,risks:data.risks,department_plan:data.department_plan,ai_workforce_plan:data.ai_workforce_plan,kpis:data.kpis,decisions:data.decisions,leadership_cadence:data.leadership_cadence,opportunities:data.opportunities,notes:data.notes||null,updated_at:new Date().toISOString()};
  if(data.id){const {data:out,error}=await sb.from('company_workspaces').update(row).eq('id',data.id).select().single();if(error)throw new Error(error.message);return out;}
  const {data:out,error}=await sb.from('company_workspaces').insert({...row,user_id:context.userId}).select().single();if(error)throw new Error(error.message);return out;
 });
