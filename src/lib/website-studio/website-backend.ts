@@ -1,6 +1,6 @@
 export type BackendField={name?:string;type?:string;required?:boolean};
 export type BackendCollection={name?:string;fields?:BackendField[]};
-export type WebsiteAppConfig={collections?:BackendCollection[];forms?:unknown[];auth?:{enabled?:boolean;providers?:string[]}};
+export type WebsiteAppConfig={collections?:BackendCollection[];forms?:unknown[];auth?:{enabled?:boolean;providers?:string[];supabaseUrl?:string;publishableKey?:string;allowSignUp?:boolean;redirectPath?:string}};
 
 const TYPE_MAP:Record<string,string>={
   text:'text',
@@ -25,8 +25,7 @@ export function safeSqlIdentifier(value:string):string{
 export function compileWebsiteBackendSql(config:WebsiteAppConfig):{sql:string;warnings:string[]}{
   const collections=Array.isArray(config.collections)?config.collections:[];
   const warnings:string[]=[];
-  if(config.auth?.enabled) warnings.push('Authentication providers are requested but require deployment credentials and callback configuration; this SQL does not activate OAuth or email delivery.');
-  if(Array.isArray(config.forms)&&config.forms.length) warnings.push('Forms are defined, but form actions still require generated server handlers or a backend adapter.');
+  if(config.auth?.enabled) warnings.push('Apply this SQL to the same dedicated Supabase project configured for the generated site. Google, GitHub and magic-link flows also require provider and redirect-URL configuration in that Supabase project.');
 
   const blocks=collections.map((collection,index)=>{
     const table=safeSqlIdentifier(collection.name||`collection_${index+1}`);
@@ -70,8 +69,5 @@ revoke all on public.${table} from anon;
 grant select, insert, update, delete on public.${table} to authenticated;`;
   });
 
-  return {
-    sql:blocks.join('\n\n'),
-    warnings,
-  };
+  return {sql:blocks.join('\n\n'),warnings};
 }
