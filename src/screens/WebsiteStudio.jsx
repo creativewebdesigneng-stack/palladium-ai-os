@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Code2, Monitor, Tablet, Smartphone, Plus, Save, Trash2, ExternalLink, Sparkles, Rocket, FolderKanban } from 'lucide-react';
+import { Code2, Monitor, Tablet, Smartphone, Plus, Save, Trash2, ExternalLink, Sparkles, Rocket, FolderKanban, Blocks, History, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/palladium/PageHeader';
 import { createWebsiteSeed } from '@/lib/website-studio/website-seed';
-import { deleteWebsiteStudioProject, listWebsiteStudioProjects, saveWebsiteStudioProject } from '@/lib/website-studio/website-studio.functions';
+import { createWebsiteStudioRevision, deleteWebsiteStudioProject, listWebsiteStudioProjects, listWebsiteStudioRevisions, saveWebsiteStudioProject } from '@/lib/website-studio/website-studio.functions';
+import { appendWebsiteBlock, WEBSITE_BLOCKS } from '@/lib/website-studio/website-blocks';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
 const widths={desktop:'100%',tablet:'820px',mobile:'390px'};
@@ -23,9 +24,12 @@ export default function WebsiteStudio(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
+  const [revisions,setRevisions]=useState([]);
 
   const refresh=async()=>{try{setProjects(await listWebsiteStudioProjects({data:{}}));}catch(e){setError(e instanceof Error?e.message:'Could not load website projects.')}};
+  const loadRevisions=async(projectId)=>{if(!projectId)return setRevisions([]);try{setRevisions(await listWebsiteStudioRevisions({data:{projectId}}));}catch(e){setError(e instanceof Error?e.message:'Could not load revisions.')}};
   useEffect(()=>{void refresh()},[]);
+  useEffect(()=>{void loadRevisions(draft.id)},[draft.id]);
 
   const preview=useMemo(()=>documentForPreview(draft),[draft]);
 
@@ -52,6 +56,10 @@ export default function WebsiteStudio(){
   };
 
   const remove=async(id)=>{setBusy(true);try{await deleteWebsiteStudioProject({data:{id}});if(draft.id===id)setDraft(blank);await refresh()}catch(e){setError(e instanceof Error?e.message:'Could not delete website project.')}finally{setBusy(false)}};
+  const snapshot=()=>({name:draft.name,slug:draft.slug,prompt:draft.prompt,brief:draft.brief||{},pages:draft.pages||[],design_tokens:draft.design_tokens||draft.designTokens||{},html:draft.html||'',css:draft.css||'',javascript:draft.javascript||'',framework:draft.framework||'html',status:draft.status||'draft'});
+  const saveRevision=async()=>{if(!draft.id)return setError('Save the website project before creating revisions.');setBusy(true);try{await createWebsiteStudioRevision({data:{projectId:draft.id,label:'Revision '+new Date().toLocaleString(),snapshot:snapshot()}});await loadRevisions(draft.id);setNotice('Revision saved.')}catch(e){setError(e instanceof Error?e.message:'Could not save revision.')}finally{setBusy(false)}};
+  const restoreRevision=(revision)=>{setDraft({...draft,...revision.snapshot,id:draft.id,design_tokens:revision.snapshot.design_tokens||{}});setNotice('Revision restored into the editor. Save the project to persist it.')};
+  const addBlock=(blockId)=>setDraft({...draft,html:appendWebsiteBlock(draft.html||'',blockId)});
 
   return <div className="space-y-5 pb-10">
     <PageHeader eyebrow="Creator workspace" title="Website Studio" description="Prompt, design, edit, preview and prepare websites for deployment using Blackstar's existing HTML Studio, developer controls and deployment infrastructure." action={<button onClick={()=>setDraft(blank)} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-medium text-white"><Plus className="h-4 w-4"/>New website</button>}/>
@@ -69,6 +77,16 @@ export default function WebsiteStudio(){
           <div className="mt-3 grid gap-3 md:grid-cols-2"><input value={draft.name||''} onChange={e=>setDraft({...draft,name:e.target.value})} placeholder="Website / project name" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"/><input value={draft.slug||''} onChange={e=>setDraft({...draft,slug:e.target.value})} placeholder="site-slug" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"/></div>
           <textarea value={draft.prompt||''} onChange={e=>setDraft({...draft,prompt:e.target.value})} rows={5} placeholder="Describe the website, audience, pages, style, brand, conversion goal and functionality you want…" className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-black/25 p-3 text-sm leading-6 text-white outline-none"/>
           <div className="mt-3 flex flex-wrap gap-2"><button onClick={createFromPrompt} className="flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-400/[.07] px-3 py-2 text-xs text-violet-100"><Sparkles className="h-3.5 w-3.5"/>Generate starter</button><button disabled={busy||!draft.name||!draft.slug} onClick={save} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"><Save className="h-3.5 w-3.5"/>Save project</button>{draft.id&&<button disabled={busy} onClick={()=>remove(draft.id)} className="flex items-center gap-2 rounded-xl border border-rose-400/20 px-3 py-2 text-xs text-rose-300"><Trash2 className="h-3.5 w-3.5"/>Delete</button>}</div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+          <div className="flex items-center gap-2 text-cyan-300"><Blocks className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Visual block library</span></div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{WEBSITE_BLOCKS.map(block=><button key={block.id} onClick={()=>addBlock(block.id)} className="rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:border-cyan-300/20"><p className="text-xs font-medium text-white">{block.name}</p><p className="mt-1 text-[10px] text-zinc-600">{block.category}</p></button>)}</div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-amber-300"><History className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Revision history</span></div><button disabled={!draft.id||busy} onClick={saveRevision} className="rounded-lg border border-amber-300/20 px-2.5 py-1.5 text-[10px] text-amber-200 disabled:opacity-40">Save restore point</button></div>
+          <div className="mt-3 space-y-2">{revisions.length===0?<p className="text-xs text-zinc-600">No restore points yet.</p>:revisions.slice(0,8).map(rev=><div key={rev.id} className="flex items-center justify-between rounded-xl border border-white/[.07] p-3"><div><p className="text-xs text-white">{rev.label}</p><p className="mt-1 text-[10px] text-zinc-600">{new Date(rev.created_at).toLocaleString()}</p></div><button onClick={()=>restoreRevision(rev)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-400"><RotateCcw className="h-3 w-3"/>Restore</button></div>)}</div>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
