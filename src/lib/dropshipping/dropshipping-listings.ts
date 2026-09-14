@@ -37,25 +37,25 @@ export function buildListingDraftPrompt(item:CatalogLike,channel:DropshipChannel
   const evidence=metadata['evidence'];
   const economics=metadata['unit_economics'];
   const compliance=metadata['compliance'];
-  return [
+  const prompt=[
     'Create an INTERNAL DRAFT product listing for a dropshipping operator. Do not publish or perform any external action.',
     `Target channel: ${channel}. Locale: ${clean(locale,40)||'en-GB'}.`,
-    'Use only the supplied product record as factual evidence. Do not invent sales volume, search volume, stock, shipping speed, materials, dimensions, certifications, warranties, origin, reviews, scarcity, discounts or performance claims.',
-    'If a useful fact is missing, omit it or put it under "Fact checks before publish". Never convert an inference into a factual claim.',
-    'Keep marketplace-policy and IP risks visible. The result must remain a draft requiring human approval before any provider write.',
-    'Return Markdown with these headings: Title, Key bullets, Description, SEO/search phrases, Fact checks before publish.',
-    '',
     `PRODUCT NAME: ${clean(item.name,180)}`,
     `SKU: ${clean(item.sku,120)||'not supplied'}`,
     `CATEGORY: ${clean(item.category,160)||'not supplied'}`,
-    `DESCRIPTION / VALIDATED NOTES: ${clean(item.description,3000)||'not supplied'}`,
     `PRICE: ${Number(item.sale_price??0)} ${clean(item.currency,8)||'currency not supplied'}`,
-    `DROPSHIPPING CHANNEL/MODEL METADATA: ${json({channel:metadata['channel'],fulfilment_model:metadata['fulfilment_model'],opportunity_score:metadata['opportunity_score'],supplier_score:metadata['supplier_score']},1800)}`,
-    `EVIDENCE SNAPSHOT: ${json(evidence,3500)}`,
-    `COMPLIANCE SNAPSHOT: ${json(compliance,2500)}`,
-    `UNIT ECONOMICS SNAPSHOT: ${json(economics,2500)}`,
-    notes.trim()?`OPERATOR NOTES (instructions, not verified facts): ${clean(notes,2000)}`:'',
+    `DESCRIPTION / VALIDATED NOTES: ${clean(item.description,900)||'not supplied'}`,
+    `DROPSHIPPING METADATA: ${json({channel:metadata['channel'],fulfilment_model:metadata['fulfilment_model'],opportunity_score:metadata['opportunity_score'],supplier_score:metadata['supplier_score']},700)}`,
+    `EVIDENCE SNAPSHOT: ${json(evidence,1000)}`,
+    `COMPLIANCE SNAPSHOT: ${json(compliance,650)}`,
+    `UNIT ECONOMICS SNAPSHOT: ${json(economics,650)}`,
+    notes.trim()?`OPERATOR NOTES (instructions, not verified facts): ${clean(notes,500)}`:'',
+    'Use only the supplied product record as factual evidence. Do not invent sales volume, search volume, stock, shipping speed, materials, dimensions, certifications, warranties, origin, reviews, scarcity, discounts or performance claims.',
+    'If a useful fact is missing, omit it or put it under "Fact checks before publish". Never convert an inference into a factual claim.',
+    'Keep marketplace-policy and IP risks visible. The result remains a draft requiring human approval before any provider write.',
+    'Return Markdown with these headings: Title, Key bullets, Description, SEO/search phrases, Fact checks before publish.',
   ].filter(Boolean).join('\n');
+  return prompt.slice(0,3900);
 }
 
 export function withListingDraftMetadata(metadata:Record<string,unknown>|null|undefined,input:{channel:DropshipChannel;text:string;provider?:string;model?:string;generatedAt?:string}){
