@@ -14,6 +14,7 @@ import {
 import { runHealthCoachInquiry } from '@/lib/health/health-ai.functions';
 import HealthPlansRecords from '@/components/health/HealthPlansRecords';
 import HealthIntelligenceCenter from '@/components/health/HealthIntelligenceCenter';
+import HealthKnowledge from '@/components/health/HealthKnowledge';
 
 const TABS = [
   ['overview','Overview',Activity],
@@ -24,6 +25,7 @@ const TABS = [
   ['insights','Trends & imports',TrendingUp],
   ['record','Health record',Stethoscope],
   ['appointment','Appointment prep',Stethoscope],
+  ['knowledge','Knowledge',Brain],
   ['coach','AI Health Coach',Sparkles],
 ];
 
@@ -199,6 +201,8 @@ export default function HealthFitnessHub() {
     {tab==='record' && <><div className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><Panel title="Medication list" icon={Tablets}><p className="mb-3 text-[10px] leading-4 text-zinc-600">For record organisation only. Blackstar will not change prescribed medication or dosage.</p><div className="grid gap-3 sm:grid-cols-2"><Field label="Medication"><input className="hf-field" value={med.name} onChange={e=>setMed({...med,name:e.target.value})}/></Field><Field label="Dose"><input className="hf-field" value={med.dose} onChange={e=>setMed({...med,dose:e.target.value})}/></Field><Field label="Schedule"><input className="hf-field" value={med.schedule} onChange={e=>setMed({...med,schedule:e.target.value})}/></Field><Field label="Purpose"><input className="hf-field" value={med.purpose} onChange={e=>setMed({...med,purpose:e.target.value})}/></Field><Field label="Prescribed by"><input className="hf-field" value={med.prescribed_by} onChange={e=>setMed({...med,prescribed_by:e.target.value})}/></Field><Field label="Started"><input className="hf-field" type="date" value={med.started_on} onChange={e=>setMed({...med,started_on:e.target.value})}/></Field></div><button onClick={addMedication} disabled={busy==='med'||!med.name.trim()} className="hf-primary mt-3"><Plus className="h-4 w-4"/>Add to record</button></Panel><Panel title="Current record" icon={Stethoscope}><div className="space-y-2">{(data?.medications??[]).length?(data?.medications??[]).map(item=><div key={item.id} className="rounded-xl border border-white/[.06] bg-black/20 p-3"><div className="flex justify-between gap-3"><span className="text-xs text-zinc-200">{item.name}</span><span className={`text-[9px] uppercase ${item.active?'text-emerald-300':'text-zinc-600'}`}>{item.active?'active':'inactive'}</span></div><p className="mt-1 text-[10px] text-zinc-500">{[item.dose,item.schedule,item.purpose].filter(Boolean).join(' · ')||'No additional details'}</p></div>):<Empty text="No medications recorded."/>}</div></Panel></div><HealthPlansRecords mode="record" /></>}
 
     {tab==='appointment' && <HealthIntelligenceCenter mode="appointment" />}
+
+    {tab==='knowledge' && <HealthKnowledge />}
 
     {tab==='coach' && <Panel title="Blackstar Health Coach" icon={Brain}><div className="rounded-xl border border-amber-300/10 bg-amber-300/[.025] p-3 text-[10px] leading-5 text-amber-100/70">For emergencies or immediate danger, contact local emergency services. The coach is for bounded health information, fitness, nutrition, recovery, organisation and appointment preparation.</div><div className="mt-4 min-h-72 max-h-[520px] overflow-auto rounded-xl border border-white/[.06] bg-black/20 p-3">{turns.length?turns.map((turn,index)=><div key={index} className={`mb-3 max-w-[88%] rounded-xl px-3 py-2 text-xs leading-5 ${turn.role==='user'?'ml-auto bg-violet-400/10 text-violet-100':'border border-white/[.06] bg-white/[.025] text-zinc-300'}`}><div className="mb-1 text-[8px] uppercase tracking-wider text-zinc-600">{turn.role==='user'?'You':'Blackstar'}</div>{turn.content}</div>):<div className="grid min-h-64 place-items-center text-center text-xs text-zinc-600">Ask about a workout plan, nutrition habits, sleep/recovery, your logged trends, questions to prepare for a clinician, or help understanding non-emergency health information.</div>}</div>{coachMeta&&<div className="mt-2 flex flex-wrap gap-2 text-[9px] text-zinc-600"><span>Mode: {coachMeta.mode}</span>{coachMeta.provider&&<span>{coachMeta.provider} · {coachMeta.model}</span>}</div>}<form onSubmit={askCoach} className="mt-3 flex gap-2"><textarea className="hf-field min-h-24 flex-1 resize-none" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Ask Blackstar about your health & fitness goals…"/><button disabled={!question.trim()||busy==='coach'} className="hf-primary w-28 justify-center">{busy==='coach'?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{busy==='coach'?'Thinking':'Ask'}</button></form></Panel>}
 
