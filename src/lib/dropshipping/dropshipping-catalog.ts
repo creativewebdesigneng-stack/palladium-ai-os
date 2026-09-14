@@ -46,17 +46,17 @@ const num=(...values:unknown[])=>{for(const value of values){const n=Number(valu
 function candidateFrom(row:Record<string,unknown>):CatalogCandidate|null{
   const name=str(row['title'],row['name'],row['product_name'],row['listing_title']);
   if(!name)return null;
-  const money=asObject(row['price'])||asObject(row['shopMoney'])||asObject(asObject(row['currentTotalPriceSet'])?.shopMoney);
+  const money=asObject(row['price'])||asObject(row['shopMoney'])||asObject(asObject(row['currentTotalPriceSet'])?.['shopMoney']);
   const price=num(row['price'],row['amount'],money?.['amount']);
   return {
     sourceId:id(row['id'],row['product_id'],row['listing_id'],row['sku']),
     name:name.slice(0,180),
     sku:str(row['sku'],row['SKU']),
     category:str(row['productType'],row['product_type'],row['category'],row['taxonomy_path']),
-    description:str(row['description'],row['description']Html,row['description']_html),
+    description:str(row['description'],row['descriptionHtml'],row['description_html']),
     vendor:str(row['vendor'],row['brand'],row['shop_name']),
     price,
-    currency:str(row['currency'],row['currency']Code,money?.['currencyCode'],money?.['currency_code']),
+    currency:str(row['currency'],row['currencyCode'],money?.['currencyCode'],money?.['currency_code']),
     inventory:num(row['inventoryQuantity'],row['totalInventory'],row['quantity'],row['stock']),
     url:str(row['url'],row['web_url'],row['listing_url']),
   };
