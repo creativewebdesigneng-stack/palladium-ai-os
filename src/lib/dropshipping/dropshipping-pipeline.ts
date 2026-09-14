@@ -53,10 +53,10 @@ export function buildDropshipCatalogPayload(input:DropshipPipelineInput){
   const compliance=assessChannelCompliance({
     channel:input.channel,
     fulfilmentModel:input.fulfilmentModel,
-    originalDesign:input.originalDesign,
-    productionPartnerDisclosed:input.productionPartnerDisclosed,
-    restrictedProduct:input.restrictedProduct,
-    ipRisk:input.ipRisk,
+    originalDesign:input.originalDesign??false,
+    productionPartnerDisclosed:input.productionPartnerDisclosed??false,
+    restrictedProduct:input.restrictedProduct??false,
+    ipRisk:input.ipRisk??false,
   });
   const unitEconomics=calculateUnitEconomics({
     sellPrice:input.sellPrice,
@@ -66,7 +66,7 @@ export function buildDropshipCatalogPayload(input:DropshipPipelineInput){
     paymentFeePct:input.paymentFeePct,
     adCost:input.adCost,
     returnsReservePct:input.returnsReservePct,
-    taxReservePct:input.taxReservePct,
+    taxReservePct:input.taxReservePct??0,
   });
   const lifecycleStage=compliance.allowed?input.stage:'blocked';
   const evidenceUrl=optionalHttpUrl(input.evidenceUrl);
