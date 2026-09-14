@@ -10,8 +10,8 @@ describe('Dropshipping listing publication handoff',()=>{
     });
     expect(result).toMatchObject({provider:'shopify',action:'shopify_product_create_draft'});
     expect(result.input.title).toBe('Travel <Cube>');
-    expect(result.input.description_html).toContain('Travel' in result.input? '': '');
     expect(result.input.description_html).toContain('Grounded description<br>No invented claims.');
+    expect(result.input.description_html).toContain('&lt;');
     expect(result.input.description_html).not.toContain('<script');
   });
 
