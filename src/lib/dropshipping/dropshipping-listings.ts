@@ -8,6 +8,12 @@ export type ListingDraftRecord={
   provider?:string;
   model?:string;
   requires_approval:true;
+  approval_request_id?:string;
+  approval_status?:'pending'|'approved'|'rejected'|'expired';
+  approval_provider?:string;
+  approval_action?:string;
+  approval_draft_hash?:string;
+  approval_prepared_at?:string;
 };
 
 export type ListingDraftMetadata=Record<string,unknown>&{listing_drafts:Record<string,ListingDraftRecord>};
@@ -74,4 +80,13 @@ export function withListingDraftMetadata(metadata:Record<string,unknown>|null|un
     requires_approval:true,
   };
   return {...existing,listing_drafts:{...drafts,[input.channel]:record}};
+}
+
+export function withListingApprovalMetadata(metadata:Record<string,unknown>|null|undefined,input:{channel:DropshipChannel;approvalRequestId:string;provider:string;action:string;draftHash:string;preparedAt?:string}):ListingDraftMetadata{
+  const existing=metadata??{};
+  const currentDrafts=existing['listing_drafts'];
+  const drafts=(currentDrafts&&typeof currentDrafts==='object'&&!Array.isArray(currentDrafts)?currentDrafts:{}) as Record<string,ListingDraftRecord>;
+  const current=drafts[input.channel];
+  if(!current||current.channel!==input.channel||current.status!=='draft')throw new Error('A saved listing draft is required before linking an approval.');
+  return {...existing,listing_drafts:{...drafts,[input.channel]:{...current,approval_request_id:input.approvalRequestId,approval_status:'pending',approval_provider:input.provider,approval_action:input.action,approval_draft_hash:input.draftHash,approval_prepared_at:input.preparedAt??new Date().toISOString()}}};
 }
