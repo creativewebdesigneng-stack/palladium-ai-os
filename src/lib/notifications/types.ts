@@ -105,6 +105,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "A date saved on a Legal Hub rights or obligations working record has arrived or passed; Blackstar does not determine that it is a statutory deadline or that a breach occurred.",
   },
   {
+    type: "compliance.regulatory_change_detected",
+    label: "Compliance Sentinel regulatory change",
+    category: "system",
+    severity: "warning",
+    desc: "An authoritative source monitored by Compliance Sentinel changed and matched one of your alert rules. Review is required before deciding applicability or legal effect.",
+  },
+  {
     type: "subscription.changed",
     label: "Subscription changed",
     category: "billing",
