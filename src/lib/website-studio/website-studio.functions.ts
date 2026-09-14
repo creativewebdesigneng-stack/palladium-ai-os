@@ -176,7 +176,9 @@ export const deleteWebsiteStudioAsset=createServerFn({method:'POST'})
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
+    const {data:asset,error:readError}=await sb.from('website_studio_assets').select('storage_path').eq('id',data.id).maybeSingle();
+    if(readError)throw new Error(readError.message);
     const {error}=await sb.from('website_studio_assets').delete().eq('id',data.id);
     if(error)throw new Error(error.message);
-    return {ok:true};
+    return {ok:true,storagePath:asset?.storage_path??null};
   });
