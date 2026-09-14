@@ -44,6 +44,28 @@ async function getProjectForMutation(sb: Sb, id: string, userId: string): Promis
   return data as ProjectScope;
 }
 
+function slugifyProjectName(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "project";
+}
+
+async function resolveProjectSlug(sb: Sb, name: string, userId: string, orgId: string | null) {
+  const base = slugifyProjectName(name);
+  for (let index = 0; index < 50; index += 1) {
+    const candidate = index === 0 ? base : `${base}-${index + 1}`;
+    let query = sb.from("projects").select("id").eq("slug", candidate).limit(1);
+    query = orgId ? query.eq("org_id", orgId) : query.is("org_id", null).eq("user_id", userId);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    if (!data?.length) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+}
+
 async function addActivity(sb: Sb, userId: string, projectId: string, kind: string, message: string) {
   const { error } = await sb.from("project_activity").insert({
     project_id: projectId,
@@ -89,7 +111,7 @@ export const listProjects = createServerFn({ method: "POST" })
 
     let q = sb
       .from("projects")
-      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,created_at,updated_at")
+      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,visibility,slug,default_branch,license,homepage_url,created_at,updated_at")
       .order("updated_at", { ascending: false })
       .limit(200);
     q = data.orgId ? q.eq("org_id", data.orgId) : q.is("org_id", null).eq("user_id", context.userId);
@@ -106,7 +128,7 @@ export const getProject = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const { data: project, error } = await sb
       .from("projects")
-      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,created_at,updated_at")
+      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,visibility,slug,default_branch,license,homepage_url,created_at,updated_at")
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -138,12 +160,14 @@ export const createProject = createServerFn({ method: "POST" })
         priority: prioritySchema.optional(),
         tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
         dueAt: z.string().datetime().nullish(),
+        visibility: visibilitySchema.optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     if (data.orgId) await requireOrgMember(sb, data.orgId, context.userId);
+    const slug = await resolveProjectSlug(sb, data.name, context.userId, data.orgId ?? null);
 
     const { data: project, error } = await sb
       .from("projects")
@@ -155,8 +179,10 @@ export const createProject = createServerFn({ method: "POST" })
         priority: data.priority ?? "normal",
         tags: data.tags ?? [],
         due_at: data.dueAt ?? null,
+        visibility: data.visibility ?? "private",
+        slug,
       })
-      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,created_at,updated_at")
+      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,visibility,slug,default_branch,license,homepage_url,created_at,updated_at")
       .single();
     if (error) throw new Error(error.message);
 
@@ -184,6 +210,10 @@ export const updateProject = createServerFn({ method: "POST" })
         priority: prioritySchema.optional(),
         tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
         dueAt: z.string().datetime().nullable().optional(),
+        visibility: visibilitySchema.optional(),
+        defaultBranch: z.string().trim().min(1).max(120).optional(),
+        license: z.string().trim().max(120).nullable().optional(),
+        homepageUrl: z.string().trim().url().max(500).nullable().optional(),
       })
       .parse(input),
   )
@@ -197,13 +227,17 @@ export const updateProject = createServerFn({ method: "POST" })
     if (data.priority !== undefined) patch["priority"] = data.priority;
     if (data.tags !== undefined) patch["tags"] = data.tags;
     if (data.dueAt !== undefined) patch["due_at"] = data.dueAt;
+    if (data.visibility !== undefined) patch["visibility"] = data.visibility;
+    if (data.defaultBranch !== undefined) patch["default_branch"] = data.defaultBranch;
+    if (data.license !== undefined) patch["license"] = data.license;
+    if (data.homepageUrl !== undefined) patch["homepage_url"] = data.homepageUrl;
     if (Object.keys(patch).length === 0) return existing;
 
     const { data: project, error } = await sb
       .from("projects")
       .update(patch)
       .eq("id", data.id)
-      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,created_at,updated_at")
+      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,visibility,slug,default_branch,license,homepage_url,created_at,updated_at")
       .single();
     if (error) throw new Error(error.message);
 
@@ -384,4 +418,123 @@ export const removeProjectResource = createServerFn({ method: "POST" })
       metadata: { resourceType: link.resource_type, resourceId: link.resource_id },
     });
     return { ok: true };
+  });
+
+
+export const listPublicProjects = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      search: z.string().trim().max(120).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    }).parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    let q = sb
+      .from("projects")
+      .select("id,user_id,org_id,name,description,status,priority,tags,due_at,visibility,slug,default_branch,license,homepage_url,created_at,updated_at")
+      .eq("visibility", "public")
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false })
+      .limit(data.limit ?? 60);
+    if (data.search) q = q.ilike("name", `%${data.search.replace(/[%_]/g, "")}%`);
+    const { data: projects, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const ids = (projects ?? []).map((project: { id: string }) => project.id);
+    if (!ids.length) return { projects: [], starredProjectIds: [] as string[] };
+
+    const [{ data: stars, error: starsError }, { data: ownStars, error: ownStarsError }] = await Promise.all([
+      sb.from("project_stars").select("project_id").in("project_id", ids),
+      sb.from("project_stars").select("project_id").in("project_id", ids).eq("user_id", context.userId),
+    ]);
+    if (starsError) throw new Error(starsError.message);
+    if (ownStarsError) throw new Error(ownStarsError.message);
+
+    const counts = new Map<string, number>();
+    for (const star of stars ?? []) counts.set(star.project_id, (counts.get(star.project_id) ?? 0) + 1);
+
+    return {
+      projects: (projects ?? []).map((project: any) => ({
+        ...project,
+        star_count: counts.get(project.id) ?? 0,
+      })),
+      starredProjectIds: (ownStars ?? []).map((star: { project_id: string }) => star.project_id),
+    };
+  });
+
+export const setProjectVisibility = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid(), visibility: visibilitySchema }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const existing = await getProjectForMutation(sb, data.id, context.userId);
+    const { data: project, error } = await sb
+      .from("projects")
+      .update({ visibility: data.visibility })
+      .eq("id", data.id)
+      .select("id,org_id,name,visibility,slug,updated_at")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await addActivity(
+      sb,
+      context.userId,
+      data.id,
+      "visibility_changed",
+      `Changed project “${existing.name}” visibility to ${data.visibility}.`,
+    );
+    await writeAudit({
+      userId: context.userId,
+      orgId: project.org_id,
+      action: "project_visibility_changed",
+      targetType: "project",
+      targetId: data.id,
+      metadata: { visibility: data.visibility },
+    });
+    return project;
+  });
+
+export const toggleProjectStar = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: project, error: projectError } = await sb
+      .from("projects")
+      .select("id,visibility")
+      .eq("id", data.projectId)
+      .maybeSingle();
+    if (projectError) throw new Error(projectError.message);
+    if (!project || project.visibility !== "public") {
+      throw new Error("Only public projects can be starred.");
+    }
+
+    const { data: existing, error: existingError } = await sb
+      .from("project_stars")
+      .select("project_id")
+      .eq("project_id", data.projectId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+
+    if (existing) {
+      const { error } = await sb
+        .from("project_stars")
+        .delete()
+        .eq("project_id", data.projectId)
+        .eq("user_id", context.userId);
+      if (error) throw new Error(error.message);
+      return { starred: false };
+    }
+
+    const { error } = await sb.from("project_stars").insert({
+      project_id: data.projectId,
+      user_id: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { starred: true };
   });
