@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import {
-  ArrowLeft, ChevronRight, CircleDot, FileCode2, Folder, GitBranch, GitCommitHorizontal,
+  ArrowLeft, ChevronRight, CircleDot, FileCode2, Folder, GitBranch, GitCommitHorizontal, GitPullRequest,
   Globe2, History, Loader2, LockKeyhole, MessageSquare, Package, Pencil, Plus, Save, ShieldCheck,
   Trash2, UserPlus, Users, X,
 } from 'lucide-react';
@@ -15,6 +15,7 @@ import {
   commitRepositoryFile,
   createRepositoryBranch,
   createRepositoryIssue,
+  createRepositoryPullRequest,
   createRepositoryRelease,
   getRepositoryOverview,
   listCommitChanges,
@@ -23,10 +24,13 @@ import {
   listRepositoryFiles,
   listRepositoryIssueComments,
   listRepositoryIssues,
+  listRepositoryPullRequests,
   listRepositoryReleases,
   readRepositoryFile,
+  mergeRepositoryPullRequest,
   removeRepositoryCollaborator,
   setRepositoryIssueStatus,
+  setRepositoryPullRequestStatus,
   updateRepositoryCollaborator,
 } from '@/lib/projects/repository.functions';
 
@@ -48,6 +52,10 @@ export default function ProjectRepository() {
   const addIssueCommentFn = useServerFn(addRepositoryIssueComment);
   const releasesFn = useServerFn(listRepositoryReleases);
   const createReleaseFn = useServerFn(createRepositoryRelease);
+  const pullRequestsFn = useServerFn(listRepositoryPullRequests);
+  const createPullRequestFn = useServerFn(createRepositoryPullRequest);
+  const pullRequestStatusFn = useServerFn(setRepositoryPullRequestStatus);
+  const mergePullRequestFn = useServerFn(mergeRepositoryPullRequest);
   const addCollaboratorFn = useServerFn(addRepositoryCollaborator);
   const updateCollaboratorFn = useServerFn(updateRepositoryCollaborator);
   const removeCollaboratorFn = useServerFn(removeRepositoryCollaborator);
@@ -63,6 +71,7 @@ export default function ProjectRepository() {
   const [branchOpen, setBranchOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [pullRequestOpen, setPullRequestOpen] = useState(false);
 
   const overviewQuery = useQuery({
     queryKey: ['project-repository', id],
@@ -108,6 +117,12 @@ export default function ProjectRepository() {
     enabled: Boolean(id && project && tab === 'releases'),
     retry: false,
   });
+  const pullRequestsQuery = useQuery({
+    queryKey: ['project-repository-pull-requests', id],
+    queryFn: () => pullRequestsFn({ data: { projectId: id } }),
+    enabled: Boolean(id && project && tab === 'pull-requests'),
+    retry: false,
+  });
 
   const invalidateRepository = () => {
     queryClient.invalidateQueries({ queryKey: ['project-repository', id] });
@@ -149,6 +164,24 @@ export default function ProjectRepository() {
       setReleaseOpen(false);
     },
   });
+  const pullRequestMutation = useMutation({
+    mutationFn: (data) => createPullRequestFn({ data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-repository-pull-requests', id] });
+      setPullRequestOpen(false);
+    },
+  });
+  const pullRequestStatusMutation = useMutation({
+    mutationFn: (data) => pullRequestStatusFn({ data }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-repository-pull-requests', id] }),
+  });
+  const mergePullRequestMutation = useMutation({
+    mutationFn: (pullRequestId) => mergePullRequestFn({ data: { projectId: id, pullRequestId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-repository-pull-requests', id] });
+      invalidateRepository();
+    },
+  });
 
   const addCollaboratorMutation = useMutation({
     mutationFn: (data) => addCollaboratorFn({ data }),
@@ -169,7 +202,7 @@ export default function ProjectRepository() {
   const files = filesQuery.data ?? [];
   const tree = useMemo(() => buildFolderView(files, path), [files, path]);
   const crumbs = path ? path.split('/').filter(Boolean) : [];
-  const error = overviewQuery.error || filesQuery.error || commitsQuery.error || collaboratorsQuery.error || issuesQuery.error || releasesQuery.error || commitMutation.error || branchMutation.error || issueMutation.error || issueStatusMutation.error || releaseMutation.error || addCollaboratorMutation.error || updateCollaboratorMutation.error || removeCollaboratorMutation.error;
+  const error = overviewQuery.error || filesQuery.error || commitsQuery.error || collaboratorsQuery.error || issuesQuery.error || releasesQuery.error || pullRequestsQuery.error || commitMutation.error || branchMutation.error || issueMutation.error || issueStatusMutation.error || releaseMutation.error || pullRequestMutation.error || pullRequestStatusMutation.error || mergePullRequestMutation.error || addCollaboratorMutation.error || updateCollaboratorMutation.error || removeCollaboratorMutation.error;
 
   async function openFile(filePath) {
     try {
@@ -212,6 +245,7 @@ export default function ProjectRepository() {
         <Tab active={tab === 'files'} onClick={() => setTab('files')} icon={FileCode2}>Files</Tab>
         <Tab active={tab === 'history'} onClick={() => setTab('history')} icon={History}>History</Tab>
         <Tab active={tab === 'issues'} onClick={() => setTab('issues')} icon={CircleDot}>Issues</Tab>
+        <Tab active={tab === 'pull-requests'} onClick={() => setTab('pull-requests')} icon={GitPullRequest}>Pull requests</Tab>
         <Tab active={tab === 'releases'} onClick={() => setTab('releases')} icon={Package}>Releases</Tab>
         <Tab active={tab === 'collaborators'} onClick={() => setTab('collaborators')} icon={Users}>Collaborators</Tab>
         <div className="ml-auto flex items-center gap-2">
@@ -260,6 +294,8 @@ export default function ProjectRepository() {
 
       {tab === 'issues' && <IssuesPanel issues={issuesQuery.data ?? []} loading={issuesQuery.isLoading} pending={issueStatusMutation.isPending} onNew={() => setIssueOpen(true)} onOpen={setSelectedIssue} onStatus={(issueId, status) => issueStatusMutation.mutate({ projectId: id, issueId, status })} />}
 
+      {tab === 'pull-requests' && <PullRequestsPanel rows={pullRequestsQuery.data ?? []} loading={pullRequestsQuery.isLoading} pending={pullRequestStatusMutation.isPending || mergePullRequestMutation.isPending} onNew={() => setPullRequestOpen(true)} onStatus={(pullRequestId, status) => pullRequestStatusMutation.mutate({ projectId: id, pullRequestId, status })} onMerge={(pullRequestId) => mergePullRequestMutation.mutate(pullRequestId)} />}
+
       {tab === 'releases' && <ReleasesPanel releases={releasesQuery.data ?? []} loading={releasesQuery.isLoading} onNew={() => setReleaseOpen(true)} />}
 
       {tab === 'collaborators' && (
@@ -277,6 +313,7 @@ export default function ProjectRepository() {
       {branchOpen && <CreateBranchDialog current={effectiveBranch} pending={branchMutation.isPending} error={branchMutation.error} onClose={() => setBranchOpen(false)} onSubmit={(name) => branchMutation.mutate({ projectId: id, name, fromBranch: effectiveBranch })} />}
       {issueOpen && <CreateIssueDialog pending={issueMutation.isPending} error={issueMutation.error} onClose={() => setIssueOpen(false)} onSubmit={(title, body, labels) => issueMutation.mutate({ projectId: id, title, body, labels })} />}
       {releaseOpen && <CreateReleaseDialog commits={commitsQuery.data ?? []} pending={releaseMutation.isPending} error={releaseMutation.error} onClose={() => setReleaseOpen(false)} onSubmit={(data) => releaseMutation.mutate({ projectId: id, ...data })} />}
+      {pullRequestOpen && <CreatePullRequestDialog branches={branches.length ? branches : [{ name: effectiveBranch }]} current={effectiveBranch} pending={pullRequestMutation.isPending} error={pullRequestMutation.error} onClose={() => setPullRequestOpen(false)} onSubmit={(data) => pullRequestMutation.mutate({ projectId: id, ...data })} />}
       {selectedIssue && <IssueDialog projectId={id} issue={selectedIssue} commentsFn={issueCommentsFn} addCommentFn={addIssueCommentFn} onClose={() => setSelectedIssue(null)} />}
     </>
   );
@@ -369,4 +406,18 @@ function ModalShell({ title, eyebrow, onClose, children }) {
 
 function ModalActions({ pending, disabled, onClose, label }) {
   return <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-400">Cancel</button><button disabled={pending || disabled} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50">{pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{label}</button></div>;
+}
+
+
+function PullRequestsPanel({ rows, loading, pending, onNew, onStatus, onMerge }) {
+  return <section className="rounded-2xl border border-white/10 bg-white/[.025]"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><div><h2 className="text-sm font-semibold text-white">Pull requests</h2><p className="mt-1 text-xs text-zinc-600">Propose branch changes and merge them into a target branch with a recorded merge commit.</p></div><button onClick={onNew} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white"><GitPullRequest className="h-3.5 w-3.5" />New pull request</button></div><div className="divide-y divide-white/[.06]">{loading ? <p className="p-5 text-xs text-zinc-500">Loading pull requests…</p> : rows.length === 0 ? <p className="p-5 text-xs text-zinc-600">No pull requests yet.</p> : rows.map((row) => <div key={row.id} className="flex flex-wrap items-start gap-3 p-4"><GitPullRequest className={`mt-0.5 h-4 w-4 ${row.status === 'open' ? 'text-emerald-300' : row.status === 'merged' ? 'text-violet-300' : 'text-zinc-500'}`} /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-zinc-200">{row.title}</p><p className="mt-1 text-[10px] text-zinc-600">#{row.pr_number} · {row.source_branch} → {row.target_branch} · {row.status}</p>{row.body && <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{row.body}</p>}</div>{row.status === 'open' && <div className="flex gap-2"><button disabled={pending} onClick={() => onStatus(row.id, 'closed')} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400 hover:bg-white/5">Close</button><button disabled={pending} onClick={() => onMerge(row.id)} className="rounded-lg border border-violet-400/20 bg-violet-500/10 px-2.5 py-1.5 text-[10px] font-medium text-violet-200">Merge</button></div>}{row.status === 'closed' && <button disabled={pending} onClick={() => onStatus(row.id, 'open')} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400 hover:bg-white/5">Reopen</button>}</div>)}</div></section>;
+}
+
+function CreatePullRequestDialog({ branches, current, pending, error, onClose, onSubmit }) {
+  const [sourceBranch, setSourceBranch] = useState(current);
+  const [targetBranch, setTargetBranch] = useState(branches.find((b) => b.name !== current)?.name || 'main');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const canSubmit = title.trim() && sourceBranch && targetBranch && sourceBranch !== targetBranch;
+  return <ModalShell title="New pull request" eyebrow="Branch review" onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); if (canSubmit) onSubmit({ sourceBranch, targetBranch, title: title.trim(), body: body.trim() || null }); }} className="space-y-3"><div className="grid grid-cols-2 gap-3"><label className="text-xs text-zinc-400">Source<select value={sourceBranch} onChange={(e) => setSourceBranch(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-[#090b12] px-3 py-2 text-sm text-white">{branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</select></label><label className="text-xs text-zinc-400">Target<select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-[#090b12] px-3 py-2 text-sm text-white">{branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}</select></label></div><input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pull request title" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none" /><textarea rows={7} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Describe the proposed change…" className="w-full resize-y rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none" />{sourceBranch === targetBranch && <p className="text-xs text-amber-300">Choose different source and target branches.</p>}{error && <p className="text-xs text-rose-300">{friendlyMessage(error)}</p>}<ModalActions pending={pending} disabled={!canSubmit} onClose={onClose} label="Create pull request" /></form></ModalShell>;
 }
