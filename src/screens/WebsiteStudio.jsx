@@ -14,6 +14,7 @@ import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
 import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
+import WebsiteSectionInspector from '@/components/website-studio/WebsiteSectionInspector';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
 import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
 import WebsiteDomainManager from '@/components/website-studio/WebsiteDomainManager';
@@ -167,6 +168,7 @@ export default function WebsiteStudio(){
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
         <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
+        <WebsiteSectionInspector project={draft} setProject={setDraft} activePath={previewPagePath}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
         <WebsiteAssetLibrary projectId={draft.id}/>
