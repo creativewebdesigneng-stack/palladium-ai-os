@@ -85,7 +85,8 @@ export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
     return capabilities
       .filter(capability=>aliases.has(normalizeIntegrationProvider(capability.provider)))
       .map(({provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema})=>({
-        provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema,
+        provider,action,description,risk,requiresApproval,deployed,transport,lane,
+        inputSchemaJson:JSON.stringify(inputSchema).slice(0,30_000),
       }))
       .sort((left,right)=>left.provider===right.provider?left.action.localeCompare(right.action):left.provider.localeCompare(right.provider));
   });
