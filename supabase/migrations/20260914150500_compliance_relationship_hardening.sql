@@ -45,12 +45,13 @@ with check (
     )
   )
   and (
-    regulation_version_id is null
+    compliance_obligations.regulation_version_id is null
     or (
-      regulation_id is not null
+      compliance_obligations.regulation_id is not null
       and exists (
         select 1 from public.compliance_regulation_versions v
-        where v.id = regulation_version_id and v.regulation_id = regulation_id
+        where v.id = compliance_obligations.regulation_version_id
+          and v.regulation_id = compliance_obligations.regulation_id
       )
     )
   )
@@ -70,12 +71,13 @@ with check (
     )
   )
   and (
-    regulation_version_id is null
+    compliance_obligations.regulation_version_id is null
     or (
-      regulation_id is not null
+      compliance_obligations.regulation_id is not null
       and exists (
         select 1 from public.compliance_regulation_versions v
-        where v.id = regulation_version_id and v.regulation_id = regulation_id
+        where v.id = compliance_obligations.regulation_version_id
+          and v.regulation_id = compliance_obligations.regulation_id
       )
     )
   )
