@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { listRetailWorkspaces } from '@/lib/retail/retail-operations.functions';
 import { getRetailServiceAutomation } from '@/lib/retail/retail-service-automation.functions';
+import RetailReceptionistConsole from '@/components/retail/RetailReceptionistConsole';
 import RetailServiceAutomation from '@/components/retail/RetailServiceAutomation';
 
 export default function RetailServiceAutomationSection() {
@@ -51,7 +52,7 @@ export default function RetailServiceAutomationSection() {
         <button type="button" onClick={refresh} disabled={!selected || loading} className="inline-flex items-center gap-1.5 rounded-xl border border-white/[.08] bg-black/30 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-40"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh service automation</button>
       </div>
       {error && <div className="mb-3 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{error}</div>}
-      {selected && data ? <RetailServiceAutomation key={selected} workspaceId={selected} initialData={data} /> : loading ? <div className="rounded-[28px] border border-white/[.06] bg-black/25 p-8 text-center text-xs text-zinc-600">Loading Retail service automation…</div> : null}
+      {selected && data ? <><RetailReceptionistConsole key={`receptionist-${selected}`} workspaceId={selected} data={data} onChanged={refresh} /><RetailServiceAutomation key={`automation-${selected}`} workspaceId={selected} initialData={data} /></> : loading ? <div className="rounded-[28px] border border-white/[.06] bg-black/25 p-8 text-center text-xs text-zinc-600">Loading Retail service automation…</div> : null}
     </div>
   );
 }
