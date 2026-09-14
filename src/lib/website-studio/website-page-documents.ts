@@ -1,3 +1,4 @@
+import { normalizePagePath } from './website-pages';
 export type WebsitePageDocument={
   name?:string;
   path?:string;
@@ -9,8 +10,9 @@ export type WebsitePageDocument={
 };
 
 export function pageOutputPath(path:string):string{
-  const normalized=String(path||'/').trim().replace(/^\/+|\/+$/g,'');
-  return normalized?normalized+'/index.html':'index.html';
+  const normalized=normalizePagePath(path);
+  if(normalized==='/')return 'index.html';
+  return normalized.replace(/^\//,'')+'/index.html';
 }
 
 export function buildFallbackPageHtml(siteName:string,page:WebsitePageDocument):string{
@@ -39,7 +41,7 @@ export function buildFallbackPageHtml(siteName:string,page:WebsitePageDocument):
 }
 
 export function resolvePageHtml(siteName:string,homeHtml:string,page:WebsitePageDocument):string{
-  if(String(page.path||'/')==='/')return homeHtml;
+  if(normalizePagePath(String(page.path||'/'))==='/')return homeHtml;
   const explicit=typeof page.html==='string'?page.html.trim():'';
   return explicit||buildFallbackPageHtml(siteName,page);
 }
