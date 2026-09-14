@@ -23,7 +23,10 @@ export async function buildWebsiteRuntimePackage(sb:PackageSb,project:any):Promi
     html:rewriteWebsiteAssetReferences(project.html||'',deploymentAssets),
     css:rewriteWebsiteAssetReferences(project.css||'',deploymentAssets),
     javascript:rewriteWebsiteAssetReferences(project.javascript||'',deploymentAssets),
-    pages:Array.isArray(project.pages)?project.pages:[],
+    pages:Array.isArray(project.pages)?project.pages.map((page:any)=>({
+      ...page,
+      ...(typeof page?.html==='string'?{html:rewriteWebsiteAssetReferences(page.html,deploymentAssets)}:{}),
+    })):[],
     designTokens:project.design_tokens||{},
     brief:project.brief||{},
     appConfig:project.app_config||{},
