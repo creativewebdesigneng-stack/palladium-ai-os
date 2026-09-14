@@ -4,11 +4,15 @@ import RetailAdvancedOperations from '@/components/retail/RetailAdvancedOperatio
 import RetailStoreOperations from '@/components/retail/RetailStoreOperations';
 import RetailExecutionControls from '@/components/retail/RetailExecutionControls';
 import RetailCommerceControl from '@/components/retail/RetailCommerceControl';
+import RetailServiceAutomationSection from '@/components/retail/RetailServiceAutomationSection';
 
 function RetailHubRoute() {
   return (
     <>
       <RetailHub />
+      <div className="mt-6">
+        <RetailServiceAutomationSection />
+      </div>
       <div className="mt-6">
         <RetailAdvancedOperations />
       </div>
@@ -29,7 +33,7 @@ export const Route = createFileRoute('/_shell/_app/retail-hub')({
   head: () => ({
     meta: [
       { title: 'Retail & Local Business Hub — Blackstar' },
-      { name: 'description', content: 'AI-assisted retail operations for inventory, suppliers, bookings, orders, shipping, calls, returns, loyalty, promotions, forecasting, stock transfers, POS registers, cash sessions, stocktakes, gift credit, staff shifts, automated reminders, connected Shopify order sync, payment ledgers and audited till reconciliation.' },
+      { name: 'description', content: 'AI-assisted retail operations for inventory, suppliers, bookings, orders, shipping, calls, governed AI receptionist actions, customer communications, returns, loyalty, promotions, forecasting, stock transfers, POS registers, cash sessions, stocktakes, gift credit, staff shifts, automated reminders, connected Shopify order sync, payment ledgers and audited till reconciliation.' },
     ],
   }),
   component: RetailHubRoute,
