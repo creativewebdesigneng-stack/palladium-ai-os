@@ -6,7 +6,7 @@ import { runChat, type ChatMessage, type ToolDef } from '@/lib/runtime/model-gat
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 
-type Sb = { from: (table: string) => any };
+type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 const optionalText=(max:number)=>z.string().trim().max(max).optional().or(z.literal(''));
 
 const planInput=z.object({
@@ -101,7 +101,7 @@ export const generateHealthPlan=createServerFn({method:'POST'})
     }else{
       const fallback=result.text.trim();
       if(!fallback)throw new Error('Health planner did not return a usable draft.');
-      draft=structuredPlan.parse({title:`${data.plan_type[0].toUpperCase()}${data.plan_type.slice(1)} plan`,summary:fallback,principles:[],schedule:[],cautions:['Review this draft before following it and seek qualified professional input for medical concerns.']});
+      draft=structuredPlan.parse({title:`${data.plan_type.charAt(0).toUpperCase()}${data.plan_type.slice(1)} plan`,summary:fallback,principles:[],schedule:[],cautions:['Review this draft before following it and seek qualified professional input for medical concerns.']});
     }
     const {data:row,error}=await sb.from('health_plans').insert({
       user_id:context.userId,plan_type:data.plan_type,title:draft.title,status:'draft',plan:draft,source:'ai',ai_provider:result.provider,ai_model:result.model,
