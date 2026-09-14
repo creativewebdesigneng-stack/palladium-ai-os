@@ -9,6 +9,7 @@ import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import WebsitePageManager from '@/components/website-studio/WebsitePageManager';
 import WebsiteDesignControls from '@/components/website-studio/WebsiteDesignControls';
 import WebsiteAssetLibrary from '@/components/website-studio/WebsiteAssetLibrary';
+import WebsiteProjectFiles from '@/components/website-studio/WebsiteProjectFiles';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
