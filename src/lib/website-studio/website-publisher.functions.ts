@@ -5,6 +5,7 @@ import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
+import { createHash, randomBytes } from 'node:crypto';
 
 type Sb={from:(table:string)=>any;storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}}};
 type PublishTarget='preview'|'production';
@@ -29,14 +30,39 @@ function asRecord(value:unknown):Record<string,unknown>{
   return value&&typeof value==='object'?value as Record<string,unknown>:{};
 }
 
-function hasBackendDependencies(appConfig:unknown):boolean{
+function backendDependencies(appConfig:unknown){
   const config=asRecord(appConfig);
   const auth=asRecord(config['auth']);
-  return Boolean(
-    (Array.isArray(config['forms'])&&config['forms'].length)||
-    (Array.isArray(config['collections'])&&config['collections'].length)||
-    auth['enabled']
-  );
+  return {
+    hasForms:Array.isArray(config['forms'])&&config['forms'].length>0,
+    hasCollections:Array.isArray(config['collections'])&&config['collections'].length>0,
+    hasAuth:Boolean(auth['enabled']),
+  };
+}
+
+function formRuntimeEndpoint(){
+  const explicit=process.env['WEBSITE_STUDIO_FORM_ENDPOINT']?.trim()||'';
+  if(explicit)return explicit;
+  const supabaseUrl=process.env['VITE_SUPABASE_URL']?.trim()||process.env['SUPABASE_URL']?.trim()||'';
+  return supabaseUrl?supabaseUrl.replace(/\/$/,'')+'/functions/v1/website-studio-form-submit':'';
+}
+
+function injectBeforeBody(html:string,markup:string):string{
+  return /<\/body>/i.test(html)?html.replace(/<\/body>/i,markup+'\n</body>'):html+'\n'+markup;
+}
+
+function wireFormRuntime(files:Array<{file:string;data:string;encoding:'utf-8'|'base64'}>,projectId:string,endpoint:string,token:string){
+  const script=`<script>
+(()=>{const endpoint=${JSON.stringify(endpoint)},projectId=${JSON.stringify(projectId)},token=${JSON.stringify(token)};
+document.addEventListener('submit',async(event)=>{const form=event.target;if(!(form instanceof HTMLFormElement))return;
+const formKey=(form.dataset.blackstarForm||form.getAttribute('name')||'').trim();if(!formKey)return;
+event.preventDefault();const button=form.querySelector('[type="submit"]');if(button)button.disabled=true;
+const values=Object.fromEntries(new FormData(form).entries());const website=String(values.website||'');delete values.website;
+try{const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId,formKey,token,payload:values,sourceUrl:location.href,website})});
+if(!response.ok)throw new Error('submit_failed');form.reset();form.dispatchEvent(new CustomEvent('blackstar:form-success',{bubbles:true}));
+}catch{form.dispatchEvent(new CustomEvent('blackstar:form-error',{bubbles:true}));}finally{if(button)button.disabled=false;}});
+})();</script>`;
+  return files.map(file=>file.encoding==='utf-8'&&file.file.endsWith('.html')?{...file,data:injectBeforeBody(file.data,script)}:file);
 }
 
 async function vercelFetchJson(url:string,token:string,init?:RequestInit):Promise<{ok:boolean;status:number;payload:Record<string,unknown>}>{
@@ -171,26 +197,38 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       const failures=readiness.checks.filter((check)=>!check.ok).map((check)=>check.detail).join(' ');
       throw new Error(`Website publish preflight failed. ${failures}`);
     }
-    if(hasBackendDependencies(project.app_config)){
-      throw new Error('This project defines forms, data collections or authentication that are not provisioned yet.');
+    const dependencies=backendDependencies(project.app_config);
+    if(dependencies.hasCollections||dependencies.hasAuth){
+      throw new Error('This project defines data collections or authentication that are not provisioned for publishing yet.');
     }
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
+    let deploymentFiles=packaged.files;
+    let formTokenHash:string|null=null;
+    if(dependencies.hasForms){
+      const endpoint=formRuntimeEndpoint();
+      if(!endpoint)throw new Error('Website Studio form runtime endpoint is not configured.');
+      const formToken=randomBytes(32).toString('base64url');
+      formTokenHash=createHash('sha256').update(formToken).digest('hex');
+      deploymentFiles=wireFormRuntime(packaged.files,data.projectId,endpoint,formToken);
+    }
 
     try{
       const created=await createVercelDeployment({
         token,
         teamId,
         name:project.slug,
-        files:packaged.files,
+        files:deploymentFiles,
         target:data.target,
       });
 
-      const {error:idError}=await sb.from('website_studio_projects').update({
+      const deploymentUpdate:Record<string,unknown>={
         deployment_provider:'vercel',
         deployment_id:created.id,
         updated_at:new Date().toISOString(),
-      }).eq('id',data.projectId);
+      };
+      if(formTokenHash)deploymentUpdate['form_submit_token_hash']=formTokenHash;
+      const {error:idError}=await sb.from('website_studio_projects').update(deploymentUpdate).eq('id',data.projectId);
       if(idError)throw new Error(idError.message);
 
       const verified=await waitForVercelReady(token,teamId,created);
