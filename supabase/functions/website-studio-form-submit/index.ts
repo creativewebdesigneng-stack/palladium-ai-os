@@ -8,6 +8,9 @@ const MAX_FIELD_NAME_LENGTH=128;
 const MAX_TEXT_VALUE_LENGTH=4_000;
 const MAX_ARRAY_VALUES=32;
 const MAX_SOURCE_URL_LENGTH=2_048;
+const CLIENT_RATE_LIMIT=10;
+const FORM_RATE_LIMIT=120;
+const RATE_WINDOW_SECONDS=60;
 
 const corsHeaders={
   "Access-Control-Allow-Origin":"*",
@@ -16,7 +19,10 @@ const corsHeaders={
   "Content-Type":"application/json",
 };
 
-const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:corsHeaders});
+const json=(body:unknown,status=200,headers:Record<string,string>={})=>new Response(JSON.stringify(body),{
+  status,
+  headers:{...corsHeaders,...headers},
+});
 const hex=async(value:string)=>{
   const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
@@ -47,7 +53,10 @@ function configuredFieldNames(form:Record<string,unknown>):Set<string>|null{
     return names.length?new Set(names):null;
   }
   if(raw&&typeof raw==="object"){
-    const names=Object.keys(raw as Record<string,unknown>).map(name=>name.trim().slice(0,MAX_FIELD_NAME_LENGTH)).filter(Boolean).slice(0,MAX_FIELDS);
+    const names=Object.keys(raw as Record<string,unknown>)
+      .map(name=>name.trim().slice(0,MAX_FIELD_NAME_LENGTH))
+      .filter(Boolean)
+      .slice(0,MAX_FIELDS);
     return names.length?new Set(names):null;
   }
   return null;
@@ -113,6 +122,37 @@ function validSourceUrl(value:string):string{
   }catch{return "";}
 }
 
+function requestAddress(req:Request):string{
+  const cloudflare=text(req.headers.get("cf-connecting-ip"),128);
+  if(cloudflare)return cloudflare;
+  const forwarded=text(req.headers.get("x-forwarded-for"),512);
+  if(forwarded)return forwarded.split(",")[0]?.trim().slice(0,128)||"unknown";
+  return text(req.headers.get("x-real-ip"),128)||"unknown";
+}
+
+async function consumeRateLimit(
+  supabase:any,
+  projectId:string,
+  formKey:string,
+  identityHash:string,
+  limit:number,
+):Promise<{allowed:boolean;retryAfter:number;error:boolean}>{
+  const {data,error}=await supabase.rpc("website_studio_form_rate_limit",{
+    p_project_id:projectId,
+    p_form_key:formKey,
+    p_identity_hash:identityHash,
+    p_limit:limit,
+    p_window_seconds:RATE_WINDOW_SECONDS,
+  });
+  if(error)return {allowed:false,retryAfter:0,error:true};
+  const row=Array.isArray(data)?asRecord(data[0]):asRecord(data);
+  return {
+    allowed:row["allowed"]===true,
+    retryAfter:Math.max(0,Number(row["retry_after_seconds"]||0)||0),
+    error:false,
+  };
+}
+
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:corsHeaders});
   if(req.method!=="POST")return json({error:"method_not_allowed"},405);
@@ -157,6 +197,23 @@ Deno.serve(async(req:Request)=>{
       .map(asRecord)
       .find((form)=>String(form["name"]||"").trim().toLowerCase()===formKey.toLowerCase());
     if(!configuredForm)return json({error:"form_not_configured"},400);
+
+    const userAgent=text(req.headers.get("user-agent"),256)||"unknown";
+    const address=requestAddress(req);
+    const globalIdentity=await hex(`global:${projectId}:${formKey.toLowerCase()}`);
+    const clientIdentity=await hex(`client:${projectId}:${formKey.toLowerCase()}:${address}:${userAgent}`);
+
+    const globalLimit=await consumeRateLimit(supabase,projectId,formKey,globalIdentity,FORM_RATE_LIMIT);
+    if(globalLimit.error)return json({error:"rate_limit_unavailable"},503);
+    if(!globalLimit.allowed){
+      return json({error:"rate_limited",retryAfterSeconds:globalLimit.retryAfter},429,{"Retry-After":String(globalLimit.retryAfter||RATE_WINDOW_SECONDS)});
+    }
+
+    const clientLimit=await consumeRateLimit(supabase,projectId,formKey,clientIdentity,CLIENT_RATE_LIMIT);
+    if(clientLimit.error)return json({error:"rate_limit_unavailable"},503);
+    if(!clientLimit.allowed){
+      return json({error:"rate_limited",retryAfterSeconds:clientLimit.retryAfter},429,{"Retry-After":String(clientLimit.retryAfter||RATE_WINDOW_SECONDS)});
+    }
 
     const allowedFields=configuredFieldNames(configuredForm);
     const payload=normalizePayload(body.payload,allowedFields);
