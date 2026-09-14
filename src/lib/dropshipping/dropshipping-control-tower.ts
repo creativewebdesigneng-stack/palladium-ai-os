@@ -37,7 +37,7 @@ export function buildDropshippingControlTower(input:{catalog?:Row[];orders?:Row[
 
   for(const order of fulfilmentQueue){
     const orderId=String(order.id??'');
-    const label=String(order.order_number??orderId||'Order');
+    const label=String(order.order_number||orderId||'Order');
     const fulfilment=String(order.fulfilment_status??'unfulfilled');
     const placedAge=ageHours(order.placed_at??order.created_at,now);
     if(fulfilment==='shipped'&&!String(order.tracking_number??'').trim())alerts.push({id:`tracking:${orderId}`,severity:'critical',kind:'tracking-missing',title:`${label} shipped without tracking`,detail:'Add verified carrier/tracking evidence before customer messaging claims shipment visibility.',orderId});
@@ -55,7 +55,7 @@ export function buildDropshippingControlTower(input:{catalog?:Row[];orders?:Row[
 
   for(const ret of openReturns){
     const id=String(ret.id??'');
-    alerts.push({id:`return:${id}`,severity:ret.status==='received'?'high':'medium',kind:'return-open',title:`Return ${String(ret.return_number??id||'case')} needs attention`,detail:`Status: ${String(ret.status??'requested')}. Refund/provider side effects must only be marked complete after the authoritative payment/store system confirms them.`,orderId:String(ret.order_id??'')||undefined});
+    alerts.push({id:`return:${id}`,severity:ret.status==='received'?'high':'medium',kind:'return-open',title:`Return ${String(ret.return_number||id||'case')} needs attention`,detail:`Status: ${String(ret.status??'requested')}. Refund/provider side effects must only be marked complete after the authoritative payment/store system confirms them.`,orderId:String(ret.order_id??'')||undefined});
   }
 
   alerts.sort((a,b)=>severityRank[b.severity]-severityRank[a.severity]||a.title.localeCompare(b.title));
