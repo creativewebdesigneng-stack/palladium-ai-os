@@ -15,3 +15,15 @@ export function removeWebsitePage(pages:WebsitePage[],path:string):WebsitePage[]
   if(target==='/')return pages;
   return pages.filter(p=>normalizePagePath(p.path)!==target);
 }
+
+
+export function ensureWebsiteHomePage<T extends {path?:string;name?:string}>(pages:T[]):T[]{
+  const safe=Array.isArray(pages)?pages:[];
+  if(safe.some(page=>normalizePagePath(page.path||'/')==='/'))return safe;
+  return [{name:'Home',path:'/'} as T,...safe];
+}
+
+export function websitePagePathsAreUnique(pages:Array<{path?:string}>):boolean{
+  const normalized=(Array.isArray(pages)?pages:[]).map(page=>normalizePagePath(page.path||'/'));
+  return new Set(normalized).size===normalized.length;
+}
