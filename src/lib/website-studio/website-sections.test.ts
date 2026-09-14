@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {moveWebsiteSection,normalizeSections} from './website-sections';
+describe('website sections',()=>{it('normalizes string sections',()=>{expect(normalizeSections(['Hero'])[0]).toMatchObject({type:'hero',label:'Hero'})});it('reorders sections',()=>{const s=normalizeSections(['Hero','CTA']);expect(moveWebsiteSection(s,1,-1).map(x=>x.label)).toEqual(['CTA','Hero'])});});

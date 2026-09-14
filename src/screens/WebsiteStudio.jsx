@@ -13,6 +13,7 @@ import WebsiteProjectFiles from '@/components/website-studio/WebsiteProjectFiles
 import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
 import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
+import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};

@@ -139,17 +139,18 @@ const assetSchema=z.object({
   projectId:z.string().uuid(),
   name:z.string().trim().min(1).max(160),
   kind:z.enum(assetKinds).default('image'),
-  sourceUrl:z.string().url().max(4000),
+  sourceUrl:z.string().url().max(4000).optional(),
+  storagePath:z.string().trim().min(1).max(4000).optional(),
   altText:z.string().trim().max(1000).optional(),
   provenance:z.string().trim().max(2000).optional(),
-});
+}).refine((value)=>Boolean(value.sourceUrl||value.storagePath),{message:'Asset needs a source URL or storage path.'});
 
 export const listWebsiteStudioAssets=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
-    const {data:rows,error}=await sb.from('website_studio_assets').select('id,project_id,name,kind,source_url,alt_text,provenance,created_at').eq('project_id',data.projectId).order('created_at',{ascending:false});
+    const {data:rows,error}=await sb.from('website_studio_assets').select('id,project_id,name,kind,source_url,storage_path,alt_text,provenance,created_at').eq('project_id',data.projectId).order('created_at',{ascending:false});
     if(error)throw new Error(error.message);
     return rows??[];
   });
@@ -159,7 +160,7 @@ export const saveWebsiteStudioAsset=createServerFn({method:'POST'})
   .inputValidator((v:unknown)=>assetSchema.parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
-    const row={project_id:data.projectId,name:data.name,kind:data.kind,source_url:data.sourceUrl,alt_text:data.altText||null,provenance:data.provenance||null};
+    const row={project_id:data.projectId,name:data.name,kind:data.kind,source_url:data.sourceUrl||null,storage_path:data.storagePath||null,alt_text:data.altText||null,provenance:data.provenance||null};
     if(data.id){
       const {data:out,error}=await sb.from('website_studio_assets').update(row).eq('id',data.id).select().single();
       if(error)throw new Error(error.message);
@@ -175,7 +176,9 @@ export const deleteWebsiteStudioAsset=createServerFn({method:'POST'})
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
+    const {data:asset,error:readError}=await sb.from('website_studio_assets').select('storage_path').eq('id',data.id).maybeSingle();
+    if(readError)throw new Error(readError.message);
     const {error}=await sb.from('website_studio_assets').delete().eq('id',data.id);
     if(error)throw new Error(error.message);
-    return {ok:true};
+    return {ok:true,storagePath:asset?.storage_path??null};
   });
