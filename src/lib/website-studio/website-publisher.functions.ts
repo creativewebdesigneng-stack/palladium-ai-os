@@ -43,11 +43,7 @@ function asRecord(value:unknown):Record<string,unknown>{
 function backendDependencies(appConfig:unknown){
   const config=asRecord(appConfig);
   const auth=asRecord(config['auth']);
-  return {
-    hasForms:Array.isArray(config['forms'])&&config['forms'].length>0,
-    hasCollections:Array.isArray(config['collections'])&&config['collections'].length>0,
-    hasAuth:Boolean(auth['enabled']),
-  };
+  return {hasAuth:Boolean(auth['enabled'])};
 }
 
 async function vercelFetchJson(url:string,token:string,init?:RequestInit):Promise<{ok:boolean;status:number;payload:Record<string,unknown>}>{
@@ -183,8 +179,8 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       throw new Error(`Website publish preflight failed. ${failures}`);
     }
     const dependencies=backendDependencies(project.app_config);
-    if(dependencies.hasCollections||dependencies.hasAuth){
-      throw new Error('This project defines data collections or authentication that are not provisioned for publishing yet.');
+    if(dependencies.hasAuth){
+      throw new Error('This project defines authentication that is not provisioned for generated-site execution yet.');
     }
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
@@ -239,6 +235,8 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
           provider:'vercel',target:data.target,deployment_id:created.id,
           ready_state:verified.deployment.readyState,verified_ready:verified.verified,
           promoted_private_assets:packaged.privateAssetCount,
+          cms_collections:packaged.cmsCollectionCount,
+          cms_published_items:packaged.cmsPublishedItemCount,
           form_runtime_token_activated:Boolean(packaged.formRuntimeTokenHash&&verified.verified),
         },
       });
