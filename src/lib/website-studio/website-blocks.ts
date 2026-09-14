@@ -50,51 +50,50 @@ export function listWebsiteBlockInstances(html:string):WebsiteBlockInstance[]{
   return result;
 }
 
-function replaceMarkedBlocks(html:string,transform:(items:Array<{full:string;instanceId:string;blockId:string;body:string}>)=>Array<{full:string;instanceId:string;blockId:string;body:string}>):string{
+type MarkedBlock={full:string;instanceId:string;blockId:string;body:string;index:number;end:number};
+
+function markedBlocks(html:string):MarkedBlock[]{
   const source=String(html||'');
-  const items=[...source.matchAll(BLOCK_PATTERN)].map(match=>({full:match[0],instanceId:match[1]!,blockId:match[2]!,body:match[3]||''}));
-  if(!items.length)return source;
-  const firstIndex=source.indexOf(items[0]!.full);
-  const last=items[items.length-1]!;
-  const lastIndex=source.lastIndexOf(last.full)+last.full.length;
-  const prefix=source.slice(0,firstIndex);
-  const suffix=source.slice(lastIndex);
-  const replacement=transform(items).map(item=>item.full).join('\n');
-  return prefix+replacement+suffix;
+  return [...source.matchAll(BLOCK_PATTERN)].map(match=>({
+    full:match[0],
+    instanceId:match[1]!,
+    blockId:match[2]!,
+    body:match[3]||'',
+    index:match.index!,
+    end:match.index!+match[0].length,
+  }));
 }
 
 export function deleteWebsiteBlock(html:string,instanceId:string):string{
+  const source=String(html||'');
   const id=safeInstanceId(instanceId);
-  return replaceMarkedBlocks(html,items=>items.filter(item=>item.instanceId!==id));
+  const target=markedBlocks(source).find(item=>item.instanceId===id);
+  if(!target)return source;
+  return source.slice(0,target.index)+source.slice(target.end);
 }
 
 export function moveWebsiteBlock(html:string,instanceId:string,direction:-1|1):string{
-  const id=safeInstanceId(instanceId);
-  return replaceMarkedBlocks(html,items=>{
-    const index=items.findIndex(item=>item.instanceId===id);
-    const target=index+direction;
-    if(index<0||target<0||target>=items.length)return items;
-    const next=[...items];
-    const current=next[index]!;
-    next[index]=next[target]!;
-    next[target]=current;
-    return next;
-  });
+  const source=String(html||'');
+  const blocks=markedBlocks(source);
+  const index=blocks.findIndex(item=>item.instanceId===safeInstanceId(instanceId));
+  const targetIndex=index+direction;
+  if(index<0||targetIndex<0||targetIndex>=blocks.length)return source;
+
+  const current=blocks[index]!;
+  const target=blocks[targetIndex]!;
+  if(direction===1){
+    const between=source.slice(current.end,target.index);
+    return source.slice(0,current.index)+target.full+between+current.full+source.slice(target.end);
+  }
+  const between=source.slice(target.end,current.index);
+  return source.slice(0,target.index)+current.full+between+target.full+source.slice(current.end);
 }
 
 export function duplicateWebsiteBlock(html:string,instanceId:string):string{
-  const id=safeInstanceId(instanceId);
-  return replaceMarkedBlocks(html,items=>{
-    const index=items.findIndex(item=>item.instanceId===id);
-    if(index<0)return items;
-    const source=items[index]!;
-    const duplicateMarkup=createWebsiteBlockMarkup(source.blockId);
-    const match=BLOCK_PATTERN.exec(duplicateMarkup);
-    BLOCK_PATTERN.lastIndex=0;
-    if(!match)return items;
-    const duplicate={full:duplicateMarkup,instanceId:match[1]!,blockId:match[2]!,body:match[3]||''};
-    const next=[...items];
-    next.splice(index+1,0,duplicate);
-    return next;
-  });
+  const source=String(html||'');
+  const target=markedBlocks(source).find(item=>item.instanceId===safeInstanceId(instanceId));
+  if(!target)return source;
+  const duplicate=createWebsiteBlockMarkup(target.blockId);
+  if(!duplicate)return source;
+  return source.slice(0,target.end)+'\n'+duplicate+source.slice(target.end);
 }
