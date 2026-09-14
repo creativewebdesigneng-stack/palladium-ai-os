@@ -56,6 +56,13 @@ describe('Website Studio generated form token lifecycle',()=>{
     expect(migrationSource).toContain("'^(vercel:(preview|production)|github:[0-9a-f]{64})$'");
   });
 
+  it('revokes superseded GitHub target slots only when a replacement is promoted',()=>{
+    expect(migrationSource).toContain("if v_target like 'github:%' then");
+    expect(migrationSource).toContain("entry.key not like 'github:%'");
+    expect(migrationSource).toContain('or entry.key = v_target');
+    expect(migrationSource.indexOf("if v_target like 'github:%' then")).toBeGreaterThan(migrationSource.indexOf("v_pending_hash := v_slot ->> 'pending_hash'"));
+  });
+
   it('activates Vercel and GitHub generated tokens only after their external side effect succeeds',()=>{
     const vercelCreated=publisherSource.indexOf('const created=await createVercelDeployment');
     const vercelStage=publisherSource.indexOf('await stageWebsiteStudioFormDeploymentToken');
