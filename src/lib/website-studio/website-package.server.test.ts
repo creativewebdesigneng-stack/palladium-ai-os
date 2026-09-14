@@ -52,15 +52,15 @@ describe('Website Studio form runtime packaging',()=>{
       html:'<!doctype html><html><body><script src="script.js"></script></body></html>',css:'',javascript:'',
       pages:[
         {name:'Home',path:'/',html:'<!doctype html><html><body>Home<script src="script.js"></script></body></html>'},
-        {name:'Contact',path:'/contact',html:'<!doctype html><html><body><form name="contact"></form><script src="script.js"></script></body></html>'},
+        {name:'Contact',path:'/contact',html:'<!doctype html><html><body><form name="contact"></form><script src="/script.js"></script></body></html>'},
       ],
       design_tokens:{},brief:{},app_config:{forms:[{name:'contact',fields:['email']}]},
     });
 
     const script=result.files.find((file)=>file.file==='script.js')?.data||'';
-    const contact=result.files.find((file)=>file.file==='contact.html')?.data||'';
+    const contact=result.files.find((file)=>file.file==='contact/index.html')?.data||'';
     expect(script.match(/website-studio-form-submit/g)?.length).toBe(1);
-    expect(contact).toContain('script.js');
+    expect(contact).toContain('/script.js');
     expect(result.files.filter((file)=>file.file==='script.js')).toHaveLength(1);
   });
 
