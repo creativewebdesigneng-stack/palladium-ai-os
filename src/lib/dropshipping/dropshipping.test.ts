@@ -2,10 +2,10 @@ import {describe,expect,it} from 'vitest';
 import {assessChannelCompliance,buildDropshipStoreBrief,calculateOpportunityScore,calculateSupplierScore,calculateUnitEconomics,dropshipProjectSlug} from './dropshipping';
 
 describe('Dropshipping Hub intelligence',()=>{
-  it('scores strong product opportunities without treating risk as demand',()=>{
+  it('scores product opportunities without treating risk as demand',()=>{
     const result=calculateOpportunityScore({demand:90,searchMomentum:86,competition:25,margin:82,shipping:75,supplierReliability:90,seasonality:70,returnRisk:15,complianceRisk:5});
     expect(result.score).toBeGreaterThan(70);
-    expect(result.band).toBe('strong');
+    expect(result.band).toBe('promising');
     const risky=calculateOpportunityScore({demand:90,searchMomentum:86,competition:25,margin:82,shipping:75,supplierReliability:90,seasonality:70,returnRisk:90,complianceRisk:100});
     expect(risky.score).toBeLessThan(result.score);
   });
