@@ -27,3 +27,16 @@ export function websitePagePathsAreUnique(pages:Array<{path?:string}>):boolean{
   const normalized=(Array.isArray(pages)?pages:[]).map(page=>normalizePagePath(page.path||'/'));
   return new Set(normalized).size===normalized.length;
 }
+
+
+export function normalizeWebsitePageSet<T extends {path?:string;name?:string}>(pages:T[]):T[]{
+  const withHome=ensureWebsiteHomePage(Array.isArray(pages)?pages:[]);
+  const seen=new Set<string>();
+  return withHome.filter(page=>{
+    const path=normalizePagePath(page.path||'/');
+    if(seen.has(path))return false;
+    seen.add(path);
+    page.path=path;
+    return true;
+  });
+}
