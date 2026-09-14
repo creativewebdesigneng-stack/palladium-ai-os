@@ -125,7 +125,7 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const pairing = await sb.from('retail_reception_voice_pairings')
-      .select('id,workspace_id,profile_id,provider_phone_sid,token_hash,expires_at,consumed_at')
+      .select('id,workspace_id,profile_id,provider_phone_sid,expires_at,consumed_at')
       .eq('id', data.pairing_id).maybeSingle();
     if (pairing.error) throw new Error(pairing.error.message);
     if (!pairing.data) throw new Error('Retail inbound voice pairing not found.');
@@ -148,7 +148,16 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
     if (existingProfile.error) throw new Error(existingProfile.error.message);
     if (existingProfile.data && existingProfile.data.user_id !== context.userId) throw new Error('Receptionist endpoint ownership mismatch.');
 
-    await verifyRetailInboundPairing(pairing.data.provider_phone_sid, pairing.data.token_hash);
+    const privatePairing = await adminSb.from('retail_reception_voice_pairings')
+      .select('token_hash')
+      .eq('id', pairing.data.id)
+      .eq('user_id', context.userId)
+      .is('consumed_at', null)
+      .maybeSingle();
+    if (privatePairing.error) throw new Error(privatePairing.error.message);
+    if (!privatePairing.data?.token_hash) throw new Error('Retail inbound voice pairing secret is unavailable.');
+
+    await verifyRetailInboundPairing(pairing.data.provider_phone_sid, privatePairing.data.token_hash);
     const verified = await configureRetailTwilioIncomingNumber(pairing.data.provider_phone_sid);
 
     const now = new Date().toISOString();
