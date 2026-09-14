@@ -17,15 +17,21 @@ import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanv
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
 import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
+import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
+import { resolvePageHtml } from '@/lib/website-studio/website-page-documents';
+import { normalizePagePath } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
 const widths={desktop:'100%',tablet:'820px',mobile:'390px'};
 
-function documentForPreview(project){
+function documentForPreview(project,path='/'){
   const css=project.css||'';
   const js=project.javascript||'';
-  const html=project.html||'<!doctype html><html><body></body></html>';
+  const normalized=normalizePagePath(path);
+  const pages=Array.isArray(project.pages)?project.pages:[];
+  const page=pages.find(item=>normalizePagePath(item?.path||'/')===normalized);
+  const html=page?resolvePageHtml(project.name||'Website',project.html||'',page):(project.html||'<!doctype html><html><body></body></html>');
   return html.replace('</head>',`<style>${css}</style></head>`).replace('</body>',`<script>${js.replace(/<\/script/gi,'<\\/script')}<\/script></body>`);
 }
 
@@ -40,19 +46,25 @@ export default function WebsiteStudio(){
   const [revisions,setRevisions]=useState([]);
   const [aiInstruction,setAiInstruction]=useState('');
   const [aiMeta,setAiMeta]=useState(null);
+  const [previewPagePath,setPreviewPagePath]=useState('/');
 
   const refresh=async()=>{try{setProjects(await listWebsiteStudioProjects({data:{}}));}catch(e){setError(e instanceof Error?e.message:'Could not load website projects.')}};
   const loadRevisions=async(projectId)=>{if(!projectId)return setRevisions([]);try{setRevisions(await listWebsiteStudioRevisions({data:{projectId}}));}catch(e){setError(e instanceof Error?e.message:'Could not load revisions.')}};
   useEffect(()=>{void refresh()},[]);
   useEffect(()=>{void loadRevisions(draft.id)},[draft.id]);
+  useEffect(()=>{
+    const pages=Array.isArray(draft.pages)?draft.pages:[];
+    if(!pages.some(page=>normalizePagePath(page?.path||'/')===normalizePagePath(previewPagePath)))setPreviewPagePath('/');
+  },[draft.pages,previewPagePath]);
 
-  const preview=useMemo(()=>documentForPreview(draft),[draft]);
+  const preview=useMemo(()=>documentForPreview(draft,previewPagePath),[draft,previewPagePath]);
   const quality=useMemo(()=>assessWebsiteQuality(draft.html||'',draft.css||''),[draft.html,draft.css]);
 
   const createFromPrompt=()=>{
     if(!draft.name.trim())return setError('Give the website a project name first.');
     const seed=createWebsiteSeed(draft.name,draft.prompt);
     setDraft({...blank,...seed,design_tokens:seed.designTokens,status:'draft'});
+    setPreviewPagePath('/');
     setNotice('Starter site generated locally. AI prompt-to-code generation will build on this project model rather than bypassing it.');
     setError('');
   };
@@ -104,13 +116,13 @@ export default function WebsiteStudio(){
   };
 
   return <div className="space-y-5 pb-10">
-    <PageHeader eyebrow="Creator workspace" title="Website Studio" description="Prompt, design, edit, preview and prepare websites for deployment using Blackstar's existing HTML Studio, developer controls and deployment infrastructure." action={<button onClick={()=>setDraft(blank)} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-medium text-white"><Plus className="h-4 w-4"/>New website</button>}/>
+    <PageHeader eyebrow="Creator workspace" title="Website Studio" description="Prompt, design, edit, preview and prepare websites for deployment using Blackstar's existing HTML Studio, developer controls and deployment infrastructure." action={<button onClick={()=>{setDraft(blank);setPreviewPagePath('/')}} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-medium text-white"><Plus className="h-4 w-4"/>New website</button>}/>
     {(error||notice)&&<div className={`rounded-xl border p-3 text-xs ${error?'border-rose-400/20 bg-rose-500/10 text-rose-200':'border-emerald-400/20 bg-emerald-500/10 text-emerald-200'}`}>{error||notice}</div>}
 
     <div className="grid gap-4 xl:grid-cols-[270px_minmax(0,1fr)]">
       <aside className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
         <div className="flex items-center gap-2"><FolderKanban className="h-4 w-4 text-violet-300"/><p className="text-xs font-semibold text-white">Website projects</p></div>
-        <div className="mt-3 space-y-2">{projects.length===0?<p className="py-8 text-center text-xs text-zinc-600">No website projects yet.</p>:projects.map(p=><button key={p.id} onClick={()=>setDraft(p)} className={`w-full rounded-xl border p-3 text-left ${draft.id===p.id?'border-violet-400/30 bg-violet-500/[.08]':'border-white/10 bg-black/15'}`}><p className="truncate text-sm text-white">{p.name}</p><p className="mt-1 text-[10px] text-zinc-500">{p.framework} · {p.status}</p></button>)}</div>
+        <div className="mt-3 space-y-2">{projects.length===0?<p className="py-8 text-center text-xs text-zinc-600">No website projects yet.</p>:projects.map(p=><button key={p.id} onClick={()=>{setDraft(p);setPreviewPagePath('/')}} className={`w-full rounded-xl border p-3 text-left ${draft.id===p.id?'border-violet-400/30 bg-violet-500/[.08]':'border-white/10 bg-black/15'}`}><p className="truncate text-sm text-white">{p.name}</p><p className="mt-1 text-[10px] text-zinc-500">{p.framework} · {p.status}</p></button>)}</div>
       </aside>
 
       <div className="space-y-4">
@@ -139,6 +151,7 @@ export default function WebsiteStudio(){
         </section>
 
         <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
+        <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
@@ -155,7 +168,7 @@ export default function WebsiteStudio(){
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex gap-1">{[['desktop',Monitor],['tablet',Tablet],['mobile',Smartphone]].map(([m,Icon])=><button key={m} onClick={()=>setMode(m)} className={`rounded-lg p-2 ${mode===m?'bg-violet-500/15 text-violet-200':'text-zinc-600'}`}><Icon className="h-4 w-4"/></button>)}</div>
+            <div className="flex flex-wrap items-center gap-2"><select value={normalizePagePath(previewPagePath)} onChange={e=>setPreviewPagePath(normalizePagePath(e.target.value))} className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[10px] text-zinc-300">{(draft.pages||[]).map((page,index)=><option key={page.path||index} value={normalizePagePath(page.path||'/')}>{page.name||page.path||'Page'}</option>)}</select><div className="flex gap-1">{[['desktop',Monitor],['tablet',Tablet],['mobile',Smartphone]].map(([m,Icon])=><button key={m} onClick={()=>setMode(m)} className={`rounded-lg p-2 ${mode===m?'bg-violet-500/15 text-violet-200':'text-zinc-600'}`}><Icon className="h-4 w-4"/></button>)}</div></div>
             <div className="flex flex-wrap gap-2"><Link to="/html-studio" className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400"><Code2 className="h-3 w-3"/>HTML Studio</Link><Link to="/developer-workspace" className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400"><Rocket className="h-3 w-3"/>Developer / deploy</Link>{draft.production_url&&<a href={draft.production_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-emerald-300/20 px-2.5 py-1.5 text-[10px] text-emerald-300"><ExternalLink className="h-3 w-3"/>Live site</a>}</div>
           </div>
           <div className="mt-4 overflow-auto rounded-xl border border-white/10 bg-[#111] p-4"><iframe title="Website Studio preview" sandbox="allow-scripts" srcDoc={preview} className="mx-auto min-h-[660px] rounded-lg bg-white transition-all" style={{width:widths[mode]}}/></div>
