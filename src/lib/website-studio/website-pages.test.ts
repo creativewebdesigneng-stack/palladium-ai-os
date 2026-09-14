@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {addWebsitePage,ensureWebsiteHomePage,normalizePagePath,removeWebsitePage,websitePagePathsAreUnique} from './website-pages';
+import {addWebsitePage,ensureWebsiteHomePage,normalizePagePath,normalizeWebsitePageSet,removeWebsitePage,websitePagePathsAreUnique} from './website-pages';
 
 describe('website pages',()=>{
   it('normalizes routes',()=>{
@@ -17,5 +17,9 @@ describe('website pages',()=>{
   it('detects duplicate normalized routes',()=>{
     expect(websitePagePathsAreUnique([{path:'/about'},{path:'about'}])).toBe(false);
     expect(websitePagePathsAreUnique([{path:'/'},{path:'/about'}])).toBe(true);
+  });
+  it('normalizes and deduplicates AI page sets',()=>{
+    const pages=normalizeWebsitePageSet([{name:'About',path:'about'},{name:'Duplicate',path:'/about'}]);
+    expect(pages.map(page=>page.path)).toEqual(['/','/about']);
   });
 });
