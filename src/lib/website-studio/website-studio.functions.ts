@@ -125,3 +125,51 @@ export const deleteWebsiteStudioRevision=createServerFn({method:'POST'})
     if(error)throw new Error(error.message);
     return {ok:true};
   });
+
+
+const assetKinds=['image','video','font','document','other'] as const;
+const assetSchema=z.object({
+  id:z.string().uuid().optional(),
+  projectId:z.string().uuid(),
+  name:z.string().trim().min(1).max(160),
+  kind:z.enum(assetKinds).default('image'),
+  sourceUrl:z.string().url().max(4000),
+  altText:z.string().trim().max(1000).optional(),
+  provenance:z.string().trim().max(2000).optional(),
+});
+
+export const listWebsiteStudioAssets=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid()}).parse(v))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const {data:rows,error}=await sb.from('website_studio_assets').select('id,project_id,name,kind,source_url,alt_text,provenance,created_at').eq('project_id',data.projectId).order('created_at',{ascending:false});
+    if(error)throw new Error(error.message);
+    return rows??[];
+  });
+
+export const saveWebsiteStudioAsset=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v:unknown)=>assetSchema.parse(v))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const row={project_id:data.projectId,name:data.name,kind:data.kind,source_url:data.sourceUrl,alt_text:data.altText||null,provenance:data.provenance||null};
+    if(data.id){
+      const {data:out,error}=await sb.from('website_studio_assets').update(row).eq('id',data.id).select().single();
+      if(error)throw new Error(error.message);
+      return out;
+    }
+    const {data:out,error}=await sb.from('website_studio_assets').insert({...row,user_id:context.userId}).select().single();
+    if(error)throw new Error(error.message);
+    return out;
+  });
+
+export const deleteWebsiteStudioAsset=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const {error}=await sb.from('website_studio_assets').delete().eq('id',data.id);
+    if(error)throw new Error(error.message);
+    return {ok:true};
+  });
