@@ -1,5 +1,6 @@
 import {createFileRoute} from '@tanstack/react-router';
 import DropshippingHub from '@/screens/DropshippingHub';
+import DropshippingConnectionMatrix from '@/screens/DropshippingConnectionMatrix';
 import DropshippingGrowthLab from '@/screens/DropshippingGrowthLab';
 import DropshippingProductPipeline from '@/screens/DropshippingProductPipeline';
 import DropshippingListingWorkbench from '@/screens/DropshippingListingWorkbench';
@@ -8,6 +9,7 @@ import DropshippingControlTower from '@/screens/DropshippingControlTower';
 function DropshippingHubRoute(){
   return <>
     <DropshippingHub/>
+    <DropshippingConnectionMatrix/>
     <DropshippingGrowthLab/>
     <DropshippingProductPipeline/>
     <DropshippingListingWorkbench/>
