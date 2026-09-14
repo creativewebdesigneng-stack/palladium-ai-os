@@ -29,15 +29,16 @@ function asRecord(value:unknown):Record<string,unknown>{
   return value&&typeof value==='object'?value as Record<string,unknown>:{};
 }
 
-function hasBackendDependencies(appConfig:unknown):boolean{
+function backendDependencies(appConfig:unknown){
   const config=asRecord(appConfig);
   const auth=asRecord(config['auth']);
-  return Boolean(
-    (Array.isArray(config['forms'])&&config['forms'].length)||
-    (Array.isArray(config['collections'])&&config['collections'].length)||
-    auth['enabled']
-  );
+  return {
+    hasForms:Array.isArray(config['forms'])&&config['forms'].length>0,
+    hasCollections:Array.isArray(config['collections'])&&config['collections'].length>0,
+    hasAuth:Boolean(auth['enabled']),
+  };
 }
+
 
 async function vercelFetchJson(url:string,token:string,init?:RequestInit):Promise<{ok:boolean;status:number;payload:Record<string,unknown>}>{
   const controller=new AbortController();
@@ -171,8 +172,9 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       const failures=readiness.checks.filter((check)=>!check.ok).map((check)=>check.detail).join(' ');
       throw new Error(`Website publish preflight failed. ${failures}`);
     }
-    if(hasBackendDependencies(project.app_config)){
-      throw new Error('This project defines forms, data collections or authentication that are not provisioned yet.');
+    const dependencies=backendDependencies(project.app_config);
+    if(dependencies.hasCollections||dependencies.hasAuth){
+      throw new Error('This project defines data collections or authentication that are not provisioned for publishing yet.');
     }
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
