@@ -22,11 +22,11 @@ export function assertNoCatalogCredentials(value:unknown,depth=0){
 
 function schemaRecord(value:unknown){return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
 export function buildCatalogReadInputTemplate(schema:unknown){
-  const root=schemaRecord(schema);const properties=schemaRecord(root.properties);const required=new Set(Array.isArray(root.required)?root.required.map(String):[]);
+  const root=schemaRecord(schema);const properties=schemaRecord(root['properties']);const requiredRaw=root['required'];const required=new Set(Array.isArray(requiredRaw)?requiredRaw.map(String):[]);
   const out:Record<string,unknown>={};
   for(const [key,raw] of Object.entries(properties).slice(0,30)){
-    const row=schemaRecord(raw);const type=String(row.type||'');
-    if(key==='limit')out[key]=Math.min(25,Number(row.maximum)||25);
+    const row=schemaRecord(raw);const type=String(row['type']||'');
+    if(key==='limit')out[key]=Math.min(25,Number(row['maximum'])||25);
     else if(key==='offset')out[key]=0;
     else if(type==='boolean')out[key]=false;
     else if(required.has(key)){
@@ -37,34 +37,33 @@ export function buildCatalogReadInputTemplate(schema:unknown){
   return out;
 }
 
-type Candidate={sourceId:string|null;name:string;sku:string|null;category:string|null;description:string|null;vendor:string|null;price:number|null;currency:string|null;inventory:number|null;url:string|null;raw:Record<string,unknown>};
+export type CatalogCandidate={sourceId:string|null;name:string;sku:string|null;category:string|null;description:string|null;vendor:string|null;price:number|null;currency:string|null;inventory:number|null;url:string|null};
 const asObject=(v:unknown)=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:null;
 const str=(...values:unknown[])=>{for(const value of values){if(typeof value==='string'&&value.trim())return value.trim().slice(0,5000)}return null};
 const id=(...values:unknown[])=>{for(const value of values){if(typeof value==='string'&&value.trim())return value.trim().slice(0,300);if(typeof value==='number'&&Number.isFinite(value))return String(value)}return null};
 const num=(...values:unknown[])=>{for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null};
 
-function candidateFrom(row:Record<string,unknown>):Candidate|null{
-  const name=str(row.title,row.name,row.product_name,row.listing_title);
+function candidateFrom(row:Record<string,unknown>):CatalogCandidate|null{
+  const name=str(row['title'],row['name'],row['product_name'],row['listing_title']);
   if(!name)return null;
-  const money=asObject(row.price)||asObject(row.shopMoney)||asObject(asObject(row.currentTotalPriceSet)?.shopMoney);
-  const price=num(row.price,row.amount,money?.amount);
+  const money=asObject(row['price'])||asObject(row['shopMoney'])||asObject(asObject(row['currentTotalPriceSet'])?.shopMoney);
+  const price=num(row['price'],row['amount'],money?.['amount']);
   return {
-    sourceId:id(row.id,row.product_id,row.listing_id,row.sku),
+    sourceId:id(row['id'],row['product_id'],row['listing_id'],row['sku']),
     name:name.slice(0,180),
-    sku:str(row.sku,row.SKU),
-    category:str(row.productType,row.product_type,row.category,row.taxonomy_path),
-    description:str(row.description,row.descriptionHtml,row.description_html),
-    vendor:str(row.vendor,row.brand,row.shop_name),
+    sku:str(row['sku'],row['SKU']),
+    category:str(row['productType'],row['product_type'],row['category'],row['taxonomy_path']),
+    description:str(row['description'],row['description']Html,row['description']_html),
+    vendor:str(row['vendor'],row['brand'],row['shop_name']),
     price,
-    currency:str(row.currency,row.currencyCode,money?.currencyCode,money?.currency_code),
-    inventory:num(row.inventoryQuantity,row.totalInventory,row.quantity,row.stock),
-    url:str(row.url,row.web_url,row.listing_url),
-    raw:Object.fromEntries(Object.entries(row).slice(0,80)),
+    currency:str(row['currency'],row['currency']Code,money?.['currencyCode'],money?.['currency_code']),
+    inventory:num(row['inventoryQuantity'],row['totalInventory'],row['quantity'],row['stock']),
+    url:str(row['url'],row['web_url'],row['listing_url']),
   };
 }
 
-export function extractDropshippingCatalogCandidates(value:unknown,max=100):Candidate[]{
-  const out:Candidate[]=[];const seen=new Set<unknown>();let visited=0;
+export function extractDropshippingCatalogCandidates(value:unknown,max=100):CatalogCandidate[]{
+  const out:CatalogCandidate[]=[];const seen=new Set<unknown>();let visited=0;
   const visit=(node:unknown,depth:number)=>{
     if(out.length>=max||depth>7||visited++>3000||node==null)return;
     if(typeof node!=='object')return;
