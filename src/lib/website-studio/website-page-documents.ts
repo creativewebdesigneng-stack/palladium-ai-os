@@ -47,5 +47,6 @@ export function resolvePageHtml(siteName:string,homeHtml:string,page:WebsitePage
 }
 
 export function setPageHtml(pages:WebsitePageDocument[],path:string,html:string):WebsitePageDocument[]{
-  return pages.map(page=>String(page.path||'/')===path?{...page,html}:page);
+  const target=normalizePagePath(path);
+  return pages.map(page=>normalizePagePath(String(page.path||'/'))===target?{...page,path:target,html}:page);
 }
