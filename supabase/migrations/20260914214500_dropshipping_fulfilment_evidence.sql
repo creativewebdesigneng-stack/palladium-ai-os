@@ -21,20 +21,10 @@ to authenticated
 using (auth.uid() = user_id);
 
 drop policy if exists dropshipping_fulfilment_evidence_owner_insert on public.dropshipping_fulfilment_evidence;
-create policy dropshipping_fulfilment_evidence_owner_insert
-on public.dropshipping_fulfilment_evidence for insert
-to authenticated
-with check (auth.uid() = user_id);
-
 drop policy if exists dropshipping_fulfilment_evidence_owner_update on public.dropshipping_fulfilment_evidence;
-create policy dropshipping_fulfilment_evidence_owner_update
-on public.dropshipping_fulfilment_evidence for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
 
-revoke all on public.dropshipping_fulfilment_evidence from anon;
-grant select, insert, update on public.dropshipping_fulfilment_evidence to authenticated;
+revoke all on public.dropshipping_fulfilment_evidence from anon, authenticated;
+grant select on public.dropshipping_fulfilment_evidence to authenticated;
 
 create index if not exists dropshipping_fulfilment_evidence_owner_order_idx
 on public.dropshipping_fulfilment_evidence(user_id, order_id, observed_at desc);
