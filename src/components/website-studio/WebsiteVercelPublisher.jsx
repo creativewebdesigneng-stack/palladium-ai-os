@@ -1,12 +1,14 @@
 import {useEffect,useState} from 'react';
 import {ExternalLink,Loader2,Rocket,ShieldCheck,RefreshCw,TriangleAlert} from 'lucide-react';
-import {getWebsiteStudioPublisherStatus,publishWebsiteStudioProject,verifyWebsiteStudioDeployment} from '@/lib/website-studio/website-publisher.functions';
+import {addWebsiteStudioDomain,getWebsiteStudioPublisherStatus,publishWebsiteStudioProject,verifyWebsiteStudioDeployment,verifyWebsiteStudioDomain} from '@/lib/website-studio/website-publisher.functions';
 
 export default function WebsiteVercelPublisher({project,onPublished}){
   const [status,setStatus]=useState(null);
   const [busy,setBusy]=useState('');
   const [error,setError]=useState('');
   const [result,setResult]=useState(null);
+  const [domain,setDomain]=useState(project.domain_config?.domain||'');
+  const [domainState,setDomainState]=useState(project.domain_config||null);
 
   useEffect(()=>{
     let active=true;
@@ -39,6 +41,28 @@ export default function WebsiteVercelPublisher({project,onPublished}){
     finally{setBusy('')}
   };
 
+  const addDomain=async()=>{
+    if(!project.id||!domain.trim())return;
+    setBusy('domain-add');setError('');
+    try{
+      const value=await addWebsiteStudioDomain({data:{projectId:project.id,domain:domain.trim()}});
+      setDomainState(value);
+      onPublished?.({domainConfig:value,domainOnly:true});
+    }catch(e){setError(e instanceof Error?e.message:'Could not add custom domain.')}
+    finally{setBusy('')}
+  };
+
+  const verifyDomain=async()=>{
+    if(!project.id)return;
+    setBusy('domain-verify');setError('');
+    try{
+      const value=await verifyWebsiteStudioDomain({data:{projectId:project.id}});
+      setDomainState(value);
+      onPublished?.({domainConfig:value,domainOnly:true});
+    }catch(e){setError(e instanceof Error?e.message:'Could not verify custom domain.')}
+    finally{setBusy('')}
+  };
+
   const configured=Boolean(status?.configured);
   return <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -62,5 +86,11 @@ export default function WebsiteVercelPublisher({project,onPublished}){
       <div className="flex flex-wrap items-center gap-2"><p className="text-xs font-medium text-white">{result.target} deployment · {result.readyState||'unknown state'}</p><span className="text-[10px] text-zinc-600">{result.verified?'READY verified':'Created; verification still pending'}</span></div>
       {result.url&&<a href={result.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] text-cyan-300"><ExternalLink className="h-3 w-3"/>Open deployment</a>}
     </div>}
+
+    <div className="mt-5 rounded-xl border border-white/[.07] bg-black/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-medium text-white">Custom domain</p><p className="mt-1 text-[10px] text-zinc-600">Attach a domain only after the Website Studio project has a Vercel deployment.</p></div>{domainState?.domain&&<span className={`rounded-full border px-2 py-1 text-[10px] ${domainState.verified?'border-emerald-300/20 text-emerald-300':'border-amber-300/20 text-amber-300'}`}>{domainState.verified?'Verified':'Verification required'}</span>}</div>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={domain} onChange={e=>setDomain(e.target.value)} placeholder="www.example.com" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none"/><button disabled={!configured||!project.deployment_id||!domain.trim()||Boolean(busy)} onClick={addDomain} className="rounded-xl border border-cyan-300/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{busy==='domain-add'?'Adding…':'Add domain'}</button>{domainState?.domain&&<button disabled={!configured||Boolean(busy)} onClick={verifyDomain} className="rounded-xl border border-emerald-300/20 px-3 py-2 text-xs text-emerald-100 disabled:opacity-40">{busy==='domain-verify'?'Checking…':'Verify DNS'}</button>}</div>
+      {Array.isArray(domainState?.verification)&&domainState.verification.length>0&&<div className="mt-3 space-y-2">{domainState.verification.map((item,index)=><div key={index} className="rounded-lg border border-amber-300/10 bg-amber-300/[.025] p-2 text-[10px] leading-4 text-zinc-500"><pre className="whitespace-pre-wrap">{JSON.stringify(item,null,2)}</pre></div>)}</div>}
+    </div>
   </section>
 }
