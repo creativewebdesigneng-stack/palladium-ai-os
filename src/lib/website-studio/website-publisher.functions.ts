@@ -51,7 +51,7 @@ function injectBeforeBody(html:string,markup:string):string{
   return /<\/body>/i.test(html)?html.replace(/<\/body>/i,markup+'\n</body>'):html+'\n'+markup;
 }
 
-function wireFormRuntime(files:Array<{file:string;data:string;encoding:'utf-8'|'base64'}>,projectId:string,endpoint:string,token:string){
+export function wireFormRuntime(files:Array<{file:string;data:string;encoding:'utf-8'|'base64'}>,projectId:string,endpoint:string,token:string){
   const script=`<script>
 (()=>{const endpoint=${JSON.stringify(endpoint)},projectId=${JSON.stringify(projectId)},token=${JSON.stringify(token)};
 document.addEventListener('submit',async(event)=>{const form=event.target;if(!(form instanceof HTMLFormElement))return;
