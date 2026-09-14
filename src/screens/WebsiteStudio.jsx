@@ -151,7 +151,7 @@ export default function WebsiteStudio(){
           ? {...current,domain_config:deployment.domainConfig}
           : {...current,deployment_provider:'vercel',deployment_id:deployment.deploymentId,status:deployment.target==='production'?'published':'ready',...(deployment.target==='production'?{production_url:deployment.url}:{preview_url:deployment.url})}
         )}/>
-        <WebsiteGitSync config={draft.git_config||{}} setConfig={(git_config)=>setDraft({...draft,git_config})}/>
+        <WebsiteGitSync config={draft.git_config||{}} setConfig={(git_config)=>setDraft({...draft,git_config})} projectId={draft.id}/>
 
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
