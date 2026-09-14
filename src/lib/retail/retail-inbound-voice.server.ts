@@ -4,7 +4,23 @@ import { computeTwilioFormSignature } from './retail-twilio-webhook.server';
 import { escapeTwimlText, resolveRetailTwilioConfig } from './retail-twilio-carrier';
 import { runRetailReceptionistCore, type RetailReceptionistInquiry } from './retail-receptionist-core.server';
 
-type AdminSb = { from: (table: string) => any };
+type AdminSb = {
+  from: (table: string) => any;
+  rpc: (name: string, args?: Record<string, unknown>) => any;
+};
+type TwilioApiBody = Record<string, any> & {
+  message?: any;
+  incoming_phone_numbers?: any;
+  phone_number?: any;
+  sid?: any;
+  voice_application_sid?: any;
+  trunk_sid?: any;
+  voice_url?: any;
+  status_callback?: any;
+  friendly_name?: any;
+};
+type HistoryCandidate = { role?: unknown; content?: unknown };
+
 const adminSb = supabaseAdmin as unknown as AdminSb;
 
 const INCOMING_PATH = '/api/public/retail/twilio-voice/incoming';
@@ -61,7 +77,7 @@ function authHeader(config: NonNullable<ReturnType<typeof runtimeConfig>>) {
   return `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64')}`;
 }
 
-async function twilioRequest(path: string, init?: RequestInit) {
+async function twilioRequest(path: string, init?: RequestInit): Promise<TwilioApiBody> {
   const config = runtimeConfig();
   if (!config) throw new Error('twilio_not_configured');
   const response = await fetch(`https://api.twilio.com${path}`, {
@@ -75,9 +91,9 @@ async function twilioRequest(path: string, init?: RequestInit) {
     signal: AbortSignal.timeout(15_000),
   });
   const raw = await response.text();
-  let body: Record<string, any> = {};
+  let body: TwilioApiBody = {};
   if (raw) {
-    try { body = JSON.parse(raw) as Record<string, any>; }
+    try { body = JSON.parse(raw) as TwilioApiBody; }
     catch { body = {}; }
   }
   if (!response.ok) {
@@ -85,22 +101,6 @@ async function twilioRequest(path: string, init?: RequestInit) {
     throw new Error(`twilio_api_error:${message}`.slice(0, 1000));
   }
   return body;
-}
-
-export async function listRetailTwilioIncomingNumbers() {
-  const config = runtimeConfig();
-  if (!config || !appOrigin()) return [];
-  const body = await twilioRequest(`/2010-04-01/Accounts/${config.accountSid}/IncomingPhoneNumbers.json?PageSize=100`);
-  const rows = Array.isArray(body.incoming_phone_numbers) ? body.incoming_phone_numbers : [];
-  return rows
-    .filter((row: any) => PHONE_SID.test(String(row.sid ?? '')) && E164.test(String(row.phone_number ?? '')))
-    .map((row: any) => ({
-      sid: String(row.sid),
-      phone_number: String(row.phone_number),
-      friendly_name: typeof row.friendly_name === 'string' ? row.friendly_name.slice(0, 120) : '',
-      voice_url: typeof row.voice_url === 'string' ? row.voice_url.slice(0, 500) : '',
-      blocked_by_application: Boolean(row.voice_application_sid || row.trunk_sid),
-    }));
 }
 
 export async function fetchRetailTwilioIncomingNumber(phoneSid: string) {
@@ -161,7 +161,10 @@ function signaturesMatch(expected: string, actual: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export async function verifyRetailTwilioVoiceRequest(request: Request, path: typeof INCOMING_PATH | typeof TURN_PATH | typeof STATUS_PATH) {
+export async function verifyRetailTwilioVoiceRequest(
+  request: Request,
+  path: typeof INCOMING_PATH | typeof TURN_PATH | typeof STATUS_PATH,
+) {
   const config = runtimeConfig();
   const url = absoluteUrl(path);
   if (!config || !url) throw webhookError('Retail inbound voice is not configured.', 503);
@@ -184,7 +187,7 @@ function safeHistory(value: unknown): Array<{ role: 'user' | 'assistant'; conten
   if (!Array.isArray(value)) return [];
   return value
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
-    .map((item) => item as Record<string, unknown>)
+    .map((item) => item as HistoryCandidate)
     .filter((item) => (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
     .map((item) => ({ role: item.role as 'user' | 'assistant', content: String(item.content).slice(0, 4000) }))
     .slice(-8);
@@ -315,7 +318,6 @@ export async function processRetailTwilioVoiceTurn(params: URLSearchParams) {
     location_id: null,
     call_id: session.call_id ?? null,
     appointment_id: null,
-    order_number: undefined,
     customer_email: '',
     customer_phone: E164.test(String(session.caller_phone ?? '')) ? String(session.caller_phone) : '',
     question: transcript,
@@ -338,8 +340,7 @@ export async function processRetailTwilioVoiceTurn(params: URLSearchParams) {
       last_transcript: transcript,
       updated_at: new Date().toISOString(),
     }).eq('id', session.id).eq('user_id', endpoint.user_id);
-    const suffix = result.queuedActions.length ? ' I have sent that request for staff review; nothing has been changed yet.' : '';
-    return gatherTwiml(`${result.answer}${suffix}`, nextTurn >= 20);
+    return gatherTwiml(result.answer, nextTurn >= 20);
   } catch (error) {
     if (session.call_id) {
       await adminSb.from('retail_call_inbox').update({
