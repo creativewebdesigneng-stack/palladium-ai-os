@@ -112,6 +112,13 @@ export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
     desc: "An authoritative source monitored by Compliance Sentinel changed and matched one of your alert rules. Review is required before deciding applicability or legal effect.",
   },
   {
+    type: "retail.communication_ready",
+    label: "Retail customer communication ready",
+    category: "system",
+    severity: "warning",
+    desc: "A Retail appointment or follow-up communication is due and needs a connected delivery provider or manual handling. Blackstar does not mark it sent until provider delivery is recorded.",
+  },
+  {
     type: "subscription.changed",
     label: "Subscription changed",
     category: "billing",
