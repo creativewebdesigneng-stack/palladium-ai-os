@@ -16,6 +16,7 @@ import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
 import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
+import WebsiteDomainManager from '@/components/website-studio/WebsiteDomainManager';
 import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
 import WebsiteNavigationBuilder from '@/components/website-studio/WebsiteNavigationBuilder';
@@ -23,7 +24,7 @@ import { resolvePageHtml, setPageHtml } from '@/lib/website-studio/website-page-
 import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
-const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
+const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},git_config:{connected:false,provider:'github',repository:'',branch:'main',rootPath:''},domain_config:{domain:'',verified:false,verification:[],lastCheckedAt:null},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
 const widths={desktop:'100%',tablet:'820px',mobile:'390px'};
 
 function documentForPreview(project,path='/'){
@@ -75,7 +76,7 @@ export default function WebsiteStudio(){
     try{
       const out=await saveWebsiteStudioProject({data:{
         id:draft.id??undefined,name:draft.name,slug:draft.slug,prompt:draft.prompt||undefined,brief:draft.brief||{},
-        pages:draft.pages||[],designTokens:draft.design_tokens||draft.designTokens||{},appConfig:draft.app_config||{},gitConfig:draft.git_config||{},html:draft.html||'',css:draft.css||'',
+        pages:draft.pages||[],designTokens:draft.design_tokens||draft.designTokens||{},appConfig:draft.app_config||{},gitConfig:draft.git_config||{},domainConfig:draft.domain_config||{},html:draft.html||'',css:draft.css||'',
         javascript:draft.javascript||'',framework:draft.framework||'html',status:draft.status||'draft',
         previewUrl:draft.preview_url||null,productionUrl:draft.production_url||null,
         deploymentProvider:draft.deployment_provider||null,deploymentId:draft.deployment_id||null,
@@ -85,7 +86,7 @@ export default function WebsiteStudio(){
   };
 
   const remove=async(id)=>{setBusy(true);try{await deleteWebsiteStudioProject({data:{id}});if(draft.id===id)setDraft(blank);await refresh()}catch(e){setError(e instanceof Error?e.message:'Could not delete website project.')}finally{setBusy(false)}};
-  const snapshot=()=>({name:draft.name,slug:draft.slug,prompt:draft.prompt,brief:draft.brief||{},pages:draft.pages||[],design_tokens:draft.design_tokens||draft.designTokens||{},app_config:draft.app_config||{},git_config:draft.git_config||{},html:draft.html||'',css:draft.css||'',javascript:draft.javascript||'',framework:draft.framework||'html',status:draft.status||'draft'});
+  const snapshot=()=>({name:draft.name,slug:draft.slug,prompt:draft.prompt,brief:draft.brief||{},pages:draft.pages||[],design_tokens:draft.design_tokens||draft.designTokens||{},app_config:draft.app_config||{},git_config:draft.git_config||{},domain_config:draft.domain_config||{},html:draft.html||'',css:draft.css||'',javascript:draft.javascript||'',framework:draft.framework||'html',status:draft.status||'draft'});
   const saveRevision=async()=>{if(!draft.id)return setError('Save the website project before creating revisions.');setBusy(true);try{await createWebsiteStudioRevision({data:{projectId:draft.id,label:'Revision '+new Date().toLocaleString(),snapshot:snapshot()}});await loadRevisions(draft.id);setNotice('Revision saved.')}catch(e){setError(e instanceof Error?e.message:'Could not save revision.')}finally{setBusy(false)}};
   const restoreRevision=(revision)=>{setDraft({...draft,...revision.snapshot,id:draft.id,design_tokens:revision.snapshot.design_tokens||{}});setNotice('Revision restored into the editor. Save the project to persist it.')};
   const addBlock=(blockId)=>{
