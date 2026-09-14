@@ -23,8 +23,8 @@ describe('Website Studio form runtime packaging',()=>{
     expect(script).toContain('blackstar:form-success');
     expect(update).toHaveBeenCalledTimes(1);
     const row=update.mock.calls[0]?.[0];
-    expect(row?.form_submit_token_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(script).not.toContain(String(row?.form_submit_token_hash||''));
+    expect(row?.['form_submit_token_hash']).toMatch(/^[0-9a-f]{64}$/);
+    expect(script).not.toContain(String(row?.['form_submit_token_hash']||''));
   });
 
   it('does not provision a token when the project has no configured forms',async()=>{
