@@ -62,7 +62,7 @@ export const getCommerceProviderCapabilities = createServerFn({ method: 'POST' }
   .inputValidator((input: unknown) => z.object({ provider: z.string().trim().min(1).max(80) }).parse(input))
   .handler(async ({ data, context }) => {
     const capabilities = await listIntegrationCapabilities(context.userId, data.provider);
-    return capabilities.map(({ provider, action, description, risk, requiresApproval, deployed, transport, lane, inputSchema }) => ({
+    return capabilities.map(({ provider, action, description, risk, requiresApproval, deployed, transport, lane }) => ({
       provider,
       action,
       description,
@@ -71,7 +71,6 @@ export const getCommerceProviderCapabilities = createServerFn({ method: 'POST' }
       deployed,
       transport,
       lane,
-      inputSchema,
     }));
   });
 
