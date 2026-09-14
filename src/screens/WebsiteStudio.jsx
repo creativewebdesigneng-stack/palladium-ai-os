@@ -138,6 +138,21 @@ export default function WebsiteStudio(){
           <div className="mt-3 space-y-2">{revisions.length===0?<p className="text-xs text-zinc-600">No restore points yet.</p>:revisions.slice(0,8).map(rev=><div key={rev.id} className="flex items-center justify-between rounded-xl border border-white/[.07] p-3"><div><p className="text-xs text-white">{rev.label}</p><p className="mt-1 text-[10px] text-zinc-600">{new Date(rev.created_at).toLocaleString()}</p></div><button onClick={()=>restoreRevision(rev)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-400"><RotateCcw className="h-3 w-3"/>Restore</button></div>)}</div>
         </section>
 
+        <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
+        <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
+        <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
+        <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
+        <WebsiteAssetLibrary projectId={draft.id}/>
+        <WebsiteProjectFiles project={draft}/>
+        <WebsiteAppScaffold config={draft.app_config||{}} setConfig={(app_config)=>setDraft({...draft,app_config})}/>
+        <WebsiteDeveloperTools project={draft} busy={busy} onRepair={(prompt)=>runAiIteration(prompt)}/>
+        <WebsitePublishPreflight project={draft} qualityScore={quality.score}/>
+        <WebsiteVercelPublisher project={draft} onPublished={(deployment)=>setDraft((current)=>deployment.domainOnly
+          ? {...current,domain_config:deployment.domainConfig}
+          : {...current,deployment_provider:'vercel',deployment_id:deployment.deploymentId,status:deployment.target==='production'?'published':'ready',...(deployment.target==='production'?{production_url:deployment.url}:{preview_url:deployment.url})}
+        )}/>
+        <WebsiteGitSync config={draft.git_config||{}} setConfig={(git_config)=>setDraft({...draft,git_config})}/>
+
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-1">{[['desktop',Monitor],['tablet',Tablet],['mobile',Smartphone]].map(([m,Icon])=><button key={m} onClick={()=>setMode(m)} className={`rounded-lg p-2 ${mode===m?'bg-violet-500/15 text-violet-200':'text-zinc-600'}`}><Icon className="h-4 w-4"/></button>)}</div>

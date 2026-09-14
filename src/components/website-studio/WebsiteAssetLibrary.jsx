@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Image as ImageIcon,Plus,Trash2,ExternalLink,UploadCloud,Loader2,LockKeyhole} from 'lucide-react';
+import {Image as ImageIcon,Plus,Trash2,ExternalLink,UploadCloud,Loader2,LockKeyhole,Copy,Check} from 'lucide-react';
 import {supabase} from '@/integrations/supabase/client';
 import {deleteWebsiteStudioAsset,listWebsiteStudioAssets,saveWebsiteStudioAsset} from '@/lib/website-studio/website-studio.functions';
 
@@ -16,6 +16,7 @@ export default function WebsiteAssetLibrary({projectId}){
   const [form,setForm]=useState(blank);
   const [error,setError]=useState('');
   const [uploading,setUploading]=useState(false);
+  const [copiedAsset,setCopiedAsset]=useState('');
 
   const hydrateSignedUrls=async(rows)=>{
     const next={};
@@ -77,6 +78,14 @@ export default function WebsiteAssetLibrary({projectId}){
     finally{setUploading(false)}
   };
 
+  const copyReference=async(asset)=>{
+    const value=asset.storage_path?`blackstar-asset://${asset.id}`:(asset.source_url||'');
+    if(!value)return;
+    await navigator.clipboard.writeText(value);
+    setCopiedAsset(asset.id);
+    setTimeout(()=>setCopiedAsset(''),1200);
+  };
+
   const remove=async(id)=>{
     try{
       const result=await deleteWebsiteStudioAsset({data:{id}});
@@ -103,7 +112,7 @@ export default function WebsiteAssetLibrary({projectId}){
 
     <div className="mt-3 flex items-start gap-2 rounded-xl border border-lime-300/10 bg-lime-300/[.025] p-3">
       <LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime-300"/>
-      <p className="text-[10px] leading-4 text-zinc-600">Uploaded assets are private builder resources. A future publish adapter must deliberately promote or copy them for public website delivery; Website Studio will not expose the private bucket as a public CDN.</p>
+      <p className="text-[10px] leading-4 text-zinc-600">Uploaded assets stay private in Supabase while editing. Use the copy button to insert a `blackstar-asset://…` reference into HTML/CSS; the publisher rewrites and promotes that asset into the deployment package without making the private bucket public.</p>
     </div>
 
     {error&&<p className="mt-3 text-xs text-rose-300">{error}</p>}
@@ -126,6 +135,7 @@ export default function WebsiteAssetLibrary({projectId}){
             <p className="mt-1 text-[10px] text-zinc-600">{asset.kind} · {asset.storage_path?'private upload':'external URL'} · {asset.alt_text||'no alt text yet'}</p>
             <p className="mt-1 truncate text-[10px] text-zinc-700">{asset.provenance||'provenance not recorded'}</p>
           </div>
+          <button onClick={()=>copyReference(asset)} className="p-1.5 text-zinc-600 hover:text-lime-300" aria-label={'Copy project reference for '+asset.name}>{copiedAsset===asset.id?<Check className="h-3.5 w-3.5"/>:<Copy className="h-3.5 w-3.5"/>}</button>
           {href&&<a href={href} target="_blank" rel="noreferrer" className="p-1.5 text-zinc-600 hover:text-lime-300"><ExternalLink className="h-3.5 w-3.5"/></a>}
           <button onClick={()=>remove(asset.id)} className="p-1.5 text-zinc-700 hover:text-rose-300"><Trash2 className="h-3.5 w-3.5"/></button>
         </div>
