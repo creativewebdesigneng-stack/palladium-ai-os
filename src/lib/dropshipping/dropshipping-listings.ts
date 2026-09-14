@@ -75,3 +75,33 @@ export function withListingDraftMetadata(metadata:Record<string,unknown>|null|un
   };
   return {...existing,listing_drafts:{...drafts,[input.channel]:record}};
 }
+
+
+type JsonSchemaLike={properties?:Record<string,{type?:string}>;required?:string[]};
+
+export function buildDropshippingActionInputTemplate(
+  schema:JsonSchemaLike|Record<string,unknown>|null|undefined,
+  item:CatalogLike,
+  draftText:string,
+){
+  const raw=schema&&typeof schema==='object'&&!Array.isArray(schema)?schema as JsonSchemaLike:{};
+  const properties=raw.properties&&typeof raw.properties==='object'&&!Array.isArray(raw.properties)?raw.properties:{};
+  const output:Record<string,unknown>={};
+  const metadata=item.metadata??{};
+  const keyValue=(key:string):unknown=>{
+    const normalized=key.toLowerCase().replace(/[^a-z0-9]/g,'');
+    if(['title','name','producttitle','listingtitle'].includes(normalized))return item.name;
+    if(['description','body','content','listingdescription','productdescription'].includes(normalized))return draftText.trim().slice(0,16000);
+    if(['sku','seller_sku','sellersku'].includes(key.toLowerCase()))return item.sku??undefined;
+    if(['price','saleprice','listingprice'].includes(normalized))return item.sale_price??undefined;
+    if(['currency','currencycode'].includes(normalized))return item.currency??undefined;
+    if(['category','categoryname'].includes(normalized))return item.category??undefined;
+    if(['fulfilmentmodel','fulfillmentmodel'].includes(normalized))return metadata['fulfilment_model']??undefined;
+    return undefined;
+  };
+  for(const key of Object.keys(properties).slice(0,100)){
+    const value=keyValue(key);
+    if(value!==undefined&&value!==null&&value!=='')output[key]=value;
+  }
+  return output;
+}
