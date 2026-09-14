@@ -61,6 +61,7 @@ const BUSINESS = [
   ['Compliance Sentinel', '/compliance-sentinel', ShieldCheck],
   ['Industry Hub', '/industry-hub', Factory],
   ['Company Hub', '/company-hub', Building2],
+  ['Retail Hub', '/retail-hub', Store],
   ['Quant Studio', '/quant-studio', LineChart],
   ['Commerce Studio', '/commerce-studio', Store],
   ['CRM', '/crm', Contact],
