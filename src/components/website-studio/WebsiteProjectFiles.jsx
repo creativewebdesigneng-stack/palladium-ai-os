@@ -14,6 +14,7 @@ export default function WebsiteProjectFiles({project}){
     pages:project.pages||[],
     designTokens:project.design_tokens||project.designTokens||{},
     brief:project.brief||{},
+    appConfig:project.app_config||{},
   }),[project]);
   const tree=useMemo(()=>websiteManifestTree(manifest),[manifest]);
   const copy=async(path)=>{const file=manifest.files.find(f=>f.path===path);if(!file)return;await navigator.clipboard.writeText(file.content);setCopied(path);setTimeout(()=>setCopied(''),1200)};
