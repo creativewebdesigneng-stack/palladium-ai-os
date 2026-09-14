@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
-import { buildWebsiteProjectManifest } from '@/lib/website-studio/website-project';
 import { writeAudit } from '@/lib/platform/audit.server';
-import { buildDeploymentAssetManifest, deploymentAssetPath, rewriteWebsiteAssetReferences } from '@/lib/website-studio/website-assets';
+import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
 
 type Sb={from:(table:string)=>any;storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}}};
 type PublishTarget='preview'|'production';
@@ -157,10 +156,6 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
     if(projectError)throw new Error(projectError.message);
     if(!project)throw new Error('Website Studio project not found.');
 
-    const {data:assets,error:assetError}=await sb.from('website_studio_assets').select('id,name,source_url,storage_path').eq('project_id',data.projectId);
-    if(assetError)throw new Error(assetError.message);
-    const deploymentAssets=Array.isArray(assets)?assets:[];
-
     const quality=assessWebsiteQuality(project.html||'',project.css||'');
     const readiness=assessPublishReadiness({
       name:project.name||'',
@@ -180,50 +175,14 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       throw new Error('This project defines forms, data collections or authentication that are not provisioned yet.');
     }
 
-    const manifest=buildWebsiteProjectManifest({
-      name:project.name,
-      slug:project.slug,
-      framework:project.framework||'html',
-      html:rewriteWebsiteAssetReferences(project.html||'',deploymentAssets),
-      css:rewriteWebsiteAssetReferences(project.css||'',deploymentAssets),
-      javascript:rewriteWebsiteAssetReferences(project.javascript||'',deploymentAssets),
-      pages:Array.isArray(project.pages)?project.pages:[],
-      designTokens:project.design_tokens||{},
-      brief:project.brief||{},
-      appConfig:project.app_config||{},
-    });
-
-    const deployFiles:Array<{file:string;data:string;encoding?:'utf-8'|'base64'}>=manifest.files.map((file)=>({file:file.path,data:file.content,encoding:'utf-8'}));
-    deployFiles.push({
-      file:'site/assets.json',
-      data:JSON.stringify(buildDeploymentAssetManifest(deploymentAssets),null,2),
-      encoding:'utf-8',
-    });
-
-    let totalPrivateBytes=0;
-    for(const asset of deploymentAssets){
-      if(!asset.storage_path)continue;
-      const {data:blob,error:downloadError}=await sb.storage.from('website-studio-assets').download(asset.storage_path);
-      if(downloadError)throw new Error(`Could not read private asset "${asset.name}": ${downloadError.message}`);
-      if(!blob)throw new Error(`Could not read private asset "${asset.name}".`);
-      if(blob.size>26_214_400)throw new Error(`Asset "${asset.name}" exceeds the 25 MB Website Studio publishing limit.`);
-      totalPrivateBytes+=blob.size;
-      if(totalPrivateBytes>52_428_800)throw new Error('Private uploaded assets exceed the 50 MB per-deployment publishing limit.');
-      const {Buffer}=await import('node:buffer');
-      const buffer=Buffer.from(await blob.arrayBuffer());
-      deployFiles.push({
-        file:deploymentAssetPath(asset),
-        data:buffer.toString('base64'),
-        encoding:'base64',
-      });
-    }
+    const packaged=await buildWebsiteRuntimePackage(sb,project);
 
     try{
       const created=await createVercelDeployment({
         token,
         teamId,
         name:project.slug,
-        files:deployFiles,
+        files:packaged.files,
         target:data.target,
       });
 
@@ -243,7 +202,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         targetType:'website_studio_project',
         targetId:data.projectId,
         status:'success',
-        metadata:{provider:'vercel',target:data.target,deployment_id:created.id,ready_state:verified.deployment.readyState,verified_ready:verified.verified,promoted_private_assets:deploymentAssets.filter((asset:any)=>Boolean(asset.storage_path)).length},
+        metadata:{provider:'vercel',target:data.target,deployment_id:created.id,ready_state:verified.deployment.readyState,verified_ready:verified.verified,promoted_private_assets:packaged.privateAssetCount},
       });
 
       return {

@@ -21,3 +21,13 @@ export function addWebsiteSection(sections:WebsiteSection[],type:string,label?:s
   const safeType=type.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-')||'section';
   return [...sections,{id:crypto.randomUUID(),type:safeType,label:label?.trim()||type.trim()||'Section'}];
 }
+
+
+export function reorderWebsiteSections(sections:WebsiteSection[],sourceIndex:number,destinationIndex:number):WebsiteSection[]{
+  if(sourceIndex===destinationIndex||sourceIndex<0||destinationIndex<0||sourceIndex>=sections.length||destinationIndex>=sections.length)return sections;
+  const next=[...sections];
+  const [moved]=next.splice(sourceIndex,1);
+  if(!moved)return sections;
+  next.splice(destinationIndex,0,moved);
+  return next;
+}
