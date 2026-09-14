@@ -11,6 +11,7 @@ import WebsiteDesignControls from '@/components/website-studio/WebsiteDesignCont
 import WebsiteAssetLibrary from '@/components/website-studio/WebsiteAssetLibrary';
 import WebsiteProjectFiles from '@/components/website-studio/WebsiteProjectFiles';
 import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
+import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
 
 const blank={id:null,name:'',slug:'',prompt:'',brief:{},pages:[],design_tokens:{},app_config:{forms:[],collections:[],auth:{enabled:false,providers:[]}},html:'',css:'',javascript:'',framework:'html',status:'draft',preview_url:null,production_url:null,deployment_provider:null,deployment_id:null};
