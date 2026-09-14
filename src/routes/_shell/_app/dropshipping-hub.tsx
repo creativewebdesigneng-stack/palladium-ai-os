@@ -5,6 +5,7 @@ import DropshippingGrowthLab from '@/screens/DropshippingGrowthLab';
 import DropshippingProductPipeline from '@/screens/DropshippingProductPipeline';
 import DropshippingListingWorkbench from '@/screens/DropshippingListingWorkbench';
 import DropshippingControlTower from '@/screens/DropshippingControlTower';
+import DropshippingAutomationPack from '@/screens/DropshippingAutomationPack';
 
 function DropshippingHubRoute(){
   return <>
@@ -14,6 +15,7 @@ function DropshippingHubRoute(){
     <DropshippingProductPipeline/>
     <DropshippingListingWorkbench/>
     <DropshippingControlTower/>
+    <DropshippingAutomationPack/>
   </>;
 }
 
