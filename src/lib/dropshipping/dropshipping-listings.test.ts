@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildListingDraftPrompt,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {buildDropshippingActionInputTemplate,buildListingDraftPrompt,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
 
 const item={
   name:'Compression Packing Cubes',sku:'TRAVEL-01',category:'Travel accessories',description:'Validated candidate from supplier research.',sale_price:39.99,currency:'GBP',
@@ -34,6 +34,12 @@ describe('dropshipping listing drafts',()=>{
     expect(shopifyDraft?.text).toBe('Shopify draft');
     expect(ebayDraft?.text).toBe('eBay draft');
     expect(ebayDraft?.requires_approval).toBe(true);
+  });
+
+  it('seeds only known marketplace action fields from persisted product evidence',()=>{
+    const template=buildDropshippingActionInputTemplate({properties:{title:{type:'string'},description:{type:'string'},sku:{type:'string'},price:{type:'number'},currency:{type:'string'},unknown:{type:'string'}}},item,'Approved draft copy');
+    expect(template).toEqual({title:'Compression Packing Cubes',description:'Approved draft copy',sku:'TRAVEL-01',price:39.99,currency:'GBP'});
+    expect(template).not.toHaveProperty('unknown');
   });
 
   it('caps stored generated text',()=>{
