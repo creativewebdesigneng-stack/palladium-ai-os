@@ -16,6 +16,7 @@ import {getRetailOperations,listRetailWorkspaces} from '@/lib/retail/retail-oper
 const panel='rounded-2xl border border-white/10 bg-white/[.03] p-5';
 const control='w-full rounded-xl border border-white/10 bg-[#11131a] px-3 py-2 text-xs text-white outline-none focus:border-violet-400/40';
 const label='mb-1.5 block text-[10px] font-medium uppercase tracking-[.12em] text-zinc-500';
+function capabilitySchema(capability){try{return JSON.parse(capability?.inputSchemaJson||'{}')}catch{return {}}}
 
 export default function DropshippingListingWorkbench(){
   const session=useSessionReady();
@@ -75,7 +76,7 @@ export default function DropshippingListingWorkbench(){
     setPublishAction(key);
     const capability=publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===key);
     if(!capability||!selected){setPublishInput('{}');return;}
-    const template=buildDropshippingActionInputTemplate(capability.inputSchema,selected,savedDraft?.text||draftText);
+    const template=buildDropshippingActionInputTemplate(capabilitySchema(capability),selected,savedDraft?.text||draftText);
     setPublishInput(JSON.stringify(template,null,2));
   };
 
@@ -86,7 +87,7 @@ export default function DropshippingListingWorkbench(){
     if(!first){setPublishAction('');setPublishInput('{}');return;}
     const key=`${first.provider}:${first.action}`;
     setPublishAction(key);
-    if(selected)setPublishInput(JSON.stringify(buildDropshippingActionInputTemplate(first.inputSchema,selected,savedDraft?.text||draftText),null,2));
+    if(selected)setPublishInput(JSON.stringify(buildDropshippingActionInputTemplate(capabilitySchema(first),selected,savedDraft?.text||draftText),null,2));
   },[channel,publishCapabilities,selected?.id,savedDraft?.generated_at]);
 
   const queuePublication=async()=>{
@@ -156,7 +157,7 @@ export default function DropshippingListingWorkbench(){
           <div className="flex flex-wrap items-start gap-3"><div><p className="text-[11px] font-medium text-emerald-200">Approved provider publication</p><p className="mt-1 max-w-3xl text-[10px] leading-5 text-zinc-500">Select a live governed capability from the connected {channel} provider. Blackstar validates the exact JSON input through the provider adapter, pins the transport, and queues it in Mission Control. The provider write occurs only after approval.</p></div><button onClick={()=>navigate('/mission-control')} className="ml-auto rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-300">Mission Control <ExternalLink className="ml-1 inline h-3 w-3"/></button></div>
           {channel==='blackstar-site'?<p className="mt-3 text-[10px] text-zinc-500">Website Studio uses its native publish workflow, so marketplace action approval is not used for this target.</p>:listingCapabilities.isFetching?<p className="mt-3 flex items-center gap-2 text-[10px] text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin"/>Discovering live provider actions…</p>:listingCapabilities.error?<p className="mt-3 text-[10px] text-rose-300">{friendlyMessage(listingCapabilities.error)}</p>:publishCapabilities.length===0?<p className="mt-3 text-[10px] leading-5 text-amber-200/80">No deployed governed write capability is currently advertised for this channel. Connect or authorize a provider action in Integrations before trying to publish.</p>:<>
             <label className="mt-3 block"><span className={label}>Live governed action</span><select className={control} value={publishAction} onChange={e=>selectPublishAction(e.target.value)}>{publishCapabilities.map(cap=><option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>{cap.provider} · {cap.action} · {cap.risk}</option>)}</select></label>
-            {publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)&&<div className="mt-3 grid gap-3 xl:grid-cols-2"><div><span className={label}>Exact provider action input</span><textarea className={`${control} min-h-48 font-mono leading-5`} value={publishInput} onChange={e=>setPublishInput(e.target.value)}/><button onClick={()=>selectPublishAction(publishAction)} disabled={!selected} className="mt-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400 disabled:opacity-40">Rebuild from product evidence</button></div><div><span className={label}>Provider input schema</span><pre className="max-h-48 overflow-auto rounded-xl border border-white/[.08] bg-black/30 p-3 text-[9px] leading-4 text-zinc-500">{JSON.stringify(publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)?.inputSchema??{},null,2)}</pre></div></div>}
+            {publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)&&<div className="mt-3 grid gap-3 xl:grid-cols-2"><div><span className={label}>Exact provider action input</span><textarea className={`${control} min-h-48 font-mono leading-5`} value={publishInput} onChange={e=>setPublishInput(e.target.value)}/><button onClick={()=>selectPublishAction(publishAction)} disabled={!selected} className="mt-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400 disabled:opacity-40">Rebuild from product evidence</button></div><div><span className={label}>Provider input schema</span><pre className="max-h-48 overflow-auto rounded-xl border border-white/[.08] bg-black/30 p-3 text-[9px] leading-4 text-zinc-500">{JSON.stringify(capabilitySchema(publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)),null,2)}</pre></div></div>}
             <button disabled={!selected||blocked||!savedDraft||!publishAction||queueing} onClick={queuePublication} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40">{queueing?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}{queueing?'Validating & queueing…':'Queue exact action for approval'}</button>
           </>}
         </div>
