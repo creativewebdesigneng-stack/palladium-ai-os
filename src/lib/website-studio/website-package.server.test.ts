@@ -3,7 +3,7 @@ import {buildWebsiteRuntimePackage} from './website-package.server';
 
 describe('Website Studio form runtime packaging',()=>{
   it('rotates a public token and wires configured forms into script.js',async()=>{
-    const update=vi.fn(()=>({eq:vi.fn(async()=>({error:null}))}));
+    const update=vi.fn((row:Record<string,unknown>)=>({eq:vi.fn(async()=>({error:null,row}))}));
     const sb:any={
       from:(table:string)=>{
         if(table==='website_studio_assets')return {select:()=>({eq:async()=>({data:[],error:null})})};
@@ -22,9 +22,9 @@ describe('Website Studio form runtime packaging',()=>{
     expect(script).toContain('contact');
     expect(script).toContain('blackstar:form-success');
     expect(update).toHaveBeenCalledTimes(1);
-    const row=update.mock.calls[0][0];
-    expect(row.form_submit_token_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(script).not.toContain(row.form_submit_token_hash);
+    const row=update.mock.calls[0]?.[0];
+    expect(row?.form_submit_token_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(script).not.toContain(String(row?.form_submit_token_hash||''));
   });
 
   it('does not provision a token when the project has no configured forms',async()=>{
