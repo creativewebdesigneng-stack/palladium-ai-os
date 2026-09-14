@@ -7,6 +7,8 @@ import { buildWebsiteProjectManifest } from '@/lib/website-studio/website-projec
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb={from:(table:string)=>any};
+type PublishTarget='preview'|'production';
+type DeploymentState={id:string;url:string;readyState:string|null};
 
 const targetSchema=z.enum(['preview','production']);
 const deploySchema=z.object({projectId:z.string().uuid(),target:targetSchema});
@@ -17,52 +19,116 @@ function publisherConfig(){
   return {configured:Boolean(token&&teamId),token,teamId};
 }
 
+function asRecord(value:unknown):Record<string,unknown>{
+  return value&&typeof value==='object'?value as Record<string,unknown>:{};
+}
+
 function hasBackendDependencies(appConfig:unknown):boolean{
-  if(!appConfig||typeof appConfig!=='object')return false;
-  const config=appConfig as Record<string,any>;
+  const config=asRecord(appConfig);
+  const auth=asRecord(config['auth']);
   return Boolean(
     (Array.isArray(config['forms'])&&config['forms'].length)||
     (Array.isArray(config['collections'])&&config['collections'].length)||
-    config['auth']?.enabled
+    auth['enabled']
   );
 }
 
-async function createVercelDeployment(args:{
-  token:string;teamId:string;name:string;files:Array<{file:string;data:string}>;target:'preview'|'production';
-}){
+async function vercelFetchJson(url:string,token:string,init?:RequestInit):Promise<{ok:boolean;status:number;payload:Record<string,unknown>}>{
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),30_000);
+  const timeout=setTimeout(()=>controller.abort(),15_000);
   try{
-    const body:Record<string,unknown>={
-      name:args.name,
-      files:args.files,
-      meta:{source:'blackstar-website-studio'},
-    };
-    if(args.target==='production')body['target']='production';
-
-    const response=await fetch(`https://api.vercel.com/v13/deployments?teamId=${encodeURIComponent(args.teamId)}`,{
-      method:'POST',
+    const response=await fetch(url,{
+      ...init,
       headers:{
-        Authorization:`Bearer ${args.token}`,
+        Authorization:`Bearer ${token}`,
         'Content-Type':'application/json',
+        ...(init?.headers||{}),
       },
-      body:JSON.stringify(body),
       signal:controller.signal,
     });
-
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok){
-      const message=typeof payload?.error?.message==='string'?payload.error.message:`Vercel deployment failed with HTTP ${response.status}.`;
-      throw new Error(message);
-    }
-
-    const id=typeof payload?.id==='string'?payload.id:'';
-    const url=typeof payload?.url==='string'?payload.url:'';
-    if(!id||!url)throw new Error('Vercel returned an incomplete deployment response.');
-    return {id,url:url.startsWith('http')?url:`https://${url}`,readyState:typeof payload?.readyState==='string'?payload.readyState:null};
+    const payload=asRecord(await response.json().catch(()=>({})));
+    return {ok:response.ok,status:response.status,payload};
   }finally{
     clearTimeout(timeout);
   }
+}
+
+function deploymentFromPayload(payload:Record<string,unknown>):DeploymentState{
+  const id=typeof payload['id']==='string'?payload['id']:'';
+  const rawUrl=typeof payload['url']==='string'?payload['url']:'';
+  if(!id||!rawUrl)throw new Error('Vercel returned an incomplete deployment response.');
+  return {
+    id,
+    url:rawUrl.startsWith('http')?rawUrl:`https://${rawUrl}`,
+    readyState:typeof payload['readyState']==='string'?payload['readyState']:typeof payload['state']==='string'?payload['state']:null,
+  };
+}
+
+function vercelError(payload:Record<string,unknown>,status:number):Error{
+  const error=asRecord(payload['error']);
+  const message=typeof error['message']==='string'?error['message']:`Vercel request failed with HTTP ${status}.`;
+  return new Error(message);
+}
+
+async function createVercelDeployment(args:{
+  token:string;teamId:string;name:string;files:Array<{file:string;data:string}>;target:PublishTarget;
+}):Promise<DeploymentState>{
+  const body:Record<string,unknown>={
+    name:args.name,
+    files:args.files,
+    meta:{source:'blackstar-website-studio'},
+  };
+  if(args.target==='production')body['target']='production';
+
+  const result=await vercelFetchJson(
+    `https://api.vercel.com/v13/deployments?teamId=${encodeURIComponent(args.teamId)}`,
+    args.token,
+    {method:'POST',body:JSON.stringify(body)},
+  );
+  if(!result.ok)throw vercelError(result.payload,result.status);
+  return deploymentFromPayload(result.payload);
+}
+
+async function getVercelDeployment(token:string,teamId:string,id:string):Promise<DeploymentState>{
+  const result=await vercelFetchJson(
+    `https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}?teamId=${encodeURIComponent(teamId)}`,
+    token,
+  );
+  if(!result.ok)throw vercelError(result.payload,result.status);
+  return deploymentFromPayload(result.payload);
+}
+
+function terminalFailure(state:string|null):boolean{
+  return state==='ERROR'||state==='CANCELED';
+}
+
+async function waitForVercelReady(token:string,teamId:string,deployment:DeploymentState):Promise<{deployment:DeploymentState;verified:boolean}>{
+  let current=deployment;
+  for(let attempt=0;attempt<10;attempt+=1){
+    if(current.readyState==='READY')return {deployment:current,verified:true};
+    if(terminalFailure(current.readyState))throw new Error(`Vercel deployment ended in state ${current.readyState}.`);
+    if(attempt<9)await new Promise((resolve)=>setTimeout(resolve,1500));
+    current=await getVercelDeployment(token,teamId,deployment.id);
+  }
+  return {deployment:current,verified:false};
+}
+
+async function markDeploymentReady(sb:Sb,projectId:string,target:PublishTarget,deployment:DeploymentState){
+  const update=target==='production'?{
+    production_url:deployment.url,
+    deployment_provider:'vercel',
+    deployment_id:deployment.id,
+    status:'published',
+    updated_at:new Date().toISOString(),
+  }:{
+    preview_url:deployment.url,
+    deployment_provider:'vercel',
+    deployment_id:deployment.id,
+    status:'ready',
+    updated_at:new Date().toISOString(),
+  };
+  const {error}=await sb.from('website_studio_projects').update(update).eq('id',projectId);
+  if(error)throw new Error(error.message);
 }
 
 export const getWebsiteStudioPublisherStatus=createServerFn({method:'POST'})
@@ -124,7 +190,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
     });
 
     try{
-      const deployment=await createVercelDeployment({
+      const created=await createVercelDeployment({
         token,
         teamId,
         name:project.slug,
@@ -132,21 +198,15 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         target:data.target,
       });
 
-      const update=data.target==='production'?{
-        production_url:deployment.url,
+      const {error:idError}=await sb.from('website_studio_projects').update({
         deployment_provider:'vercel',
-        deployment_id:deployment.id,
-        status:'published',
+        deployment_id:created.id,
         updated_at:new Date().toISOString(),
-      }:{
-        preview_url:deployment.url,
-        deployment_provider:'vercel',
-        deployment_id:deployment.id,
-        status:'ready',
-        updated_at:new Date().toISOString(),
-      };
-      const {error:updateError}=await sb.from('website_studio_projects').update(update).eq('id',data.projectId);
-      if(updateError)throw new Error(updateError.message);
+      }).eq('id',data.projectId);
+      if(idError)throw new Error(idError.message);
+
+      const verified=await waitForVercelReady(token,teamId,created);
+      if(verified.verified)await markDeploymentReady(sb,data.projectId,data.target,verified.deployment);
 
       await writeAudit({
         userId:context.userId,
@@ -154,10 +214,17 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         targetType:'website_studio_project',
         targetId:data.projectId,
         status:'success',
-        metadata:{provider:'vercel',target:data.target,deployment_id:deployment.id,ready_state:deployment.readyState},
+        metadata:{provider:'vercel',target:data.target,deployment_id:created.id,ready_state:verified.deployment.readyState,verified_ready:verified.verified},
       });
 
-      return {provider:'vercel',target:data.target,url:deployment.url,deploymentId:deployment.id,readyState:deployment.readyState};
+      return {
+        provider:'vercel',
+        target:data.target,
+        url:verified.deployment.url,
+        deploymentId:created.id,
+        readyState:verified.deployment.readyState,
+        verified:verified.verified,
+      };
     }catch(error){
       await writeAudit({
         userId:context.userId,
@@ -169,4 +236,24 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
       });
       throw new Error(error instanceof Error?error.message:'Website publishing failed.');
     }
+  });
+
+export const verifyWebsiteStudioDeployment=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value:unknown)=>deploySchema.parse(value))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const {configured,token,teamId}=publisherConfig();
+    if(!configured)throw new Error('Website Studio Vercel publishing is not configured on this deployment.');
+
+    const {data:project,error}=await sb.from('website_studio_projects').select('id,deployment_provider,deployment_id').eq('id',data.projectId).maybeSingle();
+    if(error)throw new Error(error.message);
+    if(!project?.deployment_id||project.deployment_provider!=='vercel')throw new Error('No Vercel deployment is recorded for this project.');
+
+    const deployment=await getVercelDeployment(token,teamId,project.deployment_id);
+    if(terminalFailure(deployment.readyState))throw new Error(`Vercel deployment ended in state ${deployment.readyState}.`);
+    const verified=deployment.readyState==='READY';
+    if(verified)await markDeploymentReady(sb,data.projectId,data.target,deployment);
+
+    return {provider:'vercel',target:data.target,url:deployment.url,deploymentId:deployment.id,readyState:deployment.readyState,verified};
   });
