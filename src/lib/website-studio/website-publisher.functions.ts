@@ -7,8 +7,8 @@ import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { buildWebsiteRuntimePackage } from '@/lib/website-studio/website-package.server';
 import {
+  hasStagedWebsiteStudioFormDeploymentToken,
   promoteWebsiteStudioFormDeploymentToken,
-  stagedWebsiteStudioFormDeploymentTokenRef,
   stageWebsiteStudioFormDeploymentToken,
   vercelFormTokenTarget,
 } from '@/lib/website-studio/website-form-deployment-tokens.server';
@@ -189,7 +189,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
 
     const packaged=await buildWebsiteRuntimePackage(sb,project);
     const formTokenTarget=vercelFormTokenTarget(data.target);
-    const formTokenStagingRef=packaged.formRuntimeTokenHash?`vercel-${randomUUID()}`:'';
+    const initialStagingRef=packaged.formRuntimeTokenHash?`vercel-${randomUUID()}`:'';
 
     try{
       if(packaged.formRuntimeTokenHash){
@@ -197,7 +197,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
           projectId:data.projectId,
           target:formTokenTarget,
           tokenHash:packaged.formRuntimeTokenHash,
-          stagingRef:formTokenStagingRef,
+          stagingRef:initialStagingRef,
         });
       }
 
@@ -208,6 +208,15 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
         files:packaged.files,
         target:data.target,
       });
+
+      if(packaged.formRuntimeTokenHash){
+        await stageWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          tokenHash:packaged.formRuntimeTokenHash,
+          stagingRef:created.id,
+        });
+      }
 
       const {error:idError}=await sb.from('website_studio_projects').update({
         deployment_provider:'vercel',
@@ -223,7 +232,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
           await promoteWebsiteStudioFormDeploymentToken(sb,{
             projectId:data.projectId,
             target:formTokenTarget,
-            stagingRef:formTokenStagingRef,
+            stagingRef:created.id,
             activeRef:created.id,
           });
         }
@@ -285,12 +294,11 @@ export const verifyWebsiteStudioDeployment=createServerFn({method:'POST'})
     if(verified){
       await markDeploymentReady(sb,data.projectId,data.target,deployment);
       const formTokenTarget=vercelFormTokenTarget(data.target);
-      const stagedRef=stagedWebsiteStudioFormDeploymentTokenRef(project.form_deployment_tokens,formTokenTarget);
-      if(stagedRef){
+      if(hasStagedWebsiteStudioFormDeploymentToken(project.form_deployment_tokens,formTokenTarget,deployment.id)){
         await promoteWebsiteStudioFormDeploymentToken(sb,{
           projectId:data.projectId,
           target:formTokenTarget,
-          stagingRef:stagedRef,
+          stagingRef:deployment.id,
           activeRef:deployment.id,
         });
       }
