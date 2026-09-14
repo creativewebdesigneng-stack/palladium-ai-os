@@ -1,6 +1,10 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { executeApprovedAction } from '@/lib/integrations/approved-action.server';
 import { parseRetailEmailPayload, retailProviderMessageId } from './retail-connected-delivery';
+import {
+  getRetailTwilioRuntimeCapabilities,
+  tryExecuteRetailTwilioCommunication,
+} from './retail-twilio-carrier.server';
 
 type AdminSb = { from: (table: string) => any };
 const adminSb = supabaseAdmin as unknown as AdminSb;
@@ -30,6 +34,8 @@ export type RetailConnectedExecutionResult = {
   status: string;
   action_type: 'send_communication';
   delivered: boolean;
+  provider_accepted?: boolean;
+  provider_status?: string;
   communication_id?: string;
   provider?: string;
   reason?: string;
@@ -48,6 +54,7 @@ function payloadChannel(value: unknown): string {
 export async function getRetailExternalDeliveryCapabilities(
   userId: string,
 ): Promise<RetailExternalDeliveryCapabilities> {
+  const twilio = getRetailTwilioRuntimeCapabilities();
   const { data, error } = await adminSb
     .from('integrations')
     .select('provider')
@@ -55,13 +62,13 @@ export async function getRetailExternalDeliveryCapabilities(
     .eq('status', 'connected')
     .in('provider', ['google', 'microsoft', 'nango_google', 'nango_microsoft']);
 
-  if (error) return { sms: false, email: false, whatsapp: false, voice: false };
+  if (error) return { sms: twilio.sms, email: false, whatsapp: twilio.whatsapp, voice: twilio.voice };
   const providers = new Set((data ?? []).map((row: { provider?: unknown }) => providerName(row.provider)));
   return {
-    sms: false,
+    sms: twilio.sms,
     email: providers.has('google') || providers.has('microsoft'),
-    whatsapp: false,
-    voice: false,
+    whatsapp: twilio.whatsapp,
+    voice: twilio.voice,
   };
 }
 
@@ -97,6 +104,7 @@ async function failClaimedAction(
     status: 'failed',
     action_type: 'send_communication',
     delivered: false,
+    provider_accepted: false,
     ...(communicationId ? { communication_id: communicationId } : {}),
     ...(provider ? { provider } : {}),
     reason: reason.slice(0, 500),
@@ -104,18 +112,17 @@ async function failClaimedAction(
 }
 
 /**
- * Claims and executes an approved Retail email exactly once through Blackstar's
- * existing bounded Google/Microsoft approved-action transport. A claim moves
- * the Retail action from approved -> executing before the provider side effect;
- * retries therefore cannot send a second copy if final persistence fails.
- *
- * Returns null for channels that this adapter does not own so the existing
- * Retail RPC remains authoritative for in-app and unsupported channels.
+ * Executes a supported configured carrier first, then falls through to the
+ * existing bounded Google/Microsoft email path. Unsupported/unconfigured
+ * channels return null so the Retail RPC remains the truthful fail-closed path.
  */
 export async function tryExecuteRetailConnectedCommunication(
   userId: string,
   actionId: string,
 ): Promise<RetailConnectedExecutionResult | null> {
+  const twilioResult = await tryExecuteRetailTwilioCommunication(userId, actionId);
+  if (twilioResult) return twilioResult;
+
   const { data: preview, error: previewError } = await adminSb
     .from('retail_reception_actions')
     .select('id,user_id,workspace_id,profile_id,call_id,appointment_id,order_id,action_type,status,payload')
@@ -147,6 +154,7 @@ export async function tryExecuteRetailConnectedCommunication(
       status: previewRow.status,
       action_type: 'send_communication',
       delivered: false,
+      provider_accepted: false,
       reason: 'Retail communication action is not approved or has already been claimed.',
     };
   }
@@ -245,7 +253,9 @@ export async function tryExecuteRetailConnectedCommunication(
         source: 'retail_reception_action',
         provider_delivery_required: false,
         execution_claimed_at: claimedAt,
-        delivered_at: completedAt,
+        provider_accepted: true,
+        delivery_confirmed: null,
+        provider_accepted_at: completedAt,
       },
       updated_at: completedAt,
     })
@@ -265,10 +275,11 @@ export async function tryExecuteRetailConnectedCommunication(
       action_id: actionId,
       status: 'executing',
       action_type: 'send_communication',
-      delivered: true,
+      delivered: false,
+      provider_accepted: true,
       communication_id: communicationId,
       ...(delivery.provider ? { provider: delivery.provider } : {}),
-      reason: 'Email provider accepted delivery, but Blackstar could not fully persist the final delivery state. Automatic retry is blocked to prevent duplicate email.',
+      reason: 'Email provider accepted the request, but Blackstar could not fully persist the final provider-accepted state. Automatic retry is blocked to prevent duplicate email.',
     };
   }
 
@@ -276,8 +287,10 @@ export async function tryExecuteRetailConnectedCommunication(
     action_id: actionId,
     status: 'executed',
     action_type: 'send_communication',
-    delivered: true,
+    delivered: false,
+    provider_accepted: true,
     communication_id: communicationId,
     ...(delivery.provider ? { provider: delivery.provider } : {}),
+    reason: 'Email provider accepted the request. Final recipient delivery is provider-dependent.',
   };
 }
