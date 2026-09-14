@@ -42,6 +42,7 @@ const WORKFORCE = [
   ['Sync Center', '/sync-center', Files],
   ['Tools Framework', '/tools-framework', Blocks],
   ['HTML Studio', '/html-studio', Code2],
+  ['Website Studio', '/website-studio', Globe],
   ['Integrations', '/integrations', Plug],
   ['Marketplace', '/marketplace', Store],
   ['Creator Hub', '/creator-hub', Rocket],
