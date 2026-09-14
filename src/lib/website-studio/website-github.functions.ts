@@ -177,22 +177,26 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
       const commitSha=typeof commit['sha']==='string'?commit['sha']:'';
       if(!commitSha)throw new Error('GitHub did not return a commit SHA.');
 
+      if(packageResult.formRuntimeTokenHash){
+        await stageWebsiteStudioFormDeploymentToken(sb,{
+          projectId:data.projectId,
+          target:formTokenTarget,
+          tokenHash:packageResult.formRuntimeTokenHash,
+          stagingRef:commitSha,
+        });
+      }
+
       await githubJson(token,`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`,{
         method:'PATCH',
         body:JSON.stringify({sha:commitSha,force:false}),
       });
 
       if(packageResult.formRuntimeTokenHash){
-        await stageWebsiteStudioFormDeploymentToken(sb,{
-          projectId:data.projectId,
-          target:formTokenTarget,
-          tokenHash:packageResult.formRuntimeTokenHash,
-          deploymentRef:commitSha,
-        });
         await promoteWebsiteStudioFormDeploymentToken(sb,{
           projectId:data.projectId,
           target:formTokenTarget,
-          deploymentRef:commitSha,
+          stagingRef:commitSha,
+          activeRef:commitSha,
         });
       }
 
