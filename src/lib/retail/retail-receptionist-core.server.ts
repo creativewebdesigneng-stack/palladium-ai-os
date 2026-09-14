@@ -4,8 +4,50 @@ import { runChat, type ChatMessage, type ToolDef } from '@/lib/runtime/model-gat
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 
-type Sb = { from: (table: string) => any; rpc?: (name: string, args?: Record<string, unknown>) => any };
-type Row = Record<string, any>;
+type Sb = {
+  from: (table: string) => any;
+  rpc: (name: string, args?: Record<string, unknown>) => any;
+};
+
+type Row = Record<string, any> & {
+  id?: any;
+  customer_email?: any;
+  customer_phone?: any;
+  item_id?: any;
+  on_hand?: any;
+  reserved?: any;
+  name?: any;
+  sku?: any;
+  barcode?: any;
+  category?: any;
+  description?: any;
+  item_type?: any;
+  sale_price?: any;
+  currency?: any;
+  service_duration_minutes?: any;
+  track_inventory?: any;
+  reorder_point?: any;
+  status?: any;
+  greeting?: any;
+  after_hours_message?: any;
+  business_hours?: any;
+  knowledge?: any;
+  policies?: any;
+  escalation_name?: any;
+  answer_hours?: any;
+  answer_location?: any;
+  answer_services?: any;
+  answer_pricing?: any;
+  answer_stock?: any;
+  answer_orders?: any;
+  answer_shipping?: any;
+  answer_policies?: any;
+  can_create_bookings?: any;
+  can_reschedule_bookings?: any;
+  can_cancel_bookings?: any;
+  can_create_followups?: any;
+  can_send_communications?: any;
+};
 
 const uuid = z.string().uuid();
 const nullableUuid = z.union([uuid, z.literal(''), z.null()]).optional();
@@ -106,7 +148,10 @@ function normalizeEmail(value: string | null | undefined) {
   return (value ?? '').trim().toLowerCase();
 }
 
-function customerMatches(row: Row | null, input: { customer_email?: string; customer_phone?: string }) {
+function customerMatches(
+  row: Row | null,
+  input: { customer_email?: string | undefined; customer_phone?: string | undefined },
+) {
   if (!row) return false;
   const suppliedEmail = normalizeEmail(input.customer_email);
   const suppliedPhone = normalizePhone(input.customer_phone);
@@ -161,23 +206,23 @@ function selectRelevantCatalog(question: string, catalog: Row[], inventory: Row[
   return (matched.length ? matched.slice(0, 40) : scored.slice(0, 80)).map(({ score: _score, ...item }) => item);
 }
 
-async function resolveProfile(sb: Sb, userId: string, workspaceId: string, profileId?: string | null, locationId?: string | null) {
+async function resolveProfile(sb: Sb, userId: string, workspaceId: string, profileId?: string | null, locationId?: string | null): Promise<Row | null> {
   if (profileId) {
     const result = await sb.from('retail_reception_profiles').select('*').eq('id', profileId).eq('workspace_id', workspaceId).eq('user_id', userId).eq('active', true).maybeSingle();
     if (result.error) throw new Error(result.error.message);
-    return result.data ?? null;
+    return (result.data as Row | null) ?? null;
   }
   if (locationId) {
     const location = await sb.from('retail_reception_profiles').select('*').eq('workspace_id', workspaceId).eq('user_id', userId).eq('location_id', locationId).eq('active', true).maybeSingle();
     if (location.error) throw new Error(location.error.message);
-    if (location.data) return location.data;
+    if (location.data) return location.data as Row;
   }
   const global = await sb.from('retail_reception_profiles').select('*').eq('workspace_id', workspaceId).eq('user_id', userId).is('location_id', null).eq('active', true).maybeSingle();
   if (global.error) throw new Error(global.error.message);
-  if (global.data) return global.data;
+  if (global.data) return global.data as Row;
   const fallback = await sb.from('retail_reception_profiles').select('*').eq('workspace_id', workspaceId).eq('user_id', userId).eq('active', true).order('updated_at', { ascending: false }).limit(1);
   if (fallback.error) throw new Error(fallback.error.message);
-  return fallback.data?.[0] ?? null;
+  return (fallback.data?.[0] as Row | undefined) ?? null;
 }
 
 function proposalPermission(profile: Row | null, type: z.infer<typeof actionType>) {
@@ -265,9 +310,10 @@ export async function runRetailReceptionistCore(input: {
       .select('id,order_number,status,payment_status,fulfilment_status,carrier,tracking_number,placed_at,fulfilled_at,total,currency,customer_email,customer_phone')
       .eq('workspace_id', workspaceId).eq('user_id', userId).eq('order_number', data.order_number).maybeSingle();
     if (result.error) throw new Error(result.error.message);
-    if (customerMatches(result.data, data)) {
-      const { customer_email: _email, customer_phone: _phone, ...safeOrder } = result.data;
-      verifiedOrder = safeOrder;
+    const row = result.data as Row | null;
+    if (customerMatches(row, data)) {
+      const { customer_email: _email, customer_phone: _phone, ...safeOrder } = row as Row;
+      verifiedOrder = safeOrder as Row;
     }
   }
 
@@ -279,9 +325,10 @@ export async function runRetailReceptionistCore(input: {
       .select('id,location_id,service_item_id,staff_id,starts_at,ends_at,status,customer_email,customer_phone')
       .eq('id', data.appointment_id).eq('workspace_id', workspaceId).eq('user_id', userId).maybeSingle();
     if (result.error) throw new Error(result.error.message);
-    if (customerMatches(result.data, data)) {
-      const { customer_email: _email, customer_phone: _phone, ...safeAppointment } = result.data;
-      verifiedAppointment = safeAppointment;
+    const row = result.data as Row | null;
+    if (customerMatches(row, data)) {
+      const { customer_email: _email, customer_phone: _phone, ...safeAppointment } = row as Row;
+      verifiedAppointment = safeAppointment as Row;
     }
   }
 
@@ -317,7 +364,7 @@ export async function runRetailReceptionistCore(input: {
     } : { configured: false, capabilities },
     locations: capabilities.answer_location ? (locationsResult.data ?? []) : 'topic_disabled',
     catalog: (capabilities.answer_services || capabilities.answer_pricing || capabilities.answer_stock)
-      ? selectRelevantCatalog(data.question, catalogResult.data ?? [], capabilities.answer_stock ? inventoryResult.data ?? [] : [])
+      ? selectRelevantCatalog(data.question, (catalogResult.data ?? []) as Row[], capabilities.answer_stock ? (inventoryResult.data ?? []) as Row[] : [])
       : 'topic_disabled',
     verified_order: (capabilities.answer_orders || capabilities.answer_shipping) ? verifiedOrder : 'topic_disabled',
     order_verification: orderVerificationAttempted ? (verifiedOrder ? 'verified' : 'not_verified') : 'not_requested',
@@ -376,7 +423,11 @@ export async function runRetailReceptionistCore(input: {
         blockedProposals.push({ action_type: proposal.action_type, reason: 'The governed proposal could not be queued.' });
         continue;
       }
-      queuedActions.push(queued);
+      queuedActions.push({
+        id: String(queued.id),
+        action_type: String(queued.action_type),
+        summary: String(queued.summary),
+      });
     }
 
     let answer = result.text.trim();
