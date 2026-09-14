@@ -2,20 +2,21 @@ import {useEffect,useMemo,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {useServerFn} from '@tanstack/react-start';
 import ReactMarkdown from 'react-markdown';
-import {ExternalLink,FilePenLine,Loader2,Save,ShieldAlert,Sparkles} from 'lucide-react';
+import {ExternalLink,FilePenLine,Loader2,Save,Send,ShieldAlert,Sparkles} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {useToast} from '@/components/ui/use-toast';
 import {friendlyMessage} from '@/lib/errors';
 import {useSessionReady} from '@/lib/useSessionReady';
 import {assistantChat} from '@/lib/ai/assistant.functions';
 import {DROPSHIP_CHANNELS} from '@/lib/dropshipping/dropshipping';
-import {buildListingDraftPrompt,isDropshipProductBlocked} from '@/lib/dropshipping/dropshipping-listings';
-import {saveDropshippingListingDraft} from '@/lib/dropshipping/dropshipping-listings.functions';
+import {buildDropshippingActionInputTemplate,buildListingDraftPrompt,isDropshipProductBlocked} from '@/lib/dropshipping/dropshipping-listings';
+import {getDropshippingListingCapabilities,queueDropshippingListingApproval,saveDropshippingListingDraft} from '@/lib/dropshipping/dropshipping-listings.functions';
 import {getRetailOperations,listRetailWorkspaces} from '@/lib/retail/retail-operations.functions';
 
 const panel='rounded-2xl border border-white/10 bg-white/[.03] p-5';
 const control='w-full rounded-xl border border-white/10 bg-[#11131a] px-3 py-2 text-xs text-white outline-none focus:border-violet-400/40';
 const label='mb-1.5 block text-[10px] font-medium uppercase tracking-[.12em] text-zinc-500';
+function capabilitySchema(capability){try{return JSON.parse(capability?.inputSchemaJson||'{}')}catch{return {}}}
 
 export default function DropshippingListingWorkbench(){
   const session=useSessionReady();
@@ -26,6 +27,8 @@ export default function DropshippingListingWorkbench(){
   const getOperationsFn=useServerFn(getRetailOperations);
   const assistantFn=useServerFn(assistantChat);
   const saveDraftFn=useServerFn(saveDropshippingListingDraft);
+  const listingCapabilitiesFn=useServerFn(getDropshippingListingCapabilities);
+  const queueApprovalFn=useServerFn(queueDropshippingListingApproval);
   const [workspaceId,setWorkspaceId]=useState('');
   const [itemId,setItemId]=useState('');
   const [channel,setChannel]=useState('shopify');
@@ -36,6 +39,9 @@ export default function DropshippingListingWorkbench(){
   const [model,setModel]=useState('');
   const [generating,setGenerating]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [publishAction,setPublishAction]=useState('');
+  const [publishInput,setPublishInput]=useState('{}');
+  const [queueing,setQueueing]=useState(false);
 
   const workspaces=useQuery({queryKey:['dropship-listing-workspaces'],queryFn:()=>listWorkspacesFn({data:undefined}),enabled:session==='yes',retry:false});
   const ecommerceWorkspaces=useMemo(()=>((workspaces.data??[]).filter(row=>['ecommerce','mixed'].includes(row.business_type))),[workspaces.data]);
@@ -43,6 +49,8 @@ export default function DropshippingListingWorkbench(){
 
   const operations=useQuery({queryKey:['dropship-listing-operations',workspaceId],queryFn:()=>getOperationsFn({data:{workspace_id:workspaceId}}),enabled:session==='yes'&&Boolean(workspaceId),retry:false});
   const products=useMemo(()=>((operations.data?.catalog??[]).filter(item=>item.metadata?.source==='dropshipping-hub')),[operations.data?.catalog]);
+  const listingCapabilities=useQuery({queryKey:['dropship-listing-capabilities',channel],queryFn:()=>listingCapabilitiesFn({data:{channel}}),enabled:session==='yes'&&channel!=='blackstar-site',retry:false,staleTime:30_000});
+  const publishCapabilities=useMemo(()=>((listingCapabilities.data??[]).filter(cap=>cap.deployed&&cap.requiresApproval)),[listingCapabilities.data]);
   useEffect(()=>{if(products.length&&!products.some(item=>item.id===itemId))setItemId(products[0].id);if(!products.length)setItemId('')},[products,itemId]);
   const selected=useMemo(()=>products.find(item=>item.id===itemId)??null,[products,itemId]);
   const blocked=selected?isDropshipProductBlocked(selected):false;
@@ -62,6 +70,46 @@ export default function DropshippingListingWorkbench(){
       setModel(typeof record.model==='string'?record.model:'');
     }else{setDraftText('');setProvider('');setModel('');}
   },[selected?.id,channel,selected?.metadata?.listing_drafts]);
+
+
+  const selectPublishAction=(key)=>{
+    setPublishAction(key);
+    const capability=publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===key);
+    if(!capability||!selected){setPublishInput('{}');return;}
+    const template=buildDropshippingActionInputTemplate(capabilitySchema(capability),selected,savedDraft?.text||draftText);
+    setPublishInput(JSON.stringify(template,null,2));
+  };
+
+  useEffect(()=>{
+    const current=publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction);
+    if(current)return;
+    const first=publishCapabilities[0];
+    if(!first){setPublishAction('');setPublishInput('{}');return;}
+    const key=`${first.provider}:${first.action}`;
+    setPublishAction(key);
+    if(selected)setPublishInput(JSON.stringify(buildDropshippingActionInputTemplate(capabilitySchema(first),selected,savedDraft?.text||draftText),null,2));
+  },[channel,publishCapabilities,selected?.id,savedDraft?.generated_at]);
+
+  const queuePublication=async()=>{
+    if(!selected||!workspaceId||!savedDraft||!publishAction||queueing)return;
+    const capability=publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction);
+    if(!capability)return;
+    let actionInput;
+    try{
+      actionInput=JSON.parse(publishInput||'{}');
+      if(!actionInput||typeof actionInput!=='object'||Array.isArray(actionInput))throw new Error('Payload must be a JSON object.');
+    }catch(error){
+      toast({variant:'destructive',title:'Invalid provider payload',description:error instanceof Error?error.message:'Enter a valid JSON object.'});
+      return;
+    }
+    setQueueing(true);
+    try{
+      const result=await queueApprovalFn({data:{workspace_id:workspaceId,item_id:selected.id,channel,provider:capability.provider,action:capability.action,action_input:actionInput}});
+      toast({title:result.reused?'Publication approval already queued':'Publication approval queued',description:`${result.provider} · ${result.action} is waiting in Mission Control. No provider write has happened yet.`});
+    }catch(error){
+      toast({variant:'destructive',title:'Could not queue publication approval',description:friendlyMessage(error)});
+    }finally{setQueueing(false);}
+  };
 
   const persist=async(text,nextProvider=provider,nextModel=model,{quiet=false}={})=>{
     if(!selected||!workspaceId||!text.trim())return;
@@ -105,7 +153,16 @@ export default function DropshippingListingWorkbench(){
 
         {draftText&&<div className="rounded-xl border border-white/[.08] bg-black/20 p-4"><p className="mb-3 text-xs font-medium text-white">Draft preview</p><div className="prose-chat text-xs leading-6 text-zinc-300"><ReactMarkdown>{draftText}</ReactMarkdown></div></div>}
 
-        <div className="rounded-xl border border-amber-400/15 bg-amber-500/[.035] p-4"><p className="text-[11px] font-medium text-amber-200">Publication boundary</p><p className="mt-1 text-[10px] leading-5 text-zinc-500">These are editable internal drafts only. A listing still needs human review, provider capability discovery and the existing Blackstar approval path before any external marketplace/store write. Missing product facts stay in the fact-check list instead of being fabricated.</p></div>
+        <div className="rounded-xl border border-emerald-400/15 bg-emerald-500/[.035] p-4">
+          <div className="flex flex-wrap items-start gap-3"><div><p className="text-[11px] font-medium text-emerald-200">Approved provider publication</p><p className="mt-1 max-w-3xl text-[10px] leading-5 text-zinc-500">Select a live governed capability from the connected {channel} provider. Blackstar validates the exact JSON input through the provider adapter, pins the transport, and queues it in Mission Control. The provider write occurs only after approval.</p></div><button onClick={()=>navigate('/mission-control')} className="ml-auto rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-300">Mission Control <ExternalLink className="ml-1 inline h-3 w-3"/></button></div>
+          {channel==='blackstar-site'?<p className="mt-3 text-[10px] text-zinc-500">Website Studio uses its native publish workflow, so marketplace action approval is not used for this target.</p>:listingCapabilities.isFetching?<p className="mt-3 flex items-center gap-2 text-[10px] text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin"/>Discovering live provider actions…</p>:listingCapabilities.error?<p className="mt-3 text-[10px] text-rose-300">{friendlyMessage(listingCapabilities.error)}</p>:publishCapabilities.length===0?<p className="mt-3 text-[10px] leading-5 text-amber-200/80">No deployed governed write capability is currently advertised for this channel. Connect or authorize a provider action in Integrations before trying to publish.</p>:<>
+            <label className="mt-3 block"><span className={label}>Live governed action</span><select className={control} value={publishAction} onChange={e=>selectPublishAction(e.target.value)}>{publishCapabilities.map(cap=><option key={`${cap.provider}:${cap.action}`} value={`${cap.provider}:${cap.action}`}>{cap.provider} · {cap.action} · {cap.risk}</option>)}</select></label>
+            {publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)&&<div className="mt-3 grid gap-3 xl:grid-cols-2"><div><span className={label}>Exact provider action input</span><textarea className={`${control} min-h-48 font-mono leading-5`} value={publishInput} onChange={e=>setPublishInput(e.target.value)}/><button onClick={()=>selectPublishAction(publishAction)} disabled={!selected} className="mt-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] text-zinc-400 disabled:opacity-40">Rebuild from product evidence</button></div><div><span className={label}>Provider input schema</span><pre className="max-h-48 overflow-auto rounded-xl border border-white/[.08] bg-black/30 p-3 text-[9px] leading-4 text-zinc-500">{JSON.stringify(capabilitySchema(publishCapabilities.find(cap=>`${cap.provider}:${cap.action}`===publishAction)),null,2)}</pre></div></div>}
+            <button disabled={!selected||blocked||!savedDraft||!publishAction||queueing} onClick={queuePublication} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40">{queueing?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}{queueing?'Validating & queueing…':'Queue exact action for approval'}</button>
+          </>}
+        </div>
+
+        <div className="rounded-xl border border-amber-400/15 bg-amber-500/[.035] p-4"><p className="text-[11px] font-medium text-amber-200">Publication boundary</p><p className="mt-1 text-[10px] leading-5 text-zinc-500">Draft generation never publishes. Marketplace/store execution only uses a live connected capability after Mission Control approval. The approval record locks the prepared provider, action, input and transport so the UI cannot change them after review.</p></div>
       </div>
     </div>
   </section>;
