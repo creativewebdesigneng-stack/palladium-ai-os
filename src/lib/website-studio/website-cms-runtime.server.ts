@@ -1,3 +1,5 @@
+import {Buffer} from 'node:buffer';
+
 export type WebsiteCmsRuntimeFile={file:string;data:string;encoding:'utf-8'};
 export type WebsiteCmsRuntimePackage={
   files:WebsiteCmsRuntimeFile[];
