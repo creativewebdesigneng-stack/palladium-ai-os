@@ -5,7 +5,10 @@ import {
   runRetailReceptionistCore,
 } from './retail-receptionist-core.server';
 
-type Sb = { from: (table: string) => any; rpc?: (name: string, args?: Record<string, unknown>) => any };
+type Sb = {
+  from: (table: string) => any;
+  rpc: (name: string, args?: Record<string, unknown>) => any;
+};
 
 export const runRetailReceptionistInquiry = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
