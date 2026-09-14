@@ -27,8 +27,10 @@ describe('Dropshipping Hub intelligence',()=>{
     expect(result.reasons.join(' ')).toMatch(/wholesale supplier/i);
   });
 
-  it('blocks generic Etsy dropshipping but allows disclosed original-design POD',()=>{
+  it('blocks generic Etsy dropshipping and resale but allows original-design creator/POD flows',()=>{
     expect(assessChannelCompliance({channel:'etsy',fulfilmentModel:'wholesale-supplier'}).allowed).toBe(false);
+    expect(assessChannelCompliance({channel:'etsy',fulfilmentModel:'owned-stock'}).allowed).toBe(false);
+    expect(assessChannelCompliance({channel:'etsy',fulfilmentModel:'owned-stock',originalDesign:true}).allowed).toBe(true);
     expect(assessChannelCompliance({channel:'etsy',fulfilmentModel:'pod',originalDesign:true,productionPartnerDisclosed:true}).allowed).toBe(true);
   });
 
