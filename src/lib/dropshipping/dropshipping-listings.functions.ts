@@ -1,7 +1,7 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
 import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
-import {prepareIntegrationAction,normalizeIntegrationProvider} from '@/lib/integrations/agent-integration-runtime.server';
+import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegrationProvider} from '@/lib/integrations/agent-integration-runtime.server';
 import {notify} from '@/lib/notifications/notify.server';
 import {DROPSHIP_CHANNELS} from './dropshipping';
 import {DROPSHIP_CHANNEL_TARGETS} from './dropshipping-readiness';
@@ -67,6 +67,22 @@ export const saveDropshippingListingDraft=createServerFn({method:'POST'})
       .single();
     if(updateError)throw new Error(updateError.message);
     return updated;
+  });
+
+export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value:unknown)=>z.object({channel:z.enum(channelIds)}).parse(value))
+  .handler(async({data,context})=>{
+    const target=DROPSHIP_CHANNEL_TARGETS.find(row=>row.id===data.channel);
+    if(!target||target.native)return [];
+    const aliases=new Set(target.providers.map(normalizeIntegrationProvider));
+    const capabilities=await listIntegrationCapabilities(context.userId);
+    return capabilities
+      .filter(capability=>aliases.has(normalizeIntegrationProvider(capability.provider)))
+      .map(({provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema})=>({
+        provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema,
+      }))
+      .sort((left,right)=>left.provider===right.provider?left.action.localeCompare(right.action):left.provider.localeCompare(right.provider));
   });
 
 export const queueDropshippingListingApproval=createServerFn({method:'POST'})
