@@ -9,11 +9,31 @@ type Sb={
   storage:{from:(bucket:string)=>{download:(path:string)=>Promise<{data:Blob|null;error:{message:string}|null}>}};
 };
 
-const syncSchema=z.object({projectId:z.string().uuid()});
+const syncSchema=z.object({
+  projectId:z.string().uuid(),
+  gitConfig:z.object({
+    repository:z.string().trim().min(3).max(200),
+    branch:z.string().trim().min(1).max(200),
+    rootPath:z.string().trim().max(500).default(''),
+  }),
+});
 
 function githubConfig(){
   const token=process.env['WEBSITE_STUDIO_GITHUB_TOKEN']?.trim()||'';
-  return {configured:Boolean(token),token};
+  const allowedRepositories=new Set(
+    (process.env['WEBSITE_STUDIO_GITHUB_ALLOWED_REPOSITORIES']||'')
+      .split(',')
+      .map(value=>value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  return {configured:Boolean(token&&allowedRepositories.size),token,allowedRepositories};
+}
+
+function assertAllowedRepository(owner:string,repo:string,allowedRepositories:Set<string>){
+  const full=`${owner}/${repo}`.toLowerCase();
+  if(!allowedRepositories.has(full)){
+    throw new Error('This repository is not allowlisted for Website Studio GitHub sync.');
+  }
 }
 
 function asRecord(value:unknown):Record<string,unknown>{
@@ -86,8 +106,8 @@ async function createGithubBlob(token:string,owner:string,repo:string,data:strin
 export const getWebsiteStudioGithubStatus=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
   .handler(async()=>{
-    const {configured}=githubConfig();
-    return {configured,provider:'github'};
+    const {configured,allowedRepositories}=githubConfig();
+    return {configured,provider:'github',allowedRepositoryCount:allowedRepositories.size};
   });
 
 export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
@@ -95,15 +115,16 @@ export const syncWebsiteStudioGithub=createServerFn({method:'POST'})
   .inputValidator((value:unknown)=>syncSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
-    const {configured,token}=githubConfig();
-    if(!configured)throw new Error('Website Studio GitHub sync is not configured on this deployment.');
+    const {configured,token,allowedRepositories}=githubConfig();
+    if(!configured)throw new Error('Website Studio GitHub sync requires a server token and an explicit repository allowlist.');
 
     const {data:project,error}=await sb.from('website_studio_projects').select('*').eq('id',data.projectId).maybeSingle();
     if(error)throw new Error(error.message);
     if(!project)throw new Error('Website Studio project not found.');
 
-    const git=asRecord(project.git_config);
+    const git={...asRecord(project.git_config),...data.gitConfig};
     const {owner,repo}=parseRepository(git['repository']);
+    assertAllowedRepository(owner,repo,allowedRepositories);
     const branch=cleanBranch(git['branch']);
     const rootPath=cleanRootPath(git['rootPath']);
     const packageResult=await buildWebsiteRuntimePackage(sb,project);
