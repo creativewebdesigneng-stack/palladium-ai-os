@@ -72,7 +72,7 @@ const BUSINESS = [
   ['SEO Studio', '/seo-studio', Search],
   ['Social Operations', '/social-operations', CalendarClock],
   ['Trusted Social Video', '/trusted-social-video', Clapperboard],
-  ['Fitness Studio', '/fitness-studio', Dumbbell],
+  ['Health & Fitness Hub', '/health-fitness', Dumbbell],
 ];
 
 const BOTTOM = [
