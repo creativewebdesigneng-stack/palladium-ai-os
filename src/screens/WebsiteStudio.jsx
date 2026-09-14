@@ -14,6 +14,9 @@ import WebsiteAppScaffold from '@/components/website-studio/WebsiteAppScaffold';
 import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishPreflight';
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
+import WebsiteSectionInspector from '@/components/website-studio/WebsiteSectionInspector';
+import WebsiteTemplateGallery from '@/components/website-studio/WebsiteTemplateGallery';
+import {createWebsiteFromTemplate} from '@/lib/website-studio/website-templates';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
 import WebsiteVercelPublisher from '@/components/website-studio/WebsiteVercelPublisher';
 import WebsiteDomainManager from '@/components/website-studio/WebsiteDomainManager';
@@ -61,6 +64,8 @@ export default function WebsiteStudio(){
 
   const preview=useMemo(()=>documentForPreview(draft,previewPagePath),[draft,previewPagePath]);
   const quality=useMemo(()=>assessWebsiteQuality(draft.html||'',draft.css||''),[draft.html,draft.css]);
+
+  const applyTemplate=(templateId)=>{if(!draft.name.trim())return setError('Give the website a project name first.');const site=createWebsiteFromTemplate(templateId,draft.name);setDraft({...blank,...site,design_tokens:site.designTokens,app_config:site.appConfig,status:'draft'});setPreviewPagePath('/');setNotice('Template applied. Review the generated structure, then save or refine it with AI.');setError('')};
 
   const createFromPrompt=()=>{
     if(!draft.name.trim())return setError('Give the website a project name first.');
@@ -139,6 +144,8 @@ export default function WebsiteStudio(){
       </aside>
 
       <div className="space-y-4">
+        <WebsiteTemplateGallery onSelect={applyTemplate}/>
+
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <div className="flex items-center gap-2 text-violet-300"><Sparkles className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.16em]">Prompt-to-site brief</span></div>
           <div className="mt-3 grid gap-3 md:grid-cols-2"><input value={draft.name||''} onChange={e=>setDraft({...draft,name:e.target.value})} placeholder="Website / project name" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"/><input value={draft.slug||''} onChange={e=>setDraft({...draft,slug:e.target.value})} placeholder="site-slug" className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"/></div>
@@ -167,6 +174,7 @@ export default function WebsiteStudio(){
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
         <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
+        <WebsiteSectionInspector project={draft} setProject={setDraft} activePath={previewPagePath}/>
         <WebsiteDesignControls tokens={draft.design_tokens||draft.designTokens||{}} setTokens={(design_tokens)=>setDraft({...draft,design_tokens})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteSeoPanel brief={draft.brief||{}} pages={draft.pages||[]} setBrief={(brief)=>setDraft({...draft,brief})}/>
         <WebsiteAssetLibrary projectId={draft.id}/>
