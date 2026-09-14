@@ -1,4 +1,5 @@
 import { pageOutputPath, resolvePageHtml, type WebsitePageDocument } from './website-page-documents';
+import { normalizePagePath, websitePagePathsAreUnique } from './website-pages';
 import { buildWebsiteRobots, buildWebsiteSitemap } from './website-seo';
 export type WebsiteProjectFile={path:string;content:string;kind:'html'|'css'|'javascript'|'json'|'text'};
 export type WebsiteProjectManifest={version:1;name:string;slug:string;framework:string;files:WebsiteProjectFile[]};
@@ -13,8 +14,13 @@ export function buildWebsiteProjectManifest(input:{
     {path:'robots.txt',content:robots,kind:'text'},
     ...(sitemap?[{path:'sitemap.xml',content:sitemap,kind:'text'} as WebsiteProjectFile]:[]),
   ];
-  const pageFiles=(input.pages as WebsitePageDocument[])
-    .filter(page=>String(page.path||'/')!=='/')
+  const pageDocuments=input.pages as WebsitePageDocument[];
+  if(pageDocuments.length>0){
+    const hasHome=pageDocuments.some(page=>normalizePagePath(String(page.path||'/'))==='/');
+    if(!hasHome||!websitePagePathsAreUnique(pageDocuments))throw new Error('Website Studio page routes must include one unique Home route.');
+  }
+  const pageFiles=pageDocuments
+    .filter(page=>normalizePagePath(String(page.path||'/'))!=='/')
     .map(page=>({
       path:pageOutputPath(String(page.path||'/')),
       content:resolvePageHtml(input.name,input.html||'',page),
