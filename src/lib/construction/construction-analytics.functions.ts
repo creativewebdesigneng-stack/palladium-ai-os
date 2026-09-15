@@ -10,9 +10,7 @@ const sum = (rows: any[], key: string) =>
 
 export const getConstructionPortfolioAnalytics = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) =>
-    z.object({ workspace_id: uuid }).parse(value),
-  )
+  .validator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const workspaceId = data.workspace_id;
