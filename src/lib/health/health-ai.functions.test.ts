@@ -1,28 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { matchesHealthEmergencySignal } from './health-ai.functions';
 
-describe('Health emergency preflight', () => {
+describe('Health Coach emergency preflight', () => {
   it.each([
     'I cannot breathe',
-    'I have severe chest pain',
-    'there is severe bleeding',
-    'I think this is a stroke',
+    'severe chest pain',
+    'severe bleeding',
+    'signs of stroke',
     'they are unconscious',
     'I took an overdose',
-    'this looks like anaphylaxis',
+    'this is anaphylaxis',
     'the seizure is happening now',
     'I want to kill myself',
-  ])('escalates deterministic emergency language: %s', (input) => {
-    expect(matchesHealthEmergencySignal(input)).toBe(true);
+  ])('escalates deterministic emergency language: %s', (text) => {
+    expect(matchesHealthEmergencySignal(text)).toBe(true);
   });
 
   it.each([
-    'How can I improve my 5k time?',
-    'Can you help me build a three day strength plan?',
-    'What are healthy sleep habits?',
-    'I want to understand my protein intake',
-    'I had a seizure many years ago and want help preparing questions for my doctor',
-  ])('does not block ordinary health and fitness coaching: %s', (input) => {
-    expect(matchesHealthEmergencySignal(input)).toBe(false);
+    'build a 5k training plan',
+    'help me eat more protein',
+    'I slept badly last night',
+    'I had a seizure years ago and want appointment questions',
+    'what does resting heart rate mean?',
+  ])('does not block ordinary health coaching: %s', (text) => {
+    expect(matchesHealthEmergencySignal(text)).toBe(false);
   });
 });
