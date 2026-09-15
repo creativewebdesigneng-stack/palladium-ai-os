@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import {
-  Activity, Apple, Bell, Brain, Dumbbell, FileUp, HeartPulse, Loader2, Moon, Plus, Salad,
+  Activity, Apple, Bell, BookOpen, Brain, Dumbbell, FileUp, HeartPulse, Loader2, Moon, Plus, Salad,
   ShieldCheck, Sparkles, Stethoscope, Target, Tablets, TrendingUp,
 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
@@ -17,6 +17,7 @@ import HealthImportsBriefs from '@/components/health/HealthImportsBriefs';
 import HealthIntelligenceDashboard from '@/components/health/HealthIntelligenceDashboard';
 import HealthReminders from '@/components/health/HealthReminders';
 import HealthPrivacy from '@/components/health/HealthPrivacy';
+import HealthKnowledge from '@/components/health/HealthKnowledge';
 
 const TABS = [
   ['overview','Overview',Activity],
@@ -27,6 +28,7 @@ const TABS = [
   ['plans','AI Plans',Brain],
   ['data','Data & appointments',FileUp],
   ['reminders','Reminders',Bell],
+  ['knowledge','Knowledge',BookOpen],
   ['privacy','Privacy',ShieldCheck],
   ['record','Health record',Stethoscope],
   ['coach','AI Health Coach',Sparkles],
@@ -204,6 +206,8 @@ export default function HealthFitnessHub() {
     {tab==='data' && <HealthImportsBriefs />}
 
     {tab==='reminders' && <HealthReminders />}
+
+    {tab==='knowledge' && <HealthKnowledge />}
 
     {tab==='privacy' && <HealthPrivacy />}
 
