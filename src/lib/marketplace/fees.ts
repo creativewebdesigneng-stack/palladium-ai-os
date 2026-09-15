@@ -1,0 +1,2 @@
+export const MARKETPLACE_LISTING_FEE_PENCE=300;export const MARKETPLACE_THRESHOLD_PENCE=1_000_000;
+export function marketplaceSaleFee(pricePence:number){if(!Number.isSafeInteger(pricePence)||pricePence<0)throw new Error('Sale price must be non-negative integer pence.');const rateBps=pricePence<MARKETPLACE_THRESHOLD_PENCE?200:800;const feePence=Math.round(pricePence*rateBps/10000);return{rateBps,ratePercent:rateBps/100,feePence,sellerNetPence:pricePence-feePence};}
