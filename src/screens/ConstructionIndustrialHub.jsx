@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ConstructionOperationsConsole from '@/components/construction/ConstructionOperationsConsole';
 import {
   HardHat, Factory, Building2, Wrench, Ruler, ShieldCheck, ClipboardCheck, Truck, Boxes,
   Gauge, Camera, FileText, Calculator, Workflow, Users, Map, ScanLine, Leaf, RadioTower,
@@ -69,6 +70,8 @@ export default function ConstructionIndustrialHub() {
         <div className="mt-6 flex flex-wrap gap-2">{['Projects','Estimating','Planning','Site','Safety','Quality','Plant','BIM','Procurement','Commercial','Maintenance','Sustainability'].map(x=><span key={x} className="rounded-full border border-white/[.08] bg-white/[.035] px-3 py-1.5 text-xs text-zinc-300">{x}</span>)}</div>
       </div>
     </section>
+
+    <ConstructionOperationsConsole />
 
     <Section eyebrow="Sector coverage" title="Built for the full construction and industrial chain">
       <Grid items={sectors} />
