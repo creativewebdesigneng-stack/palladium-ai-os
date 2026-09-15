@@ -14,9 +14,11 @@ import {
 import { runHealthCoachInquiry } from '@/lib/health/health-ai.functions';
 import HealthPlansRecords from '@/components/health/HealthPlansRecords';
 import HealthImportsBriefs from '@/components/health/HealthImportsBriefs';
+import HealthIntelligenceDashboard from '@/components/health/HealthIntelligenceDashboard';
 
 const TABS = [
   ['overview','Overview',Activity],
+  ['intelligence','Intelligence',TrendingUp],
   ['fitness','Fitness',Dumbbell],
   ['nutrition','Nutrition',Salad],
   ['recovery','Sleep & recovery',Moon],
@@ -155,6 +157,8 @@ export default function HealthFitnessHub() {
     </div>
     {error && <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{error}</div>}
     <div className="mb-5 flex flex-wrap gap-2">{TABS.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${tab===id?'border-violet-300/25 bg-violet-400/10 text-violet-100':'border-white/[.07] bg-black/20 text-zinc-500 hover:text-zinc-300'}`}><Icon className="h-3.5 w-3.5"/>{label}</button>)}</div>
+
+    {tab==='intelligence' && <HealthIntelligenceDashboard />}
 
     {tab==='overview' && <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
