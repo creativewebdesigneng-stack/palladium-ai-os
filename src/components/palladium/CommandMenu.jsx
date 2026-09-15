@@ -6,7 +6,7 @@ import {
   Search, CornerDownLeft, ArrowUp, ArrowDown, Command, Home, FolderKanban,
   Users, Bot, ListChecks, Workflow, Files, BookOpen, Plug, Store, Globe,
   Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, ShieldCheck, CreditCard,
-  Cpu, Lock, Loader2, Zap,
+  Cpu, Lock, Loader2, Zap, HardHat,
 } from 'lucide-react';
 import { searchWorkspace } from '@/lib/search/search.functions';
 
@@ -29,6 +29,7 @@ const PAGES = [
   ['Analytics', '/analytics', BarChart3],
   ['Finance Hub', '/finance', CreditCard],
   ['Retail Hub', '/retail-hub', Store],
+  ['Construction & Industrial', '/construction-industrial-hub', HardHat],
   ['Dropshipping Hub', '/dropshipping-hub', Store],
   ['Trading Hub', '/trading-hub', BarChart3],
   ['Quant Studio', '/quant-studio', BarChart3],
@@ -48,6 +49,7 @@ const QUICK_ACTIONS = [
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
   { title: 'Open Retail Hub', href: '/retail-hub', icon: Store },
+  { title: 'Open Construction & Industrial', href: '/construction-industrial-hub', icon: HardHat },
   { title: 'Open Dropshipping Hub', href: '/dropshipping-hub', icon: Store },
   { title: 'Manage team members', href: '/team', icon: Users },
 ];
