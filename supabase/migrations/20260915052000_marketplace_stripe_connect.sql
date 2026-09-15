@@ -1,0 +1,5 @@
+alter table public.marketplace_seller_profiles add column if not exists stripe_connected_account_id text unique,add column if not exists stripe_onboarding_complete boolean not null default false,add column if not exists stripe_charges_enabled boolean not null default false,add column if not exists stripe_payouts_enabled boolean not null default false;
+alter table public.marketplace_orders add column if not exists stripe_checkout_session_id text unique,add column if not exists stripe_payment_intent_id text unique;
+alter table public.marketplace_listing_fee_payments add column if not exists stripe_checkout_session_id text unique;
+create table if not exists public.marketplace_payment_events(id text primary key,event_type text not null,livemode boolean not null,processed_at timestamptz not null default now(),payload_digest text);
+alter table public.marketplace_payment_events enable row level security;alter table public.marketplace_payment_events force row level security;revoke all on public.marketplace_payment_events from anon,authenticated;grant all on public.marketplace_payment_events to service_role;
