@@ -232,16 +232,38 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     case "customer.subscription.deleted":
       await markCanceled(event.data.object, env);
       break;
-    case "checkout.session.completed":
-    case "checkout.session.async_payment_succeeded":
-      await handleCheckoutCompleted(event.data.object, env);
-      break;
     case "invoice.paid":
       await recordUsage(event.data.object, env);
       break;
     case "invoice.payment_failed":
       await markPaymentFailed(event.data.object, env);
       break;
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
+      const session = event.data.object as any;
+      if (session.metadata?.kind === "marketplace_listing_fee" && session.payment_status === "paid") {
+        const listingId = session.metadata?.listing_id;
+        const sellerId = session.metadata?.seller_id;
+        if (listingId && sellerId) {
+          await getSupabase().from("marketplace_listing_fee_payments").update({ status: "paid", paid_at: new Date().toISOString(), provider_payment_id: session.id }).eq("stripe_checkout_session_id", session.id).eq("seller_id", sellerId);
+          await getSupabase().from("marketplace_listings").update({ listing_fee_paid_at: new Date().toISOString(), status: "pending_review", updated_at: new Date().toISOString() }).eq("id", listingId).eq("seller_id", sellerId);
+          await getSupabase().from("marketplace_moderation_cases").insert({ listing_id: listingId, seller_id: sellerId, status: "pending" });
+        }
+        break;
+      }
+      if (session.metadata?.kind === "marketplace_purchase" && session.payment_status === "paid" && session.metadata?.order_id) {
+        await getSupabase().from("marketplace_orders").update({ status: "paid", paid_at: new Date().toISOString(), stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null }).eq("id", session.metadata.order_id).eq("stripe_checkout_session_id", session.id);
+        break;
+      }
+      await handleCheckoutCompleted(session, env);
+      break;
+    }
+    case "charge.refunded": {
+      const charge = event.data.object as any;
+      const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+      if (paymentIntentId) await getSupabase().from("marketplace_orders").update({ status: "refunded" }).eq("stripe_payment_intent_id", paymentIntentId);
+      break;
+    }
     default:
       console.log("Unhandled payments event:", event.type);
   }
