@@ -5,7 +5,7 @@ import { writeAudit } from '@/lib/platform/audit.server';
 type Sb={from:(table:string)=>any};
 const TABLES=['health_profiles','health_goals','health_metric_entries','health_workouts','health_nutrition_entries','health_sleep_entries','health_medications','health_plans','health_records','health_import_batches','health_appointment_briefs','health_reminders'] as const;
 export const exportHealthData=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
- const sb=context.supabase as unknown as Sb;const data:Record<string,unknown>={};
+ const sb=context.supabase as unknown as Sb;const data:Record<string,any[]>={};
  for(const table of TABLES){const {data:rows,error}=await sb.from(table).select('*').eq('user_id',context.userId).limit(10000);if(error)throw new Error(error.message);data[table]=rows??[];}
  await writeAudit({userId:context.userId,action:'health.data_exported',targetType:'health_workspace',targetId:context.userId,status:'success'});
  return{exported_at:new Date().toISOString(),format:'blackstar-health-json-v1',data};
