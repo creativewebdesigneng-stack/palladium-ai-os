@@ -252,7 +252,11 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         break;
       }
       if (session.metadata?.kind === "marketplace_purchase" && session.payment_status === "paid" && session.metadata?.order_id) {
-        await getSupabase().from("marketplace_orders").update({ status: "paid", paid_at: new Date().toISOString(), stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null }).eq("id", session.metadata.order_id).eq("stripe_checkout_session_id", session.id);
+        const { data: order } = await getSupabase().from("marketplace_orders").update({ status: "paid", paid_at: new Date().toISOString(), stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null }).eq("id", session.metadata.order_id).eq("stripe_checkout_session_id", session.id).select("id,listing_id,buyer_id,seller_id").single();
+        if (order) {
+          const { data: listing } = await getSupabase().from("marketplace_listings").select("delivery_type,delivery_reference,delivery_instructions").eq("id", order.listing_id).single();
+          if (listing) await getSupabase().from("marketplace_deliveries").upsert({ order_id: order.id, seller_id: order.seller_id, buyer_id: order.buyer_id, delivery_type: listing.delivery_type, delivery_reference: listing.delivery_reference, instructions: listing.delivery_instructions, status: "delivered", delivered_at: new Date().toISOString() }, { onConflict: "order_id" });
+        }
         break;
       }
       await handleCheckoutCompleted(session, env);
