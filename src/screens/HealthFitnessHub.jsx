@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import {
-  Activity, Apple, Brain, Dumbbell, FileUp, HeartPulse, Loader2, Moon, Plus, Salad,
+  Activity, Apple, Bell, Brain, Dumbbell, FileUp, HeartPulse, Loader2, Moon, Plus, Salad,
   ShieldCheck, Sparkles, Stethoscope, Target, Tablets, TrendingUp,
 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
@@ -15,6 +15,7 @@ import { runHealthCoachInquiry } from '@/lib/health/health-ai.functions';
 import HealthPlansRecords from '@/components/health/HealthPlansRecords';
 import HealthImportsBriefs from '@/components/health/HealthImportsBriefs';
 import HealthIntelligenceDashboard from '@/components/health/HealthIntelligenceDashboard';
+import HealthReminders from '@/components/health/HealthReminders';
 
 const TABS = [
   ['overview','Overview',Activity],
@@ -24,6 +25,7 @@ const TABS = [
   ['recovery','Sleep & recovery',Moon],
   ['plans','AI Plans',Brain],
   ['data','Data & appointments',FileUp],
+  ['reminders','Reminders',Bell],
   ['record','Health record',Stethoscope],
   ['coach','AI Health Coach',Sparkles],
 ];
@@ -198,6 +200,8 @@ export default function HealthFitnessHub() {
     {tab==='plans' && <HealthPlansRecords />}
 
     {tab==='data' && <HealthImportsBriefs />}
+
+    {tab==='reminders' && <HealthReminders />}
 
     {tab==='record' && <><div className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><Panel title="Medication list" icon={Tablets}><p className="mb-3 text-[10px] leading-4 text-zinc-600">For record organisation only. Blackstar will not change prescribed medication or dosage.</p><div className="grid gap-3 sm:grid-cols-2"><Field label="Medication"><input className="hf-field" value={med.name} onChange={e=>setMed({...med,name:e.target.value})}/></Field><Field label="Dose"><input className="hf-field" value={med.dose} onChange={e=>setMed({...med,dose:e.target.value})}/></Field><Field label="Schedule"><input className="hf-field" value={med.schedule} onChange={e=>setMed({...med,schedule:e.target.value})}/></Field><Field label="Purpose"><input className="hf-field" value={med.purpose} onChange={e=>setMed({...med,purpose:e.target.value})}/></Field><Field label="Prescribed by"><input className="hf-field" value={med.prescribed_by} onChange={e=>setMed({...med,prescribed_by:e.target.value})}/></Field><Field label="Started"><input className="hf-field" type="date" value={med.started_on} onChange={e=>setMed({...med,started_on:e.target.value})}/></Field></div><button onClick={addMedication} disabled={busy==='med'||!med.name.trim()} className="hf-primary mt-3"><Plus className="h-4 w-4"/>Add to record</button></Panel><Panel title="Current record" icon={Stethoscope}><div className="space-y-2">{(data?.medications??[]).length?(data?.medications??[]).map(item=><div key={item.id} className="rounded-xl border border-white/[.06] bg-black/20 p-3"><div className="flex justify-between gap-3"><span className="text-xs text-zinc-200">{item.name}</span><span className={`text-[9px] uppercase ${item.active?'text-emerald-300':'text-zinc-600'}`}>{item.active?'active':'inactive'}</span></div><p className="mt-1 text-[10px] text-zinc-500">{[item.dose,item.schedule,item.purpose].filter(Boolean).join(' · ')||'No additional details'}</p></div>):<Empty text="No medications recorded."/>}</div></Panel></div><HealthPlansRecords mode="record" /></>}
 
