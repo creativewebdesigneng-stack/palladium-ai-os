@@ -61,8 +61,12 @@ import { Route as ShellAppChatRouteImport } from './routes/_shell/_app/chat'
 import { Route as ShellAppCinemaStudioRouteImport } from './routes/_shell/_app/cinema-studio'
 import { Route as ShellAppCodeExplorerRouteImport } from './routes/_shell/_app/code-explorer'
 import { Route as ShellAppCommerceStudioRouteImport } from './routes/_shell/_app/commerce-studio'
+import { Route as ShellAppCompanyHubRouteImport } from './routes/_shell/_app/company-hub'
+import { Route as ShellAppComplianceSentinelRouteImport } from './routes/_shell/_app/compliance-sentinel'
 import { Route as ShellAppComputerControlRouteImport } from './routes/_shell/_app/computer-control'
+import { Route as ShellAppConstructionIndustrialHubRouteImport } from './routes/_shell/_app/construction-industrial-hub'
 import { Route as ShellAppCreatorHubRouteImport } from './routes/_shell/_app/creator-hub'
+import { Route as ShellAppCreatorMarketplaceRouteImport } from './routes/_shell/_app/creator-marketplace'
 import { Route as ShellAppCrmRouteImport } from './routes/_shell/_app/crm'
 import { Route as ShellAppCrmStudioRouteImport } from './routes/_shell/_app/crm-studio'
 import { Route as ShellAppDashboardRouteImport } from './routes/_shell/_app/dashboard'
@@ -74,13 +78,16 @@ import { Route as ShellAppDeveloperWorkspaceRouteImport } from './routes/_shell/
 import { Route as ShellAppDiscoveryRouteImport } from './routes/_shell/_app/discovery'
 import { Route as ShellAppDocsRouteImport } from './routes/_shell/_app/docs'
 import { Route as ShellAppDocumentsRouteImport } from './routes/_shell/_app/documents'
+import { Route as ShellAppDropshippingHubRouteImport } from './routes/_shell/_app/dropshipping-hub'
 import { Route as ShellAppFastTrackRouteImport } from './routes/_shell/_app/fast-track'
 import { Route as ShellAppFilesRouteImport } from './routes/_shell/_app/files'
 import { Route as ShellAppFilesAnalysisRouteImport } from './routes/_shell/_app/files-analysis'
 import { Route as ShellAppFinanceRouteImport } from './routes/_shell/_app/finance'
 import { Route as ShellAppFitnessStudioRouteImport } from './routes/_shell/_app/fitness-studio'
 import { Route as ShellAppGameFoundryRouteImport } from './routes/_shell/_app/game-foundry'
+import { Route as ShellAppHealthFitnessRouteImport } from './routes/_shell/_app/health-fitness'
 import { Route as ShellAppHtmlStudioRouteImport } from './routes/_shell/_app/html-studio'
+import { Route as ShellAppIndustryHubRouteImport } from './routes/_shell/_app/industry-hub'
 import { Route as ShellAppIntegrationsRouteImport } from './routes/_shell/_app/integrations'
 import { Route as ShellAppKnowledgeRouteImport } from './routes/_shell/_app/knowledge'
 import { Route as ShellAppMarketingRouteImport } from './routes/_shell/_app/marketing'
@@ -99,6 +106,8 @@ import { Route as ShellAppProjectsRouteImport } from './routes/_shell/_app/proje
 import { Route as ShellAppPromptsRouteImport } from './routes/_shell/_app/prompts'
 import { Route as ShellAppQuantStudioRouteImport } from './routes/_shell/_app/quant-studio'
 import { Route as ShellAppRecallNotesRouteImport } from './routes/_shell/_app/recall-notes'
+import { Route as ShellAppResearchRouteImport } from './routes/_shell/_app/research'
+import { Route as ShellAppRetailHubRouteImport } from './routes/_shell/_app/retail-hub'
 import { Route as ShellAppSearchRouteImport } from './routes/_shell/_app/search'
 import { Route as ShellAppSecurityRouteImport } from './routes/_shell/_app/security'
 import { Route as ShellAppSeoStudioRouteImport } from './routes/_shell/_app/seo-studio'
@@ -117,17 +126,20 @@ import { Route as ShellAppTerminalRouteImport } from './routes/_shell/_app/termi
 import { Route as ShellAppThreeDStudioRouteImport } from './routes/_shell/_app/three-d-studio'
 import { Route as ShellAppToolMarketplaceRouteImport } from './routes/_shell/_app/tool-marketplace'
 import { Route as ShellAppToolsFrameworkRouteImport } from './routes/_shell/_app/tools-framework'
+import { Route as ShellAppTradingHubRouteImport } from './routes/_shell/_app/trading-hub'
 import { Route as ShellAppTrustedSocialVideoRouteImport } from './routes/_shell/_app/trusted-social-video'
 import { Route as ShellAppVersionControlRouteImport } from './routes/_shell/_app/version-control'
 import { Route as ShellAppVoiceStudioRouteImport } from './routes/_shell/_app/voice-studio'
 import { Route as ShellAppWebRouteImport } from './routes/_shell/_app/web'
 import { Route as ShellAppWebIntelligenceRouteImport } from './routes/_shell/_app/web-intelligence'
+import { Route as ShellAppWebsiteStudioRouteImport } from './routes/_shell/_app/website-studio'
 import { Route as ShellAppWhatsappCrmRouteImport } from './routes/_shell/_app/whatsapp-crm'
 import { Route as ShellAppWorkOsRouteImport } from './routes/_shell/_app/work-os'
 import { Route as ShellAppWorkflowsRouteImport } from './routes/_shell/_app/workflows'
 import { Route as ShellAppWorkforceRouteImport } from './routes/_shell/_app/workforce'
 import { Route as ApiAgentsRunRouteImport } from './routes/api/agents/run'
 import { Route as ApiAgentsSteerRouteImport } from './routes/api/agents/steer'
+import { Route as ApiInternalDropshippingOpportunityMonitorRouteImport } from './routes/api/internal/dropshipping-opportunity-monitor'
 import { Route as ApiInternalWebhookRetriesRouteImport } from './routes/api/internal/webhook-retries'
 import { Route as ApiInternalWorkflowRunsRouteImport } from './routes/api/internal/workflow-runs'
 import { Route as ShellAppAdminIndexRouteImport } from './routes/_shell/_app/admin.index'
@@ -144,11 +156,13 @@ import { Route as ShellAppAdminUsersRouteImport } from './routes/_shell/_app/adm
 import { Route as ShellAppAgentsIndexRouteImport } from './routes/_shell/_app/agents.index'
 import { Route as ShellAppAgentsNewRouteImport } from './routes/_shell/_app/agents.new'
 import { Route as ShellAppCreatorsIdRouteImport } from './routes/_shell/_app/creators.$id'
+import { Route as ShellAppProjectsIdRouteImport } from './routes/_shell/_app/projects.$id'
 import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
 import { Route as ApiPublicIntegrationsGithubCallbackRouteImport } from './routes/api/public/integrations/github-callback'
 import { Route as ApiPublicIntegrationsNangoWebhookRouteImport } from './routes/api/public/integrations/nango-webhook'
 import { Route as ApiPublicIntegrationsShopifyCallbackRouteImport } from './routes/api/public/integrations/shopify-callback'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
+import { Route as ApiPublicRetailTwilioStatusRouteImport } from './routes/api/public/retail/twilio-status'
 import { Route as ApiPublicV1AgentsRouteImport } from './routes/api/public/v1/agents'
 import { Route as ApiPublicV1MarketplaceRouteImport } from './routes/api/public/v1/marketplace'
 import { Route as ApiPublicV1TasksRouteImport } from './routes/api/public/v1/tasks'
@@ -157,6 +171,9 @@ import { Route as ApiPublicV1WorkflowsRouteImport } from './routes/api/public/v1
 import { Route as ApiPublicV1WorkforcesRouteImport } from './routes/api/public/v1/workforces'
 import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
 import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
+import { Route as ApiPublicRetailTwilioVoiceIncomingRouteImport } from './routes/api/public/retail/twilio-voice/incoming'
+import { Route as ApiPublicRetailTwilioVoiceStatusRouteImport } from './routes/api/public/retail/twilio-voice/status'
+import { Route as ApiPublicRetailTwilioVoiceTurnRouteImport } from './routes/api/public/retail/twilio-voice/turn'
 import { Route as ApiPublicV1AgentsIdRouteImport } from './routes/api/public/v1/agents.$id'
 import { Route as ApiPublicV1AgentsIdRunRouteImport } from './routes/api/public/v1/agents.$id.run'
 import { Route as ApiPublicV1WorkflowsIdRunRouteImport } from './routes/api/public/v1/workflows.$id.run'
@@ -425,16 +442,39 @@ const ShellAppCommerceStudioRoute = ShellAppCommerceStudioRouteImport.update({
   path: '/commerce-studio',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppCompanyHubRoute = ShellAppCompanyHubRouteImport.update({
+  id: '/company-hub',
+  path: '/company-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppComplianceSentinelRoute =
+  ShellAppComplianceSentinelRouteImport.update({
+    id: '/compliance-sentinel',
+    path: '/compliance-sentinel',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppComputerControlRoute = ShellAppComputerControlRouteImport.update({
   id: '/computer-control',
   path: '/computer-control',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppConstructionIndustrialHubRoute =
+  ShellAppConstructionIndustrialHubRouteImport.update({
+    id: '/construction-industrial-hub',
+    path: '/construction-industrial-hub',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppCreatorHubRoute = ShellAppCreatorHubRouteImport.update({
   id: '/creator-hub',
   path: '/creator-hub',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppCreatorMarketplaceRoute =
+  ShellAppCreatorMarketplaceRouteImport.update({
+    id: '/creator-marketplace',
+    path: '/creator-marketplace',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppCrmRoute = ShellAppCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -491,6 +531,11 @@ const ShellAppDocumentsRoute = ShellAppDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppDropshippingHubRoute = ShellAppDropshippingHubRouteImport.update({
+  id: '/dropshipping-hub',
+  path: '/dropshipping-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppFastTrackRoute = ShellAppFastTrackRouteImport.update({
   id: '/fast-track',
   path: '/fast-track',
@@ -521,9 +566,19 @@ const ShellAppGameFoundryRoute = ShellAppGameFoundryRouteImport.update({
   path: '/game-foundry',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppHealthFitnessRoute = ShellAppHealthFitnessRouteImport.update({
+  id: '/health-fitness',
+  path: '/health-fitness',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppHtmlStudioRoute = ShellAppHtmlStudioRouteImport.update({
   id: '/html-studio',
   path: '/html-studio',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppIndustryHubRoute = ShellAppIndustryHubRouteImport.update({
+  id: '/industry-hub',
+  path: '/industry-hub',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppIntegrationsRoute = ShellAppIntegrationsRouteImport.update({
@@ -615,6 +670,16 @@ const ShellAppQuantStudioRoute = ShellAppQuantStudioRouteImport.update({
 const ShellAppRecallNotesRoute = ShellAppRecallNotesRouteImport.update({
   id: '/recall-notes',
   path: '/recall-notes',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppResearchRoute = ShellAppResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppRetailHubRoute = ShellAppRetailHubRouteImport.update({
+  id: '/retail-hub',
+  path: '/retail-hub',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppSearchRoute = ShellAppSearchRouteImport.update({
@@ -709,6 +774,11 @@ const ShellAppToolsFrameworkRoute = ShellAppToolsFrameworkRouteImport.update({
   path: '/tools-framework',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppTradingHubRoute = ShellAppTradingHubRouteImport.update({
+  id: '/trading-hub',
+  path: '/trading-hub',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppTrustedSocialVideoRoute =
   ShellAppTrustedSocialVideoRouteImport.update({
     id: '/trusted-social-video',
@@ -733,6 +803,11 @@ const ShellAppWebRoute = ShellAppWebRouteImport.update({
 const ShellAppWebIntelligenceRoute = ShellAppWebIntelligenceRouteImport.update({
   id: '/web-intelligence',
   path: '/web-intelligence',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppWebsiteStudioRoute = ShellAppWebsiteStudioRouteImport.update({
+  id: '/website-studio',
+  path: '/website-studio',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppWhatsappCrmRoute = ShellAppWhatsappCrmRouteImport.update({
@@ -765,6 +840,12 @@ const ApiAgentsSteerRoute = ApiAgentsSteerRouteImport.update({
   path: '/api/agents/steer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInternalDropshippingOpportunityMonitorRoute =
+  ApiInternalDropshippingOpportunityMonitorRouteImport.update({
+    id: '/api/internal/dropshipping-opportunity-monitor',
+    path: '/api/internal/dropshipping-opportunity-monitor',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalWebhookRetriesRoute =
   ApiInternalWebhookRetriesRouteImport.update({
     id: '/api/internal/webhook-retries',
@@ -852,6 +933,11 @@ const ShellAppCreatorsIdRoute = ShellAppCreatorsIdRouteImport.update({
   path: '/creators/$id',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppProjectsIdRoute = ShellAppProjectsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ShellAppProjectsRoute,
+} as any)
 const ApiPublicIntegrationsCallbackRoute =
   ApiPublicIntegrationsCallbackRouteImport.update({
     id: '/api/public/integrations/callback',
@@ -880,6 +966,12 @@ const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
     path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicRetailTwilioStatusRoute =
+  ApiPublicRetailTwilioStatusRouteImport.update({
+    id: '/api/public/retail/twilio-status',
+    path: '/api/public/retail/twilio-status',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicV1AgentsRoute = ApiPublicV1AgentsRouteImport.update({
@@ -922,6 +1014,24 @@ const ShellAppAgentsIdPlaygroundRoute =
     id: '/agents/$id/playground',
     path: '/agents/$id/playground',
     getParentRoute: () => ShellAppRoute,
+  } as any)
+const ApiPublicRetailTwilioVoiceIncomingRoute =
+  ApiPublicRetailTwilioVoiceIncomingRouteImport.update({
+    id: '/api/public/retail/twilio-voice/incoming',
+    path: '/api/public/retail/twilio-voice/incoming',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicRetailTwilioVoiceStatusRoute =
+  ApiPublicRetailTwilioVoiceStatusRouteImport.update({
+    id: '/api/public/retail/twilio-voice/status',
+    path: '/api/public/retail/twilio-voice/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicRetailTwilioVoiceTurnRoute =
+  ApiPublicRetailTwilioVoiceTurnRouteImport.update({
+    id: '/api/public/retail/twilio-voice/turn',
+    path: '/api/public/retail/twilio-voice/turn',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicV1AgentsIdRoute = ApiPublicV1AgentsIdRouteImport.update({
   id: '/$id',
@@ -991,8 +1101,12 @@ export interface FileRoutesByFullPath {
   '/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/code-explorer': typeof ShellAppCodeExplorerRoute
   '/commerce-studio': typeof ShellAppCommerceStudioRoute
+  '/company-hub': typeof ShellAppCompanyHubRoute
+  '/compliance-sentinel': typeof ShellAppComplianceSentinelRoute
   '/computer-control': typeof ShellAppComputerControlRoute
+  '/construction-industrial-hub': typeof ShellAppConstructionIndustrialHubRoute
   '/creator-hub': typeof ShellAppCreatorHubRoute
+  '/creator-marketplace': typeof ShellAppCreatorMarketplaceRoute
   '/crm': typeof ShellAppCrmRoute
   '/crm-studio': typeof ShellAppCrmStudioRoute
   '/dashboard': typeof ShellAppDashboardRoute
@@ -1004,13 +1118,16 @@ export interface FileRoutesByFullPath {
   '/discovery': typeof ShellAppDiscoveryRoute
   '/docs': typeof ShellAppDocsRoute
   '/documents': typeof ShellAppDocumentsRoute
+  '/dropshipping-hub': typeof ShellAppDropshippingHubRoute
   '/fast-track': typeof ShellAppFastTrackRoute
   '/files': typeof ShellAppFilesRoute
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
   '/game-foundry': typeof ShellAppGameFoundryRoute
+  '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
+  '/industry-hub': typeof ShellAppIndustryHubRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
   '/marketing': typeof ShellAppMarketingRoute
@@ -1025,10 +1142,12 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
-  '/projects': typeof ShellAppProjectsRoute
+  '/projects': typeof ShellAppProjectsRouteWithChildren
   '/prompts': typeof ShellAppPromptsRoute
   '/quant-studio': typeof ShellAppQuantStudioRoute
   '/recall-notes': typeof ShellAppRecallNotesRoute
+  '/research': typeof ShellAppResearchRoute
+  '/retail-hub': typeof ShellAppRetailHubRoute
   '/search': typeof ShellAppSearchRoute
   '/security': typeof ShellAppSecurityRoute
   '/seo-studio': typeof ShellAppSeoStudioRoute
@@ -1047,17 +1166,20 @@ export interface FileRoutesByFullPath {
   '/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/trading-hub': typeof ShellAppTradingHubRoute
   '/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/version-control': typeof ShellAppVersionControlRoute
   '/voice-studio': typeof ShellAppVoiceStudioRoute
   '/web': typeof ShellAppWebRoute
   '/web-intelligence': typeof ShellAppWebIntelligenceRoute
+  '/website-studio': typeof ShellAppWebsiteStudioRoute
   '/whatsapp-crm': typeof ShellAppWhatsappCrmRoute
   '/work-os': typeof ShellAppWorkOsRoute
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
+  '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
@@ -1072,11 +1194,13 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof ShellAppAdminUsersRoute
   '/agents/new': typeof ShellAppAgentsNewRoute
   '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/projects/$id': typeof ShellAppProjectsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
   '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/integrations/shopify-callback': typeof ApiPublicIntegrationsShopifyCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/retail/twilio-status': typeof ApiPublicRetailTwilioStatusRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
@@ -1086,6 +1210,9 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof ShellAppAdminIndexRoute
   '/agents/': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
+  '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
+  '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id/': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
@@ -1142,8 +1269,12 @@ export interface FileRoutesByTo {
   '/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/code-explorer': typeof ShellAppCodeExplorerRoute
   '/commerce-studio': typeof ShellAppCommerceStudioRoute
+  '/company-hub': typeof ShellAppCompanyHubRoute
+  '/compliance-sentinel': typeof ShellAppComplianceSentinelRoute
   '/computer-control': typeof ShellAppComputerControlRoute
+  '/construction-industrial-hub': typeof ShellAppConstructionIndustrialHubRoute
   '/creator-hub': typeof ShellAppCreatorHubRoute
+  '/creator-marketplace': typeof ShellAppCreatorMarketplaceRoute
   '/crm': typeof ShellAppCrmRoute
   '/crm-studio': typeof ShellAppCrmStudioRoute
   '/dashboard': typeof ShellAppDashboardRoute
@@ -1155,13 +1286,16 @@ export interface FileRoutesByTo {
   '/discovery': typeof ShellAppDiscoveryRoute
   '/docs': typeof ShellAppDocsRoute
   '/documents': typeof ShellAppDocumentsRoute
+  '/dropshipping-hub': typeof ShellAppDropshippingHubRoute
   '/fast-track': typeof ShellAppFastTrackRoute
   '/files': typeof ShellAppFilesRoute
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
   '/game-foundry': typeof ShellAppGameFoundryRoute
+  '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
+  '/industry-hub': typeof ShellAppIndustryHubRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
   '/marketing': typeof ShellAppMarketingRoute
@@ -1176,10 +1310,12 @@ export interface FileRoutesByTo {
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
-  '/projects': typeof ShellAppProjectsRoute
+  '/projects': typeof ShellAppProjectsRouteWithChildren
   '/prompts': typeof ShellAppPromptsRoute
   '/quant-studio': typeof ShellAppQuantStudioRoute
   '/recall-notes': typeof ShellAppRecallNotesRoute
+  '/research': typeof ShellAppResearchRoute
+  '/retail-hub': typeof ShellAppRetailHubRoute
   '/search': typeof ShellAppSearchRoute
   '/security': typeof ShellAppSecurityRoute
   '/seo-studio': typeof ShellAppSeoStudioRoute
@@ -1198,17 +1334,20 @@ export interface FileRoutesByTo {
   '/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/trading-hub': typeof ShellAppTradingHubRoute
   '/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/version-control': typeof ShellAppVersionControlRoute
   '/voice-studio': typeof ShellAppVoiceStudioRoute
   '/web': typeof ShellAppWebRoute
   '/web-intelligence': typeof ShellAppWebIntelligenceRoute
+  '/website-studio': typeof ShellAppWebsiteStudioRoute
   '/whatsapp-crm': typeof ShellAppWhatsappCrmRoute
   '/work-os': typeof ShellAppWorkOsRoute
   '/workflows': typeof ShellAppWorkflowsRoute
   '/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
+  '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
@@ -1223,11 +1362,13 @@ export interface FileRoutesByTo {
   '/admin/users': typeof ShellAppAdminUsersRoute
   '/agents/new': typeof ShellAppAgentsNewRoute
   '/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/projects/$id': typeof ShellAppProjectsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
   '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/integrations/shopify-callback': typeof ApiPublicIntegrationsShopifyCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/retail/twilio-status': typeof ApiPublicRetailTwilioStatusRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
@@ -1237,6 +1378,9 @@ export interface FileRoutesByTo {
   '/admin': typeof ShellAppAdminIndexRoute
   '/agents': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
+  '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
+  '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/agents/$id': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
@@ -1296,8 +1440,12 @@ export interface FileRoutesById {
   '/_shell/_app/cinema-studio': typeof ShellAppCinemaStudioRoute
   '/_shell/_app/code-explorer': typeof ShellAppCodeExplorerRoute
   '/_shell/_app/commerce-studio': typeof ShellAppCommerceStudioRoute
+  '/_shell/_app/company-hub': typeof ShellAppCompanyHubRoute
+  '/_shell/_app/compliance-sentinel': typeof ShellAppComplianceSentinelRoute
   '/_shell/_app/computer-control': typeof ShellAppComputerControlRoute
+  '/_shell/_app/construction-industrial-hub': typeof ShellAppConstructionIndustrialHubRoute
   '/_shell/_app/creator-hub': typeof ShellAppCreatorHubRoute
+  '/_shell/_app/creator-marketplace': typeof ShellAppCreatorMarketplaceRoute
   '/_shell/_app/crm': typeof ShellAppCrmRoute
   '/_shell/_app/crm-studio': typeof ShellAppCrmStudioRoute
   '/_shell/_app/dashboard': typeof ShellAppDashboardRoute
@@ -1309,13 +1457,16 @@ export interface FileRoutesById {
   '/_shell/_app/discovery': typeof ShellAppDiscoveryRoute
   '/_shell/_app/docs': typeof ShellAppDocsRoute
   '/_shell/_app/documents': typeof ShellAppDocumentsRoute
+  '/_shell/_app/dropshipping-hub': typeof ShellAppDropshippingHubRoute
   '/_shell/_app/fast-track': typeof ShellAppFastTrackRoute
   '/_shell/_app/files': typeof ShellAppFilesRoute
   '/_shell/_app/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/_shell/_app/finance': typeof ShellAppFinanceRoute
   '/_shell/_app/fitness-studio': typeof ShellAppFitnessStudioRoute
   '/_shell/_app/game-foundry': typeof ShellAppGameFoundryRoute
+  '/_shell/_app/health-fitness': typeof ShellAppHealthFitnessRoute
   '/_shell/_app/html-studio': typeof ShellAppHtmlStudioRoute
+  '/_shell/_app/industry-hub': typeof ShellAppIndustryHubRoute
   '/_shell/_app/integrations': typeof ShellAppIntegrationsRoute
   '/_shell/_app/knowledge': typeof ShellAppKnowledgeRoute
   '/_shell/_app/marketing': typeof ShellAppMarketingRoute
@@ -1330,10 +1481,12 @@ export interface FileRoutesById {
   '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
   '/_shell/_app/organisation': typeof ShellAppOrganisationRoute
   '/_shell/_app/product-analytics': typeof ShellAppProductAnalyticsRoute
-  '/_shell/_app/projects': typeof ShellAppProjectsRoute
+  '/_shell/_app/projects': typeof ShellAppProjectsRouteWithChildren
   '/_shell/_app/prompts': typeof ShellAppPromptsRoute
   '/_shell/_app/quant-studio': typeof ShellAppQuantStudioRoute
   '/_shell/_app/recall-notes': typeof ShellAppRecallNotesRoute
+  '/_shell/_app/research': typeof ShellAppResearchRoute
+  '/_shell/_app/retail-hub': typeof ShellAppRetailHubRoute
   '/_shell/_app/search': typeof ShellAppSearchRoute
   '/_shell/_app/security': typeof ShellAppSecurityRoute
   '/_shell/_app/seo-studio': typeof ShellAppSeoStudioRoute
@@ -1352,17 +1505,20 @@ export interface FileRoutesById {
   '/_shell/_app/three-d-studio': typeof ShellAppThreeDStudioRoute
   '/_shell/_app/tool-marketplace': typeof ShellAppToolMarketplaceRoute
   '/_shell/_app/tools-framework': typeof ShellAppToolsFrameworkRoute
+  '/_shell/_app/trading-hub': typeof ShellAppTradingHubRoute
   '/_shell/_app/trusted-social-video': typeof ShellAppTrustedSocialVideoRoute
   '/_shell/_app/version-control': typeof ShellAppVersionControlRoute
   '/_shell/_app/voice-studio': typeof ShellAppVoiceStudioRoute
   '/_shell/_app/web': typeof ShellAppWebRoute
   '/_shell/_app/web-intelligence': typeof ShellAppWebIntelligenceRoute
+  '/_shell/_app/website-studio': typeof ShellAppWebsiteStudioRoute
   '/_shell/_app/whatsapp-crm': typeof ShellAppWhatsappCrmRoute
   '/_shell/_app/work-os': typeof ShellAppWorkOsRoute
   '/_shell/_app/workflows': typeof ShellAppWorkflowsRoute
   '/_shell/_app/workforce': typeof ShellAppWorkforceRoute
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
+  '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
   '/_shell/_app/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
@@ -1377,11 +1533,13 @@ export interface FileRoutesById {
   '/_shell/_app/admin/users': typeof ShellAppAdminUsersRoute
   '/_shell/_app/agents/new': typeof ShellAppAgentsNewRoute
   '/_shell/_app/creators/$id': typeof ShellAppCreatorsIdRoute
+  '/_shell/_app/projects/$id': typeof ShellAppProjectsIdRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/github-callback': typeof ApiPublicIntegrationsGithubCallbackRoute
   '/api/public/integrations/nango-webhook': typeof ApiPublicIntegrationsNangoWebhookRoute
   '/api/public/integrations/shopify-callback': typeof ApiPublicIntegrationsShopifyCallbackRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/retail/twilio-status': typeof ApiPublicRetailTwilioStatusRoute
   '/api/public/v1/agents': typeof ApiPublicV1AgentsRouteWithChildren
   '/api/public/v1/marketplace': typeof ApiPublicV1MarketplaceRoute
   '/api/public/v1/tasks': typeof ApiPublicV1TasksRoute
@@ -1391,6 +1549,9 @@ export interface FileRoutesById {
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
   '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
   '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
+  '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
+  '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
   '/api/public/v1/agents/$id': typeof ApiPublicV1AgentsIdRouteWithChildren
   '/_shell/_app/agents/$id/': typeof ShellAppAgentsIdIndexRoute
   '/api/public/v1/agents/$id/run': typeof ApiPublicV1AgentsIdRunRoute
@@ -1449,8 +1610,12 @@ export interface FileRouteTypes {
     | '/cinema-studio'
     | '/code-explorer'
     | '/commerce-studio'
+    | '/company-hub'
+    | '/compliance-sentinel'
     | '/computer-control'
+    | '/construction-industrial-hub'
     | '/creator-hub'
+    | '/creator-marketplace'
     | '/crm'
     | '/crm-studio'
     | '/dashboard'
@@ -1462,13 +1627,16 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/docs'
     | '/documents'
+    | '/dropshipping-hub'
     | '/fast-track'
     | '/files'
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
     | '/game-foundry'
+    | '/health-fitness'
     | '/html-studio'
+    | '/industry-hub'
     | '/integrations'
     | '/knowledge'
     | '/marketing'
@@ -1487,6 +1655,8 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/quant-studio'
     | '/recall-notes'
+    | '/research'
+    | '/retail-hub'
     | '/search'
     | '/security'
     | '/seo-studio'
@@ -1505,17 +1675,20 @@ export interface FileRouteTypes {
     | '/three-d-studio'
     | '/tool-marketplace'
     | '/tools-framework'
+    | '/trading-hub'
     | '/trusted-social-video'
     | '/version-control'
     | '/voice-studio'
     | '/web'
     | '/web-intelligence'
+    | '/website-studio'
     | '/whatsapp-crm'
     | '/work-os'
     | '/workflows'
     | '/workforce'
     | '/api/agents/run'
     | '/api/agents/steer'
+    | '/api/internal/dropshipping-opportunity-monitor'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
     | '/admin/audit-logs'
@@ -1530,11 +1703,13 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/new'
     | '/creators/$id'
+    | '/projects/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
     | '/api/public/integrations/nango-webhook'
     | '/api/public/integrations/shopify-callback'
     | '/api/public/payments/webhook'
+    | '/api/public/retail/twilio-status'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
@@ -1544,6 +1719,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/agents/'
     | '/agents/$id/playground'
+    | '/api/public/retail/twilio-voice/incoming'
+    | '/api/public/retail/twilio-voice/status'
+    | '/api/public/retail/twilio-voice/turn'
     | '/api/public/v1/agents/$id'
     | '/agents/$id/'
     | '/api/public/v1/agents/$id/run'
@@ -1600,8 +1778,12 @@ export interface FileRouteTypes {
     | '/cinema-studio'
     | '/code-explorer'
     | '/commerce-studio'
+    | '/company-hub'
+    | '/compliance-sentinel'
     | '/computer-control'
+    | '/construction-industrial-hub'
     | '/creator-hub'
+    | '/creator-marketplace'
     | '/crm'
     | '/crm-studio'
     | '/dashboard'
@@ -1613,13 +1795,16 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/docs'
     | '/documents'
+    | '/dropshipping-hub'
     | '/fast-track'
     | '/files'
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
     | '/game-foundry'
+    | '/health-fitness'
     | '/html-studio'
+    | '/industry-hub'
     | '/integrations'
     | '/knowledge'
     | '/marketing'
@@ -1638,6 +1823,8 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/quant-studio'
     | '/recall-notes'
+    | '/research'
+    | '/retail-hub'
     | '/search'
     | '/security'
     | '/seo-studio'
@@ -1656,17 +1843,20 @@ export interface FileRouteTypes {
     | '/three-d-studio'
     | '/tool-marketplace'
     | '/tools-framework'
+    | '/trading-hub'
     | '/trusted-social-video'
     | '/version-control'
     | '/voice-studio'
     | '/web'
     | '/web-intelligence'
+    | '/website-studio'
     | '/whatsapp-crm'
     | '/work-os'
     | '/workflows'
     | '/workforce'
     | '/api/agents/run'
     | '/api/agents/steer'
+    | '/api/internal/dropshipping-opportunity-monitor'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
     | '/admin/audit-logs'
@@ -1681,11 +1871,13 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/new'
     | '/creators/$id'
+    | '/projects/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
     | '/api/public/integrations/nango-webhook'
     | '/api/public/integrations/shopify-callback'
     | '/api/public/payments/webhook'
+    | '/api/public/retail/twilio-status'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
@@ -1695,6 +1887,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/agents'
     | '/agents/$id/playground'
+    | '/api/public/retail/twilio-voice/incoming'
+    | '/api/public/retail/twilio-voice/status'
+    | '/api/public/retail/twilio-voice/turn'
     | '/api/public/v1/agents/$id'
     | '/agents/$id'
     | '/api/public/v1/agents/$id/run'
@@ -1753,8 +1948,12 @@ export interface FileRouteTypes {
     | '/_shell/_app/cinema-studio'
     | '/_shell/_app/code-explorer'
     | '/_shell/_app/commerce-studio'
+    | '/_shell/_app/company-hub'
+    | '/_shell/_app/compliance-sentinel'
     | '/_shell/_app/computer-control'
+    | '/_shell/_app/construction-industrial-hub'
     | '/_shell/_app/creator-hub'
+    | '/_shell/_app/creator-marketplace'
     | '/_shell/_app/crm'
     | '/_shell/_app/crm-studio'
     | '/_shell/_app/dashboard'
@@ -1766,13 +1965,16 @@ export interface FileRouteTypes {
     | '/_shell/_app/discovery'
     | '/_shell/_app/docs'
     | '/_shell/_app/documents'
+    | '/_shell/_app/dropshipping-hub'
     | '/_shell/_app/fast-track'
     | '/_shell/_app/files'
     | '/_shell/_app/files-analysis'
     | '/_shell/_app/finance'
     | '/_shell/_app/fitness-studio'
     | '/_shell/_app/game-foundry'
+    | '/_shell/_app/health-fitness'
     | '/_shell/_app/html-studio'
+    | '/_shell/_app/industry-hub'
     | '/_shell/_app/integrations'
     | '/_shell/_app/knowledge'
     | '/_shell/_app/marketing'
@@ -1791,6 +1993,8 @@ export interface FileRouteTypes {
     | '/_shell/_app/prompts'
     | '/_shell/_app/quant-studio'
     | '/_shell/_app/recall-notes'
+    | '/_shell/_app/research'
+    | '/_shell/_app/retail-hub'
     | '/_shell/_app/search'
     | '/_shell/_app/security'
     | '/_shell/_app/seo-studio'
@@ -1809,17 +2013,20 @@ export interface FileRouteTypes {
     | '/_shell/_app/three-d-studio'
     | '/_shell/_app/tool-marketplace'
     | '/_shell/_app/tools-framework'
+    | '/_shell/_app/trading-hub'
     | '/_shell/_app/trusted-social-video'
     | '/_shell/_app/version-control'
     | '/_shell/_app/voice-studio'
     | '/_shell/_app/web'
     | '/_shell/_app/web-intelligence'
+    | '/_shell/_app/website-studio'
     | '/_shell/_app/whatsapp-crm'
     | '/_shell/_app/work-os'
     | '/_shell/_app/workflows'
     | '/_shell/_app/workforce'
     | '/api/agents/run'
     | '/api/agents/steer'
+    | '/api/internal/dropshipping-opportunity-monitor'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
     | '/_shell/_app/admin/audit-logs'
@@ -1834,11 +2041,13 @@ export interface FileRouteTypes {
     | '/_shell/_app/admin/users'
     | '/_shell/_app/agents/new'
     | '/_shell/_app/creators/$id'
+    | '/_shell/_app/projects/$id'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/github-callback'
     | '/api/public/integrations/nango-webhook'
     | '/api/public/integrations/shopify-callback'
     | '/api/public/payments/webhook'
+    | '/api/public/retail/twilio-status'
     | '/api/public/v1/agents'
     | '/api/public/v1/marketplace'
     | '/api/public/v1/tasks'
@@ -1848,6 +2057,9 @@ export interface FileRouteTypes {
     | '/_shell/_app/admin/'
     | '/_shell/_app/agents/'
     | '/_shell/_app/agents/$id/playground'
+    | '/api/public/retail/twilio-voice/incoming'
+    | '/api/public/retail/twilio-voice/status'
+    | '/api/public/retail/twilio-voice/turn'
     | '/api/public/v1/agents/$id'
     | '/_shell/_app/agents/$id/'
     | '/api/public/v1/agents/$id/run'
@@ -1886,6 +2098,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiAgentsRunRoute: typeof ApiAgentsRunRoute
   ApiAgentsSteerRoute: typeof ApiAgentsSteerRoute
+  ApiInternalDropshippingOpportunityMonitorRoute: typeof ApiInternalDropshippingOpportunityMonitorRoute
   ApiInternalWebhookRetriesRoute: typeof ApiInternalWebhookRetriesRoute
   ApiInternalWorkflowRunsRoute: typeof ApiInternalWorkflowRunsRoute
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
@@ -1893,12 +2106,16 @@ export interface RootRouteChildren {
   ApiPublicIntegrationsNangoWebhookRoute: typeof ApiPublicIntegrationsNangoWebhookRoute
   ApiPublicIntegrationsShopifyCallbackRoute: typeof ApiPublicIntegrationsShopifyCallbackRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
+  ApiPublicRetailTwilioStatusRoute: typeof ApiPublicRetailTwilioStatusRoute
   ApiPublicV1AgentsRoute: typeof ApiPublicV1AgentsRouteWithChildren
   ApiPublicV1MarketplaceRoute: typeof ApiPublicV1MarketplaceRoute
   ApiPublicV1TasksRoute: typeof ApiPublicV1TasksRoute
   ApiPublicV1UsageRoute: typeof ApiPublicV1UsageRoute
   ApiPublicV1WorkflowsRoute: typeof ApiPublicV1WorkflowsRouteWithChildren
   ApiPublicV1WorkforcesRoute: typeof ApiPublicV1WorkforcesRoute
+  ApiPublicRetailTwilioVoiceIncomingRoute: typeof ApiPublicRetailTwilioVoiceIncomingRoute
+  ApiPublicRetailTwilioVoiceStatusRoute: typeof ApiPublicRetailTwilioVoiceStatusRoute
+  ApiPublicRetailTwilioVoiceTurnRoute: typeof ApiPublicRetailTwilioVoiceTurnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2267,6 +2484,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppCommerceStudioRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/company-hub': {
+      id: '/_shell/_app/company-hub'
+      path: '/company-hub'
+      fullPath: '/company-hub'
+      preLoaderRoute: typeof ShellAppCompanyHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/compliance-sentinel': {
+      id: '/_shell/_app/compliance-sentinel'
+      path: '/compliance-sentinel'
+      fullPath: '/compliance-sentinel'
+      preLoaderRoute: typeof ShellAppComplianceSentinelRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/computer-control': {
       id: '/_shell/_app/computer-control'
       path: '/computer-control'
@@ -2274,11 +2505,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppComputerControlRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/construction-industrial-hub': {
+      id: '/_shell/_app/construction-industrial-hub'
+      path: '/construction-industrial-hub'
+      fullPath: '/construction-industrial-hub'
+      preLoaderRoute: typeof ShellAppConstructionIndustrialHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/creator-hub': {
       id: '/_shell/_app/creator-hub'
       path: '/creator-hub'
       fullPath: '/creator-hub'
       preLoaderRoute: typeof ShellAppCreatorHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/creator-marketplace': {
+      id: '/_shell/_app/creator-marketplace'
+      path: '/creator-marketplace'
+      fullPath: '/creator-marketplace'
+      preLoaderRoute: typeof ShellAppCreatorMarketplaceRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/crm': {
@@ -2358,6 +2603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppDocumentsRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/dropshipping-hub': {
+      id: '/_shell/_app/dropshipping-hub'
+      path: '/dropshipping-hub'
+      fullPath: '/dropshipping-hub'
+      preLoaderRoute: typeof ShellAppDropshippingHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/fast-track': {
       id: '/_shell/_app/fast-track'
       path: '/fast-track'
@@ -2400,11 +2652,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppGameFoundryRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/health-fitness': {
+      id: '/_shell/_app/health-fitness'
+      path: '/health-fitness'
+      fullPath: '/health-fitness'
+      preLoaderRoute: typeof ShellAppHealthFitnessRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/html-studio': {
       id: '/_shell/_app/html-studio'
       path: '/html-studio'
       fullPath: '/html-studio'
       preLoaderRoute: typeof ShellAppHtmlStudioRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/industry-hub': {
+      id: '/_shell/_app/industry-hub'
+      path: '/industry-hub'
+      fullPath: '/industry-hub'
+      preLoaderRoute: typeof ShellAppIndustryHubRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/integrations': {
@@ -2533,6 +2799,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppRecallNotesRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/research': {
+      id: '/_shell/_app/research'
+      path: '/research'
+      fullPath: '/research'
+      preLoaderRoute: typeof ShellAppResearchRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/retail-hub': {
+      id: '/_shell/_app/retail-hub'
+      path: '/retail-hub'
+      fullPath: '/retail-hub'
+      preLoaderRoute: typeof ShellAppRetailHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/search': {
       id: '/_shell/_app/search'
       path: '/search'
@@ -2659,6 +2939,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppToolsFrameworkRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/trading-hub': {
+      id: '/_shell/_app/trading-hub'
+      path: '/trading-hub'
+      fullPath: '/trading-hub'
+      preLoaderRoute: typeof ShellAppTradingHubRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/trusted-social-video': {
       id: '/_shell/_app/trusted-social-video'
       path: '/trusted-social-video'
@@ -2692,6 +2979,13 @@ declare module '@tanstack/react-router' {
       path: '/web-intelligence'
       fullPath: '/web-intelligence'
       preLoaderRoute: typeof ShellAppWebIntelligenceRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/website-studio': {
+      id: '/_shell/_app/website-studio'
+      path: '/website-studio'
+      fullPath: '/website-studio'
+      preLoaderRoute: typeof ShellAppWebsiteStudioRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/whatsapp-crm': {
@@ -2734,6 +3028,13 @@ declare module '@tanstack/react-router' {
       path: '/api/agents/steer'
       fullPath: '/api/agents/steer'
       preLoaderRoute: typeof ApiAgentsSteerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/internal/dropshipping-opportunity-monitor': {
+      id: '/api/internal/dropshipping-opportunity-monitor'
+      path: '/api/internal/dropshipping-opportunity-monitor'
+      fullPath: '/api/internal/dropshipping-opportunity-monitor'
+      preLoaderRoute: typeof ApiInternalDropshippingOpportunityMonitorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/internal/webhook-retries': {
@@ -2848,6 +3149,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppCreatorsIdRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/projects/$id': {
+      id: '/_shell/_app/projects/$id'
+      path: '/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ShellAppProjectsIdRouteImport
+      parentRoute: typeof ShellAppProjectsRoute
+    }
     '/api/public/integrations/callback': {
       id: '/api/public/integrations/callback'
       path: '/api/public/integrations/callback'
@@ -2881,6 +3189,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/payments/webhook'
       fullPath: '/api/public/payments/webhook'
       preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/retail/twilio-status': {
+      id: '/api/public/retail/twilio-status'
+      path: '/api/public/retail/twilio-status'
+      fullPath: '/api/public/retail/twilio-status'
+      preLoaderRoute: typeof ApiPublicRetailTwilioStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/v1/agents': {
@@ -2939,6 +3254,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppAgentsIdPlaygroundRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/api/public/retail/twilio-voice/incoming': {
+      id: '/api/public/retail/twilio-voice/incoming'
+      path: '/api/public/retail/twilio-voice/incoming'
+      fullPath: '/api/public/retail/twilio-voice/incoming'
+      preLoaderRoute: typeof ApiPublicRetailTwilioVoiceIncomingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/retail/twilio-voice/status': {
+      id: '/api/public/retail/twilio-voice/status'
+      path: '/api/public/retail/twilio-voice/status'
+      fullPath: '/api/public/retail/twilio-voice/status'
+      preLoaderRoute: typeof ApiPublicRetailTwilioVoiceStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/retail/twilio-voice/turn': {
+      id: '/api/public/retail/twilio-voice/turn'
+      path: '/api/public/retail/twilio-voice/turn'
+      fullPath: '/api/public/retail/twilio-voice/turn'
+      preLoaderRoute: typeof ApiPublicRetailTwilioVoiceTurnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/agents/$id': {
       id: '/api/public/v1/agents/$id'
       path: '/$id'
@@ -2963,6 +3299,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ShellAppProjectsRouteChildren {
+  ShellAppProjectsIdRoute: typeof ShellAppProjectsIdRoute
+}
+
+const ShellAppProjectsRouteChildren: ShellAppProjectsRouteChildren = {
+  ShellAppProjectsIdRoute: ShellAppProjectsIdRoute,
+}
+
+const ShellAppProjectsRouteWithChildren =
+  ShellAppProjectsRoute._addFileChildren(ShellAppProjectsRouteChildren)
+
 interface ShellAppRouteChildren {
   ShellAppAgentBuilderRoute: typeof ShellAppAgentBuilderRoute
   ShellAppAgentMarketplaceRoute: typeof ShellAppAgentMarketplaceRoute
@@ -2986,8 +3333,12 @@ interface ShellAppRouteChildren {
   ShellAppCinemaStudioRoute: typeof ShellAppCinemaStudioRoute
   ShellAppCodeExplorerRoute: typeof ShellAppCodeExplorerRoute
   ShellAppCommerceStudioRoute: typeof ShellAppCommerceStudioRoute
+  ShellAppCompanyHubRoute: typeof ShellAppCompanyHubRoute
+  ShellAppComplianceSentinelRoute: typeof ShellAppComplianceSentinelRoute
   ShellAppComputerControlRoute: typeof ShellAppComputerControlRoute
+  ShellAppConstructionIndustrialHubRoute: typeof ShellAppConstructionIndustrialHubRoute
   ShellAppCreatorHubRoute: typeof ShellAppCreatorHubRoute
+  ShellAppCreatorMarketplaceRoute: typeof ShellAppCreatorMarketplaceRoute
   ShellAppCrmRoute: typeof ShellAppCrmRoute
   ShellAppCrmStudioRoute: typeof ShellAppCrmStudioRoute
   ShellAppDashboardRoute: typeof ShellAppDashboardRoute
@@ -2999,13 +3350,16 @@ interface ShellAppRouteChildren {
   ShellAppDiscoveryRoute: typeof ShellAppDiscoveryRoute
   ShellAppDocsRoute: typeof ShellAppDocsRoute
   ShellAppDocumentsRoute: typeof ShellAppDocumentsRoute
+  ShellAppDropshippingHubRoute: typeof ShellAppDropshippingHubRoute
   ShellAppFastTrackRoute: typeof ShellAppFastTrackRoute
   ShellAppFilesRoute: typeof ShellAppFilesRoute
   ShellAppFilesAnalysisRoute: typeof ShellAppFilesAnalysisRoute
   ShellAppFinanceRoute: typeof ShellAppFinanceRoute
   ShellAppFitnessStudioRoute: typeof ShellAppFitnessStudioRoute
   ShellAppGameFoundryRoute: typeof ShellAppGameFoundryRoute
+  ShellAppHealthFitnessRoute: typeof ShellAppHealthFitnessRoute
   ShellAppHtmlStudioRoute: typeof ShellAppHtmlStudioRoute
+  ShellAppIndustryHubRoute: typeof ShellAppIndustryHubRoute
   ShellAppIntegrationsRoute: typeof ShellAppIntegrationsRoute
   ShellAppKnowledgeRoute: typeof ShellAppKnowledgeRoute
   ShellAppMarketingRoute: typeof ShellAppMarketingRoute
@@ -3020,10 +3374,12 @@ interface ShellAppRouteChildren {
   ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
   ShellAppOrganisationRoute: typeof ShellAppOrganisationRoute
   ShellAppProductAnalyticsRoute: typeof ShellAppProductAnalyticsRoute
-  ShellAppProjectsRoute: typeof ShellAppProjectsRoute
+  ShellAppProjectsRoute: typeof ShellAppProjectsRouteWithChildren
   ShellAppPromptsRoute: typeof ShellAppPromptsRoute
   ShellAppQuantStudioRoute: typeof ShellAppQuantStudioRoute
   ShellAppRecallNotesRoute: typeof ShellAppRecallNotesRoute
+  ShellAppResearchRoute: typeof ShellAppResearchRoute
+  ShellAppRetailHubRoute: typeof ShellAppRetailHubRoute
   ShellAppSearchRoute: typeof ShellAppSearchRoute
   ShellAppSecurityRoute: typeof ShellAppSecurityRoute
   ShellAppSeoStudioRoute: typeof ShellAppSeoStudioRoute
@@ -3042,11 +3398,13 @@ interface ShellAppRouteChildren {
   ShellAppThreeDStudioRoute: typeof ShellAppThreeDStudioRoute
   ShellAppToolMarketplaceRoute: typeof ShellAppToolMarketplaceRoute
   ShellAppToolsFrameworkRoute: typeof ShellAppToolsFrameworkRoute
+  ShellAppTradingHubRoute: typeof ShellAppTradingHubRoute
   ShellAppTrustedSocialVideoRoute: typeof ShellAppTrustedSocialVideoRoute
   ShellAppVersionControlRoute: typeof ShellAppVersionControlRoute
   ShellAppVoiceStudioRoute: typeof ShellAppVoiceStudioRoute
   ShellAppWebRoute: typeof ShellAppWebRoute
   ShellAppWebIntelligenceRoute: typeof ShellAppWebIntelligenceRoute
+  ShellAppWebsiteStudioRoute: typeof ShellAppWebsiteStudioRoute
   ShellAppWhatsappCrmRoute: typeof ShellAppWhatsappCrmRoute
   ShellAppWorkOsRoute: typeof ShellAppWorkOsRoute
   ShellAppWorkflowsRoute: typeof ShellAppWorkflowsRoute
@@ -3092,8 +3450,13 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppCinemaStudioRoute: ShellAppCinemaStudioRoute,
   ShellAppCodeExplorerRoute: ShellAppCodeExplorerRoute,
   ShellAppCommerceStudioRoute: ShellAppCommerceStudioRoute,
+  ShellAppCompanyHubRoute: ShellAppCompanyHubRoute,
+  ShellAppComplianceSentinelRoute: ShellAppComplianceSentinelRoute,
   ShellAppComputerControlRoute: ShellAppComputerControlRoute,
+  ShellAppConstructionIndustrialHubRoute:
+    ShellAppConstructionIndustrialHubRoute,
   ShellAppCreatorHubRoute: ShellAppCreatorHubRoute,
+  ShellAppCreatorMarketplaceRoute: ShellAppCreatorMarketplaceRoute,
   ShellAppCrmRoute: ShellAppCrmRoute,
   ShellAppCrmStudioRoute: ShellAppCrmStudioRoute,
   ShellAppDashboardRoute: ShellAppDashboardRoute,
@@ -3105,13 +3468,16 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppDiscoveryRoute: ShellAppDiscoveryRoute,
   ShellAppDocsRoute: ShellAppDocsRoute,
   ShellAppDocumentsRoute: ShellAppDocumentsRoute,
+  ShellAppDropshippingHubRoute: ShellAppDropshippingHubRoute,
   ShellAppFastTrackRoute: ShellAppFastTrackRoute,
   ShellAppFilesRoute: ShellAppFilesRoute,
   ShellAppFilesAnalysisRoute: ShellAppFilesAnalysisRoute,
   ShellAppFinanceRoute: ShellAppFinanceRoute,
   ShellAppFitnessStudioRoute: ShellAppFitnessStudioRoute,
   ShellAppGameFoundryRoute: ShellAppGameFoundryRoute,
+  ShellAppHealthFitnessRoute: ShellAppHealthFitnessRoute,
   ShellAppHtmlStudioRoute: ShellAppHtmlStudioRoute,
+  ShellAppIndustryHubRoute: ShellAppIndustryHubRoute,
   ShellAppIntegrationsRoute: ShellAppIntegrationsRoute,
   ShellAppKnowledgeRoute: ShellAppKnowledgeRoute,
   ShellAppMarketingRoute: ShellAppMarketingRoute,
@@ -3126,10 +3492,12 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppNotificationsRoute: ShellAppNotificationsRoute,
   ShellAppOrganisationRoute: ShellAppOrganisationRoute,
   ShellAppProductAnalyticsRoute: ShellAppProductAnalyticsRoute,
-  ShellAppProjectsRoute: ShellAppProjectsRoute,
+  ShellAppProjectsRoute: ShellAppProjectsRouteWithChildren,
   ShellAppPromptsRoute: ShellAppPromptsRoute,
   ShellAppQuantStudioRoute: ShellAppQuantStudioRoute,
   ShellAppRecallNotesRoute: ShellAppRecallNotesRoute,
+  ShellAppResearchRoute: ShellAppResearchRoute,
+  ShellAppRetailHubRoute: ShellAppRetailHubRoute,
   ShellAppSearchRoute: ShellAppSearchRoute,
   ShellAppSecurityRoute: ShellAppSecurityRoute,
   ShellAppSeoStudioRoute: ShellAppSeoStudioRoute,
@@ -3148,11 +3516,13 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppThreeDStudioRoute: ShellAppThreeDStudioRoute,
   ShellAppToolMarketplaceRoute: ShellAppToolMarketplaceRoute,
   ShellAppToolsFrameworkRoute: ShellAppToolsFrameworkRoute,
+  ShellAppTradingHubRoute: ShellAppTradingHubRoute,
   ShellAppTrustedSocialVideoRoute: ShellAppTrustedSocialVideoRoute,
   ShellAppVersionControlRoute: ShellAppVersionControlRoute,
   ShellAppVoiceStudioRoute: ShellAppVoiceStudioRoute,
   ShellAppWebRoute: ShellAppWebRoute,
   ShellAppWebIntelligenceRoute: ShellAppWebIntelligenceRoute,
+  ShellAppWebsiteStudioRoute: ShellAppWebsiteStudioRoute,
   ShellAppWhatsappCrmRoute: ShellAppWhatsappCrmRoute,
   ShellAppWorkOsRoute: ShellAppWorkOsRoute,
   ShellAppWorkflowsRoute: ShellAppWorkflowsRoute,
@@ -3255,6 +3625,8 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiAgentsRunRoute: ApiAgentsRunRoute,
   ApiAgentsSteerRoute: ApiAgentsSteerRoute,
+  ApiInternalDropshippingOpportunityMonitorRoute:
+    ApiInternalDropshippingOpportunityMonitorRoute,
   ApiInternalWebhookRetriesRoute: ApiInternalWebhookRetriesRoute,
   ApiInternalWorkflowRunsRoute: ApiInternalWorkflowRunsRoute,
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
@@ -3265,12 +3637,17 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntegrationsShopifyCallbackRoute:
     ApiPublicIntegrationsShopifyCallbackRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
+  ApiPublicRetailTwilioStatusRoute: ApiPublicRetailTwilioStatusRoute,
   ApiPublicV1AgentsRoute: ApiPublicV1AgentsRouteWithChildren,
   ApiPublicV1MarketplaceRoute: ApiPublicV1MarketplaceRoute,
   ApiPublicV1TasksRoute: ApiPublicV1TasksRoute,
   ApiPublicV1UsageRoute: ApiPublicV1UsageRoute,
   ApiPublicV1WorkflowsRoute: ApiPublicV1WorkflowsRouteWithChildren,
   ApiPublicV1WorkforcesRoute: ApiPublicV1WorkforcesRoute,
+  ApiPublicRetailTwilioVoiceIncomingRoute:
+    ApiPublicRetailTwilioVoiceIncomingRoute,
+  ApiPublicRetailTwilioVoiceStatusRoute: ApiPublicRetailTwilioVoiceStatusRoute,
+  ApiPublicRetailTwilioVoiceTurnRoute: ApiPublicRetailTwilioVoiceTurnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
