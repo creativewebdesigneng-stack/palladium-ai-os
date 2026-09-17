@@ -11,6 +11,7 @@ import {
 } from "./shopping.mjs";
 import { extractVerifiedProductPage } from "./product-page.mjs";
 import { filterStorageState } from "./storage-state.mjs";
+import { inspectPageReadOnly } from "./qa-inspection.mjs";
 
 const PORT = Number(process.env.PORT || process.env.BROWSER_WORKER_PORT || 8787);
 const TOKEN = process.env.BROWSER_WORKER_TOKEN || "";
@@ -218,6 +219,7 @@ async function performAction(session, action, params = {}) {
   switch (action) {
     case "navigate": return navigate(session, params);
     case "read": case "extract": return extract(session, params);
+    case "inspect_qa": return inspectPageReadOnly(session.page, (safeParams) => navigate(session, safeParams), params);
     case "click": await session.page.locator(safeSelector(params.selector)).first().click({ timeout: 10_000 }); return { url: session.page.url() };
     case "type": await session.page.locator(safeSelector(params.selector)).first().fill(safeText(params.text)); return { ok: true };
     case "scroll": { const amount = Math.max(1, Math.min(10, Number(params.amount || 1))); const dy = (params.direction === "up" ? -1 : 1) * 700 * amount; await session.page.evaluate((y) => window.scrollBy(0, y), dy); return { ok: true }; }
