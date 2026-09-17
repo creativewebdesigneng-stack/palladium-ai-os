@@ -89,7 +89,7 @@ export default function AgentDetail() {
           <CommandCenter agent={agent} onFinished={load} />
           <TaskHistory tasks={tasks} />
         </div>
-        <AgentConfigPanel agent={agent} />
+        <AgentConfigPanel agent={agent} onAgentUpdated={setAgent} />
       </div>
     </>
   );
