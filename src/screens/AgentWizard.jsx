@@ -4,10 +4,9 @@ import { createAgent as createAgentFn } from '@/lib/agents/agents.functions';
 import { describeError, persistedAgentId, singleFlight } from '@/lib/agents/agent-create-submit';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Brain, Wrench, Shield, User, MessageSquare, MemoryStick } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Wrench, Shield, User, MessageSquare, MemoryStick, BadgeCheck } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { WIZARD_MODELS, WIZARD_TOOLS, AVATAR_COLORS, DEPARTMENTS } from '@/components/agents/agentsData';
-
 
 const STEPS = [
   ['identity', 'Identity', User],
@@ -15,10 +14,9 @@ const STEPS = [
   ['instructions', 'Instructions', MessageSquare],
   ['memory', 'Memory', MemoryStick],
   ['tools', 'Tools', Wrench],
+  ['skills', 'Skills', BadgeCheck],
   ['permissions', 'Permissions', Shield],
 ];
-
-const TOOL_ICONS = Object.fromEntries(WIZARD_TOOLS.map(t => [t.id, t.icon]));
 
 function Field({ label, children }) {
   return <div><label className="text-xs text-zinc-400">{label}</label><div className="mt-1.5">{children}</div></div>;
@@ -35,6 +33,10 @@ function Toggle({ label, desc, on, onToggle }) {
   );
 }
 
+function splitList(value) {
+  return [...new Set(String(value || '').split(/[,;\n]+/).map(item => item.trim()).filter(Boolean))];
+}
+
 export default function AgentWizard() {
   const [step, setStep] = useState(0);
   const [d, setD] = useState({
@@ -43,6 +45,7 @@ export default function AgentWizard() {
     role: '', goals: '', rules: '', behaviour: '', personality: '',
     mem: { long: true, short: true, history: false, kb: true },
     tools: ['web', 'files'],
+    skills: '', connectors: '', certifications: '', experience: '', learnable: '',
     perms: { internet: true, files: true, automation: false, apis: false },
   });
 
@@ -78,6 +81,28 @@ export default function AgentWizard() {
     setCreating(true);
     try {
       const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'gpt-4o-mini';
+      const skills = splitList(d.skills);
+      const connectors = splitList(d.connectors);
+      const certifications = splitList(d.certifications).map(name => ({ name, status: 'declared' }));
+      const previousExperience = splitList(d.experience);
+      const learnableSkills = splitList(d.learnable);
+      const permissionScopes = Object.entries(d.perms).filter(([, enabled]) => enabled).map(([name]) => name);
+      const skillsRegistry = {
+        version: 1,
+        skills: skills.map(name => ({
+          name,
+          proficiency: 0.6,
+          learnable: true,
+          evidence: [{ kind: 'declared', verified: false, label: 'Configured in Agent Builder' }],
+        })),
+        tools: d.tools,
+        connectors,
+        permissions: permissionScopes,
+        certifications,
+        models: [modelName],
+        previous_experience: previousExperience,
+        learnable_skills: learnableSkills,
+      };
       const result = await submitCreate({
         name: d.name.trim(),
         description: d.desc,
@@ -86,6 +111,13 @@ export default function AgentWizard() {
         instructions: d.rules || d.behaviour || '',
         allowed_tools: d.tools,
         status: 'draft',
+        operating_profile: {
+          role: d.role || d.dept,
+          objective: d.goals || d.desc,
+          skills,
+          skills_registry: skillsRegistry,
+          verification_required: true,
+        },
         preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
       });
       const id = persistedAgentId(result);
@@ -107,12 +139,10 @@ export default function AgentWizard() {
     }
   };
 
-
   return (
     <>
-      <PageHeader eyebrow="AI" title="Agent Builder" description="Build an autonomous AI teammate in six steps." />
+      <PageHeader eyebrow="AI" title="Agent Builder" description="Build an autonomous AI teammate in seven steps." />
       <div className="mx-auto max-w-2xl">
-        {/* Stepper */}
         <div className="mb-6 flex items-center">
           {STEPS.map(([key, label, Icon], i) => (
             <div key={key} className="flex flex-1 items-center last:flex-none">
@@ -128,7 +158,6 @@ export default function AgentWizard() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[.035] p-6">
-          {/* Step 1 — Identity */}
           {step === 0 && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
@@ -137,9 +166,7 @@ export default function AgentWizard() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Agent name"><input value={d.name} onChange={e => set({ name: e.target.value, letter: (e.target.value[0] || 'A').toUpperCase() })} placeholder="e.g. Research Analyst" className={inputCls} /></Field>
-                <Field label="Department">
-                  <select value={d.dept} onChange={e => set({ dept: e.target.value })} className={inputCls}>{DEPARTMENTS.map(x => <option key={x}>{x}</option>)}</select>
-                </Field>
+                <Field label="Department"><select value={d.dept} onChange={e => set({ dept: e.target.value })} className={inputCls}>{DEPARTMENTS.map(x => <option key={x}>{x}</option>)}</select></Field>
               </div>
               <Field label="Description"><textarea value={d.desc} onChange={e => set({ desc: e.target.value })} placeholder="What does this agent do?" className={`${areaCls} h-20`} /></Field>
               <Field label="Avatar letter"><input value={d.letter} maxLength={2} onChange={e => set({ letter: e.target.value.toUpperCase() })} className={inputCls} /></Field>
@@ -147,7 +174,6 @@ export default function AgentWizard() {
             </div>
           )}
 
-          {/* Step 2 — Model */}
           {step === 1 && (
             <div className="space-y-4">
               <Field label="Choose AI model">
@@ -164,7 +190,6 @@ export default function AgentWizard() {
             </div>
           )}
 
-          {/* Step 3 — Instructions */}
           {step === 2 && (
             <div className="space-y-4">
               <Field label="Role"><textarea value={d.role} onChange={e => set({ role: e.target.value })} placeholder="e.g. You are a senior research analyst…" className={`${areaCls} h-16`} /></Field>
@@ -177,7 +202,6 @@ export default function AgentWizard() {
             </div>
           )}
 
-          {/* Step 4 — Memory */}
           {step === 3 && (
             <div className="space-y-3">
               <Toggle label="Long-term memory" desc="Persist facts across sessions" on={d.mem.long} onToggle={() => setMem('long')} />
@@ -187,7 +211,6 @@ export default function AgentWizard() {
             </div>
           )}
 
-          {/* Step 5 — Tools */}
           {step === 4 && (
             <div>
               <p className="mb-3 text-xs text-zinc-400">Select the tools this agent can use</p>
@@ -207,8 +230,20 @@ export default function AgentWizard() {
             </div>
           )}
 
-          {/* Step 6 — Permissions */}
           {step === 5 && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-violet-400/15 bg-violet-500/[.05] p-3 text-[11px] leading-5 text-zinc-400">
+                These fields describe capability for Blackstar's Universal Skills Registry. They help matching and discovery, but they never bypass live tools, connector access, approvals or permission checks.
+              </div>
+              <Field label="Core skills"><textarea value={d.skills} onChange={e => set({ skills: e.target.value })} placeholder="Research, financial modelling, TypeScript, customer support" className={`${areaCls} h-20`} /></Field>
+              <Field label="Connectors / services"><textarea value={d.connectors} onChange={e => set({ connectors: e.target.value })} placeholder="Shopify, GitHub, Slack, MCP server…" className={`${areaCls} h-16`} /></Field>
+              <Field label="Certifications"><textarea value={d.certifications} onChange={e => set({ certifications: e.target.value })} placeholder="Declared certifications or verified credentials can be attached later" className={`${areaCls} h-16`} /></Field>
+              <Field label="Previous experience"><textarea value={d.experience} onChange={e => set({ experience: e.target.value })} placeholder="Campaign analysis, ecommerce catalogues, production incident triage…" className={`${areaCls} h-16`} /></Field>
+              <Field label="Skills this agent can learn"><textarea value={d.learnable} onChange={e => set({ learnable: e.target.value })} placeholder="New CRM, advanced forecasting, another provider API…" className={`${areaCls} h-16`} /></Field>
+            </div>
+          )}
+
+          {step === 6 && (
             <div className="space-y-3">
               <Toggle label="Allow internet" desc="Agent may browse the web" on={d.perms.internet} onToggle={() => setPerm('internet')} />
               <Toggle label="Allow file access" desc="Read & write workspace files" on={d.perms.files} onToggle={() => setPerm('files')} />
@@ -219,6 +254,8 @@ export default function AgentWizard() {
                 <div className="space-y-1.5 text-xs text-zinc-400">
                   <p><span className="text-zinc-600">Name:</span> {d.name || '—'} · <span className="text-zinc-600">Dept:</span> {d.dept} · <span className="text-zinc-600">Model:</span> {WIZARD_MODELS.find(m => m.id === d.model)?.name}</p>
                   <p><span className="text-zinc-600">Tools:</span> {d.tools.map(t => WIZARD_TOOLS.find(x => x.id === t)?.name).join(', ') || '—'}</p>
+                  <p><span className="text-zinc-600">Skills:</span> {splitList(d.skills).join(', ') || '—'}</p>
+                  <p><span className="text-zinc-600">Connectors:</span> {splitList(d.connectors).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Memory:</span> {Object.entries(d.mem).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}</p>
                 </div>
               </div>
