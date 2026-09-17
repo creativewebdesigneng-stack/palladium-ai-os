@@ -1,5 +1,6 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
+import { captureVerifiedAgentSkillLearning } from './agent-skill-learning.server'
 import {
   buildBlackstarAstraRunCapabilityControl,
   renderBlackstarAstraRunCapabilityControl,
@@ -169,6 +170,7 @@ export async function executeAgentTask(args: {
     const output = outputText(task)
     if (!output) throw new RuntimeError('The agent could not produce a usable final deliverable. Please review its tools/model configuration and retry.', 'EMPTY_DELIVERABLE', 502)
     await captureVerifiedAgentExperience({ sb: args.sb as never, userId: args.userId, taskId: run.taskId })
+    await captureVerifiedAgentSkillLearning({ sb: args.sb as never, userId: args.userId, taskId: run.taskId })
     return { task, output }
   } catch (error) {
     if (run) {
