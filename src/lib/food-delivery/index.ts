@@ -10,3 +10,4 @@ export * from "./approval-bridge";
 export * from "./execution-evidence";
 export * from "./webhook-reconciliation";
 export * from "./availability";
+export * from "./runtime-gate";
