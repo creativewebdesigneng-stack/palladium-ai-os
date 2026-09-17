@@ -6,3 +6,4 @@ export * from "./location";
 export * from "./idempotency";
 export * from "./provider-adapter";
 export * from "./webhooks";
+export * from "./approval-bridge";
