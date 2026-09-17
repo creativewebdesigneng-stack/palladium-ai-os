@@ -60,11 +60,15 @@ export function buildFoodDeliveryApprovalDetails(input: {
 export function isFoodDeliveryApprovalDetails(value: unknown): value is FoodDeliveryApprovalDetails {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
-  return row.domain === FOOD_DELIVERY_APPROVAL_DOMAIN
-    && typeof row.provider === "string"
-    && typeof row.action === "string"
-    && Boolean(row.input && typeof row.input === "object" && !Array.isArray(row.input))
-    && typeof row.transport === "string" && row.transport.trim().length > 0
-    && typeof row.connection_id === "string" && row.connection_id.length > 0
-    && typeof row.request_id === "string" && row.request_id.length > 0;
+  const actionInput = row["input"];
+  const transport = row["transport"];
+  const connectionId = row["connection_id"];
+  const requestId = row["request_id"];
+  return row["domain"] === FOOD_DELIVERY_APPROVAL_DOMAIN
+    && typeof row["provider"] === "string"
+    && typeof row["action"] === "string"
+    && Boolean(actionInput && typeof actionInput === "object" && !Array.isArray(actionInput))
+    && typeof transport === "string" && transport.trim().length > 0
+    && typeof connectionId === "string" && connectionId.length > 0
+    && typeof requestId === "string" && requestId.length > 0;
 }
