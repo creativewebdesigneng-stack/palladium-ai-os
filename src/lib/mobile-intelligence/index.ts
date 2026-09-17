@@ -1,3 +1,4 @@
+export * from './approval';
 export * from './contracts';
 export * from './envelope';
 export * from './pairing';
