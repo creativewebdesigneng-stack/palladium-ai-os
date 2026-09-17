@@ -27,6 +27,34 @@ describe("Agent Spec v2", () => {
     expect(hasAgentSpecV2(profile)).toBe(true);
   });
 
+  it("persists and renders a universal skills registry inside the durable profile", () => {
+    const profile = normaliseOperatingProfile({
+      skills_registry: {
+        skills: [
+          {
+            name: "commerce automation",
+            proficiency: 0.9,
+            connectors: ["Shopify", "Etsy"],
+            evidence: [{ kind: "verified_task", verified: true, score: 0.95 }],
+          },
+        ],
+        tools: ["browser"],
+        connectors: ["Shopify", "Etsy", "MCP"],
+        permissions: ["orders:read"],
+        models: ["blackstar:astra"],
+        previous_experience: ["Verified storefront operations"],
+        learnable_skills: ["inventory forecasting"],
+      },
+    });
+
+    expect(profile.skills_registry?.skills[0]?.name).toBe("commerce automation");
+    expect(profile.skills_registry?.connectors).toEqual(["Shopify", "Etsy", "MCP"]);
+    expect(hasAgentSpecV2(profile)).toBe(true);
+    const prompt = renderOperatingProfilePrompt(profile);
+    expect(prompt).toContain("UNIVERSAL SKILLS REGISTRY");
+    expect(prompt).toContain("Registry metadata describes capability only");
+  });
+
   it("renders completion and verification rules into the runtime contract", () => {
     const profile = normaliseOperatingProfile({
       role: "Researcher",
