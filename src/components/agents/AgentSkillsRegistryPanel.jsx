@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BadgeCheck, BrainCircuit, Check, Pencil, Plug, ShieldCheck, Sparkles, Wrench, X } from 'lucide-react';
 import { updateAgent } from '@/lib/agents/agents.functions';
 import { effectiveAgentSkillsRegistry } from '@/lib/agents/agent-skills-registry';
@@ -42,26 +42,27 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
   const [savedAgent, setSavedAgent] = useState(agent);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState(() => draftFromRegistry(null));
   const { toast } = useToast();
 
   useEffect(() => { setSavedAgent(agent); }, [agent]);
   const currentAgent = savedAgent || agent;
   const legacySkills = currentAgent?.operating_profile?.skills || [];
   const tools = currentAgent?.allowed_tools || currentAgent?.tools || [];
-  const registry = useMemo(() => effectiveAgentSkillsRegistry({
+  const registry = effectiveAgentSkillsRegistry({
     registry: currentAgent?.operating_profile?.skills_registry,
     legacySkills,
     allowedTools: tools,
     modelProvider: currentAgent?.model_provider,
     model: currentAgent?.model,
-  }), [currentAgent, legacySkills, tools]);
-  const [draft, setDraft] = useState(() => draftFromRegistry(registry));
-
-  useEffect(() => {
-    if (!editing) setDraft(draftFromRegistry(registry));
-  }, [registry, editing]);
+  });
 
   if (!registry) return null;
+
+  const beginEdit = () => {
+    setDraft(draftFromRegistry(registry));
+    setEditing(true);
+  };
 
   const save = async () => {
     if (!currentAgent?.id || saving) return;
@@ -110,7 +111,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
         requires_approval: currentAgent.requires_approval,
         autonomy: currentAgent.autonomy,
         instructions: currentAgent.instructions || '',
-        allowed_tools: currentAgent.allowed_tools || [],
+        allowed_tools: currentAgent.allowed_tools || currentAgent.tools || [],
         preferences: currentAgent.preferences || {},
         status: currentAgent.status || 'draft',
         operating_profile: operatingProfile,
@@ -136,7 +137,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
         <div className="flex items-center gap-1.5">
           <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-zinc-500">v{registry.version}</span>
           {!editing ? (
-            <button type="button" onClick={() => setEditing(true)} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[.03] text-zinc-400 hover:text-white" aria-label="Edit skills registry"><Pencil className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={beginEdit} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[.03] text-zinc-400 hover:text-white" aria-label="Edit skills registry"><Pencil className="h-3.5 w-3.5" /></button>
           ) : null}
         </div>
       </div>
@@ -150,7 +151,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
           <textarea value={draft.learnable} onChange={e => setDraft(p => ({ ...p, learnable: e.target.value }))} placeholder="Skills this agent can learn" className={`${areaCls} h-14`} />
           <p className="text-[10px] leading-4 text-zinc-600">Existing verified evidence and verified certification state are preserved when the matching skill or certification remains in the list. New entries start as declared, not verified.</p>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => { setEditing(false); setDraft(draftFromRegistry(registry)); }} disabled={saving} className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-400 hover:text-white"><X className="h-3.5 w-3.5" />Cancel</button>
+            <button type="button" onClick={() => setEditing(false)} disabled={saving} className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-400 hover:text-white"><X className="h-3.5 w-3.5" />Cancel</button>
             <button type="button" onClick={save} disabled={saving} className="flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500 disabled:opacity-60"><Check className="h-3.5 w-3.5" />{saving ? 'Saving…' : 'Save'}</button>
           </div>
         </div>
