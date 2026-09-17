@@ -274,7 +274,7 @@ export function registrySearchText(registry: AgentSkillsRegistry | null | undefi
 }
 
 function skillEvidenceScore(skill: AgentSkillRecord): number {
-  const verifiedEvidence = (skill.evidence ?? []).filter((item) => item.verified);
+  const verifiedEvidence = (skill.evidence ?? []).filter((item) => item.verified && item.kind !== "verified_failure");
   const evidenceScore = verifiedEvidence.length
     ? verifiedEvidence.reduce((sum, item) => sum + (item.score ?? 0.75), 0) / verifiedEvidence.length
     : 0;
