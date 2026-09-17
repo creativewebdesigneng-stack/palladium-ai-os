@@ -22,6 +22,18 @@ import {
   listShopifyNangoCapabilities,
   prepareShopifyNangoAction,
 } from "./shopify-nango-actions.server";
+import {
+  executeEbayNangoAction,
+  isEbayNangoAction,
+  listEbayNangoCapabilities,
+  prepareEbayNangoAction,
+} from "./ebay-nango-actions.server";
+import {
+  executeWooCommerceNangoAction,
+  isWooCommerceNangoAction,
+  listWooCommerceNangoCapabilities,
+  prepareWooCommerceNangoAction,
+} from "./woocommerce-nango-actions.server";
 
 export type NangoActionRisk = "low" | "medium" | "high";
 
@@ -200,7 +212,11 @@ function mergeBuiltInCapabilities(
       ? listEtsyNangoCapabilities()
       : providerId === "shopify"
         ? listShopifyNangoCapabilities()
-        : [];
+        : providerId === "ebay"
+          ? listEbayNangoCapabilities()
+          : providerId === "woocommerce"
+            ? listWooCommerceNangoCapabilities()
+            : [];
   if (!builtIn.length) return advertised;
   const merged = new Map<string, NangoAgentCapability>();
   for (const capability of builtIn) merged.set(capability.action, capability);
@@ -299,6 +315,48 @@ export async function executeNangoAgentAction(input: {
       };
     }
   }
+  if (input.provider === "ebay" && isEbayNangoAction(input.action)) {
+    try {
+      const outcome = await executeEbayNangoAction({
+        userId: input.userId,
+        action: input.action,
+        actionInput: input.actionInput,
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return {
+        ok: true as const,
+        provider: "ebay",
+        result: sanitizeNangoActionOutput(outcome.result),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        provider: "ebay",
+        error: error instanceof Error ? error.message : "eBay proxy action execution failed.",
+      };
+    }
+  }
+  if (input.provider === "woocommerce" && isWooCommerceNangoAction(input.action)) {
+    try {
+      const outcome = await executeWooCommerceNangoAction({
+        userId: input.userId,
+        action: input.action,
+        actionInput: input.actionInput,
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return {
+        ok: true as const,
+        provider: "woocommerce",
+        result: sanitizeNangoActionOutput(outcome.result),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        provider: "woocommerce",
+        error: error instanceof Error ? error.message : "WooCommerce proxy action execution failed.",
+      };
+    }
+  }
   if (input.provider === "shopify" && isShopifyNangoAction(input.action)) {
     try {
       const outcome = await executeShopifyNangoAction({
@@ -355,6 +413,20 @@ export async function prepareNangoAgentAction(input: {
   assertSafeNangoActionInput(input.actionInput);
   if (input.provider === "etsy" && isEtsyNangoAction(input.action)) {
     return prepareEtsyNangoAction({
+      userId: input.userId,
+      action: input.action,
+      actionInput: input.actionInput,
+    });
+  }
+  if (input.provider === "ebay" && isEbayNangoAction(input.action)) {
+    return prepareEbayNangoAction({
+      userId: input.userId,
+      action: input.action,
+      actionInput: input.actionInput,
+    });
+  }
+  if (input.provider === "woocommerce" && isWooCommerceNangoAction(input.action)) {
+    return prepareWooCommerceNangoAction({
       userId: input.userId,
       action: input.action,
       actionInput: input.actionInput,
