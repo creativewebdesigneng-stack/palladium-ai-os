@@ -12,20 +12,19 @@ export interface MobilePlatformReport {
 export function normalizeMobilePlatformReport(
   report: MobilePlatformReport,
 ): MobileDeviceCapabilities {
-  return {
+  const normalized: MobileDeviceCapabilities = {
     platform: report.platform,
     osVersion: report.osVersion,
     nativeIntelligenceAvailable: report.nativeIntelligenceAvailable,
-    nativeProvider:
-      report.nativeProvider ??
-      (report.nativeIntelligenceAvailable
-        ? report.platform === 'ios'
-          ? 'apple-foundation-models'
-          : 'gemini-nano'
-        : undefined),
     capabilities: [...new Set(report.capabilities ?? [])],
     appActionsAvailable: report.appActionsAvailable === true,
   };
+  const provider = report.nativeProvider ??
+    (report.nativeIntelligenceAvailable
+      ? report.platform === 'ios' ? 'apple-foundation-models' : 'gemini-nano'
+      : undefined);
+  if (provider) normalized.nativeProvider = provider;
+  return normalized;
 }
 
 export function supportsNativeAppActions(device: MobileDeviceCapabilities): boolean {
