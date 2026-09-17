@@ -542,7 +542,7 @@ export async function runStep(args: {
       lastError = error;
       if (run) {
         await failRun({ userId: args.userId, run, error }).catch(() => undefined);
-        if (error instanceof RuntimeError && error.code === "VERIFICATION_FAILED") {
+        if (attempt === attemptsAllowed && error instanceof RuntimeError && error.code === "VERIFICATION_FAILED") {
           await captureVerifiedAgentSkillFailure({
             sb: args.sb as never,
             userId: args.userId,
