@@ -1,17 +1,14 @@
-import type { FoodDeliveryCapability, FoodDeliveryProviderId } from './contracts';
-
-export type FoodDeliveryActionRequest = {
-  capability: FoodDeliveryCapability;
-  connectionId: string;
-  requestId: string;
-  input: Record<string, unknown>;
-};
+import type {
+  FoodDeliveryActionRequest,
+  FoodDeliveryCapability,
+  FoodDeliveryProviderId,
+} from "./contracts";
 
 export type FoodDeliveryActionResult = {
   provider: FoodDeliveryProviderId;
   capability: FoodDeliveryCapability;
   providerResourceId?: string;
-  status: 'completed' | 'accepted' | 'pending';
+  status: "completed" | "accepted" | "pending";
   evidence: Record<string, unknown>;
 };
 
