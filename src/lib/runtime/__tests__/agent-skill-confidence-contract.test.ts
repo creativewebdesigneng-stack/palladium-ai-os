@@ -22,7 +22,7 @@ describe("verified skill confidence runtime contract", () => {
 
   it("captures negative skill evidence only behind VERIFICATION_FAILED in workforce runtime", () => {
     expect(workforceSource).toContain("captureVerifiedAgentSkillFailure");
-    expect(workforceSource).toContain('error.code === "VERIFICATION_FAILED"');
+    expect(workforceSource).toContain('attempt === attemptsAllowed && error instanceof RuntimeError && error.code === "VERIFICATION_FAILED"');
     expect(workforceSource.indexOf("await failRun(")).toBeLessThan(
       workforceSource.indexOf("await captureVerifiedAgentSkillFailure("),
     );

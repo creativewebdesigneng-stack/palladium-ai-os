@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, BrainCircuit, Check, Pencil, Plug, ShieldCheck, Sparkles, Wrench, X } from 'lucide-react';
+import { BadgeCheck, BrainCircuit, Check, Pencil, Plug, ShieldCheck, Sparkles, Target, Wrench, X } from 'lucide-react';
 import { updateAgent } from '@/lib/agents/agents.functions';
 import { effectiveAgentSkillsRegistry } from '@/lib/agents/agent-skills-registry';
+import { buildAgentSkillGapPlan } from '@/lib/agents/agent-skill-confidence';
 import { useToast } from '@/components/ui/use-toast';
 
 function Chip({ children, tone = 'default' }) {
@@ -59,6 +60,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
   });
 
   if (!registry) return null;
+  const developmentPlan = buildAgentSkillGapPlan(registry, 5);
 
   const beginEdit = () => {
     setDraft(draftFromRegistry(registry));
@@ -199,10 +201,19 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
           {registry.certifications?.length ? (
             <Section icon={BadgeCheck} title="Certifications"><div className="flex flex-wrap gap-1.5">{registry.certifications.map((item) => <Chip key={`${item.name}-${item.issuer || ''}`} tone={item.status === 'verified' ? 'verified' : 'default'}>{item.name} · {item.status}</Chip>)}</div></Section>
           ) : null}
-          {registry.learnable_skills?.length ? (
-            <Section icon={BrainCircuit} title="Learning gaps">
-              <div className="flex flex-wrap gap-1.5">{registry.learnable_skills.map((item) => <Chip key={item} tone="learning">{item}</Chip>)}</div>
-              <p className="mt-2 text-[10px] leading-4 text-zinc-600">Operator-declared skills awaiting verifier-backed execution evidence.</p>
+          {developmentPlan.length ? (
+            <Section icon={Target} title="Development priorities">
+              <div className="space-y-1.5">
+                {developmentPlan.map((gap) => (
+                  <div key={`${gap.kind}-${gap.skill}`} className="rounded-lg border border-white/8 bg-black/15 px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-zinc-300">{gap.skill}</span>
+                      <span className="text-[9px] uppercase tracking-[0.1em] text-violet-300">{gap.kind.replace('_', ' ')}</span>
+                    </div>
+                    <p className="mt-1 text-[10px] leading-4 text-zinc-600">{gap.reason}</p>
+                  </div>
+                ))}
+              </div>
             </Section>
           ) : null}
           {registry.permissions?.length ? (

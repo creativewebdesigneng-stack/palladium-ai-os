@@ -18,6 +18,13 @@ export type VerifiedSkillFailureResult = {
   reduced_skills: string[];
 };
 
+export type AgentSkillGap = {
+  skill: string;
+  kind: "revalidate" | "build_evidence" | "develop" | "learnable";
+  priority: number;
+  reason: string;
+};
+
 const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
 
 function clean(value: unknown, max: number) {
@@ -149,3 +156,70 @@ export function applyVerifiedSkillFailure(args: {
     reduced_skills: [...new Set(reduced)],
   };
 }
+
+/**
+ * Builds an operator-facing development plan from the same verified success /
+ * failure evidence used by skill confidence. This is advisory only: it never
+ * changes capabilities, permissions, approvals or delegation rights.
+ */
+export function buildAgentSkillGapPlan(
+  registry: AgentSkillsRegistry | null | undefined,
+  limit = 6,
+): AgentSkillGap[] {
+  if (!registry) return [];
+  const gaps: AgentSkillGap[] = [];
+
+  for (const skill of registry.skills) {
+    const failures = failureEvidence(skill).length;
+    const successes = (skill.evidence ?? []).filter((item) =>
+      item.kind === "verified_task" &&
+      item.verified &&
+      typeof item.reference === "string" &&
+      item.reference.length > 0,
+    ).length;
+    const certified = (skill.certifications ?? []).some((item) => item.status === "verified");
+
+    if (failures >= 2 && failures >= successes) {
+      gaps.push({
+        skill: skill.name,
+        kind: "revalidate",
+        priority: 100 + failures * 5,
+        reason: `${failures} verifier-confirmed failures need fresh successful evidence.`,
+      });
+      continue;
+    }
+    if (successes === 0) {
+      gaps.push({
+        skill: skill.name,
+        kind: "build_evidence",
+        priority: 80 + Math.round((1 - skill.proficiency) * 10),
+        reason: "Declared capability has no verified task evidence yet.",
+      });
+      continue;
+    }
+    if (skill.proficiency < 0.7 && !certified) {
+      gaps.push({
+        skill: skill.name,
+        kind: "develop",
+        priority: 60 + Math.round((0.7 - skill.proficiency) * 100),
+        reason: `Verified proficiency is ${Math.round(skill.proficiency * 100)}%; more successful evidence can strengthen it.`,
+      });
+    }
+  }
+
+  const known = new Set(registry.skills.map((skill) => key(skill.name)));
+  for (const skill of registry.learnable_skills ?? []) {
+    if (known.has(key(skill))) continue;
+    gaps.push({
+      skill,
+      kind: "learnable",
+      priority: 50,
+      reason: "Operator marked this capability as available to learn.",
+    });
+  }
+
+  return gaps
+    .sort((a, b) => b.priority - a.priority || a.skill.localeCompare(b.skill))
+    .slice(0, Math.min(Math.max(limit, 1), 12));
+}
+
