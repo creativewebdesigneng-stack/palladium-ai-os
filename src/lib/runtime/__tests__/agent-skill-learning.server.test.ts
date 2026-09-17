@@ -82,7 +82,7 @@ describe("verified skill learning persistence", () => {
       userId: "user-1",
       taskId: "task-1",
     });
-    const repeated = sb.tables["personal_agents"]?.[0]?.operating_profile?.skills_registry?.skills?.[0]?.evidence
+    const repeated = sb.tables["personal_agents"]?.[0]?.["operating_profile"]?.skills_registry?.skills?.[0]?.evidence
       ?.filter((item: { reference?: string }) => item.reference === "task:task-1");
     expect(repeated).toHaveLength(1);
   });
@@ -101,6 +101,6 @@ describe("verified skill learning persistence", () => {
     });
 
     expect(result).toBeNull();
-    expect(sb.tables["personal_agents"]?.[0]?.operating_profile).toEqual(agent.operating_profile);
+    expect(sb.tables["personal_agents"]?.[0]?.["operating_profile"]).toEqual(agent.operating_profile);
   });
 });
