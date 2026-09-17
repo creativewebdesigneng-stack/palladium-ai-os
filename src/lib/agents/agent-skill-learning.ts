@@ -179,10 +179,10 @@ export function applyVerifiedSkillLearning(args: {
     changed = changed || advanced.changed;
     const certification = maybeCertification(skill);
     if (certification) {
-      const nextSkillCerts = upsertCertification(skill.certifications ?? [], certification);
+      const currentSkillCerts = skill.certifications ?? [];
+      const nextSkillCerts = upsertCertification(currentSkillCerts, certification);
       const nextRegistryCerts = upsertCertification(registryCertifications, certification);
-      if (nextSkillCerts.length !== (skill.certifications ?? []).length ||
-          nextRegistryCerts.length !== registryCertifications.length) {
+      if (nextSkillCerts !== currentSkillCerts || nextRegistryCerts !== registryCertifications) {
         changed = true;
         if (!awarded.includes(certification.name)) awarded.push(certification.name);
       }
