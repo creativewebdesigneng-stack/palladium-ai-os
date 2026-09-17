@@ -9,6 +9,7 @@ export * from './envelope';
 export * from './execution';
 export * from './feature-status';
 export * from './health';
+export * from './mobile-intelligence.functions';
 export * from './native-action';
 export * from './pairing';
 export * from './platforms';
