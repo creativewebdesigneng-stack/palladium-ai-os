@@ -16,6 +16,7 @@ export * from './provider-policy';
 export * from './rate-limit';
 export * from './replay';
 export * from './request-policy';
+export * from './request-size';
 export * from './result';
 export * from './router';
 export * from './security';
