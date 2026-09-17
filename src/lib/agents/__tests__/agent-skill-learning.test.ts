@@ -42,6 +42,7 @@ describe("verified skill learning", () => {
       signal: {
         taskId: "task-1",
         objective: "Research the market",
+        verifiedOutcome: "Completed verified market research",
         verificationScore: 0.95,
       },
     });
@@ -83,6 +84,7 @@ describe("verified skill learning", () => {
         signal: {
           taskId: `task-${index}`,
           objective: "Perform market research with source verification",
+          evidence: ["Market research sources verified"],
           verificationScore: 0.94,
         },
       }).registry;
@@ -110,6 +112,21 @@ describe("verified skill learning", () => {
       signal: {
         taskId: "cooking",
         objective: "Prepare a brisket recipe",
+        verificationScore: 0.99,
+      },
+    });
+
+    expect(result.changed).toBe(false);
+    expect(result.matched_skills).toEqual([]);
+  });
+
+  it("does not award evidence from a skill name in the objective alone", () => {
+    const result = applyVerifiedSkillLearning({
+      registry: registry(),
+      signal: {
+        taskId: "prompt-only",
+        objective: "Perform market research",
+        verifiedOutcome: "Delivered the requested document",
         verificationScore: 0.99,
       },
     });

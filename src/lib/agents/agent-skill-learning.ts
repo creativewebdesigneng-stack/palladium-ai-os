@@ -125,6 +125,7 @@ function addVerifiedEvidence(skill: AgentSkillRecord, signal: VerifiedSkillLearn
  * Safety rules:
  * - only existing skills or operator-declared learnable skills may advance;
  * - one task can never create an arbitrary new capability;
+ * - skill names in the operator objective alone do not earn evidence;
  * - retries are idempotent by task reference;
  * - certification requires at least three distinct evidence-backed tasks
  *   averaging 90% verifier score.
@@ -148,8 +149,9 @@ export function applyVerifiedSkillLearning(args: {
     };
   }
 
+  // Capability credit comes from verified execution artifacts, not merely from
+  // a skill name appearing in the operator's objective.
   const evidenceText = [
-    args.signal.objective,
     args.signal.verifiedOutcome ?? "",
     ...(args.signal.evidence ?? []),
     ...(args.signal.completedSteps ?? []),
