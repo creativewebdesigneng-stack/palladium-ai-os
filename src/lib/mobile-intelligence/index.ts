@@ -1,4 +1,5 @@
 export * from './approval';
+export * from './audit';
 export * from './contracts';
 export * from './device-store';
 export * from './envelope';
