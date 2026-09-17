@@ -42,7 +42,7 @@ export const registerMobileIntelligenceDevice = createServerFn({ method: "POST" 
       app_actions_available: device.appActionsAvailable,
       last_seen_at: new Date().toISOString(),
     };
-    if (device.nativeProvider !== undefined) row.native_provider = device.nativeProvider;
+    if (device.nativeProvider !== undefined) row["native_provider"] = device.nativeProvider;
     const { data: created, error } = await sb.from("mobile_intelligence_devices")
       .insert(row)
       .select("id,display_name,platform,paired_at")
@@ -74,7 +74,7 @@ export const updateMobileIntelligenceCapabilities = createServerFn({ method: "PO
       last_seen_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    patch.native_provider = device.nativeProvider ?? null;
+    patch["native_provider"] = device.nativeProvider ?? null;
     const { data: updated, error } = await sb.from("mobile_intelligence_devices")
       .update(patch)
       .eq("id", data.deviceId)
