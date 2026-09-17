@@ -50,13 +50,15 @@ function capabilityMatches(text: string, name: string, aliases: string[] = []) {
   return false;
 }
 
-function verifiedTaskEvidence(skill: AgentSkillRecord) {
-  return (skill.evidence ?? []).filter((item) =>
-    item.kind === "verified_task" &&
-    item.verified &&
-    typeof item.reference === "string" &&
-    item.reference.length > 0,
-  );
+function recentCapabilityEvidence(skill: AgentSkillRecord) {
+  return (skill.evidence ?? [])
+    .filter((item) =>
+      item.verified &&
+      (item.kind === "verified_task" || item.kind === "verified_failure") &&
+      typeof item.reference === "string" &&
+      item.reference.length > 0,
+    )
+    .slice(-3);
 }
 
 function certificationName(skillName: string) {
@@ -67,19 +69,25 @@ function isSameCertification(a: AgentSkillCertification, b: AgentSkillCertificat
   return key(a.name) === key(b.name) && key(a.issuer ?? "") === key(b.issuer ?? "");
 }
 
-function addCertification(
+function upsertCertification(
   certifications: AgentSkillCertification[],
   certification: AgentSkillCertification,
 ) {
-  return certifications.some((item) => isSameCertification(item, certification))
-    ? certifications
-    : [...certifications, certification];
+  const index = certifications.findIndex((item) => isSameCertification(item, certification));
+  if (index === -1) return [...certifications, certification];
+  const existing = certifications[index];
+  if (
+    existing?.status === certification.status &&
+    existing?.evidence_ref === certification.evidence_ref
+  ) return certifications;
+  const next = [...certifications];
+  next[index] = { ...existing, ...certification };
+  return next;
 }
 
 function maybeCertification(skill: AgentSkillRecord): AgentSkillCertification | null {
-  const evidence = verifiedTaskEvidence(skill);
-  const uniqueRefs = new Set(evidence.map((item) => item.reference));
-  if (uniqueRefs.size < 3) return null;
+  const evidence = recentCapabilityEvidence(skill);
+  if (evidence.length < 3 || evidence.some((item) => item.kind !== "verified_task")) return null;
   const scores = evidence
     .map((item) => Number(item.score))
     .filter((score) => Number.isFinite(score));
@@ -171,10 +179,10 @@ export function applyVerifiedSkillLearning(args: {
     changed = changed || advanced.changed;
     const certification = maybeCertification(skill);
     if (certification) {
-      const nextSkillCerts = addCertification(skill.certifications ?? [], certification);
-      const nextRegistryCerts = addCertification(registryCertifications, certification);
-      if (nextSkillCerts.length !== (skill.certifications ?? []).length ||
-          nextRegistryCerts.length !== registryCertifications.length) {
+      const currentSkillCerts = skill.certifications ?? [];
+      const nextSkillCerts = upsertCertification(currentSkillCerts, certification);
+      const nextRegistryCerts = upsertCertification(registryCertifications, certification);
+      if (nextSkillCerts !== currentSkillCerts || nextRegistryCerts !== registryCertifications) {
         changed = true;
         if (!awarded.includes(certification.name)) awarded.push(certification.name);
       }

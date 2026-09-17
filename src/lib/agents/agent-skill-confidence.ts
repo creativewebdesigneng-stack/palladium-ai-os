@@ -1,5 +1,6 @@
 import {
   normaliseAgentSkillsRegistry,
+  type AgentSkillCertification,
   type AgentSkillRecord,
   type AgentSkillsRegistry,
 } from "./agent-skills-registry";
@@ -16,6 +17,7 @@ export type VerifiedSkillFailureResult = {
   changed: boolean;
   matched_skills: string[];
   reduced_skills: string[];
+  certifications_expired: string[];
 };
 
 export type AgentSkillGap = {
@@ -60,6 +62,39 @@ function failureEvidence(skill: AgentSkillRecord) {
     typeof item.reference === "string" &&
     item.reference.length > 0,
   );
+}
+
+function certificationName(skillName: string) {
+  return `Blackstar Verified — ${skillName}`;
+}
+
+function shouldExpireCertification(skill: AgentSkillRecord) {
+  const recent = (skill.evidence ?? [])
+    .filter((item) =>
+      item.verified &&
+      (item.kind === "verified_task" || item.kind === "verified_failure") &&
+      typeof item.reference === "string" &&
+      item.reference.length > 0,
+    )
+    .slice(-3);
+  return recent.length === 3 && recent.every((item) => item.kind === "verified_failure");
+}
+
+function expireBlackstarCertification(
+  certifications: AgentSkillCertification[],
+  skillName: string,
+) {
+  const targetName = certificationName(skillName);
+  let changed = false;
+  const next = certifications.map((item) => {
+    const isTarget =
+      key(item.name) === key(targetName) &&
+      key(item.issuer ?? "") === key("Blackstar runtime verifier");
+    if (!isTarget || item.status !== "verified") return item;
+    changed = true;
+    return { ...item, status: "expired" as const };
+  });
+  return { certifications: next, changed, name: changed ? targetName : null };
 }
 
 function addFailureEvidence(skill: AgentSkillRecord, signal: VerifiedSkillFailureSignal) {
@@ -128,12 +163,15 @@ export function applyVerifiedSkillFailure(args: {
       changed: false,
       matched_skills: [],
       reduced_skills: [],
+      certifications_expired: [],
     };
   }
 
   const matched: string[] = [];
   const reduced: string[] = [];
+  const expired: string[] = [];
   let changed = false;
+  let registryCertifications = [...(normalised.certifications ?? [])];
 
   const skills = normalised.skills.map((skill) => {
     if (!capabilityMatches(supportText, skill.name, skill.aliases ?? [])) return skill;
@@ -141,12 +179,25 @@ export function applyVerifiedSkillFailure(args: {
     const next = addFailureEvidence(skill, args.signal);
     changed = changed || next.changed;
     if (next.reduced) reduced.push(skill.name);
-    return next.skill;
+
+    let nextSkill = next.skill;
+    if (shouldExpireCertification(nextSkill)) {
+      const skillExpiration = expireBlackstarCertification(nextSkill.certifications ?? [], skill.name);
+      const registryExpiration = expireBlackstarCertification(registryCertifications, skill.name);
+      if (skillExpiration.changed || registryExpiration.changed) {
+        changed = true;
+        if (!expired.includes(certificationName(skill.name))) expired.push(certificationName(skill.name));
+      }
+      nextSkill = { ...nextSkill, certifications: skillExpiration.certifications };
+      registryCertifications = registryExpiration.certifications;
+    }
+    return nextSkill;
   });
 
   const registry = normaliseAgentSkillsRegistry({
     ...normalised,
     skills,
+    certifications: registryCertifications,
   }) ?? normalised;
 
   return {
@@ -154,6 +205,7 @@ export function applyVerifiedSkillFailure(args: {
     changed,
     matched_skills: [...new Set(matched)],
     reduced_skills: [...new Set(reduced)],
+    certifications_expired: [...new Set(expired)],
   };
 }
 
