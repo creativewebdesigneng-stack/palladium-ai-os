@@ -41,9 +41,20 @@ describe("provider-neutral execution fabric", () => {
     expect(route.primary).toBe("browser");
   });
 
-  it("labels future store/social providers without pretending they are already native", () => {
+  it("routes food delivery through official API/connector lanes without browser fallback", () => {
+    const route = resolveExecutionRoute({
+      provider: "uber_eats",
+      availability: { directApi: false, connectorTransport: true, browser: true },
+    });
+    expect(route.family).toBe("food_delivery");
+    expect(route.primary).toBe("connector_transport");
+    expect(route.lanes).toEqual(["connector_transport"]);
+  });
+
+  it("labels future providers without pretending they are already native", () => {
     expect(capabilityProfile("shopify")?.status).toBe("planned");
     expect(capabilityProfile("instagram")?.families).toContain("social_media");
+    expect(capabilityProfile("deliveroo")?.status).toBe("planned");
   });
 });
 
