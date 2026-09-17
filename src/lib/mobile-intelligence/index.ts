@@ -1,5 +1,6 @@
 export * from './approval';
 export * from './contracts';
+export * from './device-store';
 export * from './envelope';
 export * from './pairing';
 export * from './platforms';
