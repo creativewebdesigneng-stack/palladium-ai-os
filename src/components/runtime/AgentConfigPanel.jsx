@@ -1,15 +1,17 @@
 import { Cpu, Wrench, Brain } from 'lucide-react';
+import AgentSkillsRegistryPanel from '@/components/agents/AgentSkillsRegistryPanel';
 
 function Row({ k, v }) {
   return <div className="flex justify-between"><dt className="text-zinc-500">{k}</dt><dd className="text-zinc-200">{String(v)}</dd></div>;
 }
 
-// Right-hand sidebar summarising the agent's model, tools and memory settings
-// pulled live from the backend agent record.
-export default function AgentConfigPanel({ agent }) {
+// Right-hand sidebar summarising the agent's model, tools, memory and bounded
+// capability registry pulled live from the backend agent record.
+export default function AgentConfigPanel({ agent, onAgentUpdated }) {
   const tools = agent.allowed_tools || agent.tools || [];
   return (
     <div className="space-y-3">
+      <AgentSkillsRegistryPanel agent={agent} onAgentUpdated={onAgentUpdated} />
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Cpu className="h-3.5 w-3.5 text-violet-400" />Model</p>
         <dl className="mt-3 space-y-1.5 text-xs">
