@@ -2,6 +2,7 @@ export * from './approval';
 export * from './contracts';
 export * from './device-store';
 export * from './envelope';
+export * from './native-action';
 export * from './pairing';
 export * from './platforms';
 export * from './router';
