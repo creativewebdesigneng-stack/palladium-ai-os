@@ -16,12 +16,13 @@ export interface MobileDeviceRow {
 }
 
 export function rowToMobileCapabilities(row: MobileDeviceRow): MobileDeviceCapabilities {
-  return {
+  const capabilities: MobileDeviceCapabilities = {
     platform: row.platform,
     osVersion: row.os_version,
     nativeIntelligenceAvailable: row.native_intelligence_available,
-    nativeProvider: row.native_provider ?? undefined,
     capabilities: row.capabilities,
     appActionsAvailable: row.app_actions_available,
   };
+  if (row.native_provider) capabilities.nativeProvider = row.native_provider;
+  return capabilities;
 }
