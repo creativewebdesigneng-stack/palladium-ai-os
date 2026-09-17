@@ -35,77 +35,33 @@ function adapter(execute: FoodDeliveryProviderAdapter["execute"]): FoodDeliveryP
 
 describe("food delivery runtime gate", () => {
   it("does not call a provider before consequential approval", async () => {
-    const execute = vi.fn(async () => ({
-      provider: "uber-eats" as const,
-      capability: "consumer.order_create" as const,
-      status: "accepted" as const,
-      evidence: { providerOrderId: "order-1" },
-    }));
-    const request: FoodDeliveryActionRequest = {
-      requestId: "req-1",
-      providerId: "uber-eats",
-      connectionId: "conn-1",
-      capability: "consumer.order_create",
-      input: { basket: "basket-1" },
-    };
-
+    const execute = vi.fn(async () => ({ provider: "uber-eats" as const, capability: "consumer.order_create" as const, status: "accepted" as const, evidence: { providerOrderId: "order-1" } }));
+    const request: FoodDeliveryActionRequest = { requestId: "req-1", providerId: "uber-eats", connectionId: "conn-1", capability: "consumer.order_create", input: { basket: "basket-1" } };
     const result = await executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute) });
     expect(result.status).toBe("approval_required");
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("executes a granted read-only capability without consequential approval", async () => {
-    const execute = vi.fn(async () => ({
-      provider: "uber-eats" as const,
-      capability: "consumer.menu_read" as const,
-      status: "completed" as const,
-      evidence: { menuVersion: "v1" },
-    }));
-    const request: FoodDeliveryActionRequest = {
-      requestId: "req-2",
-      providerId: "uber-eats",
-      connectionId: "conn-1",
-      capability: "consumer.menu_read",
-      input: { restaurantId: "restaurant-1" },
-    };
-
+    const execute = vi.fn(async () => ({ provider: "uber-eats" as const, capability: "consumer.menu_read" as const, status: "completed" as const, evidence: { menuVersion: "v1" } }));
+    const request: FoodDeliveryActionRequest = { requestId: "req-2", providerId: "uber-eats", connectionId: "conn-1", capability: "consumer.menu_read", input: { restaurantId: "restaurant-1" } };
     const result = await executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute) });
     expect(result.status).toBe("executed");
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("executes a consequential capability only after approval is supplied", async () => {
-    const execute = vi.fn(async () => ({
-      provider: "uber-eats" as const,
-      capability: "consumer.order_create" as const,
-      status: "accepted" as const,
-      evidence: { providerOrderId: "order-2" },
-    }));
-    const request: FoodDeliveryActionRequest = {
-      requestId: "req-3",
-      providerId: "uber-eats",
-      connectionId: "conn-1",
-      capability: "consumer.order_create",
-      input: { basket: "basket-2" },
-    };
-
-    const result = await executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute), approved: true });
-    expect(result.status).toBe("executed");
-    expect(execute).toHaveBeenCalledTimes(1);
+  it("cannot bypass consequential approval with caller-controlled input", async () => {
+    const execute = vi.fn(async () => ({ provider: "uber-eats" as const, capability: "consumer.order_create" as const, status: "accepted" as const, evidence: { providerOrderId: "order-2" } }));
+    const request: FoodDeliveryActionRequest = { requestId: "req-3", providerId: "uber-eats", connectionId: "conn-1", capability: "consumer.order_create", input: { basket: "basket-2", approved: true } };
+    const result = await executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute) });
+    expect(result.status).toBe("approval_required");
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("rejects a mismatched connection before provider execution", async () => {
     const execute = vi.fn();
-    const request: FoodDeliveryActionRequest = {
-      requestId: "req-4",
-      providerId: "uber-eats",
-      connectionId: "other-connection",
-      capability: "consumer.menu_read",
-      input: {},
-    };
-
-    await expect(executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute) }))
-      .rejects.toThrow("requested connection");
+    const request: FoodDeliveryActionRequest = { requestId: "req-4", providerId: "uber-eats", connectionId: "other-connection", capability: "consumer.menu_read", input: {} };
+    await expect(executeFoodDeliveryRuntimeAction({ request, availability: availability(), adapter: adapter(execute) })).rejects.toThrow("requested connection");
     expect(execute).not.toHaveBeenCalled();
   });
 });

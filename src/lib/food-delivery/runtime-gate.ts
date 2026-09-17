@@ -10,15 +10,16 @@ export type FoodDeliveryRuntimeDecision =
   | { status: "executed"; result: VerifiedFoodDeliveryExecution };
 
 /**
- * Shared preflight for agent/runtime calls. Consequential capabilities stop at
- * the existing Blackstar approval boundary; provider execution is impossible
- * until the caller returns through the approved integration-action executor.
+ * Shared preflight for agent/runtime calls. Consequential capabilities always
+ * stop at Blackstar's existing approval boundary. This public runtime entry
+ * point deliberately has no caller-controlled approval bypass: consequential
+ * execution must return through the immutable approved integration-action
+ * executor after its atomic approval claim.
  */
 export async function executeFoodDeliveryRuntimeAction(input: {
   request: FoodDeliveryActionRequest;
   availability: FoodDeliveryProviderAvailability;
   adapter: FoodDeliveryProviderAdapter;
-  approved?: boolean;
 }): Promise<FoodDeliveryRuntimeDecision> {
   if (input.availability.provider.id !== input.request.providerId) {
     throw new Error("Food delivery availability does not match the requested provider.");
@@ -29,7 +30,7 @@ export async function executeFoodDeliveryRuntimeAction(input: {
 
   assertFoodDeliveryExecutionAvailable(input.availability, input.request.capability);
 
-  if (capabilityRequiresApproval(input.request.capability) && input.approved !== true) {
+  if (capabilityRequiresApproval(input.request.capability)) {
     return { status: "approval_required", request: input.request };
   }
 
