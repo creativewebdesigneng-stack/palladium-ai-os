@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fallbackOrchestratorPlan,
   normaliseOrchestratorPlan,
+  renderCandidateCatalogue,
   scoreAgentForGoal,
   shortlistAgents,
   type OrchestratorCandidate,
@@ -60,6 +61,44 @@ describe("Palladium Orchestrator", () => {
     };
     const unproven: OrchestratorCandidate = { ...research, id: "unproven", name: "Unproven Researcher" };
     expect(shortlistAgents("research competitors", [unproven, reliable])[0]?.id).toBe("reliable");
+  });
+
+  it("uses evidence-backed registry skills and trust as bounded routing signals", () => {
+    const verified: OrchestratorCandidate = {
+      ...coder,
+      id: "verified-commerce",
+      name: "Verified Commerce Agent",
+      trust_score: 0.94,
+      operating_profile: {
+        ...coder.operating_profile,
+        skills_registry: {
+          version: 1,
+          skills: [
+            {
+              name: "shopify inventory automation",
+              proficiency: 0.95,
+              learnable: true,
+              connectors: ["Shopify"],
+              evidence: [{ kind: "verified_task", verified: true, score: 0.97 }],
+            },
+          ],
+          connectors: ["Shopify", "MCP"],
+          permissions: ["inventory:read"],
+          models: ["blackstar:astra"],
+        },
+      },
+    };
+    const generic: OrchestratorCandidate = {
+      ...coder,
+      id: "generic-commerce",
+      name: "Generic Commerce Agent",
+      trust_score: 0.1,
+    };
+
+    expect(shortlistAgents("automate shopify inventory", [generic, verified])[0]?.id).toBe("verified-commerce");
+    const catalogue = renderCandidateCatalogue([verified]);
+    expect(catalogue).toContain("shopify inventory automation [verified]");
+    expect(catalogue).toContain("Trust score: 94%");
   });
 
   it("rejects assignments to agents outside the authorised shortlist", () => {
