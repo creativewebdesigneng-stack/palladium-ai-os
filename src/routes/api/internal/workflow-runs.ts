@@ -65,12 +65,12 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
           : 2;
 
         const [
-          workflows,
-          reminders,
-          agentResumes,
-          autonomousGoals,
-          legalAutomation,
-          phoneCommunications,
+          workflowsResult,
+          remindersResult,
+          agentResumesResult,
+          autonomousGoalsResult,
+          legalAutomationResult,
+          phoneCommunicationsResult,
         ] = await Promise.all([
           runIsolated("workflows", () => processQueuedWorkflowRuns(limit)),
           runIsolated("reminders", () => processDuePersonalReminders(Math.max(10, limit * 5))),
@@ -81,12 +81,12 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         ]);
 
         const results = [
-          workflows,
-          reminders,
-          agentResumes,
-          autonomousGoals,
-          legalAutomation,
-          phoneCommunications,
+          workflowsResult,
+          remindersResult,
+          agentResumesResult,
+          autonomousGoalsResult,
+          legalAutomationResult,
+          phoneCommunicationsResult,
         ] as const;
         const failures = results
           .filter((result) => !result.ok)
@@ -95,20 +95,25 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
             errorName: result.ok ? "" : result.errorName,
           }));
         const allFailed = failures.length === results.length;
-        const workflowPayload = workflows.ok
-          ? (workflows.value as Record<string, unknown>)
+        const workflowPayload = workflowsResult.ok
+          ? (workflowsResult.value as Record<string, unknown>)
           : {};
+        const reminders = valueOrNull(remindersResult);
+        const agentResumes = valueOrNull(agentResumesResult);
+        const autonomousGoals = valueOrNull(autonomousGoalsResult);
+        const legalAutomation = valueOrNull(legalAutomationResult);
+        const phoneCommunications = valueOrNull(phoneCommunicationsResult);
 
         return json(
           {
             ok: !allFailed,
             degraded: failures.length > 0,
             ...workflowPayload,
-            reminders: valueOrNull(reminders),
-            agent_resumes: valueOrNull(agentResumes),
-            autonomous_goals: valueOrNull(autonomousGoals),
-            legal_automation: valueOrNull(legalAutomation),
-            phone_communications: valueOrNull(phoneCommunications),
+            reminders,
+            agent_resumes: agentResumes,
+            autonomous_goals: autonomousGoals,
+            legal_automation: legalAutomation,
+            phone_communications: phoneCommunications,
             worker_failures: failures,
           },
           allFailed ? 503 : 200,
