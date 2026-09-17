@@ -1,6 +1,7 @@
 export * from './approval';
 export * from './audit';
 export * from './capability-manifest';
+export * from './compatibility';
 export * from './contracts';
 export * from './device-auth';
 export * from './device-store';
