@@ -8,3 +8,4 @@ export * from "./provider-adapter";
 export * from "./webhooks";
 export * from "./approval-bridge";
 export * from "./execution-evidence";
+export * from "./webhook-reconciliation";
