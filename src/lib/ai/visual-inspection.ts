@@ -3,6 +3,7 @@ export type BlackstarInspectionSurface = {
   title: string;
   status: "healthy" | "warning" | "error" | "unknown";
   screenshotUrl?: string | null;
+  screenshotAvailable?: boolean;
   consoleErrors?: string[];
   networkErrors?: string[];
   runtimeErrors?: string[];
@@ -43,6 +44,7 @@ export function normaliseBlackstarVisualInspection(value: unknown): BlackstarVis
       title: clean(surface["title"], 200) || route,
       status,
       screenshotUrl: clean(surface["screenshotUrl"], 2000) || null,
+      screenshotAvailable: surface["screenshotAvailable"] === true,
       consoleErrors: cleanErrors(surface["consoleErrors"]),
       networkErrors: cleanErrors(surface["networkErrors"]),
       runtimeErrors: cleanErrors(surface["runtimeErrors"]),
@@ -61,7 +63,7 @@ export function visualInspectionContext(inspection: BlackstarVisualInspection): 
     route: surface.route,
     title: surface.title,
     status: surface.status,
-    screenshot_available: Boolean(surface.screenshotUrl),
+    screenshot_available: Boolean(surface.screenshotAvailable || surface.screenshotUrl),
     console_errors: surface.consoleErrors ?? [],
     network_errors: surface.networkErrors ?? [],
     runtime_errors: surface.runtimeErrors ?? [],
