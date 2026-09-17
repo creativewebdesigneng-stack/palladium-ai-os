@@ -178,7 +178,6 @@ export const sendCommunicationSms = createServerFn({ method: 'POST' })
     if (!recipient.sms_consent_at) throw new Error('SMS consent is required for this phone number.');
     await assertDailyLimit(context.userId, 'sms', prefs.max_daily_sms);
 
-    const now = new Date().toISOString();
     const inserted = await admin.from('communication_events').insert({
       user_id: context.userId,
       recipient_id: recipient.id,
@@ -206,7 +205,8 @@ export const sendCommunicationSms = createServerFn({ method: 'POST' })
       return { event_id: event.id, status: 'sent', provider_status: provider.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'SMS delivery failed.';
-      await admin.from('communication_events').update({ status: 'failed', error: message.slice(0, 1000), updated_at: now }).eq('id', event.id).eq('status', 'sending');
+      const failedAt = new Date().toISOString();
+      await admin.from('communication_events').update({ status: 'failed', error: message.slice(0, 1000), updated_at: failedAt }).eq('id', event.id).eq('status', 'sending');
       await writeAudit({ userId: context.userId, action: 'communications.sms_sent', targetType: 'communication_event', targetId: event.id, status: 'failed', metadata: { purpose: data.purpose, error: message.slice(0, 500) } });
       throw error;
     }
@@ -290,8 +290,8 @@ export const sendCommunicationPhonePush = createServerFn({ method: 'POST' })
     const endpoints = await admin.from('notification_endpoints').select('id,topic').eq('user_id', context.userId).eq('provider', 'ntfy').eq('enabled', true);
     if (endpoints.error) throw new Error(endpoints.error.message);
     if (!endpoints.data?.length) throw new Error('No enabled phone push endpoint is connected.');
-    const base = (process.env.NTFY_BASE_URL?.trim() || 'https://ntfy.sh').replace(/\/+$/, '');
-    const token = process.env.NTFY_TOKEN?.trim();
+    const base = (process.env['NTFY_BASE_URL']?.trim() || 'https://ntfy.sh').replace(/\/+$/, '');
+    const token = process.env['NTFY_TOKEN']?.trim();
     let sent = 0;
     for (const endpoint of endpoints.data) {
       const response = await fetch(`${base}/${encodeURIComponent(endpoint.topic)}`, {
