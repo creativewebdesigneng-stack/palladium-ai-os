@@ -7,9 +7,11 @@ import { useToast } from '@/components/ui/use-toast';
 function Chip({ children, tone = 'default' }) {
   const cls = tone === 'verified'
     ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
-    : tone === 'learning'
-      ? 'border-violet-400/20 bg-violet-400/10 text-violet-200'
-      : 'border-white/10 bg-white/5 text-zinc-300';
+    : tone === 'expired'
+      ? 'border-amber-400/20 bg-amber-400/10 text-amber-200'
+      : tone === 'learning'
+        ? 'border-violet-400/20 bg-violet-400/10 text-violet-200'
+        : 'border-white/10 bg-white/5 text-zinc-300';
   return <span className={`rounded-lg border px-2 py-1 text-[11px] ${cls}`}>{children}</span>;
 }
 
@@ -133,7 +135,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-xs font-medium text-white"><BrainCircuit className="h-3.5 w-3.5 text-violet-300" />Universal Skills Registry</p>
-          <p className="mt-1 text-[10px] leading-4 text-zinc-500">Capability evidence used for bounded matching. Runtime permissions and approvals remain authoritative.</p>
+          <p className="mt-1 text-[10px] leading-4 text-zinc-500">Capability evidence used for bounded matching. Blackstar verification can expire after repeated verifier-confirmed failures and be earned back; runtime permissions and approvals remain authoritative.</p>
         </div>
         <div className="flex items-center gap-1.5">
           <span className={`rounded-md border px-2 py-1 text-[10px] ${learningEnabled ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-300' : 'border-white/10 bg-black/20 text-zinc-500'}`}>{learningEnabled ? 'Verified learning on' : 'Learning paused'}</span>
@@ -197,7 +199,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
             <Section icon={Plug} title="Connectors"><div className="flex flex-wrap gap-1.5">{registry.connectors.map((item) => <Chip key={item}>{item}</Chip>)}</div></Section>
           ) : null}
           {registry.certifications?.length ? (
-            <Section icon={BadgeCheck} title="Certifications"><div className="flex flex-wrap gap-1.5">{registry.certifications.map((item) => <Chip key={`${item.name}-${item.issuer || ''}`} tone={item.status === 'verified' ? 'verified' : 'default'}>{item.name} · {item.status}</Chip>)}</div></Section>
+            <Section icon={BadgeCheck} title="Certifications"><div className="flex flex-wrap gap-1.5">{registry.certifications.map((item) => <Chip key={`${item.name}-${item.issuer || ''}`} tone={item.status === 'verified' ? 'verified' : item.status === 'expired' ? 'expired' : 'default'}>{item.name} · {item.status}</Chip>)}</div></Section>
           ) : null}
           {registry.learnable_skills?.length ? (
             <Section icon={BrainCircuit} title="Learning gaps">
