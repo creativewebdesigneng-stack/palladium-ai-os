@@ -40,7 +40,12 @@ export function resolveFoodDeliveryLocation(input: FoodDeliveryLocationInput): F
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       throw new Error("Invalid delivery coordinates");
     }
-    return { countryCode, deliveryAddress, coordinates: { latitude, longitude }, source: "device" };
+    return {
+      countryCode,
+      ...(deliveryAddress ? { deliveryAddress } : {}),
+      coordinates: { latitude, longitude },
+      source: "device",
+    };
   }
 
   if (deliveryAddress) return { countryCode, deliveryAddress, source: "manual_address" };
