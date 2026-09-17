@@ -37,13 +37,15 @@ function tokens(value: string) {
 }
 
 function capabilityMatches(text: string, name: string, aliases: string[] = []) {
-  const haystack = key(text);
+  const normalisedText = key(text);
+  const haystack = ` ${normalisedText} `;
+  const available = tokens(normalisedText);
   for (const candidate of [name, ...aliases]) {
     const phrase = key(candidate);
     if (!phrase) continue;
-    if (haystack.includes(phrase)) return true;
+    if (haystack.includes(` ${phrase} `)) return true;
     const required = [...tokens(phrase)];
-    if (required.length && required.every((token) => tokens(haystack).has(token))) return true;
+    if (required.length && required.every((token) => available.has(token))) return true;
   }
   return false;
 }
@@ -124,7 +126,7 @@ function addVerifiedEvidence(skill: AgentSkillRecord, signal: VerifiedSkillLearn
  * - only existing skills or operator-declared learnable skills may advance;
  * - one task can never create an arbitrary new capability;
  * - retries are idempotent by task reference;
- * - certification requires at least three distinct >= evidence-backed tasks
+ * - certification requires at least three distinct evidence-backed tasks
  *   averaging 90% verifier score.
  */
 export function applyVerifiedSkillLearning(args: {

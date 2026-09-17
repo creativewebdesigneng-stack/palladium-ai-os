@@ -1,8 +1,5 @@
 import { buildVerifiedExperienceLearning } from "@/lib/agents/agent-learning";
-import {
-  effectiveAgentSkillsRegistry,
-  type AgentSkillsRegistry,
-} from "@/lib/agents/agent-skills-registry";
+import { effectiveAgentSkillsRegistry } from "@/lib/agents/agent-skills-registry";
 import { applyVerifiedSkillLearning } from "@/lib/agents/agent-skill-learning";
 import {
   compileAgentSystemPrompt,
@@ -95,7 +92,7 @@ export async function captureVerifiedAgentSkillLearning(args: {
       const nextProfile = normaliseOperatingProfile({
         ...profile,
         skills: result.registry.skills.map((skill) => skill.name),
-        skills_registry: result.registry satisfies AgentSkillsRegistry,
+        skills_registry: result.registry,
       });
       const nextSystemPrompt = compileAgentSystemPrompt(agent.system_prompt, nextProfile).slice(0, 16_000);
 

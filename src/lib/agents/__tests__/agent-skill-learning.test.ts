@@ -101,6 +101,23 @@ describe("verified skill learning", () => {
     ]));
   });
 
+  it("does not match capability names as accidental word substrings", () => {
+    const result = applyVerifiedSkillLearning({
+      registry: {
+        version: 1,
+        skills: [{ name: "Risk", proficiency: 0.6, learnable: true }],
+      },
+      signal: {
+        taskId: "cooking",
+        objective: "Prepare a brisket recipe",
+        verificationScore: 0.99,
+      },
+    });
+
+    expect(result.changed).toBe(false);
+    expect(result.matched_skills).toEqual([]);
+  });
+
   it("does not advance capability from weak or unrelated evidence", () => {
     const weak = applyVerifiedSkillLearning({
       registry: registry(),
