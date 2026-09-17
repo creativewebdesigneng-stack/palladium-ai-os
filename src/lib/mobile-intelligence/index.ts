@@ -12,6 +12,7 @@ export * from './native-action';
 export * from './pairing';
 export * from './platforms';
 export * from './provider-policy';
+export * from './rate-limit';
 export * from './router';
 export * from './security';
 export * from './telemetry';
