@@ -6,6 +6,7 @@ export * from './device-auth';
 export * from './device-store';
 export * from './envelope';
 export * from './execution';
+export * from './health';
 export * from './native-action';
 export * from './pairing';
 export * from './platforms';
