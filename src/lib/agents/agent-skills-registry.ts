@@ -51,7 +51,7 @@ export type AgentSkillsRegistry = {
   permissions?: string[];
   certifications?: AgentSkillCertification[];
   models?: string[];
-  cost?: AgentCostProfile;
+  cost?: AgentCostProfile | undefined;
   previous_experience?: string[];
   learnable_skills?: string[];
 };
@@ -198,11 +198,11 @@ function mergeUnique(...lists: Array<string[] | null | undefined>): string[] {
 }
 
 export function effectiveAgentSkillsRegistry(args: {
-  registry?: AgentSkillsRegistry | null;
-  legacySkills?: string[] | null;
-  allowedTools?: string[] | null;
-  modelProvider?: string | null;
-  model?: string | null;
+  registry?: AgentSkillsRegistry | null | undefined;
+  legacySkills?: string[] | null | undefined;
+  allowedTools?: string[] | null | undefined;
+  modelProvider?: string | null | undefined;
+  model?: string | null | undefined;
 }): AgentSkillsRegistry | null {
   const explicit = normaliseAgentSkillsRegistry(args.registry);
   const skills = [...(explicit?.skills ?? [])];
