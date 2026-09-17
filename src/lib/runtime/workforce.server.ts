@@ -25,6 +25,7 @@ import { failRun, prepareRun, RuntimeError } from "./runtime.server";
 import { executePlannedRun } from "./planner-runtime.server";
 import { captureVerifiedAgentExperience } from "./agent-learning.server";
 import { captureVerifiedAgentSkillLearning } from "./agent-skill-learning.server";
+import { captureVerifiedAgentSkillFailure } from "./agent-skill-confidence.server";
 import { notify } from "@/lib/notifications/notify.server";
 import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
 import {
@@ -539,7 +540,16 @@ export async function runStep(args: {
       return outcome;
     } catch (error) {
       lastError = error;
-      if (run) await failRun({ userId: args.userId, run, error }).catch(() => undefined);
+      if (run) {
+        await failRun({ userId: args.userId, run, error }).catch(() => undefined);
+        if (error instanceof RuntimeError && error.code === "VERIFICATION_FAILED") {
+          await captureVerifiedAgentSkillFailure({
+            sb: args.sb as never,
+            userId: args.userId,
+            taskId: run.taskId,
+          });
+        }
+      }
       const message = error instanceof Error ? error.message : "Step failed.";
       if (stepRunId) {
         await db

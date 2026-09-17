@@ -1,6 +1,7 @@
 export type AgentSkillEvidenceKind =
   | "declared"
   | "verified_task"
+  | "verified_failure"
   | "certification"
   | "tool"
   | "connector"
@@ -70,6 +71,7 @@ function evidenceKind(value: unknown): AgentSkillEvidenceKind {
   const kind = clean(value, 40);
   if (
     kind === "verified_task" ||
+    kind === "verified_failure" ||
     kind === "certification" ||
     kind === "tool" ||
     kind === "connector" ||

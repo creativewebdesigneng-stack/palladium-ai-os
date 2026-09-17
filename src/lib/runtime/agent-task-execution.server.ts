@@ -1,6 +1,7 @@
 import { EntitlementError } from '@/lib/platform/entitlements.server'
 import { captureVerifiedAgentExperience } from './agent-learning.server'
 import { captureVerifiedAgentSkillLearning } from './agent-skill-learning.server'
+import { captureVerifiedAgentSkillFailure } from './agent-skill-confidence.server'
 import {
   buildBlackstarAstraRunCapabilityControl,
   renderBlackstarAstraRunCapabilityControl,
@@ -177,6 +178,9 @@ export async function executeAgentTask(args: {
       const rescued = await rescueRuntimeConnectedServiceRead({ sb: args.sb, userId: args.userId, run, error })
       if (rescued) return { task: rescued.task, output: rescued.result.text }
       await failRun({ userId: args.userId, run, error })
+      if (error instanceof RuntimeError && error.code === 'VERIFICATION_FAILED') {
+        await captureVerifiedAgentSkillFailure({ sb: args.sb as never, userId: args.userId, taskId: run.taskId })
+      }
     }
     surface(error)
   }

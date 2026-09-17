@@ -164,17 +164,22 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
               <div className="space-y-2">
                 {registry.skills.map((skill) => {
                   const verifiedTasks = (skill.evidence || []).filter((item) => item.kind === 'verified_task' && item.verified).length;
+                  const verifiedFailures = (skill.evidence || []).filter((item) => item.kind === 'verified_failure' && item.verified).length;
                   const verified = verifiedTasks > 0
-                    || (skill.evidence || []).some((item) => item.verified)
+                    || (skill.evidence || []).some((item) => item.verified && item.kind !== 'verified_failure')
                     || (skill.certifications || []).some((item) => item.status === 'verified');
-                  const evidenceLabel = verifiedTasks > 0
-                    ? `${verifiedTasks} verified task${verifiedTasks === 1 ? '' : 's'}`
-                    : verified ? 'Verified evidence' : 'Declared';
+                  const evidenceLabel = verifiedTasks > 0 && verifiedFailures > 0
+                    ? `${verifiedTasks} verified · ${verifiedFailures} flagged`
+                    : verifiedTasks > 0
+                      ? `${verifiedTasks} verified task${verifiedTasks === 1 ? '' : 's'}`
+                      : verifiedFailures > 0
+                        ? `${verifiedFailures} verifier flag${verifiedFailures === 1 ? '' : 's'}`
+                        : verified ? 'Verified evidence' : 'Declared';
                   return (
                     <div key={skill.name} className="rounded-xl border border-white/8 bg-black/15 p-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate text-xs font-medium text-zinc-200">{skill.name}</span>
-                        <span className={`shrink-0 text-[10px] ${verified ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                        <span className={`shrink-0 text-[10px] ${verifiedFailures > 0 ? 'text-amber-300' : verified ? 'text-emerald-300' : 'text-zinc-500'}`}>
                           {evidenceLabel} · {Math.round((skill.proficiency ?? 0.5) * 100)}%
                         </span>
                       </div>
@@ -195,7 +200,10 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
             <Section icon={BadgeCheck} title="Certifications"><div className="flex flex-wrap gap-1.5">{registry.certifications.map((item) => <Chip key={`${item.name}-${item.issuer || ''}`} tone={item.status === 'verified' ? 'verified' : 'default'}>{item.name} · {item.status}</Chip>)}</div></Section>
           ) : null}
           {registry.learnable_skills?.length ? (
-            <Section icon={BrainCircuit} title="Can learn"><div className="flex flex-wrap gap-1.5">{registry.learnable_skills.map((item) => <Chip key={item} tone="learning">{item}</Chip>)}</div></Section>
+            <Section icon={BrainCircuit} title="Learning gaps">
+              <div className="flex flex-wrap gap-1.5">{registry.learnable_skills.map((item) => <Chip key={item} tone="learning">{item}</Chip>)}</div>
+              <p className="mt-2 text-[10px] leading-4 text-zinc-600">Operator-declared skills awaiting verifier-backed execution evidence.</p>
+            </Section>
           ) : null}
           {registry.permissions?.length ? (
             <Section icon={ShieldCheck} title="Declared scopes"><div className="flex flex-wrap gap-1.5">{registry.permissions.map((item) => <Chip key={item}>{item}</Chip>)}</div></Section>
