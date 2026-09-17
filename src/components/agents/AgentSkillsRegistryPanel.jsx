@@ -47,6 +47,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
 
   useEffect(() => { setSavedAgent(agent); }, [agent]);
   const currentAgent = savedAgent || agent;
+  const learningEnabled = currentAgent?.memory_enabled !== false;
   const legacySkills = currentAgent?.operating_profile?.skills || [];
   const tools = currentAgent?.allowed_tools || currentAgent?.tools || [];
   const registry = effectiveAgentSkillsRegistry({
@@ -135,6 +136,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
           <p className="mt-1 text-[10px] leading-4 text-zinc-500">Capability evidence used for bounded matching. Runtime permissions and approvals remain authoritative.</p>
         </div>
         <div className="flex items-center gap-1.5">
+          <span className={`rounded-md border px-2 py-1 text-[10px] ${learningEnabled ? 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-300' : 'border-white/10 bg-black/20 text-zinc-500'}`}>{learningEnabled ? 'Verified learning on' : 'Learning paused'}</span>
           <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-zinc-500">v{registry.version}</span>
           {!editing ? (
             <button type="button" onClick={beginEdit} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[.03] text-zinc-400 hover:text-white" aria-label="Edit skills registry"><Pencil className="h-3.5 w-3.5" /></button>
@@ -161,14 +163,19 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
             {registry.skills.length ? (
               <div className="space-y-2">
                 {registry.skills.map((skill) => {
-                  const verified = (skill.evidence || []).some((item) => item.verified)
+                  const verifiedTasks = (skill.evidence || []).filter((item) => item.kind === 'verified_task' && item.verified).length;
+                  const verified = verifiedTasks > 0
+                    || (skill.evidence || []).some((item) => item.verified)
                     || (skill.certifications || []).some((item) => item.status === 'verified');
+                  const evidenceLabel = verifiedTasks > 0
+                    ? `${verifiedTasks} verified task${verifiedTasks === 1 ? '' : 's'}`
+                    : verified ? 'Verified evidence' : 'Declared';
                   return (
                     <div key={skill.name} className="rounded-xl border border-white/8 bg-black/15 p-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate text-xs font-medium text-zinc-200">{skill.name}</span>
                         <span className={`shrink-0 text-[10px] ${verified ? 'text-emerald-300' : 'text-zinc-500'}`}>
-                          {verified ? 'Verified evidence' : 'Declared'} · {Math.round((skill.proficiency ?? 0.5) * 100)}%
+                          {evidenceLabel} · {Math.round((skill.proficiency ?? 0.5) * 100)}%
                         </span>
                       </div>
                     </div>
