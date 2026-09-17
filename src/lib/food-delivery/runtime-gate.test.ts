@@ -30,13 +30,13 @@ function availability() {
 }
 
 function adapter(execute: FoodDeliveryProviderAdapter["execute"]): FoodDeliveryProviderAdapter {
-  return { providerId: "uber-eats", capabilities: provider.capabilities, execute };
+  return { provider: "uber-eats", capabilities: new Set(provider.capabilities), execute };
 }
 
 describe("food delivery runtime gate", () => {
   it("does not call a provider before consequential approval", async () => {
     const execute = vi.fn(async () => ({
-      providerId: "uber-eats" as const,
+      provider: "uber-eats" as const,
       capability: "consumer.order_create" as const,
       status: "accepted" as const,
       evidence: { providerOrderId: "order-1" },
@@ -56,7 +56,7 @@ describe("food delivery runtime gate", () => {
 
   it("executes a granted read-only capability without consequential approval", async () => {
     const execute = vi.fn(async () => ({
-      providerId: "uber-eats" as const,
+      provider: "uber-eats" as const,
       capability: "consumer.menu_read" as const,
       status: "completed" as const,
       evidence: { menuVersion: "v1" },
@@ -76,7 +76,7 @@ describe("food delivery runtime gate", () => {
 
   it("executes a consequential capability only after approval is supplied", async () => {
     const execute = vi.fn(async () => ({
-      providerId: "uber-eats" as const,
+      provider: "uber-eats" as const,
       capability: "consumer.order_create" as const,
       status: "accepted" as const,
       evidence: { providerOrderId: "order-2" },
