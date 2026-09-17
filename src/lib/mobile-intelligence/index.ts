@@ -14,6 +14,7 @@ export * from './platforms';
 export * from './provider-policy';
 export * from './rate-limit';
 export * from './replay';
+export * from './result';
 export * from './router';
 export * from './security';
 export * from './telemetry';
