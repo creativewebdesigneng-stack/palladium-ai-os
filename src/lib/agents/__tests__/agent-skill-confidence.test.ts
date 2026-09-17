@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AgentSkillsRegistry } from "../agent-skills-registry";
-import { applyVerifiedSkillFailure } from "../agent-skill-confidence";
+import { registrySelectionBonus, type AgentSkillsRegistry } from "../agent-skills-registry";
+import { applyVerifiedSkillFailure, buildAgentSkillGapPlan } from "../agent-skill-confidence";
 
 function registry(): AgentSkillsRegistry {
   return {
@@ -83,6 +83,53 @@ describe("verified skill confidence", () => {
 
     expect(duplicate.changed).toBe(false);
     expect(duplicate.registry.skills[0]?.evidence?.filter((item) => item.kind === "verified_failure")).toHaveLength(1);
+  });
+
+  it("never lets verified failure evidence increase the positive routing bonus", () => {
+    const before = registry();
+    const beforeBonus = registrySelectionBonus("market research", before);
+    const first = applyVerifiedSkillFailure({
+      registry: before,
+      signal: {
+        taskId: "fail-routing",
+        verificationScore: 0.3,
+        issues: ["Market research claims lack source evidence"],
+      },
+    });
+
+    expect(first.changed).toBe(true);
+    expect(registrySelectionBonus("market research", first.registry)).toBeLessThanOrEqual(beforeBonus);
+  });
+
+  it("turns repeated failures and missing evidence into development priorities", () => {
+    let current: AgentSkillsRegistry = {
+      ...registry(),
+      skills: [
+        ...registry().skills,
+        { name: "TypeScript", proficiency: 0.6, learnable: true },
+      ],
+      learnable_skills: ["Forecasting"],
+    };
+    for (const taskId of ["fail-a", "fail-b"]) {
+      current = applyVerifiedSkillFailure({
+        registry: current,
+        signal: {
+          taskId,
+          verificationScore: 0.3,
+          issues: ["Market research methodology is unsupported"],
+        },
+      }).registry;
+    }
+
+    const gaps = buildAgentSkillGapPlan(current, 6);
+    expect(gaps[0]).toEqual(expect.objectContaining({
+      skill: "Market research",
+      kind: "revalidate",
+    }));
+    expect(gaps).toEqual(expect.arrayContaining([
+      expect.objectContaining({ skill: "TypeScript", kind: "build_evidence" }),
+      expect.objectContaining({ skill: "Forecasting", kind: "learnable" }),
+    ]));
   });
 
   it("ignores unrelated or above-floor verifier feedback", () => {
