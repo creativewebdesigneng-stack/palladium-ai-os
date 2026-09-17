@@ -1,3 +1,9 @@
+import {
+  normaliseAgentSkillsRegistry,
+  renderAgentSkillsRegistryPrompt,
+  type AgentSkillsRegistry,
+} from "./agent-skills-registry";
+
 export type AgentKpi = {
   name: string;
   target?: string | number | null;
@@ -18,6 +24,7 @@ export type AgentOperatingProfile = {
   expected_inputs?: string[];
   expected_outputs?: string[];
   skills?: string[];
+  skills_registry?: AgentSkillsRegistry;
   knowledge_sources?: string[];
   success_criteria?: string[];
   kpis?: AgentKpi[];
@@ -76,6 +83,7 @@ export function normaliseOperatingProfile(value: unknown): AgentOperatingProfile
   const maxDepth = Number(delegationInput["max_depth"]);
   const role = text(input["role"], 160);
   const objective = text(input["objective"], 4000);
+  const skillsRegistry = normaliseAgentSkillsRegistry(input["skills_registry"]);
 
   const profile: AgentOperatingProfile = {
     ...(role ? { role } : {}),
@@ -84,6 +92,7 @@ export function normaliseOperatingProfile(value: unknown): AgentOperatingProfile
     expected_inputs: textList(input["expected_inputs"], 20, 500),
     expected_outputs: textList(input["expected_outputs"], 20, 500),
     skills: textList(input["skills"], 30, 120),
+    ...(skillsRegistry ? { skills_registry: skillsRegistry } : {}),
     knowledge_sources: textList(input["knowledge_sources"], 30, 300),
     success_criteria: textList(input["success_criteria"], 24, 600),
     kpis: normaliseKpis(input["kpis"]),
@@ -112,6 +121,7 @@ export function hasAgentSpecV2(profile: AgentOperatingProfile | null | undefined
     profile.role ||
       profile.objective ||
       profile.responsibilities?.length ||
+      profile.skills_registry?.skills.length ||
       profile.success_criteria?.length ||
       profile.kpis?.length,
   );
@@ -128,6 +138,8 @@ export function renderOperatingProfilePrompt(profile: AgentOperatingProfile | nu
   if (profile.expected_inputs?.length) sections.push(`Expected inputs:\n${bullets(profile.expected_inputs)}`);
   if (profile.expected_outputs?.length) sections.push(`Required outputs:\n${bullets(profile.expected_outputs)}`);
   if (profile.skills?.length) sections.push(`Core skills: ${profile.skills.join(", ")}`);
+  const registryPrompt = renderAgentSkillsRegistryPrompt(profile.skills_registry);
+  if (registryPrompt) sections.push(registryPrompt);
   if (profile.knowledge_sources?.length) sections.push(`Preferred knowledge sources:\n${bullets(profile.knowledge_sources)}`);
   if (profile.success_criteria?.length) sections.push(`Completion criteria — do not claim completion until these are satisfied or explicitly reported as unverifiable:\n${bullets(profile.success_criteria)}`);
   if (profile.kpis?.length) {
