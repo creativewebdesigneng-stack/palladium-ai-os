@@ -132,6 +132,57 @@ describe("verified skill confidence", () => {
     ]));
   });
 
+  it("prioritizes expired Blackstar verification even when older success history is large", () => {
+    const successes = Array.from({ length: 8 }, (_, index) => ({
+      kind: "verified_task" as const,
+      verified: true,
+      reference: `task:historic-${index + 1}`,
+      score: 0.95,
+    }));
+    const gaps = buildAgentSkillGapPlan({
+      version: 1,
+      skills: [{
+        name: "Market research",
+        proficiency: 0.86,
+        learnable: true,
+        evidence: successes,
+        certifications: [{
+          name: "Blackstar Verified — Market research",
+          issuer: "Blackstar runtime verifier",
+          status: "expired",
+        }],
+      }],
+      certifications: [{
+        name: "Blackstar Verified — Market research",
+        issuer: "Blackstar runtime verifier",
+        status: "expired",
+      }],
+    });
+
+    expect(gaps[0]).toEqual(expect.objectContaining({
+      skill: "Market research",
+      kind: "revalidate",
+      priority: 130,
+    }));
+    expect(gaps[0]?.reason).toContain("expired");
+
+    const externalOnly = buildAgentSkillGapPlan({
+      version: 1,
+      skills: [{
+        name: "Market research",
+        proficiency: 0.86,
+        learnable: true,
+        evidence: successes,
+        certifications: [{
+          name: "External Research Certificate",
+          issuer: "Independent Institute",
+          status: "expired",
+        }],
+      }],
+    });
+    expect(externalOnly).toEqual([]);
+  });
+
   it("ignores unrelated or above-floor verifier feedback", () => {
     const unrelated = applyVerifiedSkillFailure({
       registry: registry(),
