@@ -34,6 +34,18 @@ function Toggle({ checked, onChange, label, detail }) {
   );
 }
 
+function useActionMutation({ mutationFn, successTitle, onRefresh, onFailure }) {
+  return useMutation({
+    mutationFn,
+    onSuccess: (result) => {
+      toast({ title: successTitle });
+      onRefresh();
+      return result;
+    },
+    onError: onFailure,
+  });
+}
+
 export default function PhoneCommunications() {
   const qc = useQueryClient();
   const overviewFn = useServerFn(getCommunicationsOverview);
@@ -64,15 +76,14 @@ export default function PhoneCommunications() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['phone-communications'] });
   const fail = (e) => { console.error('[phone-communications]', e); toast({ title: 'Phone communication failed', description: friendlyMessage(e), variant: 'destructive' }); };
-  const mutation = (fn, success) => useMutation({ mutationFn: fn, onSuccess: (result) => { toast({ title: success }); refresh(); return result; }, onError: fail });
 
-  const savePrefs = mutation(() => savePrefsFn({ data: prefs }), 'Communication preferences saved');
-  const saveRecipient = mutation(() => saveRecipientFn({ data: { label, phone_e164: phone, sms_consent: smsConsent, voice_consent: voiceConsent } }), 'Mobile number saved');
-  const beginVerify = mutation(() => beginVerifyFn({ data: { recipient_id: selectedId } }), 'Verification code sent');
-  const confirmVerify = mutation(() => confirmVerifyFn({ data: { recipient_id: selectedId, code: verifyCode } }), 'Mobile number verified');
-  const sendPush = mutation(() => pushFn({ data: { title: pushTitle, body: pushBody, purpose } }), 'Phone notification sent');
-  const sendSms = mutation(() => smsFn({ data: { recipient_id: selectedId, purpose, body: smsBody } }), 'SMS accepted by provider');
-  const startCall = mutation(() => callFn({ data: { recipient_id: selectedId, purpose, objective: callObjective } }), 'Blackstar AI call started');
+  const savePrefs = useActionMutation({ mutationFn: () => savePrefsFn({ data: prefs }), successTitle: 'Communication preferences saved', onRefresh: refresh, onFailure: fail });
+  const saveRecipient = useActionMutation({ mutationFn: () => saveRecipientFn({ data: { label, phone_e164: phone, sms_consent: smsConsent, voice_consent: voiceConsent } }), successTitle: 'Mobile number saved', onRefresh: refresh, onFailure: fail });
+  const beginVerify = useActionMutation({ mutationFn: () => beginVerifyFn({ data: { recipient_id: selectedId } }), successTitle: 'Verification code sent', onRefresh: refresh, onFailure: fail });
+  const confirmVerify = useActionMutation({ mutationFn: () => confirmVerifyFn({ data: { recipient_id: selectedId, code: verifyCode } }), successTitle: 'Mobile number verified', onRefresh: refresh, onFailure: fail });
+  const sendPush = useActionMutation({ mutationFn: () => pushFn({ data: { title: pushTitle, body: pushBody, purpose } }), successTitle: 'Phone notification sent', onRefresh: refresh, onFailure: fail });
+  const sendSms = useActionMutation({ mutationFn: () => smsFn({ data: { recipient_id: selectedId, purpose, body: smsBody } }), successTitle: 'SMS accepted by provider', onRefresh: refresh, onFailure: fail });
+  const startCall = useActionMutation({ mutationFn: () => callFn({ data: { recipient_id: selectedId, purpose, objective: callObjective } }), successTitle: 'Blackstar AI call started', onRefresh: refresh, onFailure: fail });
 
   const selected = useMemo(() => data?.recipients?.find((r) => r.id === selectedId), [data?.recipients, selectedId]);
   const caps = data?.capabilities ?? {};
