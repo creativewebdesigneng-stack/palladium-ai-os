@@ -4,6 +4,11 @@ import {
   type AgentPerformanceSnapshot,
   type AgentSimilaritySnapshot,
 } from "./agent-performance";
+import {
+  effectiveAgentSkillsRegistry,
+  registrySearchText,
+  registrySelectionBonus,
+} from "./agent-skills-registry";
 import type { AgentOperatingProfile } from "./agent-spec";
 
 export type OrchestratorCandidate = {
@@ -17,6 +22,7 @@ export type OrchestratorCandidate = {
   operating_profile?: AgentOperatingProfile | null;
   performance?: AgentPerformanceSnapshot | null;
   similar_performance?: AgentSimilaritySnapshot | null;
+  trust_score?: number | null;
 };
 
 export type OrchestratorAssignment = {
@@ -52,8 +58,20 @@ function tokens(value: string): Set<string> {
   );
 }
 
+function skillsRegistryForCandidate(candidate: OrchestratorCandidate) {
+  const profile = candidate.operating_profile ?? {};
+  return effectiveAgentSkillsRegistry({
+    registry: profile.skills_registry,
+    legacySkills: profile.skills,
+    allowedTools: candidate.allowed_tools,
+    modelProvider: candidate.model_provider,
+    model: candidate.model,
+  });
+}
+
 function candidateText(candidate: OrchestratorCandidate): string {
   const profile = candidate.operating_profile ?? {};
+  const registry = skillsRegistryForCandidate(candidate);
   return [
     candidate.name,
     candidate.category,
@@ -66,14 +84,21 @@ function candidateText(candidate: OrchestratorCandidate): string {
     ...(profile.expected_outputs ?? []),
     ...(profile.success_criteria ?? []),
     ...(candidate.allowed_tools ?? []),
+    registrySearchText(registry),
   ]
     .filter(Boolean)
     .join(" ");
 }
 
+function trustSelectionBonus(trustScore: number | null | undefined): number {
+  if (trustScore === null || trustScore === undefined || !Number.isFinite(trustScore)) return 0;
+  return Math.round(Math.min(Math.max(trustScore, 0), 1) * 4);
+}
+
 /**
  * Deterministic pre-ranking. Declared role/skill fit remains primary; verified
- * global history and similar-task history supply only bounded secondary bonuses.
+ * registry evidence, trust, global history and similar-task history supply only
+ * bounded secondary bonuses.
  */
 export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate): number {
   const wanted = tokens(goal);
@@ -81,11 +106,14 @@ export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate
   let score = 0;
   for (const token of wanted) if (available.has(token)) score += 4;
   const profile = candidate.operating_profile ?? {};
+  const registry = skillsRegistryForCandidate(candidate);
   if (profile.role) score += 3;
   if (profile.objective) score += 2;
   if (profile.skills?.length) score += Math.min(profile.skills.length, 5);
   if (profile.success_criteria?.length) score += 2;
   if (candidate.allowed_tools?.length) score += 1;
+  score += registrySelectionBonus(goal, registry);
+  score += trustSelectionBonus(candidate.trust_score);
   score += performanceSelectionBonus(candidate.performance);
   score += similaritySelectionBonus(candidate.similar_performance);
   return score;
@@ -226,6 +254,27 @@ function similarityLine(candidate: OrchestratorCandidate): string | null {
   return `Similar-task evidence: ${similarity.successes}/${similarity.similarity_runs} successful; verifier ${verifier}; match ${Math.round(similarity.average_similarity * 100)}%`;
 }
 
+function registryLine(candidate: OrchestratorCandidate): string | null {
+  const registry = skillsRegistryForCandidate(candidate);
+  if (!registry) return null;
+  const skills = registry.skills.slice(0, 12).map((skill) => {
+    const verified = (skill.evidence ?? []).some((item) => item.verified) ||
+      (skill.certifications ?? []).some((item) => item.status === "verified");
+    return `${skill.name}${verified ? " [verified]" : ""}`;
+  });
+  const parts = [
+    skills.length ? `skills ${skills.join(", ")}` : "",
+    registry.connectors?.length ? `connectors ${registry.connectors.join(", ")}` : "",
+    registry.models?.length ? `models ${registry.models.join(", ")}` : "",
+  ].filter(Boolean);
+  return parts.length ? `Universal registry: ${parts.join("; ")}` : null;
+}
+
+function trustLine(candidate: OrchestratorCandidate): string | null {
+  if (candidate.trust_score === null || candidate.trust_score === undefined || !Number.isFinite(candidate.trust_score)) return null;
+  return `Trust score: ${Math.round(Math.min(Math.max(candidate.trust_score, 0), 1) * 100)}%`;
+}
+
 export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): string {
   return candidates
     .map((candidate) => {
@@ -237,6 +286,8 @@ export function renderCandidateCatalogue(candidates: OrchestratorCandidate[]): s
         `Objective: ${profile.objective ?? candidate.purpose ?? "not specified"}`,
         `Skills: ${(profile.skills ?? []).join(", ") || "not specified"}`,
         `Tools: ${(candidate.allowed_tools ?? []).join(", ") || "none"}`,
+        registryLine(candidate),
+        trustLine(candidate),
         performanceLine(candidate),
         similarityLine(candidate),
       ].filter(Boolean).join("\n");
