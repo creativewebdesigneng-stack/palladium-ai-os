@@ -12,13 +12,19 @@ describe("workforce verified learning contract", () => {
     expect(workforceSource).toContain(
       'import { captureVerifiedAgentExperience } from "./agent-learning.server"',
     );
+    expect(workforceSource).toContain(
+      'import { captureVerifiedAgentSkillLearning } from "./agent-skill-learning.server"',
+    );
     expect(workforceSource).toContain("task = await executePlannedRun({");
     expect(workforceSource).toContain("await captureVerifiedAgentExperience({");
+    expect(workforceSource).toContain("await captureVerifiedAgentSkillLearning({");
     expect(workforceSource).toContain("taskId: run.taskId");
 
     const executeIndex = workforceSource.indexOf("task = await executePlannedRun({");
     const learningIndex = workforceSource.indexOf("await captureVerifiedAgentExperience({");
+    const skillLearningIndex = workforceSource.indexOf("await captureVerifiedAgentSkillLearning({");
     expect(executeIndex).toBeGreaterThanOrEqual(0);
     expect(learningIndex).toBeGreaterThan(executeIndex);
+    expect(skillLearningIndex).toBeGreaterThan(learningIndex);
   });
 });

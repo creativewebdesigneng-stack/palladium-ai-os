@@ -24,6 +24,7 @@ import {
 import { failRun, prepareRun, RuntimeError } from "./runtime.server";
 import { executePlannedRun } from "./planner-runtime.server";
 import { captureVerifiedAgentExperience } from "./agent-learning.server";
+import { captureVerifiedAgentSkillLearning } from "./agent-skill-learning.server";
 import { notify } from "@/lib/notifications/notify.server";
 import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
 import {
@@ -482,6 +483,11 @@ export async function runStep(args: {
           timeoutMs,
         });
         await captureVerifiedAgentExperience({
+          sb: args.sb as never,
+          userId: args.userId,
+          taskId: run.taskId,
+        });
+        await captureVerifiedAgentSkillLearning({
           sb: args.sb as never,
           userId: args.userId,
           taskId: run.taskId,
