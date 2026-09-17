@@ -1,5 +1,6 @@
 export type CapabilityFamily =
   | "ecommerce"
+  | "food_delivery"
   | "social_media"
   | "productivity"
   | "communication"
@@ -39,6 +40,11 @@ export const PROVIDER_CAPABILITY_PROFILES: ProviderCapabilityProfile[] = [
   { id: "woocommerce", name: "WooCommerce", families: ["ecommerce"], preferredLanes: ["direct_api", "browser"], status: "planned" },
   { id: "amazon_seller", name: "Amazon Seller", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
   { id: "ebay", name: "eBay", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
+  { id: "uber_eats", name: "Uber Eats", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
+  { id: "deliveroo", name: "Deliveroo", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
+  { id: "just_eat", name: "Just Eat", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
+  { id: "doordash", name: "DoorDash", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned" },
+  { id: "wolt", name: "Wolt", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned" },
   { id: "instagram", name: "Instagram", families: ["social_media"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
   { id: "facebook", name: "Facebook", families: ["social_media"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
   { id: "tiktok", name: "TikTok", families: ["social_media"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
