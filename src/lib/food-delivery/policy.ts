@@ -22,6 +22,10 @@ export function foodDeliveryActionPolicy(capability: FoodDeliveryCapability): Fo
   };
 }
 
+export function capabilityRequiresApproval(capability: FoodDeliveryCapability): boolean {
+  return foodDeliveryActionPolicy(capability).requiresApproval;
+}
+
 export function assertFoodDeliveryCapabilityGranted(
   capability: FoodDeliveryCapability,
   grantedCapabilities: readonly FoodDeliveryCapability[],
