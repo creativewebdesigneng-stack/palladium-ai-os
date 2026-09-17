@@ -65,8 +65,8 @@ describe("verified skill learning persistence", () => {
     });
 
     expect(result?.changed).toBe(true);
-    const saved = sb.tables.personal_agents?.[0];
-    const skill = saved?.operating_profile?.skills_registry?.skills?.[0];
+    const saved = sb.tables["personal_agents"]?.[0];
+    const skill = saved?.["operating_profile"]?.skills_registry?.skills?.[0];
     expect(skill?.evidence).toEqual(expect.arrayContaining([
       expect.objectContaining({
         kind: "verified_task",
@@ -75,14 +75,14 @@ describe("verified skill learning persistence", () => {
         score: 0.95,
       }),
     ]));
-    expect(saved?.system_prompt).toContain("UNIVERSAL SKILLS REGISTRY");
+    expect(saved?.["system_prompt"]).toContain("UNIVERSAL SKILLS REGISTRY");
 
     await captureVerifiedAgentSkillLearning({
       sb,
       userId: "user-1",
       taskId: "task-1",
     });
-    const repeated = sb.tables.personal_agents?.[0]?.operating_profile?.skills_registry?.skills?.[0]?.evidence
+    const repeated = sb.tables["personal_agents"]?.[0]?.operating_profile?.skills_registry?.skills?.[0]?.evidence
       ?.filter((item: { reference?: string }) => item.reference === "task:task-1");
     expect(repeated).toHaveLength(1);
   });
@@ -101,6 +101,6 @@ describe("verified skill learning persistence", () => {
     });
 
     expect(result).toBeNull();
-    expect(sb.tables.personal_agents?.[0]?.operating_profile).toEqual(agent.operating_profile);
+    expect(sb.tables["personal_agents"]?.[0]?.operating_profile).toEqual(agent.operating_profile);
   });
 });
