@@ -230,6 +230,24 @@ export function buildAgentSkillGapPlan(
       item.reference.length > 0,
     ).length;
     const certified = (skill.certifications ?? []).some((item) => item.status === "verified");
+    const expiredBlackstarCertification = [
+      ...(skill.certifications ?? []),
+      ...(registry.certifications ?? []),
+    ].some((item) =>
+      item.status === "expired" &&
+      key(item.issuer ?? "") === key("Blackstar runtime verifier") &&
+      key(item.name) === key(certificationName(skill.name)),
+    );
+
+    if (expiredBlackstarCertification) {
+      gaps.push({
+        skill: skill.name,
+        kind: "revalidate",
+        priority: 130 + Math.min(failures, 10) * 2,
+        reason: "Blackstar verification expired after recent verifier-confirmed failures; earn fresh successful evidence to re-certify.",
+      });
+      continue;
+    }
 
     if (failures >= 2 && failures >= successes) {
       gaps.push({
