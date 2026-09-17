@@ -34,7 +34,7 @@ function origin() {
 export function communicationsRuntimeCapabilities() {
   const twilio = config();
   const capabilities = getRetailTwilioCapabilities(twilio);
-  const verifySid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim() ?? '';
+  const verifySid = process.env['TWILIO_VERIFY_SERVICE_SID']?.trim() ?? '';
   return {
     phone_push: true,
     sms: capabilities.sms,
@@ -76,7 +76,7 @@ async function postForm(url: string, body: URLSearchParams) {
 
 export async function startPhoneVerification(phoneE164: string) {
   const twilio = config();
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim() ?? '';
+  const serviceSid = process.env['TWILIO_VERIFY_SERVICE_SID']?.trim() ?? '';
   if (!twilio || !VERIFY_SERVICE_SID.test(serviceSid)) throw new Error('Twilio Verify is not configured.');
   const body = new URLSearchParams({ To: phoneE164, Channel: 'sms' });
   const result = await postForm(`https://verify.twilio.com/v2/Services/${serviceSid}/Verifications`, body);
@@ -85,7 +85,7 @@ export async function startPhoneVerification(phoneE164: string) {
 
 export async function checkPhoneVerification(phoneE164: string, code: string) {
   const twilio = config();
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim() ?? '';
+  const serviceSid = process.env['TWILIO_VERIFY_SERVICE_SID']?.trim() ?? '';
   if (!twilio || !VERIFY_SERVICE_SID.test(serviceSid)) throw new Error('Twilio Verify is not configured.');
   const body = new URLSearchParams({ To: phoneE164, Code: code });
   const result = await postForm(`https://verify.twilio.com/v2/Services/${serviceSid}/VerificationCheck`, body);
