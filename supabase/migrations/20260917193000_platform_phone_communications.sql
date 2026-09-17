@@ -82,19 +82,12 @@ alter table public.communication_recipients enable row level security;
 alter table public.communication_events enable row level security;
 alter table public.communication_call_sessions enable row level security;
 
+-- Authenticated clients may read only their own communication state. All writes go
+-- through authenticated Blackstar server functions so verification, consent,
+-- quiet-hour and rate-limit checks cannot be bypassed by direct table updates.
 create policy "communication preferences owner read" on public.communication_preferences for select to authenticated using (auth.uid() = user_id);
-create policy "communication preferences owner insert" on public.communication_preferences for insert to authenticated with check (auth.uid() = user_id);
-create policy "communication preferences owner update" on public.communication_preferences for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
 create policy "communication recipients owner read" on public.communication_recipients for select to authenticated using (auth.uid() = user_id);
-create policy "communication recipients owner insert" on public.communication_recipients for insert to authenticated with check (auth.uid() = user_id);
-create policy "communication recipients owner update" on public.communication_recipients for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "communication recipients owner delete" on public.communication_recipients for delete to authenticated using (auth.uid() = user_id);
-
 create policy "communication events owner read" on public.communication_events for select to authenticated using (auth.uid() = user_id);
-create policy "communication events owner insert" on public.communication_events for insert to authenticated with check (auth.uid() = user_id);
-create policy "communication events owner update" on public.communication_events for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
 create policy "communication call sessions owner read" on public.communication_call_sessions for select to authenticated using (auth.uid() = user_id);
 
 revoke all on table public.communication_preferences from anon;
@@ -102,7 +95,12 @@ revoke all on table public.communication_recipients from anon;
 revoke all on table public.communication_events from anon;
 revoke all on table public.communication_call_sessions from anon;
 
-grant select, insert, update on table public.communication_preferences to authenticated;
-grant select, insert, update, delete on table public.communication_recipients to authenticated;
-grant select, insert, update on table public.communication_events to authenticated;
+revoke all on table public.communication_preferences from authenticated;
+revoke all on table public.communication_recipients from authenticated;
+revoke all on table public.communication_events from authenticated;
+revoke all on table public.communication_call_sessions from authenticated;
+
+grant select on table public.communication_preferences to authenticated;
+grant select on table public.communication_recipients to authenticated;
+grant select on table public.communication_events to authenticated;
 grant select on table public.communication_call_sessions to authenticated;
