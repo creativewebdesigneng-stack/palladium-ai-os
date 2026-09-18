@@ -570,6 +570,10 @@ describe("workflow approval gates", () => {
       duration_ms: 0,
       tokens_in: 0,
       tokens_out: 0,
+      task_id: null,
+      verification_score: null,
+      verification_passed: null,
+      skill_feedback: null,
     };
     const sb = workflowDb({ workflow_steps: [upstream, approval, downstream] });
     sb.tables.workflow_runs[0].step_results = [completedUpstream];
