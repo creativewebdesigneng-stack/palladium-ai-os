@@ -10,6 +10,10 @@ const consoleSource = readFileSync(
   fileURLToPath(new URL("../../../components/mission/OrchestratorConsole.jsx", import.meta.url)),
   "utf8",
 );
+const workforceSource = readFileSync(
+  fileURLToPath(new URL("../workforce.server.ts", import.meta.url)),
+  "utf8",
+);
 
 describe("orchestrator selection attribution contract", () => {
   it("attaches deterministic attribution after planner output and persists it with the workflow step", () => {
@@ -33,5 +37,18 @@ describe("orchestrator selection attribution contract", () => {
     expect(consoleSource).toContain("selection_audit");
     expect(consoleSource).toContain("score_delta_from_top");
     expect(consoleSource).toContain("Deterministic bounded pre-ranking");
+  });
+
+  it("links observed workflow outcomes to the executed task without inventing counterfactual evidence", () => {
+    expect(workforceSource).toContain("verification_score");
+    expect(workforceSource).toContain("verification_passed");
+    expect(workforceSource).toContain("skill_feedback");
+    expect(workforceSource).toContain("captureVerifiedAgentSkillLearning");
+    expect(workforceSource).toContain("captureVerifiedAgentSkillFailure");
+    expect(workforceSource).toContain("step_results: completed");
+    expect(consoleSource).toContain("Observed outcome");
+    expect(consoleSource).toContain("outcome.verification_score");
+    expect(consoleSource).toContain("outcome.skill_feedback");
+    expect(consoleSource).toContain("does not infer outcomes for candidates that were not run");
   });
 });
