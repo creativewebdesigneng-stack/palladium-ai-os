@@ -34,6 +34,8 @@ export type AgentSelectionSkillAttribution = {
 
 export type AgentSelectionAttribution = {
   version: 1;
+  agent_name: string;
+  role: string;
   score: number;
   matched_goal_tokens: string[];
   matched_skills: AgentSelectionSkillAttribution[];
@@ -202,6 +204,8 @@ export function buildAgentSelectionAttribution(
 
   return {
     version: 1,
+    agent_name: candidate.name,
+    role: String(profile.role ?? candidate.category ?? "specialist"),
     score: textFit + registryEvidence + trust + performance + similarPerformance,
     matched_goal_tokens: matchedGoalTokens,
     matched_skills: matchedSkills,
@@ -355,7 +359,7 @@ export function attachSelectionAttribution(
       return candidate
         ? {
             ...assignment,
-            selection_attribution: buildAgentSelectionAttribution(assignment.objective, candidate),
+            selection_attribution: buildAgentSelectionAttribution(plan.goal, candidate),
           }
         : assignment;
     }),
