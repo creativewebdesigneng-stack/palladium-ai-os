@@ -25,6 +25,44 @@ export type OrchestratorCandidate = {
   trust_score?: number | null;
 };
 
+export type AgentSelectionSkillAttribution = {
+  name: string;
+  proficiency: number;
+  verified: boolean;
+  certified: boolean;
+};
+
+export type AgentSelectionAttribution = {
+  version: 1;
+  score: number;
+  matched_goal_tokens: string[];
+  matched_skills: AgentSelectionSkillAttribution[];
+  matched_tools: string[];
+  matched_connectors: string[];
+  matched_certifications: string[];
+  matched_experience: string[];
+  matched_models: string[];
+  score_breakdown: {
+    text_fit: number;
+    registry_evidence: number;
+    trust: number;
+    performance: number;
+    similar_performance: number;
+  };
+  trust_score: number | null;
+  recent_performance: {
+    runs: number;
+    successes: number;
+    average_verifier_score: number | null;
+  } | null;
+  similar_task_performance: {
+    runs: number;
+    successes: number;
+    average_similarity: number;
+    average_verifier_score: number | null;
+  } | null;
+};
+
 export type OrchestratorAssignment = {
   id: string;
   title: string;
@@ -33,6 +71,7 @@ export type OrchestratorAssignment = {
   depends_on: string[];
   success_criteria: string[];
   requires_approval: boolean;
+  selection_attribution?: AgentSelectionAttribution;
 };
 
 export type OrchestratorPlan = {
@@ -56,6 +95,24 @@ function tokens(value: string): Set<string> {
       .split(/\s+/)
       .filter((word) => word.length > 2),
   );
+}
+
+
+function relevantValues(goal: string, values: string[], limit = 8): string[] {
+  const wanted = tokens(goal);
+  const goalText = ` ${goal.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  return values.filter((value) => {
+    const phrase = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!phrase) return false;
+    if (goalText.includes(` ${phrase} `)) return true;
+    const available = tokens(value);
+    for (const token of wanted) if (available.has(token)) return true;
+    return false;
+  }).slice(0, limit);
+}
+
+function positiveSkillEvidence(skill: NonNullable<ReturnType<typeof skillsRegistryForCandidate>>["skills"][number]) {
+  return (skill.evidence ?? []).some((item) => item.verified && item.kind !== "verified_failure");
 }
 
 function skillsRegistryForCandidate(candidate: OrchestratorCandidate) {
@@ -100,23 +157,96 @@ function trustSelectionBonus(trustScore: number | null | undefined): number {
  * registry evidence, trust, global history and similar-task history supply only
  * bounded secondary bonuses.
  */
-export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate): number {
+export function buildAgentSelectionAttribution(
+  goal: string,
+  candidate: OrchestratorCandidate,
+): AgentSelectionAttribution {
   const wanted = tokens(goal);
   const available = tokens(candidateText(candidate));
-  let score = 0;
-  for (const token of wanted) if (available.has(token)) score += 4;
+  const matchedGoalTokens = [...wanted].filter((token) => available.has(token)).slice(0, 24);
   const profile = candidate.operating_profile ?? {};
   const registry = skillsRegistryForCandidate(candidate);
-  if (profile.role) score += 3;
-  if (profile.objective) score += 2;
-  if (profile.skills?.length) score += Math.min(profile.skills.length, 5);
-  if (profile.success_criteria?.length) score += 2;
-  if (candidate.allowed_tools?.length) score += 1;
-  score += registrySelectionBonus(goal, registry);
-  score += trustSelectionBonus(candidate.trust_score);
-  score += performanceSelectionBonus(candidate.performance);
-  score += similaritySelectionBonus(candidate.similar_performance);
-  return score;
+
+  let textFit = matchedGoalTokens.length * 4;
+  if (profile.role) textFit += 3;
+  if (profile.objective) textFit += 2;
+  if (profile.skills?.length) textFit += Math.min(profile.skills.length, 5);
+  if (profile.success_criteria?.length) textFit += 2;
+  if (candidate.allowed_tools?.length) textFit += 1;
+
+  const registryEvidence = registrySelectionBonus(goal, registry);
+  const trust = trustSelectionBonus(candidate.trust_score);
+  const performance = performanceSelectionBonus(candidate.performance);
+  const similarPerformance = similaritySelectionBonus(candidate.similar_performance);
+
+  const matchedSkills = (registry?.skills ?? [])
+    .filter((skill) => relevantValues(goal, [skill.name, ...(skill.aliases ?? [])], 1).length > 0)
+    .slice(0, 12)
+    .map((skill) => ({
+      name: skill.name,
+      proficiency: skill.proficiency,
+      verified: positiveSkillEvidence(skill) ||
+        (skill.certifications ?? []).some((item) => item.status === "verified"),
+      certified: (skill.certifications ?? []).some((item) => item.status === "verified"),
+    }));
+
+  const certifications = [
+    ...(registry?.certifications ?? []),
+    ...(registry?.skills ?? []).flatMap((skill) => skill.certifications ?? []),
+  ].filter((item) => item.status === "verified").map((item) => item.name);
+
+  const experience = [
+    ...(registry?.previous_experience ?? []),
+    ...(registry?.skills ?? []).flatMap((skill) => skill.previous_experience ?? []),
+  ];
+
+  return {
+    version: 1,
+    score: textFit + registryEvidence + trust + performance + similarPerformance,
+    matched_goal_tokens: matchedGoalTokens,
+    matched_skills: matchedSkills,
+    matched_tools: relevantValues(goal, [
+      ...(candidate.allowed_tools ?? []),
+      ...(registry?.tools ?? []),
+      ...(registry?.skills ?? []).flatMap((skill) => skill.tools ?? []),
+    ]),
+    matched_connectors: relevantValues(goal, [
+      ...(registry?.connectors ?? []),
+      ...(registry?.skills ?? []).flatMap((skill) => skill.connectors ?? []),
+    ]),
+    matched_certifications: relevantValues(goal, certifications),
+    matched_experience: relevantValues(goal, experience, 5),
+    matched_models: relevantValues(goal, registry?.models ?? [], 5),
+    score_breakdown: {
+      text_fit: textFit,
+      registry_evidence: registryEvidence,
+      trust,
+      performance,
+      similar_performance: similarPerformance,
+    },
+    trust_score: candidate.trust_score === null || candidate.trust_score === undefined || !Number.isFinite(candidate.trust_score)
+      ? null
+      : Math.min(Math.max(candidate.trust_score, 0), 1),
+    recent_performance: candidate.performance && candidate.performance.runs >= 2
+      ? {
+          runs: candidate.performance.runs,
+          successes: candidate.performance.successes,
+          average_verifier_score: candidate.performance.average_verifier_score,
+        }
+      : null,
+    similar_task_performance: candidate.similar_performance && candidate.similar_performance.similarity_runs >= 2
+      ? {
+          runs: candidate.similar_performance.similarity_runs,
+          successes: candidate.similar_performance.successes,
+          average_similarity: candidate.similar_performance.average_similarity,
+          average_verifier_score: candidate.similar_performance.average_verifier_score,
+        }
+      : null,
+  };
+}
+
+export function scoreAgentForGoal(goal: string, candidate: OrchestratorCandidate): number {
+  return buildAgentSelectionAttribution(goal, candidate).score;
 }
 
 export function shortlistAgents(
@@ -213,6 +343,25 @@ export function normaliseOrchestratorPlan(args: {
   };
 }
 
+export function attachSelectionAttribution(
+  plan: OrchestratorPlan,
+  candidates: OrchestratorCandidate[],
+): OrchestratorPlan {
+  const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  return {
+    ...plan,
+    assignments: plan.assignments.map((assignment) => {
+      const candidate = byId.get(assignment.agent_id);
+      return candidate
+        ? {
+            ...assignment,
+            selection_attribution: buildAgentSelectionAttribution(assignment.objective, candidate),
+          }
+        : assignment;
+    }),
+  };
+}
+
 export function fallbackOrchestratorPlan(
   goal: string,
   candidate: OrchestratorCandidate,
@@ -231,6 +380,7 @@ export function fallbackOrchestratorPlan(
         depends_on: [],
         success_criteria: candidate.operating_profile?.success_criteria?.slice(0, 12) ?? [],
         requires_approval: forceApproval,
+        selection_attribution: buildAgentSelectionAttribution(goal, candidate),
       },
     ],
   };
@@ -258,7 +408,7 @@ function registryLine(candidate: OrchestratorCandidate): string | null {
   const registry = skillsRegistryForCandidate(candidate);
   if (!registry) return null;
   const skills = registry.skills.slice(0, 12).map((skill) => {
-    const verified = (skill.evidence ?? []).some((item) => item.verified) ||
+    const verified = positiveSkillEvidence(skill) ||
       (skill.certifications ?? []).some((item) => item.status === "verified");
     return `${skill.name}${verified ? " [verified]" : ""}`;
   });
