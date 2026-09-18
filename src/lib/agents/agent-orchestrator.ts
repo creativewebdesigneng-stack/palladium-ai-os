@@ -8,6 +8,7 @@ import {
   effectiveAgentSkillsRegistry,
   registrySearchText,
   registrySelectionBonus,
+  type AgentSkillRecord,
 } from "./agent-skills-registry";
 import type { AgentOperatingProfile } from "./agent-spec";
 
@@ -103,7 +104,7 @@ function tokens(value: string): Set<string> {
 function relevantValues(goal: string, values: string[], limit = 8): string[] {
   const wanted = tokens(goal);
   const goalText = ` ${goal.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
-  return values.filter((value) => {
+  return [...new Set(values)].filter((value) => {
     const phrase = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     if (!phrase) return false;
     if (goalText.includes(` ${phrase} `)) return true;
@@ -113,7 +114,7 @@ function relevantValues(goal: string, values: string[], limit = 8): string[] {
   }).slice(0, limit);
 }
 
-function positiveSkillEvidence(skill: NonNullable<ReturnType<typeof skillsRegistryForCandidate>>["skills"][number]) {
+function positiveSkillEvidence(skill: AgentSkillRecord) {
   return (skill.evidence ?? []).some((item) => item.verified && item.kind !== "verified_failure");
 }
 
