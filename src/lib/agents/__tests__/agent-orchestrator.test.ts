@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  attachSelectionAttribution,
+  buildAgentSelectionAttribution,
   fallbackOrchestratorPlan,
   normaliseOrchestratorPlan,
   renderCandidateCatalogue,
@@ -99,6 +101,125 @@ describe("Palladium Orchestrator", () => {
     const catalogue = renderCandidateCatalogue([verified]);
     expect(catalogue).toContain("shopify inventory automation [verified]");
     expect(catalogue).toContain("Trust score: 94%");
+  });
+
+  it("builds selection attribution from the exact bounded pre-ranking score", () => {
+    const candidate: OrchestratorCandidate = {
+      ...research,
+      trust_score: 0.8,
+      performance: {
+        agent_id: "research",
+        runs: 8,
+        successes: 7,
+        failures: 1,
+        verified_runs: 8,
+        success_rate: 0.875,
+        average_verifier_score: 0.93,
+        average_replans: 0.25,
+        average_duration_ms: 1200,
+        performance_score: 0.82,
+      },
+      similar_performance: {
+        agent_id: "research",
+        goal: "research competitors",
+        runs: 4,
+        successes: 4,
+        failures: 0,
+        verified_runs: 4,
+        success_rate: 1,
+        average_verifier_score: 0.95,
+        average_replans: 0,
+        average_duration_ms: 1100,
+        performance_score: 0.72,
+        similarity_runs: 4,
+        average_similarity: 0.75,
+        similarity_score: 0.54,
+      },
+      operating_profile: {
+        ...research.operating_profile,
+        skills_registry: {
+          version: 1,
+          skills: [{
+            name: "competitor analysis",
+            proficiency: 0.9,
+            learnable: true,
+            tools: ["web_search"],
+            connectors: ["Research MCP"],
+            certifications: [{
+              name: "Blackstar Verified — competitor analysis",
+              issuer: "Blackstar runtime verifier",
+              status: "verified",
+            }],
+            evidence: [{ kind: "verified_task", verified: true, score: 0.96, reference: "task:one" }],
+          }],
+          tools: ["web_search"],
+          connectors: ["Research MCP"],
+          previous_experience: ["Competitor research for UK retail launches"],
+          models: ["blackstar:astra"],
+        },
+      },
+    };
+
+    const attribution = buildAgentSelectionAttribution("perform competitor analysis with web_search evidence", candidate);
+
+    expect(attribution.score).toBe(scoreAgentForGoal("perform competitor analysis with web_search evidence", candidate));
+    expect(attribution.agent_name).toBe("Market Intelligence Agent");
+    expect(attribution.matched_skills).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "competitor analysis", verified: true, certified: true }),
+    ]));
+    expect(attribution.matched_tools).toContain("web_search");
+    expect(attribution.score_breakdown.trust).toBeGreaterThan(0);
+    expect(attribution.score_breakdown.performance).toBeGreaterThan(0);
+    expect(attribution.score_breakdown.similar_performance).toBeGreaterThan(0);
+  });
+
+  it("never lets planner-provided attribution override deterministic selection evidence", () => {
+    const plan = normaliseOrchestratorPlan({
+      goal: "Research competitors",
+      candidates: [research],
+      value: {
+        assignments: [{
+          id: "research-step",
+          title: "Research",
+          objective: "Find competitor evidence",
+          agent_id: "research",
+          selection_attribution: { score: 999999, agent_name: "spoofed" },
+        }],
+      },
+    });
+
+    expect(plan.assignments[0]?.selection_attribution).toBeUndefined();
+
+    const attributed = attachSelectionAttribution(plan, [research]);
+    expect(attributed.assignments[0]?.selection_attribution?.agent_name).toBe(research.name);
+    expect(attributed.assignments[0]?.selection_attribution?.score).toBe(scoreAgentForGoal(plan.goal, research));
+  });
+
+  it("does not present verifier-confirmed failure evidence as positive verification", () => {
+    const failureOnly: OrchestratorCandidate = {
+      ...research,
+      operating_profile: {
+        ...research.operating_profile,
+        skills_registry: {
+          version: 1,
+          skills: [{
+            name: "competitor analysis",
+            proficiency: 0.6,
+            learnable: true,
+            evidence: [{
+              kind: "verified_failure",
+              verified: true,
+              score: 0.3,
+              reference: "task:failed:verification-failure",
+            }],
+          }],
+        },
+      },
+    };
+
+    const attribution = buildAgentSelectionAttribution("competitor analysis", failureOnly);
+    expect(attribution.matched_skills[0]?.verified).toBe(false);
+    expect(renderCandidateCatalogue([failureOnly])).not.toContain("competitor analysis [verified]");
   });
 
   it("rejects assignments to agents outside the authorised shortlist", () => {

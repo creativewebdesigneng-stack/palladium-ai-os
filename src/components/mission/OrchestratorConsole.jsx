@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Network, Play, ShieldCheck, Sparkles, Users, GitBranch, Radio } from 'lucide-react';
+import { Network, Play, ShieldCheck, Sparkles, Users, GitBranch, Radio, BadgeCheck, Gauge } from 'lucide-react';
 
 function statusLabel(execution) {
   if (execution?.paused) return 'Waiting for approval';
@@ -8,6 +8,69 @@ function statusLabel(execution) {
   if (status === 'failed') return 'Failed';
   if (status === 'cancelled') return 'Cancelled';
   return status ? String(status).replaceAll('_', ' ') : 'Ready';
+}
+
+function SelectionAttribution({ attribution }) {
+  if (!attribution) return null;
+  const breakdown = attribution.score_breakdown || {};
+  const trust = attribution.trust_score == null ? null : Math.round(attribution.trust_score * 100);
+  const performance = attribution.recent_performance;
+  const similar = attribution.similar_task_performance;
+  const evidence = [
+    ...(attribution.matched_skills || []).map((skill) => ({
+      label: `${skill.name}${skill.verified ? ' · verified' : ''}`,
+      verified: skill.verified,
+    })),
+    ...(attribution.matched_tools || []).map((item) => ({ label: `Tool · ${item}`, verified: false })),
+    ...(attribution.matched_connectors || []).map((item) => ({ label: `Connector · ${item}`, verified: false })),
+    ...(attribution.matched_certifications || []).map((item) => ({ label: `Certificate · ${item}`, verified: true })),
+  ].slice(0, 10);
+
+  return (
+    <div className="mt-3 rounded-xl border border-violet-300/10 bg-violet-300/[.025] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+          <BadgeCheck className="h-3.5 w-3.5" /> Selection evidence
+        </p>
+        <span className="flex items-center gap-1 rounded-md border border-white/8 bg-black/20 px-2 py-1 text-[9px] text-white/45">
+          <Gauge className="h-3 w-3" /> mission score {attribution.score}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] text-white/55">
+        <span className="font-medium text-white/75">{attribution.agent_name}</span> · {attribution.role}
+      </p>
+
+      {evidence.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {evidence.map((item, index) => (
+            <span
+              key={`${item.label}-${index}`}
+              className={`rounded-md border px-1.5 py-1 text-[9px] ${item.verified ? 'border-emerald-300/15 bg-emerald-300/[.045] text-emerald-200/75' : 'border-white/8 bg-white/[.025] text-white/42'}`}
+            >
+              {item.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-2 grid gap-1.5 text-[9px] text-white/36 sm:grid-cols-2">
+        <p>Score · fit {breakdown.text_fit ?? 0} · registry {breakdown.registry_evidence ?? 0} · trust {breakdown.trust ?? 0} · performance {breakdown.performance ?? 0} · similar {breakdown.similar_performance ?? 0}</p>
+        <p>
+          {trust == null ? 'Trust evidence unavailable' : `Trust ${trust}%`}
+          {performance ? ` · recent ${performance.successes}/${performance.runs} successful` : ''}
+          {similar ? ` · similar-task match ${Math.round(similar.average_similarity * 100)}%` : ''}
+        </p>
+      </div>
+
+      {(attribution.matched_experience || []).length || (attribution.matched_models || []).length ? (
+        <p className="mt-1.5 text-[9px] leading-4 text-white/30">
+          {attribution.matched_experience?.length ? `Relevant experience: ${attribution.matched_experience.join('; ')}. ` : ''}
+          {attribution.matched_models?.length ? `Model fit: ${attribution.matched_models.join(', ')}.` : ''}
+        </p>
+      ) : null}
+      <p className="mt-1.5 text-[9px] leading-4 text-white/25">This explains Blackstar’s deterministic pre-ranking evidence; it does not grant tools, permissions, connector access or approval rights.</p>
+    </div>
+  );
 }
 
 export default function OrchestratorConsole({ onRun, pending, result }) {
@@ -84,6 +147,7 @@ export default function OrchestratorConsole({ onRun, pending, result }) {
                     <div><p className="text-sm font-semibold text-white">{assignment.title}</p><p className="mt-1 text-xs leading-5 text-white/42">{assignment.objective}</p></div>
                     <span className="shrink-0 rounded-md border border-white/8 bg-black/25 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/38">{step?.status ?? 'planned'}</span>
                   </div>
+                  <SelectionAttribution attribution={assignment.selection_attribution} />
                   {assignment.depends_on?.length > 0 && <p className="mt-3 text-[10px] text-white/30">Dependencies: {assignment.depends_on.join(', ')}</p>}
                   {assignment.requires_approval && <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-amber-300/80">Human approval gate</p>}
                 </div>
