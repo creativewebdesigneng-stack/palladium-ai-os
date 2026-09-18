@@ -66,6 +66,25 @@ export type AgentSelectionAttribution = {
   } | null;
 };
 
+export type OrchestratorSelectionAuditCandidate = {
+  rank: number;
+  agent_id: string;
+  agent_name: string;
+  role: string;
+  score: number;
+  score_delta_from_top: number;
+  selected: boolean;
+  matched_skills: string[];
+  verified_skills: string[];
+  score_breakdown: AgentSelectionAttribution["score_breakdown"];
+};
+
+export type OrchestratorSelectionAudit = {
+  version: 1;
+  scoring_method: "bounded_pre_rank_v1";
+  ranked_candidates: OrchestratorSelectionAuditCandidate[];
+};
+
 export type OrchestratorAssignment = {
   id: string;
   title: string;
@@ -82,6 +101,7 @@ export type OrchestratorPlan = {
   goal: string;
   summary: string;
   assignments: OrchestratorAssignment[];
+  selection_audit?: OrchestratorSelectionAudit;
 };
 
 const clean = (value: unknown, max: number) =>
@@ -348,13 +368,49 @@ export function normaliseOrchestratorPlan(args: {
   };
 }
 
+export function buildOrchestratorSelectionAudit(
+  goal: string,
+  candidates: OrchestratorCandidate[],
+  selectedAgentIds: Iterable<string> = [],
+): OrchestratorSelectionAudit {
+  const selected = new Set(selectedAgentIds);
+  const ranked = candidates
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      attribution: buildAgentSelectionAttribution(goal, candidate),
+    }))
+    .sort((a, b) => b.attribution.score - a.attribution.score || a.index - b.index)
+    .slice(0, 12);
+  const topScore = ranked[0]?.attribution.score ?? 0;
+
+  return {
+    version: 1,
+    scoring_method: "bounded_pre_rank_v1",
+    ranked_candidates: ranked.map(({ candidate, attribution }, index) => ({
+      rank: index + 1,
+      agent_id: candidate.id,
+      agent_name: attribution.agent_name,
+      role: attribution.role,
+      score: attribution.score,
+      score_delta_from_top: Math.max(0, topScore - attribution.score),
+      selected: selected.has(candidate.id),
+      matched_skills: attribution.matched_skills.map((skill) => skill.name),
+      verified_skills: attribution.matched_skills.filter((skill) => skill.verified).map((skill) => skill.name),
+      score_breakdown: attribution.score_breakdown,
+    })),
+  };
+}
+
 export function attachSelectionAttribution(
   plan: OrchestratorPlan,
   candidates: OrchestratorCandidate[],
 ): OrchestratorPlan {
   const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const selectedAgentIds = new Set(plan.assignments.map((assignment) => assignment.agent_id));
   return {
     ...plan,
+    selection_audit: buildOrchestratorSelectionAudit(plan.goal, candidates, selectedAgentIds),
     assignments: plan.assignments.map((assignment) => {
       const candidate = byId.get(assignment.agent_id);
       return candidate
@@ -372,7 +428,7 @@ export function fallbackOrchestratorPlan(
   candidate: OrchestratorCandidate,
   forceApproval = false,
 ): OrchestratorPlan {
-  return {
+  const plan: OrchestratorPlan = {
     version: 1,
     goal: clean(goal, 12_000),
     summary: `Assigned the objective to ${candidate.name}.`,
@@ -385,10 +441,10 @@ export function fallbackOrchestratorPlan(
         depends_on: [],
         success_criteria: candidate.operating_profile?.success_criteria?.slice(0, 12) ?? [],
         requires_approval: forceApproval,
-        selection_attribution: buildAgentSelectionAttribution(goal, candidate),
       },
     ],
   };
+  return attachSelectionAttribution(plan, [candidate]);
 }
 
 function performanceLine(candidate: OrchestratorCandidate): string | null {

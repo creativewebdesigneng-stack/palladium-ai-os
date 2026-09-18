@@ -73,6 +73,58 @@ function SelectionAttribution({ attribution }) {
   );
 }
 
+function SelectionAudit({ audit }) {
+  const candidates = audit?.ranked_candidates || [];
+  if (!candidates.length) return null;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/8 bg-white/[.018] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+            <Users className="h-3.5 w-3.5" /> Candidates considered
+          </p>
+          <p className="mt-1 text-[10px] leading-4 text-white/28">
+            Deterministic bounded pre-ranking. The planner may still assign a lower-ranked specialist when mission decomposition makes that agent a better fit for a specific node.
+          </p>
+        </div>
+        <span className="rounded-md border border-white/8 bg-black/20 px-2 py-1 text-[9px] text-white/35">
+          {candidates.length} specialist{candidates.length === 1 ? '' : 's'}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        {candidates.map((candidate) => (
+          <div
+            key={candidate.agent_id}
+            className={`rounded-xl border p-2.5 ${candidate.selected ? 'border-violet-300/15 bg-violet-300/[.035]' : 'border-white/7 bg-black/15'}`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-white/8 bg-black/20 text-[9px] font-semibold text-white/45">#{candidate.rank}</span>
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-medium text-white/70">{candidate.agent_name}</p>
+                <p className="truncate text-[9px] text-white/28">{candidate.role}</p>
+              </div>
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                {candidate.selected ? <span className="rounded-md border border-violet-300/15 bg-violet-300/[.05] px-1.5 py-0.5 text-[8px] uppercase tracking-[0.12em] text-violet-200/75">assigned</span> : null}
+                <span className="text-[9px] text-white/38">{candidate.score} pts</span>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(candidate.verified_skills || []).slice(0, 4).map((skill) => (
+                <span key={skill} className="rounded-md border border-emerald-300/12 bg-emerald-300/[.035] px-1.5 py-0.5 text-[8px] text-emerald-200/65">{skill} · verified</span>
+              ))}
+              {!candidate.selected && candidate.score_delta_from_top > 0 ? (
+                <span className="rounded-md border border-white/7 bg-white/[.02] px-1.5 py-0.5 text-[8px] text-white/28">−{candidate.score_delta_from_top} from top score</span>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function OrchestratorConsole({ onRun, pending, result }) {
   const [goal, setGoal] = useState('');
   const assignments = result?.plan?.assignments ?? [];
@@ -137,6 +189,8 @@ export default function OrchestratorConsole({ onRun, pending, result }) {
               <span className="rounded-lg border border-violet-300/15 bg-violet-300/[.05] px-2.5 py-1.5 text-violet-100/80">{status}</span>
             </div>
           </div>
+
+          <SelectionAudit audit={result?.plan?.selection_audit} />
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             {assignments.map((assignment, index) => {
