@@ -3,6 +3,7 @@ import { BadgeCheck, BrainCircuit, Check, Pencil, Plug, ShieldCheck, Sparkles, T
 import { updateAgent } from '@/lib/agents/agents.functions';
 import { effectiveAgentSkillsRegistry } from '@/lib/agents/agent-skills-registry';
 import { buildAgentSkillGapPlan } from '@/lib/agents/agent-skill-confidence';
+import { buildAgentSkillCertificationProgress } from '@/lib/agents/agent-skill-certification-progress';
 import { useToast } from '@/components/ui/use-toast';
 
 function Chip({ children, tone = 'default' }) {
@@ -63,6 +64,7 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
 
   if (!registry) return null;
   const developmentPlan = buildAgentSkillGapPlan(registry, 5);
+  const certificationProgress = buildAgentSkillCertificationProgress(registry);
 
   const beginEdit = () => {
     setDraft(draftFromRegistry(registry));
@@ -193,6 +195,67 @@ export default function AgentSkillsRegistryPanel({ agent, onAgentUpdated }) {
               </div>
             ) : <span className="text-[11px] text-zinc-600">No skills declared</span>}
           </Section>
+
+          {certificationProgress.length ? (
+            <Section icon={BadgeCheck} title="Blackstar certification progress">
+              <div className="space-y-2">
+                {certificationProgress.map((progress) => {
+                  const average = progress.recent_average_score === null
+                    ? null
+                    : Math.round(progress.recent_average_score * 100);
+                  const verified = progress.status === 'verified';
+                  const expired = progress.status === 'expired';
+                  const statusLabel = verified ? 'verified' : expired ? 're-certifying' : 'building';
+                  const statusTone = verified ? 'verified' : expired ? 'expired' : 'learning';
+                  const qualityNeedsWork = !verified
+                    && progress.current_success_streak >= progress.required_tasks
+                    && !progress.quality_target_met;
+                  return (
+                    <div key={progress.skill} className="rounded-xl border border-white/8 bg-black/15 p-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-[11px] font-medium text-zinc-300">{progress.skill}</span>
+                        <Chip tone={statusTone}>{statusLabel}</Chip>
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        {Array.from({ length: progress.required_tasks }, (_, index) => (
+                          <span
+                            key={index}
+                            className={`h-1.5 flex-1 rounded-full ${index < progress.current_success_streak ? 'bg-violet-400/70' : 'bg-white/8'}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-zinc-500">
+                        <span>{progress.current_success_streak}/{progress.required_tasks} recent verified tasks</span>
+                        <span>{average === null ? 'No recent quality score' : `${average}% recent verifier average`}</span>
+                        <span>{progress.verified_tasks} passed · {progress.verifier_failures} flagged overall</span>
+                      </div>
+                      {qualityNeedsWork ? (
+                        <p className="mt-1.5 text-[10px] text-amber-300">Three recent passes are present, but the verifier average must reach at least 90%.</p>
+                      ) : expired ? (
+                        <p className="mt-1.5 text-[10px] text-amber-300">Blackstar verification expired. Fresh verifier-approved work can earn it back automatically.</p>
+                      ) : verified ? (
+                        <p className="mt-1.5 text-[10px] text-emerald-300">Blackstar runtime verification is active for this skill.</p>
+                      ) : (
+                        <p className="mt-1.5 text-[10px] text-zinc-600">Target: three consecutive verified tasks averaging at least 90% verifier quality.</p>
+                      )}
+                      {progress.recent_evidence.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {progress.recent_evidence.map((item, index) => (
+                            <span
+                              key={`${progress.skill}-evidence-${index}`}
+                              className={`rounded-md border px-1.5 py-0.5 text-[9px] ${item.kind === 'verified_failure' ? 'border-amber-400/15 bg-amber-400/[.06] text-amber-300' : 'border-emerald-400/15 bg-emerald-400/[.06] text-emerald-300'}`}
+                            >
+                              {item.kind === 'verified_failure' ? 'Flag' : 'Pass'}{item.score === null ? '' : ` ${Math.round(item.score * 100)}%`}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+          ) : null}
 
           {registry.tools?.length ? (
             <Section icon={Wrench} title="Tools"><div className="flex flex-wrap gap-1.5">{registry.tools.map((item) => <Chip key={item}>{item}</Chip>)}</div></Section>
