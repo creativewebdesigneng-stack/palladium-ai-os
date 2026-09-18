@@ -17,6 +17,7 @@ describe("orchestrator selection attribution contract", () => {
     expect(server).toContain("const attributed = attachSelectionAttribution(plan, shortlist)");
     expect(server).toContain("selection_attribution: assignment.selection_attribution ?? null");
     expect(server).toContain("plan: args.plan");
+    expect(server).toContain("const attributed = attachSelectionAttribution(plan, shortlist)");
   });
 
   it("shows mission score evidence without presenting it as an authority grant", () => {
@@ -28,5 +29,9 @@ describe("orchestrator selection attribution contract", () => {
     expect(consoleSource).toContain("matched_connectors");
     expect(consoleSource).toContain("deterministic pre-ranking evidence");
     expect(consoleSource).toContain("does not grant tools, permissions, connector access or approval rights");
+    expect(consoleSource).toContain("Candidates considered");
+    expect(consoleSource).toContain("selection_audit");
+    expect(consoleSource).toContain("score_delta_from_top");
+    expect(consoleSource).toContain("Deterministic bounded pre-ranking");
   });
 });
