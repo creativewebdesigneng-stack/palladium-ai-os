@@ -178,6 +178,10 @@ describe("Palladium Orchestrator", () => {
       goal: "Research competitors",
       candidates: [research],
       value: {
+        selection_audit: {
+          scoring_method: "planner_claim",
+          ranked_candidates: [{ agent_id: "unknown", score: 999999 }],
+        },
         assignments: [{
           id: "research-step",
           title: "Research",
@@ -189,10 +193,47 @@ describe("Palladium Orchestrator", () => {
     });
 
     expect(plan.assignments[0]?.selection_attribution).toBeUndefined();
+    expect(plan.selection_audit).toBeUndefined();
 
     const attributed = attachSelectionAttribution(plan, [research]);
     expect(attributed.assignments[0]?.selection_attribution?.agent_name).toBe(research.name);
     expect(attributed.assignments[0]?.selection_attribution?.score).toBe(scoreAgentForGoal(plan.goal, research));
+    expect(attributed.selection_audit?.scoring_method).toBe("bounded_pre_rank_v1");
+    expect(attributed.selection_audit?.ranked_candidates[0]).toEqual(expect.objectContaining({
+      agent_id: "research",
+      rank: 1,
+      selected: true,
+    }));
+  });
+
+  it("records ranked alternatives and score gaps without changing assignment authority", () => {
+    const plan = normaliseOrchestratorPlan({
+      goal: "Research competitors with web evidence",
+      candidates: [coder, research],
+      value: {
+        assignments: [{
+          id: "research-step",
+          title: "Research",
+          objective: "Find competitor evidence",
+          agent_id: "research",
+        }],
+      },
+    });
+
+    const attributed = attachSelectionAttribution(plan, [coder, research]);
+    const audit = attributed.selection_audit?.ranked_candidates ?? [];
+
+    expect(audit).toHaveLength(2);
+    expect(audit[0]).toEqual(expect.objectContaining({
+      rank: 1,
+      agent_id: "research",
+      selected: true,
+      score_delta_from_top: 0,
+    }));
+    expect(audit[1]?.rank).toBe(2);
+    expect(audit[1]?.selected).toBe(false);
+    expect(audit[1]?.score_delta_from_top).toBeGreaterThanOrEqual(0);
+    expect(attributed.assignments[0]?.agent_id).toBe("research");
   });
 
   it("does not present verifier-confirmed failure evidence as positive verification", () => {
@@ -276,5 +317,8 @@ describe("Palladium Orchestrator", () => {
     expect(plan.assignments).toHaveLength(1);
     expect(plan.assignments[0]?.agent_id).toBe("research");
     expect(plan.assignments[0]?.success_criteria).toContain("Claims cite evidence");
+    expect(plan.selection_audit?.ranked_candidates).toEqual([
+      expect.objectContaining({ rank: 1, agent_id: "research", selected: true, score_delta_from_top: 0 }),
+    ]);
   });
 });
