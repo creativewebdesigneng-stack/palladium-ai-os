@@ -160,9 +160,9 @@ describe("Palladium Orchestrator", () => {
       },
     };
 
-    const attribution = buildAgentSelectionAttribution("research competitors with web_search evidence", candidate);
+    const attribution = buildAgentSelectionAttribution("perform competitor analysis with web_search evidence", candidate);
 
-    expect(attribution.score).toBe(scoreAgentForGoal("research competitors with web_search evidence", candidate));
+    expect(attribution.score).toBe(scoreAgentForGoal("perform competitor analysis with web_search evidence", candidate));
     expect(attribution.agent_name).toBe("Market Intelligence Agent");
     expect(attribution.matched_skills).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "competitor analysis", verified: true, certified: true }),
