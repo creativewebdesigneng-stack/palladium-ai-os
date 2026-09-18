@@ -10,7 +10,7 @@ function statusLabel(execution) {
   return status ? String(status).replaceAll('_', ' ') : 'Ready';
 }
 
-function SelectionAttribution({ attribution }) {
+function SelectionAttribution({ attribution, outcome }) {
   if (!attribution) return null;
   const breakdown = attribution.score_breakdown || {};
   const trust = attribution.trust_score == null ? null : Math.round(attribution.trust_score * 100);
@@ -69,6 +69,47 @@ function SelectionAttribution({ attribution }) {
         </p>
       ) : null}
       <p className="mt-1.5 text-[9px] leading-4 text-white/25">This explains Blackstar’s deterministic pre-ranking evidence; it does not grant tools, permissions, connector access or approval rights.</p>
+
+      {outcome ? (() => {
+        const feedback = outcome.skill_feedback || {};
+        const positive = [
+          ...(feedback.matched_skills || []).map((item) => `${item} · verified work`),
+          ...(feedback.promoted_skills || []).map((item) => `${item} · learned`),
+          ...(feedback.certifications_awarded || []).map((item) => `${item} · awarded`),
+        ];
+        const negative = [
+          ...(feedback.flagged_skills || []).map((item) => `${item} · verifier flag`),
+          ...(feedback.reduced_skills || []).map((item) => `${item} · confidence reduced`),
+          ...(feedback.certifications_expired || []).map((item) => `${item} · expired`),
+        ];
+        const hasVerifier = typeof outcome.verification_score === 'number' || typeof outcome.verification_passed === 'boolean';
+        const taskRef = outcome.task_id ? String(outcome.task_id).slice(0, 12) : null;
+        return (
+          <div className="mt-3 border-t border-white/8 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/38">Observed outcome</p>
+              <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
+                <span className={`rounded-md border px-1.5 py-0.5 ${outcome.status === 'succeeded' ? 'border-emerald-300/15 bg-emerald-300/[.04] text-emerald-200/75' : outcome.status === 'failed' ? 'border-amber-300/15 bg-amber-300/[.04] text-amber-200/75' : 'border-white/8 bg-white/[.02] text-white/38'}`}>
+                  {String(outcome.status || 'unknown').replaceAll('_', ' ')}
+                </span>
+                {hasVerifier ? (
+                  <span className="rounded-md border border-white/8 bg-black/20 px-1.5 py-0.5 text-white/45">
+                    Verifier {typeof outcome.verification_score === 'number' ? `${Math.round(outcome.verification_score * 100)}%` : 'result'}{typeof outcome.verification_passed === 'boolean' ? ` · ${outcome.verification_passed ? 'passed' : 'not passed'}` : ''}
+                  </span>
+                ) : null}
+                {taskRef ? <span className="rounded-md border border-white/8 bg-black/20 px-1.5 py-0.5 text-white/30">task {taskRef}</span> : null}
+              </div>
+            </div>
+            {positive.length || negative.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {positive.map((item) => <span key={item} className="rounded-md border border-emerald-300/15 bg-emerald-300/[.04] px-1.5 py-0.5 text-[9px] text-emerald-200/70">{item}</span>)}
+                {negative.map((item) => <span key={item} className="rounded-md border border-amber-300/15 bg-amber-300/[.04] px-1.5 py-0.5 text-[9px] text-amber-200/70">{item}</span>)}
+              </div>
+            ) : null}
+            <p className="mt-2 text-[9px] leading-4 text-white/24">Observed evidence comes only from this executed assignment. Blackstar does not infer outcomes for candidates that were not run.</p>
+          </div>
+        );
+      })() : null}
     </div>
   );
 }
@@ -201,7 +242,7 @@ export default function OrchestratorConsole({ onRun, pending, result }) {
                     <div><p className="text-sm font-semibold text-white">{assignment.title}</p><p className="mt-1 text-xs leading-5 text-white/42">{assignment.objective}</p></div>
                     <span className="shrink-0 rounded-md border border-white/8 bg-black/25 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/38">{step?.status ?? 'planned'}</span>
                   </div>
-                  <SelectionAttribution attribution={assignment.selection_attribution} />
+                  <SelectionAttribution attribution={assignment.selection_attribution} outcome={step} />
                   {assignment.depends_on?.length > 0 && <p className="mt-3 text-[10px] text-white/30">Dependencies: {assignment.depends_on.join(', ')}</p>}
                   {assignment.requires_approval && <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-amber-300/80">Human approval gate</p>}
                 </div>

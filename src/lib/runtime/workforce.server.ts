@@ -26,6 +26,11 @@ import { executePlannedRun } from "./planner-runtime.server";
 import { captureVerifiedAgentExperience } from "./agent-learning.server";
 import { captureVerifiedAgentSkillLearning } from "./agent-skill-learning.server";
 import { captureVerifiedAgentSkillFailure } from "./agent-skill-confidence.server";
+import {
+  buildWorkflowSkillFeedback,
+  normaliseWorkflowVerificationOutcome,
+  type WorkflowSkillFeedback,
+} from "./workflow-selection-outcome";
 import { notify } from "@/lib/notifications/notify.server";
 import { NOTIFICATION_TYPE_MAP, type NotificationSeverity } from "@/lib/notifications/types";
 import {
@@ -75,6 +80,10 @@ export type StepOutcome = {
   duration_ms: number;
   tokens_in: number;
   tokens_out: number;
+  task_id: string | null;
+  verification_score: number | null;
+  verification_passed: boolean | null;
+  skill_feedback: WorkflowSkillFeedback | null;
 };
 
 export class WorkforceError extends Error {
@@ -408,6 +417,10 @@ export async function runStep(args: {
     duration_ms: 0,
     tokens_in: 0,
     tokens_out: 0,
+    task_id: null,
+    verification_score: null,
+    verification_passed: null,
+    skill_feedback: null,
   };
 
   if (step.kind !== "agent") return runBuiltInStep(args, base);
@@ -417,6 +430,10 @@ export async function runStep(args: {
 
   const attemptsAllowed = Math.min(Math.max(step.max_retries ?? 1, 1), 4);
   let lastError: unknown = null;
+  let lastTaskId: string | null = null;
+  let lastVerificationScore: number | null = null;
+  let lastVerificationPassed: boolean | null = null;
+  let lastSkillFeedback: WorkflowSkillFeedback | null = null;
 
   for (let attempt = 1; attempt <= attemptsAllowed; attempt += 1) {
     const startedAt = Date.now();
@@ -488,11 +505,16 @@ export async function runStep(args: {
           userId: args.userId,
           taskId: run.taskId,
         });
-        await captureVerifiedAgentSkillLearning({
+        const learning = await captureVerifiedAgentSkillLearning({
           sb: args.sb as never,
           userId: args.userId,
           taskId: run.taskId,
         });
+        lastTaskId = String(task?.id ?? run.taskId);
+        const verification = normaliseWorkflowVerificationOutcome(task?.verification_state);
+        lastVerificationScore = verification.score;
+        lastVerificationPassed = verification.passed;
+        lastSkillFeedback = buildWorkflowSkillFeedback({ learning });
       } finally {
         clearTimeout(deadlineTimer);
         clearInterval(cancellationPoll);
@@ -509,6 +531,10 @@ export async function runStep(args: {
         duration_ms: Date.now() - startedAt,
         tokens_in: Number(task?.tokens_in ?? 0),
         tokens_out: Number(task?.tokens_out ?? 0),
+        task_id: lastTaskId ?? String(task?.id ?? run.taskId),
+        verification_score: lastVerificationScore,
+        verification_passed: lastVerificationPassed,
+        skill_feedback: lastSkillFeedback,
       };
 
       if (stepRunId) {
@@ -541,13 +567,23 @@ export async function runStep(args: {
     } catch (error) {
       lastError = error;
       if (run) {
+        lastTaskId = run.taskId;
         await failRun({ userId: args.userId, run, error }).catch(() => undefined);
         if (attempt === attemptsAllowed && error instanceof RuntimeError && error.code === "VERIFICATION_FAILED") {
-          await captureVerifiedAgentSkillFailure({
+          const failure = await captureVerifiedAgentSkillFailure({
             sb: args.sb as never,
             userId: args.userId,
             taskId: run.taskId,
           });
+          const { data: failedTask } = await args.sb
+            .from("agent_tasks")
+            .select("id,verification_state")
+            .eq("id", run.taskId)
+            .maybeSingle();
+          const verification = normaliseWorkflowVerificationOutcome(failedTask?.verification_state);
+          lastVerificationScore = verification.score;
+          lastVerificationPassed = verification.passed;
+          lastSkillFeedback = buildWorkflowSkillFeedback({ failure });
         }
       }
       const message = error instanceof Error ? error.message : "Step failed.";
@@ -556,6 +592,7 @@ export async function runStep(args: {
           .from("workflow_step_runs")
           .update({
             status: "failed",
+            task_id: run?.taskId ?? null,
             error: message.slice(0, 600),
             duration_ms: Date.now() - startedAt,
             completed_at: new Date().toISOString(),
@@ -574,6 +611,10 @@ export async function runStep(args: {
     status: "failed",
     attempts: attemptsAllowed,
     error: lastError instanceof Error ? lastError.message : "Step failed.",
+    task_id: lastTaskId,
+    verification_score: lastVerificationScore,
+    verification_passed: lastVerificationPassed,
+    skill_feedback: lastSkillFeedback,
   };
 }
 
@@ -645,6 +686,10 @@ export async function executeWorkflowRun(args: {
                 duration_ms: 0,
                 tokens_in: 0,
                 tokens_out: 0,
+                task_id: null,
+                verification_score: null,
+                verification_passed: null,
+                skill_feedback: null,
               };
               await args.db.from("workflow_step_runs").insert({
                 run_id: runId,
