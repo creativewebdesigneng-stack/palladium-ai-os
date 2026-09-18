@@ -1,4 +1,5 @@
 import {
+  attachSelectionAttribution,
   fallbackOrchestratorPlan,
   normaliseOrchestratorPlan,
   renderCandidateCatalogue,
@@ -190,7 +191,8 @@ async function createDelegationPlan(
       maxAssignments,
       forceApproval: options.forceApproval,
     });
-    return plan.assignments.length ? plan : fallback;
+    const attributed = attachSelectionAttribution(plan, shortlist);
+    return attributed.assignments.length ? attributed : fallback;
   } catch (error) {
     console.error("[orchestrator] planning failed; using ranked specialist fallback", error);
     return fallback;
@@ -262,7 +264,10 @@ async function persistGeneratedWorkflow(args: {
       timeout_ms: 180_000,
       continue_on_error: false,
       requires_approval: assignment.requires_approval,
-      config: { orchestrator_assignment_id: assignment.id },
+      config: {
+        orchestrator_assignment_id: assignment.id,
+        selection_attribution: assignment.selection_attribution ?? null,
+      },
     };
   });
   const { error: stepError } = await args.sb.from("workflow_steps").insert(steps);
