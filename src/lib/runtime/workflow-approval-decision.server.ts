@@ -53,6 +53,10 @@ function approvalOutcome(args: {
     duration_ms: 0,
     tokens_in: 0,
     tokens_out: 0,
+    task_id: null,
+    verification_score: null,
+    verification_passed: null,
+    skill_feedback: null,
   };
 }
 
