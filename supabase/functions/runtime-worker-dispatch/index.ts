@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import postgres from "npm:postgres@3.4.3";
 
 type WorkerName = "workflow_runner" | "webhook_retry" | "dropshipping_monitor";
 
@@ -70,27 +71,14 @@ function workerConfig(value: string | null): WorkerConfig | null {
   return Object.prototype.hasOwnProperty.call(WORKERS, name) ? WORKERS[name] : null;
 }
 
+const databaseUrl = Deno.env.get("SUPABASE_DB_URL")?.trim() ?? "";
+const sql = databaseUrl ? postgres(databaseUrl, { prepare: false, max: 1 }) : null;
+
 async function validWorkerToken(worker: WorkerName, token: string) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/+$/, "");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
-  if (!supabaseUrl || !serviceRoleKey) return false;
+  if (!sql) return false;
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/verify_runtime_worker_token`, {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        worker_name: worker,
-        supplied_token: token,
-      }),
-      redirect: "error",
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) return false;
-    return (await response.json().catch(() => null)) === true;
+    const rows = await sql<{ valid: boolean }[]>`select public.verify_runtime_worker_token(${worker}, ${token}) as valid`;
+    return rows[0]?.valid === true;
   } catch {
     return false;
   }
