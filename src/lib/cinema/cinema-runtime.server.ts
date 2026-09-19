@@ -74,6 +74,22 @@ export async function getCinemaRender(id:string) {
   return {status:String(json.status ?? 'queued'),outputUrl:typeof json.output_url==='string'?json.output_url:null,errorMessage:typeof json.error==='string'?json.error.slice(0,1000):null,metadata:{stage:json.stage ?? null,progress:json.progress ?? null}}
 }
 
+export async function getCinemaMasterAssembly(id:string) {
+  if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error('Invalid cinema master worker job id.')
+  const url=masterBase()
+  const response=await fetch(`${url}/v1/films/${encodeURIComponent(id)}`,{headers:headers(),redirect:'manual',signal:AbortSignal.timeout(60_000)})
+  const raw=await response.text()
+  if(!response.ok) throw new Error(`Cinema master worker status failed (${response.status}): ${raw.slice(0,400)}`)
+  let json:any
+  try{json=JSON.parse(raw)}catch{throw new Error('Cinema master worker returned invalid JSON.')}
+  return {
+    status:String(json.status ?? 'queued'),
+    outputUrl:typeof json.output_url==='string'?json.output_url:typeof json.outputUrl==='string'?json.outputUrl:null,
+    errorMessage:typeof json.error==='string'?json.error.slice(0,1000):null,
+    metadata:{stage:json.stage ?? 'master',progress:json.progress ?? null,provider:json.metadata?.provider ?? 'blackstar-cinema-master'},
+  }
+}
+
 export async function submitCinemaMasterAssembly(input:{
   projectId:string;
   title:string;

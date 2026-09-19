@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CINEMA_MAX_DURATION_MINUTES, getCinemaCapabilities, submitCinemaRender } from './cinema-runtime.server'
+import { BLACKSTAR_CINEMA_MASTER_WORKER_URL, CINEMA_MAX_DURATION_MINUTES, getCinemaCapabilities, getCinemaMasterAssembly, submitCinemaRender } from './cinema-runtime.server'
 
 const originalWorker=process.env['CINEMA_STUDIO_WORKER_URL']
 const originalMasterWorker=process.env['CINEMA_STUDIO_MASTER_WORKER_URL']
@@ -40,6 +40,16 @@ describe('Blackstar Cinema Studio',()=>{
   expect(c.masterConfigured).toBe(true)
   expect(c.masterProvider).toBe('configured-cinema-worker')
  })
+ it('refreshes hosted master jobs through the master worker even without a direct Cinema renderer',async()=>{
+  delete process.env['CINEMA_STUDIO_WORKER_URL']
+  delete process.env['CINEMA_STUDIO_MASTER_WORKER_URL']
+  const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({id:'master-1',status:'completed',output_url:'https://media.example/master.mp4'}),{status:200}))
+  const result=await getCinemaMasterAssembly('master-1')
+  expect(result.status).toBe('completed')
+  expect(result.outputUrl).toBe('https://media.example/master.mp4')
+  expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${BLACKSTAR_CINEMA_MASTER_WORKER_URL}/v1/films/master-1`)
+ })
+
  it('submits a scene-based long-form render contract to a configured worker',async()=>{
   process.env['CINEMA_STUDIO_WORKER_URL']='https://cinema.example.com/'
   const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({id:'film-1',status:'queued'}),{status:200}))

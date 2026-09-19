@@ -1,3 +1,5 @@
+import { BLACKSTAR_HOSTED_3D_WORKER } from './game-foundry-runtime.server';
+
 export type FoundryIntegrationStatus = "configured_bridge" | "export_only";
 export type FoundryIntegration = {
   id: string;
@@ -45,11 +47,12 @@ type HealthTarget = {
   name:string;
   env:string;
   tokenEnv?:string;
+  fallbackBase?:string;
   category:"worker"|"engine"|"dcc";
 };
 
 const healthTargets:HealthTarget[] = [
-  {id:"3d-worker",name:"Game Foundry 3D Worker",env:"GAME_FOUNDRY_3D_API_URL",tokenEnv:"GAME_FOUNDRY_3D_API_TOKEN",category:"worker"},
+  {id:"3d-worker",name:"Game Foundry 3D Worker",env:"GAME_FOUNDRY_3D_API_URL",tokenEnv:"GAME_FOUNDRY_3D_API_TOKEN",fallbackBase:BLACKSTAR_HOSTED_3D_WORKER,category:"worker"},
   {id:"game-worker",name:"Game Foundry Game Worker",env:"GAME_FOUNDRY_GAME_API_URL",tokenEnv:"GAME_FOUNDRY_GAME_API_TOKEN",category:"worker"},
   ...definitions.map((item)=>({id:item.id,name:item.name,env:item.env,tokenEnv:"GAME_FOUNDRY_ENGINE_BRIDGE_TOKEN",category:item.category as "engine"|"dcc"})),
 ];
@@ -61,12 +64,13 @@ function cleanBase(value:string|undefined){
 export async function probeGameFoundryConnections(){
   const results=[];
   for(const target of healthTargets){
-    const base=cleanBase(process.env[target.env]);
+    const configuredBase=cleanBase(process.env[target.env]);
+    const base=configuredBase||cleanBase(target.fallbackBase);
     if(!base){
       results.push({id:target.id,name:target.name,category:target.category,configured:false,reachable:false,healthy:false,httpStatus:null,error:null});
       continue;
     }
-    const token=target.tokenEnv?process.env[target.tokenEnv]?.trim():"";
+    const token=configuredBase&&target.tokenEnv?process.env[target.tokenEnv]?.trim():"";
     const started=Date.now();
     try{
       const response=await fetch(`${base}/health`,{

@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { cinemaSegmentDurations } from './cinema-render.functions'
-import { getCinemaRender, submitCinemaMasterAssembly } from './cinema-runtime.server'
+import { getCinemaMasterAssembly, submitCinemaMasterAssembly } from './cinema-runtime.server'
 
 type Sb={from:(table:string)=>any}
 
@@ -106,7 +106,7 @@ export const refreshCinemaMaster=createServerFn({method:'POST'}).middleware([req
     const job=await sb.from('media_generation_jobs').select('id,worker_job_id').eq('id',data.jobId).eq('user_id',context.userId).eq('provider','cinema').maybeSingle()
     if(job.error) throw new Error(job.error.message)
     if(!job.data?.worker_job_id) throw new Error('Cinema master job has no worker id.')
-    const result=await getCinemaRender(String(job.data.worker_job_id))
+    const result=await getCinemaMasterAssembly(String(job.data.worker_job_id))
     const terminal=['completed','failed','cancelled'].includes(result.status)
     const update=await sb.from('media_generation_jobs').update({status:result.status,output_url:result.outputUrl,error_message:result.errorMessage,metadata:result.metadata,completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',data.jobId).eq('user_id',context.userId)
     if(update.error) throw new Error(update.error.message)
