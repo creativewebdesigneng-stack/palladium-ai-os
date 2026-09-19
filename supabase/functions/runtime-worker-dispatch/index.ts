@@ -74,13 +74,13 @@ function workerConfig(value: string | null): WorkerConfig | null {
 const databaseUrl = Deno.env.get("SUPABASE_DB_URL")?.trim() ?? "";
 const sql = databaseUrl ? postgres(databaseUrl, { prepare: false, max: 1 }) : null;
 
-async function validWorkerToken(worker: WorkerName, token: string) {
-  if (!sql) return false;
+async function validWorkerToken(worker: WorkerName, token: string): Promise<boolean | null> {
+  if (!sql) return null;
   try {
     const rows = await sql<{ valid: boolean }[]>`select public.verify_runtime_worker_token(${worker}, ${token}) as valid`;
     return rows[0]?.valid === true;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -94,9 +94,13 @@ Deno.serve(async (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 
-  if (token.length < 32 || !(await validWorkerToken(worker.name, token))) {
-    return json({ error: "Unauthorized" }, 401);
+  if (token.length < 32) return json({ error: "Unauthorized" }, 401);
+  const tokenValid = await validWorkerToken(worker.name, token);
+  if (tokenValid === null) {
+    console.error("[runtime-worker-dispatch] token verifier unavailable");
+    return json({ error: "Runtime worker verifier unavailable" }, 503);
   }
+  if (!tokenValid) return json({ error: "Unauthorized" }, 401);
 
   let secretKey: string;
   try {
