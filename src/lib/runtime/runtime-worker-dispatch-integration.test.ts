@@ -50,9 +50,9 @@ describe("runtime worker Supabase dispatch relay", () => {
   });
 
   it("uses backend-only credentials for verification and dispatch", () => {
-    expect(relay).toContain('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")');
-    expect(relay).toContain("apikey: serviceRoleKey");
-    expect(relay).toContain('Authorization: `Bearer ${serviceRoleKey}`');
+    expect(relay).toContain('Deno.env.get("SUPABASE_DB_URL")');
+    expect(relay).toContain("verify_runtime_worker_token");
+    expect(relay).toContain("postgres(databaseUrl, { prepare: false, max: 1 })");
     expect(relay).toContain('Deno.env.get("SUPABASE_SECRET_KEYS")');
     expect(relay).toContain('key.startsWith("sb_secret_")');
     expect(relay).toContain('"x-blackstar-supabase-secret-key": secretKey');
