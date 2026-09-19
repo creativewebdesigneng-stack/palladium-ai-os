@@ -45,19 +45,17 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
         }
 
         try {
-          const { supabaseAdmin, withRequestScopedSupabaseAdminKey } = await import(
-            "@/integrations/supabase/client.server"
+          const { withVerifiedForwardedRuntimeWorker } = await import(
+            "@/lib/runtime/runtime-worker-forwarded-auth.server"
           );
-          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, async () => {
-            const verified = await supabaseAdmin.rpc("verify_runtime_worker_token", {
-              worker_name: "webhook_retry",
-              supplied_token: supplied,
-            });
-            if (verified.error || verified.data !== true) {
-              return json({ error: "Unauthorized" }, 401);
-            }
-            return execute();
+          const verified = await withVerifiedForwardedRuntimeWorker({
+            name: "webhook_retry",
+            suppliedToken: supplied,
+            forwardedAdminKey,
+            operation: execute,
           });
+          if (!verified.authorized) return json({ error: "Unauthorized" }, 401);
+          return verified.value;
         } catch {
           console.error("[runtime-worker] request-scoped database credential rejected", {
             worker: "webhook_retry",
