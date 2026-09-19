@@ -21,7 +21,10 @@ describe('Blackstar Game Foundry runtime', () => {
     delete process.env['GAME_FOUNDRY_3D_API_URL']
     delete process.env['GAME_FOUNDRY_GAME_API_URL']
     const caps = getGameFoundryCapabilities()
-    expect(caps.gameGeneration.configured).toBe(false)
+    expect(caps.gameGeneration.configured).toBe(true)
+    expect(caps.gameGeneration.nativeCompiler).toBe(true)
+    expect(caps.gameGeneration.externalWorkerConfigured).toBe(false)
+    expect(caps.gameGeneration.provider).toBe('blackstar-native-game-compiler')
     expect(caps.engines.find((engine) => engine.id === 'unreal')?.integration).toBe('export-or-plugin')
     expect(caps.engines.find((engine) => engine.id === 'unity')?.exports).toContain('fbx')
   })
@@ -45,7 +48,7 @@ describe('Blackstar Game Foundry runtime', () => {
     expect(result.provider).toBe('game-foundry-3d')
   })
 
-  it('fails closed for full game generation when no build worker exists', async () => {
+  it('keeps the direct external game-worker call fail-closed when no external worker exists', async () => {
     delete process.env['GAME_FOUNDRY_GAME_API_URL']
     await expect(submitGameFoundryProject({
       projectId: '00000000-0000-0000-0000-000000000001',

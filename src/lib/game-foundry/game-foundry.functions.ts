@@ -9,7 +9,7 @@ import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
 import { getGameFoundryIntegrations, probeGameFoundryConnections } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
-import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
+import { compileGameFoundrySourceManifest } from "./game-foundry-source.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 import {
   getGameFoundryCapabilities,
@@ -32,6 +32,113 @@ async function resolveGameFoundryPreference(sb: Sb, userId: string) {
     if (!result.error) stored = result.data;
   } catch {}
   return resolveAssistantModelPreference(stored);
+}
+
+async function compileNativeGameFoundryBuild(args:{
+  sb:Sb;
+  userId:string;
+  project:any;
+  provider:any;
+  model:string;
+}) {
+  const {sb,userId,project,provider,model}=args;
+  const existingContent=project.content_status==="generated"&&project.content_manifest&&typeof project.content_manifest==="object"
+    ? project.content_manifest
+    : null;
+  const content=existingContent ?? await generateGameFoundryContent({
+    name:project.name,
+    prompt:project.prompt,
+    targetEngine:project.target_engine,
+    qualityProfile:project.quality_profile,
+    designSpec:project.design_spec,
+    provider,
+    model,
+  });
+
+  const existingSource=existingContent&&project.source_status==="generated"&&project.source_manifest&&typeof project.source_manifest==="object"
+    ? project.source_manifest
+    : null;
+  const source=existingSource ?? await compileGameFoundrySourceManifest({
+    name:project.name,
+    prompt:project.prompt,
+    targetEngine:project.target_engine,
+    projectType:project.project_type,
+    qualityProfile:project.quality_profile,
+    designSpec:project.design_spec,
+    contentManifest:content,
+    contentGenerated:true,
+    provider,
+    model,
+  });
+
+  const assetResult=await sb.from("three_d_jobs")
+    .select("id,input_name,requested_format,output_url,processed_output_url,target_engine,validation_report,status")
+    .eq("project_id",project.id).eq("user_id",userId).eq("status","completed")
+    .order("created_at",{ascending:true});
+  if(assetResult.error) throw new Error(assetResult.error.message);
+  const completedAssets=assetResult.data??[];
+  const exportManifest=completedAssets.length
+    ? buildGameFoundryExportManifest(project,completedAssets)
+    : {};
+
+  const packageManifest=buildGameFoundryProjectPackage({
+    project:{
+      ...project,
+      content_manifest:content,
+      source_manifest:source,
+      export_manifest:exportManifest,
+    },
+  });
+  const now=new Date().toISOString();
+  const saved=await sb.from("game_foundry_projects").update({
+    status:"completed",
+    worker_job_id:null,
+    output_url:null,
+    preview_url:null,
+    error_message:null,
+    content_manifest:content,
+    content_status:"generated",
+    content_error:null,
+    content_generated_at:project.content_generated_at??now,
+    source_manifest:source,
+    source_status:"generated",
+    source_error:null,
+    source_generated_at:project.source_generated_at??now,
+    export_manifest:exportManifest,
+    package_manifest:packageManifest,
+    package_status:"prepared",
+    package_error:null,
+    package_prepared_at:now,
+    metadata:{
+      ...(project.metadata&&typeof project.metadata==="object"?project.metadata:{}),
+      provider:"blackstar-native-game-compiler",
+      external_worker:false,
+      content_generated_by:(content as any)?.generatedBy??null,
+      source_generated_by:(source as any)?.generatedBy??null,
+      linked_assets:completedAssets.length,
+    },
+    completed_at:now,
+    updated_at:now,
+  }).eq("id",project.id).eq("user_id",userId).eq("status","running")
+    .select("id,status,content_status,source_status,package_status,package_manifest,export_manifest,completed_at").maybeSingle();
+  if(saved.error) throw new Error(saved.error.message);
+  if(!saved.data) throw new Error("The native Game Foundry build lost its execution claim before completion.");
+  return {
+    workerJobId:`native:${project.id}`,
+    status:"completed" as const,
+    outputUrl:null,
+    previewUrl:null,
+    errorMessage:null,
+    metadata:{
+      provider:"blackstar-native-game-compiler",
+      externalWorker:false,
+      sourceFiles:Array.isArray((source as any)?.files)?(source as any).files.length:0,
+      linkedAssets:completedAssets.length,
+      packagePrepared:true,
+    },
+    designSpec:project.design_spec,
+    provider:"blackstar-native-game-compiler" as const,
+  };
 }
 
 const engine = z.enum(["generic","unity","unreal","godot","web","blender"]);
@@ -137,17 +244,34 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const project = await sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status,content_manifest,content_status,content_generated_at,source_manifest,source_status,source_generated_at,export_manifest,metadata")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (project.error) throw new Error(project.error.message);
     if (!project.data) throw new Error("Game Foundry project not found.");
-    const designRow = await sb.from("game_foundry_projects").select("design_spec,status").eq("id",data.id).eq("user_id",context.userId).maybeSingle();
-    if (designRow.error) throw new Error(designRow.error.message);
-    if (!designRow.data || designRow.data.status !== "planned" || !designRow.data.design_spec || Object.keys(designRow.data.design_spec).length === 0) {
+    if (project.data.status !== "planned" || !project.data.design_spec || Object.keys(project.data.design_spec).length === 0) {
       throw new Error("Generate and review the Game Foundry design plan before starting the game build.");
     }
-    await sb.from("game_foundry_projects").update({status:"queued",error_message:null,updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
+
+    const externalWorkerConfigured=getGameFoundryCapabilities().gameGeneration.externalWorkerConfigured;
+    const claimStatus=externalWorkerConfigured?"queued":"running";
+    const claimed=await sb.from("game_foundry_projects").update({
+      status:claimStatus,error_message:null,completed_at:null,updated_at:new Date().toISOString(),
+    }).eq("id",data.id).eq("user_id",context.userId).eq("status","planned").select("id").maybeSingle();
+    if(claimed.error) throw new Error(claimed.error.message);
+    if(!claimed.data) throw new Error("This Game Foundry project is no longer ready to build.");
+
     try {
+      if(!externalWorkerConfigured){
+        const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
+        const native=await compileNativeGameFoundryBuild({sb,userId:context.userId,project:project.data,provider,model});
+        await writeAudit({
+          userId:context.userId,orgId:null,action:"game_foundry.native_build_completed",
+          targetType:"game_foundry_project",targetId:data.id,status:"success",
+          metadata:{targetEngine:project.data.target_engine,sourceFiles:native.metadata.sourceFiles,linkedAssets:native.metadata.linkedAssets},
+        });
+        return {id:data.id,...native};
+      }
+
       const worker = await submitGameFoundryProject({
         projectId:project.data.id,
         name:project.data.name,
@@ -168,12 +292,14 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
         metadata:{ provider:worker.provider, response:worker.metadata, worker_design_spec:worker.designSpec },
         completed_at:terminal ? new Date().toISOString() : null,
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).eq("status","queued");
       if (updated.error) throw new Error(updated.error.message);
       return { id:data.id, ...worker };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Game generation failed";
-      await sb.from("game_foundry_projects").update({status:"planned",error_message:message.slice(0,1000),completed_at:null,updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
+      await sb.from("game_foundry_projects").update({
+        status:"planned",error_message:message.slice(0,1000),completed_at:null,updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId).in("status",["queued","running"]);
       throw error;
     }
   });
@@ -555,27 +681,15 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
 
     const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
     try{
-      const engineGuidanceByTarget: Record<string,string> = {
-        unity:"Generate a bounded Unity starter using C# scripts and text project/config files only. Do not emit binary scenes, prefabs, packages, Library output or credentials.",
-        unreal:"Generate a bounded Unreal Engine starter using C++ source, headers, Build.cs/Target.cs and text config only. Do not claim Blueprint assets, .uasset files or compiled binaries exist.",
-        godot:"Generate a bounded Godot starter using GDScript, .tscn/.tres text resources and project.godot where useful.",
-        web:"Generate a bounded playable web-game starter using browser-native JavaScript, HTML and CSS with no vendored dependencies. Always include index.html. Avoid module imports, remote scripts, remote stylesheets, network APIs and external assets so Blackstar can run the generated game inside a network-blocked sandboxed preview.",
-        blender:"Generate a bounded Blender-oriented starter using Python automation/scripts and text configuration only. Do not claim a .blend binary was created.",
-        generic:"Generate a portable game prototype source starter using text source/config files only.",
-      };
-      const engineGuidance = engineGuidanceByTarget[String(claimed.data.target_engine)] ?? engineGuidanceByTarget["generic"]!;
-      const source=await generateBuilderSourceManifest({
-        title:claimed.data.name,
-        prompt:[
-          claimed.data.prompt,
-          `Target engine: ${claimed.data.target_engine}`,
-          `Project type: ${claimed.data.project_type}`,
-          `Quality profile: ${claimed.data.quality_profile}`,
-          engineGuidance,
-          "This is a Blackstar Game Foundry project. Keep generated code bounded, game-oriented, and compatible with the approved design. Linked 3D assets are managed separately; reference import locations/placeholders rather than inventing binary asset files.",
-          claimed.data.content_status === "generated" ? `Compiled gameplay/world content:\n${JSON.stringify(claimed.data.content_manifest)}` : "No compiled gameplay/world content manifest is available yet; do not invent one as already approved.",
-        ].join("\n\n"),
-        plan:claimed.data.design_spec,
+      const source=await compileGameFoundrySourceManifest({
+        name:claimed.data.name,
+        prompt:claimed.data.prompt,
+        targetEngine:claimed.data.target_engine,
+        projectType:claimed.data.project_type,
+        qualityProfile:claimed.data.quality_profile,
+        designSpec:claimed.data.design_spec,
+        contentManifest:claimed.data.content_manifest,
+        contentGenerated:claimed.data.content_status === "generated",
         provider,
         model,
       });

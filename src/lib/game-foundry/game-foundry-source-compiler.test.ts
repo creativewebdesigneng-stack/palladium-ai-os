@@ -3,11 +3,13 @@ import { readFileSync } from 'node:fs'
 
 const functions=readFileSync('src/lib/game-foundry/game-foundry.functions.ts','utf8')
 const builder=readFileSync('src/lib/builder/builder-source.server.ts','utf8')
+const sourceCompiler=readFileSync('src/lib/game-foundry/game-foundry-source.server.ts','utf8')
 const migration=readFileSync('supabase/migrations/20260911225500_game_foundry_source_compiler.sql','utf8')
 
 describe('Game Foundry bounded source compiler',()=>{
   it('reuses the hardened Builder source generator',()=>{
-    expect(functions).toContain('generateBuilderSourceManifest')
+    expect(functions).toContain('compileGameFoundrySourceManifest')
+    expect(sourceCompiler).toContain('generateBuilderSourceManifest')
     expect(builder).toContain('Unsafe source file path.')
     expect(builder).toContain('Generated source exceeds the Builder manifest size limit.')
   })
@@ -17,8 +19,8 @@ describe('Game Foundry bounded source compiler',()=>{
     expect(migration).not.toContain('create table')
   })
   it('does not represent binary engine artifacts as generated source',()=>{
-    expect(functions).toContain('Do not claim Blueprint assets, .uasset files or compiled binaries exist.')
-    expect(functions).toContain('Do not claim a .blend binary was created.')
-    expect(functions).toContain('Linked 3D assets are managed separately')
+    expect(sourceCompiler).toContain('Do not claim Blueprint assets, .uasset files or compiled binaries exist.')
+    expect(sourceCompiler).toContain('Do not claim a .blend binary was created.')
+    expect(sourceCompiler).toContain('Linked 3D assets are managed separately')
   })
 })

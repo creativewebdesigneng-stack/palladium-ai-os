@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 const screen=readFileSync('src/screens/GameFoundry.jsx','utf8')
 const component=readFileSync('src/components/game-foundry/GameFoundryWebPreview.jsx','utf8')
 const functions=readFileSync('src/lib/game-foundry/game-foundry.functions.ts','utf8')
+const sourceCompiler=readFileSync('src/lib/game-foundry/game-foundry-source.server.ts','utf8')
 
 describe('Game Foundry playable preview integration',()=>{
   it('renders web previews only from generated source',()=>{
@@ -14,7 +15,7 @@ describe('Game Foundry playable preview integration',()=>{
     expect(component).toContain('referrerPolicy="no-referrer"')
   })
   it('guides generated web games away from remote dependencies',()=>{
-    expect(functions).toContain('Always include index.html')
-    expect(functions).toContain('network-blocked sandboxed preview')
+    expect(sourceCompiler).toContain('Always include index.html')
+    expect(sourceCompiler).toContain('network-blocked sandboxed preview')
   })
 })
