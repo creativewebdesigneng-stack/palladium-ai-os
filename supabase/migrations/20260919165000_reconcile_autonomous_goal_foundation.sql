@@ -186,5 +186,8 @@ grant select,insert,update,delete on public.autonomous_goals,
   to authenticated;
 grant select,insert on public.autonomous_goal_events to authenticated;
 
+revoke execute on function public.touch_autonomous_os_updated_at()
+  from public,anon,authenticated;
+
 -- The original August worker does not require turning on a scheduler here.
 -- Keep its shared cron inactive until all six processors pass live probes.
