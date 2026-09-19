@@ -126,17 +126,17 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         }
 
         try {
-          const { supabaseAdmin, withRequestScopedSupabaseAdminKey } = await import("@/integrations/supabase/client.server");
-          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, async () => {
-            const verified = await supabaseAdmin.rpc("verify_runtime_worker_token", {
-              worker_name: "workflow_runner",
-              supplied_token: supplied,
-            });
-            if (verified.error || verified.data !== true) {
-              return json({ error: "Unauthorized" }, 401);
-            }
-            return execute();
+          const { withVerifiedForwardedRuntimeWorker } = await import(
+            "@/lib/runtime/runtime-worker-forwarded-auth.server"
+          );
+          const verified = await withVerifiedForwardedRuntimeWorker({
+            name: "workflow_runner",
+            suppliedToken: supplied,
+            forwardedAdminKey,
+            operation: execute,
           });
+          if (!verified.authorized) return json({ error: "Unauthorized" }, 401);
+          return verified.value;
         } catch {
           console.error("[runtime-worker] request-scoped database credential rejected");
           return json({ error: "Runtime worker database credential unavailable" }, 503);
