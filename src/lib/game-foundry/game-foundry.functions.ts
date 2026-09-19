@@ -243,17 +243,34 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const project = await sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status,content_manifest,content_status,content_generated_at,source_manifest,source_status,source_generated_at,export_manifest")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (project.error) throw new Error(project.error.message);
     if (!project.data) throw new Error("Game Foundry project not found.");
-    const designRow = await sb.from("game_foundry_projects").select("design_spec,status").eq("id",data.id).eq("user_id",context.userId).maybeSingle();
-    if (designRow.error) throw new Error(designRow.error.message);
-    if (!designRow.data || designRow.data.status !== "planned" || !designRow.data.design_spec || Object.keys(designRow.data.design_spec).length === 0) {
+    if (project.data.status !== "planned" || !project.data.design_spec || Object.keys(project.data.design_spec).length === 0) {
       throw new Error("Generate and review the Game Foundry design plan before starting the game build.");
     }
-    await sb.from("game_foundry_projects").update({status:"queued",error_message:null,updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
+
+    const externalWorkerConfigured=getGameFoundryCapabilities().gameGeneration.externalWorkerConfigured;
+    const claimStatus=externalWorkerConfigured?"queued":"running";
+    const claimed=await sb.from("game_foundry_projects").update({
+      status:claimStatus,error_message:null,completed_at:null,updated_at:new Date().toISOString(),
+    }).eq("id",data.id).eq("user_id",context.userId).eq("status","planned").select("id").maybeSingle();
+    if(claimed.error) throw new Error(claimed.error.message);
+    if(!claimed.data) throw new Error("This Game Foundry project is no longer ready to build.");
+
     try {
+      if(!externalWorkerConfigured){
+        const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
+        const native=await compileNativeGameFoundryBuild({sb,userId:context.userId,project:project.data,provider,model});
+        await writeAudit({
+          userId:context.userId,orgId:null,action:"game_foundry.native_build_completed",
+          targetType:"game_foundry_project",targetId:data.id,status:"success",
+          metadata:{targetEngine:project.data.target_engine,sourceFiles:native.metadata.sourceFiles,linkedAssets:native.metadata.linkedAssets},
+        });
+        return {id:data.id,...native};
+      }
+
       const worker = await submitGameFoundryProject({
         projectId:project.data.id,
         name:project.data.name,
@@ -274,12 +291,14 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
         metadata:{ provider:worker.provider, response:worker.metadata, worker_design_spec:worker.designSpec },
         completed_at:terminal ? new Date().toISOString() : null,
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).eq("status","queued");
       if (updated.error) throw new Error(updated.error.message);
       return { id:data.id, ...worker };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Game generation failed";
-      await sb.from("game_foundry_projects").update({status:"planned",error_message:message.slice(0,1000),completed_at:null,updated_at:new Date().toISOString()}).eq("id",data.id).eq("user_id",context.userId);
+      await sb.from("game_foundry_projects").update({
+        status:"planned",error_message:message.slice(0,1000),completed_at:null,updated_at:new Date().toISOString(),
+      }).eq("id",data.id).eq("user_id",context.userId).in("status",["queued","running"]);
       throw error;
     }
   });
