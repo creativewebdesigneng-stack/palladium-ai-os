@@ -3,6 +3,8 @@ import {
   createSupabaseAdminFetch,
   resolveSupabaseAdminKey,
   resolveSupabaseAdminKeyCandidates,
+  supabaseAdmin,
+  withRequestScopedSupabaseAdminKey,
   type SupabaseAdminKey,
 } from "./client.server";
 
@@ -233,5 +235,44 @@ describe("Supabase admin key failover fetch", () => {
     expect(serialized).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(serialized).not.toContain("sb_secret_stale_test");
     expect(serialized).not.toContain("legacy-service-role-test");
+  });
+});
+
+
+describe("request-scoped Supabase admin credentials", () => {
+  it("rejects public keys before running privileged work", async () => {
+    await expect(
+      withRequestScopedSupabaseAdminKey("sb_publishable_not_privileged", async () => true),
+    ).rejects.toThrow("Invalid request-scoped Supabase secret key");
+  });
+
+  it("uses a scoped secret without mutating the process environment", async () => {
+    const originalUrl = process.env["SUPABASE_URL"];
+    const originalSecret = process.env["SUPABASE_SECRET_KEY"];
+    process.env["SUPABASE_URL"] = "https://example.supabase.co";
+    delete process.env["SUPABASE_SECRET_KEY"];
+
+    const seen: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((async (_input, init) => {
+      seen.push(new Headers(init?.headers).get("apikey") ?? "");
+      return new Response("[]", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch);
+
+    try {
+      await withRequestScopedSupabaseAdminKey("sb_secret_scoped_test", async () => {
+        const result = await supabaseAdmin.from("workflow_runs").select("id").limit(1);
+        expect(result.error).toBeNull();
+      });
+      expect(seen).toEqual(["sb_secret_scoped_test"]);
+      expect(process.env["SUPABASE_SECRET_KEY"]).toBeUndefined();
+    } finally {
+      if (originalUrl === undefined) delete process.env["SUPABASE_URL"];
+      else process.env["SUPABASE_URL"] = originalUrl;
+      if (originalSecret === undefined) delete process.env["SUPABASE_SECRET_KEY"];
+      else process.env["SUPABASE_SECRET_KEY"] = originalSecret;
+    }
   });
 });

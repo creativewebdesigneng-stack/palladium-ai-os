@@ -2,6 +2,7 @@
 // Server-side Supabase client with service role/secret key - bypasses RLS.
 // Use this for admin operations in server functions and server routes only.
 // For user-authenticated queries (with RLS), use the auth middleware instead.
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
@@ -232,10 +233,11 @@ export function createSupabaseAdminFetch(
   };
 }
 
-function createSupabaseAdminClient() {
+function createSupabaseAdminClientFromCandidates(
+  candidates: SupabaseAdminKey[],
+  preferred: SupabaseAdminKey | null = candidates[0] ?? null,
+) {
   const SUPABASE_URL = process.env["SUPABASE_URL"];
-  const candidates = resolveSupabaseAdminKeyCandidates();
-  const preferred = resolveSupabaseAdminKey();
   const publishableKey = resolveSupabasePublishableKey();
 
   if (!SUPABASE_URL || !preferred || !candidates.length) {
@@ -262,7 +264,28 @@ function createSupabaseAdminClient() {
   });
 }
 
-let _supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | undefined;
+function createSupabaseAdminClient() {
+  return createSupabaseAdminClientFromCandidates(
+    resolveSupabaseAdminKeyCandidates(),
+    resolveSupabaseAdminKey(),
+  );
+}
+
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
+const requestScopedSupabaseAdmin = new AsyncLocalStorage<SupabaseAdminClient>();
+
+export async function withRequestScopedSupabaseAdminKey<T>(
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const cleaned = cleanSecretKey(key);
+  if (!cleaned) throw new Error("Invalid request-scoped Supabase secret key.");
+  const candidate: SupabaseAdminKey = { key: cleaned, source: "SUPABASE_SECRET_KEY" };
+  const client = createSupabaseAdminClientFromCandidates([candidate], candidate);
+  return requestScopedSupabaseAdmin.run(client, operation);
+}
+
+let _supabaseAdmin: SupabaseAdminClient | undefined;
 
 // Server-side Supabase client with elevated server credentials - bypasses RLS.
 // SECURITY: Only use this for trusted server-side operations, never expose to client code.
@@ -270,7 +293,8 @@ let _supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | undefined;
 // Top-level import is safe only in other .server.ts modules - route files and *.functions.ts ship to the client bundle.
 export const supabaseAdmin = new Proxy({} as ReturnType<typeof createSupabaseAdminClient>, {
   get(_, prop, receiver) {
-    if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdminClient();
-    return Reflect.get(_supabaseAdmin, prop, receiver);
+    const scoped = requestScopedSupabaseAdmin.getStore();
+    const client = scoped ?? (_supabaseAdmin ??= createSupabaseAdminClient());
+    return Reflect.get(client, prop, receiver);
   },
 });
