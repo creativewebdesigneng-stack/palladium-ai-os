@@ -10,7 +10,7 @@ export function gameFoundryEngineGuidance(targetEngine:string) {
     blender:"Generate a bounded Blender-oriented starter using Python automation/scripts and text configuration only. Do not claim a .blend binary was created.",
     generic:"Generate a portable game prototype source starter using text source/config files only.",
   };
-  return guidance[targetEngine] ?? guidance.generic!;
+  return guidance[targetEngine] ?? guidance["generic"]!;
 }
 
 export async function compileGameFoundrySourceManifest(args:{
