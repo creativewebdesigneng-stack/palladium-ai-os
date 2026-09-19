@@ -54,9 +54,7 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
       POST: async ({ request }) => {
         const authorization = request.headers.get("authorization") ?? "";
         const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-        if (!(await isValidRuntimeWorkerToken("workflow_runner", supplied))) {
-          return json({ error: "Unauthorized" }, 401);
-        }
+        const verifyFallback = () => isValidRuntimeWorkerToken("workflow_runner", supplied);
 
         const execute = async () => {
           const url = new URL(request.url);
@@ -122,11 +120,23 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
         };
 
         const forwardedAdminKey = request.headers.get("x-blackstar-supabase-secret-key")?.trim() ?? "";
-        if (!forwardedAdminKey) return execute();
+        if (!forwardedAdminKey) {
+          if (!(await verifyFallback())) return json({ error: "Unauthorized" }, 401);
+          return execute();
+        }
 
         try {
-          const { withRequestScopedSupabaseAdminKey } = await import("@/integrations/supabase/client.server");
-          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, execute);
+          const { supabaseAdmin, withRequestScopedSupabaseAdminKey } = await import("@/integrations/supabase/client.server");
+          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, async () => {
+            const verified = await supabaseAdmin.rpc("verify_runtime_worker_token", {
+              worker_name: "workflow_runner",
+              supplied_token: supplied,
+            });
+            if (verified.error || verified.data !== true) {
+              return json({ error: "Unauthorized" }, 401);
+            }
+            return execute();
+          });
         } catch {
           console.error("[runtime-worker] request-scoped database credential rejected");
           return json({ error: "Runtime worker database credential unavailable" }, 503);
