@@ -50,7 +50,7 @@ export function buildGameFoundryExportManifest(project: ProjectRow, assets: Asse
     .map((asset) => ({
       id:asset.id,
       name:asset.input_name,
-      format:String(asset.requested_format || "glb").toLowerCase(),
+      format:String((asset.validation_report as any)?.output?.format || asset.requested_format || "glb").toLowerCase(),
       url:asset.processed_output_url || asset.output_url,
       preferredSource:asset.processed_output_url ? "processed" : "generated",
       importPath:`${importRoot(project.target_engine)}/${asset.input_name.replace(/[^a-zA-Z0-9._-]+/g,"-").slice(0,80)}`,

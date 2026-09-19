@@ -32,6 +32,11 @@ function normalizeStatus(value: unknown) {
   return "queued";
 }
 
+export function preferredGameFoundryAssetFormat(targetEngine:GameFoundryEngine) {
+  const custom=Boolean(cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]));
+  return custom && ["unity","unreal"].includes(targetEngine) ? "fbx" : "glb";
+}
+
 export function getGameFoundryCapabilities() {
   const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const assetWorker = promptWorkerBase();
@@ -237,23 +242,17 @@ export type GameReadyProcessingProfile = {
 };
 
 export function getGameReadyProcessingCapabilities() {
-  const base = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const custom = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   return {
-    configured: Boolean(base),
-    provider: base ? "game-foundry-3d" : null,
-    operations: [
-      "pbr_materials",
-      "uv_unwrap",
-      "lod_generation",
-      "collision_generation",
-      "topology_optimization",
-      "auto_rigging",
-      "basic_animation",
-      "validation",
-    ],
-    note: base
+    configured: true,
+    provider: custom ? "game-foundry-3d" : "blackstar-hosted-3d",
+    operations: custom
+      ? ["pbr_materials","uv_unwrap","lod_generation","collision_generation","topology_optimization","auto_rigging","basic_animation","validation"]
+      : ["pbr_materials","uv_unwrap","lod_generation","collision_generation","topology_optimization","validation"],
+    requiresSpecialistWorker: ["auto_rigging","basic_animation"],
+    note: custom
       ? "Processing uses the configured real Game Foundry 3D worker."
-      : "Game-ready post-processing requires GAME_FOUNDRY_3D_API_URL; no local simulated processing is used.",
+      : "Blackstar hosted processing provides real GLB topology cleanup, normals/UVs, a neutral PBR material scaffold, LOD meshes, collision proxy and validation. Auto-rigging/animation remain specialist-worker capabilities.",
   };
 }
 
@@ -263,14 +262,17 @@ export async function submitGameReadyProcessing(input: {
   outputFormat: string;
   profile: GameReadyProcessingProfile;
 }) {
-  const base = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  if (!base) throw new Error("Game-ready 3D processing requires GAME_FOUNDRY_3D_API_URL.");
-  const json = await request(base, process.env["GAME_FOUNDRY_3D_API_TOKEN"], "/v1/assets/process", {
+  const custom = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const base = custom || BLACKSTAR_HOSTED_3D_WORKER;
+  if (!custom && (input.profile.rigging !== "none" || input.profile.animation !== "none")) {
+    throw new Error("Hosted game-ready processing does not fabricate rigging or animation. Configure GAME_FOUNDRY_3D_API_URL for those specialist operations.");
+  }
+  const json = await request(base, custom ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined, "/v1/assets/process", {
     method: "POST",
     body: JSON.stringify({
       source_url: publicHttpUrl(input.sourceUrl),
       target_engine: input.targetEngine,
-      output_format: input.outputFormat,
+      output_format: custom ? input.outputFormat : "glb",
       processing_profile: input.profile,
     }),
   });
@@ -291,9 +293,9 @@ export async function submitGameReadyProcessing(input: {
 export async function getGameReadyProcessingJob(workerJobId:string) {
   const id=workerJobId.trim();
   if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry processing worker id.");
-  const base=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  if(!base) throw new Error("Game Foundry 3D worker is not configured.");
-  const json=await request(base,process.env["GAME_FOUNDRY_3D_API_TOKEN"],`/v1/assets/process/${encodeURIComponent(id)}`,{method:"GET"});
+  const custom=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
+  const base=custom||BLACKSTAR_HOSTED_3D_WORKER;
+  const json=await request(base,custom?process.env["GAME_FOUNDRY_3D_API_TOKEN"]:undefined,`/v1/assets/process/${encodeURIComponent(id)}`,{method:"GET"});
   return {
     workerJobId:id,
     status:normalizeStatus(json.status),

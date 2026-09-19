@@ -14,6 +14,7 @@ import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./ga
 import {
   getGameFoundryCapabilities,
   getGameReadyProcessingCapabilities,
+  preferredGameFoundryAssetFormat,
   getGameFoundryAssetJob,
   getGameFoundryProjectJob,
   getGameReadyProcessingJob,
@@ -291,7 +292,7 @@ export const generateGameFoundryRequiredAssets = createServerFn({ method:"POST" 
     if(!pending.length) throw new Error("The selected Game Foundry asset requirements already have linked 3D jobs.");
 
     const targetEngine=project.data.target_engine;
-    const outputFormat=["unreal","unity"].includes(targetEngine)?"fbx":"glb";
+    const outputFormat=preferredGameFoundryAssetFormat(targetEngine);
     const qualityProfile=project.data.quality_profile==="cinematic"?"cinematic":project.data.quality_profile==="prototype"?"draft":"game_ready";
     const results:any[]=[];
 
