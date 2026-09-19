@@ -58,66 +58,79 @@ export const Route = createFileRoute("/api/internal/workflow-runs")({
           return json({ error: "Unauthorized" }, 401);
         }
 
-        const url = new URL(request.url);
-        const requested = Number(url.searchParams.get("limit") ?? 2);
-        const limit = Number.isFinite(requested)
-          ? Math.max(1, Math.min(4, Math.trunc(requested)))
-          : 2;
+        const execute = async () => {
+          const url = new URL(request.url);
+          const requested = Number(url.searchParams.get("limit") ?? 2);
+          const limit = Number.isFinite(requested)
+            ? Math.max(1, Math.min(4, Math.trunc(requested)))
+            : 2;
 
-        const [
-          workflowsResult,
-          remindersResult,
-          agentResumesResult,
-          autonomousGoalsResult,
-          legalAutomationResult,
-          phoneCommunicationsResult,
-        ] = await Promise.all([
-          runIsolated("workflows", () => processQueuedWorkflowRuns(limit)),
-          runIsolated("reminders", () => processDuePersonalReminders(Math.max(10, limit * 5))),
-          runIsolated("agent_resumes", () => processResumableAgentRuns(limit)),
-          runIsolated("autonomous_goals", () => processDueAutonomousGoals(Math.min(2, limit))),
-          runIsolated("legal_automation", () => processDueLegalAutomation(Math.min(2, limit))),
-          runIsolated("phone_communications", () => processDuePhoneCommunicationNotifications(Math.max(10, limit * 5))),
-        ]);
+          const [
+            workflowsResult,
+            remindersResult,
+            agentResumesResult,
+            autonomousGoalsResult,
+            legalAutomationResult,
+            phoneCommunicationsResult,
+          ] = await Promise.all([
+            runIsolated("workflows", () => processQueuedWorkflowRuns(limit)),
+            runIsolated("reminders", () => processDuePersonalReminders(Math.max(10, limit * 5))),
+            runIsolated("agent_resumes", () => processResumableAgentRuns(limit)),
+            runIsolated("autonomous_goals", () => processDueAutonomousGoals(Math.min(2, limit))),
+            runIsolated("legal_automation", () => processDueLegalAutomation(Math.min(2, limit))),
+            runIsolated("phone_communications", () => processDuePhoneCommunicationNotifications(Math.max(10, limit * 5))),
+          ]);
 
-        const results = [
-          workflowsResult,
-          remindersResult,
-          agentResumesResult,
-          autonomousGoalsResult,
-          legalAutomationResult,
-          phoneCommunicationsResult,
-        ] as const;
-        const failures = results
-          .filter((result) => !result.ok)
-          .map((result) => ({
-            worker: result.worker,
-            errorName: result.ok ? "" : result.errorName,
-          }));
-        const allFailed = failures.length === results.length;
-        const workflowPayload = workflowsResult.ok
-          ? (workflowsResult.value as Record<string, unknown>)
-          : {};
-        const reminders = valueOrNull(remindersResult);
-        const agentResumes = valueOrNull(agentResumesResult);
-        const autonomousGoals = valueOrNull(autonomousGoalsResult);
-        const legalAutomation = valueOrNull(legalAutomationResult);
-        const phoneCommunications = valueOrNull(phoneCommunicationsResult);
+          const results = [
+            workflowsResult,
+            remindersResult,
+            agentResumesResult,
+            autonomousGoalsResult,
+            legalAutomationResult,
+            phoneCommunicationsResult,
+          ] as const;
+          const failures = results
+            .filter((result) => !result.ok)
+            .map((result) => ({
+              worker: result.worker,
+              errorName: result.ok ? "" : result.errorName,
+            }));
+          const allFailed = failures.length === results.length;
+          const workflowPayload = workflowsResult.ok
+            ? (workflowsResult.value as Record<string, unknown>)
+            : {};
+          const reminders = valueOrNull(remindersResult);
+          const agentResumes = valueOrNull(agentResumesResult);
+          const autonomousGoals = valueOrNull(autonomousGoalsResult);
+          const legalAutomation = valueOrNull(legalAutomationResult);
+          const phoneCommunications = valueOrNull(phoneCommunicationsResult);
 
-        return json(
-          {
-            ok: !allFailed,
-            degraded: failures.length > 0,
-            ...workflowPayload,
-            reminders,
-            agent_resumes: agentResumes,
-            autonomous_goals: autonomousGoals,
-            legal_automation: legalAutomation,
-            phone_communications: phoneCommunications,
-            worker_failures: failures,
-          },
-          allFailed ? 503 : 200,
-        );
+          return json(
+            {
+              ok: !allFailed,
+              degraded: failures.length > 0,
+              ...workflowPayload,
+              reminders,
+              agent_resumes: agentResumes,
+              autonomous_goals: autonomousGoals,
+              legal_automation: legalAutomation,
+              phone_communications: phoneCommunications,
+              worker_failures: failures,
+            },
+            allFailed ? 503 : 200,
+          );
+        };
+
+        const forwardedAdminKey = request.headers.get("x-blackstar-supabase-secret-key")?.trim() ?? "";
+        if (!forwardedAdminKey) return execute();
+
+        try {
+          const { withRequestScopedSupabaseAdminKey } = await import("@/integrations/supabase/client.server");
+          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, execute);
+        } catch {
+          console.error("[runtime-worker] request-scoped database credential rejected");
+          return json({ error: "Runtime worker database credential unavailable" }, 503);
+        }
       },
     },
   },
