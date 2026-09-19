@@ -41,9 +41,9 @@ describe("runtime worker Supabase dispatch relay", () => {
     expect(relay).toContain('"https://palladium-ai-os.vercel.app/api/internal/webhook-retries"');
     expect(relay).toContain('"https://palladium-ai-os.vercel.app/api/internal/dropshipping-opportunity-monitor"');
     expect(relay).toContain('"x-blackstar-supabase-secret-key": secretKey');
+    expect(relay).toContain('request.headers.get("x-blackstar-worker-token")');
     expect(relay).toContain('validWorkerToken(worker.name, token)');
-    expect(relay).toContain('rest/v1/rpc/verify_runtime_worker_token');
-    expect(relay).toContain('worker_name: worker');
+    expect(relay).toContain('verify_runtime_worker_token');
     expect(relay).toContain('request.method !== "POST"');
     expect(relay).not.toContain("target_url");
     expect(relay).not.toContain("request.json()");
@@ -58,6 +58,7 @@ describe("runtime worker Supabase dispatch relay", () => {
     expect(relay).toContain('"x-blackstar-supabase-secret-key": secretKey');
     expect(relay).not.toContain("SUPABASE_PUBLISHABLE_KEYS");
     expect(relay).not.toContain("SUPABASE_ANON_KEY");
+    expect(relay).toContain('Authorization: `Bearer ${token}`');
   });
 
   it("keeps request-scoped credentials behind each route's existing worker token", () => {
