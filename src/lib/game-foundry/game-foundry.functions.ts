@@ -9,7 +9,7 @@ import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
 import { getGameFoundryIntegrations, probeGameFoundryConnections } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
-import { generateBuilderSourceManifest } from "@/lib/builder/builder-source.server";
+import { compileGameFoundrySourceManifest } from "./game-foundry-source.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 import {
   getGameFoundryCapabilities,
@@ -555,27 +555,15 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
 
     const {provider,model}=await resolveGameFoundryPreference(sb,context.userId);
     try{
-      const engineGuidanceByTarget: Record<string,string> = {
-        unity:"Generate a bounded Unity starter using C# scripts and text project/config files only. Do not emit binary scenes, prefabs, packages, Library output or credentials.",
-        unreal:"Generate a bounded Unreal Engine starter using C++ source, headers, Build.cs/Target.cs and text config only. Do not claim Blueprint assets, .uasset files or compiled binaries exist.",
-        godot:"Generate a bounded Godot starter using GDScript, .tscn/.tres text resources and project.godot where useful.",
-        web:"Generate a bounded playable web-game starter using browser-native JavaScript, HTML and CSS with no vendored dependencies. Always include index.html. Avoid module imports, remote scripts, remote stylesheets, network APIs and external assets so Blackstar can run the generated game inside a network-blocked sandboxed preview.",
-        blender:"Generate a bounded Blender-oriented starter using Python automation/scripts and text configuration only. Do not claim a .blend binary was created.",
-        generic:"Generate a portable game prototype source starter using text source/config files only.",
-      };
-      const engineGuidance = engineGuidanceByTarget[String(claimed.data.target_engine)] ?? engineGuidanceByTarget["generic"]!;
-      const source=await generateBuilderSourceManifest({
-        title:claimed.data.name,
-        prompt:[
-          claimed.data.prompt,
-          `Target engine: ${claimed.data.target_engine}`,
-          `Project type: ${claimed.data.project_type}`,
-          `Quality profile: ${claimed.data.quality_profile}`,
-          engineGuidance,
-          "This is a Blackstar Game Foundry project. Keep generated code bounded, game-oriented, and compatible with the approved design. Linked 3D assets are managed separately; reference import locations/placeholders rather than inventing binary asset files.",
-          claimed.data.content_status === "generated" ? `Compiled gameplay/world content:\n${JSON.stringify(claimed.data.content_manifest)}` : "No compiled gameplay/world content manifest is available yet; do not invent one as already approved.",
-        ].join("\n\n"),
-        plan:claimed.data.design_spec,
+      const source=await compileGameFoundrySourceManifest({
+        name:claimed.data.name,
+        prompt:claimed.data.prompt,
+        targetEngine:claimed.data.target_engine,
+        projectType:claimed.data.project_type,
+        qualityProfile:claimed.data.quality_profile,
+        designSpec:claimed.data.design_spec,
+        contentManifest:claimed.data.content_manifest,
+        contentGenerated:claimed.data.content_status === "generated",
         provider,
         model,
       });
