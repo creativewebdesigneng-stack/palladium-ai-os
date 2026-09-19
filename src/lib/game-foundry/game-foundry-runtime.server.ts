@@ -13,7 +13,7 @@ const ENGINE_EXPORTS: Record<GameFoundryEngine, string[]> = {
   blender: ["glb","gltf","fbx","obj","usd"],
 };
 
-const BLACKSTAR_HOSTED_3D_WORKER = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
+export const BLACKSTAR_HOSTED_3D_WORKER = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
 
 function cleanBase(value: string | undefined) {
   return (value || "").trim().replace(/\/+$/, "");
