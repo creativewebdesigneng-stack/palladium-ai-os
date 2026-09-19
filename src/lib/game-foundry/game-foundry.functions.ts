@@ -34,6 +34,112 @@ async function resolveGameFoundryPreference(sb: Sb, userId: string) {
   return resolveAssistantModelPreference(stored);
 }
 
+async function compileNativeGameFoundryBuild(args:{
+  sb:Sb;
+  userId:string;
+  project:any;
+  provider:any;
+  model:string;
+}) {
+  const {sb,userId,project,provider,model}=args;
+  const existingContent=project.content_status==="generated"&&project.content_manifest&&typeof project.content_manifest==="object"
+    ? project.content_manifest
+    : null;
+  const content=existingContent ?? await generateGameFoundryContent({
+    name:project.name,
+    prompt:project.prompt,
+    targetEngine:project.target_engine,
+    qualityProfile:project.quality_profile,
+    designSpec:project.design_spec,
+    provider,
+    model,
+  });
+
+  const existingSource=project.source_status==="generated"&&project.source_manifest&&typeof project.source_manifest==="object"
+    ? project.source_manifest
+    : null;
+  const source=existingSource ?? await compileGameFoundrySourceManifest({
+    name:project.name,
+    prompt:project.prompt,
+    targetEngine:project.target_engine,
+    projectType:project.project_type,
+    qualityProfile:project.quality_profile,
+    designSpec:project.design_spec,
+    contentManifest:content,
+    contentGenerated:true,
+    provider,
+    model,
+  });
+
+  const assetResult=await sb.from("three_d_jobs")
+    .select("id,input_name,requested_format,output_url,processed_output_url,target_engine,validation_report,status")
+    .eq("project_id",project.id).eq("user_id",userId).eq("status","completed")
+    .order("created_at",{ascending:true});
+  if(assetResult.error) throw new Error(assetResult.error.message);
+  const completedAssets=assetResult.data??[];
+  const exportManifest=completedAssets.length
+    ? buildGameFoundryExportManifest(project,completedAssets)
+    : {};
+
+  const packageManifest=buildGameFoundryProjectPackage({
+    project:{
+      ...project,
+      content_manifest:content,
+      source_manifest:source,
+      export_manifest:exportManifest,
+    },
+  });
+  const now=new Date().toISOString();
+  const saved=await sb.from("game_foundry_projects").update({
+    status:"completed",
+    worker_job_id:null,
+    output_url:null,
+    preview_url:null,
+    error_message:null,
+    content_manifest:content,
+    content_status:"generated",
+    content_error:null,
+    content_generated_at:project.content_generated_at??now,
+    source_manifest:source,
+    source_status:"generated",
+    source_error:null,
+    source_generated_at:project.source_generated_at??now,
+    export_manifest:exportManifest,
+    package_manifest:packageManifest,
+    package_status:"prepared",
+    package_error:null,
+    package_prepared_at:now,
+    metadata:{
+      provider:"blackstar-native-game-compiler",
+      external_worker:false,
+      content_generated_by:(content as any)?.generatedBy??null,
+      source_generated_by:(source as any)?.generatedBy??null,
+      linked_assets:completedAssets.length,
+    },
+    completed_at:now,
+    updated_at:now,
+  }).eq("id",project.id).eq("user_id",userId).eq("status","running")
+    .select("id,status,content_status,source_status,package_status,package_manifest,export_manifest,completed_at").maybeSingle();
+  if(saved.error) throw new Error(saved.error.message);
+  if(!saved.data) throw new Error("The native Game Foundry build lost its execution claim before completion.");
+  return {
+    workerJobId:`native:${project.id}`,
+    status:"completed" as const,
+    outputUrl:null,
+    previewUrl:null,
+    errorMessage:null,
+    metadata:{
+      provider:"blackstar-native-game-compiler",
+      externalWorker:false,
+      sourceFiles:Array.isArray((source as any)?.files)?(source as any).files.length:0,
+      linkedAssets:completedAssets.length,
+      packagePrepared:true,
+    },
+    designSpec:project.design_spec,
+    provider:"blackstar-native-game-compiler" as const,
+  };
+}
+
 const engine = z.enum(["generic","unity","unreal","godot","web","blender"]);
 const quality = z.enum(["prototype","game_ready","cinematic"]);
 const assetQuality = z.enum(["draft","game_ready","cinematic"]);
