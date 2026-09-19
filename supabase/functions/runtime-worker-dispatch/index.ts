@@ -92,7 +92,8 @@ Deno.serve(async (request: Request) => {
   if (!worker) return json({ error: "Unknown worker" }, 404);
 
   const authorization = request.headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  const bearerToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  const token = request.headers.get("x-blackstar-worker-token")?.trim() || bearerToken;
 
   if (token.length < 32) return json({ error: "Unauthorized" }, 401);
   const tokenValid = await validWorkerToken(worker.name, token);
