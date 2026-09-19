@@ -55,7 +55,7 @@ async function compileNativeGameFoundryBuild(args:{
     model,
   });
 
-  const existingSource=project.source_status==="generated"&&project.source_manifest&&typeof project.source_manifest==="object"
+  const existingSource=existingContent&&project.source_status==="generated"&&project.source_manifest&&typeof project.source_manifest==="object"
     ? project.source_manifest
     : null;
   const source=existingSource ?? await compileGameFoundrySourceManifest({
@@ -110,6 +110,7 @@ async function compileNativeGameFoundryBuild(args:{
     package_error:null,
     package_prepared_at:now,
     metadata:{
+      ...(project.metadata&&typeof project.metadata==="object"?project.metadata:{}),
       provider:"blackstar-native-game-compiler",
       external_worker:false,
       content_generated_by:(content as any)?.generatedBy??null,
@@ -243,7 +244,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const project = await sb.from("game_foundry_projects")
-      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status,content_manifest,content_status,content_generated_at,source_manifest,source_status,source_generated_at,export_manifest")
+      .select("id,name,prompt,target_engine,project_type,quality_profile,design_spec,status,content_manifest,content_status,content_generated_at,source_manifest,source_status,source_generated_at,export_manifest,metadata")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (project.error) throw new Error(project.error.message);
     if (!project.data) throw new Error("Game Foundry project not found.");
