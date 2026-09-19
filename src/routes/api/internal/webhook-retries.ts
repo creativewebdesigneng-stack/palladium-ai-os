@@ -21,20 +21,38 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
           return json({ error: "Unauthorized" }, 401);
         }
 
-        const url = new URL(request.url);
-        const requested = Number(url.searchParams.get("limit") ?? 20);
-        const limit = Number.isFinite(requested)
-          ? Math.max(1, Math.min(50, Math.trunc(requested)))
-          : 20;
+        const execute = async () => {
+          const url = new URL(request.url);
+          const requested = Number(url.searchParams.get("limit") ?? 20);
+          const limit = Number.isFinite(requested)
+            ? Math.max(1, Math.min(50, Math.trunc(requested)))
+            : 20;
+
+          try {
+            const result = await processDueWebhookRetries(limit);
+            return json({ ok: true, ...result }, 200);
+          } catch (error) {
+            console.error("[runtime-worker] webhook retry processing unavailable", {
+              errorName: error instanceof Error ? error.name : "UnknownError",
+            });
+            return json({ ok: false, error: "Worker unavailable" }, 503);
+          }
+        };
+
+        const forwardedAdminKey =
+          request.headers.get("x-blackstar-supabase-secret-key")?.trim() ?? "";
+        if (!forwardedAdminKey) return execute();
 
         try {
-          const result = await processDueWebhookRetries(limit);
-          return json({ ok: true, ...result }, 200);
-        } catch (error) {
-          console.error("[runtime-worker] webhook retry processing unavailable", {
-            errorName: error instanceof Error ? error.name : "UnknownError",
+          const { withRequestScopedSupabaseAdminKey } = await import(
+            "@/integrations/supabase/client.server"
+          );
+          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, execute);
+        } catch {
+          console.error("[runtime-worker] request-scoped database credential rejected", {
+            worker: "webhook_retry",
           });
-          return json({ ok: false, error: "Worker unavailable" }, 503);
+          return json({ error: "Runtime worker database credential unavailable" }, 503);
         }
       },
     },
