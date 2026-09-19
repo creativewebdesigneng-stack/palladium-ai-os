@@ -24,5 +24,6 @@ describe('Game Foundry native build integration',()=>{
   it('does not claim native engine binaries were compiled',()=>{
     expect(screen).toContain('without pretending engine binaries were built')
     expect(screen).toContain('External executable build worker')
+    expect(screen).toContain('Blackstar game project package compiled')
   })
 })

@@ -110,7 +110,7 @@ export default function GameFoundry() {
   });
   const generateProject = useMutation({
     mutationFn:(id)=>generateProjectFn({data:{id}}),
-    onSuccess:async(res)=>{ await refresh(); toast({title:res?.provider==='blackstar-native-game-compiler'?'Blackstar game project compiled':'Game generation submitted'}); },
+    onSuccess:async(res)=>{ await refresh(); toast({title:res?.provider==='blackstar-native-game-compiler'?'Blackstar game project package compiled':'Game generation submitted'}); },
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'Game generation could not start',description:friendlyMessage(error)}); },
   });
   const preparePackage = useMutation({

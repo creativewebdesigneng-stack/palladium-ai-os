@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 
 const migration=readFileSync('supabase/migrations/20260911234500_game_foundry_content_compiler.sql','utf8')
 const functions=readFileSync('src/lib/game-foundry/game-foundry.functions.ts','utf8')
+const sourceCompiler=readFileSync('src/lib/game-foundry/game-foundry-source.server.ts','utf8')
 const tool=readFileSync('src/lib/game-foundry/game-foundry-agent-tool.server.ts','utf8')
 const pkg=readFileSync('src/lib/game-foundry/game-foundry-project-package.server.ts','utf8')
 
@@ -13,7 +14,7 @@ describe('Game Foundry content compiler integration',()=>{
     expect(migration).not.toContain('create table')
   })
   it('feeds approved content into source generation and portable packages',()=>{
-    expect(functions).toContain('Compiled gameplay/world content:')
+    expect(sourceCompiler).toContain('Compiled gameplay/world content:')
     expect(pkg).toContain('content:input.project.content_manifest')
   })
   it('exposes content generation to the bounded agent tool',()=>{
