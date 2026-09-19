@@ -101,6 +101,7 @@ import { Route as ShellAppModelsRouteImport } from './routes/_shell/_app/models'
 import { Route as ShellAppNewsResearchRouteImport } from './routes/_shell/_app/news-research'
 import { Route as ShellAppNotificationsRouteImport } from './routes/_shell/_app/notifications'
 import { Route as ShellAppOrganisationRouteImport } from './routes/_shell/_app/organisation'
+import { Route as ShellAppPhoneCommunicationsRouteImport } from './routes/_shell/_app/phone-communications'
 import { Route as ShellAppProductAnalyticsRouteImport } from './routes/_shell/_app/product-analytics'
 import { Route as ShellAppProjectsRouteImport } from './routes/_shell/_app/projects'
 import { Route as ShellAppPromptsRouteImport } from './routes/_shell/_app/prompts'
@@ -171,6 +172,10 @@ import { Route as ApiPublicV1WorkflowsRouteImport } from './routes/api/public/v1
 import { Route as ApiPublicV1WorkforcesRouteImport } from './routes/api/public/v1/workforces'
 import { Route as ShellAppAgentsIdIndexRouteImport } from './routes/_shell/_app/agents.$id.index'
 import { Route as ShellAppAgentsIdPlaygroundRouteImport } from './routes/_shell/_app/agents.$id.playground'
+import { Route as ApiPublicCommunicationsTwilioMessageStatusRouteImport } from './routes/api/public/communications/twilio/message-status'
+import { Route as ApiPublicCommunicationsTwilioStatusRouteImport } from './routes/api/public/communications/twilio/status'
+import { Route as ApiPublicCommunicationsTwilioTurnRouteImport } from './routes/api/public/communications/twilio/turn'
+import { Route as ApiPublicCommunicationsTwilioVoiceRouteImport } from './routes/api/public/communications/twilio/voice'
 import { Route as ApiPublicRetailTwilioVoiceIncomingRouteImport } from './routes/api/public/retail/twilio-voice/incoming'
 import { Route as ApiPublicRetailTwilioVoiceStatusRouteImport } from './routes/api/public/retail/twilio-voice/status'
 import { Route as ApiPublicRetailTwilioVoiceTurnRouteImport } from './routes/api/public/retail/twilio-voice/turn'
@@ -646,6 +651,12 @@ const ShellAppOrganisationRoute = ShellAppOrganisationRouteImport.update({
   path: '/organisation',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppPhoneCommunicationsRoute =
+  ShellAppPhoneCommunicationsRouteImport.update({
+    id: '/phone-communications',
+    path: '/phone-communications',
+    getParentRoute: () => ShellAppRoute,
+  } as any)
 const ShellAppProductAnalyticsRoute =
   ShellAppProductAnalyticsRouteImport.update({
     id: '/product-analytics',
@@ -1015,6 +1026,30 @@ const ShellAppAgentsIdPlaygroundRoute =
     path: '/agents/$id/playground',
     getParentRoute: () => ShellAppRoute,
   } as any)
+const ApiPublicCommunicationsTwilioMessageStatusRoute =
+  ApiPublicCommunicationsTwilioMessageStatusRouteImport.update({
+    id: '/api/public/communications/twilio/message-status',
+    path: '/api/public/communications/twilio/message-status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCommunicationsTwilioStatusRoute =
+  ApiPublicCommunicationsTwilioStatusRouteImport.update({
+    id: '/api/public/communications/twilio/status',
+    path: '/api/public/communications/twilio/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCommunicationsTwilioTurnRoute =
+  ApiPublicCommunicationsTwilioTurnRouteImport.update({
+    id: '/api/public/communications/twilio/turn',
+    path: '/api/public/communications/twilio/turn',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCommunicationsTwilioVoiceRoute =
+  ApiPublicCommunicationsTwilioVoiceRouteImport.update({
+    id: '/api/public/communications/twilio/voice',
+    path: '/api/public/communications/twilio/voice',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRetailTwilioVoiceIncomingRoute =
   ApiPublicRetailTwilioVoiceIncomingRouteImport.update({
     id: '/api/public/retail/twilio-voice/incoming',
@@ -1141,6 +1176,7 @@ export interface FileRoutesByFullPath {
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
+  '/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/projects': typeof ShellAppProjectsRouteWithChildren
   '/prompts': typeof ShellAppPromptsRoute
@@ -1210,6 +1246,10 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof ShellAppAdminIndexRoute
   '/agents/': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/communications/twilio/message-status': typeof ApiPublicCommunicationsTwilioMessageStatusRoute
+  '/api/public/communications/twilio/status': typeof ApiPublicCommunicationsTwilioStatusRoute
+  '/api/public/communications/twilio/turn': typeof ApiPublicCommunicationsTwilioTurnRoute
+  '/api/public/communications/twilio/voice': typeof ApiPublicCommunicationsTwilioVoiceRoute
   '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
   '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
   '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
@@ -1309,6 +1349,7 @@ export interface FileRoutesByTo {
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
+  '/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/projects': typeof ShellAppProjectsRouteWithChildren
   '/prompts': typeof ShellAppPromptsRoute
@@ -1378,6 +1419,10 @@ export interface FileRoutesByTo {
   '/admin': typeof ShellAppAdminIndexRoute
   '/agents': typeof ShellAppAgentsIndexRoute
   '/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/communications/twilio/message-status': typeof ApiPublicCommunicationsTwilioMessageStatusRoute
+  '/api/public/communications/twilio/status': typeof ApiPublicCommunicationsTwilioStatusRoute
+  '/api/public/communications/twilio/turn': typeof ApiPublicCommunicationsTwilioTurnRoute
+  '/api/public/communications/twilio/voice': typeof ApiPublicCommunicationsTwilioVoiceRoute
   '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
   '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
   '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
@@ -1480,6 +1525,7 @@ export interface FileRoutesById {
   '/_shell/_app/news-research': typeof ShellAppNewsResearchRoute
   '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
   '/_shell/_app/organisation': typeof ShellAppOrganisationRoute
+  '/_shell/_app/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/_shell/_app/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/_shell/_app/projects': typeof ShellAppProjectsRouteWithChildren
   '/_shell/_app/prompts': typeof ShellAppPromptsRoute
@@ -1549,6 +1595,10 @@ export interface FileRoutesById {
   '/_shell/_app/admin/': typeof ShellAppAdminIndexRoute
   '/_shell/_app/agents/': typeof ShellAppAgentsIndexRoute
   '/_shell/_app/agents/$id/playground': typeof ShellAppAgentsIdPlaygroundRoute
+  '/api/public/communications/twilio/message-status': typeof ApiPublicCommunicationsTwilioMessageStatusRoute
+  '/api/public/communications/twilio/status': typeof ApiPublicCommunicationsTwilioStatusRoute
+  '/api/public/communications/twilio/turn': typeof ApiPublicCommunicationsTwilioTurnRoute
+  '/api/public/communications/twilio/voice': typeof ApiPublicCommunicationsTwilioVoiceRoute
   '/api/public/retail/twilio-voice/incoming': typeof ApiPublicRetailTwilioVoiceIncomingRoute
   '/api/public/retail/twilio-voice/status': typeof ApiPublicRetailTwilioVoiceStatusRoute
   '/api/public/retail/twilio-voice/turn': typeof ApiPublicRetailTwilioVoiceTurnRoute
@@ -1650,6 +1700,7 @@ export interface FileRouteTypes {
     | '/news-research'
     | '/notifications'
     | '/organisation'
+    | '/phone-communications'
     | '/product-analytics'
     | '/projects'
     | '/prompts'
@@ -1719,6 +1770,10 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/agents/'
     | '/agents/$id/playground'
+    | '/api/public/communications/twilio/message-status'
+    | '/api/public/communications/twilio/status'
+    | '/api/public/communications/twilio/turn'
+    | '/api/public/communications/twilio/voice'
     | '/api/public/retail/twilio-voice/incoming'
     | '/api/public/retail/twilio-voice/status'
     | '/api/public/retail/twilio-voice/turn'
@@ -1818,6 +1873,7 @@ export interface FileRouteTypes {
     | '/news-research'
     | '/notifications'
     | '/organisation'
+    | '/phone-communications'
     | '/product-analytics'
     | '/projects'
     | '/prompts'
@@ -1887,6 +1943,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/agents'
     | '/agents/$id/playground'
+    | '/api/public/communications/twilio/message-status'
+    | '/api/public/communications/twilio/status'
+    | '/api/public/communications/twilio/turn'
+    | '/api/public/communications/twilio/voice'
     | '/api/public/retail/twilio-voice/incoming'
     | '/api/public/retail/twilio-voice/status'
     | '/api/public/retail/twilio-voice/turn'
@@ -1988,6 +2048,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/news-research'
     | '/_shell/_app/notifications'
     | '/_shell/_app/organisation'
+    | '/_shell/_app/phone-communications'
     | '/_shell/_app/product-analytics'
     | '/_shell/_app/projects'
     | '/_shell/_app/prompts'
@@ -2057,6 +2118,10 @@ export interface FileRouteTypes {
     | '/_shell/_app/admin/'
     | '/_shell/_app/agents/'
     | '/_shell/_app/agents/$id/playground'
+    | '/api/public/communications/twilio/message-status'
+    | '/api/public/communications/twilio/status'
+    | '/api/public/communications/twilio/turn'
+    | '/api/public/communications/twilio/voice'
     | '/api/public/retail/twilio-voice/incoming'
     | '/api/public/retail/twilio-voice/status'
     | '/api/public/retail/twilio-voice/turn'
@@ -2113,6 +2178,10 @@ export interface RootRouteChildren {
   ApiPublicV1UsageRoute: typeof ApiPublicV1UsageRoute
   ApiPublicV1WorkflowsRoute: typeof ApiPublicV1WorkflowsRouteWithChildren
   ApiPublicV1WorkforcesRoute: typeof ApiPublicV1WorkforcesRoute
+  ApiPublicCommunicationsTwilioMessageStatusRoute: typeof ApiPublicCommunicationsTwilioMessageStatusRoute
+  ApiPublicCommunicationsTwilioStatusRoute: typeof ApiPublicCommunicationsTwilioStatusRoute
+  ApiPublicCommunicationsTwilioTurnRoute: typeof ApiPublicCommunicationsTwilioTurnRoute
+  ApiPublicCommunicationsTwilioVoiceRoute: typeof ApiPublicCommunicationsTwilioVoiceRoute
   ApiPublicRetailTwilioVoiceIncomingRoute: typeof ApiPublicRetailTwilioVoiceIncomingRoute
   ApiPublicRetailTwilioVoiceStatusRoute: typeof ApiPublicRetailTwilioVoiceStatusRoute
   ApiPublicRetailTwilioVoiceTurnRoute: typeof ApiPublicRetailTwilioVoiceTurnRoute
@@ -2764,6 +2833,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppOrganisationRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/phone-communications': {
+      id: '/_shell/_app/phone-communications'
+      path: '/phone-communications'
+      fullPath: '/phone-communications'
+      preLoaderRoute: typeof ShellAppPhoneCommunicationsRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/product-analytics': {
       id: '/_shell/_app/product-analytics'
       path: '/product-analytics'
@@ -3254,6 +3330,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppAgentsIdPlaygroundRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/api/public/communications/twilio/message-status': {
+      id: '/api/public/communications/twilio/message-status'
+      path: '/api/public/communications/twilio/message-status'
+      fullPath: '/api/public/communications/twilio/message-status'
+      preLoaderRoute: typeof ApiPublicCommunicationsTwilioMessageStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/communications/twilio/status': {
+      id: '/api/public/communications/twilio/status'
+      path: '/api/public/communications/twilio/status'
+      fullPath: '/api/public/communications/twilio/status'
+      preLoaderRoute: typeof ApiPublicCommunicationsTwilioStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/communications/twilio/turn': {
+      id: '/api/public/communications/twilio/turn'
+      path: '/api/public/communications/twilio/turn'
+      fullPath: '/api/public/communications/twilio/turn'
+      preLoaderRoute: typeof ApiPublicCommunicationsTwilioTurnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/communications/twilio/voice': {
+      id: '/api/public/communications/twilio/voice'
+      path: '/api/public/communications/twilio/voice'
+      fullPath: '/api/public/communications/twilio/voice'
+      preLoaderRoute: typeof ApiPublicCommunicationsTwilioVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/retail/twilio-voice/incoming': {
       id: '/api/public/retail/twilio-voice/incoming'
       path: '/api/public/retail/twilio-voice/incoming'
@@ -3373,6 +3477,7 @@ interface ShellAppRouteChildren {
   ShellAppNewsResearchRoute: typeof ShellAppNewsResearchRoute
   ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
   ShellAppOrganisationRoute: typeof ShellAppOrganisationRoute
+  ShellAppPhoneCommunicationsRoute: typeof ShellAppPhoneCommunicationsRoute
   ShellAppProductAnalyticsRoute: typeof ShellAppProductAnalyticsRoute
   ShellAppProjectsRoute: typeof ShellAppProjectsRouteWithChildren
   ShellAppPromptsRoute: typeof ShellAppPromptsRoute
@@ -3491,6 +3596,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppNewsResearchRoute: ShellAppNewsResearchRoute,
   ShellAppNotificationsRoute: ShellAppNotificationsRoute,
   ShellAppOrganisationRoute: ShellAppOrganisationRoute,
+  ShellAppPhoneCommunicationsRoute: ShellAppPhoneCommunicationsRoute,
   ShellAppProductAnalyticsRoute: ShellAppProductAnalyticsRoute,
   ShellAppProjectsRoute: ShellAppProjectsRouteWithChildren,
   ShellAppPromptsRoute: ShellAppPromptsRoute,
@@ -3644,6 +3750,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicV1UsageRoute: ApiPublicV1UsageRoute,
   ApiPublicV1WorkflowsRoute: ApiPublicV1WorkflowsRouteWithChildren,
   ApiPublicV1WorkforcesRoute: ApiPublicV1WorkforcesRoute,
+  ApiPublicCommunicationsTwilioMessageStatusRoute:
+    ApiPublicCommunicationsTwilioMessageStatusRoute,
+  ApiPublicCommunicationsTwilioStatusRoute:
+    ApiPublicCommunicationsTwilioStatusRoute,
+  ApiPublicCommunicationsTwilioTurnRoute:
+    ApiPublicCommunicationsTwilioTurnRoute,
+  ApiPublicCommunicationsTwilioVoiceRoute:
+    ApiPublicCommunicationsTwilioVoiceRoute,
   ApiPublicRetailTwilioVoiceIncomingRoute:
     ApiPublicRetailTwilioVoiceIncomingRoute,
   ApiPublicRetailTwilioVoiceStatusRoute: ApiPublicRetailTwilioVoiceStatusRoute,
