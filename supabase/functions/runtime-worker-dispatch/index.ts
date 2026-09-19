@@ -12,23 +12,53 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-function runtimeSecretKey() {
-  const raw = Deno.env.get("SUPABASE_SECRET_KEYS")?.trim();
-  if (!raw) throw new Error("SUPABASE_SECRET_KEYS is unavailable.");
+function defaultManagedKey(envName: "SUPABASE_SECRET_KEYS" | "SUPABASE_PUBLISHABLE_KEYS", prefix: string) {
+  const raw = Deno.env.get(envName)?.trim();
+  if (!raw) throw new Error(`${envName} is unavailable.`);
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("SUPABASE_SECRET_KEYS is invalid.");
+    throw new Error(`${envName} is invalid.`);
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("SUPABASE_SECRET_KEYS is invalid.");
+    throw new Error(`${envName} is invalid.`);
   }
   const key = (parsed as Record<string, unknown>)["default"];
-  if (typeof key !== "string" || !key.startsWith("sb_secret_")) {
-    throw new Error("The default Supabase secret key is unavailable.");
+  if (typeof key !== "string" || !key.startsWith(prefix)) {
+    throw new Error(`The default managed key in ${envName} is unavailable.`);
   }
   return key;
+}
+
+async function validWorkerToken(token: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/+$/, "");
+  if (!supabaseUrl) return false;
+  let publishableKey: string;
+  try {
+    publishableKey = defaultManagedKey("SUPABASE_PUBLISHABLE_KEYS", "sb_publishable_");
+  } catch {
+    return false;
+  }
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/verify_runtime_worker_token`, {
+      method: "POST",
+      headers: {
+        apikey: publishableKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        worker_name: "workflow_runner",
+        supplied_token: token,
+      }),
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return false;
+    return (await response.json().catch(() => null)) === true;
+  } catch {
+    return false;
+  }
 }
 
 Deno.serve(async (request: Request) => {
@@ -36,7 +66,9 @@ Deno.serve(async (request: Request) => {
 
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (token.length < 32) return json({ error: "Unauthorized" }, 401);
+  if (token.length < 32 || !(await validWorkerToken(token))) {
+    return json({ error: "Unauthorized" }, 401);
+  }
 
   const incoming = new URL(request.url);
   const requested = Number(incoming.searchParams.get("limit") ?? 2);
@@ -46,7 +78,7 @@ Deno.serve(async (request: Request) => {
 
   let secretKey: string;
   try {
-    secretKey = runtimeSecretKey();
+    secretKey = defaultManagedKey("SUPABASE_SECRET_KEYS", "sb_secret_");
   } catch {
     console.error("[runtime-worker-dispatch] Supabase secret key unavailable");
     return json({ error: "Runtime database credential unavailable" }, 503);
