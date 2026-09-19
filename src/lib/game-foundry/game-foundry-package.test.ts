@@ -15,11 +15,12 @@ const project = {
 describe('Game Foundry engine handoff', () => {
   it('builds deterministic engine-aware manifests from linked completed assets', () => {
     const manifest = buildGameFoundryExportManifest(project, [{
-      id:'asset-1', input_name:'Hero Rifle', requested_format:'fbx', output_url:'https://example.com/rifle.fbx', processed_output_url:'https://example.com/rifle-ready.fbx', target_engine:'unreal', validation_report:{ok:true},
+      id:'asset-1', input_name:'Hero Rifle', requested_format:'fbx', output_url:'https://example.com/rifle.fbx', processed_output_url:'https://example.com/rifle-ready.glb', target_engine:'unreal', validation_report:{ok:true,output:{format:'glb'}},
     }])
     expect(manifest.schema).toBe('blackstar.game_foundry.export_manifest.v1')
     expect(manifest.importRoot).toBe('/Game/BlackstarGameFoundry')
     expect(manifest.assets[0]?.preferredSource).toBe('processed')
+    expect(manifest.assets[0]?.format).toBe('glb')
     expect(manifest.assets[0]?.importPath).toContain('Hero-Rifle')
   })
 
