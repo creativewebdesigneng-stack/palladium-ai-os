@@ -51,8 +51,10 @@ export function getGameFoundryCapabilities() {
       formats: configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : ["glb","gltf","obj","ply","stl","vox"],
     },
     gameGeneration: {
-      configured: Boolean(gameWorker),
-      provider: gameWorker ? "game-foundry-game" : null,
+      configured: true,
+      nativeCompiler: true,
+      externalWorkerConfigured: Boolean(gameWorker),
+      provider: gameWorker ? "game-foundry-game" : "blackstar-native-game-compiler",
     },
     engines: (Object.keys(ENGINE_EXPORTS) as GameFoundryEngine[]).map((id) => ({
       id,
@@ -63,7 +65,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Prompt-to-3D uses Blackstar's hosted 3D execution node by default. GAME_FOUNDRY_3D_API_URL overrides it for a private/custom worker. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
+    note: "Prompt-to-3D and game-ready geometry processing use Blackstar-hosted execution by default. Blackstar's native game compiler produces bounded engine source and portable project packages without an external game worker; GAME_FOUNDRY_GAME_API_URL remains an optional external build lane. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
   };
 }
 
