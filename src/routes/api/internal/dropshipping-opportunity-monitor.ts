@@ -31,15 +31,15 @@ export const Route=createFileRoute('/api/internal/dropshipping-opportunity-monit
         }
 
         try{
-          const {supabaseAdmin,withRequestScopedSupabaseAdminKey}=await import('@/integrations/supabase/client.server');
-          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey,async()=>{
-            const verified=await supabaseAdmin.rpc('verify_runtime_worker_token',{
-              worker_name:'dropshipping_monitor',
-              supplied_token:supplied,
-            });
-            if(verified.error||verified.data!==true) return json({error:'Unauthorized'},401);
-            return execute();
+          const {withVerifiedForwardedRuntimeWorker}=await import('@/lib/runtime/runtime-worker-forwarded-auth.server');
+          const verified=await withVerifiedForwardedRuntimeWorker({
+            name:'dropshipping_monitor',
+            suppliedToken:supplied,
+            forwardedAdminKey,
+            operation:execute,
           });
+          if(!verified.authorized) return json({error:'Unauthorized'},401);
+          return verified.value;
         }catch{
           console.error('[runtime-worker] request-scoped database credential rejected',{
             worker:'dropshipping_monitor',
