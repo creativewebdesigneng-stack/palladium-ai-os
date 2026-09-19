@@ -14,6 +14,7 @@ begin
   if v_job_id is not null then
     perform cron.alter_job(
       v_job_id,
+      schedule := '*/5 * * * *',
       command := $workflow$
         select net.http_post(
           url := 'https://piwhiuangitqvwvwwcga.supabase.co/functions/v1/runtime-worker-dispatch?worker=workflow_runner&limit=4',
@@ -42,6 +43,7 @@ begin
   if v_job_id is not null then
     perform cron.alter_job(
       v_job_id,
+      schedule := '*/5 * * * *',
       command := $webhook$
         select net.http_post(
           url := 'https://piwhiuangitqvwvwwcga.supabase.co/functions/v1/runtime-worker-dispatch?worker=webhook_retry&limit=50',
@@ -70,6 +72,7 @@ begin
   if v_job_id is not null then
     perform cron.alter_job(
       v_job_id,
+      schedule := '7,37 * * * *',
       command := $dropshipping$
         select net.http_post(
           url := 'https://piwhiuangitqvwvwwcga.supabase.co/functions/v1/runtime-worker-dispatch?worker=dropshipping_monitor&limit=4',
