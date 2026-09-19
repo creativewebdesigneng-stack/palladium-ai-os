@@ -67,10 +67,12 @@ describe("runtime worker Supabase dispatch relay", () => {
       [webhookRoute, "webhook_retry"],
       [dropshippingRoute, "dropshipping_monitor"],
     ] as const) {
-      expect(source).toContain(`isValidRuntimeWorkerToken("${tokenName}"`)
-      expect(source).toContain("x-blackstar-supabase-secret-key")
-      expect(source.indexOf(`isValidRuntimeWorkerToken("${tokenName}"`))
-        .toBeLessThan(source.indexOf("x-blackstar-supabase-secret-key"))
+      const doubleQuoted = `isValidRuntimeWorkerToken("${tokenName}"`;
+      const singleQuoted = `isValidRuntimeWorkerToken('${tokenName}'`;
+      const authIndex = Math.max(source.indexOf(doubleQuoted), source.indexOf(singleQuoted));
+      expect(authIndex).toBeGreaterThanOrEqual(0);
+      expect(source).toContain("x-blackstar-supabase-secret-key");
+      expect(authIndex).toBeLessThan(source.indexOf("x-blackstar-supabase-secret-key"));
     }
   });
 });
