@@ -10,12 +10,10 @@ type WorkerConfig = {
   timeoutMs: number;
 };
 
-const UPSTREAM = "https://palladium-ai-os.vercel.app/api/internal/workflow-runs";
-
 const WORKERS: Record<WorkerName, WorkerConfig> = {
   workflow_runner: {
     name: "workflow_runner",
-    upstream: UPSTREAM,
+    upstream: "https://palladium-ai-os.vercel.app/api/internal/workflow-runs",
     defaultLimit: 2,
     maxLimit: 4,
     timeoutMs: 55_000,
@@ -46,21 +44,24 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-function defaultManagedSecretKey() {
-  const raw = Deno.env.get("SUPABASE_SECRET_KEYS")?.trim();
-  if (!raw) throw new Error("SUPABASE_SECRET_KEYS is unavailable.");
+function defaultManagedKey(
+  envName: "SUPABASE_SECRET_KEYS" | "SUPABASE_PUBLISHABLE_KEYS",
+  prefix: string,
+) {
+  const raw = Deno.env.get(envName)?.trim();
+  if (!raw) throw new Error(`${envName} is unavailable.`);
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("SUPABASE_SECRET_KEYS is invalid.");
+    throw new Error(`${envName} is invalid.`);
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("SUPABASE_SECRET_KEYS is invalid.");
+    throw new Error(`${envName} is invalid.`);
   }
   const key = (parsed as Record<string, unknown>)["default"];
-  if (typeof key !== "string" || !key.startsWith("sb_secret_")) {
-    throw new Error("The default Supabase secret key is unavailable.");
+  if (typeof key !== "string" || !key.startsWith(prefix)) {
+    throw new Error(`The default managed key in ${envName} is unavailable.`);
   }
   return key;
 }
@@ -70,14 +71,22 @@ function workerConfig(value: string | null): WorkerConfig | null {
   return Object.prototype.hasOwnProperty.call(WORKERS, name) ? WORKERS[name] : null;
 }
 
-async function validWorkerToken(worker: WorkerName, token: string, secretKey: string) {
+async function validWorkerToken(worker: WorkerName, token: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/+$/, "");
   if (!supabaseUrl) return false;
+
+  let publishableKey: string;
+  try {
+    publishableKey = defaultManagedKey("SUPABASE_PUBLISHABLE_KEYS", "sb_publishable_");
+  } catch {
+    return false;
+  }
+
   try {
     const response = await fetch(`${supabaseUrl}/rest/v1/rpc/verify_runtime_worker_token`, {
       method: "POST",
       headers: {
-        apikey: secretKey,
+        apikey: publishableKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -103,17 +112,18 @@ Deno.serve(async (request: Request) => {
 
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (token.length < 32 || !(await validWorkerToken(worker.name, token))) {
+    return json({ error: "Unauthorized" }, 401);
+  }
 
   let secretKey: string;
   try {
-    secretKey = defaultManagedSecretKey();
+    secretKey = defaultManagedKey("SUPABASE_SECRET_KEYS", "sb_secret_");
   } catch {
-    console.error("[runtime-worker-dispatch] Supabase secret key unavailable");
+    console.error("[runtime-worker-dispatch] Supabase secret key unavailable", {
+      worker: worker.name,
+    });
     return json({ error: "Runtime database credential unavailable" }, 503);
-  }
-
-  if (token.length < 32 || !(await validWorkerToken(worker.name, token, secretKey))) {
-    return json({ error: "Unauthorized" }, 401);
   }
 
   const requested = Number(incoming.searchParams.get("limit") ?? worker.defaultLimit);
