@@ -70,14 +70,16 @@ function workerConfig(value: string | null): WorkerConfig | null {
   return Object.prototype.hasOwnProperty.call(WORKERS, name) ? WORKERS[name] : null;
 }
 
-async function validWorkerToken(worker: WorkerName, token: string, secretKey: string) {
+async function validWorkerToken(worker: WorkerName, token: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/+$/, "");
-  if (!supabaseUrl) return false;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
+  if (!supabaseUrl || !serviceRoleKey) return false;
   try {
     const response = await fetch(`${supabaseUrl}/rest/v1/rpc/verify_runtime_worker_token`, {
       method: "POST",
       headers: {
-        apikey: secretKey,
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -104,16 +106,16 @@ Deno.serve(async (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 
+  if (token.length < 32 || !(await validWorkerToken(worker.name, token))) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
   let secretKey: string;
   try {
     secretKey = defaultManagedSecretKey();
   } catch {
     console.error("[runtime-worker-dispatch] Supabase secret key unavailable");
     return json({ error: "Runtime database credential unavailable" }, 503);
-  }
-
-  if (token.length < 32 || !(await validWorkerToken(worker.name, token, secretKey))) {
-    return json({ error: "Unauthorized" }, 401);
   }
 
   const requested = Number(incoming.searchParams.get("limit") ?? worker.defaultLimit);
