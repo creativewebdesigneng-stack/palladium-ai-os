@@ -5,25 +5,36 @@ import { getDirectSeedream, getFalServerKey, hasDirectSeedreamProvider, submitDi
 type Provider = 'seedream' | 'ltx';
 type JsonObject = Record<string, unknown>;
 
+export const BLACKSTAR_HOSTED_KEYFRAME_WORKER_URL='https://blackstar-cinema-keyframe-worker-y3s7rg.v2.appdeploy.ai';
+export const BLACKSTAR_HOSTED_MOTION_WORKER_URL='https://blackstar-auto-editor-worker-0kjxvk.v2.appdeploy.ai';
+
 export function resolveSeedreamProvider(){
   const forceWorker=(process.env['SEEDREAM_PROVIDER']??'').trim().toLowerCase()==='worker';
   if(hasDirectSeedreamProvider()&&!forceWorker) return 'direct' as const;
   const workerUrl=(process.env['SEEDREAM_WORKER_URL']??'').trim();
-  return workerUrl ? 'worker' as const : hasDirectSeedreamProvider() ? 'direct' as const : 'unconfigured' as const;
+  if(workerUrl) return 'worker' as const;
+  if(hasDirectSeedreamProvider()) return 'direct' as const;
+  return 'hosted' as const;
 }
 
 function config(provider: Provider) {
   if (provider === 'seedream') {
+    const custom=(process.env['SEEDREAM_WORKER_URL'] ?? '').replace(/\/$/, '');
+    const resolution=resolveSeedreamProvider();
     return {
-      url: (process.env['SEEDREAM_WORKER_URL'] ?? '').replace(/\/$/, ''),
-      token: process.env['SEEDREAM_WORKER_TOKEN'] ?? '',
+      url: custom || (resolution==='hosted' ? BLACKSTAR_HOSTED_KEYFRAME_WORKER_URL : ''),
+      token: custom ? process.env['SEEDREAM_WORKER_TOKEN'] ?? '' : '',
       kind: 'image' as const,
+      hosted: resolution==='hosted',
     };
   }
+  const custom=(process.env['LTX_WORKER_URL'] ?? '').replace(/\/$/, '');
+  const hosted=!custom&&!hasDirectLtx23Provider();
   return {
-    url: (process.env['LTX_WORKER_URL'] ?? '').replace(/\/$/, ''),
-    token: process.env['LTX_WORKER_TOKEN'] ?? '',
+    url: custom || (hosted ? BLACKSTAR_HOSTED_MOTION_WORKER_URL : ''),
+    token: custom ? process.env['LTX_WORKER_TOKEN'] ?? '' : '',
     kind: 'video' as const,
+    hosted,
   };
 }
 
@@ -82,21 +93,29 @@ export function getGenerativeMediaCapabilities() {
   return {
     diagnostics:{falKeyVisible},
     seedream: {
-      configured: resolveSeedreamProvider()!=='unconfigured',
+      configured: true,
       provider:resolveSeedreamProvider(),
       kind: seedream.kind,
-      workflows: ['text-to-image', 'image-edit', 'multi-image-composite'],
+      workflows: resolveSeedreamProvider()==='hosted' ? ['text-to-image'] : ['text-to-image', 'image-edit', 'multi-image-composite'],
       aspectRatios: ['1:1', '4:5', '3:4', '16:9', '9:16', '21:9'],
-      note: resolveSeedreamProvider()==='direct' ? 'Cinema keyframes use fal Seedream server-side through Blackstar\'s FAL_KEY.' : resolveSeedreamProvider()==='worker' ? 'Cinema keyframes use the configured Seedream-compatible worker because SEEDREAM_PROVIDER=worker.' : 'Seedream keyframes require FAL_KEY or SEEDREAM_WORKER_URL on the server.',
+      note: resolveSeedreamProvider()==='direct'
+        ? 'Cinema keyframes use fal Seedream server-side through Blackstar\'s FAL_KEY.'
+        : resolveSeedreamProvider()==='worker'
+          ? 'Cinema keyframes use the configured Seedream-compatible worker.'
+          : 'Cinema keyframes use Blackstar\'s hosted image-generation worker. Configure FAL_KEY for the premium Seedream lane.',
     },
     ltx: {
-      configured: Boolean(ltx.url || hasDirectLtx23Provider()),
-      provider:ltx.url?'worker':hasDirectLtx23Provider()?'direct':'unconfigured',
+      configured: true,
+      provider:ltx.hosted?'hosted-motion-fallback':ltx.url?'worker':hasDirectLtx23Provider()?'direct':'unconfigured',
       kind: ltx.kind,
-      workflows: ltx.url ? ['text-to-video', 'image-to-video', 'audio-video'] : ['image-to-video'],
-      aspectRatios: ltx.url ? ['16:9', '9:16', '1:1'] : ['16:9', '9:16'],
+      workflows: ltx.hosted ? ['image-to-video'] : ltx.url ? ['text-to-video', 'image-to-video', 'audio-video'] : ['image-to-video'],
+      aspectRatios: ['16:9', '9:16'],
       durationSeconds: [3, 5, 8, 10],
-      note: ltx.url ? 'LTX generation uses the configured worker.' : hasDirectLtx23Provider() ? 'LTX video segments use fal LTX-2.3 server-side; provider minimum durations are trimmed to Blackstar logical timing during mastering.' : 'LTX video generation requires FAL_KEY or LTX_WORKER_URL on the server.',
+      note: ltx.hosted
+        ? 'Video segments use Blackstar\'s hosted FFmpeg motion fallback. Configure FAL_KEY or LTX_WORKER_URL for premium generative LTX motion.'
+        : ltx.url
+          ? 'LTX generation uses the configured worker.'
+          : 'LTX video segments use fal LTX-2.3 server-side; provider minimum durations are trimmed to Blackstar logical timing during mastering.',
     },
   };
 }
@@ -114,7 +133,8 @@ export async function submitGenerativeMediaJob(input: {
     if (sourceUrl) throw new Error('Direct Seedream fallback currently supports text-to-image keyframes only.');
     return submitDirectSeedream({ prompt: input.prompt, aspectRatio: input.aspectRatio });
   }
-  if (input.provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) {
+  const customLtxWorker=Boolean((process.env['LTX_WORKER_URL']??'').trim());
+  if (input.provider === 'ltx' && !customLtxWorker && hasDirectLtx23Provider()) {
     if (!sourceUrl) throw new Error('LTX-2.3 image-to-video requires a completed keyframe URL.');
     return submitDirectLtx23({ prompt: input.prompt, sourceUrl, aspectRatio: input.aspectRatio, durationSeconds: input.durationSeconds ?? 5 });
   }
@@ -135,7 +155,8 @@ export async function submitGenerativeMediaJob(input: {
         ...(sourceUrl ? { source_url: sourceUrl } : {}),
       };
 
-  const response = await fetch(`${cfg.url}/jobs`, {
+  const jobsPath=input.provider==='seedream'&&cfg.hosted?'/api/jobs':'/jobs';
+  const response = await fetch(`${cfg.url}${jobsPath}`, {
     method: 'POST',
     headers: headers(cfg.token),
     body: JSON.stringify(body),
@@ -154,9 +175,11 @@ export async function submitGenerativeMediaJob(input: {
 export async function getGenerativeMediaJob(provider: Provider, workerJobId: string) {
   const cfg = config(provider);
   if (provider === 'seedream' && resolveSeedreamProvider()==='direct') return getDirectSeedream(workerJobId);
-  if (provider === 'ltx' && !cfg.url && hasDirectLtx23Provider()) return getDirectLtx23(workerJobId);
+  const customLtxWorker=Boolean((process.env['LTX_WORKER_URL']??'').trim());
+  if (provider === 'ltx' && !customLtxWorker && hasDirectLtx23Provider()) return getDirectLtx23(workerJobId);
   if (!cfg.url) throw new Error(`${provider === 'seedream' ? 'Seedream' : 'LTX'} generation worker is not configured on this deployment.`);
-  const response = await fetch(`${cfg.url}/jobs/${encodeURIComponent(workerJobId)}`, {
+  const jobsPath=provider==='seedream'&&cfg.hosted?'/api/jobs':'/jobs';
+  const response = await fetch(`${cfg.url}${jobsPath}/${encodeURIComponent(workerJobId)}`, {
     method: 'GET',
     headers: headers(cfg.token),
     signal: AbortSignal.timeout(60_000),
