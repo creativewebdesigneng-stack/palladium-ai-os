@@ -14,6 +14,8 @@ describe('Cinema master integration',()=>{
     expect(runtime).toContain('BLACKSTAR_CINEMA_MASTER_WORKER_URL')
     expect(runtime).toContain("CINEMA_STUDIO_MASTER_WORKER_URL")
     expect(runtime).toContain('/v1/films/assemble')
+    expect(runtime).toContain('getCinemaMasterAssembly')
+    expect(functions).toContain('getCinemaMasterAssembly')
   })
   it('keeps direct text-to-film distinct from evidence-based final assembly',()=>{
     expect(runtime).toContain('renderConfigured')
