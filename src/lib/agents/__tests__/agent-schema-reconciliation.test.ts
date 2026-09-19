@@ -1,7 +1,7 @@
 import {readFileSync} from "node:fs";
 import {describe,expect,it} from "vitest";
 
-const migration=readFileSync(new URL("../../../supabase/migrations/20260919175500_reconcile_agent_builder_runtime_schema.sql",import.meta.url),"utf8");
+const migration=readFileSync(new URL("../../../../supabase/migrations/20260919175500_reconcile_agent_builder_runtime_schema.sql",import.meta.url),"utf8");
 
 describe("agent builder production schema reconciliation",()=>{
   it("restores every agent configuration field written by the canonical agent builder",()=>{
