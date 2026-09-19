@@ -17,9 +17,7 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
       POST: async ({ request }) => {
         const authorization = request.headers.get("authorization") ?? "";
         const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-        if (!(await isValidRuntimeWorkerToken("webhook_retry", supplied))) {
-          return json({ error: "Unauthorized" }, 401);
-        }
+        const verifyFallback = () => isValidRuntimeWorkerToken("webhook_retry", supplied);
 
         const execute = async () => {
           const url = new URL(request.url);
@@ -41,13 +39,23 @@ export const Route = createFileRoute("/api/internal/webhook-retries")({
 
         const forwardedAdminKey =
           request.headers.get("x-blackstar-supabase-secret-key")?.trim() ?? "";
-        if (!forwardedAdminKey) return execute();
+        if (!forwardedAdminKey) {
+          if (!(await verifyFallback())) return json({ error: "Unauthorized" }, 401);
+          return execute();
+        }
 
         try {
-          const { withRequestScopedSupabaseAdminKey } = await import(
-            "@/integrations/supabase/client.server"
+          const { withVerifiedForwardedRuntimeWorker } = await import(
+            "@/lib/runtime/runtime-worker-forwarded-auth.server"
           );
-          return await withRequestScopedSupabaseAdminKey(forwardedAdminKey, execute);
+          const verified = await withVerifiedForwardedRuntimeWorker({
+            name: "webhook_retry",
+            suppliedToken: supplied,
+            forwardedAdminKey,
+            operation: execute,
+          });
+          if (!verified.authorized) return json({ error: "Unauthorized" }, 401);
+          return verified.value;
         } catch {
           console.error("[runtime-worker] request-scoped database credential rejected", {
             worker: "webhook_retry",
