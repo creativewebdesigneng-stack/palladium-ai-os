@@ -3,6 +3,8 @@
  * None of these entries are agent capabilities, external integrations or attestations
  * that a human actually performed an action. Responses remain user-authored.
  */
+import { HUMAN_FRONTIER_ADDITIONS } from './additions';
+
 export type HumanField = { label: string; hint: string };
 export type HumanTool = {
   id: string;
@@ -176,6 +178,7 @@ export const HUMAN_FRONTIER_TOOLS: readonly HumanTool[] = [
     checks: ['I attempted the task rather than imagining it.', 'I noted the moment and conditions of the obstacle.', 'I chose one feasible improvement to try.'],
     output: 'An observation-led friction discovery note',
   },
+  ...HUMAN_FRONTIER_ADDITIONS,
 ] as const;
 
 export function validateHumanFrontierTools(tools: readonly HumanTool[] = HUMAN_FRONTIER_TOOLS) {
@@ -187,5 +190,5 @@ export function validateHumanFrontierTools(tools: readonly HumanTool[] = HUMAN_F
     if (tool.fields.length !== 3 || tool.checks.length !== 3) return false;
     if (tool.fields.some((field) => !field.label.trim() || !field.hint.trim()) || tool.checks.some((check) => !check.trim())) return false;
   }
-  return tools.length === 20;
+  return tools.length === 60;
 }
