@@ -1,3 +1,5 @@
+import { prepareAgentSkillPackage } from "./skill-package";
+
 type Sb = { from: (table: string) => any };
 
 export type SkillScriptStep = {
@@ -131,6 +133,32 @@ export async function loadOwnedSkillScript(args: {
   const skill = data as SkillRow;
   if (!skill.enabled) throw new Error("That skill is disabled.");
   if (skill.dangerous || skill.scan_verdict === "dangerous") throw new Error("Dangerous skills cannot execute scripts.");
+
+  // Owner-writable skill rows cannot attest to their own security scan or
+  // manifest permissions. Revalidate the exact stored files on both approval
+  // preparation and replay, before using any declared recipe or tool list.
+  const fileMap = skill.files;
+  if (!fileMap || typeof fileMap !== "object" || Array.isArray(fileMap)) {
+    throw new Error("Installed skill package files are invalid.");
+  }
+  const files = Object.entries(fileMap).map(([path, content]) => {
+    if (typeof content !== "string") throw new Error("Installed skill package contains a non-text file.");
+    return { path, content };
+  });
+  const prepared = prepareAgentSkillPackage(files);
+  const sameList = (stored: string[] | null, verified: string[]) =>
+    Array.isArray(stored) && stored.length === verified.length &&
+    stored.every((value, index) => value === verified[index]);
+  if (
+    prepared.name !== skill.name ||
+    prepared.version !== skill.version ||
+    prepared.dangerous !== skill.dangerous ||
+    prepared.scan.verdict !== skill.scan_verdict ||
+    !sameList(skill.requires_tools, prepared.requiresTools) ||
+    !sameList(skill.requires_scripts, prepared.requiresScripts)
+  ) {
+    throw new Error("Installed skill metadata does not match its verified package.");
+  }
   if (!(skill.requires_scripts ?? []).includes(script)) throw new Error(`Script "${script}" is not declared by this skill.`);
   const content = skill.files?.[`scripts/${script}`];
   if (typeof content !== "string") throw new Error(`Declared script "${script}" is missing from the installed package.`);
