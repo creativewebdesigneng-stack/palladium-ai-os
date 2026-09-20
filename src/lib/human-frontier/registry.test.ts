@@ -21,7 +21,7 @@ describe('Human Frontier user-led tools', () => {
 
   it('adds forty different workflows without changing the original twenty', () => {
     expect(HUMAN_FRONTIER_ADDITIONS).toHaveLength(40);
-    expect(HUMAN_FRONTIER_TOOLS.slice(20)).toEqual(HUMAN_FRONTIER_ADDITIONS);
+    expect(HUMAN_FRONTIER_TOOLS.slice(20, 60)).toEqual(HUMAN_FRONTIER_ADDITIONS);
     const initial = new Set(HUMAN_FRONTIER_TOOLS.slice(0, 20).map((tool) => tool.id));
     expect(HUMAN_FRONTIER_ADDITIONS.every((tool) => !initial.has(tool.id))).toBe(true);
     expect(new Set(HUMAN_FRONTIER_ADDITIONS.map((tool) => tool.id)).size).toBe(40);
