@@ -15,11 +15,11 @@ describe('Human Frontier user-led tools', () => {
   });
 
   it('rejects duplicate ids and missing human-workflow steps', () => {
-    const one = HUMAN_FRONTIER_TOOLS[0];
+    const one = HUMAN_FRONTIER_TOOLS[0]!;
     expect(validateHumanFrontierTools([...HUMAN_FRONTIER_TOOLS.slice(0, 19), one])).toBe(false);
     expect(validateHumanFrontierTools(HUMAN_FRONTIER_TOOLS.slice(0, 19))).toBe(false);
     expect(validateHumanFrontierTools(HUMAN_FRONTIER_TOOLS.map((tool, index) =>
-      index === 0 ? { ...tool, checks: ['', tool.checks[1], tool.checks[2]] } : tool,
+      index === 0 ? { ...tool, checks: ['', tool.checks[1]!, tool.checks[2]!] as [string, string, string] } : tool,
     ))).toBe(false);
   });
 
