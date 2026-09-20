@@ -1400,7 +1400,7 @@ export async function resolveGrantedTools(
   const grants = new Map<string, ToolGrant>();
   if (!requested.length) return { defs: [], grants };
 
-  const [{ data: perms }, { data: catalogue }] = await Promise.all([
+  const [{ data: perms, error: permissionsError }, { data: catalogue, error: catalogueError }] = await Promise.all([
     sb
       .from("tool_permissions")
       .select("tool,enabled,requires_approval,allowed_domains,spend_cap,agent_id")
@@ -1408,12 +1408,15 @@ export async function resolveGrantedTools(
     sb.from("tools").select("slug,is_active,min_plan,requires_approval").in("slug", requested),
   ]);
 
+  // No catalogue or permission lookup may accidentally broaden the grant set.
+  if (permissionsError || catalogueError || !catalogue) return { defs: [], grants };
+
   const planRank = PLAN_RANK[plan] ?? 0;
 
   for (const slug of requested) {
     const entry = (catalogue ?? []).find((t: any) => t.slug === slug);
-    // A tool missing from the catalogue is treated as active with no plan gate.
-    if (entry && entry.is_active === false) continue;
+    // A missing catalogue row is not executable authority.
+    if (!entry || entry.is_active !== true) continue;
     if (entry?.min_plan && planRank < (PLAN_RANK[entry.min_plan as string] ?? 0)) continue;
 
     const ownRows = (perms ?? []).filter((p: any) => p.tool === slug);
