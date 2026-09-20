@@ -22,7 +22,7 @@ export function buildAiWorkbenchMessage(tool: AiWorkbenchTool, source: string, g
     preferences || 'None supplied.',
     'USER-SUPPLIED SOURCE MATERIAL:',
     supplied,
-  ].join('\\n\\n');
+  ].join('\n\n');
   if (message.length > 4000) throw new Error('The request is too long; shorten the source material.');
   return message;
 }
