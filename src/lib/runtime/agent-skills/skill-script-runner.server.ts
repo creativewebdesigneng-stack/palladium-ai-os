@@ -1,3 +1,5 @@
+import { prepareAgentSkillPackage } from "./skill-package";
+
 type Sb = { from: (table: string) => any };
 
 export type SkillScriptStep = {
@@ -131,10 +133,32 @@ export async function loadOwnedSkillScript(args: {
   const skill = data as SkillRow;
   if (!skill.enabled) throw new Error("That skill is disabled.");
   if (skill.dangerous || skill.scan_verdict === "dangerous") throw new Error("Dangerous skills cannot execute scripts.");
-  if (!(skill.requires_scripts ?? []).includes(script)) throw new Error(`Script "${script}" is not declared by this skill.`);
-  const content = skill.files?.[`scripts/${script}`];
+
+  // The owner can write skill metadata via the Data API. Reconstruct the
+  // package from the actual files before both approval creation and replay:
+  // persisted scan_verdict, dangerous and declared grants are not proof that
+  // the current package passed the canonical scanner.
+  const files = skill.files && typeof skill.files === "object" && !Array.isArray(skill.files)
+    ? Object.entries(skill.files).map(([path, value]) => {
+        if (typeof value !== "string") throw new Error("The installed skill contains an invalid file.");
+        return { path, content: value };
+      })
+    : [];
+  const prepared = prepareAgentSkillPackage(files, { acknowledgeRisk: true });
+  if (prepared.dangerous || prepared.scan.verdict === "dangerous") {
+    throw new Error("Dangerous skills cannot execute scripts.");
+  }
+  const matches = (actual: string[], stored: string[] | null) =>
+    JSON.stringify([...actual].sort()) === JSON.stringify([...(stored ?? [])].sort());
+  if (prepared.name !== skill.name || prepared.version !== skill.version
+    || !matches(prepared.requiresTools, skill.requires_tools)
+    || !matches(prepared.requiresScripts, skill.requires_scripts)) {
+    throw new Error("The installed skill manifest no longer matches its approved metadata.");
+  }
+  if (!prepared.requiresScripts.includes(script)) throw new Error(`Script "${script}" is not declared by this skill.`);
+  const content = prepared.files[`scripts/${script}`];
   if (typeof content !== "string") throw new Error(`Declared script "${script}" is missing from the installed package.`);
-  const recipe = parseSkillScriptRecipe(content, skill.requires_tools ?? []);
+  const recipe = parseSkillScriptRecipe(content, prepared.requiresTools);
   return { skill, recipe, script };
 }
 
