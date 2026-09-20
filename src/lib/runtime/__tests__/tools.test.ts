@@ -4,14 +4,14 @@ import { createFakeSupabase } from "./fake-supabase";
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: createFakeSupabase() }));
 
-import { executeTool, resolveGrantedTools } from "../tools.server";
+import { executeTool, resolveGrantedTools, TOOL_SLUGS } from "../tools.server";
 
 const AGENT = { id: "agent-1", allowed_tools: ["web_search", "browser"] };
 
 function sb(seed: Record<string, any[]> = {}) {
   return createFakeSupabase({
     tool_permissions: [],
-    tools: [],
+    tools: TOOL_SLUGS.map((slug) => ({ slug, is_active: true, min_plan: null, requires_approval: false })),
     tool_executions: [],
     ...seed,
   }) as any;
@@ -21,6 +21,16 @@ describe("tool grants", () => {
   it("grants nothing when the agent declares no tools", async () => {
     const { defs, grants } = await resolveGrantedTools(sb(), { id: "a", allowed_tools: [] });
     expect(defs).toHaveLength(0);
+    expect(grants.size).toBe(0);
+  });
+
+  it("denies every tool when its catalogue entry is absent", async () => {
+    const { grants } = await resolveGrantedTools(sb({ tools: [] }), AGENT);
+    expect(grants.size).toBe(0);
+  });
+
+  it("denies disabled catalogue rows even if the agent requested the tool", async () => {
+    const { grants } = await resolveGrantedTools(sb({ tools: [{ slug: "web_search", is_active: false }] }), AGENT);
     expect(grants.size).toBe(0);
   });
 

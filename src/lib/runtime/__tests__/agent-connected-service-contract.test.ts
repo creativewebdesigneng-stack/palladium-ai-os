@@ -3,12 +3,12 @@ import { createFakeSupabase } from "./fake-supabase";
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: createFakeSupabase() }));
 
-import { executeTool, resolveGrantedTools } from "../tools.server";
+import { executeTool, resolveGrantedTools, TOOL_SLUGS } from "../tools.server";
 
 function sb(seed: Record<string, any[]> = {}) {
   return createFakeSupabase({
     tool_permissions: [],
-    tools: [],
+    tools: TOOL_SLUGS.map((slug) => ({ slug, is_active: true, min_plan: null, requires_approval: false })),
     tool_executions: [],
     approval_requests: [],
     ...seed,
