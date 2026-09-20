@@ -88,7 +88,9 @@ export async function loadProgressiveSkillContext(args: {
     .eq("user_id", args.userId)
     .eq("enabled", true)
     .order("updated_at", { ascending: false })
-    .limit(50);
+    // Scan all 160 pack entries plus existing built-ins and owner-created skills.
+    // Only the top MAX_INDEX entries and MAX_SELECTED bodies enter the agent prompt.
+    .limit(250);
   if (error) throw new Error("Could not load reusable agent skills.");
 
   const inputTokens = tokens(args.input);

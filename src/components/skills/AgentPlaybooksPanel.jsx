@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { BookOpenCheck, Braces, Download, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
   setAgentSkillEnabled,
 } from '@/lib/runtime/agent-skills/agent-skills.functions';
 import { installIntegrationPlaybookPack } from '@/lib/runtime/agent-skills/builtin-integration-playbooks.functions';
+import { installAgentProcedurePack160 } from '@/lib/runtime/agent-skills/agent-procedure-playbooks.functions';
 
 function riskLabel(skill) {
   if (skill.scan_verdict === 'dangerous') return 'Dangerous';
@@ -29,6 +30,10 @@ export default function AgentPlaybooksPanel({ enabled }) {
   const deleteFn = useServerFn(deleteAgentSkill);
   const compileFn = useServerFn(compileInstalledAgentSkillCapability);
   const installPackFn = useServerFn(installIntegrationPlaybookPack);
+  const installProceduresFn = useServerFn(installAgentProcedurePack160);
+  const [procedureProgress, setProcedureProgress] = useState(0);
+  const [skillSearch, setSkillSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const skills = useQuery({
     queryKey: ['agent-skills'],
@@ -81,9 +86,45 @@ export default function AgentPlaybooksPanel({ enabled }) {
       toast({ variant: 'destructive', title: 'Could not install playbooks', description: friendlyMessage(error) }),
   });
 
+  const installProcedures = useMutation({
+    mutationFn: async () => {
+      let cursor = 0;
+      let inserted = 0;
+      let updated = 0;
+      const skipped = [];
+      setProcedureProgress(0);
+      while (cursor !== null) {
+        const result = await installProceduresFn({ data: { cursor } });
+        inserted += result.inserted;
+        updated += result.updated;
+        skipped.push(...result.skipped);
+        setProcedureProgress(cursor + result.processed);
+        cursor = result.nextCursor;
+      }
+      return { inserted, updated, skipped };
+    },
+    onSuccess: async (result) => {
+      toast({
+        title: 'Agent skill pack processed',
+        description: result.skipped.length
+          ? `${result.inserted} installed; ${result.updated} updated. ${result.skipped.length} name conflicts were left untouched.`
+          : 'All 160 built-in agent procedures are available in your workspace. Existing enable/disable choices were preserved.',
+      });
+      await qc.invalidateQueries({ queryKey: ['agent-skills'] });
+    },
+    onError: (error) => toast({
+      variant: 'destructive',
+      title: 'Agent skill installation interrupted',
+      description: `${friendlyMessage(error)} The first ${procedureProgress} entries were processed; run the installer again to resume safely.`,
+    }),
+  });
+
   const rows = useMemo(() => skills.data?.skills ?? [], [skills.data]);
   const reviewCount = rows.filter((skill) => skill.source_kind === 'reflection' && !skill.enabled).length;
   const builtinCount = rows.filter((skill) => skill.source_kind === 'builtin').length;
+  const procedureInstalled = rows.filter((skill) => skill.source_kind === 'builtin' && skill.source_ref?.startsWith('blackstar-agent-procedures:v1:')).length;
+  const matchedRows = rows.filter((skill) => [skill.name, skill.description, skill.source_ref].some((value) => String(value ?? '').toLowerCase().includes(skillSearch.trim().toLowerCase())));
+  const visibleRows = matchedRows.slice(0, visibleCount);
 
   return (
     <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
@@ -100,8 +141,13 @@ export default function AgentPlaybooksPanel({ enabled }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary">{rows.length} installed</Badge>
           {builtinCount > 0 && <Badge variant="outline">{builtinCount} built-in</Badge>}
+          <Badge variant="outline">{procedureInstalled}/160 new agent skills installed</Badge>
           {reviewCount > 0 && <Badge variant="outline">{reviewCount} awaiting review</Badge>}
-          <Button size="sm" variant="outline" disabled={installPack.isPending} onClick={() => installPack.mutate()}>
+          <Button size="sm" variant="outline" disabled={installProcedures.isPending || installPack.isPending} onClick={() => installProcedures.mutate()}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            {installProcedures.isPending ? `Installing ${procedureProgress}/160…` : 'Install 160 agent skills'}
+          </Button>
+          <Button size="sm" variant="outline" disabled={installPack.isPending || installProcedures.isPending} onClick={() => installPack.mutate()}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
             {installPack.isPending ? 'Installing…' : 'Install integration pack'}
           </Button>
@@ -119,8 +165,13 @@ export default function AgentPlaybooksPanel({ enabled }) {
       )}
 
       {skills.isSuccess && rows.length > 0 && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {rows.map((skill) => {
+        <div>
+          <label className="mb-3 block text-xs text-zinc-400">Search installed agent playbooks
+            <input value={skillSearch} onChange={(event) => { setSkillSearch(event.target.value); setVisibleCount(24); }} placeholder="Search by name or description" className="mt-1 block w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-violet-400/50" />
+          </label>
+          <p className="mb-3 text-xs text-zinc-500">{matchedRows.length} matching skills · Showing {visibleRows.length}</p>
+          <div className="grid gap-3 lg:grid-cols-2">
+          {visibleRows.map((skill) => {
             const reflected = skill.source_kind === 'reflection';
             const builtin = skill.source_kind === 'builtin';
             const blocked = skill.scan_verdict === 'dangerous';
@@ -212,6 +263,9 @@ export default function AgentPlaybooksPanel({ enabled }) {
               </article>
             );
           })}
+          </div>
+          {matchedRows.length > visibleCount && <div className="mt-4 text-center"><Button size="sm" variant="outline" onClick={() => setVisibleCount((count) => count + 24)}>Show more skills ({matchedRows.length - visibleRows.length} remaining)</Button></div>}
+          {!matchedRows.length && <p className="rounded-xl border border-white/10 p-4 text-sm text-zinc-400">No installed skills match this search.</p>}
         </div>
       )}
     </section>
