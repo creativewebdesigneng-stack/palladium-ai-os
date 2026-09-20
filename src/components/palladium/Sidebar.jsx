@@ -49,6 +49,7 @@ const WORKFORCE = [
   ['AI Web', '/web', Globe],
   ['Web Intelligence', '/web-intelligence', Search],
   ['AI Tools', '/ai-tools', Wrench],
+  ['AI Workbench', '/ai-workbench', Sparkles],
   ['Human Frontier', '/human-frontier', Hand],
 ];
 
