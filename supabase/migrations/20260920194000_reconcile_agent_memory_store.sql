@@ -142,6 +142,7 @@ create policy agent_memories_owner_insert on public.agent_memories
    and (agent_id is null or exists(select 1 from public.personal_agents a where a.id=agent_id and a.user_id=(select auth.uid())))
    and (task_id is null or exists(select 1 from public.agent_tasks t where t.id=task_id and t.user_id=(select auth.uid())))
    and (document_id is null or exists(select 1 from public.memory_documents d where d.id=document_id and d.user_id=(select auth.uid())))
+   and (workflow_id is null or exists(select 1 from public.workflows w where w.id=workflow_id and w.user_id=(select auth.uid())))
  );
 drop policy if exists agent_memories_owner_update on public.agent_memories;
 create policy agent_memories_owner_update on public.agent_memories
@@ -150,6 +151,9 @@ create policy agent_memories_owner_update on public.agent_memories
    user_id=(select auth.uid())
    and (org_id is null or private.is_org_member(org_id))
    and (agent_id is null or exists(select 1 from public.personal_agents a where a.id=agent_id and a.user_id=(select auth.uid())))
+   and (task_id is null or exists(select 1 from public.agent_tasks t where t.id=task_id and t.user_id=(select auth.uid())))
+   and (document_id is null or exists(select 1 from public.memory_documents d where d.id=document_id and d.user_id=(select auth.uid())))
+   and (workflow_id is null or exists(select 1 from public.workflows w where w.id=workflow_id and w.user_id=(select auth.uid())))
  );
 drop policy if exists agent_memories_owner_delete on public.agent_memories;
 create policy agent_memories_owner_delete on public.agent_memories
