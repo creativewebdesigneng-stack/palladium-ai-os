@@ -75,14 +75,13 @@ export const getAgentRuntime = createServerFn({ method: "POST" })
     return { ...snapshot, availableTools: TOOL_SLUGS };
   });
 
-/** Closes any run of the caller's that has been stuck beyond the timeout. */
+/**
+ * Kept only for older clients. The legacy manual reaper RPC is absent from
+ * production; crash recovery belongs to the authenticated background scheduler.
+ * Never invoke the service-role-only global resume worker from a user endpoint.
+ */
 export const reapStuckRuns = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.rpc("reap_stale_agent_tasks", {
-      _user: context.userId,
-    } as never);
-    if (error) throw new Error("Could not inspect stale agent runs.");
-    return { reaped: Number(data ?? 0) };
+  .handler(async () => {
+    throw new Error("Manual stale-run reaping has been retired. Agent crash recovery runs through Blackstar's scheduled worker.");
   });
