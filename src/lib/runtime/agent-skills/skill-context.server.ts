@@ -1,3 +1,5 @@
+import { prepareAgentSkillPackage } from "./skill-package";
+
 type Sb = { from: (table: string) => any };
 
 export type SkillIndexEntry = {
@@ -38,6 +40,32 @@ function safeStringArray(value: unknown): string[] {
     : [];
 }
 
+/** Owner-writable scan flags are hints, not execution or prompt-context authority. */
+function verifiedSkillContextRow(row: Record<string, unknown>): Record<string, unknown> | null {
+  if (row["dangerous"] === true || row["scan_verdict"] === "dangerous") return null;
+  const fileMap = row["files"];
+  if (!fileMap || typeof fileMap !== "object" || Array.isArray(fileMap)) return null;
+  try {
+    const files = Object.entries(fileMap as Record<string, unknown>).map(([path, content]) => {
+      if (typeof content !== "string") throw new Error("Invalid stored skill file.");
+      return { path, content };
+    });
+    const prepared = prepareAgentSkillPackage(files, { acknowledgeRisk: true });
+    const sameList = (declared: string[], stored: unknown) =>
+      Array.isArray(stored) && stored.every((item) => typeof item === "string")
+      && JSON.stringify([...declared].sort()) === JSON.stringify([...stored].sort());
+    if (prepared.dangerous || prepared.scan.verdict === "dangerous"
+      || prepared.name !== row["name"] || prepared.version !== row["version"]
+      || prepared.description !== row["description"] || prepared.body !== row["body"]
+      || !sameList(prepared.requiresTools, row["requires_tools"])
+      || !sameList(prepared.requiresScripts, row["requires_scripts"])) return null;
+    return row;
+  } catch {
+    // A corrupt or modified package cannot enter an agent's instructions.
+    return null;
+  }
+}
+
 function scoreSkill(inputTokens: Set<string>, row: Record<string, unknown>): number {
   const name = String(row["name"] ?? "");
   const haystack = tokens(`${name.replace(/-/g, " ")} ${String(row["description"] ?? "")}`);
@@ -56,7 +84,7 @@ export async function loadProgressiveSkillContext(args: {
   const grantedTools = args.grantedTools ? new Set(args.grantedTools) : null;
   const { data, error } = await args.sb
     .from("agent_skills")
-    .select("id,name,description,version,requires_tools,requires_scripts,dangerous,body,enabled,scan_verdict")
+    .select("id,name,description,version,requires_tools,requires_scripts,dangerous,body,enabled,scan_verdict,files")
     .eq("user_id", args.userId)
     .eq("enabled", true)
     .order("updated_at", { ascending: false })
@@ -65,7 +93,8 @@ export async function loadProgressiveSkillContext(args: {
 
   const inputTokens = tokens(args.input);
   const rows = ((data ?? []) as Array<Record<string, unknown>>)
-    .filter((row) => row["scan_verdict"] !== "dangerous")
+    .map(verifiedSkillContextRow)
+    .filter((row): row is Record<string, unknown> => row !== null)
     .map((row) => {
       const requiresTools = safeStringArray(row["requires_tools"]);
       const requiresScripts = safeStringArray(row["requires_scripts"]);
