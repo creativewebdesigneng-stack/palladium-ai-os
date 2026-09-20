@@ -6,8 +6,8 @@ export type AgentContextMemoryRow = {
   content: string;
   title?: string | null;
   source?: string | null;
-  memory_type?: string | null;
-  scope?: string | null;
+  memory_type?: string;
+  scope?: string;
   category?: string | null;
   agent_id?: string | null;
   org_id?: string | null;
