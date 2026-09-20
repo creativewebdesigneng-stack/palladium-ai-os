@@ -59,7 +59,15 @@ export function buildAgentMemoryContext(args: {
   let totalChars = 0;
   const MAX_TOTAL = 9_000;
   const MAX_ITEMS = 18;
-  for (const row of [...args.pinned, ...args.recent, ...args.recalled]) {
+  // Reserve context for query-relevant search results and knowledge chunks.
+  // A large pinned/recent collection must not crowd out all evidence from the
+  // current task. Preserve each list's existing recency or search-rank order.
+  const candidates = [
+    ...args.pinned.slice(0, 4),
+    ...args.recent.slice(0, 4),
+    ...args.recalled,
+  ];
+  for (const row of candidates) {
     if (used.size >= MAX_ITEMS || totalChars >= MAX_TOTAL) break;
     if (!allowedAgentContextMemory(row, args.context, args.preferences, now)) continue;
     const identity = row.kind + ':' + row.id;
