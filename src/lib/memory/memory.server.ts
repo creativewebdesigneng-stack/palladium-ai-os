@@ -434,7 +434,7 @@ async function keywordDocumentSearch(
   limit: number,
 ): Promise<MemorySearchHit[]> {
   const stopwords = new Set(["about", "after", "are", "can", "could", "does", "find", "for", "from", "have", "how", "into", "please", "show", "that", "the", "their", "this", "what", "when", "where", "which", "with", "would", "your"]);
-  const tokens = [...new Set(query.normalize("NFKC").toLowerCase().match(/[\\p{L}\\p{N}]{3,}/gu) ?? [])]
+  const tokens = [...new Set(query.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])]
     .filter((token) => !stopwords.has(token))
     .slice(0, 4);
   if (!tokens.length) return [];
