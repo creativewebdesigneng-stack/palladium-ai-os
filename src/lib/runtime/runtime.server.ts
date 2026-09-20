@@ -81,15 +81,6 @@ const RUN_BUDGET_MS = 120_000;
 
 /* --------------------------------------------------------------- preparation */
 
-async function reapStale(userId: string) {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.rpc("reap_stale_agent_tasks", { _user: userId } as never);
-  } catch (error) {
-    console.error("[runtime] reap failed", error);
-  }
-}
-
 /** Loads the agent through the caller's own client, so RLS is the permission check. */
 async function loadAgent(sb: Sb, agentId: string): Promise<Agent> {
   const { data, error } = await sb
@@ -276,7 +267,8 @@ export async function prepareRun(args: {
       "INPUT_TOO_LONG",
     );
 
-  await reapStale(args.userId);
+  // Durable recovery runs through the bounded checkpoint-aware background worker.
+  // Do not invoke the retired reap_stale_agent_tasks RPC on each user request.
 
   const agent = await loadAgent(args.sb, args.agentId);
   const orgId = agent.org_id_fk ?? agent.org_id ?? null;
