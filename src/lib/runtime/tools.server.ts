@@ -109,16 +109,17 @@ export async function resolveGrantedTools(
   if (!requested.length) return core;
 
   const names = requested.map((def) => def.name);
-  const [{ data: permissions }, { data: catalogue }] = await Promise.all([
+  const [{ data: permissions, error: permissionsError }, { data: catalogue, error: catalogueError }] = await Promise.all([
     sb.from("tool_permissions").select("tool,enabled,requires_approval,allowed_domains,spend_cap,agent_id").in("tool", names),
     sb.from("tools").select("slug,is_active,min_plan,requires_approval").in("slug", names),
   ]);
 
+  if (permissionsError || catalogueError || !catalogue) return core;
   const grants = new Map(core.grants);
   const defs = [...core.defs];
   for (const def of requested) {
     const entry = (catalogue ?? []).find((row: any) => row.slug === def.name);
-    if (entry?.is_active === false) continue;
+    if (!entry || entry.is_active !== true) continue;
     if (entry?.min_plan && (PLAN_RANK[plan] ?? 0) < (PLAN_RANK[String(entry.min_plan)] ?? 0)) continue;
 
     const rows = (permissions ?? []).filter((row: any) => row.tool === def.name);
