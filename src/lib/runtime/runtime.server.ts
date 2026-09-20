@@ -11,11 +11,8 @@
  */
 import { isProviderConfigured } from "@/lib/ai/ai-preferences.server";
 import { writeAudit } from "@/lib/platform/audit.server";
-import {
-  renderMemoryPrompt,
-  retrieveRelevantMemory,
-  storeMemory,
-} from "@/lib/memory/memory.server";
+import { storeMemory } from "@/lib/memory/memory.server";
+import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
 import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
 import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
@@ -121,7 +118,7 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
 
   if (agent.memory_enabled !== false) {
     const [memory, historyRes] = await Promise.all([
-      retrieveRelevantMemory({
+      retrieveGovernedAgentMemory({
         sb: sb as never,
         userId: agent.user_id,
         agentId: agent.id,
@@ -140,7 +137,7 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
         .limit(3),
     ]);
 
-    const memoryPrompt = memory ? renderMemoryPrompt(memory) : "";
+    const memoryPrompt = memory ? renderGovernedAgentMemoryPrompt(memory) : "";
     if (memoryPrompt) system.push(memoryPrompt);
 
     for (const past of [...(historyRes.data ?? [])].reverse()) {
