@@ -295,6 +295,8 @@ export type MemorySearchHit = {
   similarity: number;
   kind: "memory" | "document";
   document_id?: string | null;
+  /** Checked at recall time, never inferred from a search index hit. */
+  recorded_at?: string | null;
 };
 
 /**
