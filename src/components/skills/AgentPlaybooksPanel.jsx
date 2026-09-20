@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { BookOpenCheck, Braces, Download, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
   setAgentSkillEnabled,
 } from '@/lib/runtime/agent-skills/agent-skills.functions';
 import { installIntegrationPlaybookPack } from '@/lib/runtime/agent-skills/builtin-integration-playbooks.functions';
+import { installAgentProcedurePack160 } from '@/lib/runtime/agent-skills/agent-procedure-playbooks.functions';
 
 function riskLabel(skill) {
   if (skill.scan_verdict === 'dangerous') return 'Dangerous';
@@ -29,6 +30,8 @@ export default function AgentPlaybooksPanel({ enabled }) {
   const deleteFn = useServerFn(deleteAgentSkill);
   const compileFn = useServerFn(compileInstalledAgentSkillCapability);
   const installPackFn = useServerFn(installIntegrationPlaybookPack);
+  const installProceduresFn = useServerFn(installAgentProcedurePack160);
+  const [procedureProgress, setProcedureProgress] = useState(0);
 
   const skills = useQuery({
     queryKey: ['agent-skills'],
@@ -81,6 +84,39 @@ export default function AgentPlaybooksPanel({ enabled }) {
       toast({ variant: 'destructive', title: 'Could not install playbooks', description: friendlyMessage(error) }),
   });
 
+  const installProcedures = useMutation({
+    mutationFn: async () => {
+      let cursor = 0;
+      let inserted = 0;
+      let updated = 0;
+      const skipped = [];
+      setProcedureProgress(0);
+      while (cursor !== null) {
+        const result = await installProceduresFn({ data: { cursor } });
+        inserted += result.inserted;
+        updated += result.updated;
+        skipped.push(...result.skipped);
+        setProcedureProgress(cursor + result.processed);
+        cursor = result.nextCursor;
+      }
+      return { inserted, updated, skipped };
+    },
+    onSuccess: async (result) => {
+      toast({
+        title: 'Agent skill pack processed',
+        description: result.skipped.length
+          ? `${result.inserted} installed; ${result.updated} updated. ${result.skipped.length} name conflicts were left untouched.`
+          : 'All 160 built-in agent procedures are available in your workspace. Existing enable/disable choices were preserved.',
+      });
+      await qc.invalidateQueries({ queryKey: ['agent-skills'] });
+    },
+    onError: (error) => toast({
+      variant: 'destructive',
+      title: 'Agent skill installation interrupted',
+      description: `${friendlyMessage(error)} The first ${procedureProgress} entries were processed; run the installer again to resume safely.`,
+    }),
+  });
+
   const rows = useMemo(() => skills.data?.skills ?? [], [skills.data]);
   const reviewCount = rows.filter((skill) => skill.source_kind === 'reflection' && !skill.enabled).length;
   const builtinCount = rows.filter((skill) => skill.source_kind === 'builtin').length;
@@ -101,7 +137,11 @@ export default function AgentPlaybooksPanel({ enabled }) {
           <Badge variant="secondary">{rows.length} installed</Badge>
           {builtinCount > 0 && <Badge variant="outline">{builtinCount} built-in</Badge>}
           {reviewCount > 0 && <Badge variant="outline">{reviewCount} awaiting review</Badge>}
-          <Button size="sm" variant="outline" disabled={installPack.isPending} onClick={() => installPack.mutate()}>
+          <Button size="sm" variant="outline" disabled={installProcedures.isPending || installPack.isPending} onClick={() => installProcedures.mutate()}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            {installProcedures.isPending ? `Installing ${procedureProgress}/160…` : 'Install 160 agent skills'}
+          </Button>
+          <Button size="sm" variant="outline" disabled={installPack.isPending || installProcedures.isPending} onClick={() => installPack.mutate()}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
             {installPack.isPending ? 'Installing…' : 'Install integration pack'}
           </Button>
