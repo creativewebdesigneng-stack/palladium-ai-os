@@ -71,6 +71,7 @@ export async function recallMemoryFabric(args: {
       ? args.sb
           .from('agent_memories')
           .select('id,scope,memory_type,source,agent_id,org_id,expires_at')
+          .eq('user_id', args.userId)
           .in('id', memoryIds)
           .then((result: any) => { if (result.error) throw new Error('Could not verify memory access.'); return result.data ?? [] })
       : Promise.resolve([] as MemoryAuthorityRow[]),
@@ -78,6 +79,7 @@ export async function recallMemoryFabric(args: {
       ? args.sb
           .from('memory_documents')
           .select('id,org_id,agent_id,title,metadata')
+          .eq('user_id', args.userId)
           .in('id', documentIds)
           .then((result: any) => { if (result.error) throw new Error('Could not verify document access.'); return result.data ?? [] })
       : Promise.resolve([] as DocumentAuthorityRow[]),
