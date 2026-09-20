@@ -65,6 +65,16 @@ describe('governed agent memory and knowledge context', () => {
     expect(prompt).toContain('document:document-one/chunk:chunk-one');
   });
 
+  it('reserves search-result space when pinned and recent histories are large', () => {
+    const pinned = Array.from({ length: 40 }, (_, index) => ({ ...base, id: 'pin-' + index, pinned: true }));
+    const recent = Array.from({ length: 40 }, (_, index) => ({ ...base, id: 'recent-' + index, memory_type: 'short_term' }));
+    const found = [{ ...base, id: 'current-task-evidence', content: 'Relevant source for the new task.' }];
+    const result = buildAgentMemoryContext({ recalled: found, pinned, recent, context, preferences: prefs });
+    expect(result.longTerm.filter((row) => row.includes('memory:pin-'))).toHaveLength(4);
+    expect(result.shortTerm.filter((row) => row.includes('memory:recent-'))).toHaveLength(4);
+    expect(result.longTerm.some((row) => row.includes('memory:current-task-evidence'))).toBe(true);
+  });
+
   it('bounds the injected memory budget while preserving the newest pinned item first', () => {
     const pinned = { ...base, id: 'important', content: 'Pinned operator decision.' };
     const entries = Array.from({ length: 100 }, (_, index) => ({ ...base, id: 'candidate-' + index, content: 'x'.repeat(1500) }));
