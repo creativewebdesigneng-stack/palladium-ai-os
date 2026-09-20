@@ -260,7 +260,7 @@ export async function replayApprovedSkillScript(args: {
       execute: args.execute,
     });
     const status = result.ok ? "succeeded" : "failed";
-    const { error: ledgerError } = await args.sb
+    const { error: ledgerError } = await ledger
       .from("agent_skill_script_executions")
       .update({ status, result, error: result.ok ? null : "One or more native tool steps failed.", completed_at: new Date().toISOString() })
       .eq("id", claimed.id)
@@ -270,7 +270,7 @@ export async function replayApprovedSkillScript(args: {
     return { already_claimed: false, execution: { id: claimed.id, status, result } };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Skill script execution failed.";
-    await args.sb
+    await ledger
       .from("agent_skill_script_executions")
       .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
       .eq("id", claimed.id)
