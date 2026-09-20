@@ -12,7 +12,6 @@ import {
   ingestDocument,
   MemoryError,
   pruneExpiredMemory,
-  retrieveRelevantMemory,
   searchMemory,
   storeMemory,
   updateMemory,
