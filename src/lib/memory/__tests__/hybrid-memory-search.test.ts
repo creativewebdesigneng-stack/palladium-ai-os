@@ -54,7 +54,7 @@ function sb(args: {
       }),
       or: vi.fn((expression: string) => {
         if (table === "memory_chunks") {
-          terms = [...expression.matchAll(/content\\.ilike\\.%([^%]+)%/g)].map((match) => match[1].toLowerCase());
+          terms = [...expression.matchAll(/content\\.ilike\\.%([^%]+)%/g)].map((match) => (match[1] ?? '').toLowerCase());
         }
         return chain;
       }),
