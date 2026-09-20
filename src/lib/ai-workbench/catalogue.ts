@@ -846,7 +846,7 @@ export const AI_WORKBENCH_TOOLS: readonly AiWorkbenchTool[] = [
     "category": "Creative studio",
     "description": "Generate original text concepts and production plans; not rendered media.",
     "instruction": "Break a fictional scene premise into beats that advance character and conflict.",
-    "deliverable": "A numbered scene-beat plan."
+    "deliverable": "A numbered scene-beat plan with turning points and stakes."
   },
   {
     "id": "dialogue-variant-studio",
