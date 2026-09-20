@@ -16,6 +16,7 @@ type MemoryAuthorityRow = {
   source: string | null
   agent_id: string | null
   org_id: string | null
+  expires_at: string | null
 }
 
 type DocumentAuthorityRow = {
@@ -69,16 +70,16 @@ export async function recallMemoryFabric(args: {
     memoryIds.length
       ? args.sb
           .from('agent_memories')
-          .select('id,scope,memory_type,source,agent_id,org_id')
+          .select('id,scope,memory_type,source,agent_id,org_id,expires_at')
           .in('id', memoryIds)
-          .then((result: any) => result.data ?? [])
+          .then((result: any) => { if (result.error) throw new Error('Could not verify memory access.'); return result.data ?? [] })
       : Promise.resolve([] as MemoryAuthorityRow[]),
     documentIds.length
       ? args.sb
           .from('memory_documents')
           .select('id,org_id,agent_id,title,metadata')
           .in('id', documentIds)
-          .then((result: any) => result.data ?? [])
+          .then((result: any) => { if (result.error) throw new Error('Could not verify document access.'); return result.data ?? [] })
       : Promise.resolve([] as DocumentAuthorityRow[]),
   ])
 
@@ -94,6 +95,7 @@ export async function recallMemoryFabric(args: {
     if (hit.kind === 'memory') {
       const authority = memoryAuthority.get(hit.id)
       if (!authority) continue
+      if (authority.expires_at && (!Number.isFinite(Date.parse(authority.expires_at)) || Date.parse(authority.expires_at) <= Date.now())) continue
       const scope = authority.scope ?? hit.scope
       const memoryType = authority.memory_type ?? hit.memory_type
       governed.push({
