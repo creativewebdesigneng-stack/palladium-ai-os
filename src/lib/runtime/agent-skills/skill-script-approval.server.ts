@@ -220,6 +220,12 @@ export async function replayApprovedSkillScript(args: {
     }
   }
 
+  // The approval and skill are read through the caller's RLS client above.
+  // Only the server-side privileged client may claim/finalize execution evidence;
+  // browser clients must never be able to forge a successful skill result.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const ledger = supabaseAdmin as unknown as Sb;
+
   const claim = {
     approval_request_id: approval.id,
     user_id: args.userId,
@@ -231,7 +237,7 @@ export async function replayApprovedSkillScript(args: {
     fingerprint,
     status: "running",
   };
-  const { data: claimed, error: claimError } = await args.sb
+  const { data: claimed, error: claimError } = await ledger
     .from("agent_skill_script_executions")
     .insert(claim)
     .select("id")
