@@ -3,6 +3,7 @@
  * caller, so row-level security decides which memories are reachable.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { retrieveGovernedAgentMemory } from "./agent-memory-context.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   deleteDocument,
@@ -172,10 +173,22 @@ export const previewAgentMemory = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     try {
-      return await retrieveRelevantMemory({
-        sb: context.supabase as unknown as Sb,
+      const sb = context.supabase as unknown as Sb;
+      let orgId: string | null = null;
+      if (data.agent_id) {
+        const { data: agent, error } = await sb.from("personal_agents")
+          .select("id,org_id,org_id_fk")
+          .eq("id", data.agent_id)
+          .eq("user_id", context.userId)
+          .maybeSingle();
+        if (error || !agent) throw new MemoryError("That agent is not available to you.");
+        orgId = agent.org_id_fk ?? agent.org_id ?? null;
+      }
+      return await retrieveGovernedAgentMemory({
+        sb,
         userId: context.userId,
         agentId: data.agent_id,
+        orgId,
         query: data.query,
       });
     } catch (error) {
