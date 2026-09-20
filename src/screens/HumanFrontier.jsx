@@ -84,7 +84,7 @@ export default function HumanFrontier() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Blackstar · User-controlled tools" title="Human Frontier" description="Twenty practical workflows built around human observation, consent, hands-on practice and personal decisions. AI can guide you, but it cannot complete these real-world steps on your behalf." />
+      <PageHeader eyebrow="Blackstar · User-controlled tools" title="Human Frontier" description="Sixty practical workflows built around human observation, consent, hands-on practice and personal decisions. AI can guide you, but it cannot complete these real-world steps on your behalf." />
 
       <div className="flex items-start gap-3 rounded-2xl border border-violet-300/20 bg-violet-500/[.06] p-4">
         <Hand aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" />
@@ -97,7 +97,7 @@ export default function HumanFrontier() {
       <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.3fr)]">
         <section className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4" aria-label="Available Human Frontier tools">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-white">Explore 20 tools</h2>
+            <h2 className="text-base font-semibold text-white">Explore {HUMAN_FRONTIER_TOOLS.length} tools</h2>
             <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-zinc-400">{filtered.length} shown</span>
           </div>
           <label className="relative mt-4 block">
