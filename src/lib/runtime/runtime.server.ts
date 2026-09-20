@@ -11,11 +11,8 @@
  */
 import { isProviderConfigured } from "@/lib/ai/ai-preferences.server";
 import { writeAudit } from "@/lib/platform/audit.server";
-import {
-  renderMemoryPrompt,
-  retrieveRelevantMemory,
-  storeMemory,
-} from "@/lib/memory/memory.server";
+import { storeMemory } from "@/lib/memory/memory.server";
+import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
 import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
 import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
@@ -117,38 +114,27 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
     "Operating rules: be concise and decisive, use markdown, cite sources when you used the web, and never claim to have completed a real-world action unless a tool confirmed it. If an action costs money or affects the outside world, raise an approval request instead of pretending to act.",
   );
 
-  const messages: ChatMessage[] = [];
-
+  // Do not replay old task input/output as a fresh user/assistant conversation:
+  // it bypasses memory preferences, provenance and expiry, and can promote an
+  // unverified prior output to a trusted assistant statement in a new run.
+  // Durable and short-term context is recalled through the canonical memory
+  // fabric, using the current task, user and agent boundaries instead.
   if (agent.memory_enabled !== false) {
-    const [memory, historyRes] = await Promise.all([
-      retrieveRelevantMemory({
-        sb: sb as never,
-        userId: agent.user_id,
-        agentId: agent.id,
-        orgId: agent.org_id_fk ?? agent.org_id ?? null,
-        query: input,
-      }).catch((error) => {
-        console.error("[runtime] memory retrieval failed", error);
-        return null;
-      }),
-      sb
-        .from("agent_tasks")
-        .select("input,output_text,status")
-        .eq("agent_id", agent.id)
-        .eq("status", "succeeded")
-        .order("created_at", { ascending: false })
-        .limit(3),
-    ]);
-
-    const memoryPrompt = memory ? renderMemoryPrompt(memory) : "";
+    const memory = await retrieveGovernedAgentMemory({
+      sb: sb as never,
+      userId: agent.user_id,
+      agentId: agent.id,
+      orgId: agent.org_id_fk ?? agent.org_id ?? null,
+      query: input,
+    }).catch((error) => {
+      console.error("[runtime] governed memory recall unavailable", error);
+      return null;
+    });
+    const memoryPrompt = memory ? renderGovernedAgentMemoryPrompt(memory) : "";
     if (memoryPrompt) system.push(memoryPrompt);
-
-    for (const past of [...(historyRes.data ?? [])].reverse()) {
-      if (!past.input) continue;
-      messages.push({ role: "user", content: String(past.input).slice(0, 1500) });
-      messages.push({ role: "assistant", content: String(past.output_text ?? "").slice(0, 1500) });
-    }
   }
+
+  const messages: ChatMessage[] = [];
 
   messages.unshift({ role: "system", content: system.join("\n\n") });
   messages.push({ role: "user", content: input });

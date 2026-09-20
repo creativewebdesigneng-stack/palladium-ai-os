@@ -34,11 +34,13 @@ export const DEFAULT_MEMORY_PREFERENCES: MemoryPreferences = {
 
 /** Reads the caller's preferences; absent rows mean "the safe defaults". */
 export async function loadMemoryPreferences(sb: Sb, userId: string): Promise<MemoryPreferences> {
-  const { data } = await sb
+  const { data, error } = await sb
     .from("memory_preferences")
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
+  // An access or database failure is not evidence that the user opted into defaults.
+  if (error) throw new Error("Could not load memory privacy preferences.");
   if (!data) return { ...DEFAULT_MEMORY_PREFERENCES };
   return {
     auto_capture: data.auto_capture !== false,

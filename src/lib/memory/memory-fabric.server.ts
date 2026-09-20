@@ -16,6 +16,9 @@ type MemoryAuthorityRow = {
   source: string | null
   agent_id: string | null
   org_id: string | null
+  expires_at: string | null
+  title: string | null
+  content: string
 }
 
 type DocumentAuthorityRow = {
@@ -25,6 +28,8 @@ type DocumentAuthorityRow = {
   title: string | null
   metadata: Record<string, unknown> | null
 }
+
+type DocumentChunkRow = { id: string; document_id: string; content: string }
 
 type GovernedMemoryHit = MemorySearchHit & MemoryFabricCandidate & {
   source: string | null
@@ -65,21 +70,33 @@ export async function recallMemoryFabric(args: {
     hits.filter((hit) => hit.kind === 'document' && hit.document_id).map((hit) => hit.document_id as string),
   )]
 
-  const [memoryRows, documentRows] = await Promise.all([
+  const chunkIds = hits.filter((hit) => hit.kind === 'document').map((hit) => hit.id)
+
+  const [memoryRows, documentRows, chunkRows] = await Promise.all([
     memoryIds.length
       ? args.sb
           .from('agent_memories')
-          .select('id,scope,memory_type,source,agent_id,org_id')
+          .select('id,scope,memory_type,source,agent_id,org_id,expires_at,title,content')
+          .eq('user_id', args.userId)
           .in('id', memoryIds)
-          .then((result: any) => result.data ?? [])
+          .then((result: any) => { if (result.error) throw new Error('Could not verify memory access.'); return result.data ?? [] })
       : Promise.resolve([] as MemoryAuthorityRow[]),
     documentIds.length
       ? args.sb
           .from('memory_documents')
           .select('id,org_id,agent_id,title,metadata')
+          .eq('user_id', args.userId)
           .in('id', documentIds)
-          .then((result: any) => result.data ?? [])
+          .then((result: any) => { if (result.error) throw new Error('Could not verify document access.'); return result.data ?? [] })
       : Promise.resolve([] as DocumentAuthorityRow[]),
+    chunkIds.length
+      ? args.sb
+          .from('memory_chunks')
+          .select('id,document_id,content')
+          .eq('user_id', args.userId)
+          .in('id', chunkIds)
+          .then((result: any) => { if (result.error) throw new Error('Could not verify knowledge chunk access.'); return result.data ?? [] })
+      : Promise.resolve([] as DocumentChunkRow[]),
   ])
 
   const memoryAuthority = new Map<string, MemoryAuthorityRow>(
@@ -88,16 +105,22 @@ export async function recallMemoryFabric(args: {
   const documentAuthority = new Map<string, DocumentAuthorityRow>(
     (documentRows as DocumentAuthorityRow[]).map((row) => [row.id, row]),
   )
+  const chunkAuthority = new Map<string, DocumentChunkRow>(
+    (chunkRows as DocumentChunkRow[]).map((row) => [row.id, row]),
+  )
 
   const governed: GovernedMemoryHit[] = []
   for (const hit of hits) {
     if (hit.kind === 'memory') {
       const authority = memoryAuthority.get(hit.id)
       if (!authority) continue
+      if (authority.expires_at && (!Number.isFinite(Date.parse(authority.expires_at)) || Date.parse(authority.expires_at) <= Date.now())) continue
       const scope = authority.scope ?? hit.scope
       const memoryType = authority.memory_type ?? hit.memory_type
       governed.push({
         ...hit,
+        content: authority.content,
+        title: authority.title,
         ...(scope === undefined ? {} : { scope }),
         ...(memoryType === undefined ? {} : { memory_type: memoryType }),
         source: authority.source,
@@ -108,12 +131,14 @@ export async function recallMemoryFabric(args: {
     }
 
     const authority = hit.document_id ? documentAuthority.get(hit.document_id) : undefined
-    if (!authority) continue
+    const chunk = chunkAuthority.get(hit.id)
+    if (!authority || !chunk || chunk.document_id !== hit.document_id) continue
     const source = typeof authority.metadata?.['source'] === 'string'
       ? authority.metadata['source'] as string
       : authority.title
     governed.push({
       ...hit,
+      content: chunk.content,
       source,
       agent_id: authority.agent_id,
       org_id: authority.org_id,
