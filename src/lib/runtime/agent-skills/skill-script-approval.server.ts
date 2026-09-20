@@ -220,6 +220,12 @@ export async function replayApprovedSkillScript(args: {
     }
   }
 
+  // The approval and skill are read through the caller's RLS client above.
+  // Only the server-side privileged client may claim/finalize execution evidence;
+  // browser clients must never be able to forge a successful skill result.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const ledger = supabaseAdmin as unknown as Sb;
+
   const claim = {
     approval_request_id: approval.id,
     user_id: args.userId,
@@ -231,7 +237,7 @@ export async function replayApprovedSkillScript(args: {
     fingerprint,
     status: "running",
   };
-  const { data: claimed, error: claimError } = await args.sb
+  const { data: claimed, error: claimError } = await ledger
     .from("agent_skill_script_executions")
     .insert(claim)
     .select("id")
@@ -254,7 +260,7 @@ export async function replayApprovedSkillScript(args: {
       execute: args.execute,
     });
     const status = result.ok ? "succeeded" : "failed";
-    const { error: ledgerError } = await args.sb
+    const { error: ledgerError } = await ledger
       .from("agent_skill_script_executions")
       .update({ status, result, error: result.ok ? null : "One or more native tool steps failed.", completed_at: new Date().toISOString() })
       .eq("id", claimed.id)
@@ -264,7 +270,7 @@ export async function replayApprovedSkillScript(args: {
     return { already_claimed: false, execution: { id: claimed.id, status, result } };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Skill script execution failed.";
-    await args.sb
+    await ledger
       .from("agent_skill_script_executions")
       .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
       .eq("id", claimed.id)
