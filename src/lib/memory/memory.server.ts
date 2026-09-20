@@ -327,6 +327,16 @@ export async function searchMemory(args: {
     return [] as MemorySearchHit[];
   });
 
+  // Document chunks must remain searchable even when the embedding service is
+  // unavailable or a newly uploaded document has not been vector-indexed yet.
+  const documentKeywordPromise = args.includeDocuments === false
+    ? Promise.resolve([] as MemorySearchHit[])
+    : keywordDocumentSearch(args.sb, args.userId, query, limit)
+      .catch((error) => {
+        console.error("[memory] document keyword search unavailable", error);
+        return [] as MemorySearchHit[];
+      });
+
   const semanticHits: MemorySearchHit[] = [];
   try {
     const { vector } = await embedOne(query);
@@ -371,10 +381,10 @@ export async function searchMemory(args: {
     console.error("[memory] semantic search unavailable", error);
   }
 
-  const keywordHits = await keywordPromise;
+  const [keywordHits, documentKeywordHits] = await Promise.all([keywordPromise, documentKeywordPromise]);
   return rankHybridMemoryHits({
     semantic: semanticHits,
-    keyword: keywordHits,
+    keyword: [...keywordHits, ...documentKeywordHits],
     query,
     limit,
   });
@@ -409,6 +419,42 @@ async function keywordSearch(
     similarity: 0,
     kind: "memory" as const,
   }));
+}
+
+/**
+ * Owner-filtered lexical retrieval for indexed or newly uploaded knowledge.
+ * Keep search tokens simple to avoid PostgREST filter injection and cap the
+ * number of candidate chunks; the memory fabric separately verifies the
+ * document owner, matching chunk/document IDs and exact execution scope.
+ */
+async function keywordDocumentSearch(
+  sb: Sb,
+  userId: string,
+  query: string,
+  limit: number,
+): Promise<MemorySearchHit[]> {
+  const stopwords = new Set(["about", "after", "are", "can", "could", "does", "find", "for", "from", "have", "how", "into", "please", "show", "that", "the", "their", "this", "what", "when", "where", "which", "with", "would", "your"]);
+  const tokens = [...new Set(query.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])]
+    .filter((token) => !stopwords.has(token))
+    .slice(0, 4);
+  if (!tokens.length) return [];
+  const terms = tokens.map((token) => `content.ilike.%${token}%`);
+  let q = sb.from("memory_chunks")
+    .select("id,document_id,content")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(limit, 8));
+  q = terms.length === 1 ? q.ilike("content", `%${tokens[0]}%`) : q.or(terms.join(","));
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? []).filter((row: any) => row.id && row.document_id && typeof row.content === "string")
+    .map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      document_id: row.document_id,
+      similarity: 0,
+      kind: "document" as const,
+    }));
 }
 
 /* -------------------------------------------------- retrieveRelevantMemory */

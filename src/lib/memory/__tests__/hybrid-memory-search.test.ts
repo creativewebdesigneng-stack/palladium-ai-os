@@ -29,20 +29,44 @@ function sb(args: {
   chunks?: Array<{ id: string; content: string; similarity: number; document_id: string }>;
   keyword?: SearchRow[];
   keywordError?: string;
+  documentKeywords?: Array<{ id: string; document_id: string; content: string; user_id: string }>;
+  documentKeywordError?: string;
 }) {
   const keywordResponse = args.keywordError
     ? { data: null, error: { message: args.keywordError } }
     : { data: args.keyword ?? [], error: null };
 
-  const from = vi.fn(() => {
+  const from = vi.fn((table: string) => {
+    let owner: string | null = null;
+    let terms: string[] = [];
+    let rowLimit = 25;
     const chain: any = {
       select: vi.fn(() => chain),
       order: vi.fn(() => chain),
-      limit: vi.fn(() => chain),
-      or: vi.fn(() => chain),
+      limit: vi.fn((value: number) => { rowLimit = value; return chain; }),
+      eq: vi.fn((column: string, value: string) => {
+        if (column === "user_id") owner = value;
+        return chain;
+      }),
+      ilike: vi.fn((_column: string, pattern: string) => {
+        terms = [pattern.replace(/^%|%$/g, "").toLowerCase()];
+        return chain;
+      }),
+      or: vi.fn((expression: string) => {
+        if (table === "memory_chunks") {
+          terms = [...expression.matchAll(/content\.ilike\.%([^%]+)%/g)].map((match) => (match[1] ?? '').toLowerCase());
+        }
+        return chain;
+      }),
       in: vi.fn(() => chain),
-      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-        Promise.resolve(keywordResponse).then(resolve, reject),
+      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
+        if (table !== "memory_chunks") return Promise.resolve(keywordResponse).then(resolve, reject);
+        if (args.documentKeywordError) return Promise.resolve({ data: null, error: { message: args.documentKeywordError } }).then(resolve, reject);
+        const rows = (args.documentKeywords ?? []).filter((row) =>
+          (!owner || row.user_id === owner) && terms.some((term) => row.content.toLowerCase().includes(term))
+        ).slice(0, rowLimit);
+        return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+      },
     };
     return chain;
   });
@@ -92,6 +116,44 @@ describe("searchMemory hybrid retrieval", () => {
     });
 
     expect(result.map((row) => row.id)).toEqual(["keyword"]);
+  });
+
+  it("recalls owned document chunks when vector embeddings are unavailable", async () => {
+    embeddings.embedOne.mockRejectedValueOnce(new Error("embedding unavailable"));
+    const database = sb({
+      documentKeywords: [
+        { id: "chunk-owned", user_id: "user-1", document_id: "doc-owned", content: "Supplier returns policy is in section 4." },
+        { id: "chunk-other", user_id: "user-2", document_id: "doc-other", content: "Supplier returns policy of another user." },
+      ],
+    });
+    const result = await searchMemory({
+      sb: database, userId: "user-1", agentId: "agent-1", query: "Where is the supplier returns policy?",
+    });
+    expect(result.filter((row) => row.kind === "document").map((row) => row.id)).toEqual(["chunk-owned"]);
+    expect(database.from).toHaveBeenCalledWith("memory_chunks");
+  });
+
+  it("does not search document chunks when the owner disabled document recall", async () => {
+    embeddings.embedOne.mockRejectedValueOnce(new Error("embedding unavailable"));
+    const database = sb({ documentKeywords: [
+      { id: "chunk-one", user_id: "user-1", document_id: "doc-one", content: "Relevant notes" },
+    ] });
+    const result = await searchMemory({
+      sb: database, userId: "user-1", agentId: null, query: "Relevant notes", includeDocuments: false,
+    });
+    expect(result.some((row) => row.kind === "document")).toBe(false);
+    expect(database.from).not.toHaveBeenCalledWith("memory_chunks");
+  });
+
+  it("retains owned document keyword hits when memory keyword retrieval fails", async () => {
+    embeddings.embedOne.mockRejectedValueOnce(new Error("embedding unavailable"));
+    const database = sb({ keywordError: "memory search offline", documentKeywords: [
+      { id: "chunk-one", user_id: "user-1", document_id: "doc-one", content: "Supplier documentation and warranty notes" },
+    ] });
+    const result = await searchMemory({
+      sb: database, userId: "user-1", query: "supplier documentation",
+    });
+    expect(result.some((row) => row.id === "chunk-one" && row.kind === "document")).toBe(true);
   });
 
   it("preserves semantic and document results when keyword retrieval fails", async () => {
