@@ -27,7 +27,7 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
       .from('agent_skills')
       .select('id,name,source_kind,source_ref,enabled')
       .eq('user_id', context.userId)
-      .limit(1000);
+      .in('name', entries.map((entry) => entry.name));
     if (readError) throw new Error('Could not inspect existing agent skills for this workspace.');
     const existingByName = new Map<string, {
       id: string; name: string; source_kind: string; source_ref: string | null; enabled: boolean
@@ -36,7 +36,6 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
     }) => [item.name.toLowerCase(), item]));
 
     const newRows: Record<string, unknown>[] = [];
-    const updates: Array<{ id: string; row: Record<string, unknown> }> = [];
     const skipped: string[] = [];
 
     for (const entry of entries) {
@@ -69,8 +68,10 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
         enabled: existing ? existing.enabled : true,
         updated_at: new Date().toISOString(),
       };
-      if (existing) updates.push({ id: existing.id, row });
-      else newRows.push(row);
+      // Existing pack entries retain user-controlled enable state and contents.
+      // Re-installation must not silently replace a playbook already reviewed by its owner.
+      if (existing) continue;
+      newRows.push(row);
     }
 
     if (newRows.length) {
@@ -79,11 +80,7 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
         throw new Error('Could not install this skill batch. Your existing skills were not overwritten.');
       }
     }
-    for (const item of updates) {
-      const updated = await sb.from('agent_skills').update(item.row)
-        .eq('id', item.id).eq('user_id', context.userId).select('id').maybeSingle();
-      if (updated.error || !updated.data) throw new Error('Could not update an existing skill in this batch.');
-    }
+
 
     const nextCursor = data.cursor + BATCH_SIZE;
     const audit = await sb.from('mission_audit_logs').insert({
@@ -97,7 +94,7 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
         from: data.cursor,
         to: nextCursor,
         inserted: newRows.length,
-        updated: updates.length,
+        updated: 0,
         skipped,
       },
     });
@@ -106,7 +103,7 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
     return {
       processed: entries.length,
       inserted: newRows.length,
-      updated: updates.length,
+      updated: 0,
       skipped,
       nextCursor: nextCursor < AGENT_PROCEDURE_PLAYBOOKS_160.length ? nextCursor : null,
       total: AGENT_PROCEDURE_PLAYBOOKS_160.length,
