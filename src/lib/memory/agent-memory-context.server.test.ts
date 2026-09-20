@@ -11,7 +11,7 @@ const enabled = {
   long_term_enabled: true, document_memory_enabled: true,
   organisation_sharing_enabled: false, short_term_ttl_minutes: 720, retention_days: null,
 };
-const own = { id: 'owned', title: null, content: 'Owner note', source: 'user',
+const own = { id: 'owned', user_id: 'user-A', title: null, content: 'Owner note', source: 'user',
   memory_type: 'long_term', scope: 'agent', category: 'note', agent_id: 'agent-A',
   org_id: null, expires_at: null, pinned: true };
 
@@ -42,11 +42,11 @@ beforeEach(() => {
 
 describe('agent memory runtime integration', () => {
   it('uses only owner-scoped recent and pinned rows plus governed search', async () => {
-    const sb = database([own, { ...own, id: 'stranger', pinned: true }]);
+    const sb = database([own, { ...own, id: 'stranger', user_id: 'user-B', pinned: true }]);
     const result = await retrieveGovernedAgentMemory({ sb: sb as any, userId: 'user-A', agentId: 'agent-A', query: 'project' });
     expect(sb.from).toHaveBeenCalledWith('agent_memories');
     expect(sb.chains.every((chain) => chain.filters.get('user_id') === 'user-A')).toBe(true);
-    expect(result.longTerm).toHaveLength(2);
+    expect(result.longTerm).toHaveLength(1);
     expect(recallMemoryFabric).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'user-A', query: 'project', context: { agentId: 'agent-A', orgId: null },
     }));
