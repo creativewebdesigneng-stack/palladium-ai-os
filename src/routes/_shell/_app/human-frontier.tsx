@@ -5,7 +5,7 @@ export const Route = createFileRoute('/_shell/_app/human-frontier')({
   head: () => ({
     meta: [
       { title: 'Human Frontier — Blackstar' },
-      { name: 'description', content: 'Sixty user-controlled, human-led tools for firsthand observation, consent, practical action and personal judgement.' },
+      { name: 'description', content: '160 user-controlled, human-led tools for firsthand observation, consent, practical action and personal judgement.' },
       { property: 'og:title', content: 'Human Frontier — Blackstar' },
       { property: 'og:type', content: 'website' },
     ],

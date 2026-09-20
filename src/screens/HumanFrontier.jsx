@@ -84,7 +84,7 @@ export default function HumanFrontier() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Blackstar · User-controlled tools" title="Human Frontier" description="Sixty practical workflows built around human observation, consent, hands-on practice and personal decisions. AI can guide you, but it cannot complete these real-world steps on your behalf." />
+      <PageHeader eyebrow="Blackstar · User-controlled tools" title="Human Frontier" description="160 practical workflows built around human observation, consent, hands-on practice and personal decisions. AI can guide you, but it cannot complete these real-world steps on your behalf." />
 
       <div className="flex items-start gap-3 rounded-2xl border border-violet-300/20 bg-violet-500/[.06] p-4">
         <Hand aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" />
