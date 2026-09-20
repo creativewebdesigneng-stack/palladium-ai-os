@@ -139,6 +139,10 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
+    // The caller's client above is used for owner-scoped reads and tool grants.
+    // Only server-side credentials may claim/finalize execution evidence.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const approvalDb = supabaseAdmin as unknown as Sb;
 
     const current = await sb
       .from("approval_requests")
@@ -153,7 +157,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     const type = actionType(approval.action_type);
 
     if (data.decision === "reject") {
-      const rejected = await sb
+      const rejected = await approvalDb
         .from("approval_requests")
         .update({
           status: "rejected",
@@ -177,7 +181,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
 
     // Atomically claim the human decision before any provider side effect. This
     // is the single-use guard against double-click/two-tab duplicate writes.
-    const claim = await sb
+    const claim = await approvalDb
       .from("approval_requests")
       .update({
         status: "approved",
@@ -204,7 +208,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
       claim.data,
     );
 
-    await sb
+    await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",
@@ -269,6 +273,10 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
+    // The caller's client above is used for owner-scoped reads and tool grants.
+    // Only server-side credentials may claim/finalize execution evidence.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const approvalDb = supabaseAdmin as unknown as Sb;
 
     const current = await sb
       .from("approval_requests")
@@ -288,7 +296,7 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
 
     // Retry claims only the already-approved immutable request payload. The UI
     // cannot supply changed provider action details here.
-    const claim = await sb
+    const claim = await approvalDb
       .from("approval_requests")
       .update({ execution_status: "executing", execution_error: null })
       .eq("id", data.id)
@@ -308,7 +316,7 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       claim.data,
     );
 
-    await sb
+    await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",

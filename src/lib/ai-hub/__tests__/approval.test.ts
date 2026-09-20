@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+const privilegedWriter=vi.hoisted(()=>({
+  from: (_table:string): unknown => { throw new Error('Privileged approval writer was not mocked.') },
+}))
+vi.mock('@/integrations/supabase/client.server',()=>({
+  supabaseAdmin:privilegedWriter,
+}))
+
 import { createAiHubApprovalGate } from '../approval.server'
 import type { AiHubOrchestrationPlan } from '../orchestrator'
 
@@ -67,6 +75,9 @@ describe('AI Hub durable approval gate', () => {
         async maybeSingle() { return { data: { id: 'approval-1' }, error: null } },
       }),
     }
+
+    // The claim is made through the backend writer, not the caller's client.
+    privilegedWriter.from=db.from
 
     const approved = await createAiHubApprovalGate(db).claim(
       plan, { tenantId: 'tenant-1', actorId: 'actor-1' }, 'approval-1',

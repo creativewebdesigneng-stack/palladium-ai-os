@@ -3,6 +3,11 @@ import type { AiHubOrchestrationPlan } from './orchestrator'
 
 type SupabaseLike = { from: (table: string) => any }
 
+async function privilegedApprovalDb(): Promise<SupabaseLike> {
+  const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+  return supabaseAdmin as unknown as SupabaseLike
+}
+
 function approvalDetails(plan: AiHubOrchestrationPlan) {
   return {
     ai_hub_workload_id: plan.workloadId,
@@ -53,7 +58,8 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
 
     async claim(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext, approvalRequestId: string) {
       const details = approvalDetails(plan)
-      let query = db
+      const executionDb = await privilegedApprovalDb()
+      let query = executionDb
         .from('approval_requests')
         .update({ execution_status: 'executing', execution_error: null, execution_result: null })
         .eq('id', approvalRequestId)
@@ -75,7 +81,8 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
 
     async complete(approvalRequestId, context, result) {
       const succeeded = result.status === 'completed'
-      let query = db
+      const executionDb = await privilegedApprovalDb()
+      let query = executionDb
         .from('approval_requests')
         .update({
           execution_status: succeeded ? 'succeeded' : 'failed',
