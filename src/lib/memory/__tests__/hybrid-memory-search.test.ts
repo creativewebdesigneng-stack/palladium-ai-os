@@ -15,6 +15,7 @@ vi.mock("../vector-store.server", () => ({
 import { searchMemory } from "../memory.server";
 
 type SearchRow = {
+  user_id?: string;
   id: string;
   content: string;
   title?: string | null;
@@ -60,7 +61,13 @@ function sb(args: {
       }),
       in: vi.fn(() => chain),
       then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
-        if (table !== "memory_chunks") return Promise.resolve(keywordResponse).then(resolve, reject);
+        if (table !== "memory_chunks") {
+          const response = keywordResponse.error ? keywordResponse : {
+            data: (keywordResponse.data ?? []).filter((row) => !owner || (row.user_id ?? "user-1") === owner),
+            error: null,
+          };
+          return Promise.resolve(response).then(resolve, reject);
+        }
         if (args.documentKeywordError) return Promise.resolve({ data: null, error: { message: args.documentKeywordError } }).then(resolve, reject);
         const rows = (args.documentKeywords ?? []).filter((row) =>
           (!owner || row.user_id === owner) && terms.some((term) => row.content.toLowerCase().includes(term))
@@ -102,6 +109,21 @@ describe("searchMemory hybrid retrieval", () => {
 
     expect(result.map((row) => row.id)).toContain("semantic");
     expect(result.map((row) => row.id)).toContain("exact");
+  });
+
+  it("excludes other users' keyword rows even if the client can read them", async () => {
+    embeddings.embedOne.mockRejectedValueOnce(new Error("embedding unavailable"));
+    const database = sb({ keyword: [
+      { id: "stranger", user_id: "user-2", content: "Customer private notes for another user" },
+      { id: "owned", user_id: "user-1", content: "Customer private notes for the current user" },
+    ] });
+    const result = await searchMemory({
+      sb: database, userId: "user-1", agentId: null,
+      query: "Customer private notes", includeDocuments: false,
+    });
+    expect(result.filter((hit) => hit.kind === "memory").map((hit) => hit.id)).toEqual(["owned"]);
+    const memoryQuery = database.from.mock.results.find((result: { value: { eq: ReturnType<typeof vi.fn> } }) => result.value?.eq)?.value;
+    expect(memoryQuery?.eq).toHaveBeenCalledWith("user_id", "user-1");
   });
 
   it("falls back to keyword recall when embeddings fail", async () => {
