@@ -318,6 +318,7 @@ export async function searchMemory(args: {
 
   const keywordPromise = keywordSearch(
     args.sb,
+    args.userId,
     query,
     limit,
     args.agentId ?? null,
@@ -392,6 +393,7 @@ export async function searchMemory(args: {
 
 async function keywordSearch(
   sb: Sb,
+  userId: string,
   query: string,
   limit: number,
   agentId: string | null,
@@ -401,6 +403,9 @@ async function keywordSearch(
   let q = sb
     .from("agent_memories")
     .select("id,title,content,memory_type,scope,category")
+    // Do not rely solely on caller RLS: the agent runtime may use an
+    // elevated client and the index can contain unrelated owners' rows.
+    .eq("user_id", userId)
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false })
     .limit(limit);
