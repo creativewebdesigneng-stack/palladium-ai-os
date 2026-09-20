@@ -4,6 +4,10 @@
  * that a human actually performed an action. Responses remain user-authored.
  */
 import { HUMAN_FRONTIER_ADDITIONS } from './additions';
+import { FRONTIER_EVERYDAY_25 } from './expansion-everyday';
+import { FRONTIER_PEOPLE_25 } from './expansion-people';
+import { FRONTIER_MAKING_25 } from './expansion-making';
+import { FRONTIER_JUDGEMENT_25 } from './expansion-judgement';
 
 export type HumanField = { label: string; hint: string };
 export type HumanTool = {
@@ -179,6 +183,10 @@ export const HUMAN_FRONTIER_TOOLS: readonly HumanTool[] = [
     output: 'An observation-led friction discovery note',
   },
   ...HUMAN_FRONTIER_ADDITIONS,
+  ...FRONTIER_EVERYDAY_25,
+  ...FRONTIER_PEOPLE_25,
+  ...FRONTIER_MAKING_25,
+  ...FRONTIER_JUDGEMENT_25,
 ] as const;
 
 export function validateHumanFrontierTools(tools: readonly HumanTool[] = HUMAN_FRONTIER_TOOLS) {
@@ -190,5 +198,5 @@ export function validateHumanFrontierTools(tools: readonly HumanTool[] = HUMAN_F
     if (tool.fields.length !== 3 || tool.checks.length !== 3) return false;
     if (tool.fields.some((field) => !field.label.trim() || !field.hint.trim()) || tool.checks.some((check) => !check.trim())) return false;
   }
-  return tools.length === 60;
+  return tools.length === 160;
 }
