@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, BrainCircuit, Hammer, HardHat, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Scale, Factory, Mic2, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn, PhoneCall,
+  FileText, Layers3, Search, FlaskConical, Scale, Factory, Mic2, Hand, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn, PhoneCall,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -49,6 +49,7 @@ const WORKFORCE = [
   ['AI Web', '/web', Globe],
   ['Web Intelligence', '/web-intelligence', Search],
   ['AI Tools', '/ai-tools', Wrench],
+  ['Human Frontier', '/human-frontier', Hand],
 ];
 
 const BUSINESS = [
