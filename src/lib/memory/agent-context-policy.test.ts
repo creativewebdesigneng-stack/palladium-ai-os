@@ -46,7 +46,9 @@ describe('governed agent memory and knowledge context', () => {
     const disabled = { ...prefs, long_term_enabled: false, short_term_enabled: false, document_memory_enabled: false, organisation_sharing_enabled: false };
     expect([base, org, doc, short].every((row) => !allowedAgentContextMemory(row, context, disabled, Date.now()))).toBe(true);
     expect(allowedAgentContextMemory(org, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
-    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A' }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
+    // An agent-restricted document within this workspace is not automatically shared.
+    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A' }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(true);
+    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A', agent_id: null }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
     expect(allowedAgentContextMemory(short, context, prefs, Date.now())).toBe(true);
   });
 
