@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { executeAgentTask } from "./agent-task-execution.server";
+import { resolveAgentRuntimeSnapshot } from "./runtime-snapshot";
 import { TOOL_SLUGS } from "./tools.server";
 
 type Sb = { from: (t: string) => any };
@@ -39,7 +40,7 @@ export const cancelAgentTask = createServerFn({ method: "POST" })
   .inputValidator((input: { task_id: string }) => ({ task_id: String(input?.task_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { data: task } = await sb
+    const { data: task, error: cancellationError } = await sb
       .from("agent_tasks")
       .update({
         status: "cancelled",
@@ -48,9 +49,11 @@ export const cancelAgentTask = createServerFn({ method: "POST" })
         error: "Cancelled by the operator.",
       })
       .eq("id", data.task_id)
+      .eq("user_id", context.userId)
       .in("status", ["pending", "queued", "running", "waiting_for_tool", "waiting_for_approval"])
       .select("*")
       .maybeSingle();
+    if (cancellationError) throw new Error("Could not cancel the agent task.");
     return { task: task ?? null };
   });
 
@@ -60,26 +63,27 @@ export const getAgentRuntime = createServerFn({ method: "POST" })
   .inputValidator((input: { agent_id: string }) => ({ agent_id: String(input?.agent_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [{ data: agent }, { data: tasks }] = await Promise.all([
-      sb.from("personal_agents").select("*").eq("id", data.agent_id).maybeSingle(),
+    const [agentResult, taskResult] = await Promise.all([
+      sb.from("personal_agents").select("*").eq("id", data.agent_id).eq("user_id", context.userId).maybeSingle(),
       sb
         .from("agent_tasks")
         .select("*")
         .eq("agent_id", data.agent_id)
+        .eq("user_id", context.userId)
         .order("created_at", { ascending: false })
         .limit(25),
     ]);
-    if (!agent) throw new Error("Agent not found or you do not have access to it.");
-    return { agent, tasks: tasks ?? [], availableTools: TOOL_SLUGS };
+    const snapshot = resolveAgentRuntimeSnapshot(agentResult, taskResult);
+    return { ...snapshot, availableTools: TOOL_SLUGS };
   });
 
-/** Closes any run of the caller's that has been stuck beyond the timeout. */
+/**
+ * Legacy user-triggered reaper: retained as an explicit retirement error for
+ * older clients. Recovery belongs to the existing scheduler and durable
+ * run-resume worker; never expose its service-role authority through this API.
+ */
 export const reapStuckRuns = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.rpc("reap_stale_agent_tasks", {
-      _user: context.userId,
-    } as never);
-    return { reaped: Number(data ?? 0) };
+  .handler(async () => {
+    throw new Error("Manual stale-run reaping has been retired. Agent crash recovery runs through Blackstar's scheduled worker.");
   });
