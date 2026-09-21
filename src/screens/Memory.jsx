@@ -25,6 +25,7 @@ import {
   removeMemories,
   removeKnowledgeDocument,
   editMemory,
+  retainReviewedAgentMemory,
   listMemories,
   pruneMemory,
   reindexMemory,
@@ -279,6 +280,34 @@ export default function Memory() {
     }
   };
 
+  const handleRetain = async (entry) => {
+    if (!entry?.reviewedVersion) {
+      toast({ title: 'Refresh memory first', description: 'A saved record version is required before review.', variant: 'destructive' });
+      return;
+    }
+    const confirmed = window.confirm(
+      'Review the memory text and its source before keeping it for longer.\\n\\n' +
+      'Title: ' + (entry.title || 'Untitled memory') + '\\n' +
+      'Content: ' + String(entry.content || '').slice(0, 800) +
+      (String(entry.content || '').length > 800 ? '\\n[Text shortened in this confirmation; review the whole card before continuing.]' : '') +
+      '\\n\\nContinue? This keeps the same agent and privacy scope, applies your long-term retention settings, and does NOT independently verify the memory is factual.'
+    );
+    if (!confirmed) return;
+    try {
+      const result = await retainReviewedAgentMemory({ data: {
+        id: entry.id,
+        expectedUpdatedAt: entry.reviewedVersion,
+        reviewed: true,
+      } });
+      toast({ title: 'Memory retained after your review', description: result.expires_at ? 'Long-term retention follows your configured expiry.' : 'This memory now follows your long-term retention settings.' });
+      pulseBrain();
+      await reload();
+    } catch (error) {
+      fail('Could not retain memory')(error);
+      await reload();
+    }
+  };
+
   const handleIndex = async (provider) => {
     setIndexing(true);
     try {
@@ -298,6 +327,7 @@ export default function Memory() {
     if (kind === 'pin') handlePin(entry);
     if (kind === 'delete') handleDelete(entry);
     if (kind === 'edit') setEditEntry(entry);
+    if (kind === 'retain') handleRetain(entry);
     if (kind === 'index') setIndexEntry(entry);
   };
 
