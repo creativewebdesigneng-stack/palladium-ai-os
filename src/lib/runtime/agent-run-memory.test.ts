@@ -12,7 +12,7 @@ vi.mock('@/lib/memory/memory.server', () => ({
 }));
 import { captureCompletedAgentRunMemory } from './agent-run-memory.server';
 
-const sb = { from: vi.fn() };
+const sb = { from: vi.fn(), rpc: vi.fn() };
 const run = {
   sb,
   userId: 'operator-1',
