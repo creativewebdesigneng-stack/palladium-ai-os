@@ -1,4 +1,4 @@
-import { Pin, Pencil, Trash2, Database, FileText } from 'lucide-react';
+import { Pin, Pencil, Trash2, Database, FileText, BookmarkCheck } from 'lucide-react';
 import { IMPORTANCE_STYLE, CATEGORY_LABELS, VECTOR_STATUS_STYLE } from './memoryData';
 import { typeMeta, scopeMeta, createdLabel, relTime } from './normalizeMemory';
 
@@ -48,6 +48,11 @@ export default function MemoryCard({ entry, onAction }) {
         <ActionBtn icon={Database} label="Index" onClick={() => onAction(entry, 'index')} />
         <ActionBtn icon={Trash2} label="Delete" danger onClick={() => onAction(entry, 'delete')} />
       </div>
+      {entry.memory_type === 'short_term' && (
+        <button type="button" onClick={() => onAction(entry, 'retain')} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-violet-400/25 bg-violet-400/[.08] px-3 py-2 text-[11px] font-medium text-violet-200 hover:bg-violet-400/[.13]">
+          <BookmarkCheck className="h-3.5 w-3.5" />Review and keep as long-term memory
+        </button>
+      )}
     </div>
   );
 }
