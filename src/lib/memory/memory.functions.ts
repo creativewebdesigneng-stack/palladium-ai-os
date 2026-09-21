@@ -4,6 +4,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { retrieveGovernedAgentMemory } from "./agent-memory-context.server";
+import { promoteReviewedShortTermMemory } from "./reviewed-memory.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   deleteDocument,
@@ -112,6 +113,29 @@ export const editMemory = createServerFn({ method: "POST" })
           patch: data.patch as never,
         }),
       };
+    } catch (error) {
+      surface(error);
+    }
+  });
+
+/** Explicit, owner-reviewed retention; this never makes a private memory shared. */
+export const retainReviewedAgentMemory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string; expectedUpdatedAt: string; reviewed: boolean }) => ({
+    id: asString(input?.id),
+    expectedUpdatedAt: asString(input?.expectedUpdatedAt),
+    reviewed: input?.reviewed === true,
+  }))
+  .handler(async ({ data, context }) => {
+    if (!data.id) throw new MemoryError("Select a memory to retain.");
+    try {
+      return await promoteReviewedShortTermMemory({
+        sb: context.supabase as unknown as Sb,
+        userId: context.userId,
+        id: data.id,
+        reviewed: data.reviewed,
+        expectedUpdatedAt: data.expectedUpdatedAt,
+      });
     } catch (error) {
       surface(error);
     }
