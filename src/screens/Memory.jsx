@@ -3,6 +3,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import MemoryToolbar from '@/components/memory/MemoryToolbar';
 import MemoryCard from '@/components/memory/MemoryCard';
 import MemorySettings from '@/components/memory/MemorySettings';
+import AgentRecallPreview from '@/components/memory/AgentRecallPreview';
 import MemoryGraph from '@/components/memory/MemoryGraph';
 import MemoryBrain from '@/components/memory/MemoryBrain';
 import VectorPanel from '@/components/memory/VectorPanel';
@@ -355,6 +356,8 @@ export default function Memory() {
           <DocumentVault documents={documents} onDelete={handleDeleteDocument} onError={fail('Could not open document')} />
           <MemorySettings preferences={prefs} onSave={savePrefs} saving={savingPrefs} disabled={session !== 'yes'} />
         </div>
+
+        {session === 'yes' && <AgentRecallPreview agents={agents} disabled={loading} />}
 
         <div className="mt-8"><VectorPanel /></div>
         <div className="mt-8"><MemoryGraph entries={entries} /></div>
