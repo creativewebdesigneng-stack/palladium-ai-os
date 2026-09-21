@@ -50,4 +50,4 @@ The separate [operator verification queue](blackstar-user-verification-queue.md)
 
 - 2026-09-22: latest verified production merge `dd041e14` READY; initial ledger reconciled from current main, 20 open PRs, existing completion contracts and the active memory schema. This is **not** an end-to-end certification of every area.
 - 2026-09-22: read-only active production database check found zero saved agent memories, zero memory documents/chunks, and zero installed agent skills. E01 and E04 remain owner-data/workspace-acceptance dependent; do not claim their live recall or skill selection is verified.
-- E02: current main still contains legacy `reap_stale_agent_tasks` browser-triggered RPC and treats task-read failure as empty history. Repair is being implemented on the branch that adds this ledger.
+- E02 initial audit (baseline `dd041e14`): the user-triggered legacy `reap_stale_agent_tasks` RPC was still present and task read failures appeared as empty history. The linked recovery patch retires that endpoint and handles read errors explicitly. Confirm matching production SHA and real-run acceptance before closing E02.
