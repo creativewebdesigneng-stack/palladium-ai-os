@@ -5,6 +5,8 @@ import { BellRing, CheckCircle2, MessageSquareText, PhoneCall, ShieldCheck, Smar
 import PageHeader from '@/components/palladium/PageHeader';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
+import { listProjects } from '@/lib/projects/project.functions';
+import { listCompanyWorkspaces } from '@/lib/company/company-workspaces.functions';
 import {
   beginCommunicationPhoneVerification,
   confirmCommunicationPhoneVerification,
@@ -56,6 +58,8 @@ export default function PhoneCommunications() {
   const pushFn = useServerFn(sendCommunicationPhonePush);
   const smsFn = useServerFn(sendCommunicationSms);
   const callFn = useServerFn(startCommunicationAiCall);
+  const listProjectsFn = useServerFn(listProjects);
+  const listCompaniesFn = useServerFn(listCompanyWorkspaces);
 
   const { data, isLoading, error } = useQuery({ queryKey: ['phone-communications'], queryFn: () => overviewFn({ data: {} }), retry: false });
   const [prefs, setPrefs] = useState(null);
@@ -68,6 +72,8 @@ export default function PhoneCommunications() {
   const [purpose, setPurpose] = useState('project_update');
   const [smsBody, setSmsBody] = useState('Blackstar update: your requested project status is ready to review.');
   const [callObjective, setCallObjective] = useState('Give me a concise update on my current projects, live agents, workflows and anything that needs my attention.');
+  const [callProjectId, setCallProjectId] = useState('');
+  const [callCompanyId, setCallCompanyId] = useState('');
   const [pushTitle, setPushTitle] = useState('Blackstar project update');
   const [pushBody, setPushBody] = useState('Your Blackstar workspace has an update ready to review.');
 
@@ -83,10 +89,20 @@ export default function PhoneCommunications() {
   const confirmVerify = useActionMutation({ mutationFn: () => confirmVerifyFn({ data: { recipient_id: selectedId, code: verifyCode } }), successTitle: 'Mobile number verified', onRefresh: refresh, onFailure: fail });
   const sendPush = useActionMutation({ mutationFn: () => pushFn({ data: { title: pushTitle, body: pushBody, purpose } }), successTitle: 'Phone notification sent', onRefresh: refresh, onFailure: fail });
   const sendSms = useActionMutation({ mutationFn: () => smsFn({ data: { recipient_id: selectedId, purpose, body: smsBody } }), successTitle: 'SMS accepted by provider', onRefresh: refresh, onFailure: fail });
-  const startCall = useActionMutation({ mutationFn: () => callFn({ data: { recipient_id: selectedId, purpose, objective: callObjective } }), successTitle: 'Blackstar AI call started', onRefresh: refresh, onFailure: fail });
+  const startCall = useActionMutation({ mutationFn: () => callFn({ data: {
+    recipient_id: selectedId, purpose, objective: callObjective,
+    project_id: callProjectId || undefined,
+    company_workspace_id: callCompanyId || undefined,
+  } }), successTitle: 'Blackstar AI call started', onRefresh: refresh, onFailure: fail });
 
   const selected = useMemo(() => data?.recipients?.find((r) => r.id === selectedId), [data?.recipients, selectedId]);
   const caps = data?.capabilities ?? {};
+  // Selection is opt-in and sends IDs only; owned records are reloaded and
+  // authorised on the server before their bounded summary enters a call.
+  const projectsQuery = useQuery({ queryKey: ['phone-owned-projects'], queryFn: () => listProjectsFn({ data: { orgId: null, includeArchived: false } }), retry: false });
+  const companiesQuery = useQuery({ queryKey: ['phone-owned-companies'], queryFn: () => listCompaniesFn({ data: {} }), retry: false });
+  const projects = projectsQuery.data?.projects ?? [];
+  const companies = companiesQuery.data ?? [];
 
   if (isLoading || !prefs) return <div className="space-y-4"><div className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" /><div className="h-80 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" /></div>;
   if (error) return <div className="rounded-2xl border border-rose-400/25 bg-rose-500/[.06] p-5 text-sm text-rose-100">{friendlyMessage(error)}</div>;
@@ -134,7 +150,25 @@ export default function PhoneCommunications() {
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <div className="rounded-xl border border-white/10 bg-black/10 p-4"><p className="flex items-center gap-2 text-sm font-medium text-white"><BellRing className="h-4 w-4 text-violet-300" />Phone push</p><input value={pushTitle} onChange={(e) => setPushTitle(e.target.value)} className="mt-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" /><textarea value={pushBody} onChange={(e) => setPushBody(e.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" /><button disabled={sendPush.isPending || !data.phone_push_endpoints?.length} onClick={() => sendPush.mutate()} className="mt-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">Send push</button></div>
           <div className="rounded-xl border border-white/10 bg-black/10 p-4"><p className="flex items-center gap-2 text-sm font-medium text-white"><MessageSquareText className="h-4 w-4 text-violet-300" />SMS</p><textarea value={smsBody} onChange={(e) => setSmsBody(e.target.value)} rows={5} className="mt-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" /><button disabled={sendSms.isPending || !selected?.verified_at || !selected?.sms_consent_at || !caps.sms} onClick={() => sendSms.mutate()} className="mt-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">Send SMS</button></div>
-          <div className="rounded-xl border border-white/10 bg-black/10 p-4"><p className="flex items-center gap-2 text-sm font-medium text-white"><Volume2 className="h-4 w-4 text-violet-300" />Blackstar AI call</p><textarea value={callObjective} onChange={(e) => setCallObjective(e.target.value)} rows={5} className="mt-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" /><button disabled={startCall.isPending || !selected?.verified_at || !selected?.voice_consent_at || !caps.ai_voice_calls} onClick={() => startCall.mutate()} className="mt-2 rounded-lg bg-fuchsia-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">Call my phone</button></div>
+          <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+            <p className="flex items-center gap-2 text-sm font-medium text-white"><Volume2 className="h-4 w-4 text-violet-300" />Blackstar AI call</p>
+            <textarea aria-label="AI call objective" value={callObjective} onChange={(e) => setCallObjective(e.target.value)} maxLength={2000} rows={5} className="mt-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" />
+            <p className="mt-2 text-[11px] leading-5 text-zinc-400">Optional: select an owned personal project or company for a short, read-only context brief on this call. Your original objective and Blackstar's existing general workspace context may also be discussed. Do not select sensitive information you do not want spoken aloud.</p>
+            <label className="mt-3 block text-xs text-zinc-300">Project for this call
+              <select value={callProjectId} onChange={(e) => setCallProjectId(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white">
+                <option value="">No specific project</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </label>
+            <label className="mt-3 block text-xs text-zinc-300">Company workspace for this call
+              <select value={callCompanyId} onChange={(e) => setCallCompanyId(e.target.value)} className="mt-1 block w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white">
+                <option value="">No specific company</option>
+                {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+              </select>
+            </label>
+            {(projectsQuery.error || companiesQuery.error) && <p role="alert" className="mt-2 text-xs text-rose-300">Some owned records could not be listed. You can still call without selecting them.</p>}
+            <button disabled={startCall.isPending || !selected?.verified_at || !selected?.voice_consent_at || !caps.ai_voice_calls || !callObjective.trim() || (callObjective.trim().length > 1750 && (!!callProjectId || !!callCompanyId))} onClick={() => startCall.mutate()} className="mt-3 rounded-lg bg-fuchsia-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">Call my phone</button>
+          </div>
         </div>
       </section>
 
