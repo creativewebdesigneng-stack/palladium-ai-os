@@ -67,6 +67,8 @@ export const startAiCallSchema = z.object({
   recipient_id: z.string().uuid(),
   purpose: communicationPurposeSchema,
   objective: z.string().trim().min(1).max(2000),
+  project_id: z.string().uuid().optional(),
+  company_workspace_id: z.string().uuid().optional(),
   source_type: z.string().trim().max(80).optional(),
   source_id: z.string().trim().max(160).optional(),
 });
