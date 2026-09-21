@@ -50,6 +50,31 @@ describe('governed agent memory and knowledge context', () => {
     expect(allowedAgentContextMemory(short, context, prefs, Date.now())).toBe(true);
   });
 
+  it('recalls agent-private workspace run memory without switching on organisation sharing', () => {
+    const disabledSharing = { ...prefs, organisation_sharing_enabled: false };
+    const privateRun: AgentContextMemoryRow = {
+      ...base, id: 'private-workspace-run', memory_type: 'short_term',
+      scope: 'agent', agent_id: 'agent-A', org_id: 'org-A',
+    };
+    expect(allowedAgentContextMemory(privateRun, context, disabledSharing, Date.now())).toBe(true);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'another-agent', agent_id: 'agent-B' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'other-workspace', org_id: 'org-B' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'shared-record', scope: 'shared', agent_id: null },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'shared-document', kind: 'document', agent_id: null, memory_type: 'knowledge' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+  });
+
   it('deduplicates pinned/recent/semantic results and includes traceable document provenance', () => {
     const doc: AgentContextMemoryRow = { ...base, id: 'chunk-one', kind: 'document', document_id: 'document-one', memory_type: 'knowledge', title: 'Reference note', source: 'uploaded document' };
     const result = buildAgentMemoryContext({
