@@ -1,3 +1,5 @@
+import CompanyResourceCenter from '@/components/company/CompanyResourceCenter';
+import CompanyCommandIntelligence from '@/components/company/CompanyCommandIntelligence';
 import CompanyPlaybooks from '@/components/company/CompanyPlaybooks';
 import CompanyGrowthLab from '@/components/company/CompanyGrowthLab';
 import CompanyAIWorkforceBlueprint from '@/components/company/CompanyAIWorkforceBlueprint';
@@ -107,9 +109,11 @@ export default function CompanyHub(){
   <CompanyTransformationRoadmap />
   <CompanyAIWorkforceOrchestrator />
   <CompanyHealthAssessment />
+  <CompanyCommandIntelligence />
   <CompanyGrowthLab />
   <CompanyAIWorkforceBlueprint />
   <CompanyPlaybooks />
+  <CompanyResourceCenter />
   <CompanyWorkspace />
 
   <section className="grid gap-4 lg:grid-cols-3">
