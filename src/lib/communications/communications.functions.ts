@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { writeAudit } from '@/lib/platform/audit.server';
+import { resolveSelectedCallContext } from './call-context.server';
 import {
   communicationPreferencesSchema,
   DEFAULT_COMMUNICATION_PREFERENCES,
@@ -223,6 +224,13 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
     if (!recipient.verified_at) throw new Error('Verify this phone number before Blackstar starts an AI call.');
     if (!recipient.voice_consent_at) throw new Error('AI voice-call consent is required for this phone number.');
     await assertDailyLimit(context.userId, 'voice', prefs.max_daily_calls);
+    const selectedContext = await resolveSelectedCallContext({
+      sb: admin,
+      userId: context.userId,
+      objective: data.objective,
+      projectId: data.project_id,
+      companyWorkspaceId: data.company_workspace_id,
+    });
 
     const eventResult = await admin.from('communication_events').insert({
       user_id: context.userId,
@@ -231,10 +239,10 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
       purpose: data.purpose,
       source_type: data.source_type ?? 'user',
       source_id: data.source_id ?? null,
-      call_objective: data.objective,
+      call_objective: selectedContext.objective,
       status: 'queued',
       provider: 'twilio',
-      metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true },
+      metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true, selected_project_id: selectedContext.projectId, selected_company_workspace_id: selectedContext.companyWorkspaceId },
     }).select('*').single();
     if (eventResult.error || !eventResult.data) throw new Error(eventResult.error?.message || 'Call event could not be created.');
     const event = eventResult.data;
@@ -244,7 +252,7 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
       user_id: context.userId,
       provider: 'twilio',
       status: 'queued',
-      call_objective: data.objective,
+      call_objective: selectedContext.objective,
       retain_transcript: prefs.retain_call_transcript,
       history: [],
     }).select('*').single();
@@ -259,7 +267,7 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
       const now = new Date().toISOString();
       await Promise.all([
         admin.from('communication_call_sessions').update({ provider_call_sid: provider.sid, status: 'queued', updated_at: now }).eq('id', session.id).is('provider_call_sid', null),
-        admin.from('communication_events').update({ provider_id: provider.sid, status: 'queued', updated_at: now, metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true, provider_status: provider.status } }).eq('id', event.id),
+        admin.from('communication_events').update({ provider_id: provider.sid, status: 'queued', updated_at: now, metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true, provider_status: provider.status, selected_project_id: selectedContext.projectId, selected_company_workspace_id: selectedContext.companyWorkspaceId } }).eq('id', event.id),
       ]);
       await writeAudit({ userId: context.userId, action: 'communications.ai_call_started', targetType: 'communication_event', targetId: event.id, status: 'success', metadata: { purpose: data.purpose, provider: 'twilio' } });
       return { event_id: event.id, session_id: session.id, status: provider.status };
