@@ -30,7 +30,7 @@ export type WebsiteBlockInstance = {
   html: string;
 };
 type BlockSpan = WebsiteBlockInstance & { full: string; start: number; end: number };
-const BLOCK_PATTERN = /<!-- BLACKSTAR_BLOCK_START id="([a-zA-Z0-9_-]+)" type="([a-zA-Z0-9_-]+)" -->\\n?([\\s\\S]*?)\\n?<!-- BLACKSTAR_BLOCK_END -->/g;
+const BLOCK_PATTERN = /<!-- BLACKSTAR_BLOCK_START id="([a-zA-Z0-9_-]+)" type="([a-zA-Z0-9_-]+)" -->\n?([\s\S]*?)\n?<!-- BLACKSTAR_BLOCK_END -->/g;
 let instanceSequence = 0;
 function newWebsiteBlockId(blockId: string): string {
   instanceSequence += 1;
@@ -38,7 +38,7 @@ function newWebsiteBlockId(blockId: string): string {
   return `${blockId}-${id}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0,80);
 }
 function markedBlock(blockId: string, instanceId: string, body: string): string {
-  return `<!-- BLACKSTAR_BLOCK_START id="${instanceId}" type="${blockId}" -->\\n${body}\\n<!-- BLACKSTAR_BLOCK_END -->`;
+  return `<!-- BLACKSTAR_BLOCK_START id="${instanceId}" type="${blockId}" -->\n${body}\n<!-- BLACKSTAR_BLOCK_END -->`;
 }
 export function createWebsiteBlockMarkup(blockId: string, instanceId = newWebsiteBlockId(blockId)): string {
   const block = WEBSITE_BLOCKS.find((item) => item.id === blockId);
@@ -98,5 +98,5 @@ export function duplicateWebsiteBlock(html: string, instanceId: string): string 
   }
   if (source.includes(`id="${duplicateId}"`)) return source;
   const copy = markedBlock(target.blockId, duplicateId, target.html);
-  return source.slice(0, target.end) + '\\n' + copy + source.slice(target.end);
+  return source.slice(0, target.end) + '\n' + copy + source.slice(target.end);
 }
