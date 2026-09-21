@@ -31,13 +31,13 @@ export async function retrieveGovernedAgentMemory(args: {
 
   const readOwn = async (pinned: boolean): Promise<AgentContextMemoryRow[]> => {
     let q = args.sb.from('agent_memories')
-      .select('id,title,content,source,memory_type,scope,category,agent_id,org_id,expires_at,pinned')
+      .select('id,title,content,source,memory_type,scope,category,agent_id,org_id,expires_at,pinned,updated_at')
       .eq('user_id', args.userId);
     if (pinned) q = q.eq('pinned', true);
     else q = q.eq('memory_type', 'short_term');
     const { data, error } = await q.order('updated_at', { ascending: false }).limit(pinned ? 40 : 60);
     if (error) throw new Error('Could not load authorised agent memory.');
-    return (data ?? []).map((row: Omit<AgentContextMemoryRow, 'kind'>) => ({ ...row, kind: 'memory' as const }));
+    return (data ?? []).map((row: Omit<AgentContextMemoryRow, 'kind'> & { updated_at: string | null }) => ({ ...row, recorded_at: row.updated_at, kind: 'memory' as const }));
   };
 
   const [recalled, pinned, recent] = await Promise.all([
@@ -52,6 +52,7 @@ export async function retrieveGovernedAgentMemory(args: {
       content: hit.content,
       title: hit.title ?? null,
       source: hit.source,
+      recorded_at: hit.recorded_at ?? null,
       memory_type: hit.memory_type ?? (hit.kind === 'document' ? 'knowledge' : 'long_term'),
       scope: hit.scope ?? 'private',
       agent_id: hit.agent_id,
