@@ -15,8 +15,8 @@ export async function resolveSelectedCallContext(args: {
   sb: Sb;
   userId: string;
   objective: string;
-  projectId?: string;
-  companyWorkspaceId?: string;
+  projectId?: string | undefined;
+  companyWorkspaceId?: string | undefined;
 }) {
   const projectRequest = args.projectId
     ? args.sb.from('projects')
