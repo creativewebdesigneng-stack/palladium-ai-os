@@ -11,9 +11,8 @@
  */
 import { isProviderConfigured } from "@/lib/ai/ai-preferences.server";
 import { writeAudit } from "@/lib/platform/audit.server";
-import { storeMemory } from "@/lib/memory/memory.server";
+import { captureCompletedAgentRunMemory } from "./agent-run-memory.server";
 import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
-import { loadMemoryPreferences } from "@/lib/memory/preferences.server";
 import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
   assertWithinLimit,
@@ -433,47 +432,19 @@ export async function completeRun(args: {
     .update({ last_run_at: new Date().toISOString() })
     .eq("id", run.agent.id);
 
-  if (run.agent.memory_enabled !== false && result.text) {
-    const request = String(run.messages[run.messages.length - 1]?.content ?? "").slice(0, 300);
-    const memoryPrefs = await loadMemoryPreferences(args.sb as never, args.userId).catch(
-      () => null,
-    );
-    const mayCapture = memoryPrefs
-      ? memoryPrefs.auto_capture && memoryPrefs.short_term_enabled
-      : true;
-    await Promise.all([
-      storeMemory({
-        sb: args.sb as never,
-        userId: args.userId,
-        input: {
-          content: `Task: ${request}\nOutcome: ${result.text.slice(0, 1500)}`,
-          memory_type: "short_term",
-          category: "task",
-          scope: "agent",
-          title: `${run.agent.name} run`,
-          source: "agent_runtime",
-          agent_id: run.agent.id,
-          task_id: run.taskId,
-          org_id: run.orgId,
-          metadata: { provider: run.provider, model: run.model },
-          automatic: true,
-        },
-      }).catch((error: unknown) =>
-        console.error("[runtime] short-term memory write failed", error),
-      ),
-      mayCapture &&
-        args.sb.from("personal_memories").insert({
-          user_id: args.userId,
-          org_id: run.orgId,
-          agent_id: run.agent.id,
-          category: "run_history",
-          key: `run:${new Date().toISOString().slice(0, 19)}`,
-          value: `Task: ${request}\nOutcome: ${result.text.slice(0, 600)}`,
-          scope: "personal",
-          metadata: { task_id: run.taskId, agent: run.agent.name },
-        }),
-    ]);
-  }
+  // Keep task completion independent of memory availability, but never
+  // treat a missing privacy setting as consent or bypass canonical sanitisation.
+  await captureCompletedAgentRunMemory({
+    sb: args.sb as never,
+    userId: args.userId,
+    agent: run.agent,
+    orgId: run.orgId,
+    taskId: run.taskId,
+    request: String(run.messages[run.messages.length - 1]?.content ?? ""),
+    outcome: result.text,
+    provider: run.provider,
+    model: run.model,
+  }).catch((error: unknown) => console.error("[runtime] authorised run memory capture unavailable", error));
 
   await Promise.all([
     recordUsage({

@@ -46,8 +46,35 @@ describe('governed agent memory and knowledge context', () => {
     const disabled = { ...prefs, long_term_enabled: false, short_term_enabled: false, document_memory_enabled: false, organisation_sharing_enabled: false };
     expect([base, org, doc, short].every((row) => !allowedAgentContextMemory(row, context, disabled, Date.now()))).toBe(true);
     expect(allowedAgentContextMemory(org, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
-    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A' }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
+    // An agent-restricted document within this workspace is not automatically shared.
+    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A' }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(true);
+    expect(allowedAgentContextMemory({ ...doc, org_id: 'org-A', agent_id: null }, context, { ...prefs, organisation_sharing_enabled: false }, Date.now())).toBe(false);
     expect(allowedAgentContextMemory(short, context, prefs, Date.now())).toBe(true);
+  });
+
+  it('recalls agent-private workspace run memory without switching on organisation sharing', () => {
+    const disabledSharing = { ...prefs, organisation_sharing_enabled: false };
+    const privateRun: AgentContextMemoryRow = {
+      ...base, id: 'private-workspace-run', memory_type: 'short_term',
+      scope: 'agent', agent_id: 'agent-A', org_id: 'org-A',
+    };
+    expect(allowedAgentContextMemory(privateRun, context, disabledSharing, Date.now())).toBe(true);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'another-agent', agent_id: 'agent-B' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'other-workspace', org_id: 'org-B' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'shared-record', scope: 'shared', agent_id: null },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
+    expect(allowedAgentContextMemory(
+      { ...privateRun, id: 'shared-document', kind: 'document', agent_id: null, memory_type: 'knowledge' },
+      context, disabledSharing, Date.now(),
+    )).toBe(false);
   });
 
   it('deduplicates pinned/recent/semantic results and includes traceable document provenance', () => {

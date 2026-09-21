@@ -33,9 +33,14 @@ export function allowedAgentContextMemory(row: AgentContextMemoryRow, context: M
     const expires = Date.parse(row.expires_at);
     if (!Number.isFinite(expires) || expires <= now) return false;
   }
-  if (row.scope === 'organisation' || row.scope === 'shared' || row.memory_type === 'organisation' || row.org_id) {
-    if (!preferences.organisation_sharing_enabled || !context.orgId) return false;
-  }
+  // An org_id is a tenancy boundary, NOT proof that an agent-private record
+  // was shared with the whole organisation. Require sharing opt-in for actual
+  // organisation-scoped memories and shared document knowledge, not for a
+  // private agent's short-term run history in an organisation workspace.
+  const shared = row.scope === 'organisation' || row.scope === 'shared'
+    || row.memory_type === 'organisation'
+    || (row.kind === 'document' && Boolean(row.org_id) && !row.agent_id);
+  if (shared && (!preferences.organisation_sharing_enabled || !context.orgId)) return false;
   if (row.kind === 'document' || row.memory_type === 'knowledge') return preferences.document_memory_enabled;
   if (row.memory_type === 'short_term') return preferences.short_term_enabled;
   if (row.memory_type === 'organisation' || row.scope === 'organisation' || row.scope === 'shared') return preferences.organisation_sharing_enabled;
