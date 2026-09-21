@@ -27,6 +27,7 @@ import WebsiteSeoPanel from '@/components/website-studio/WebsiteSeoPanel';
 import WebsitePageDocuments from '@/components/website-studio/WebsitePageDocuments';
 import WebsiteNavigationBuilder from '@/components/website-studio/WebsiteNavigationBuilder';
 import WebsiteFooterBuilder from '@/components/website-studio/WebsiteFooterBuilder';
+import WebsiteComponentManager from '@/components/website-studio/WebsiteComponentManager';
 import { resolvePageHtml, setPageHtml } from '@/lib/website-studio/website-page-documents';
 import { normalizePagePath, normalizeWebsitePageSet } from '@/lib/website-studio/website-pages';
 import { generateWebsiteIteration } from '@/lib/website-studio/website-ai.functions';
@@ -68,6 +69,14 @@ export default function WebsiteStudio(){
 
   const preview=useMemo(()=>documentForPreview(draft,previewPagePath),[draft,previewPagePath]);
   const quality=useMemo(()=>assessWebsiteQuality(draft.html||'',draft.css||''),[draft.html,draft.css]);
+  const managedPath=normalizePagePath(previewPagePath);
+  const managedPage=(draft.pages||[]).find(page=>normalizePagePath(page?.path||'/')===managedPath);
+  const managedHtml=managedPath==='/' ? draft.html||'' : managedPage ? resolvePageHtml(draft.name||'Website',draft.html||'',managedPage) : '';
+  const setManagedHtml=(html)=>setDraft((current)=>{
+    if(managedPath==='/')return {...current,html};
+    const hasPage=(current.pages||[]).some(page=>normalizePagePath(page?.path||'/')===managedPath);
+    return hasPage ? {...current,pages:setPageHtml(current.pages||[],managedPath,html)} : current;
+  });
 
   const applyTemplate=(templateId)=>{if(!draft.name.trim())return setError('Give the website a project name first.');const site=createWebsiteFromTemplate(templateId,draft.name);setDraft({...blank,...site,design_tokens:site.designTokens,app_config:site.appConfig,status:'draft'});setPreviewPagePath('/');setNotice('Template applied. Review the generated structure, then save or refine it with AI.');setError('')};
 
@@ -176,6 +185,7 @@ export default function WebsiteStudio(){
 
         <WebsitePageManager pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
         <WebsitePageDocuments name={draft.name||'Website'} pages={draft.pages||[]} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} setPages={(pages)=>setDraft({...draft,pages})} activePath={previewPagePath} setActivePath={setPreviewPagePath}/>
+        <WebsiteComponentManager html={managedHtml} setHtml={setManagedHtml} pagePath={managedPath}/>
         <WebsiteNavigationBuilder name={draft.name||'Website'} pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})} homeHtml={draft.html||''} setHomeHtml={(html)=>setDraft({...draft,html})} css={draft.css||''} setCss={(css)=>setDraft({...draft,css})}/>
         <WebsiteFooterBuilder project={draft} setProject={setDraft}/>
         <WebsiteSectionCanvas pages={draft.pages||[]} setPages={(pages)=>setDraft({...draft,pages})}/>
