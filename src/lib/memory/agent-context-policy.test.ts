@@ -75,6 +75,22 @@ describe('governed agent memory and knowledge context', () => {
     expect(result.longTerm.some((row) => row.includes('memory:current-task-evidence'))).toBe(true);
   });
 
+  it('shows owner-validated source dates without presenting future or invalid timestamps as history', () => {
+    const now = Date.parse('2026-09-21T12:00:00Z');
+    const rows: AgentContextMemoryRow[] = [
+      { ...base, id: 'dated-memory', recorded_at: '2026-08-01T09:30:00Z' },
+      { ...base, id: 'undated-memory', recorded_at: 'nonsense' },
+      { ...base, id: 'future-memory', recorded_at: '2027-01-01T09:30:00Z' },
+      { ...base, id: 'dated-document', kind: 'document', document_id: 'doc-1', memory_type: 'knowledge', recorded_at: '2026-06-10T11:00:00Z' },
+    ];
+    const result = buildAgentMemoryContext({ recalled: rows, pinned: [], recent: [], context, preferences: prefs, now });
+    expect(result.longTerm.find((line) => line.includes('memory:dated-memory'))).toContain('recorded: 2026-08-01');
+    expect(result.longTerm.find((line) => line.includes('memory:undated-memory'))).not.toContain('recorded:');
+    expect(result.longTerm.find((line) => line.includes('memory:future-memory'))).not.toContain('recorded:');
+    expect(result.documents[0]).toContain('recorded: 2026-06-10');
+    expect(renderGovernedAgentMemoryPrompt(result)).toContain('not whether it remains true today');
+  });
+
   it('bounds the injected memory budget while preserving the newest pinned item first', () => {
     const pinned = { ...base, id: 'important', content: 'Pinned operator decision.' };
     const entries = Array.from({ length: 100 }, (_, index) => ({ ...base, id: 'candidate-' + index, content: 'x'.repeat(1500) }));
