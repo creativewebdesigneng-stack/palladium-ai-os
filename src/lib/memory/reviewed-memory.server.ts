@@ -31,8 +31,12 @@ export async function promoteReviewedShortTermMemory(args: {
   userId: string;
   id: string;
   reviewed: boolean;
+  expectedUpdatedAt: string;
 }) {
   if (!args.reviewed) throw new MemoryError('Review the memory and confirm that you wish to keep it for longer.');
+  if (!args.expectedUpdatedAt || !Number.isFinite(Date.parse(args.expectedUpdatedAt))) {
+    throw new MemoryError('Refresh the memory before reviewing it.');
+  }
   const preferences = await loadMemoryPreferences(args.sb, args.userId);
   if (!preferences.long_term_enabled) {
     throw new MemoryError('Enable long-term memory in Memory settings before retaining this record.');
@@ -45,7 +49,7 @@ export async function promoteReviewedShortTermMemory(args: {
     .maybeSingle();
   if (readError) throw new MemoryError('Could not review that memory. Try again.');
   const candidate = row as ReviewCandidate | null;
-  if (!candidate || candidate.memory_type !== 'short_term') {
+  if (!candidate || candidate.updated_at !== args.expectedUpdatedAt || candidate.memory_type !== 'short_term') {
     throw new MemoryError('The selected short-term memory is unavailable or has changed.');
   }
   // Explicit organisation sharing has its own approval controls. Reviewing an
