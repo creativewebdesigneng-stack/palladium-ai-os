@@ -17,6 +17,7 @@ type MemoryAuthorityRow = {
   agent_id: string | null
   org_id: string | null
   expires_at: string | null
+  updated_at: string | null
   title: string | null
   content: string
 }
@@ -29,7 +30,7 @@ type DocumentAuthorityRow = {
   metadata: Record<string, unknown> | null
 }
 
-type DocumentChunkRow = { id: string; document_id: string; content: string }
+type DocumentChunkRow = { id: string; document_id: string; content: string; created_at: string | null }
 
 type GovernedMemoryHit = MemorySearchHit & MemoryFabricCandidate & {
   source: string | null
@@ -76,7 +77,7 @@ export async function recallMemoryFabric(args: {
     memoryIds.length
       ? args.sb
           .from('agent_memories')
-          .select('id,scope,memory_type,source,agent_id,org_id,expires_at,title,content')
+          .select('id,scope,memory_type,source,agent_id,org_id,expires_at,updated_at,title,content')
           .eq('user_id', args.userId)
           .in('id', memoryIds)
           .then((result: any) => { if (result.error) throw new Error('Could not verify memory access.'); return result.data ?? [] })
@@ -92,7 +93,7 @@ export async function recallMemoryFabric(args: {
     chunkIds.length
       ? args.sb
           .from('memory_chunks')
-          .select('id,document_id,content')
+          .select('id,document_id,content,created_at')
           .eq('user_id', args.userId)
           .in('id', chunkIds)
           .then((result: any) => { if (result.error) throw new Error('Could not verify knowledge chunk access.'); return result.data ?? [] })
@@ -121,6 +122,7 @@ export async function recallMemoryFabric(args: {
         ...hit,
         content: authority.content,
         title: authority.title,
+        recorded_at: authority.updated_at,
         ...(scope === undefined ? {} : { scope }),
         ...(memoryType === undefined ? {} : { memory_type: memoryType }),
         source: authority.source,
@@ -139,6 +141,7 @@ export async function recallMemoryFabric(args: {
     governed.push({
       ...hit,
       content: chunk.content,
+      recorded_at: chunk.created_at,
       source,
       agent_id: authority.agent_id,
       org_id: authority.org_id,
