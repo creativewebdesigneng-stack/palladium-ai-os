@@ -1,7 +1,7 @@
 import { storeMemory } from '@/lib/memory/memory.server';
 import { loadMemoryPreferences } from '@/lib/memory/preferences.server';
 
-type Sb = { from: (table: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
+type Sb = { from: (table: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
 /**
  * Automatic agent-run memory is written only through the canonical, expiring,
