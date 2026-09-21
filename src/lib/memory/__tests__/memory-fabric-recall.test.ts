@@ -109,6 +109,20 @@ describe('recallMemoryFabric', () => {
     }
   })
 
+  it('takes timestamp and content from the owner-checked source, not vector-search metadata', async () => {
+    searchMemory.mockResolvedValue([
+      { id: 'owned', kind: 'memory', content: 'Unverified index content', similarity: 0.9, recorded_at: '2026-09-21T00:00:00Z' },
+      { id: 'chunk-1', kind: 'document', document_id: 'doc-1', content: 'Unverified index chunk', similarity: 0.8, recorded_at: '2026-09-21T00:00:00Z' },
+    ])
+    const found = await recallMemoryFabric({ sb: sb({
+      agent_memories: [{ id: 'owned', user_id: 'user-1', content: 'Actual saved fact', updated_at: '2026-08-10T10:00:00Z', scope: 'private', memory_type: 'long_term', agent_id: null, org_id: null }],
+      memory_documents: [{ id: 'doc-1', user_id: 'user-1', title: 'Knowledge', metadata: {}, agent_id: null, org_id: null }],
+      memory_chunks: [{ id: 'chunk-1', user_id: 'user-1', document_id: 'doc-1', content: 'Actual source passage', created_at: '2026-08-11T11:00:00Z' }],
+    }), userId: 'user-1', query: 'knowledge', context: { agentId: null, orgId: null } })
+    expect(found.find((hit) => hit.id === 'owned')).toMatchObject({ content: 'Actual saved fact', recorded_at: '2026-08-10T10:00:00Z' })
+    expect(found.find((hit) => hit.id === 'chunk-1')).toMatchObject({ content: 'Actual source passage', recorded_at: '2026-08-11T11:00:00Z' })
+  })
+
   it('checks document organisation metadata before returning knowledge', async () => {
     searchMemory.mockResolvedValue([
       { id: 'chunk-1', kind: 'document', document_id: 'doc-1', content: 'policy', similarity: 0.8 },
