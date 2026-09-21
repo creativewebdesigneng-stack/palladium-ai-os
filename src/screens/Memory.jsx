@@ -286,11 +286,11 @@ export default function Memory() {
       return;
     }
     const confirmed = window.confirm(
-      'Review the memory text and its source before keeping it for longer.\\n\\n' +
-      'Title: ' + (entry.title || 'Untitled memory') + '\\n' +
+      'Review the memory text and its source before keeping it for longer.\n\n' +
+      'Title: ' + (entry.title || 'Untitled memory') + '\n' +
       'Content: ' + String(entry.content || '').slice(0, 800) +
-      (String(entry.content || '').length > 800 ? '\\n[Text shortened in this confirmation; review the whole card before continuing.]' : '') +
-      '\\n\\nContinue? This keeps the same agent and privacy scope, applies your long-term retention settings, and does NOT independently verify the memory is factual.'
+      (String(entry.content || '').length > 800 ? '\n[Text shortened in this confirmation; review the whole card before continuing.]' : '') +
+      '\n\nContinue? This keeps the same agent and privacy scope, applies your long-term retention settings, and does NOT independently verify the memory is factual.'
     );
     if (!confirmed) return;
     try {
