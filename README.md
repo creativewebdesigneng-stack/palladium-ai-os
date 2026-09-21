@@ -616,3 +616,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Blackstar completion and operator verification
+
+The current Blackstar programme uses two **separate** tracked checklists: [Engineering completion ledger](docs/blackstar-completion-ledger.md) for implementation, automated tests, deployment and operational acceptance; and [Operator verification queue](docs/blackstar-user-verification-queue.md) for only those checks requiring the owner's account, actual device, external provider consent or qualified sign-off. A deployed screen or merged PR is not, by itself, evidence that the full platform is 100% operational.
