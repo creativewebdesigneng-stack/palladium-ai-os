@@ -73,7 +73,7 @@ export const getAgentRuntime = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(25),
     ]);
-    const snapshot = resolveAgentRuntimeSnapshot(agentResult, taskResult);
+    const snapshot = resolveAgentRuntimeSnapshot<any, any>(agentResult, taskResult);
     return { ...snapshot, availableTools: TOOL_SLUGS };
   });
 
