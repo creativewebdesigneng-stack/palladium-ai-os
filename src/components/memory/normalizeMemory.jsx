@@ -39,6 +39,8 @@ export function normalizeMemory(m, agents = []) {
     similarity: typeof m.similarity === 'number' ? m.similarity : null,
     created: m.created_at || m.created_date,
     lastUsed: m.last_used_at || m.last_used_date || m.updated_at || m.updated_date,
+    reviewedVersion: m.updated_at || '',
+    expires_at: m.expires_at || null,
     _backend: true,
   };
 }
