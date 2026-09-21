@@ -166,21 +166,27 @@ export const searchMemories = createServerFn({ method: "POST" })
 /** retrieveRelevantMemory — the exact block the runtime injects before execution. */
 export const previewAgentMemory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { query: string; agent_id?: string }) => ({
-    query: asString(input?.query),
-    agent_id: asId(input?.agent_id),
-  }))
+  .inputValidator((input: { query: string; agent_id?: string }) => {
+    const query = asString(input?.query).trim();
+    if (query.length < 3 || query.length > 500) throw new MemoryError("Enter a memory recall question between 3 and 500 characters.");
+    return { query, agent_id: asId(input?.agent_id) };
+  })
   .handler(async ({ data, context }) => {
     try {
       const sb = context.supabase as unknown as Sb;
       let orgId: string | null = null;
       if (data.agent_id) {
         const { data: agent, error } = await sb.from("personal_agents")
-          .select("id,org_id,org_id_fk")
+          .select("id,org_id,org_id_fk,memory_enabled")
           .eq("id", data.agent_id)
           .eq("user_id", context.userId)
           .maybeSingle();
         if (error || !agent) throw new MemoryError("That agent is not available to you.");
+        // Match the actual agent runtime: no recall occurs for memory-disabled agents.
+        if (agent.memory_enabled === false) return {
+          shortTerm: [], longTerm: [], organisation: [], documents: [],
+          memoryDisabled: true,
+        };
         orgId = agent.org_id_fk ?? agent.org_id ?? null;
       }
       return await retrieveGovernedAgentMemory({
