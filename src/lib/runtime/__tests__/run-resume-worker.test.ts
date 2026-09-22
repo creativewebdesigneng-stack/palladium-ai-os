@@ -101,7 +101,7 @@ function db(checkpointState: unknown = checkpoint) {
       category: "reasoning",
       requires_approval: false,
     }],
-    agent_tasks: [{ id: "task-1", status: "running", checkpoint_state: checkpointState }],
+    agent_tasks: [{ id: "task-1", user_id: "user-1", status: "running", cancel_requested: false, resume_lease_token: "lease-1", checkpoint_state: checkpointState }],
   }) as any;
 }
 
@@ -121,7 +121,7 @@ describe("durable run resume worker", () => {
 
     await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("resumed");
 
-    expect(runtime.setState).toHaveBeenCalledWith(sb, "task-1", "running");
+    expect(sb.tables.agent_tasks[0].status).toBe("running");
     expect(planner.execute).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user-1",
       resumeCheckpoint: checkpoint,
@@ -186,7 +186,7 @@ describe("durable run resume worker", () => {
 
     await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("failed");
 
-    expect(runtime.setState).not.toHaveBeenCalled();
+    expect(sb.tables.agent_tasks[0].status).toBe("failed");
     expect(planner.execute).not.toHaveBeenCalled();
     expect(sb.tables.agent_tasks[0].status).toBe("failed");
     expect(resume.release).toHaveBeenCalledWith(expect.objectContaining({
@@ -206,6 +206,50 @@ describe("durable run resume worker", () => {
     expect(runtime.fail).not.toHaveBeenCalled();
     expect(sb.tables.agent_tasks[0].status).toBe("failed");
     expect(resume.release).toHaveBeenCalledWith(expect.objectContaining({ leaseToken: "lease-1" }));
+  });
+
+  it("does not resurrect a task cancelled after the resume claim", async () => {
+    const sb = db();
+    sb.tables.agent_tasks[0].status = "cancelled";
+    sb.tables.agent_tasks[0].cancel_requested = true;
+    resume.claim.mockResolvedValue(claim());
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("none");
+
+    expect(sb.tables.agent_tasks[0].status).toBe("cancelled");
+    expect(planner.execute).not.toHaveBeenCalled();
+    expect(checkpointMod.invalidate).not.toHaveBeenCalled();
+    expect(runtime.fail).not.toHaveBeenCalled();
+    expect(resume.release).toHaveBeenCalledWith({
+      sb, taskId: "task-1", leaseToken: "lease-1",
+    });
+  });
+
+  it("does not dispatch a claimed task after its lease has been replaced", async () => {
+    const sb = db();
+    sb.tables.agent_tasks[0].resume_lease_token = "lease-2";
+    resume.claim.mockResolvedValue(claim());
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("none");
+
+    expect(sb.tables.agent_tasks[0].status).toBe("running");
+    expect(planner.execute).not.toHaveBeenCalled();
+    expect(runtime.fail).not.toHaveBeenCalled();
+    expect(resume.release).toHaveBeenCalledWith({
+      sb, taskId: "task-1", leaseToken: "lease-1",
+    });
+  });
+
+  it("never dispatches a claimed task when its owner changed before activation", async () => {
+    const sb = db();
+    sb.tables.agent_tasks[0].user_id = "user-2";
+    resume.claim.mockResolvedValue(claim());
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("none");
+
+    expect(planner.execute).not.toHaveBeenCalled();
+    expect(runtime.fail).not.toHaveBeenCalled();
+    expect(sb.tables.agent_tasks[0].status).toBe("running");
   });
 
   it("fails closed when the checkpoint disappeared during tool execution", async () => {
