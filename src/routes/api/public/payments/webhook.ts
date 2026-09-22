@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
 import { planForPriceKey } from "@/lib/billing/catalog";
+import { preparePaidMarketplaceDelivery, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -251,11 +252,57 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         }
         break;
       }
-      if (session.metadata?.kind === "marketplace_purchase" && session.payment_status === "paid" && session.metadata?.order_id) {
-        const { data: order } = await getSupabase().from("marketplace_orders").update({ status: "paid", paid_at: new Date().toISOString(), stripe_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null }).eq("id", session.metadata.order_id).eq("stripe_checkout_session_id", session.id).select("id,listing_id,buyer_id,seller_id").single();
-        if (order) {
-          const { data: listing } = await getSupabase().from("marketplace_listings").select("delivery_type,delivery_reference,delivery_instructions").eq("id", order.listing_id).single();
-          if (listing) await getSupabase().from("marketplace_deliveries").upsert({ order_id: order.id, seller_id: order.seller_id, buyer_id: order.buyer_id, delivery_type: listing.delivery_type, delivery_reference: listing.delivery_reference, instructions: listing.delivery_instructions, status: "delivered", delivered_at: new Date().toISOString() }, { onConflict: "order_id" });
+      if (session.metadata?.kind === "marketplace_purchase") {
+        // Asynchronous methods can complete Checkout before the payment is
+        // actually paid. A completed session alone never means delivery.
+        if (session.payment_status !== "paid") break;
+        if (!session.metadata?.order_id || !session.metadata?.buyer_id || !session.metadata?.seller_id) {
+          throw new Error("Paid marketplace session lacks an authoritative order reference.");
+        }
+        const db = getSupabase();
+        const { data: order, error: orderReadError } = await db
+          .from("marketplace_orders")
+          .select("id,listing_id,buyer_id,seller_id,sale_price_pence,currency,status,stripe_payment_intent_id")
+          .eq("id", session.metadata.order_id)
+          .eq("stripe_checkout_session_id", session.id)
+          .eq("buyer_id", session.metadata.buyer_id)
+          .eq("seller_id", session.metadata.seller_id)
+          .maybeSingle();
+        if (orderReadError || !order) throw new Error("Paid session does not match a recorded marketplace order.");
+        verifyMarketplacePaidPurchase(session, order, env);
+        // Never revert a refunded, disputed, cancelled or already fulfilled
+        // order to 'paid' merely because a duplicate payment event arrived.
+        if (!["pending", "paid"].includes(order.status)) break;
+        const paymentIntentId = typeof session.payment_intent === "string"
+          ? session.payment_intent : session.payment_intent?.id;
+        if (typeof paymentIntentId !== "string" || !paymentIntentId.startsWith("pi_")) {
+          throw new Error("Paid marketplace session lacks a verified payment intent reference.");
+        }
+        if (order.status === "pending") {
+          const { data: paid, error: paidError } = await db
+            .from("marketplace_orders")
+            .update({
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              stripe_payment_intent_id: paymentIntentId,
+            })
+            .eq("id", order.id).eq("stripe_checkout_session_id", session.id).eq("status", "pending")
+            .select("id").maybeSingle();
+          if (paidError || !paid) throw new Error("Could not record the verified marketplace payment.");
+        }
+        const { data: existingDelivery, error: deliveryReadError } = await db
+          .from("marketplace_deliveries").select("id,status").eq("order_id", order.id).maybeSingle();
+        if (deliveryReadError) throw new Error("Could not check the marketplace delivery ledger.");
+        if (!existingDelivery) {
+          const { data: listing, error: listingError } = await db
+            .from("marketplace_listings").select("delivery_type")
+            .eq("id", order.listing_id).eq("seller_id", order.seller_id).maybeSingle();
+          if (listingError || !listing) throw new Error("Paid order has no valid listing delivery configuration.");
+          const { error: deliveryError } = await db
+            .from("marketplace_deliveries").insert(preparePaidMarketplaceDelivery(order, listing));
+          if (deliveryError && deliveryError.code !== "23505") {
+            throw new Error("Could not record the pending marketplace delivery.");
+          }
         }
         break;
       }
