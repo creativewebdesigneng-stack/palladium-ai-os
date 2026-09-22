@@ -29,6 +29,12 @@ Applied via the connected Supabase migration workflow. Supabase assigns its own 
 - Repository Construction API modules reference the expected table families. The public `/construction-industrial-hub` route responds with HTTP 200, but this unauthenticated page response does **not** establish signed-in CRUD, live industry data or safe engineering advice.
 - Supabase Security Advisor reported no construction-table findings immediately after applying these migrations. Other existing project-wide warnings are tracked separately.
 
+## Relational integrity and index hardening — separate follow-up
+
+The next additive migration `20260922001000_construction_relational_owner_scope.sql` is designed to close two **engineering-owned** schema gaps found in the active database: (a) single-column parent foreign keys permit a child row to reference an owned record in a different workspace or another owner's workspace, and (b) the Performance Advisor identified 51 unindexed construction foreign keys, consisting of 24 `user_id` FKs plus 27 construction-to-construction FKs.
+
+This migration proposes 8 scoped unique parent indexes, 52 additional composite, deferred owner/workspace FKs, and 51 missing child covering indexes. It retains the original deletion constraints and all current RLS/privileges. A separate rolled-back temporary-table check established that deferred composite references coexist with original `ON DELETE CASCADE` and `ON DELETE SET NULL` behaviours. **A proposed SQL file or green CI does not establish that the production migration has been applied**; record exact production migration status and subsequent catalog/advisor results separately after execution.
+
 ## Still on the engineering list, not owner verification
 
 - Supabase Performance Advisor identified **51 unindexed construction foreign keys**. Indexing is an additive engineering optimisation to design, test and review against actual query patterns; do not remove fresh indexes merely because unused-index lints appear on an empty new schema. [Advisor guidance](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
