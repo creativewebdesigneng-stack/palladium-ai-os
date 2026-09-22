@@ -74,9 +74,12 @@ describe('Marketplace provider payment and fulfilment truth', () => {
     expect(fee).toContain('if (paymentReadError || !payment)');
     expect(fee).toContain('verifyMarketplacePaidListingFee(session, payment, listingId, sellerId, env)');
     expect(fee.indexOf('verifyMarketplacePaidListingFee(')).toBeLessThan(fee.indexOf('.update({ status: "paid"'));
-    expect(fee).toContain('if (paymentWriteError) throw');
-    expect(fee).toContain('if (listingWriteError) throw');
+    expect(fee).toContain('if (paymentWriteError || !markedPayment) throw');
+    expect(fee).toContain('if (listingWriteError || !marked) throw');
     expect(fee).toContain('if (moderationError) throw');
+    expect(fee).toContain('if (payment.status === "paid" && listing.listing_fee_paid_at &&');
+    expect(fee).toContain('if (!priorCase)');
+    expect(fee.indexOf('if (!priorCase)')).toBeLessThan(fee.indexOf('.update({ status: "paid"'));
   });
 
   it('keeps the signed webhook on the paid-ledger/pending-delivery path, never auto-delivering on payment', () => {
