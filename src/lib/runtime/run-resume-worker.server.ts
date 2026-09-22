@@ -3,7 +3,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   failRun,
   RuntimeError,
-  setRunState,
   type Agent,
   type PreparedRun,
 } from "./runtime.server";
@@ -92,6 +91,26 @@ async function prepareClaimedRun(sb: Sb, claim: ClaimedRunResume): Promise<Prepa
   };
 }
 
+/**
+ * Only the current owner-scoped lease may transition an active, uncancelled task
+ * back to running. An operator can cancel between the SQL claim and agent reload.
+ * A conditional update prevents the worker from resurrecting that task.
+ */
+async function activateClaimedRun(sb: Sb, claim: ClaimedRunResume): Promise<boolean> {
+  const { data, error } = await sb
+    .from("agent_tasks")
+    .update({ status: "running", heartbeat_at: new Date().toISOString() })
+    .eq("id", claim.taskId)
+    .eq("user_id", claim.userId)
+    .eq("resume_lease_token", claim.leaseToken)
+    .eq("cancel_requested", false)
+    .in("status", ["queued", "running"])
+    .select("id")
+    .maybeSingle();
+  if (error) throw new RuntimeError("Could not confirm the resumed task is still active.", "RESUME_ACTIVATION_FAILED", 500);
+  return Boolean(data);
+}
+
 async function currentCheckpoint(sb: Sb, taskId: string): Promise<unknown> {
   const { data } = await sb
     .from("agent_tasks")
@@ -118,7 +137,12 @@ export async function resumeOneStaleAgentRun(args: {
   try {
     run = await prepareClaimedRun(sb, claim);
     const reasoningControl = reasoningControlForResumedAstraRun(run);
-    await setRunState(sb, claim.taskId, "running");
+    if (!(await activateClaimedRun(sb, claim))) {
+      // Cancellation, termination or lease replacement happened after claiming.
+      // Do not run the model or mark the already-changed task as failed.
+      await releaseRunResumeLease({ sb, taskId: claim.taskId, leaseToken: claim.leaseToken });
+      return "none";
+    }
     await executePlannedRun({
       sb,
       userId: claim.userId,
@@ -157,7 +181,11 @@ export async function resumeOneStaleAgentRun(args: {
           completed_at: new Date().toISOString(),
           heartbeat_at: new Date().toISOString(),
         })
-        .eq("id", claim.taskId);
+        .eq("id", claim.taskId)
+        .eq("user_id", claim.userId)
+        .eq("resume_lease_token", claim.leaseToken)
+        .eq("cancel_requested", false)
+        .in("status", ["queued", "running"]);
     }
     await releaseRunResumeLease({
       sb,
