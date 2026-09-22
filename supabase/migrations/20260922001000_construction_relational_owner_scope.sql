@@ -14,6 +14,31 @@ create unique index if not exists c_construction_parent_scope_uq_06 on public.co
 create unique index if not exists c_construction_parent_scope_uq_07 on public.construction_work_packages (id, workspace_id, user_id);
 create unique index if not exists c_construction_parent_scope_uq_08 on public.construction_workspaces (id, user_id);
 
+create index if not exists c_construction_owner_idx_01 on public.construction_agent_actions (user_id);
+create index if not exists c_construction_owner_idx_02 on public.construction_agent_runs (user_id);
+create index if not exists c_construction_owner_idx_03 on public.construction_asset_health (user_id);
+create index if not exists c_construction_owner_idx_04 on public.construction_asset_telemetry (user_id);
+create index if not exists c_construction_owner_idx_05 on public.construction_assets (user_id);
+create index if not exists c_construction_owner_idx_06 on public.construction_changes (user_id);
+create index if not exists c_construction_owner_idx_07 on public.construction_documents (user_id);
+create index if not exists c_construction_owner_idx_08 on public.construction_estimate_items (user_id);
+create index if not exists c_construction_owner_idx_09 on public.construction_field_records (user_id);
+create index if not exists c_construction_owner_idx_10 on public.construction_inspection_actions (user_id);
+create index if not exists c_construction_owner_idx_11 on public.construction_inspections (user_id);
+create index if not exists c_construction_owner_idx_12 on public.construction_issues (user_id);
+create index if not exists c_construction_owner_idx_13 on public.construction_maintenance (user_id);
+create index if not exists c_construction_owner_idx_14 on public.construction_materials (user_id);
+create index if not exists c_construction_owner_idx_15 on public.construction_partners (user_id);
+create index if not exists c_construction_owner_idx_16 on public.construction_progress_evidence (user_id);
+create index if not exists c_construction_owner_idx_17 on public.construction_projects (user_id);
+create index if not exists c_construction_owner_idx_18 on public.construction_reliability_events (user_id);
+create index if not exists c_construction_owner_idx_19 on public.construction_reports (user_id);
+create index if not exists c_construction_owner_idx_20 on public.construction_schedule_tasks (user_id);
+create index if not exists c_construction_owner_idx_21 on public.construction_tenders (user_id);
+create index if not exists c_construction_owner_idx_22 on public.construction_work_packages (user_id);
+create index if not exists c_construction_owner_idx_23 on public.construction_workforce (user_id);
+create index if not exists c_construction_owner_idx_24 on public.construction_workspaces (user_id);
+
 alter table public.construction_agent_actions add constraint c_construction_scope_fk_001 foreign key (run_id, workspace_id, user_id) references public.construction_agent_runs (id, workspace_id, user_id) deferrable initially deferred;
 create index if not exists c_construction_scope_idx_001 on public.construction_agent_actions (run_id, workspace_id, user_id);
 alter table public.construction_agent_actions add constraint c_construction_scope_fk_002 foreign key (workspace_id, user_id) references public.construction_workspaces (id, user_id) deferrable initially deferred;
