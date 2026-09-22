@@ -13,6 +13,9 @@ export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
     if(error||!l)throw new Error('Listing not found or unavailable to this seller.');
     const amount= requireUnpaidListingFee(l);
     const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
+    // Generated Supabase table types lag behind the already-applied Marketplace
+    // migration; this narrow server-only adapter preserves runtime grants.
+    const admin=supabaseAdmin as unknown as Sb;
     const stripe=marketplaceStripe(),base=marketplaceBaseUrl();
     const session=await requireRecordedStripeSession({
       create:()=>stripe.checkout.sessions.create({
@@ -23,7 +26,7 @@ export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
         metadata:{kind:'marketplace_listing_fee',listing_id:l.id,seller_id:context.userId},
       }),
       record:async(created)=>{
-        const {error:ledgerError}=await supabaseAdmin.from('marketplace_listing_fee_payments').insert({
+        const {error:ledgerError}=await admin.from('marketplace_listing_fee_payments').insert({
           listing_id:l.id,seller_id:context.userId,amount_pence:MARKETPLACE_LISTING_FEE_PENCE,
           currency:'GBP',status:'pending',payment_provider:'stripe',
           provider_payment_id:created.id,stripe_checkout_session_id:created.id,
@@ -56,9 +59,12 @@ export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
     const connected=await stripe.accounts.retrieve(seller.stripe_connected_account_id);
     if(!connected.charges_enabled||!connected.payouts_enabled)throw new Error('Seller payout provider is not ready.');
     const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
+    // Generated Supabase table types lag behind the already-applied Marketplace
+    // migration; this narrow server-only adapter preserves runtime grants.
+    const admin=supabaseAdmin as unknown as Sb;
     // The payment ledger is created before a payable session exists. The
     // user-scoped Supabase role intentionally has no INSERT/UPDATE grant here.
-    const {data:order,error:oe}=await supabaseAdmin.from('marketplace_orders').insert({
+    const {data:order,error:oe}=await admin.from('marketplace_orders').insert({
       listing_id:l.id,buyer_id:context.userId,seller_id:l.seller_id,
       sale_price_pence:l.price_pence,platform_fee_bps:quote.rateBps,
       platform_fee_pence:quote.feePence,seller_net_pence:quote.sellerNetPence,
@@ -79,7 +85,7 @@ export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
           metadata:{kind:'marketplace_purchase',order_id:order.id,listing_id:l.id,buyer_id:context.userId,seller_id:l.seller_id},
         }),
         record:async(created)=>{
-          const {data:linked,error:linkError}=await supabaseAdmin.from('marketplace_orders')
+          const {data:linked,error:linkError}=await admin.from('marketplace_orders')
             .update({stripe_checkout_session_id:created.id,provider_payment_id:created.id})
             .eq('id',order.id).eq('buyer_id',context.userId).eq('seller_id',l.seller_id).eq('status','pending')
             .select('id').maybeSingle();
@@ -91,7 +97,7 @@ export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
     }catch(checkoutError){
       // Never call this a paid or fulfilled order. A failed/unknown provider
       // outcome is surfaced to the operator and still needs reconciliation.
-      const {error:cancelError}=await supabaseAdmin.from('marketplace_orders')
+      const {error:cancelError}=await admin.from('marketplace_orders')
         .update({status:'cancelled'}).eq('id',order.id).eq('buyer_id',context.userId).eq('status','pending');
       if(cancelError)console.error('[marketplace] Could not mark incomplete checkout as cancelled:',cancelError.message);
       throw checkoutError;
