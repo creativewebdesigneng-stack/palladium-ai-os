@@ -65,6 +65,7 @@ async function prepareClaimedRun(sb: Sb, claim: ClaimedRunResume): Promise<Prepa
     .from("personal_agents")
     .select("*")
     .eq("id", claim.agentId)
+    .eq("user_id", claim.userId)
     .maybeSingle();
   if (agentError || !agentRow) throw new RuntimeError("Could not reload the agent for resume.", "AGENT_LOAD_FAILED", 500);
 
