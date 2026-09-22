@@ -41,3 +41,36 @@ export function verifyMarketplacePaidPurchase(
     throw new Error('Payment session does not match the authorised marketplace order.');
   }
 }
+
+/**
+ * A signed Stripe event is not by itself proof that a particular £3 listing
+ * fee was settled. Bind the paid session to the existing pending/paid ledger,
+ * amount, currency and environment before changing any listing permissions.
+ */
+export function verifyMarketplacePaidListingFee(
+  session: { id?: string; payment_status?: string; amount_total?: number | null; currency?: string | null; livemode?: boolean },
+  payment: {
+    listing_id: string;
+    seller_id: string;
+    stripe_checkout_session_id: string | null;
+    amount_pence: number;
+    currency: string;
+    status: string;
+    payment_provider: string | null;
+  },
+  listingId: string,
+  sellerId: string,
+  environment: 'sandbox' | 'live',
+) {
+  if (!listingId || !sellerId ||
+    payment.listing_id !== listingId || payment.seller_id !== sellerId ||
+    !session.id || session.id !== payment.stripe_checkout_session_id ||
+    session.payment_status !== 'paid' ||
+    session.amount_total !== 300 || payment.amount_pence !== 300 ||
+    session.currency?.toLowerCase() !== 'gbp' || payment.currency !== 'GBP' ||
+    session.livemode !== (environment === 'live') ||
+    payment.payment_provider !== 'stripe' ||
+    !['pending', 'paid'].includes(payment.status)) {
+    throw new Error('Paid listing fee does not match its authorised Marketplace payment ledger.');
+  }
+}

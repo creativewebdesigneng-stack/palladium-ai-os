@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
 import { planForPriceKey } from "@/lib/billing/catalog";
-import { preparePaidMarketplaceDelivery, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
+import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -242,13 +242,72 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as any;
-      if (session.metadata?.kind === "marketplace_listing_fee" && session.payment_status === "paid") {
+      if (session.metadata?.kind === "marketplace_listing_fee") {
+        // A completed-but-unpaid Checkout session must never publish a listing.
+        if (session.payment_status !== "paid") break;
         const listingId = session.metadata?.listing_id;
         const sellerId = session.metadata?.seller_id;
-        if (listingId && sellerId) {
-          await getSupabase().from("marketplace_listing_fee_payments").update({ status: "paid", paid_at: new Date().toISOString(), provider_payment_id: session.id }).eq("stripe_checkout_session_id", session.id).eq("seller_id", sellerId);
-          await getSupabase().from("marketplace_listings").update({ listing_fee_paid_at: new Date().toISOString(), status: "pending_review", updated_at: new Date().toISOString() }).eq("id", listingId).eq("seller_id", sellerId);
-          await getSupabase().from("marketplace_moderation_cases").insert({ listing_id: listingId, seller_id: sellerId, status: "pending" });
+        if (!listingId || !sellerId) {
+          throw new Error("Paid listing fee session has no authorised listing and seller references.");
+        }
+        const db = getSupabase();
+        const { data: payment, error: paymentReadError } = await db
+          .from("marketplace_listing_fee_payments")
+          .select("listing_id,seller_id,stripe_checkout_session_id,amount_pence,currency,status,payment_provider")
+          .eq("stripe_checkout_session_id", session.id)
+          .eq("listing_id", listingId)
+          .eq("seller_id", sellerId)
+          .maybeSingle();
+        if (paymentReadError || !payment) {
+          throw new Error("Paid listing fee session has no matching Marketplace payment ledger.");
+        }
+        verifyMarketplacePaidListingFee(session, payment, listingId, sellerId, env);
+
+        // A previously reviewed/published listing must not be pushed back into
+        // moderation by a delayed or duplicate Checkout event.
+        const { data: listing, error: listingReadError } = await db
+          .from("marketplace_listings")
+          .select("id,status,listing_fee_paid_at")
+          .eq("id", listingId).eq("seller_id", sellerId).maybeSingle();
+        if (listingReadError || !listing) throw new Error("Paid fee has no matching seller-owned listing.");
+        if (payment.status === "paid" && listing.listing_fee_paid_at &&
+          ["published", "unlisted", "sold"].includes(listing.status)) break;
+        if (!["draft", "listing_fee_due", "rejected", "pending_review"].includes(listing.status)) {
+          throw new Error("Paid listing fee cannot change the listing's current review state.");
+        }
+        if (!listing.listing_fee_paid_at) {
+          const { data: marked, error: listingWriteError } = await db
+            .from("marketplace_listings")
+            .update({ listing_fee_paid_at: new Date().toISOString(), status: "pending_review", updated_at: new Date().toISOString() })
+            .eq("id", listingId).eq("seller_id", sellerId)
+            .is("listing_fee_paid_at", null)
+            .in("status", ["draft", "listing_fee_due", "rejected", "pending_review"])
+            .select("id").maybeSingle();
+          if (listingWriteError || !marked) throw new Error("Could not update the paid listing's review status.");
+        }
+        // A retried event may follow a successful moderation insertion but a
+        // failed payment-ledger update. Do not create another case on replay.
+        const { data: priorCase, error: moderationReadError } = await db
+          .from("marketplace_moderation_cases")
+          .select("id").eq("listing_id", listingId).eq("seller_id", sellerId)
+          .limit(1).maybeSingle();
+        if (moderationReadError) throw new Error("Could not inspect the listing moderation queue.");
+        if (!priorCase) {
+          const { error: moderationError } = await db
+            .from("marketplace_moderation_cases")
+            .insert({ listing_id: listingId, seller_id: sellerId, status: "pending" });
+          if (moderationError) throw new Error("Could not queue the paid listing for moderation.");
+        }
+        // Record fee settlement last; a partial processing failure can be
+        // retried without resetting the listing or creating a new review case.
+        if (payment.status === "pending") {
+          const { data: markedPayment, error: paymentWriteError } = await db
+            .from("marketplace_listing_fee_payments")
+            .update({ status: "paid", paid_at: new Date().toISOString(), provider_payment_id: session.id })
+            .eq("stripe_checkout_session_id", session.id)
+            .eq("listing_id", listingId).eq("seller_id", sellerId)
+            .eq("status", "pending").select("id").maybeSingle();
+          if (paymentWriteError || !markedPayment) throw new Error("Could not record the verified listing fee payment.");
         }
         break;
       }
