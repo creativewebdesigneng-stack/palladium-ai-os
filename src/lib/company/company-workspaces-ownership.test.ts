@@ -19,7 +19,7 @@ import { deleteCompanyWorkspace, listCompanyWorkspaces, saveCompanyWorkspace } f
 const owner = 'user-one';
 const workspaceId = '88888888-8888-4888-8888-888888888888';
 
-function mockDatabase(mode: 'list' | 'update' | 'delete', data: unknown, error: unknown = null) {
+function mockDatabase(data: unknown, error: unknown = null) {
   const eq = vi.fn((_column: string, _value: unknown) => query);
   const query: Record<string, any> = {
     select: vi.fn(() => query),
@@ -35,14 +35,14 @@ function mockDatabase(mode: 'list' | 'update' | 'delete', data: unknown, error: 
 
 describe('owner-scoped Company Hub workspace operations', () => {
   it('lists only the authenticated owner’s records', async () => {
-    const { sb, eq } = mockDatabase('list', [{ id: workspaceId }]);
+    const { sb, eq } = mockDatabase([{ id: workspaceId }]);
     const result = await (listCompanyWorkspaces as any)({ context: { userId: owner, supabase: sb }, data: {} });
     expect(result).toEqual([{ id: workspaceId }]);
     expect(eq).toHaveBeenCalledWith('user_id', owner);
   });
 
   it('scopes edits to both the exact workspace and authenticated owner', async () => {
-    const { sb, eq, query } = mockDatabase('update', { id: workspaceId, name: 'Company A' });
+    const { sb, eq, query } = mockDatabase({ id: workspaceId, name: 'Company A' });
     const result = await (saveCompanyWorkspace as any)({
       context: { userId: owner, supabase: sb }, data: { id: workspaceId, name: 'Company A' },
     });
@@ -53,7 +53,7 @@ describe('owner-scoped Company Hub workspace operations', () => {
   });
 
   it('does not report success for a workspace outside the caller’s scope', async () => {
-    const { sb, eq, query } = mockDatabase('delete', null);
+    const { sb, eq, query } = mockDatabase(null);
     await expect((deleteCompanyWorkspace as any)({
       context: { userId: owner, supabase: sb }, data: { id: workspaceId },
     })).rejects.toThrow('not found or you do not have access');
@@ -63,12 +63,12 @@ describe('owner-scoped Company Hub workspace operations', () => {
   });
 
   it('reports a confirmed owner-scoped deletion as success and propagates database errors', async () => {
-    const success = mockDatabase('delete', { id: workspaceId });
+    const success = mockDatabase({ id: workspaceId });
     await expect((deleteCompanyWorkspace as any)({
       context: { userId: owner, supabase: success.sb }, data: { id: workspaceId },
     })).resolves.toEqual({ ok: true });
 
-    const failure = mockDatabase('delete', null, { message: 'Database unavailable' });
+    const failure = mockDatabase(null, { message: 'Database unavailable' });
     await expect((deleteCompanyWorkspace as any)({
       context: { userId: owner, supabase: failure.sb }, data: { id: workspaceId },
     })).rejects.toThrow('Database unavailable');
