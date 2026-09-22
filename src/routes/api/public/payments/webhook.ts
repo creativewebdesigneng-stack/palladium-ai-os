@@ -263,28 +263,52 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         }
         verifyMarketplacePaidListingFee(session, payment, listingId, sellerId, env);
 
-        // Do not silently acknowledge a paid webhook when any ledger update
-        // failed. The existing webhook retry/deduplication path still requires
-        // separate reconciliation before financial lifecycle certification.
-        const { error: paymentWriteError } = await db
-          .from("marketplace_listing_fee_payments")
-          .update({ status: "paid", paid_at: new Date().toISOString(), provider_payment_id: session.id })
-          .eq("stripe_checkout_session_id", session.id)
-          .eq("listing_id", listingId)
-          .eq("seller_id", sellerId)
-          .in("status", ["pending", "paid"]);
-        if (paymentWriteError) throw new Error("Could not record the verified listing fee payment.");
-        const { error: listingWriteError } = await db
+        // A previously reviewed/published listing must not be pushed back into
+        // moderation by a delayed or duplicate Checkout event.
+        const { data: listing, error: listingReadError } = await db
           .from("marketplace_listings")
-          .update({ listing_fee_paid_at: new Date().toISOString(), status: "pending_review", updated_at: new Date().toISOString() })
-          .eq("id", listingId)
-          .eq("seller_id", sellerId)
-          .in("status", ["draft", "listing_fee_due", "rejected", "pending_review"]);
-        if (listingWriteError) throw new Error("Could not update the paid listing's review status.");
-        const { error: moderationError } = await db
+          .select("id,status,listing_fee_paid_at")
+          .eq("id", listingId).eq("seller_id", sellerId).maybeSingle();
+        if (listingReadError || !listing) throw new Error("Paid fee has no matching seller-owned listing.");
+        if (payment.status === "paid" && listing.listing_fee_paid_at &&
+          ["published", "unlisted", "sold"].includes(listing.status)) break;
+        if (!["draft", "listing_fee_due", "rejected", "pending_review"].includes(listing.status)) {
+          throw new Error("Paid listing fee cannot change the listing's current review state.");
+        }
+        if (!listing.listing_fee_paid_at) {
+          const { data: marked, error: listingWriteError } = await db
+            .from("marketplace_listings")
+            .update({ listing_fee_paid_at: new Date().toISOString(), status: "pending_review", updated_at: new Date().toISOString() })
+            .eq("id", listingId).eq("seller_id", sellerId)
+            .is("listing_fee_paid_at", null)
+            .in("status", ["draft", "listing_fee_due", "rejected", "pending_review"])
+            .select("id").maybeSingle();
+          if (listingWriteError || !marked) throw new Error("Could not update the paid listing's review status.");
+        }
+        // A retried event may follow a successful moderation insertion but a
+        // failed payment-ledger update. Do not create another case on replay.
+        const { data: priorCase, error: moderationReadError } = await db
           .from("marketplace_moderation_cases")
-          .insert({ listing_id: listingId, seller_id: sellerId, status: "pending" });
-        if (moderationError) throw new Error("Could not queue the paid listing for moderation.");
+          .select("id").eq("listing_id", listingId).eq("seller_id", sellerId)
+          .limit(1).maybeSingle();
+        if (moderationReadError) throw new Error("Could not inspect the listing moderation queue.");
+        if (!priorCase) {
+          const { error: moderationError } = await db
+            .from("marketplace_moderation_cases")
+            .insert({ listing_id: listingId, seller_id: sellerId, status: "pending" });
+          if (moderationError) throw new Error("Could not queue the paid listing for moderation.");
+        }
+        // Record fee settlement last; a partial processing failure can be
+        // retried without resetting the listing or creating a new review case.
+        if (payment.status === "pending") {
+          const { data: markedPayment, error: paymentWriteError } = await db
+            .from("marketplace_listing_fee_payments")
+            .update({ status: "paid", paid_at: new Date().toISOString(), provider_payment_id: session.id })
+            .eq("stripe_checkout_session_id", session.id)
+            .eq("listing_id", listingId).eq("seller_id", sellerId)
+            .eq("status", "pending").select("id").maybeSingle();
+          if (paymentWriteError || !markedPayment) throw new Error("Could not record the verified listing fee payment.");
+        }
         break;
       }
       if (session.metadata?.kind === "marketplace_purchase") {
