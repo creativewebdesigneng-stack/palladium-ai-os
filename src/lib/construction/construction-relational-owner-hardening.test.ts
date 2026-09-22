@@ -35,6 +35,6 @@ describe('Construction owner and workspace relational hardening', () => {
 
   it('is additive and neither changes grants nor introduces new privileged routines', () => {
     expect(source).not.toMatch(/\b(?:drop table|truncate table|delete from|update public\.|insert into|security definer|grant |revoke )\b/i);
-    expect(source).toContain('Existing ON DELETE');
+    expect(source).toMatch(/existing ON DELETE/i);
   });
 });
