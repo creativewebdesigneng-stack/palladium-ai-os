@@ -19,14 +19,14 @@ const workspace=z.object({
  notes:z.string().trim().max(12000).optional(),
 });
 export const listCompanyWorkspaces=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
- const sb=context.supabase as unknown as Sb; const {data,error}=await sb.from('company_workspaces').select('*').order('updated_at',{ascending:false}); if(error)throw new Error(error.message); return data??[];
+ const sb=context.supabase as unknown as Sb; const {data,error}=await sb.from('company_workspaces').select('*').eq('user_id',context.userId).order('updated_at',{ascending:false}); if(error)throw new Error(error.message); return data??[];
 });
 export const saveCompanyWorkspace=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>workspace.parse(v)).handler(async({data,context})=>{
  const sb=context.supabase as unknown as Sb;
  const row={name:data.name,industry:data.industry||null,stage:data.stage||null,geography:data.geography||null,mission:data.mission||null,company_context:data.company_context||null,objectives:data.objectives,priorities:data.priorities,risks:data.risks,department_plan:data.department_plan,ai_workforce_plan:data.ai_workforce_plan,notes:data.notes||null,updated_at:new Date().toISOString()};
- if(data.id){const {data:out,error}=await sb.from('company_workspaces').update(row).eq('id',data.id).select().single();if(error)throw new Error(error.message);return out;}
+ if(data.id){const {data:out,error}=await sb.from('company_workspaces').update(row).eq('id',data.id).eq('user_id',context.userId).select().single();if(error)throw new Error(error.message);return out;}
  const {data:out,error}=await sb.from('company_workspaces').insert({...row,user_id:context.userId}).select().single();if(error)throw new Error(error.message);return out;
 });
 export const deleteCompanyWorkspace=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v)).handler(async({data,context})=>{
- const sb=context.supabase as unknown as Sb; const {error}=await sb.from('company_workspaces').delete().eq('id',data.id); if(error)throw new Error(error.message); return {ok:true};
+ const sb=context.supabase as unknown as Sb; const {data:deleted,error}=await sb.from('company_workspaces').delete().eq('id',data.id).eq('user_id',context.userId).select('id').maybeSingle(); if(error)throw new Error(error.message); if(!deleted)throw new Error('Company workspace not found or you do not have access to it.'); return {ok:true};
 });
