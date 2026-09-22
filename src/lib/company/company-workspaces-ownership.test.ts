@@ -49,7 +49,7 @@ describe('owner-scoped Company Hub workspace operations', () => {
     expect(result).toMatchObject({ id: workspaceId });
     expect(eq).toHaveBeenCalledWith('id', workspaceId);
     expect(eq).toHaveBeenCalledWith('user_id', owner);
-    expect(query.update).toHaveBeenCalledOnce();
+    expect(query['update']).toHaveBeenCalledOnce();
   });
 
   it('does not report success for a workspace outside the caller’s scope', async () => {
@@ -59,7 +59,7 @@ describe('owner-scoped Company Hub workspace operations', () => {
     })).rejects.toThrow('not found or you do not have access');
     expect(eq).toHaveBeenCalledWith('id', workspaceId);
     expect(eq).toHaveBeenCalledWith('user_id', owner);
-    expect(query.select).toHaveBeenCalledWith('id');
+    expect(query['select']).toHaveBeenCalledWith('id');
   });
 
   it('reports a confirmed owner-scoped deletion as success and propagates database errors', async () => {
