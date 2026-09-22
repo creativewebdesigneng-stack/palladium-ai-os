@@ -179,6 +179,35 @@ describe("durable run resume worker", () => {
     }));
   });
 
+  it("refuses to resume when the persisted agent no longer belongs to the task owner", async () => {
+    const sb = db();
+    sb.tables.personal_agents[0].user_id = "user-2";
+    resume.claim.mockResolvedValue(claim());
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("failed");
+
+    expect(runtime.setState).not.toHaveBeenCalled();
+    expect(planner.execute).not.toHaveBeenCalled();
+    expect(sb.tables.agent_tasks[0].status).toBe("failed");
+    expect(resume.release).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: "task-1",
+      leaseToken: "lease-1",
+    }));
+  });
+
+  it("does not retry an archived agent or dispatch a model after a stale claim", async () => {
+    const sb = db();
+    sb.tables.personal_agents[0].status = "archived";
+    resume.claim.mockResolvedValue(claim());
+
+    await expect(resumeOneStaleAgentRun({ sb })).resolves.toBe("failed");
+
+    expect(planner.execute).not.toHaveBeenCalled();
+    expect(runtime.fail).not.toHaveBeenCalled();
+    expect(sb.tables.agent_tasks[0].status).toBe("failed");
+    expect(resume.release).toHaveBeenCalledWith(expect.objectContaining({ leaseToken: "lease-1" }));
+  });
+
   it("fails closed when the checkpoint disappeared during tool execution", async () => {
     const sb = db(null);
     resume.claim.mockResolvedValue(claim(1));

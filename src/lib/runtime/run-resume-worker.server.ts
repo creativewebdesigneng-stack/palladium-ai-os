@@ -55,7 +55,7 @@ export function shouldRetryResumedRun(args: {
   error: unknown;
   checkpoint: unknown;
 }): boolean {
-  if (args.error instanceof RuntimeError && args.error.code === "CANCELLED") return false;
+  if (args.error instanceof RuntimeError && ["CANCELLED", "AGENT_UNAVAILABLE", "AGENT_ARCHIVED"].includes(args.error.code)) return false;
   if (args.resumeCount >= MAX_RESUME_ATTEMPTS) return false;
   return parseDurableRunCheckpoint(args.checkpoint) !== null;
 }
@@ -65,8 +65,10 @@ async function prepareClaimedRun(sb: Sb, claim: ClaimedRunResume): Promise<Prepa
     .from("personal_agents")
     .select("*")
     .eq("id", claim.agentId)
+    .eq("user_id", claim.userId)
     .maybeSingle();
-  if (agentError || !agentRow) throw new RuntimeError("Could not reload the agent for resume.", "AGENT_LOAD_FAILED", 500);
+  if (agentError) throw new RuntimeError("Could not reload the agent for resume.", "AGENT_LOAD_FAILED", 500);
+  if (!agentRow) throw new RuntimeError("The agent is no longer accessible for resume.", "AGENT_UNAVAILABLE", 409);
 
   const agent = agentRow as Agent;
   if (agent.status === "archived") {
