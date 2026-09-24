@@ -44,3 +44,51 @@ export async function recordProcessedPaymentEvent(sb: Sb, event: PaymentEvent, e
   if (error.code === "23505" && await wasPaymentEventProcessed(sb, event, env)) return;
   throw new Error("Could not persist completed payment event for replay protection.");
 }
+
+/**
+ * Per-event database claim. The existing payment-event PK is the serialization
+ * point for simultaneous Stripe retries, including across Vercel instances.
+ * A busy delivery MUST return a retryable response instead of 2xx.
+ */
+export type PaymentEventClaim =
+  | { status: "acquired"; token: string }
+  | { status: "done" | "busy" };
+
+export async function claimPaymentEvent(
+  sb: Sb, event: PaymentEvent, env: StripeEnv,
+): Promise<PaymentEventClaim> {
+  const identity = eventIdentity(event, env);
+  const token = crypto.randomUUID();
+  const { data, error } = await (sb as Sb & { rpc: (name: string, args: Record<string, unknown>) => Promise<any> })
+    .rpc("blackstar_claim_payment_event", {
+      p_event_id: identity.id,
+      p_event_type: identity.event_type,
+      p_livemode: identity.livemode,
+      p_lease_token: token,
+      p_lease_seconds: 300,
+    });
+  if (error) throw new Error("Could not acquire a payment event processing lease.");
+  if (data === "acquired") return { status: "acquired", token };
+  if (data === "done" || data === "busy") return { status: data };
+  throw new Error("Payment event claim returned an invalid state.");
+}
+
+export async function completePaymentEvent(
+  sb: Sb, event: PaymentEvent, env: StripeEnv, token: string,
+): Promise<void> {
+  const { id } = eventIdentity(event, env);
+  const { data, error } = await (sb as Sb & { rpc: (name: string, args: Record<string, unknown>) => Promise<any> })
+    .rpc("blackstar_complete_payment_event", { p_event_id: id, p_lease_token: token });
+  if (error || data !== true) {
+    throw new Error("Could not complete the owned payment event lease.");
+  }
+}
+
+export async function releasePaymentEvent(
+  sb: Sb, event: PaymentEvent, env: StripeEnv, token: string,
+): Promise<void> {
+  const { id } = eventIdentity(event, env);
+  const { error } = await (sb as Sb & { rpc: (name: string, args: Record<string, unknown>) => Promise<any> })
+    .rpc("blackstar_release_payment_event", { p_event_id: id, p_lease_token: token });
+  if (error) throw new Error("Could not release the failed payment event lease.");
+}
