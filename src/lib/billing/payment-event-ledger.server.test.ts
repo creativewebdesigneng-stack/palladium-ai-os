@@ -72,9 +72,13 @@ describe("signed Stripe event ledger", () => {
   it("records successful handling after the switch and uses the installed ledger, not the absent billing claim table", () => {
     const route = readFileSync(new URL("../../routes/api/public/payments/webhook.ts", import.meta.url), "utf8");
     const handle = route.slice(route.indexOf("async function handleWebhook("), route.indexOf("export const Route ="));
-    expect(handle).toContain("await wasPaymentEventProcessed(db, event, env)");
-    expect(handle).toContain("await recordProcessedPaymentEvent(db, event, env)");
-    expect(handle.indexOf("await recordProcessedPaymentEvent(")).toBeGreaterThan(handle.indexOf("switch (event.type)"));
+    expect(handle).toContain("await claimPaymentEvent(db, event, env)");
+    expect(handle).toContain('if (claim.status === "busy") throw');
+    expect(handle).toContain("await completePaymentEvent(db, event, env, claim.token)");
+    expect(handle).toContain("if (!completed) await releasePaymentEvent(db, event, env, claim.token)");
+    expect(handle.indexOf("await completePaymentEvent(")).toBeGreaterThan(handle.indexOf("switch (event.type)"));
+    expect(handle).not.toContain("await wasPaymentEventProcessed(");
+    expect(handle).not.toContain("await recordProcessedPaymentEvent(");
     expect(handle).not.toContain("claimEvent(");
     expect(route).not.toContain("billing_webhook_events");
     expect(route).toContain('if (error) throw new Error("Failed to record the paid invoice usage.")');
