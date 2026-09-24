@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
 import { planForPriceKey } from "@/lib/billing/catalog";
-import { recordProcessedPaymentEvent, wasPaymentEventProcessed } from "@/lib/billing/payment-event-ledger.server";
+import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/lib/billing/payment-event-ledger.server";
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 
 let _supabase: any = null;
@@ -226,11 +226,15 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event: any = await verifyWebhook(req, env);
 
-  // The installed event ledger is service-role-only. Do not acknowledge a
-  // webhook as processed until all provider-event handler writes have succeeded.
+  // Atomic database claim serialises simultaneous Stripe deliveries for the
+  // same event ID across server instances. Busy events get a retryable 503.
   const db = getSupabase();
-  if (await wasPaymentEventProcessed(db, event, env)) return;
+  const claim = await claimPaymentEvent(db, event, env);
+  if (claim.status === "done") return;
+  if (claim.status === "busy") throw new Error("Payment event is being processed by another worker.");
 
+  let completed = false;
+  try {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
@@ -387,7 +391,11 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     default:
       console.log("Unhandled payments event:", event.type);
   }
-  await recordProcessedPaymentEvent(db, event, env);
+  await completePaymentEvent(db, event, env, claim.token);
+  completed = true;
+  } finally {
+    if (!completed) await releasePaymentEvent(db, event, env, claim.token);
+  }
 }
 
 export const Route = createFileRoute("/api/public/payments/webhook")({
