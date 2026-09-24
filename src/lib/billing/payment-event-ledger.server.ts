@@ -52,7 +52,8 @@ export async function recordProcessedPaymentEvent(sb: Sb, event: PaymentEvent, e
  */
 export type PaymentEventClaim =
   | { status: "acquired"; token: string }
-  | { status: "done" | "busy" };
+  | { status: "done" }
+  | { status: "busy" };
 
 export async function claimPaymentEvent(
   sb: Sb, event: PaymentEvent, env: StripeEnv,
@@ -69,7 +70,8 @@ export async function claimPaymentEvent(
     });
   if (error) throw new Error("Could not acquire a payment event processing lease.");
   if (data === "acquired") return { status: "acquired", token };
-  if (data === "done" || data === "busy") return { status: data };
+  if (data === "done") return { status: "done" };
+  if (data === "busy") return { status: "busy" };
   throw new Error("Payment event claim returned an invalid state.");
 }
 
