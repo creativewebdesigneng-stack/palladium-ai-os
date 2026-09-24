@@ -75,7 +75,7 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
   const { error } = await getSupabase()
     .from("subscriptions")
     .upsert(row, { onConflict: "stripe_subscription_id" });
-  if (error) console.error("Failed to upsert subscription:", error.message);
+  if (error) throw new Error("Failed to record the subscription update.");
 
   const { notify } = await import("@/lib/notifications/notify.server");
   await notify({
@@ -102,14 +102,15 @@ async function markCanceled(subscription: any, env: StripeEnv) {
     })
     .eq("stripe_subscription_id", subscription.id)
     .eq("environment", env);
-  if (error) console.error("Failed to cancel subscription:", error.message);
+  if (error) throw new Error("Failed to record the subscription cancellation.");
 
-  const { data: cancelled } = await getSupabase()
+  const { data: cancelled, error: lookupError } = await getSupabase()
     .from("subscriptions")
     .select("user_id, org_id, plan_code")
     .eq("stripe_subscription_id", subscription.id)
     .eq("environment", env)
     .maybeSingle();
+  if (lookupError) throw new Error("Could not load the cancelled subscription notification context.");
   if (cancelled?.user_id) {
     const { notify } = await import("@/lib/notifications/notify.server");
     await notify({
@@ -128,7 +129,7 @@ async function recordUsage(invoice: any, env: StripeEnv) {
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
 
-  const { data: sub } = await getSupabase()
+  const { data: sub, error: lookupError } = await getSupabase()
     .from("subscriptions")
     .select("user_id, org_id")
     .eq("stripe_customer_id", customerId)
@@ -136,7 +137,24 @@ async function recordUsage(invoice: any, env: StripeEnv) {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lookupError) throw new Error("Could not load the paid-invoice subscription.");
   if (!sub?.user_id) return;
+  if (typeof invoice.id !== "string" || !invoice.id.startsWith("in_")) {
+    throw new Error("Paid invoice has no authoritative Stripe invoice ID.");
+  }
+  // A handler may have written usage before a transient failure to save the
+  // event marker. Detect that exact invoice on retry; concurrent deliveries
+  // still require a transactional provider-event claim in the remaining E10 work.
+  const { data: recorded, error: priorUsageError } = await getSupabase()
+    .from("usage_records")
+    .select("id")
+    .eq("user_id", sub.user_id)
+    .eq("metric", "billing.invoice_paid")
+    .contains("metadata", { invoice_id: invoice.id, environment: env })
+    .limit(1)
+    .maybeSingle();
+  if (priorUsageError) throw new Error("Could not inspect the paid invoice usage ledger.");
+  if (recorded) return;
 
   const { error } = await getSupabase()
     .from("usage_records")
@@ -149,7 +167,7 @@ async function recordUsage(invoice: any, env: StripeEnv) {
       period_start: new Date().toISOString().slice(0, 8) + "01",
       metadata: { invoice_id: invoice.id, environment: env },
     });
-  if (error) console.error("Failed to record usage:", error.message);
+  if (error) throw new Error("Failed to record the paid invoice usage.");
 }
 
 async function markPaymentFailed(invoice: any, env: StripeEnv) {
@@ -161,14 +179,15 @@ async function markPaymentFailed(invoice: any, env: StripeEnv) {
     .update({ status: "past_due", updated_at: new Date().toISOString() })
     .eq("stripe_subscription_id", subscriptionId)
     .eq("environment", env);
-  if (error) console.error("Failed to mark subscription past_due:", error.message);
+  if (error) throw new Error("Failed to record the subscription payment failure.");
 
-  const { data: sub } = await getSupabase()
+  const { data: sub, error: lookupError } = await getSupabase()
     .from("subscriptions")
     .select("user_id, org_id")
     .eq("stripe_subscription_id", subscriptionId)
     .eq("environment", env)
     .maybeSingle();
+  if (lookupError) throw new Error("Could not load the failed-payment notification context.");
   if (sub?.user_id) {
     const { notify } = await import("@/lib/notifications/notify.server");
     await notify({
@@ -358,7 +377,11 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     case "charge.refunded": {
       const charge = event.data.object as any;
       const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
-      if (paymentIntentId) await getSupabase().from("marketplace_orders").update({ status: "refunded" }).eq("stripe_payment_intent_id", paymentIntentId);
+      if (paymentIntentId) {
+        const { error: refundError } = await getSupabase().from("marketplace_orders")
+          .update({ status: "refunded" }).eq("stripe_payment_intent_id", paymentIntentId);
+        if (refundError) throw new Error("Could not reconcile the marketplace charge refund.");
+      }
       break;
     }
     default:
