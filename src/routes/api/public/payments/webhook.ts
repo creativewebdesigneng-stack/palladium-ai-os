@@ -142,9 +142,10 @@ async function recordUsage(invoice: any, env: StripeEnv) {
   if (typeof invoice.id !== "string" || !invoice.id.startsWith("in_")) {
     throw new Error("Paid invoice has no authoritative Stripe invoice ID.");
   }
-  // A handler may have written usage before a transient failure to save the
-  // event marker. Detect that exact invoice on retry; concurrent deliveries
-  // still require a transactional provider-event claim in the remaining E10 work.
+  // A handler may have written usage before a transient marker failure.
+  // Check the exact signed invoice and owner before trying another insert.
+  // The database also enforces one record per (invoice_id, environment), so
+  // different Stripe event IDs cannot race into duplicate usage entries.
   const { data: recorded, error: priorUsageError } = await getSupabase()
     .from("usage_records")
     .select("id")
@@ -167,7 +168,23 @@ async function recordUsage(invoice: any, env: StripeEnv) {
       period_start: new Date().toISOString().slice(0, 8) + "01",
       metadata: { invoice_id: invoice.id, environment: env },
     });
-  if (error) throw new Error("Failed to record the paid invoice usage.");
+  if (error) {
+    if (error.code === "23505") {
+      // Another signed event for the same invoice could have inserted first.
+      // Only acknowledge its record if it belongs to this resolved owner;
+      // a conflicting cross-owner invoice stays an error for investigation.
+      const { data: concurrent, error: concurrentReadError } = await getSupabase()
+        .from("usage_records")
+        .select("id")
+        .eq("user_id", sub.user_id)
+        .eq("metric", "billing.invoice_paid")
+        .contains("metadata", { invoice_id: invoice.id, environment: env })
+        .limit(1)
+        .maybeSingle();
+      if (!concurrentReadError && concurrent) return;
+    }
+    throw new Error("Failed to record the paid invoice usage.");
+  }
 }
 
 async function markPaymentFailed(invoice: any, env: StripeEnv) {
