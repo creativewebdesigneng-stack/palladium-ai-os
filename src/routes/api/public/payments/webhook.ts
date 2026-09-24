@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
 import { planForPriceKey } from "@/lib/billing/catalog";
+import { recordProcessedPaymentEvent, wasPaymentEventProcessed } from "@/lib/billing/payment-event-ledger.server";
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 
 let _supabase: any = null;
@@ -203,27 +204,13 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
   await upsertSubscription(subscription, env);
 }
 
-/** Returns true when this event has not been processed before. */
-async function claimEvent(event: any, env: StripeEnv): Promise<boolean> {
-  if (!event?.id) return true;
-  const { error } = await getSupabase()
-    .from("billing_webhook_events")
-    .insert({ event_id: event.id, type: event.type, environment: env });
-  if (!error) return true;
-  // 23505 = unique violation -> already handled, ack without reprocessing.
-  if ((error as any).code === "23505") return false;
-  console.error("Failed to record webhook event:", error.message);
-  return true;
-}
-
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event: any = await verifyWebhook(req, env);
 
-  const fresh = await claimEvent(event, env);
-  if (!fresh) {
-    console.log("Duplicate payments event ignored:", event.id);
-    return;
-  }
+  // The installed event ledger is service-role-only. Do not acknowledge a
+  // webhook as processed until all provider-event handler writes have succeeded.
+  const db = getSupabase();
+  if (await wasPaymentEventProcessed(db, event, env)) return;
 
   switch (event.type) {
     case "customer.subscription.created":
@@ -377,6 +364,7 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     default:
       console.log("Unhandled payments event:", event.type);
   }
+  await recordProcessedPaymentEvent(db, event, env);
 }
 
 export const Route = createFileRoute("/api/public/payments/webhook")({
@@ -386,14 +374,14 @@ export const Route = createFileRoute("/api/public/payments/webhook")({
         const rawEnv = new URL(request.url).searchParams.get("env");
         if (rawEnv !== "sandbox" && rawEnv !== "live") {
           console.error("Payments webhook with invalid env:", rawEnv);
-          return Response.json({ received: true, ignored: "invalid env" });
+          return Response.json({ error: "Invalid payment environment" }, { status: 400 });
         }
         try {
           await handleWebhook(request, rawEnv as StripeEnv);
           return Response.json({ received: true });
         } catch (e) {
           console.error("Payments webhook error:", e);
-          return new Response("Webhook error", { status: 400 });
+          return new Response("Webhook processing failed", { status: 503 });
         }
       },
     },
