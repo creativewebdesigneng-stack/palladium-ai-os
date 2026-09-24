@@ -4,6 +4,7 @@ import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.
 import { planForPriceKey } from "@/lib/billing/catalog";
 import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/lib/billing/payment-event-ledger.server";
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
+import { verifyMarketplaceChargeRefund } from "@/lib/marketplace/refund-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -398,11 +399,36 @@ async function handleWebhook(req: Request, env: StripeEnv) {
     case "charge.refunded": {
       const charge = event.data.object as any;
       const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
-      if (paymentIntentId) {
-        const { error: refundError } = await getSupabase().from("marketplace_orders")
-          .update({ status: "refunded" }).eq("stripe_payment_intent_id", paymentIntentId);
-        if (refundError) throw new Error("Could not reconcile the marketplace charge refund.");
+      if (!paymentIntentId) break; // Other Stripe charges are not Marketplace purchases.
+      const { data: order, error: lookupError } = await db
+        .from("marketplace_orders")
+        .select("id,sale_price_pence,currency,status,payment_provider")
+        .eq("stripe_payment_intent_id", paymentIntentId)
+        .maybeSingle();
+      if (lookupError) throw new Error("Could not inspect the Marketplace order for a refunded charge.");
+      if (!order) break; // Subscription or another provider-owned charge.
+      if (order.payment_provider !== "stripe") throw new Error("Refund provider does not match the Marketplace order.");
+      const refund = verifyMarketplaceChargeRefund(charge, order, env);
+      if (refund === "partial") {
+        // Partial refunds require their own amount-level ledger: never label
+        // an order fully refunded or automatically revoke a delivered asset.
+        console.warn("[marketplace] Partial charge refund requires amount-level reconciliation", { orderId: order.id });
+        break;
       }
+      if (order.status === "refunded") break;
+      if (!["paid", "fulfilled"].includes(order.status)) {
+        // A disputed/cancelled order is not silently reclassified. Preserve
+        // its current workflow until a separate reconciliation decides it.
+        throw new Error("A fully refunded charge has an incompatible Marketplace order state.");
+      }
+      const { data: refunded, error: refundError } = await db
+        .from("marketplace_orders")
+        .update({ status: "refunded" })
+        .eq("id", order.id)
+        .eq("stripe_payment_intent_id", paymentIntentId)
+        .in("status", ["paid", "fulfilled"])
+        .select("id").maybeSingle();
+      if (refundError || !refunded) throw new Error("Could not reconcile the verified full Marketplace charge refund.");
       break;
     }
     default:
