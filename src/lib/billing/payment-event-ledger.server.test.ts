@@ -83,7 +83,7 @@ describe("signed Stripe event ledger", () => {
     expect(route).not.toContain("billing_webhook_events");
     expect(route).toContain('if (error.code === "23505")');
     expect(route).toContain('throw new Error("Failed to record the paid invoice usage.")');
-    expect(route).toContain('if (refundError) throw new Error("Could not reconcile the marketplace charge refund.")');
+    expect(route).toContain('if (refundError || !refunded) throw new Error("Could not reconcile the verified full Marketplace charge refund.")');
     expect(route).toContain('return new Response("Webhook processing failed", { status: 503 })');
   });
 });
