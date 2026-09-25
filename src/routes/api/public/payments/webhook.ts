@@ -519,7 +519,7 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
       }
       if (order.status === "refunded") break;
-      if (!["paid", "fulfilled"].includes(order.status)) {
+      if (!["paid", "fulfilled", "disputed"].includes(order.status)) {
         // Financial refund truth is retained separately from dispute/cancel
         // workflow state; do not silently replace that workflow status.
         await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
@@ -530,7 +530,7 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         .update({ status: "refunded" })
         .eq("id", order.id)
         .eq("stripe_payment_intent_id", paymentIntentId)
-        .in("status", ["paid", "fulfilled"])
+        .in("status", ["paid", "fulfilled", "disputed"])
         .select("id").maybeSingle();
       if (refundError || !refunded) throw new Error("Could not reconcile the verified full Marketplace charge refund.");
       await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
