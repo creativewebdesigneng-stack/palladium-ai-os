@@ -4,6 +4,7 @@ import {
   buildMarketplaceProviderDisputeRows,
   compareProviderDisputeChronology,
   planMarketplaceProviderDisputeOrderState,
+  resolveMarketplaceDisputeProviderIds,
   resolveMarketplacePreDisputeStatus,
   verifyMarketplaceProviderDispute,
 } from "./provider-dispute-evidence";
@@ -54,6 +55,28 @@ describe("Marketplace provider dispute truth", () => {
       expect(() => verifyMarketplaceProviderDispute({ ...dispute, ...changed }, order, "sandbox")).toThrow("does not match");
     }
     expect(() => verifyMarketplaceProviderDispute(dispute, { ...order, payment_provider: "other" }, "sandbox")).toThrow("does not match");
+  });
+
+  it("uses an embedded PaymentIntent or resolves it from the signed Stripe charge", async () => {
+    let retrieved = "";
+    const retrieve = async (chargeId: string) => {
+      retrieved = chargeId;
+      return { payment_intent: "pi_FromCharge123" };
+    };
+    await expect(resolveMarketplaceDisputeProviderIds(dispute, retrieve)).resolves.toEqual({
+      disputeId: "du_owned", chargeId: "ch_owned", paymentIntentId: "pi_owned",
+    });
+    expect(retrieved).toBe("");
+    await expect(resolveMarketplaceDisputeProviderIds(
+      { ...dispute, payment_intent: null }, retrieve,
+    )).resolves.toEqual({
+      disputeId: "du_owned", chargeId: "ch_owned", paymentIntentId: "pi_FromCharge123",
+    });
+    expect(retrieved).toBe("ch_owned");
+    await expect(resolveMarketplaceDisputeProviderIds(
+      { ...dispute, payment_intent: null },
+      async () => ({ payment_intent: null }),
+    )).rejects.toThrow("PaymentIntent");
   });
 
   it("captures the verified pre-dispute state and restores only when safe", () => {
@@ -111,23 +134,30 @@ describe("Marketplace provider dispute truth", () => {
     expect(sql).toContain("revoke all on public.marketplace_provider_disputes, public.marketplace_provider_dispute_events");
     expect(sql).toContain("grant select on public.marketplace_provider_disputes, public.marketplace_provider_dispute_events");
     expect(sql).toContain("grant all on public.marketplace_provider_disputes, public.marketplace_provider_dispute_events");
+    expect(sql).toContain("create or replace function public.blackstar_reconcile_marketplace_provider_dispute");
+    expect(sql).toContain("for update;");
+    expect(sql).toContain("p_stripe_event_created_at < v_existing.last_event_created_at");
+    expect(sql).toContain("provider dispute terminal status conflict");
+    expect(sql).toContain("v_target_status := 'charged_back'");
+    expect(sql).toContain("from public, anon, authenticated");
+    expect(sql).toContain("to service_role");
   });
 
-  it("routes all provider dispute lifecycle events through monotonic compare-and-set reconciliation", () => {
+  it("routes all signed provider dispute lifecycle events through the atomic reconciliation RPC", () => {
     const route = readFileSync(new URL("../../routes/api/public/payments/webhook.ts", import.meta.url), "utf8");
     const start = route.indexOf('case "charge.dispute.created"');
     const end = route.indexOf('case "charge.refunded"', start);
     const block = route.slice(start, end);
-    expect(block).toContain('case "charge.dispute.updated"');
-    expect(block).toContain('case "charge.dispute.closed"');
-    expect(block).toContain("resolveMarketplaceDisputePaymentIntent");
+    for (const type of [
+      "charge.dispute.updated", "charge.dispute.closed",
+      "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated",
+    ]) expect(block).toContain(`case "${type}"`);
+    expect(block).toContain("resolveMarketplaceDisputeProviderIds");
     expect(block).toContain("verifyMarketplaceProviderDispute(dispute, order, env)");
-    expect(block).toContain("compareProviderDisputeChronology(rows.eventCreatedAt, existing)");
-    expect(block).toContain('if (chronology === "stale")');
-    expect(block).toContain('.eq("last_event_id", existing.last_event_id)');
-    expect(block).toContain('.eq("last_event_created_at", existing.last_event_created_at)');
-    expect(block).toContain("planMarketplaceProviderDisputeOrderState");
-    expect(block).toContain('throw new Error("Marketplace order changed concurrently during provider dispute reconciliation.")');
-    expect(block).toContain("recordMarketplaceProviderDisputeAudit");
+    expect(block).toContain("stripeProviderEventCreatedAt(event.created)");
+    expect(block).toContain('"blackstar_reconcile_marketplace_provider_dispute"');
+    expect(block).toContain("p_stripe_event_type: event.type");
+    expect(block).toContain("p_stripe_event_created_at: eventCreatedAt");
+    expect(block).toContain('throw new Error("Could not reconcile the Stripe dispute with its Marketplace order.")');
   });
 });
