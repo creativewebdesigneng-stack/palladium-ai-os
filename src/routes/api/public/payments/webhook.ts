@@ -5,6 +5,7 @@ import { planForPriceKey } from "@/lib/billing/catalog";
 import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/lib/billing/payment-event-ledger.server";
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 import { verifyMarketplaceChargeRefund } from "@/lib/marketplace/refund-evidence";
+import { buildMarketplaceRefundEventRow, planMarketplaceRefundReconciliation } from "@/lib/marketplace/refund-reconciliation";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -241,6 +242,30 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
   await upsertSubscription(subscription, env);
 }
 
+async function recordMarketplaceRefundAudit(
+  db: any, event: any, charge: any, order: any, env: StripeEnv, plan: any,
+) {
+  const row = buildMarketplaceRefundEventRow(event.id, charge, order, env, plan);
+  const { error } = await db.from("marketplace_refund_events").insert(row);
+  if (!error) return;
+  if (error.code === "23505") {
+    const { data: existing, error: readError } = await db
+      .from("marketplace_refund_events")
+      .select("order_id,stripe_charge_id,stripe_payment_intent_id,cumulative_refunded_pence,currency,refund_state,livemode")
+      .eq("stripe_event_id", event.id)
+      .maybeSingle();
+    if (!readError && existing &&
+      existing.order_id === row.order_id &&
+      existing.stripe_charge_id === row.stripe_charge_id &&
+      existing.stripe_payment_intent_id === row.stripe_payment_intent_id &&
+      Number(existing.cumulative_refunded_pence) === Number(row.cumulative_refunded_pence) &&
+      existing.currency === row.currency &&
+      existing.refund_state === row.refund_state &&
+      existing.livemode === row.livemode) return;
+  }
+  throw new Error("Could not persist the verified Marketplace refund event.");
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event: any = await verifyWebhook(req, env);
 
@@ -402,24 +427,45 @@ async function handleWebhook(req: Request, env: StripeEnv) {
       if (!paymentIntentId) break; // Other Stripe charges are not Marketplace purchases.
       const { data: order, error: lookupError } = await db
         .from("marketplace_orders")
-        .select("id,sale_price_pence,currency,status,payment_provider")
+        .select("id,sale_price_pence,currency,status,payment_provider,refunded_pence,refund_state")
         .eq("stripe_payment_intent_id", paymentIntentId)
         .maybeSingle();
       if (lookupError) throw new Error("Could not inspect the Marketplace order for a refunded charge.");
       if (!order) break; // Subscription or another provider-owned charge.
       if (order.payment_provider !== "stripe") throw new Error("Refund provider does not match the Marketplace order.");
       const refund = verifyMarketplaceChargeRefund(charge, order, env);
+      const plan = planMarketplaceRefundReconciliation(charge, order, env);
+      if (plan.disposition === "advance") {
+        const { data: amountUpdated, error: amountError } = await db
+          .from("marketplace_orders")
+          .update({
+            refunded_pence: plan.cumulativeRefundedPence,
+            refund_state: plan.refundState,
+          })
+          .eq("id", order.id)
+          .eq("stripe_payment_intent_id", paymentIntentId)
+          .eq("status", order.status)
+          .eq("refunded_pence", Number(order.refunded_pence ?? 0))
+          .select("id").maybeSingle();
+        if (amountError || !amountUpdated) {
+          throw new Error("Could not reconcile the Marketplace cumulative refund amount.");
+        }
+      }
       if (refund === "partial") {
-        // Partial refunds require their own amount-level ledger: never label
-        // an order fully refunded or automatically revoke a delivered asset.
-        console.warn("[marketplace] Partial charge refund requires amount-level reconciliation", { orderId: order.id });
+        // The signed cumulative amount is persisted, but payment alone never
+        // revokes delivered assets or claims the full order was refunded.
+        await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
         break;
+      }
+      if (order.status === "refunded") {
+        await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
       }
       if (order.status === "refunded") break;
       if (!["paid", "fulfilled"].includes(order.status)) {
-        // A disputed/cancelled order is not silently reclassified. Preserve
-        // its current workflow until a separate reconciliation decides it.
-        throw new Error("A fully refunded charge has an incompatible Marketplace order state.");
+        // Financial refund truth is retained separately from dispute/cancel
+        // workflow state; do not silently replace that workflow status.
+        await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
+        break;
       }
       const { data: refunded, error: refundError } = await db
         .from("marketplace_orders")
@@ -429,6 +475,7 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         .in("status", ["paid", "fulfilled"])
         .select("id").maybeSingle();
       if (refundError || !refunded) throw new Error("Could not reconcile the verified full Marketplace charge refund.");
+      await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
       break;
     }
     default:
