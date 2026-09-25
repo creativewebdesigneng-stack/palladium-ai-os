@@ -198,3 +198,32 @@ export function compareProviderDisputeChronology(
   if (incoming < current) return "stale";
   return "same";
 }
+
+
+type StripeLikeId = string | { id?: string | null } | null | undefined;
+function stripeObjectId(value: StripeLikeId): string | null {
+  if (typeof value === "string") return value;
+  return value && typeof value === "object" && typeof value.id === "string" ? value.id : null;
+}
+
+export async function resolveMarketplaceDisputeProviderIds(
+  dispute: { id?: unknown; charge?: StripeLikeId; payment_intent?: StripeLikeId },
+  retrieveCharge: (chargeId: string) => Promise<{ payment_intent?: StripeLikeId }>,
+): Promise<{ disputeId: string; chargeId: string; paymentIntentId: string }> {
+  if (typeof dispute.id !== "string" || !/^du_[A-Za-z0-9]+$/.test(dispute.id)) {
+    throw new Error("Stripe dispute has no authoritative dispute ID.");
+  }
+  const chargeId = stripeObjectId(dispute.charge);
+  if (!chargeId || !/^ch_[A-Za-z0-9]+$/.test(chargeId)) {
+    throw new Error("Stripe dispute has no authoritative charge ID.");
+  }
+  let paymentIntentId = stripeObjectId(dispute.payment_intent);
+  if (!paymentIntentId) {
+    const charge = await retrieveCharge(chargeId);
+    paymentIntentId = stripeObjectId(charge.payment_intent);
+  }
+  if (!paymentIntentId || !/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) {
+    throw new Error("Stripe dispute could not be linked to a PaymentIntent.");
+  }
+  return { disputeId: dispute.id, chargeId, paymentIntentId };
+}
