@@ -6,6 +6,11 @@ import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 import { verifyMarketplaceChargeRefund } from "@/lib/marketplace/refund-evidence";
 import { buildMarketplaceRefundEventRow, planMarketplaceRefundReconciliation } from "@/lib/marketplace/refund-reconciliation";
+import {
+  resolveMarketplaceDisputeProviderIds,
+  stripeProviderEventCreatedAt,
+  verifyMarketplaceProviderDispute,
+} from "@/lib/marketplace/provider-dispute-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -419,6 +424,59 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         break;
       }
       await handleCheckoutCompleted(session, env);
+      break;
+    }
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed":
+    case "charge.dispute.funds_withdrawn":
+    case "charge.dispute.funds_reinstated": {
+      const rawDispute = event.data.object as any;
+      const stripe = createStripeClient(env);
+      const providerIdentity = await resolveMarketplaceDisputeProviderIds(
+        rawDispute,
+        async (chargeId) => stripe.charges.retrieve(chargeId) as any,
+      );
+      const { data: order, error: orderError } = await db
+        .from("marketplace_orders")
+        .select("id,status,sale_price_pence,currency,payment_provider,stripe_payment_intent_id,refund_state,paid_at,fulfilled_at")
+        .eq("stripe_payment_intent_id", providerIdentity.paymentIntentId)
+        .maybeSingle();
+      if (orderError) throw new Error("Could not inspect the Marketplace order for a provider dispute.");
+      if (!order) break; // Another Stripe product/account payment.
+      const dispute = {
+        ...rawDispute,
+        id: providerIdentity.disputeId,
+        charge: providerIdentity.chargeId,
+        payment_intent: providerIdentity.paymentIntentId,
+      };
+      const verified = verifyMarketplaceProviderDispute(dispute, order, env);
+      const eventCreatedAt = stripeProviderEventCreatedAt(event.created);
+      const reason = typeof dispute.reason === "string" ? dispute.reason.slice(0, 128) : null;
+      const { data: result, error: reconcileError } = await db.rpc(
+        "blackstar_reconcile_marketplace_provider_dispute",
+        {
+          p_stripe_event_id: event.id,
+          p_stripe_event_type: event.type,
+          p_stripe_event_created_at: eventCreatedAt,
+          p_stripe_dispute_id: providerIdentity.disputeId,
+          p_stripe_charge_id: providerIdentity.chargeId,
+          p_stripe_payment_intent_id: providerIdentity.paymentIntentId,
+          p_disputed_pence: dispute.amount,
+          p_currency: order.currency,
+          p_provider_status: verified.status,
+          p_reason: reason,
+          p_livemode: env === "live",
+          p_evidence_due_at: verified.evidenceDueAt,
+        },
+      );
+      if (reconcileError) {
+        throw new Error("Could not reconcile the Stripe dispute with its Marketplace order.");
+      }
+      const reconciled = Array.isArray(result) ? result[0] : result;
+      if (!reconciled || reconciled.order_id !== order.id) {
+        throw new Error("Stripe dispute reconciliation returned no authoritative Marketplace order.");
+      }
       break;
     }
     case "charge.refunded": {
