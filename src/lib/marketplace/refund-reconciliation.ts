@@ -66,7 +66,7 @@ export function planMarketplaceRefundReconciliation(
     cumulativeRefundedPence: next,
     refundState,
     nextOrderStatus:
-      refundState === "full" && ["paid", "fulfilled"].includes(order.status)
+      refundState === "full" && ["paid", "fulfilled", "disputed"].includes(order.status)
         ? "refunded"
         : order.status,
   };
