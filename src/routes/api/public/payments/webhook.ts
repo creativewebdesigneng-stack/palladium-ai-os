@@ -6,6 +6,13 @@ import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 import { verifyMarketplaceChargeRefund } from "@/lib/marketplace/refund-evidence";
 import { buildMarketplaceRefundEventRow, planMarketplaceRefundReconciliation } from "@/lib/marketplace/refund-reconciliation";
+import {
+  buildMarketplaceProviderDisputeRows,
+  compareProviderDisputeChronology,
+  planMarketplaceProviderDisputeOrderState,
+  resolveMarketplacePreDisputeStatus,
+  verifyMarketplaceProviderDispute,
+} from "@/lib/marketplace/provider-dispute-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -266,6 +273,45 @@ async function recordMarketplaceRefundAudit(
   throw new Error("Could not persist the verified Marketplace refund event.");
 }
 
+async function resolveMarketplaceDisputePaymentIntent(dispute: any, env: StripeEnv): Promise<{ chargeId: string; paymentIntentId: string } | null> {
+  const chargeId = typeof dispute?.charge === "string" ? dispute.charge : dispute?.charge?.id;
+  if (typeof chargeId !== "string" || !chargeId.startsWith("ch_")) return null;
+  let paymentIntentId =
+    typeof dispute?.payment_intent === "string"
+      ? dispute.payment_intent
+      : dispute?.payment_intent?.id;
+  if (typeof paymentIntentId !== "string" || !paymentIntentId.startsWith("pi_")) {
+    const stripe = createStripeClient(env);
+    const charge: any = await stripe.charges.retrieve(chargeId);
+    paymentIntentId =
+      typeof charge?.payment_intent === "string"
+        ? charge.payment_intent
+        : charge?.payment_intent?.id;
+  }
+  if (typeof paymentIntentId !== "string" || !paymentIntentId.startsWith("pi_")) return null;
+  return { chargeId, paymentIntentId };
+}
+
+async function recordMarketplaceProviderDisputeAudit(db: any, row: Record<string, unknown>) {
+  const { error } = await db.from("marketplace_provider_dispute_events").insert(row);
+  if (!error) return;
+  if (error.code === "23505") {
+    const { data: existing, error: readError } = await db
+      .from("marketplace_provider_dispute_events")
+      .select("order_id,stripe_dispute_id,provider_status,disputed_pence,currency,livemode")
+      .eq("stripe_event_id", row["stripe_event_id"])
+      .maybeSingle();
+    if (!readError && existing &&
+      existing.order_id === row["order_id"] &&
+      existing.stripe_dispute_id === row["stripe_dispute_id"] &&
+      existing.provider_status === row["provider_status"] &&
+      Number(existing.disputed_pence) === Number(row["disputed_pence"]) &&
+      existing.currency === row["currency"] &&
+      existing.livemode === row["livemode"]) return;
+  }
+  throw new Error("Could not persist the verified Marketplace provider dispute event.");
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event: any = await verifyWebhook(req, env);
 
@@ -419,6 +465,90 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         break;
       }
       await handleCheckoutCompleted(session, env);
+      break;
+    }
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed": {
+      const rawDispute = event.data.object as any;
+      const providerIdentity = await resolveMarketplaceDisputePaymentIntent(rawDispute, env);
+      if (!providerIdentity) break; // A non-PaymentIntent Stripe dispute is not a Marketplace purchase.
+      const { data: order, error: orderError } = await db
+        .from("marketplace_orders")
+        .select("id,status,sale_price_pence,currency,payment_provider,stripe_payment_intent_id,refund_state,paid_at,fulfilled_at")
+        .eq("stripe_payment_intent_id", providerIdentity.paymentIntentId)
+        .maybeSingle();
+      if (orderError) throw new Error("Could not inspect the Marketplace order for a provider dispute.");
+      if (!order) break; // Another Stripe product/account charge.
+      const dispute = {
+        ...rawDispute,
+        charge: providerIdentity.chargeId,
+        payment_intent: providerIdentity.paymentIntentId,
+      };
+      const verified = verifyMarketplaceProviderDispute(dispute, order, env);
+      const { data: existing, error: existingError } = await db
+        .from("marketplace_provider_disputes")
+        .select("id,pre_dispute_status,last_event_id,last_event_created_at,provider_status")
+        .eq("stripe_dispute_id", dispute.id)
+        .maybeSingle();
+      if (existingError) throw new Error("Could not inspect the Marketplace provider dispute ledger.");
+      const preDisputeStatus = resolveMarketplacePreDisputeStatus(order, existing);
+      const rows = buildMarketplaceProviderDisputeRows(
+        event, dispute, order, env, verified, preDisputeStatus,
+      );
+      let chronology = compareProviderDisputeChronology(rows.eventCreatedAt, existing);
+      const activeStatuses = new Set(["warning_needs_response","warning_under_review","needs_response","under_review"]);
+      const terminalStatuses = new Set(["warning_closed","won","lost","prevented"]);
+      if (chronology === "same" && existing?.last_event_id !== event.id) {
+        if (terminalStatuses.has(existing?.provider_status) && activeStatuses.has(verified.status)) {
+          chronology = "stale";
+        } else if (activeStatuses.has(existing?.provider_status) && terminalStatuses.has(verified.status)) {
+          chronology = "newer";
+        } else if (existing?.provider_status === verified.status) {
+          chronology = "stale";
+        } else {
+          throw new Error("Provider dispute events have ambiguous same-timestamp state ordering.");
+        }
+      }
+      if (chronology === "stale") {
+        await recordMarketplaceProviderDisputeAudit(db, rows.audit);
+        break;
+      }
+
+      if (!existing) {
+        const { error: insertError } = await db
+          .from("marketplace_provider_disputes")
+          .insert(rows.current);
+        if (insertError) throw new Error("Could not create the Marketplace provider dispute ledger.");
+      } else if (existing.last_event_id !== event.id || existing.provider_status !== verified.status) {
+        const { data: updated, error: updateError } = await db
+          .from("marketplace_provider_disputes")
+          .update(rows.current)
+          .eq("id", existing.id)
+          .eq("last_event_id", existing.last_event_id)
+          .eq("last_event_created_at", existing.last_event_created_at)
+          .select("id").maybeSingle();
+        if (updateError || !updated) {
+          throw new Error("Marketplace provider dispute changed concurrently; retry reconciliation.");
+        }
+      }
+
+      const targetStatus = planMarketplaceProviderDisputeOrderState(
+        verified.outcome, order, preDisputeStatus,
+      );
+      if (targetStatus !== order.status) {
+        const { data: transitioned, error: transitionError } = await db
+          .from("marketplace_orders")
+          .update({ status: targetStatus })
+          .eq("id", order.id)
+          .eq("stripe_payment_intent_id", providerIdentity.paymentIntentId)
+          .eq("status", order.status)
+          .select("id").maybeSingle();
+        if (transitionError || !transitioned) {
+          throw new Error("Marketplace order changed concurrently during provider dispute reconciliation.");
+        }
+      }
+      await recordMarketplaceProviderDisputeAudit(db, rows.audit);
       break;
     }
     case "charge.refunded": {
