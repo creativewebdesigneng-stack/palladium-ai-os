@@ -459,8 +459,8 @@ async function handleWebhook(req: Request, env: StripeEnv) {
       }
       if (order.status === "refunded") {
         await recordMarketplaceRefundAudit(db, event, charge, order, env, plan);
-        break;
       }
+      if (order.status === "refunded") break;
       if (!["paid", "fulfilled"].includes(order.status)) {
         // Financial refund truth is retained separately from dispute/cancel
         // workflow state; do not silently replace that workflow status.
