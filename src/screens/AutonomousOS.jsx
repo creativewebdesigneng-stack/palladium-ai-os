@@ -5,12 +5,16 @@ import { BrainCircuit, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Squa
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
-import { createAutonomousGoal, listAutonomousGoals, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import {
+  recommendBlackstarOpportunityActions,
+  requestBlackstarOpportunityApproval,
+} from '@/lib/ai-hub/opportunity-execution.functions';
+import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 
 const badge = (status) => {
-  if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
-  if (status === 'failed' || status === 'cancelled') return 'border-rose-300/20 bg-rose-300/[.06] text-rose-200';
+  if (status === 'completed' || status === 'ready') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
+  if (status === 'failed' || status === 'cancelled' || status === 'unroutable') return 'border-rose-300/20 bg-rose-300/[.06] text-rose-200';
   if (status === 'paused' || status === 'waiting_for_approval') return 'border-amber-300/20 bg-amber-300/[.06] text-amber-200';
   return 'border-violet-300/20 bg-violet-300/[.06] text-violet-100';
 };
@@ -37,19 +41,47 @@ const emptyDraft = () => ({
 export default function AutonomousOS() {
   const session = useSessionReady();
   const qc = useQueryClient();
-  const listFn = useServerFn(listAutonomousGoals);
+  const listGoalsFn = useServerFn(listAutonomousGoals);
+  const listRunsFn = useServerFn(listAutonomousGoalRuns);
+  const listFleetsFn = useServerFn(listAutonomousFleetAssignments);
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
+  const recommendFn = useServerFn(recommendBlackstarOpportunityActions);
+  const requestApprovalFn = useServerFn(requestBlackstarOpportunityApproval);
   const [draft, setDraft] = useState(emptyDraft);
 
-  const goalsQuery = useQuery({ queryKey: ['autonomous-os-goals'], queryFn: () => listFn(), enabled: session === 'yes', refetchInterval: 15000, retry: 1 });
-  const refresh = () => qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
+  const goalsQuery = useQuery({
+    queryKey: ['autonomous-os-goals'],
+    queryFn: async () => {
+      const [goals, runs, fleets] = await Promise.all([listGoalsFn(), listRunsFn(), listFleetsFn()]);
+      return { goals: goals ?? [], runs: runs ?? [], events: [], fleets: fleets ?? [] };
+    },
+    enabled: session === 'yes',
+    refetchInterval: 15000,
+    retry: 1,
+  });
+  const actionsQuery = useQuery({
+    queryKey: ['autonomous-os-opportunity-actions'],
+    queryFn: () => recommendFn({ data: { maximumRecommendations: 6 } }),
+    enabled: session === 'yes',
+    refetchInterval: 30000,
+    retry: 1,
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
+    qc.invalidateQueries({ queryKey: ['autonomous-os-opportunity-actions'] });
+  };
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
+  const requestApproval = useMutation({
+    mutationFn: (goalId) => requestApprovalFn({ data: { goalId } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['autonomous-os-opportunity-actions'] }),
+  });
 
   const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [] };
+  const actions = actionsQuery.data?.actions ?? [];
   const latestRun = useMemo(() => {
     const map = new Map();
     for (const run of data.runs ?? []) if (!map.has(run.goal_id)) map.set(run.goal_id, run);
@@ -133,6 +165,48 @@ export default function AutonomousOS() {
         <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled, event-triggered and continuous runs all hand execution to the same durable workflow worker.</div>
       </section>
     </div>
+
+    <section className="mt-4 rounded-[28px] border border-cyan-300/12 bg-black/35 p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Recommended actions</p>
+          <h3 className="mt-1 text-xl font-semibold text-white">Opportunity execution plans</h3>
+        </div>
+        <button onClick={() => actionsQuery.refetch()} className="rounded-lg border border-white/10 p-2 text-white/45 hover:text-white"><RefreshCw className={`h-4 w-4 ${actionsQuery.isFetching ? 'animate-spin' : ''}`} /></button>
+      </div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-white/40">Ranked from this owner’s Autonomous OS portfolio and routed through existing agents and workflows. Listing does not execute. Approval-gated actions open the existing Mission Control approval path.</p>
+      {actionsQuery.isLoading && <p className="mt-5 text-sm text-white/35">Planning recommended actions…</p>}
+      {actionsQuery.isError && <p className="mt-5 text-sm text-rose-300">{friendlyMessage(actionsQuery.error)}</p>}
+      {!actionsQuery.isLoading && !actionsQuery.isError && !actions.length && <div className="mt-5 rounded-2xl border border-dashed border-white/10 p-8 text-center"><Sparkles className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">No ranked actions yet. Create an active goal or add an owner agent/workflow capability.</p></div>}
+      <div className="mt-5 grid gap-3 xl:grid-cols-2">
+        {actions.map((action) => {
+          const busy = requestApproval.isPending && requestApproval.variables === action.goalId;
+          return <article key={action.goalId} className="rounded-2xl border border-white/8 bg-white/[.018] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="font-semibold text-white">{action.title}</h4>
+                  <span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(action.routingStatus)}`}>{action.routingStatus}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-white/42">{action.recommendedAction}</p>
+              </div>
+              <Sparkles className="h-5 w-5 shrink-0 text-cyan-300/70" />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-[10px] text-white/35">
+              <span className="rounded-md border border-white/8 px-2 py-1">{action.kind}</span>
+              <span className="rounded-md border border-white/8 px-2 py-1">score {Number(action.score).toFixed(2)}</span>
+              <span className="rounded-md border border-white/8 px-2 py-1">confidence {Number(action.confidence).toFixed(2)}</span>
+              <span className="rounded-md border border-white/8 px-2 py-1">{action.actionRisk} risk</span>
+              {action.requiresApproval && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-amber-100/70">approval required</span>}
+              {action.routedCapabilityIds?.length > 0 && <span className="rounded-md border border-cyan-300/10 px-2 py-1 text-cyan-100/60">{action.routedCapabilityIds.length} routed capabilities</span>}
+            </div>
+            {action.routingStatus === 'waiting_for_approval' && <div className="mt-4"><button disabled={busy} onClick={() => requestApproval.mutate(action.goalId)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[.08] px-3 py-2 text-xs font-semibold text-amber-100 disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />{busy ? 'Opening approval…' : 'Request approval'}</button></div>}
+            {requestApproval.isError && requestApproval.variables === action.goalId && <p className="mt-3 text-xs text-rose-300">{friendlyMessage(requestApproval.error)}</p>}
+            {requestApproval.isSuccess && requestApproval.variables === action.goalId && requestApproval.data?.approvalRequestId && <p className="mt-3 text-xs text-emerald-200/80">Approval request {requestApproval.data.approvalRequestId} is waiting in Mission Control. Nothing was executed.</p>}
+          </article>;
+        })}
+      </div>
+    </section>
 
     <section className="mt-4 rounded-[28px] border border-white/10 bg-black/35 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-violet-300/70">Mission portfolio</p><h3 className="mt-1 text-xl font-semibold text-white">Persistent goals</h3></div><span className="text-xs text-white/30">{data.goals?.length ?? 0} total</span></div>
