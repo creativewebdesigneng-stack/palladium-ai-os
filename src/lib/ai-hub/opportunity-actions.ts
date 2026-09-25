@@ -106,7 +106,7 @@ export function signalsFromAutonomousPortfolio(
         title: goal.name.trim().slice(0, 200),
         summary: goal.objective.trim().slice(0, 2000),
         confidence: clamp01(failed ? 0.86 : latestRun ? 0.74 : 0.68),
-        impact: clamp01((autonomous ? 0.18 : 0) + (budgeted ? 0.16 : 0.08) + (failed ? 0.28 : 0.42)),
+        impact: clamp01((autonomous ? 0.18 : 0) + (budgeted ? 0.16 : 0.08) + (failed ? 0.28 : 0.48)),
         urgency: clamp01((failed ? 0.72 : 0.38) + Math.min(0.2, retries * 0.05)),
         evidence,
       } satisfies BlackstarOpportunitySignal
