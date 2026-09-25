@@ -6,6 +6,46 @@ export interface TeamAgentCandidate {
   activeWorkloads?: number
 }
 
+type AgentHistoryRow = { agent_id: string; status?: string | null }
+type AgentCapabilityRow = {
+  id: string
+  allowed_tools?: string[] | null
+  operating_profile?: { skills?: string[] | null } | null
+}
+
+export function buildDynamicTeamCandidates(
+  agents: AgentCapabilityRow[],
+  tasks: AgentHistoryRow[],
+): TeamAgentCandidate[] {
+  const byAgent = new Map<string, AgentHistoryRow[]>()
+  for (const task of tasks) {
+    const rows = byAgent.get(task.agent_id) ?? []
+    rows.push(task)
+    byAgent.set(task.agent_id, rows)
+  }
+
+  return agents.map((agent) => {
+    const history = byAgent.get(agent.id) ?? []
+    const completed = history.filter((task) => ['completed', 'succeeded'].includes(String(task.status))).length
+    const failed = history.filter((task) => ['failed', 'cancelled'].includes(String(task.status))).length
+    const finished = completed + failed
+    const trustScore = finished > 0 ? completed / finished : 0.75
+    const activeWorkloads = history.filter((task) => ['queued', 'running', 'waiting_for_approval'].includes(String(task.status))).length
+    const capabilities = [...new Set([
+      ...(agent.allowed_tools ?? []),
+      ...(agent.operating_profile?.skills ?? []),
+    ].map((value) => String(value).trim()).filter(Boolean))]
+
+    return {
+      agentId: agent.id,
+      capabilities,
+      trustScore,
+      available: true,
+      activeWorkloads,
+    }
+  })
+}
+
 export interface DynamicTeamRequest {
   missionId: string
   requiredCapabilities: string[]
