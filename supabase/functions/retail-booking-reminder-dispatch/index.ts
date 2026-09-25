@@ -56,12 +56,31 @@ function e164(value: unknown): string {
   const normalized = typeof value === "string" ? value.trim().replace(/[\s().-]/g, "") : "";
   return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : "";
 }
+function appOrigin(): string | null {
+  const base = textEnv("RETAIL_APP_ORIGIN") || textEnv("APP_ORIGIN");
+  if (!base) return null;
+  try {
+    const url = new URL(base);
+    return url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
 function callbackUrl(): string | null {
-  const base = textEnv("TWILIO_STATUS_CALLBACK_BASE_URL") || textEnv("APP_ORIGIN");
+  const base = textEnv("TWILIO_STATUS_CALLBACK_BASE_URL") || appOrigin();
   if (!base) return null;
   try {
     const url = new URL("/api/public/retail/twilio-status", base);
     return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+function emailBridgeUrl(): string | null {
+  const base = appOrigin();
+  if (!base) return null;
+  try {
+    return new URL("/api/internal/retail-booking-reminder-email", base).toString();
   } catch {
     return null;
   }
@@ -85,11 +104,12 @@ function twilioConfig(): TwilioConfig | null {
     whatsappFrom: textEnv("TWILIO_WHATSAPP_FROM"),
   };
 }
-function twilioCapabilities() {
+function deliveryCapabilities() {
   const config = twilioConfig();
   return {
     sms: Boolean(config && (config.smsFrom || config.messagingServiceSid)),
     whatsapp: Boolean(config && config.whatsappFrom),
+    email_bridge: Boolean(emailBridgeUrl()),
   };
 }
 function formatAppointmentTime(value: string, timezone: string): string {
@@ -135,9 +155,90 @@ async function getReminderCommunication(supabase: any, reminder: any) {
   return data;
 }
 
+async function dispatchConnectedEmailReminder(supabase: any, reminder: any, schedulerToken: string) {
+  const bridge = emailBridgeUrl();
+  if (!bridge) {
+    await updateReminder(supabase, reminder.id, {
+      status: "skipped",
+      next_attempt_at: null,
+      last_error: "provider_not_configured:email_bridge",
+    });
+    return { id: reminder.id, status: "skipped", channel: "email", reason: "provider_not_configured:email_bridge" };
+  }
+
+  let bridgeResponse: Response;
+  try {
+    bridgeResponse = await fetch(bridge, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${schedulerToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ reminder_id: reminder.id }),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (error) {
+    const { data: current } = await supabase
+      .from("retail_booking_reminders")
+      .select("status,provider_message_id,last_error")
+      .eq("id", reminder.id)
+      .maybeSingle();
+    if (current?.status === "sent") {
+      return { id: reminder.id, status: "sent", channel: "email", reconciled: true, provider_message_id: current.provider_message_id || null };
+    }
+    const reason = error instanceof Error ? `email_bridge_outcome_unknown:${error.message}` : "email_bridge_outcome_unknown";
+    await updateReminder(supabase, reminder.id, { status: "failed", next_attempt_at: null, last_error: reason.slice(0, 1800) });
+    return { id: reminder.id, status: "failed", channel: "email", reason: "email_bridge_outcome_unknown" };
+  }
+
+  const raw = (await bridgeResponse.text()).slice(0, 12_000);
+  let payload: Record<string, unknown> = {};
+  if (raw) {
+    try { payload = JSON.parse(raw) as Record<string, unknown>; }
+    catch { payload = {}; }
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from("retail_booking_reminders")
+    .select("status,provider_message_id,last_error")
+    .eq("id", reminder.id)
+    .maybeSingle();
+  if (currentError) throw new Error(`email_bridge_reconcile_failed:${currentError.message}`);
+  if (current?.status === "sent") {
+    return { id: reminder.id, status: "sent", channel: "email", reconciled: true, provider_message_id: current.provider_message_id || null };
+  }
+  if (["failed", "skipped", "cancelled"].includes(String(current?.status || ""))) {
+    return { id: reminder.id, status: String(current.status), channel: "email", reason: current.last_error || null };
+  }
+
+  if (!bridgeResponse.ok) {
+    const reason = `email_bridge_rejected:${bridgeResponse.status}`;
+    await updateReminder(supabase, reminder.id, { status: "failed", next_attempt_at: null, last_error: reason });
+    return { id: reminder.id, status: "failed", channel: "email", reason };
+  }
+
+  const result = objectValue(payload.result);
+  const status = typeof result.status === "string" ? result.status : "failed";
+  if (status === "sent" || status === "reconciled") {
+    const providerMessageId = typeof result.provider_message_id === "string" ? result.provider_message_id : null;
+    await updateReminder(supabase, reminder.id, {
+      status: "sent",
+      next_attempt_at: null,
+      ...(providerMessageId ? { provider_message_id: providerMessageId } : {}),
+      last_error: null,
+    });
+    return { id: reminder.id, status: "sent", channel: "email", provider: result.provider || null, provider_message_id: providerMessageId };
+  }
+
+  const reason = typeof result.reason === "string" ? result.reason.slice(0, 1800) : "email_bridge_did_not_finalize";
+  await updateReminder(supabase, reminder.id, { status: status === "skipped" ? "skipped" : "failed", next_attempt_at: null, last_error: reason });
+  return { id: reminder.id, status: status === "skipped" ? "skipped" : "failed", channel: "email", reason };
+}
+
 async function dispatchTwilioReminder(supabase: any, reminder: any, appointment: any, workspace: any, nextAttempt: number) {
   const config = twilioConfig();
-  const capabilities = twilioCapabilities();
+  const capabilities = deliveryCapabilities();
   const channel = String(reminder.channel);
   if (!config || (channel === "sms" && !capabilities.sms) || (channel === "whatsapp" && !capabilities.whatsapp)) {
     await updateReminder(supabase, reminder.id, {
@@ -401,7 +502,7 @@ async function dispatchTwilioReminder(supabase: any, reminder: any, appointment:
   };
 }
 
-async function dispatchOne(supabase: any, reminder: any) {
+async function dispatchOne(supabase: any, reminder: any, schedulerToken: string) {
   const now = new Date().toISOString();
   if (Number(reminder.attempt_count || 0) >= Number(reminder.max_attempts || 5)) {
     await updateReminder(supabase, reminder.id, { status: "failed", next_attempt_at: null, last_error: "max_attempts_exhausted" });
@@ -445,6 +546,9 @@ async function dispatchOne(supabase: any, reminder: any) {
 
     if (["sms", "whatsapp"].includes(String(reminder.channel))) {
       return await dispatchTwilioReminder(supabase, reminder, appointment, workspace, nextAttempt);
+    }
+    if (reminder.channel === "email") {
+      return await dispatchConnectedEmailReminder(supabase, reminder, schedulerToken);
     }
 
     if (reminder.channel !== "in_app") {
@@ -497,6 +601,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   if (!supabaseUrl || !serviceKey) return response({ error: "server_configuration_missing" }, 500);
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const schedulerToken = bearer(req);
   if (!(await authorized(supabase, req))) return response({ error: "unauthorized" }, 401);
 
   const now = new Date().toISOString();
@@ -511,6 +616,6 @@ Deno.serve(async (req: Request) => {
   if (error) return response({ error: "queue_load_failed", detail: error.message }, 500);
 
   const results = [];
-  for (const reminder of due || []) results.push(await dispatchOne(supabase, reminder));
-  return response({ ok: true, checked: results.length, capabilities: twilioCapabilities(), results });
+  for (const reminder of due || []) results.push(await dispatchOne(supabase, reminder, schedulerToken));
+  return response({ ok: true, checked: results.length, capabilities: deliveryCapabilities(), results });
 });
