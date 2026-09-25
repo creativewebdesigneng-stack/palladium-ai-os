@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
-import { formDynamicAgentTeam, type TeamAgentCandidate } from './dynamic-teams'
+import { buildDynamicTeamCandidates, formDynamicAgentTeam } from './dynamic-teams'
 
 type Sb = { from: (table: string) => any }
 
@@ -21,35 +21,7 @@ const inputSchema = z.object({
   maxActiveWorkloads: z.number().int().min(0).max(20).optional(),
 })
 
-export function buildDynamicTeamCandidates(agents: AgentRow[], tasks: TaskRow[]): TeamAgentCandidate[] {
-  const byAgent = new Map<string, TaskRow[]>()
-  for (const task of tasks) {
-    const rows = byAgent.get(task.agent_id) ?? []
-    rows.push(task)
-    byAgent.set(task.agent_id, rows)
-  }
-
-  return agents.map((agent) => {
-    const history = byAgent.get(agent.id) ?? []
-    const completed = history.filter((task) => ['completed', 'succeeded'].includes(String(task.status))).length
-    const failed = history.filter((task) => ['failed', 'cancelled'].includes(String(task.status))).length
-    const finished = completed + failed
-    const trustScore = finished > 0 ? completed / finished : 0.75
-    const activeWorkloads = history.filter((task) => ['queued', 'running', 'waiting_for_approval'].includes(String(task.status))).length
-    const capabilities = [...new Set([
-      ...(agent.allowed_tools ?? []),
-      ...(agent.operating_profile?.skills ?? []),
-    ].map((value) => String(value).trim()).filter(Boolean))]
-
-    return {
-      agentId: agent.id,
-      capabilities,
-      trustScore,
-      available: true,
-      activeWorkloads,
-    }
-  })
-}
+export { buildDynamicTeamCandidates }
 
 export const planDynamicAgentTeam = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
