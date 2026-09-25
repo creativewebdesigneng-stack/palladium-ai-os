@@ -23,7 +23,7 @@ create table if not exists public.marketplace_provider_disputes (
   evidence_due_at timestamptz,
   pre_dispute_status text check (pre_dispute_status in ('paid','fulfilled')),
   livemode boolean not null,
-  last_event_id text not null,
+  last_event_id text not null,\n  last_event_created_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -37,7 +37,7 @@ create table if not exists public.marketplace_provider_dispute_events (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.marketplace_orders(id) on delete cascade,
   stripe_dispute_id text not null,
-  stripe_event_id text not null unique,
+  stripe_event_id text not null unique,\n  stripe_event_created_at timestamptz not null,
   provider_status text not null,
   disputed_pence bigint not null check (disputed_pence > 0),
   currency text not null check (currency='GBP'),
