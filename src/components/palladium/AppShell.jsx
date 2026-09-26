@@ -34,6 +34,7 @@ export default function AppShell() {
   const { unread } = useRealtimeNotifications()
   const { pathname } = useLocation()
   const room = roomClass(pathname)
+  const mission = pathname.startsWith('/mission-control')
 
   useEffect(() => {
     const handler = (e) => {
@@ -44,7 +45,7 @@ export default function AppShell() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const stage = pathname.startsWith('/mission-control') ? (
+  const stage = mission ? (
     <CommandTheatre>
       <Outlet />
     </CommandTheatre>
@@ -60,8 +61,8 @@ export default function AppShell() {
     <UpgradeProvider>
       <div className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${room}`}>
         <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
-        <div aria-hidden className="pointer-events-none fixed inset-0 -z-40 opacity-55">
-          <SpaceBackground intensity="low" />
+        <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-80' : 'opacity-55'}`}>
+          <SpaceBackground intensity={mission ? 'medium' : 'low'} />
         </div>
         <div
           aria-hidden
