@@ -93,6 +93,21 @@
   animation: astra-theatre-pulse 7s var(--astra-ease) infinite;
 }
 
+.astra-theatre-corner {
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(123, 92, 255, 0.55);
+  border-style: solid;
+}
+
+.astra-theatre-corner-tl { top: 6px; left: 6px; border-width: 1px 0 0 1px; }
+.astra-theatre-corner-tr { top: 6px; right: 6px; border-width: 1px 1px 0 0; }
+.astra-theatre-corner-bl { bottom: 6px; left: 6px; border-width: 0 0 1px 1px; }
+.astra-theatre-corner-br { bottom: 6px; right: 6px; border-width: 0 1px 1px 0; }
+
 .astra-room-label {
   font-size: 10px;
   font-weight: 600;
