@@ -93,6 +93,13 @@
   animation: astra-theatre-pulse 7s var(--astra-ease) infinite;
 }
 
+.astra-room-frame {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 0.15rem;
+  box-shadow: 0 0 0 1px rgba(232, 230, 240, 0.06);
+}
+
 .astra-theatre-corner {
   pointer-events: none;
   position: absolute;
