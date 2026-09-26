@@ -14,6 +14,7 @@ Additive identity on the existing Blackstar shell. Does not rebuild Mission Cont
 
 - Void five-point star, metal facet stroke, aperture
 - 18s orbital ring (off under `prefers-reduced-motion`)
+- Live states: ready, syncing, executing, attention, alert
 
 Mounted on:
 
@@ -23,6 +24,23 @@ Mounted on:
 - `PageHeader` / `PrimarySurfaceFrame`
 - Mission Control deck header and holographic core
 - Document title in `src/routes/__root.tsx`
+
+## Rooms
+
+`AppShell` assigns `astra-room-*` by route.
+
+- Mission Control uses `CommandTheatre` on a 1920px stage
+- Hub, workforce, finance, legal, studio, memory and admin use `AstraRoomFrame`
+- Each named room has a wash, scanline, caption and inset
+- CSS motion is disabled under `prefers-reduced-motion`
+
+## Depth field
+
+`src/components/blackstar/AstraDepthField.jsx` — one WebGL context behind the shell.
+
+- Room palettes and distinct core meshes
+- Non-interactive; operational UI stays stable
+- Mobile particle cap; reduced-motion renders one frame
 
 ## Tokens
 
@@ -34,8 +52,7 @@ Mounted on:
 - ready amber `#C9A227` (judgment)
 - red stays incident-only
 
-`AppShell` tints the existing spatial field by route (`astra-room-*`).
-
 ## Honesty
 
 Owner-scoped live data only. No fabricated globe or market feed. External writes stay on existing approval gates.
+This layer is not 100% of the original 3D brief. Unique full scenes and a rebuilt command-room page are still open.
