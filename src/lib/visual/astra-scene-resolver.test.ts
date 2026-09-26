@@ -39,7 +39,7 @@ describe("Blackstar route-specific 3D scenes", () => {
     ["/models", "models"],
   ])("maps %s to %s", (pathname, scene) => {
     expect(resolveAstraScene(pathname)).toBe(scene);
-    expect(ASTRA_SCENES[scene]).toBeTruthy();
+    expect(ASTRA_SCENES[scene as keyof typeof ASTRA_SCENES]).toBeTruthy();
   });
 
   it("falls back safely for routes without a dedicated scene", () => {
