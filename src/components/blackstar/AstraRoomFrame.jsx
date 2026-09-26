@@ -17,7 +17,7 @@ export default function AstraRoomFrame({ children, room }) {
       <span aria-hidden className="astra-theatre-corner astra-theatre-corner-bl" />
       <span aria-hidden className="astra-theatre-corner astra-theatre-corner-br" />
       {label ? <p className="astra-room-label px-3 pt-2">{label}</p> : null}
-      {children}
+      <div className="px-2 pb-3 pt-1 lg:px-3">{children}</div>
     </div>
   )
 }
