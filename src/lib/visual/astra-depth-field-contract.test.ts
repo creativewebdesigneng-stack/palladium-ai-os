@@ -10,6 +10,10 @@ describe("Blackstar Astra WebGL depth field contract", () => {
     new URL("../../components/palladium/AppShell.jsx", import.meta.url),
     "utf8",
   );
+  const scenes = readFileSync(
+    new URL("../../components/blackstar/astra-scenes.js", import.meta.url),
+    "utf8",
+  );
 
   it("uses the installed Three.js runtime as a progressive enhancement", () => {
     expect(depth).toContain("await import('three')");
@@ -43,22 +47,41 @@ describe("Blackstar Astra WebGL depth field contract", () => {
     expect(depth).toContain("renderer?.dispose()");
   });
 
-  it("provides distinct room palettes and mounts behind the operational shell", () => {
-    for (const room of [
-      "astra-room-mission",
-      "astra-room-hub",
-      "astra-room-workforce",
-      "astra-room-finance",
-      "astra-room-legal",
-      "astra-room-studio",
-      "astra-room-memory",
-      "astra-room-admin",
+  it("provides distinct scene composition and mounts behind the operational shell", () => {
+    for (const scene of [
+      "mission",
+      "ai-hub",
+      "agents",
+      "workforce",
+      "finance",
+      "trading",
+      "legal",
+      "compliance",
+      "cinema",
+      "game-foundry",
+      "website-studio",
+      "marketplace",
+      "company",
+      "industry",
+      "construction",
+      "retail",
+      "health",
+      "memory",
+      "knowledge",
+      "projects",
+      "developer",
+      "automation",
+      "security",
+      "admin",
     ]) {
-      expect(depth).toContain(room);
+      expect(scenes).toContain(`${scene}:`);
     }
-    expect(shell).toContain("import AstraDepthField from '@/components/blackstar/AstraDepthField'");
-    expect(shell).toContain("<AstraDepthField room={room} />");
-    expect(shell.indexOf("<AstraDepthField room={room} />"))
+    expect(depth).toContain("ASTRA_SCENES[sceneKey]");
+    expect(depth).toContain("camera.position.set(...palette.camera)");
+    expect(depth).toContain("core.position.set(...palette.core)");
+    expect(shell).toContain("import { resolveAstraScene } from '@/components/blackstar/astra-scenes'");
+    expect(shell).toContain("<AstraDepthField room={room} sceneKey={scene} />");
+    expect(shell.indexOf("<AstraDepthField room={room} sceneKey={scene} />"))
       .toBeLessThan(shell.indexOf("<Sidebar"));
   });
 });
