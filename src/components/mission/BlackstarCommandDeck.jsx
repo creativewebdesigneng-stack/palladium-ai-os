@@ -93,7 +93,7 @@ function OrbitNode({ icon: Icon, label, value, className, delay = 0, tone = 'cya
   );
 }
 
-function HolographicCore({ metrics = {} }) {
+function HolographicCore({ metrics = {}, markState = 'ready' }) {
   const reduced = useReducedMotion();
   const activeAgents = Number(metrics.activeAgents || 0);
   const running = Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
@@ -106,7 +106,7 @@ function HolographicCore({ metrics = {} }) {
       </motion.div>
       <motion.div className="absolute left-1/2 top-[52%] h-[270px] w-[270px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/25" animate={{ rotate: -360 }} transition={{ duration: reduced ? 38 : 15, repeat: Infinity, ease: 'linear' }} />
       <motion.div className="absolute left-1/2 top-[52%] h-[205px] w-[205px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-violet-100/15" animate={{ rotate: 360 }} transition={{ duration: reduced ? 30 : 11, repeat: Infinity, ease: 'linear' }} />
-      <div className="absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2"><AstraMark size={108} /></div>
+      <div className="absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2"><AstraMark size={108} state={markState} title="Blackstar Astra operational core" /></div>
       <motion.div className="absolute inset-x-[18%] bottom-[10%] h-12 rounded-[50%] border border-violet-300/25" animate={{ scaleX: [0.92, 1.04, 0.92], opacity: [0.35, 0.9, 0.35] }} transition={{ duration: reduced ? 6 : 2.4, repeat: Infinity }} />
       <OrbitNode icon={Bot} label="Agents" value={`${activeAgents} online`} className="left-[8%] top-[16%]" delay={0} />
       <OrbitNode icon={ServerCog} label="MCP servers" value="Connected" className="right-[8%] top-[16%]" tone="emerald" delay={0.5} />
@@ -197,19 +197,30 @@ export default function BlackstarCommandDeck({ metrics = {}, approvals = [], not
   const now = useMissionClock();
   const pendingApprovals = approvals.filter((approval) => approval.status === 'pending').length;
   const failedTasks = tasks.filter((task) => task.status === 'failed').length;
+  const runningWork =
+    Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
+  const markState = loading
+    ? 'syncing'
+    : failedTasks
+      ? 'alert'
+      : runningWork > 0
+        ? 'executing'
+        : pendingApprovals
+          ? 'attention'
+          : 'ready';
   const health = failedTasks ? 'Attention required' : pendingApprovals ? 'Decisions pending' : 'Operational';
 
   return (
     <div className="overflow-hidden rounded-2xl border border-violet-300/12 bg-[#01050d] shadow-[0_30px_80px_rgba(0,0,0,.45)]">
       <div className="flex flex-wrap items-center gap-3 border-b border-white/7 bg-black/35 px-4 py-3">
-        <CommandDeckBrand />
+        <CommandDeckBrand state={markState} />
         <div className="ml-auto flex flex-wrap items-center gap-4 font-mono text-[9px] text-zinc-400"><span className="flex items-center gap-1.5"><motion.span className="h-1.5 w-1.5 rounded-full bg-emerald-300" animate={{ opacity: [0.25, 1, 0.25] }} transition={{ duration: 1.1, repeat: Infinity }} />REALTIME</span><span>{now.toLocaleTimeString('en-GB')}</span><span className={failedTasks ? 'text-rose-300' : pendingApprovals ? 'text-amber-300' : 'text-emerald-300'}>{health}</span></div>
       </div>
       <LiveTicker notifications={notifications} activities={activities} />
       <div className="grid xl:grid-cols-[180px_minmax(0,1fr)_300px]">
         <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Global infrastructure</div><p className="mt-2 text-[9px] text-zinc-500">Realtime data plane connected.</p></div></aside>
         <main className="space-y-3 p-3">
-          <HolographicCore metrics={metrics} />
+          <HolographicCore metrics={metrics} markState={markState} />
           <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} /></div>
           <MissionFeed activities={activities} />
         </main>
