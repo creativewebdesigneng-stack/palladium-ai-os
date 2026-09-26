@@ -1,5 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { createAiHubApprovalGate } from './approval.server'
 import {
   AI_HUB_CAPABILITY_KINDS,
   type AiHubCapabilityKind,
@@ -8,6 +10,12 @@ import {
 import { AiHubOrchestrator } from './orchestrator'
 import { planBlackstarOpportunityExecution } from './opportunity-execution'
 import type { BlackstarOpportunityActionRisk, BlackstarOpportunitySignalKind } from './opportunities'
+import {
+  buildOpportunityActionCards,
+  buildOwnerHubCapabilities,
+  type AutonomousGoalSignalSource,
+  type AutonomousRunSignalSource,
+} from './opportunity-actions'
 
 type StageInput = {
   id: string
@@ -125,6 +133,49 @@ export function validateOpportunityExecutionInput(input: unknown): OpportunityEx
   }
 }
 
+function serializeOpportunityPlan(plan: NonNullable<ReturnType<typeof planBlackstarOpportunityExecution>>) {
+  return {
+    ...plan,
+    intelligence: {
+      ...plan.intelligence,
+      stages: plan.intelligence.stages.map((stage) => ({
+        ...stage,
+        plan: {
+          ...stage.plan,
+          discovery: stage.plan.discovery.map((result) => ({
+            ...result,
+            capability: serializableCapability(result.capability),
+          })),
+          route: {
+            ...stage.plan.route,
+            capability: serializableCapability(stage.plan.route.capability),
+          },
+        },
+      })),
+    },
+  }
+}
+
+async function loadOwnerCapabilities(supabase: { from: (table: string) => any }, userId: string) {
+  const [agentsRes, workflowsRes] = await Promise.all([
+    supabase
+      .from('personal_agents')
+      .select('id,name,org_id,allowed_tools,status')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(100),
+    supabase
+      .from('workflows')
+      .select('id,name,org_id,status')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(100),
+  ])
+  if (agentsRes.error) throw new Error(agentsRes.error.message)
+  if (workflowsRes.error) throw new Error(workflowsRes.error.message)
+  return buildOwnerHubCapabilities(agentsRes.data ?? [], workflowsRes.data ?? [])
+}
+
 /**
  * Authenticated planning boundary for Blackstar Opportunity Execution. It uses
  * the user's existing active agents/workflows as routable capabilities and
@@ -134,44 +185,7 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
   .middleware([requireSupabaseAuth])
   .inputValidator(validateOpportunityExecutionInput)
   .handler(async ({ data, context }) => {
-    const [agentsRes, workflowsRes] = await Promise.all([
-      context.supabase
-        .from('personal_agents')
-        .select('id,name,org_id,allowed_tools,status')
-        .eq('user_id', context.userId)
-        .eq('status', 'active')
-        .limit(100),
-      context.supabase
-        .from('workflows')
-        .select('id,name,org_id,status')
-        .eq('user_id', context.userId)
-        .eq('status', 'active')
-        .limit(100),
-    ])
-    if (agentsRes.error) throw new Error(agentsRes.error.message)
-    if (workflowsRes.error) throw new Error(workflowsRes.error.message)
-
-    const capabilities: AiHubCapabilityRef[] = [
-      ...(agentsRes.data ?? []).map((agent): AiHubCapabilityRef => ({
-        id: agent.id,
-        kind: 'agent',
-        providerId: 'palladium-agent-runtime',
-        name: agent.name,
-        capabilities: ['agent-execution', ...((agent.allowed_tools ?? []) as string[])],
-        deploymentTargets: ['palladium-cloud'],
-        metadata: { orgId: agent.org_id ?? null },
-      })),
-      ...(workflowsRes.data ?? []).map((workflow): AiHubCapabilityRef => ({
-        id: workflow.id,
-        kind: 'workflow',
-        providerId: 'palladium-workflows',
-        name: workflow.name,
-        capabilities: ['workflow-execution'],
-        deploymentTargets: ['palladium-cloud'],
-        metadata: { orgId: workflow.org_id ?? null },
-      })),
-    ]
-
+    const capabilities = await loadOwnerCapabilities(context.supabase, context.userId)
     const orchestrator = new AiHubOrchestrator(() => capabilities)
     const tenantId = context.userId
     const plan = planBlackstarOpportunityExecution({
@@ -203,30 +217,143 @@ export const planBlackstarOpportunityExecutionServer = createServerFn({ method: 
       }
     }
 
-    const serializablePlan = {
-      ...plan,
-      intelligence: {
-        ...plan.intelligence,
-        stages: plan.intelligence.stages.map((stage) => ({
-          ...stage,
-          plan: {
-            ...stage.plan,
-            discovery: stage.plan.discovery.map((result) => ({
-              ...result,
-              capability: serializableCapability(result.capability),
-            })),
-            route: {
-              ...stage.plan.route,
-              capability: serializableCapability(stage.plan.route.capability),
-            },
-          },
-        })),
-      },
-    }
-
     return {
       status: plan.status,
-      plan: serializablePlan,
+      plan: serializeOpportunityPlan(plan),
       availableCapabilities: capabilities.length,
+    }
+  })
+
+const recommendInputSchema = z.object({
+  maximumRecommendations: z.number().int().min(1).max(8).optional(),
+})
+
+export function validateOpportunityRecommendInput(input: unknown) {
+  return recommendInputSchema.parse(input ?? {})
+}
+
+/**
+ * Rank owner-scoped Autonomous OS goals into recommended actions and plan
+ * them against the owner's existing agents/workflows. Listing never executes
+ * and never inserts approval rows.
+ */
+export const recommendBlackstarOpportunityActions = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(validateOpportunityRecommendInput)
+  .handler(async ({ data, context }) => {
+    const [goalsRes, runsRes, capabilities] = await Promise.all([
+      context.supabase
+        .from('autonomous_goals')
+        .select('id,name,objective,status,autonomy_level,trigger_type,budget_pence,last_scheduler_error,scheduler_attempts,trigger_config')
+        .eq('user_id', context.userId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      context.supabase
+        .from('autonomous_goal_runs')
+        .select('goal_id,status,error,created_at')
+        .eq('user_id', context.userId)
+        .order('created_at', { ascending: false })
+        .limit(100),
+      loadOwnerCapabilities(context.supabase, context.userId),
+    ])
+    if (goalsRes.error) throw new Error(goalsRes.error.message)
+    if (runsRes.error) throw new Error(runsRes.error.message)
+
+    const cards = buildOpportunityActionCards({
+      tenantId: context.userId,
+      actorId: context.userId,
+      goals: (goalsRes.data ?? []) as AutonomousGoalSignalSource[],
+      runs: (runsRes.data ?? []) as AutonomousRunSignalSource[],
+      capabilities,
+      maximumRecommendations: data.maximumRecommendations,
+    })
+
+    return {
+      engine: 'blackstar_opportunity_execution' as const,
+      availableCapabilities: capabilities.length,
+      actions: cards.map((card) => ({
+        goalId: card.goalId,
+        title: card.recommendation.title,
+        kind: card.recommendation.kind,
+        score: card.recommendation.score,
+        confidence: card.recommendation.confidence,
+        recommendedAction: card.recommendation.recommendedAction,
+        actionRisk: card.recommendation.actionRisk,
+        requiresApproval: card.recommendation.requiresApproval || Boolean(card.plan?.requiresApproval),
+        evidence: card.recommendation.evidence,
+        routingStatus: card.routingStatus,
+        routedCapabilityIds: card.plan?.intelligence.capabilityIds ?? [],
+        policyChecks: card.plan?.policyChecks ?? card.recommendation.policyChecks,
+      })),
+    }
+  })
+
+const approvalInputSchema = z.object({
+  goalId: z.string().trim().min(1).max(120),
+})
+
+/**
+ * Open an existing Mission Control approval_requests row for a planned
+ * opportunity that the policy marked as approval-gated. Does not execute.
+ */
+export const requestBlackstarOpportunityApproval = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => approvalInputSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const [goalRes, capabilities] = await Promise.all([
+      context.supabase
+        .from('autonomous_goals')
+        .select('id,name,objective,status,autonomy_level,trigger_type,budget_pence,last_scheduler_error,scheduler_attempts,trigger_config')
+        .eq('user_id', context.userId)
+        .eq('id', data.goalId)
+        .maybeSingle(),
+      loadOwnerCapabilities(context.supabase, context.userId),
+    ])
+    if (goalRes.error) throw new Error(goalRes.error.message)
+    if (!goalRes.data) throw new Error('Autonomous goal not found.')
+
+    const runsRes = await context.supabase
+      .from('autonomous_goal_runs')
+      .select('goal_id,status,error,created_at')
+      .eq('user_id', context.userId)
+      .eq('goal_id', data.goalId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (runsRes.error) throw new Error(runsRes.error.message)
+
+    const [card] = buildOpportunityActionCards({
+      tenantId: context.userId,
+      actorId: context.userId,
+      goals: [goalRes.data as AutonomousGoalSignalSource],
+      runs: (runsRes.data ?? []) as AutonomousRunSignalSource[],
+      capabilities,
+      maximumRecommendations: 1,
+    })
+    if (!card?.plan) {
+      return { status: 'unroutable' as const, approvalRequestId: null, recommendedAction: null }
+    }
+    if (!card.plan.requiresApproval) {
+      return {
+        status: 'ready' as const,
+        approvalRequestId: null,
+        recommendedAction: card.plan.recommendedAction,
+      }
+    }
+
+    const stagePlan = card.plan.intelligence.stages.find((stage) => stage.plan.requiresApproval)?.plan
+      ?? card.plan.intelligence.stages[0]?.plan
+    if (!stagePlan) {
+      return { status: 'unroutable' as const, approvalRequestId: null, recommendedAction: card.plan.recommendedAction }
+    }
+
+    const gate = createAiHubApprovalGate(context.supabase)
+    const approvalRequestId = await gate.request(stagePlan, {
+      tenantId: context.userId,
+      actorId: context.userId,
+    })
+    return {
+      status: 'waiting_for_approval' as const,
+      approvalRequestId,
+      recommendedAction: card.plan.recommendedAction,
     }
   })
