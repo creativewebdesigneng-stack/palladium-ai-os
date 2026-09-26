@@ -27,6 +27,92 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes astra-counter-orbit {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes astra-core-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.14); }
+}
+
+@keyframes astra-state-halo {
+  0%, 100% { opacity: 0.08; transform: scale(0.84); }
+  50% { opacity: 0.48; transform: scale(1.18); }
+}
+
+.astra-ring-secondary,
+.astra-core,
+.astra-core-halo,
+.astra-star-facet {
+  transform-origin: 32px 32px;
+  transform-box: fill-box;
+}
+
+.astra-mark-live .astra-ring-secondary {
+  animation: astra-counter-orbit 27s linear infinite;
+}
+
+.astra-mark-live .astra-core {
+  animation: astra-core-breathe 4.8s var(--astra-ease) infinite;
+}
+
+.astra-mark-live[data-state='ready'] .astra-core {
+  stroke: #a78bfa;
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.38));
+}
+
+.astra-mark-live[data-state='syncing'] .astra-ring-primary {
+  animation-duration: 7s;
+}
+
+.astra-mark-live[data-state='syncing'] .astra-ring-secondary {
+  animation-duration: 11s;
+}
+
+.astra-mark-live[data-state='syncing'] .astra-core-halo {
+  animation: astra-state-halo 1.8s var(--astra-ease) infinite;
+}
+
+.astra-mark-live[data-state='executing'] .astra-ring-primary {
+  animation-duration: 3.6s;
+  filter: drop-shadow(0 0 3px rgba(123, 92, 255, 0.48));
+}
+
+.astra-mark-live[data-state='executing'] .astra-ring-secondary {
+  animation-duration: 6.5s;
+}
+
+.astra-mark-live[data-state='executing'] .astra-core,
+.astra-mark-live[data-state='executing'] .astra-core-halo {
+  animation: astra-state-halo 1.25s var(--astra-ease) infinite;
+  stroke: #c4b5fd;
+}
+
+.astra-mark-live[data-state='attention'] .astra-ring,
+.astra-mark-live[data-state='attention'] .astra-core,
+.astra-mark-live[data-state='attention'] .astra-core-halo {
+  stroke: #c9a227;
+}
+
+.astra-mark-live[data-state='attention'] .astra-core-halo {
+  animation: astra-state-halo 2.2s var(--astra-ease) infinite;
+}
+
+.astra-mark-live[data-state='alert'] .astra-ring,
+.astra-mark-live[data-state='alert'] .astra-core,
+.astra-mark-live[data-state='alert'] .astra-core-halo {
+  stroke: #fb7185;
+}
+
+.astra-mark-live[data-state='alert'] .astra-ring-primary {
+  animation-duration: 2.8s;
+}
+
+.astra-mark-live[data-state='alert'] .astra-core-halo {
+  animation: astra-state-halo 0.95s var(--astra-ease) infinite;
+}
+
 @keyframes astra-wash-drift {
   0% { filter: hue-rotate(0deg) saturate(1); }
   50% { filter: hue-rotate(8deg) saturate(1.08); }
@@ -240,6 +326,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .astra-mark-live .astra-ring,
+  .astra-mark-live .astra-core,
+  .astra-mark-live .astra-core-halo,
   .astra-room-wash,
   .astra-room-mission .astra-room-wash::before,
   .astra-room-hub .astra-room-wash::before,
