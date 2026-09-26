@@ -6,7 +6,7 @@ export default function CommandTheatre({ children }) {
       <span aria-hidden className="astra-theatre-corner astra-theatre-corner-bl" />
       <span aria-hidden className="astra-theatre-corner astra-theatre-corner-br" />
       <p className="astra-room-label px-3 pt-2">Blackstar mission theatre</p>
-      {children}
+      <div className="px-2 pb-3 pt-1 lg:px-3">{children}</div>
     </div>
   );
 }
