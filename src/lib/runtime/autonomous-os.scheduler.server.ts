@@ -1,6 +1,7 @@
 import { nextAutonomousRun } from "./autonomous-schedule";
 import { planOrchestratedGoal } from "./orchestrator.server";
 import { queueWorkflowRun } from "./workflow-queue.server";
+import { planFallbackAutonomousTeam } from "./autonomous-dynamic-team.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -82,7 +83,6 @@ function executionObjective(goal: GoalRow) {
 
 async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
   const assignments = Array.isArray(plan?.assignments) ? plan.assignments : [];
-  if (!assignments.length) return;
   const rows = assignments.map((assignment: any) => ({
     goal_id: goal.id,
     run_id: runId,
@@ -96,6 +96,32 @@ async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
     requires_approval: Boolean(assignment.requires_approval),
     status: "queued",
   }));
+
+  if (!rows.length) {
+    const fallback = await planFallbackAutonomousTeam(db, {
+      userId: goal.user_id,
+      missionId: goal.id,
+      objective: goal.objective,
+      maxTeamSize: Number(goal.max_parallel_agents ?? 4),
+    });
+    for (const agentId of fallback.agentIds) {
+      rows.push({
+        goal_id: goal.id,
+        run_id: runId,
+        user_id: goal.user_id,
+        agent_id: agentId,
+        assignment_id: `dynamic-team:${agentId}`,
+        title: "Dynamic team fallback",
+        objective: goal.objective.slice(0, 12_000),
+        depends_on: [],
+        success_criteria: fallback.coveredCapabilities,
+        requires_approval: goal.autonomy_level !== "autonomous",
+        status: "queued",
+      });
+    }
+  }
+
+  if (!rows.length) return;
   await db.from("autonomous_goal_fleet_assignments").insert(rows);
 }
 

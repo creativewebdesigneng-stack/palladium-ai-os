@@ -70,6 +70,16 @@ export function buildBrowserTaskComputerUsePlan(
   const requestedMax = Number(input["max_steps"] ?? 12);
   const maximumSteps = Math.min(20, Math.max(1, Number.isFinite(requestedMax) ? Math.trunc(requestedMax) : 12));
 
+  if (steps.length === 0) {
+    return {
+      allowedDomains: [...new Set(allowedDomains.map((value) => value.trim().toLowerCase().replace(/^www\./, "")).filter(Boolean))].slice(0, 50),
+      decisions: [],
+      executable: true,
+      requiresApproval: false,
+      blockedCount: 0,
+    };
+  }
+
   return buildBlackstarComputerUsePlan(steps, {
     allowedDomains,
     maximumSteps,
@@ -77,8 +87,84 @@ export function buildBrowserTaskComputerUsePlan(
     allowFormFill: false,
     allowClicks: true,
     allowStorageState: false,
-    // The existing ToolGrant/approval_requests boundary remains authoritative;
-    // this preflight must not create a second approval lifecycle.
+    requireApprovalForMutations: false,
+  });
+}
+
+const RECORDED_ACTION_MAP: Record<string, BlackstarComputerUseStep["action"] | null> = {
+  navigate: "navigate",
+  read: "read",
+  extract: "extract",
+  click: "click",
+  type: "type",
+  scroll: "scroll",
+  wait: "wait",
+  screenshot: "screenshot",
+  back: "back",
+  forward: "forward",
+  close: "close",
+  fill_form: "fill_form",
+  search: "read",
+  compare: "read",
+  prepare_checkout: null,
+};
+
+export type BrowserComputerUseVerdict = {
+  engine: "blackstar_computer_use";
+  executable: boolean;
+  requiresApproval: boolean;
+  blockedCount: number;
+  allowedDomains: string[];
+  reviewedSteps: number;
+  firstBlockReason: string | null;
+};
+
+export function summarizeBrowserComputerUsePlan(plan: BlackstarComputerUsePlan): BrowserComputerUseVerdict {
+  const firstBlocked = plan.decisions.find((decision) => !decision.allowed);
+  return {
+    engine: "blackstar_computer_use",
+    executable: plan.executable,
+    requiresApproval: plan.requiresApproval,
+    blockedCount: plan.blockedCount,
+    allowedDomains: plan.allowedDomains,
+    reviewedSteps: plan.decisions.length,
+    firstBlockReason: firstBlocked?.reason ?? null,
+  };
+}
+
+export function buildRecordedSessionComputerUsePlan(
+  steps: Array<{ kind?: unknown; target?: unknown; detail?: unknown }>,
+  allowedDomains: string[],
+): BlackstarComputerUsePlan {
+  const mapped: BlackstarComputerUseStep[] = [];
+  for (const step of steps.slice(0, 30)) {
+    const kind = text(step.kind, 40);
+    const action = RECORDED_ACTION_MAP[kind];
+    if (!action) continue;
+    const target = text(step.target, 2000);
+    const detail = text(step.detail, 500);
+    const mappedStep: BlackstarComputerUseStep = { action };
+    if (/^https?:\/\//i.test(target)) mappedStep.url = target;
+    else if (target) mappedStep.selector = target;
+    if (detail) mappedStep.purpose = detail;
+    mapped.push(mappedStep);
+  }
+  if (mapped.length === 0) {
+    return {
+      allowedDomains: [...new Set(allowedDomains.map((value) => value.trim().toLowerCase().replace(/^www\./, "")).filter(Boolean))].slice(0, 50),
+      decisions: [],
+      executable: true,
+      requiresApproval: false,
+      blockedCount: 0,
+    };
+  }
+  return buildBlackstarComputerUsePlan(mapped, {
+    allowedDomains,
+    maximumSteps: Math.min(30, Math.max(1, mapped.length)),
+    allowTyping: true,
+    allowFormFill: true,
+    allowClicks: true,
+    allowStorageState: false,
     requireApprovalForMutations: false,
   });
 }

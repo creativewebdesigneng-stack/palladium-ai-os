@@ -101,24 +101,60 @@ export default function ComputerControl() {
           </Panel>
         </div>
 
-        <Panel title="Enforced safeguards" icon={ShieldCheck} tint="text-emerald-400">
-          <ul className="space-y-2 text-[11px] text-zinc-300">
-            {[
-              { icon: ShieldCheck, text: 'Agents may only reach domains on your allow-list. Everything else is blocked server-side.' },
-              { icon: Wallet, text: 'Purchases can only be prepared. Payment requires your explicit approval in the Approval centre.' },
-              { icon: KeyRound, text: 'Agents never receive card numbers or payment credentials of any kind.' },
-              { icon: Activity, text: 'Every browser step and tool run is recorded and auditable.' },
-            ].map((s) => {
-              const I = s.icon;
-              return (
-                <li key={s.text} className="flex gap-2.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                  <I className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                  <span>{s.text}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
+        <div className="space-y-4">
+          <Panel title="Computer-use policy verdict" icon={ShieldCheck} tint="text-amber-300">
+            {isLoading ? (
+              <Center />
+            ) : !data?.policyPlan ? (
+              <Empty text="No recorded sessions to score against Blackstar Computer Use policy." />
+            ) : (
+              <div className="space-y-3 text-[11px] text-zinc-300">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 ${data.policyPlan.executable ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                    {data.policyPlan.executable ? 'executable under policy' : 'policy blocked'}
+                  </span>
+                  <span className="text-zinc-500">{data.policyPlan.reviewedSteps} reviewed steps</span>
+                  <span className="text-zinc-500">{data.policyPlan.blockedCount} blocked</span>
+                </div>
+                <p className="text-zinc-500">
+                  Engine {data.policyPlan.engine}. Recorded sessions are scored against the same allow-list and secret-class rules used before browser dispatch. This panel does not execute anything.
+                </p>
+                {data.policyPlan.firstBlockReason && (
+                  <p className="rounded-lg border border-rose-400/20 bg-rose-500/10 px-2.5 py-2 text-rose-200">
+                    {data.policyPlan.firstBlockReason}
+                  </p>
+                )}
+                {(data.sessionVerdicts ?? []).slice(0, 6).map((verdict) => (
+                  <div key={verdict.sessionId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/5 bg-black/20 px-2.5 py-1.5">
+                    <span className="font-mono text-zinc-400">{String(verdict.sessionId).slice(0, 8)}</span>
+                    <span className={verdict.executable ? 'text-emerald-300' : 'text-rose-300'}>
+                      {verdict.executable ? 'allowed' : 'blocked'} · {verdict.reviewedSteps} steps
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Enforced safeguards" icon={ShieldCheck} tint="text-emerald-400">
+            <ul className="space-y-2 text-[11px] text-zinc-300">
+              {[
+                { icon: ShieldCheck, text: 'Agents may only reach domains on your allow-list. Everything else is blocked server-side.' },
+                { icon: Wallet, text: 'Purchases can only be prepared. Payment requires your explicit approval in the Approval centre.' },
+                { icon: KeyRound, text: 'Agents never receive card numbers or payment credentials of any kind.' },
+                { icon: Activity, text: 'Every browser step and tool run is recorded and auditable.' },
+              ].map((s) => {
+                const I = s.icon;
+                return (
+                  <li key={s.text} className="flex gap-2.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                    <I className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                    <span>{s.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+        </div>
       </div>
     </>
   );
