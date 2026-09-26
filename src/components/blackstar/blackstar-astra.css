@@ -308,6 +308,17 @@
     radial-gradient(circle at 50% 0%, rgba(180, 170, 150, 0.06), transparent 36%);
 }
 
+.astra-room-legal .astra-room-wash::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  height: 6%;
+  background: linear-gradient(180deg, transparent, rgba(180, 170, 150, 0.10), transparent);
+  animation: astra-scan 22s linear infinite;
+}
+
 .astra-room-studio .astra-room-wash {
   background:
     radial-gradient(circle at 50% 30%, rgba(0, 0, 0, 0.2), transparent 40%),
@@ -346,6 +357,17 @@
   background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03), transparent 40%);
 }
 
+.astra-room-admin .astra-room-wash::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 24%;
+  right: 24%;
+  height: 5%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: astra-scan 24s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .astra-mark-live .astra-ring,
   .astra-mark-live .astra-core,
@@ -357,6 +379,8 @@
   .astra-room-finance .astra-room-wash::before,
   .astra-room-studio .astra-room-wash::before,
   .astra-room-memory .astra-room-wash::before,
+  .astra-room-legal .astra-room-wash::before,
+  .astra-room-admin .astra-room-wash::before,
   .astra-command-theatre {
     animation: none;
   }
