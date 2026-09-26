@@ -16,6 +16,17 @@ function paletteFor(room) {
   return ROOM_PALETTES[room] || ROOM_PALETTES['astra-room-default']
 }
 
+function coreGeometryFor(THREE, room, size) {
+  if (room === 'astra-room-finance') return new THREE.OctahedronGeometry(size, 0)
+  if (room === 'astra-room-legal') return new THREE.BoxGeometry(size * 1.15, size * 1.15, size * 1.15)
+  if (room === 'astra-room-studio') return new THREE.TetrahedronGeometry(size, 0)
+  if (room === 'astra-room-memory') return new THREE.DodecahedronGeometry(size * 0.92, 0)
+  if (room === 'astra-room-admin') return new THREE.OctahedronGeometry(size * 0.86, 0)
+  if (room === 'astra-room-workforce') return new THREE.IcosahedronGeometry(size * 0.9, 1)
+  if (room === 'astra-room-hub') return new THREE.IcosahedronGeometry(size, 1)
+  return new THREE.IcosahedronGeometry(size, 2)
+}
+
 /**
  * Low-cost WebGL depth field for the authenticated Blackstar shell.
  *
@@ -83,7 +94,8 @@ export default function AstraDepthField({
         root.rotation.x = -0.08
         scene.add(root)
 
-        coreGeometry = new THREE.IcosahedronGeometry(mobile ? 0.72 : mission ? 1.02 : 0.92, 2)
+        const coreSize = mobile ? 0.72 : mission ? 1.02 : 0.92
+        coreGeometry = coreGeometryFor(THREE, room, coreSize)
         coreMaterial = new THREE.MeshBasicMaterial({
           color: palette.primary,
           wireframe: true,
