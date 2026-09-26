@@ -27,6 +27,19 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes astra-wash-drift {
+  0% { filter: hue-rotate(0deg) saturate(1); }
+  50% { filter: hue-rotate(8deg) saturate(1.08); }
+  100% { filter: hue-rotate(0deg) saturate(1); }
+}
+
+@keyframes astra-scan {
+  0% { transform: translateY(-40%); opacity: 0; }
+  18% { opacity: 0.18; }
+  50% { opacity: 0.08; }
+  100% { transform: translateY(140%); opacity: 0; }
+}
+
 .astra-wordmark {
   display: inline-flex;
   align-items: center;
@@ -76,16 +89,46 @@
 }
 
 .astra-room-wash {
+  position: relative;
+  isolation: isolate;
   transition: background 700ms var(--astra-ease);
   background:
     radial-gradient(circle at 70% 8%, rgba(123, 92, 255, 0.10), transparent 25%),
     radial-gradient(circle at 28% 82%, rgba(56, 189, 248, 0.04), transparent 28%);
+  animation: astra-wash-drift 22s var(--astra-ease) infinite;
+}
+
+.astra-room-wash::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(232, 230, 240, 0.35), transparent),
+    radial-gradient(1px 1px at 28% 64%, rgba(123, 92, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 61% 22%, rgba(232, 230, 240, 0.22), transparent),
+    radial-gradient(1px 1px at 78% 71%, rgba(123, 92, 255, 0.28), transparent),
+    radial-gradient(1.5px 1.5px at 44% 48%, rgba(232, 230, 240, 0.18), transparent);
+  background-size: 100% 100%;
 }
 
 .astra-room-mission .astra-room-wash {
   background:
-    radial-gradient(circle at 50% 18%, rgba(123, 92, 255, 0.16), transparent 32%),
-    radial-gradient(circle at 80% 80%, rgba(201, 162, 39, 0.05), transparent 30%);
+    radial-gradient(circle at 50% 18%, rgba(123, 92, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 80% 80%, rgba(201, 162, 39, 0.06), transparent 30%);
+}
+
+.astra-room-mission .astra-room-wash::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 18%;
+  background: linear-gradient(180deg, transparent, rgba(123, 92, 255, 0.12), transparent);
+  animation: astra-scan 9s linear infinite;
 }
 
 .astra-room-hub .astra-room-wash {
@@ -128,7 +171,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .astra-mark-live .astra-ring {
+  .astra-mark-live .astra-ring,
+  .astra-room-wash,
+  .astra-room-mission .astra-room-wash::before {
     animation: none;
   }
   .astra-room-wash {
