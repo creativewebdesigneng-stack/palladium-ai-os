@@ -4,11 +4,11 @@ import { AstraWordmark } from "@/components/blackstar/AstraMark";
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
-    <div className="blackstar-auth-space relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020204] px-4 py-10 text-zinc-100">
-      <div aria-hidden className="absolute inset-0 -z-20 opacity-60"><SpaceBackground intensity="low" /></div>
+    <div className="blackstar-auth-space relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050508] px-4 py-10 text-zinc-100">
+      <div aria-hidden className="absolute inset-0 -z-20 opacity-70"><SpaceBackground intensity="medium" /></div>
       <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-a" />
       <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-b" />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(123,92,255,.14),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(0,0,0,.46)_100%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(123,92,255,.10),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(0,0,0,.55)_100%)]" />
       <div aria-hidden className="blackstar-auth-grid pointer-events-none absolute inset-0" />
 
       <div className="relative w-full max-w-md">
@@ -20,7 +20,7 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
           <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-violet-300/15 bg-violet-300/[.06] shadow-[0_0_38px_rgba(123,92,255,.12)]">
             <Icon className="h-5 w-5 text-violet-200" aria-hidden="true" />
           </div>
-          <p className="astra-room-label mb-2 text-violet-300/65">Secure Access Node</p>
+          <p className="astra-room-label mb-2 text-zinc-500">Void observatory access</p>
           <h1 className="text-3xl font-semibold tracking-[-.04em] text-white">{title}</h1>
           {subtitle && <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-white/45">{subtitle}</p>}
         </div>
