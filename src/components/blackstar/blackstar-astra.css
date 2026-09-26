@@ -172,6 +172,17 @@
     radial-gradient(circle at 86% 70%, rgba(167, 139, 250, 0.08), transparent 32%);
 }
 
+.astra-room-hub .astra-room-wash::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  height: 12%;
+  background: linear-gradient(180deg, transparent, rgba(167, 139, 250, 0.10), transparent);
+  animation: astra-scan 14s linear infinite;
+}
+
 .astra-room-workforce .astra-room-wash {
   background:
     radial-gradient(circle at 22% 12%, rgba(196, 181, 253, 0.10), transparent 26%),
@@ -209,6 +220,7 @@
   .astra-mark-live .astra-ring,
   .astra-room-wash,
   .astra-room-mission .astra-room-wash::before,
+  .astra-room-hub .astra-room-wash::before,
   .astra-command-theatre {
     animation: none;
   }
