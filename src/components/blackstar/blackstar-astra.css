@@ -206,6 +206,17 @@
     radial-gradient(circle at 80% 80%, rgba(123, 92, 255, 0.05), transparent 30%);
 }
 
+.astra-room-finance .astra-room-wash::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  height: 8%;
+  background: linear-gradient(180deg, transparent, rgba(34, 197, 94, 0.10), transparent);
+  animation: astra-scan 18s linear infinite;
+}
+
 .astra-room-legal .astra-room-wash {
   background:
     radial-gradient(circle at 50% 0%, rgba(180, 170, 150, 0.06), transparent 36%);
@@ -233,6 +244,7 @@
   .astra-room-mission .astra-room-wash::before,
   .astra-room-hub .astra-room-wash::before,
   .astra-room-workforce .astra-room-wash::before,
+  .astra-room-finance .astra-room-wash::before,
   .astra-command-theatre {
     animation: none;
   }
