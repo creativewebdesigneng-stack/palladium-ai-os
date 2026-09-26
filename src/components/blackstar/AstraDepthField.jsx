@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 const ROOM_PALETTES = {
-  'astra-room-mission': { primary: 0x7b5cff, secondary: 0xc9a227, density: 1.0 },
+  'astra-room-mission': { primary: 0x7b5cff, secondary: 0xc9a227, density: 1.18 },
   'astra-room-hub': { primary: 0x8b5cf6, secondary: 0xa78bfa, density: 0.95 },
   'astra-room-workforce': { primary: 0x8b5cf6, secondary: 0xc4b5fd, density: 0.9 },
   'astra-room-finance': { primary: 0x3a8f5c, secondary: 0x7b5cff, density: 0.72 },
@@ -58,6 +58,7 @@ export default function AstraDepthField({
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const mobile = window.matchMedia('(max-width: 767px)').matches
     const palette = paletteFor(room)
+    const mission = room === 'astra-room-mission'
 
     const boot = async () => {
       try {
@@ -82,12 +83,12 @@ export default function AstraDepthField({
         root.rotation.x = -0.08
         scene.add(root)
 
-        coreGeometry = new THREE.IcosahedronGeometry(mobile ? 0.72 : 0.92, 2)
+        coreGeometry = new THREE.IcosahedronGeometry(mobile ? 0.72 : mission ? 1.02 : 0.92, 2)
         coreMaterial = new THREE.MeshBasicMaterial({
           color: palette.primary,
           wireframe: true,
           transparent: true,
-          opacity: 0.14,
+          opacity: mission ? 0.2 : 0.14,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         })
@@ -95,7 +96,7 @@ export default function AstraDepthField({
         core.position.set(2.55, -0.55, -1.2)
         root.add(core)
 
-        haloGeometry = new THREE.SphereGeometry(mobile ? 1.04 : 1.34, 24, 16)
+        haloGeometry = new THREE.SphereGeometry(mobile ? 1.04 : mission ? 1.48 : 1.34, 24, 16)
         haloMaterial = new THREE.MeshBasicMaterial({
           color: palette.secondary,
           wireframe: true,
@@ -108,7 +109,7 @@ export default function AstraDepthField({
         halo.position.copy(core.position)
         root.add(halo)
 
-        ringAGeometry = new THREE.TorusGeometry(mobile ? 1.3 : 1.72, 0.012, 6, 96)
+        ringAGeometry = new THREE.TorusGeometry(mobile ? 1.3 : mission ? 1.88 : 1.72, 0.012, 6, 96)
         ringAMaterial = new THREE.MeshBasicMaterial({
           color: palette.primary,
           transparent: true,
