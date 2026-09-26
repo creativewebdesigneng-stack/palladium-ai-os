@@ -12,6 +12,7 @@ import { searchWorkspace } from '@/lib/search/search.functions';
 
 const PAGES = [
   ['Home', '/dashboard', Home],
+  ['Mission Control', '/mission-control', Globe],
   ['Fast Track', '/fast-track', Zap],
   ['Projects', '/projects', FolderKanban],
   ['AI Workforce', '/workforce', Users],
@@ -45,6 +46,7 @@ const PAGES = [
 
 const QUICK_ACTIONS = [
   { title: 'Open Fast Track', href: '/fast-track', icon: Zap },
+  { title: 'Open Mission Control', href: '/mission-control', icon: Globe },
   { title: 'Create new project', href: '/projects', icon: FolderKanban },
   { title: 'Create new agent', href: '/agent-builder', icon: Bot },
   { title: 'Create new workflow', href: '/automation', icon: Workflow },
@@ -204,7 +206,7 @@ export default function CommandMenu({ open, onClose }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Search pages, projects, agents, tasks, workflows and files…"
+                placeholder="Search Blackstar pages, projects, agents, tasks, workflows and files…"
                 aria-label="Command menu search"
                 className="h-14 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
               />
@@ -234,7 +236,7 @@ export default function CommandMenu({ open, onClose }) {
                 <span className="flex items-center gap-1"><kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5"><CornerDownLeft className="inline h-2.5 w-2.5" /></kbd> open</span>
                 <span className="hidden items-center gap-1 sm:flex"><kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5">ESC</kbd> close</span>
               </div>
-              <span className="flex items-center gap-1"><Command className="h-3 w-3" /> PalladiumAI Command</span>
+              <span className="flex items-center gap-1"><Command className="h-3 w-3" /> Blackstar Command</span>
             </div>
           </motion.div>
         </motion.div>
