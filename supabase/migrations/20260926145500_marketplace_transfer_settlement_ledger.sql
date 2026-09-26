@@ -125,10 +125,20 @@ begin
   if not found then raise exception 'marketplace settlement order not found'; end if;
   if v_order.seller_id<>p_seller_id
     or v_order.payment_provider<>'stripe'
-    or v_order.stripe_payment_intent_id is distinct from p_payment_intent_id
+    or (v_order.stripe_payment_intent_id is not null and v_order.stripe_payment_intent_id<>p_payment_intent_id)
     or v_order.sale_price_pence<>p_charge_pence
     or v_order.currency<>p_currency
   then raise exception 'marketplace settlement does not match authoritative order'; end if;
+
+  if v_order.stripe_payment_intent_id is null then
+    if v_order.status<>'pending' then
+      raise exception 'marketplace settlement cannot establish payment intent for non-pending order';
+    end if;
+    update public.marketplace_orders
+      set stripe_payment_intent_id=p_payment_intent_id
+      where id=p_order_id and stripe_payment_intent_id is null and status='pending';
+    if not found then raise exception 'marketplace payment intent link changed concurrently'; end if;
+  end if;
 
   select stripe_connected_account_id into v_seller_account
   from public.marketplace_seller_profiles
