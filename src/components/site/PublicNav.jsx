@@ -3,18 +3,7 @@ import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { isSignedIn } from '@/lib/authUiState';
-
-function Mark() {
-  return (
-    <span className="blackstar-brand-core relative grid h-10 w-10 shrink-0 place-items-center" aria-hidden="true">
-      <span className="blackstar-brand-orbit blackstar-brand-orbit-one" />
-      <span className="blackstar-brand-orbit blackstar-brand-orbit-two" />
-      <span className="blackstar-brand-center" />
-      <span className="blackstar-brand-cross blackstar-brand-cross-a" />
-      <span className="blackstar-brand-cross blackstar-brand-cross-b" />
-    </span>
-  );
-}
+import { AstraMark } from '@/components/blackstar/AstraMark';
 
 export default function PublicNav() {
   const [open, setOpen] = useState(false);
@@ -35,10 +24,10 @@ export default function PublicNav() {
     <header className="blackstar-public-nav fixed inset-x-0 top-0 z-50">
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3" aria-label="Blackstar home">
-          <Mark />
+          <AstraMark size={32} />
           <span>
             <span className="block text-sm font-semibold tracking-[.18em] text-white">BLACKSTAR</span>
-            <span className="hidden text-[7px] font-medium uppercase tracking-[.24em] text-zinc-600 lg:block">Intelligence Infrastructure</span>
+            <span className="hidden text-[7px] font-medium uppercase tracking-[.24em] text-zinc-600 lg:block">Astra-class intelligence</span>
           </span>
         </Link>
         <nav className="ml-10 hidden items-center gap-7 text-xs font-medium text-zinc-500 md:flex">

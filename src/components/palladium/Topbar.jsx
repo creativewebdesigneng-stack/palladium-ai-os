@@ -1,6 +1,7 @@
 import { Menu, PanelLeftClose, PanelLeftOpen, Search, SunMoon, Bell, HelpCircle, ChevronDown, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { AstraMark } from '@/components/blackstar/AstraMark';
 
 export default function Topbar({ collapsed, toggleSidebar, openMobile, openCommand, openAssistant, unread = 0 }) {
   const toggleTheme = () => document.documentElement.classList.toggle('palladium-dim');
@@ -26,8 +27,8 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
 
       <div className="ml-auto flex items-center gap-1">
         <div className="mr-2 hidden items-center gap-2 rounded-full border border-violet-400/10 bg-violet-500/[.035] px-2.5 py-1 text-[9px] font-medium uppercase tracking-[.16em] text-violet-300/70 xl:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_8px_rgba(196,181,253,.8)]" />
-          Intelligence online
+          <AstraMark size={14} />
+          Astra online
         </div>
         <button onClick={openAssistant} aria-label="AI Assistant" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-violet-500/[.06] hover:text-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:block">
           <Sparkles className="h-5 w-5" />

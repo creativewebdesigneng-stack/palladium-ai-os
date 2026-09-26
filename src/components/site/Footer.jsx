@@ -1,5 +1,5 @@
-import { Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AstraMark } from '@/components/blackstar/AstraMark';
 
 export default function Footer() {
   const cols = [
@@ -14,10 +14,10 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles className="h-4 w-4 text-white" /></span>
-              <span className="text-sm font-semibold text-white">Palladium<span className="text-violet-400">AI</span></span>
+              <AstraMark size={28} />
+              <span className="text-sm font-semibold tracking-[0.18em] text-white">BLACKSTAR</span>
             </div>
-            <p className="mt-4 max-w-xs text-sm text-zinc-500">The AI operating system for business, developers, and teams.</p>
+            <p className="mt-4 max-w-xs text-sm text-zinc-500">Bounded intelligence infrastructure. Astra-class engine under command.</p>
             <div className="mt-5 flex gap-3 text-zinc-500">
               <a href="#" className="rounded-lg border border-white/10 p-2 hover:text-white">Discord</a>
               <a href="#" className="rounded-lg border border-white/10 p-2 hover:text-white">GitHub</a>
@@ -42,8 +42,8 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-xs text-zinc-600 sm:flex-row">
-          <p>© {new Date().getFullYear()} PalladiumAI. All rights reserved.</p>
-          <p>Built for the future of work.</p>
+          <p>© {new Date().getFullYear()} Blackstar. All rights reserved.</p>
+          <p>Astra-class intelligence · Not claimed as AGI</p>
         </div>
       </div>
     </footer>

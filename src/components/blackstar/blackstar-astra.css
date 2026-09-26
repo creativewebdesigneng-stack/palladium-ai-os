@@ -1,0 +1,137 @@
+/* Astra visual layer — additive. Does not replace existing blackstar-* chrome. */
+
+:root {
+  --astra-void: #07070a;
+  --astra-ion: #e8e6f0;
+  --astra-violet: #7b5cff;
+  --astra-ready: #c9a227;
+  --astra-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.astra-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.astra-ring {
+  transform-origin: 32px 32px;
+  transform-box: fill-box;
+}
+
+.astra-mark-live .astra-ring {
+  animation: astra-orbit 18s linear infinite;
+}
+
+@keyframes astra-orbit {
+  to { transform: rotate(360deg); }
+}
+
+.astra-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.astra-wordmark-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.astra-wordmark-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--astra-ion);
+}
+
+.astra-wordmark-desc {
+  margin-top: 0.12rem;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 240, 0.38);
+}
+
+.astra-command-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  border: 1px solid rgba(232, 230, 240, 0.1);
+  background: linear-gradient(180deg, rgba(20, 22, 28, 0.92), rgba(8, 9, 12, 0.88));
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.astra-room-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 240, 0.38);
+}
+
+.astra-room-wash {
+  transition: background 700ms var(--astra-ease);
+  background:
+    radial-gradient(circle at 70% 8%, rgba(123, 92, 255, 0.10), transparent 25%),
+    radial-gradient(circle at 28% 82%, rgba(56, 189, 248, 0.04), transparent 28%);
+}
+
+.astra-room-mission .astra-room-wash {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(123, 92, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 80% 80%, rgba(201, 162, 39, 0.05), transparent 30%);
+}
+
+.astra-room-hub .astra-room-wash {
+  background:
+    radial-gradient(circle at 18% 20%, rgba(123, 92, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 86% 70%, rgba(167, 139, 250, 0.08), transparent 32%);
+}
+
+.astra-room-workforce .astra-room-wash {
+  background:
+    radial-gradient(circle at 22% 12%, rgba(196, 181, 253, 0.10), transparent 26%),
+    radial-gradient(circle at 70% 88%, rgba(123, 92, 255, 0.08), transparent 34%);
+}
+
+.astra-room-finance .astra-room-wash {
+  background:
+    radial-gradient(circle at 40% 10%, rgba(34, 80, 50, 0.22), transparent 34%),
+    radial-gradient(circle at 80% 80%, rgba(123, 92, 255, 0.05), transparent 30%);
+}
+
+.astra-room-legal .astra-room-wash {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(180, 170, 150, 0.06), transparent 36%);
+}
+
+.astra-room-studio .astra-room-wash {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(0, 0, 0, 0.2), transparent 40%),
+    radial-gradient(circle at 88% 12%, rgba(123, 92, 255, 0.10), transparent 24%);
+}
+
+.astra-room-memory .astra-room-wash {
+  background:
+    radial-gradient(circle at 30% 40%, rgba(123, 92, 255, 0.12), transparent 36%),
+    radial-gradient(circle at 70% 20%, rgba(232, 230, 240, 0.04), transparent 28%);
+}
+
+.astra-room-admin .astra-room-wash {
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03), transparent 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .astra-mark-live .astra-ring {
+    animation: none;
+  }
+  .astra-room-wash {
+    transition: none;
+  }
+}

@@ -1,19 +1,23 @@
 import React from 'react'
+import { AstraMark } from '@/components/blackstar/AstraMark'
 
 const cx = (...parts) => parts.filter(Boolean).join(' ')
 
 export function PrimarySurfaceFrame({ eyebrow = 'BLACKSTAR', title, description, actions, children, className = '' }) {
   return (
     <section className={cx('relative overflow-hidden rounded-[28px] border border-white/10 bg-black/45 p-5 shadow-[0_28px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-7', className)}>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.16),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.045),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(123,92,255,0.16),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.045),transparent_35%)]" />
       <div className="relative">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.32em] text-violet-300/80">{eyebrow}</div>
+            <div className="mb-3 flex items-center gap-3">
+              <AstraMark size={22} />
+              <div className="astra-room-label text-violet-300/80">{eyebrow}</div>
+            </div>
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">{title}</h1>
             {description ? <p className="mt-3 max-w-2xl text-sm leading-6 text-white/58 sm:text-base">{description}</p> : null}
           </div>
-          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="astra-command-bar">{actions}</div> : null}
         </div>
         <div className="mt-7">{children}</div>
       </div>
@@ -35,7 +39,7 @@ export function IntelligenceTile({ label, value, detail, tone = 'neutral', class
 
   return (
     <div className={cx('rounded-2xl border p-4 backdrop-blur-xl', toneClasses[tone] || toneClasses.neutral, className)}>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/42">{label}</div>
+      <div className="astra-room-label text-white/42">{label}</div>
       <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">{value}</div>
       {detail ? <div className="mt-2 text-xs leading-5 text-white/48">{detail}</div> : null}
     </div>
