@@ -79,6 +79,10 @@ export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
           payment_intent_data:{
             application_fee_amount:quote.feePence,
             transfer_data:{destination:seller.stripe_connected_account_id},
+            metadata:{
+              kind:'marketplace_purchase',order_id:order.id,listing_id:l.id,
+              buyer_id:context.userId,seller_id:l.seller_id,
+            },
           },
           success_url:`${base}/creator-marketplace?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url:`${base}/creator-marketplace?purchase=cancelled`,

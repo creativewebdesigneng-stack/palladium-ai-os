@@ -11,6 +11,7 @@ import {
   stripeProviderEventCreatedAt,
   verifyMarketplaceProviderDispute,
 } from "@/lib/marketplace/provider-dispute-evidence";
+import { buildMarketplaceSettlementEvidence, resolveMarketplaceSettlementProviderObjects } from "@/lib/marketplace/settlement-evidence";
 
 let _supabase: any = null;
 function getSupabase(): any {
@@ -271,6 +272,64 @@ async function recordMarketplaceRefundAudit(
   throw new Error("Could not persist the verified Marketplace refund event.");
 }
 
+async function reconcileMarketplaceSettlementEvent(event: any, env: StripeEnv, db: any) {
+  const stripe: any = createStripeClient(env);
+  const provider = await resolveMarketplaceSettlementProviderObjects(
+    event.type, event.data.object, stripe,
+  );
+  if (!provider) return;
+
+  const paymentIntent = provider.paymentIntent as any;
+  const paymentIntentId =
+    typeof paymentIntent?.id === "string" && paymentIntent.id.startsWith("pi_")
+      ? paymentIntent.id
+      : null;
+  if (!paymentIntentId) return;
+
+  const metadataOrderId =
+    paymentIntent?.metadata?.kind === "marketplace_purchase"
+      ? paymentIntent?.metadata?.order_id
+      : null;
+  if (paymentIntent?.metadata?.kind === "marketplace_purchase" &&
+      (typeof metadataOrderId !== "string" ||
+       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(metadataOrderId))) {
+    throw new Error("Marketplace settlement PaymentIntent has an invalid order reference.");
+  }
+
+  let orderQuery = db.from("marketplace_orders")
+    .select("id,seller_id,sale_price_pence,platform_fee_pence,currency,payment_provider,stripe_payment_intent_id");
+  orderQuery = metadataOrderId
+    ? orderQuery.eq("id", metadataOrderId)
+    : orderQuery.eq("stripe_payment_intent_id", paymentIntentId);
+  const { data: order, error: orderError } = await orderQuery.maybeSingle();
+  if (orderError) throw new Error("Could not inspect the Marketplace order settlement.");
+  if (!order) {
+    if (paymentIntent?.metadata?.kind === "marketplace_purchase") {
+      throw new Error("Marketplace settlement PaymentIntent has no recorded order.");
+    }
+    return;
+  }
+
+  const { data: seller, error: sellerError } = await db
+    .from("marketplace_seller_profiles")
+    .select("stripe_connected_account_id")
+    .eq("user_id", order.seller_id)
+    .maybeSingle();
+  if (sellerError || !seller?.stripe_connected_account_id) {
+    throw new Error("Marketplace settlement has no verified seller payout account.");
+  }
+
+  const evidence = buildMarketplaceSettlementEvidence(
+    event, provider, order, seller.stripe_connected_account_id, env,
+  );
+  const { data, error } = await db.rpc(
+    "blackstar_reconcile_marketplace_settlement", evidence,
+  );
+  if (error || data !== "applied") {
+    throw new Error("Could not reconcile Marketplace Stripe settlement evidence.");
+  }
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event: any = await verifyWebhook(req, env);
 
@@ -296,6 +355,14 @@ async function handleWebhook(req: Request, env: StripeEnv) {
       break;
     case "invoice.payment_failed":
       await markPaymentFailed(event.data.object, env);
+      break;
+    case "charge.succeeded":
+    case "transfer.created":
+    case "transfer.updated":
+    case "transfer.reversed":
+    case "application_fee.created":
+    case "application_fee.refunded":
+      await reconcileMarketplaceSettlementEvent(event, env, db);
       break;
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
