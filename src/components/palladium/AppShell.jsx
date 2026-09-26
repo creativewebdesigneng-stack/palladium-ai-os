@@ -92,7 +92,7 @@ export default function AppShell() {
             openAssistant={() => setAssistantPanel(true)}
             unread={unread}
           />
-          <main className="blackstar-stage relative mx-auto max-w-[1740px] p-4 lg:p-7 xl:p-8">
+          <main className={`blackstar-stage relative mx-auto ${mission ? 'max-w-[1920px] p-3 lg:p-5 xl:p-6' : 'max-w-[1740px] p-4 lg:p-7 xl:p-8'}`}>
             <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-40 bg-gradient-to-b from-violet-500/[.035] via-violet-500/[.01] to-transparent blur-3xl" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
