@@ -8,6 +8,7 @@ import SpaceBackground from '@/components/visual/SpaceBackground'
 import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
 import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
+import AstraDepthField from '@/components/blackstar/AstraDepthField'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
@@ -61,6 +62,13 @@ export default function AppShell() {
         <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-40 opacity-55">
           <SpaceBackground intensity="low" />
+        </div>
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 opacity-75"
+          style={{ zIndex: -35 }}
+        >
+          <AstraDepthField room={room} />
         </div>
         <div aria-hidden className="blackstar-spatial-field fixed inset-0 -z-30">
           <span className="blackstar-orb blackstar-orb-a" />
