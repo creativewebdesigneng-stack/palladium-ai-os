@@ -19,8 +19,9 @@ export async function resolveMarketplaceSettlementProviderObjects(
     charges: { retrieve: (id: string) => Promise<any> };
     transfers: { retrieve: (id: string) => Promise<any> };
     applicationFees: { retrieve: (id: string) => Promise<any> };
+    paymentIntents: { retrieve: (id: string) => Promise<any> };
   },
-): Promise<{ charge: any; transfer: any | null; applicationFee: any | null } | null> {
+): Promise<{ charge: any; transfer: any | null; applicationFee: any | null; paymentIntent: any } | null> {
   let charge: any = null;
   let transfer: any | null = null;
   let applicationFee: any | null = null;
@@ -43,6 +44,7 @@ export async function resolveMarketplaceSettlementProviderObjects(
 
   const paymentIntentId = providerId(charge?.payment_intent, "pi_");
   if (!paymentIntentId) return null;
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
   if (!transfer) {
     const transferId = providerId(charge?.transfer, "tr_");
@@ -53,7 +55,7 @@ export async function resolveMarketplaceSettlementProviderObjects(
     if (feeId) applicationFee = await stripe.applicationFees.retrieve(feeId);
   }
 
-  return { charge, transfer, applicationFee };
+  return { charge, transfer, applicationFee, paymentIntent };
 }
 
 export function buildMarketplaceSettlementEvidence(
@@ -80,11 +82,19 @@ export function buildMarketplaceSettlementEvidence(
     throw new Error("Marketplace settlement event identity is invalid.");
   }
   const charge = provider.charge;
+  const paymentIntent = (provider as any).paymentIntent;
   const chargeId = providerId(charge?.id, "ch_");
   const paymentIntentId = providerId(charge?.payment_intent, "pi_");
+  const retrievedPaymentIntentId = providerId(paymentIntent?.id, "pi_");
   const chargeDestination = providerId(charge?.transfer_data?.destination, "acct_");
-  if (!chargeId || !paymentIntentId ||
-      paymentIntentId !== order.stripe_payment_intent_id ||
+  if (!chargeId || !paymentIntentId || retrievedPaymentIntentId !== paymentIntentId ||
+      (order.stripe_payment_intent_id !== null && paymentIntentId !== order.stripe_payment_intent_id) ||
+      paymentIntent?.metadata?.kind !== "marketplace_purchase" ||
+      paymentIntent?.metadata?.order_id !== order.id ||
+      paymentIntent?.metadata?.seller_id !== order.seller_id ||
+      !Number.isSafeInteger(paymentIntent?.amount) || paymentIntent.amount !== order.sale_price_pence ||
+      paymentIntent?.currency?.toUpperCase() !== "GBP" ||
+      paymentIntent?.livemode !== (environment === "live") ||
       order.payment_provider !== "stripe" ||
       !Number.isSafeInteger(order.sale_price_pence) || order.sale_price_pence <= 0 ||
       !Number.isSafeInteger(order.platform_fee_pence) || order.platform_fee_pence < 0 ||
