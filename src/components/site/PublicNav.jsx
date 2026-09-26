@@ -27,7 +27,7 @@ export default function PublicNav() {
           <AstraMark size={32} />
           <span>
             <span className="block text-sm font-semibold tracking-[.18em] text-white">BLACKSTAR</span>
-            <span className="hidden text-[7px] font-medium uppercase tracking-[.24em] text-zinc-600 lg:block">Astra-class intelligence</span>
+            <span className="hidden text-[7px] font-medium uppercase tracking-[.24em] text-zinc-600 lg:block">Void observatory</span>
           </span>
         </Link>
         <nav className="ml-10 hidden items-center gap-7 text-xs font-medium text-zinc-500 md:flex">
