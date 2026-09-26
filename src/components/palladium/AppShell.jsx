@@ -50,7 +50,7 @@ export default function AppShell() {
       <Outlet />
     </CommandTheatre>
   ) : room !== 'astra-room-default' ? (
-    <AstraRoomFrame>
+    <AstraRoomFrame room={room}>
       <Outlet />
     </AstraRoomFrame>
   ) : (
