@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   Bell,
   Bot,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   Database,
@@ -208,7 +207,7 @@ export default function BlackstarCommandDeck({ metrics = {}, approvals = [], not
       </div>
       <LiveTicker notifications={notifications} activities={activities} />
       <div className="grid xl:grid-cols-[180px_minmax(0,1fr)_300px]">
-        <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Observed infrastructure</div><p className="mt-2 text-[9px] text-zinc-500">Owner-scoped live plane. No fabricated venues.</p></div></aside>
+        <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Global infrastructure</div><p className="mt-2 text-[9px] text-zinc-500">Realtime data plane connected.</p></div></aside>
         <main className="space-y-3 p-3">
           <HolographicCore metrics={metrics} />
           <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} /></div>
