@@ -60,7 +60,7 @@ export async function resolveMarketplaceSettlementProviderObjects(
 
 export function buildMarketplaceSettlementEvidence(
   event: { id?: unknown; created?: unknown; type?: unknown },
-  provider: { charge: any; transfer: any | null; applicationFee: any | null },
+  provider: { charge: any; transfer: any | null; applicationFee: any | null; paymentIntent: any },
   order: {
     id: string;
     seller_id: string;
