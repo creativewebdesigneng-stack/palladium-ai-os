@@ -1,42 +1,41 @@
 # Blackstar visual system — Astra layer
 
-This is an additive identity layer on the existing Blackstar shell (`blackstar-*` classes in `src/styles.css`). It does not rebuild Mission Control, agents, approvals, MCP, routing, memory, audit or RLS.
+Additive identity on the existing Blackstar shell. Does not rebuild Mission Control data paths, agents, approvals, MCP, routing, memory, audit or RLS.
 
 ## Identity
 
 - Product: **Blackstar**
-- Engine framing: bounded general intelligence / Astra-class engine
+- Engine: bounded general intelligence / Astra-class
 - Do not describe the product as true AGI or claim GPT/OpenAI parity
 
 ## Mark
 
-`src/components/blackstar/AstraMark.jsx`
+`src/components/blackstar/AstraMark.jsx` plus `public/astra-mark.svg` for the tab icon.
 
-- Void five-point star with metal facet stroke
-- Central aperture
-- 18s orbital ring (disabled under `prefers-reduced-motion`)
+- Void five-point star, metal facet stroke, aperture
+- 18s orbital ring (off under `prefers-reduced-motion`)
 
-Use `AstraWordmark` on access and chrome. Use `AstraMark` on room headers via `PrimarySurfaceFrame`.
+Mounted on:
+
+- Public landing, nav, footer
+- Auth access node
+- Sidebar brand and top-bar posture chip
+- `PageHeader` / `PrimarySurfaceFrame`
+- Mission Control deck header and holographic core
+- Document title in `src/routes/__root.tsx`
 
 ## Tokens
 
-Defined in `src/components/blackstar/blackstar-astra.css`:
+`src/components/blackstar/blackstar-astra.css`
 
 - void `#07070A`
 - ion `#E8E6F0`
-- violet `#7B5CFF`
-- ready amber `#C9A227`
+- violet `#7B5CFF` (current)
+- ready amber `#C9A227` (judgment)
+- red stays incident-only
 
-Violet is current. Amber is judgment. Red remains incident-only.
+`AppShell` tints the existing spatial field by route (`astra-room-*`).
 
-## Layout primitives already in product
+## Honesty
 
-- `PrimarySurfaceFrame` — room header + command-bar slot for actions
-- `IntelligenceTile` / `StatusRail` / `SurfaceGrid`
-- Existing `blackstar-shell`, sidebar, topbar, spatial field
-
-## Next rooms (do not duplicate systems)
-
-1. Keep Mission Control data paths as they are; only restyle chrome.
-2. Put `Authorize` actions into `.astra-command-bar` when a page already has an approval gate.
-3. Do not add fabricated globe layers. Owner-scoped goals/runs only.
+Owner-scoped live data only. No fabricated globe or market feed. External writes stay on existing approval gates.
