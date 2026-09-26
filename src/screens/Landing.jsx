@@ -4,7 +4,7 @@ import { ArrowRight, Orbit, ShieldCheck, Network, Bot, Boxes } from 'lucide-reac
 import PublicNav from '@/components/site/PublicNav';
 import NeuralSpace from '@/components/visual/NeuralSpace';
 import SectionReveal from '@/components/site/SectionReveal';
-import PlatformVisual from '@/components/site/PlatformVisual';
+import VoidObservatoryDeck from '@/components/blackstar/VoidObservatoryDeck';
 import SectionGrid from '@/components/site/SectionGrid';
 import Footer from '@/components/site/Footer';
 import { AstraMark } from '@/components/blackstar/AstraMark';
@@ -18,23 +18,23 @@ const pillars = [
 
 export default function Landing() {
   return (
-    <div className="blackstar-public-page blackstar-public-landing min-h-screen overflow-hidden bg-[#020204] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-landing min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
       <PublicNav />
 
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-24">
         <NeuralSpace mode="space" intensity="hero" interactive className="absolute inset-0 h-full w-full opacity-90" />
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[38%] h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-700/15 blur-[120px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(123,92,255,.16),transparent_34%),radial-gradient(circle_at_50%_38%,rgba(255,255,255,.06),transparent_18%)]" />
-          <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#030306] to-transparent" />
+          <div className="absolute left-1/2 top-[38%] h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-700/12 blur-[120px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(123,92,255,.12),transparent_34%),radial-gradient(circle_at_50%_38%,rgba(255,255,255,.05),transparent_18%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#050508] to-transparent" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-5xl text-center">
           <motion.div initial={{ opacity: 0, scale: .85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .8 }} className="mx-auto mb-8 grid place-items-center">
             <AstraMark size={80} title="Blackstar" />
           </motion.div>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-medium uppercase tracking-[.42em] text-violet-300 sm:text-sm">
-            Intelligence Hub & Infrastructure
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-medium uppercase tracking-[.42em] text-zinc-500 sm:text-sm">
+            Void observatory
           </motion.p>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .06 }} className="mt-5 text-5xl font-semibold leading-none tracking-[.12em] text-white sm:text-7xl md:text-8xl">
             BLACKSTAR
@@ -57,7 +57,7 @@ export default function Landing() {
         </div>
 
         <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .35, duration: 1 }} className="relative z-10 mt-16 w-full px-2">
-          <PlatformVisual />
+          <VoidObservatoryDeck />
         </motion.div>
       </section>
 
