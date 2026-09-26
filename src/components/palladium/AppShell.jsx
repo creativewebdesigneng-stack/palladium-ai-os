@@ -59,14 +59,14 @@ export default function AppShell() {
 
   return (
     <UpgradeProvider>
-      <div className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${room}`}>
-        <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
-        <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-80' : 'opacity-55'}`}>
-          <SpaceBackground intensity={mission ? 'medium' : 'low'} />
+      <div className={`blackstar-shell astra-shell astra-void-observatory relative min-h-screen overflow-x-hidden bg-[#050508] text-zinc-100 ${room}`}>
+        <div aria-hidden className="fixed inset-0 -z-50 bg-[#050508]" />
+        <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-90' : 'opacity-70'}`}>
+          <SpaceBackground intensity={mission ? 'medium' : 'medium'} />
         </div>
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-0 opacity-75"
+          className="pointer-events-none fixed inset-0 opacity-60"
           style={{ zIndex: -35 }}
         >
           <AstraDepthField room={room} />
@@ -79,7 +79,7 @@ export default function AppShell() {
           <span className="blackstar-orbit blackstar-orbit-b" />
           <span className="blackstar-horizon" />
         </div>
-        <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20" />
+        <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20 opacity-40" />
         <div aria-hidden className="astra-room-wash pointer-events-none fixed inset-0 -z-10" />
 
         <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} />
@@ -93,7 +93,7 @@ export default function AppShell() {
             unread={unread}
           />
           <main className={`blackstar-stage relative mx-auto ${mission ? 'max-w-[1920px] p-3 lg:p-5 xl:p-6' : 'max-w-[1740px] p-4 lg:p-7 xl:p-8'}`}>
-            <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-40 bg-gradient-to-b from-violet-500/[.035] via-violet-500/[.01] to-transparent blur-3xl" />
+            <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-40 bg-gradient-to-b from-violet-500/[.02] via-transparent to-transparent blur-3xl" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
             <div className="relative z-10">
