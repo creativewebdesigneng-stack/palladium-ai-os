@@ -6,6 +6,7 @@ import CommandMenu from '@/components/palladium/CommandMenu'
 import GlobalAIAssistant from '@/components/palladium/GlobalAIAssistant'
 import SpaceBackground from '@/components/visual/SpaceBackground'
 import PageTransition from '@/components/visual/PageTransition'
+import CommandTheatre from '@/components/mission/CommandTheatre'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
@@ -72,7 +73,17 @@ export default function AppShell() {
             <div aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-40 bg-gradient-to-b from-violet-500/[.035] via-violet-500/[.01] to-transparent blur-3xl" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
-            <div className="relative z-10"><PageTransition><Outlet /></PageTransition></div>
+            <div className="relative z-10">
+              <PageTransition>
+                {pathname.startsWith('/mission-control') ? (
+                  <CommandTheatre>
+                    <Outlet />
+                  </CommandTheatre>
+                ) : (
+                  <Outlet />
+                )}
+              </PageTransition>
+            </div>
           </main>
         </div>
         {mobileOpen && <button className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm md:hidden" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
