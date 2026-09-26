@@ -7,6 +7,7 @@ import GlobalAIAssistant from '@/components/palladium/GlobalAIAssistant'
 import SpaceBackground from '@/components/visual/SpaceBackground'
 import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
+import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
@@ -31,6 +32,7 @@ export default function AppShell() {
   const [assistantPanel, setAssistantPanel] = useState(false)
   const { unread } = useRealtimeNotifications()
   const { pathname } = useLocation()
+  const room = roomClass(pathname)
 
   useEffect(() => {
     const handler = (e) => {
@@ -41,9 +43,21 @@ export default function AppShell() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  const stage = pathname.startsWith('/mission-control') ? (
+    <CommandTheatre>
+      <Outlet />
+    </CommandTheatre>
+  ) : room !== 'astra-room-default' ? (
+    <AstraRoomFrame>
+      <Outlet />
+    </AstraRoomFrame>
+  ) : (
+    <Outlet />
+  )
+
   return (
     <UpgradeProvider>
-      <div className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${roomClass(pathname)}`}>
+      <div className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${room}`}>
         <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-40 opacity-55">
           <SpaceBackground intensity="low" />
@@ -74,15 +88,7 @@ export default function AppShell() {
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
             <div className="relative z-10">
-              <PageTransition>
-                {pathname.startsWith('/mission-control') ? (
-                  <CommandTheatre>
-                    <Outlet />
-                  </CommandTheatre>
-                ) : (
-                  <Outlet />
-                )}
-              </PageTransition>
+              <PageTransition>{stage}</PageTransition>
             </div>
           </main>
         </div>
