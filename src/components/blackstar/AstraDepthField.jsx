@@ -5,9 +5,17 @@ const ROOM_PALETTES = {
   'astra-room-hub': { primary: 0x8b5cf6, secondary: 0xa78bfa, density: 0.95 },
   'astra-room-workforce': { primary: 0x8b5cf6, secondary: 0xc4b5fd, density: 0.9 },
   'astra-room-finance': { primary: 0x3a8f5c, secondary: 0x7b5cff, density: 0.72 },
+  'astra-room-trading': { primary: 0x22c55e, secondary: 0x38bdf8, density: 0.88 },
   'astra-room-legal': { primary: 0xb8ae9c, secondary: 0x7b5cff, density: 0.55 },
-  'astra-room-studio': { primary: 0x7b5cff, secondary: 0xe879f9, density: 0.86 },
+  'astra-room-compliance': { primary: 0xc9a227, secondary: 0x7b5cff, density: 0.62 },
+  'astra-room-cinema': { primary: 0xe879f9, secondary: 0x7b5cff, density: 0.9 },
+  'astra-room-game': { primary: 0x22d3ee, secondary: 0x8b5cf6, density: 0.92 },
   'astra-room-memory': { primary: 0x7b5cff, secondary: 0xe8e6f0, density: 0.82 },
+  'astra-room-knowledge': { primary: 0xe8e6f0, secondary: 0x38bdf8, density: 0.76 },
+  'astra-room-company': { primary: 0x8b5cf6, secondary: 0xc9a227, density: 0.7 },
+  'astra-room-industry': { primary: 0x94a3b8, secondary: 0xf59e0b, density: 0.68 },
+  'astra-room-commerce': { primary: 0x60a5fa, secondary: 0xa78bfa, density: 0.78 },
+  'astra-room-builder': { primary: 0x22d3ee, secondary: 0xc084fc, density: 0.84 },
   'astra-room-admin': { primary: 0xe8e6f0, secondary: 0x7b5cff, density: 0.45 },
   'astra-room-default': { primary: 0x7b5cff, secondary: 0x7dd3fc, density: 0.65 },
 }
@@ -18,9 +26,17 @@ function paletteFor(room) {
 
 function coreGeometryFor(THREE, room, size) {
   if (room === 'astra-room-finance') return new THREE.OctahedronGeometry(size, 0)
+  if (room === 'astra-room-trading') return new THREE.ConeGeometry(size * 0.85, size * 1.8, 6, 1)
   if (room === 'astra-room-legal') return new THREE.BoxGeometry(size * 1.15, size * 1.15, size * 1.15)
-  if (room === 'astra-room-studio') return new THREE.TetrahedronGeometry(size, 0)
+  if (room === 'astra-room-compliance') return new THREE.CylinderGeometry(size * 0.8, size, size * 1.5, 6, 1)
+  if (room === 'astra-room-cinema') return new THREE.TetrahedronGeometry(size, 0)
+  if (room === 'astra-room-game') return new THREE.IcosahedronGeometry(size * 0.96, 0)
   if (room === 'astra-room-memory') return new THREE.DodecahedronGeometry(size * 0.92, 0)
+  if (room === 'astra-room-knowledge') return new THREE.DodecahedronGeometry(size * 0.86, 1)
+  if (room === 'astra-room-company') return new THREE.OctahedronGeometry(size * 0.94, 1)
+  if (room === 'astra-room-industry') return new THREE.BoxGeometry(size * 1.35, size * 0.8, size * 1.35, 2, 1, 2)
+  if (room === 'astra-room-commerce') return new THREE.SphereGeometry(size * 0.92, 8, 6)
+  if (room === 'astra-room-builder') return new THREE.TorusKnotGeometry(size * 0.62, size * 0.16, 72, 8)
   if (room === 'astra-room-admin') return new THREE.OctahedronGeometry(size * 0.86, 0)
   if (room === 'astra-room-workforce') return new THREE.IcosahedronGeometry(size * 0.9, 1)
   if (room === 'astra-room-hub') return new THREE.IcosahedronGeometry(size, 1)
