@@ -22,7 +22,7 @@ export default function Landing() {
       <PublicNav />
 
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-24">
-        <NeuralSpace mode="space" intensity="hero" interactive className="absolute inset-0 h-full w-full opacity-90" />
+        <NeuralSpace mode="space" intensity="low" className="absolute inset-0 h-full w-full opacity-70" />
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/2 top-[38%] h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-700/12 blur-[120px]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(123,92,255,.12),transparent_34%),radial-gradient(circle_at_50%_38%,rgba(255,255,255,.05),transparent_18%)]" />
