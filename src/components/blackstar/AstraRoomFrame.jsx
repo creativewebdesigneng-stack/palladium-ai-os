@@ -1,15 +1,7 @@
-const LABELS = {
-  'astra-room-hub': 'Blackstar intelligence hub',
-  'astra-room-workforce': 'Blackstar workforce floor',
-  'astra-room-finance': 'Blackstar finance floor',
-  'astra-room-legal': 'Blackstar legal floor',
-  'astra-room-studio': 'Blackstar studio',
-  'astra-room-memory': 'Blackstar memory vault',
-  'astra-room-admin': 'Blackstar admin',
-}
+import { ROOM_LABELS } from './visualRooms'
 
 export default function AstraRoomFrame({ children, room }) {
-  const label = LABELS[room]
+  const label = ROOM_LABELS[room]
   return (
     <div className="astra-room-frame">
       <span aria-hidden className="astra-theatre-corner astra-theatre-corner-tl" />
