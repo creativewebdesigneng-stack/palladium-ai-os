@@ -9,7 +9,7 @@ export default function Footer() {
     { title: 'Legal', links: ['Privacy', 'Terms', 'Security', 'Cookies', 'DPA'].map((l, i) => ({ label: l, to: ['/legal/privacy-policy','/legal/terms-of-service','/legal/security','/legal/cookie-policy','/legal/data-processing-agreement'][i] })) },
   ];
   return (
-    <footer className="border-t border-white/10 bg-[#070809]">
+    <footer className="border-t border-white/10 bg-[#050508]">
       <div className="mx-auto max-w-7xl px-6 py-16">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div>
@@ -17,6 +17,7 @@ export default function Footer() {
               <AstraMark size={28} />
               <span className="text-sm font-semibold tracking-[0.18em] text-white">BLACKSTAR</span>
             </div>
+            <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-zinc-600">Void observatory</p>
             <p className="mt-4 max-w-xs text-sm text-zinc-500">Bounded intelligence infrastructure. Astra-class engine under command.</p>
             <div className="mt-5 flex gap-3 text-zinc-500">
               <a href="#" className="rounded-lg border border-white/10 p-2 hover:text-white">Discord</a>
@@ -43,7 +44,7 @@ export default function Footer() {
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-xs text-zinc-600 sm:flex-row">
           <p>© {new Date().getFullYear()} Blackstar. All rights reserved.</p>
-          <p>Astra-class intelligence · Not claimed as AGI</p>
+          <p>Void observatory · Not claimed as AGI</p>
         </div>
       </div>
     </footer>
