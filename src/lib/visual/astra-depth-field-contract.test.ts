@@ -26,7 +26,7 @@ describe("Blackstar Astra WebGL depth field contract", () => {
     expect(depth).not.toContain("mousemove");
     expect(depth).toContain("prefers-reduced-motion: reduce");
     expect(depth).toContain("max-width: 767px");
-    expect(depth).toContain("mobile ? 1.15 : 1.5");
+    expect(depth).toContain("mobile ? 1 : constrained ? 1.25 : 1.5");
     expect(depth).toContain("if (!reduceMotion && !document.hidden)");
   });
 
