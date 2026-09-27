@@ -5,7 +5,7 @@ import { AstraWordmark } from "@/components/blackstar/AstraMark";
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
     <div className="blackstar-auth-space relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050508] px-4 py-10 text-zinc-100">
-      <div aria-hidden className="absolute inset-0 -z-20 opacity-70"><SpaceBackground intensity="medium" /></div>
+      <div aria-hidden className="absolute inset-0 -z-20 opacity-55"><SpaceBackground intensity="low" /></div>
       <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-a" />
       <div aria-hidden className="blackstar-auth-orb blackstar-auth-orb-b" />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(123,92,255,.10),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(0,0,0,.55)_100%)]" />
