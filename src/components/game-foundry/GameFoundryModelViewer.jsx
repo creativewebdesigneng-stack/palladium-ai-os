@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Loader2, TriangleAlert } from 'lucide-react';
 
+function disposeScene(scene) {
+  scene?.traverse?.((object) => {
+    object.geometry?.dispose?.();
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (!material) continue;
+      for (const value of Object.values(material)) {
+        if (value?.isTexture) value.dispose?.();
+      }
+      material.dispose?.();
+    }
+  });
+}
+
 export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
   const mountRef = useRef(null);
   const [state,setState] = useState('loading');
@@ -8,10 +22,15 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
   useEffect(() => {
     if (!url || !mountRef.current) return;
     let disposed = false;
-    let renderer;
+    let contextLost = false;
+    let renderer = null;
+    let scene = null;
+    let controls = null;
     let frame = 0;
-    let resizeObserver;
+    let resizeObserver = null;
+    let onContextLost = null;
     const mount = mountRef.current;
+    setState('loading');
 
     (async () => {
       try {
@@ -22,18 +41,27 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
         ]);
         if (disposed) return;
 
-        const scene = new THREE.Scene();
+        scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 1000);
         camera.position.set(2.8, 2.1, 3.4);
 
         renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        const mobile = window.matchMedia('(max-width: 767px)').matches;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.75));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1;
+
+        onContextLost = (event) => {
+          event.preventDefault();
+          contextLost = true;
+          cancelAnimationFrame(frame);
+          if (!disposed) setState('error');
+        };
+        renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
         mount.appendChild(renderer.domElement);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
+        controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.06;
 
@@ -51,7 +79,10 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
 
         const loader = new GLTFLoader();
         loader.load(url, (gltf) => {
-          if (disposed) return;
+          if (disposed || contextLost) {
+            disposeScene(gltf.scene);
+            return;
+          }
           const model = gltf.scene;
           scene.add(model);
           const box = new THREE.Box3().setFromObject(model);
@@ -73,18 +104,23 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
         });
 
         const resize = () => {
+          if (disposed || contextLost || !renderer) return;
           const width = Math.max(mount.clientWidth,1);
           const height = Math.max(mount.clientHeight,1);
           renderer.setSize(width,height,false);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
         };
-        resizeObserver = new ResizeObserver(resize);
-        resizeObserver.observe(mount);
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(resize);
+          resizeObserver.observe(mount);
+        } else {
+          window.addEventListener('resize', resize);
+        }
         resize();
 
         const animate = () => {
-          if (disposed) return;
+          if (disposed || contextLost || !renderer || !scene || !controls) return;
           controls.update();
           renderer.render(scene,camera);
           frame = requestAnimationFrame(animate);
@@ -99,8 +135,14 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
       disposed = true;
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
+      window.removeEventListener('resize', () => {});
+      controls?.dispose?.();
+      disposeScene(scene);
       if (renderer) {
+        if (onContextLost) renderer.domElement.removeEventListener('webglcontextlost', onContextLost, false);
+        renderer.renderLists?.dispose?.();
         renderer.dispose();
+        renderer.forceContextLoss?.();
         if (renderer.domElement?.parentNode === mount) mount.removeChild(renderer.domElement);
       }
     };
