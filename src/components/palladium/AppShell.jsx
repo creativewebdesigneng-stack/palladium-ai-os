@@ -9,23 +9,12 @@ import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
 import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
 import AstraDepthField from '@/components/blackstar/AstraDepthField'
+import { blackstarRoomForPath } from '@/components/blackstar/visualRooms'
 import BlackstarRouteErrorBoundary from '@/components/blackstar/BlackstarRouteErrorBoundary'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
 import '@/components/blackstar/blackstar-astra.css'
-
-function roomClass(pathname) {
-  if (pathname.startsWith('/mission-control')) return 'astra-room-mission'
-  if (pathname.startsWith('/ai-hub') || pathname.startsWith('/ai-workbench')) return 'astra-room-hub'
-  if (pathname.startsWith('/agents') || pathname.startsWith('/workforce') || pathname.startsWith('/autonomous-os')) return 'astra-room-workforce'
-  if (pathname.startsWith('/finance') || pathname.startsWith('/trading')) return 'astra-room-finance'
-  if (pathname.startsWith('/legal') || pathname.startsWith('/compliance')) return 'astra-room-legal'
-  if (pathname.startsWith('/cinema') || pathname.startsWith('/media') || pathname.startsWith('/game-foundry')) return 'astra-room-studio'
-  if (pathname.startsWith('/memory') || pathname.startsWith('/knowledge')) return 'astra-room-memory'
-  if (pathname.startsWith('/admin')) return 'astra-room-admin'
-  return 'astra-room-default'
-}
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
@@ -34,7 +23,7 @@ export default function AppShell() {
   const [assistantPanel, setAssistantPanel] = useState(false)
   const { unread } = useRealtimeNotifications()
   const { pathname } = useLocation()
-  const room = roomClass(pathname)
+  const room = blackstarRoomForPath(pathname)
   const mission = pathname.startsWith('/mission-control')
   const dedicatedWebGL = pathname.startsWith('/game-foundry')
 
