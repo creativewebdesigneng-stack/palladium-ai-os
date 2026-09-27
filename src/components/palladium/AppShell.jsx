@@ -35,6 +35,7 @@ export default function AppShell() {
   const { pathname } = useLocation()
   const room = roomClass(pathname)
   const mission = pathname.startsWith('/mission-control')
+  const dedicatedWebGL = pathname.startsWith('/game-foundry')
 
   useEffect(() => {
     const handler = (e) => {
@@ -69,7 +70,7 @@ export default function AppShell() {
           className="pointer-events-none fixed inset-0 opacity-75"
           style={{ zIndex: -35 }}
         >
-          <AstraDepthField room={room} />
+          {!dedicatedWebGL ? <AstraDepthField room={room} /> : null}
         </div>
         <div aria-hidden className="blackstar-spatial-field fixed inset-0 -z-30">
           <span className="blackstar-orb blackstar-orb-a" />
