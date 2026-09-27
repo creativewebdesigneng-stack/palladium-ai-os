@@ -339,6 +339,7 @@ export default function MissionControl() {
           notifications={data?.notifications ?? []}
           tasks={data?.tasks ?? []}
           activities={data?.activities ?? []}
+          connectedIntegrations={data?.connectedIntegrations ?? []}
           lastSync={lastSync}
           loading={loading}
           onNavigate={setTab}
