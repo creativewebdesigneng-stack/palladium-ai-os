@@ -28,6 +28,7 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
     let controls = null;
     let frame = 0;
     let resizeObserver = null;
+    let fallbackResize = null;
     let onContextLost = null;
     const mount = mountRef.current;
     setState('loading');
@@ -115,7 +116,8 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
           resizeObserver = new ResizeObserver(resize);
           resizeObserver.observe(mount);
         } else {
-          window.addEventListener('resize', resize);
+          fallbackResize = resize;
+          window.addEventListener('resize', fallbackResize);
         }
         resize();
 
@@ -135,7 +137,7 @@ export default function GameFoundryModelViewer({ url, label = '3D asset' }) {
       disposed = true;
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
-      window.removeEventListener('resize', () => {});
+      if (fallbackResize) window.removeEventListener('resize', fallbackResize);
       controls?.dispose?.();
       disposeScene(scene);
       if (renderer) {
