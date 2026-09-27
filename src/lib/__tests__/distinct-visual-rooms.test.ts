@@ -33,7 +33,7 @@ describe("Blackstar distinct 3D room identities", () => {
       "astra-room-game", "astra-room-knowledge", "astra-room-company",
       "astra-room-industry", "astra-room-commerce", "astra-room-builder",
     ]) {
-      expect(ROOM_LABELS[room]).toMatch(/^Blackstar /);
+      expect(ROOM_LABELS[room as keyof typeof ROOM_LABELS]).toMatch(/^Blackstar /);
     }
   });
 
