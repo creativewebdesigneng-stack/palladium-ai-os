@@ -14,7 +14,6 @@ import CreateDepartmentModal from '@/components/workforce/CreateDepartmentModal'
 import AgentCommsFeed from '@/components/workforce/AgentCommsFeed';
 import { STATUSES } from '@/components/workforce/wfData';
 import { mapAgentToWf } from '@/components/workforce/normalize';
-import NeuralNetworkBackground from '@/components/visual/NeuralNetworkBackground';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -126,7 +125,6 @@ export default function Workforce() {
 
   return (
     <div className="blackstar-core-page blackstar-workforce">
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-45"><NeuralNetworkBackground intensity="low" /></div>
       <PageHeader eyebrow="Blackstar Workforce OS" title="Autonomous Workforce" description="Deploy, organise, govern and supervise your AI workforce as one coordinated intelligence network." action={headerActions} />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">

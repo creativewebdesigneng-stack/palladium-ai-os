@@ -63,8 +63,16 @@ export default function AstraDepthField({
     let ringAMaterial = null
     let ringBGeometry = null
     let ringBMaterial = null
+    let contextLost = false
     const canvas = canvasRef.current
     if (!canvas || typeof window === 'undefined') return
+
+    const onContextLost = (event) => {
+      event.preventDefault()
+      contextLost = true
+      cancelAnimationFrame(frame)
+    }
+    canvas.addEventListener('webglcontextlost', onContextLost, false)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const mobile = window.matchMedia('(max-width: 767px)').matches
@@ -194,7 +202,7 @@ export default function AstraDepthField({
 
         let last = performance.now()
         const render = (now) => {
-          if (disposed || !renderer || !scene || !camera) return
+          if (disposed || contextLost || !renderer || !scene || !camera) return
           const dt = Math.min(40, now - last)
           last = now
           const t = now * 0.001
@@ -255,6 +263,7 @@ export default function AstraDepthField({
       disposed = true
       cancelAnimationFrame(frame)
       resizeObserver?.disconnect()
+      canvas.removeEventListener('webglcontextlost', onContextLost, false)
       canvas.__astraCleanup?.()
       delete canvas.__astraCleanup
 
