@@ -22,7 +22,7 @@ describe("Blackstar visual performance contract", () => {
 
   it("caps mobile 2D canvas pixel density and fails safely when a 2D context is unavailable", () => {
     expect(neuralSpace).toContain("if (!ctx) return;");
-    expect(neuralSpace).toContain("mobile ? 1.25 : 1.75");
+    expect(neuralSpace).toContain("mobile ? 1.1 : constrained ? 1.35 : 1.75");
   });
 
   it("stops rendering instead of crashing the route when WebGL context is lost", () => {
