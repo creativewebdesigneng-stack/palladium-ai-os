@@ -49,13 +49,24 @@ export default function NeuralSpace({
     if (!ctx) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const mobile = window.innerWidth < 768;
+    const saveData = navigator.connection?.saveData === true;
+    const deviceMemory = Number(navigator.deviceMemory || 0);
+    const hardwareConcurrency = Number(navigator.hardwareConcurrency || 0);
+    const constrained =
+      mobile ||
+      saveData ||
+      (deviceMemory > 0 && deviceMemory <= 4) ||
+      (hardwareConcurrency > 0 && hardwareConcurrency <= 4);
     const cfg = INTENSITY[intensity] || INTENSITY.low;
-    const mf = mobile ? 0.5 : 1;
+    const mf = constrained ? (mobile ? 0.42 : 0.68) : 1;
+    const targetFps = constrained ? 30 : 45;
+    const frameInterval = 1000 / targetFps;
     const nodeCount = Math.round(cfg.nodes * mf);
     const starCount = Math.round(cfg.stars * mf);
     let w = 0, h = 0;
     let nodes = [], stars = [], pulses = [], hexes = [], nebula = [], glow = [], streams = [], metal = [];
     let t0 = performance.now();
+    let lastPaint = 0;
     let start = 0;
     const mouse = { x: -9999, y: -9999 };
 
@@ -104,7 +115,7 @@ export default function NeuralSpace({
     };
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.75);
+      const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.1 : constrained ? 1.35 : 1.75);
       const rect = canvas.getBoundingClientRect();
       w = rect.width; h = rect.height;
       if (w < 2 || h < 2) return;
@@ -147,6 +158,11 @@ export default function NeuralSpace({
     };
 
     const draw = (now) => {
+      if (!reduce && lastPaint && now - lastPaint < frameInterval) {
+        rafRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      lastPaint = now;
       const dt = Math.min(40, now - t0);
       t0 = now;
       if (!start) start = now;
@@ -314,7 +330,7 @@ export default function NeuralSpace({
     const onLeave = () => { mouse.x = -9999; mouse.y = -9999; };
     const onVis = () => {
       if (document.hidden) cancelAnimationFrame(rafRef.current);
-      else if (!reduce) { t0 = performance.now(); rafRef.current = requestAnimationFrame(draw); }
+      else if (!reduce) { t0 = performance.now(); lastPaint = 0; rafRef.current = requestAnimationFrame(draw); }
     };
 
     resize();
