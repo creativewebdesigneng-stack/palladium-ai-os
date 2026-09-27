@@ -9,6 +9,7 @@ import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
 import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
 import AstraDepthField from '@/components/blackstar/AstraDepthField'
+import BlackstarRouteErrorBoundary from '@/components/blackstar/BlackstarRouteErrorBoundary'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
@@ -98,7 +99,9 @@ export default function AppShell() {
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
             <div className="relative z-10">
-              <PageTransition>{stage}</PageTransition>
+              <BlackstarRouteErrorBoundary resetKey={pathname}>
+                <PageTransition>{stage}</PageTransition>
+              </BlackstarRouteErrorBoundary>
             </div>
           </main>
         </div>
