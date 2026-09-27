@@ -7,6 +7,7 @@ describe("Blackstar visual performance contract", () => {
   const workforce = readFileSync(new URL("../../screens/Workforce.jsx", import.meta.url), "utf8");
   const neuralSpace = readFileSync(new URL("../../components/visual/NeuralSpace.jsx", import.meta.url), "utf8");
   const depth = readFileSync(new URL("../../components/blackstar/AstraDepthField.jsx", import.meta.url), "utf8");
+  const gameViewer = readFileSync(new URL("../../components/game-foundry/GameFoundryModelViewer.jsx", import.meta.url), "utf8");
 
   it("keeps one shell-owned ambient canvas instead of stacking page-level full-screen canvases", () => {
     expect(agents).not.toContain("AnimatedBrain");
@@ -30,4 +31,14 @@ describe("Blackstar visual performance contract", () => {
     expect(depth).toContain("disposed || contextLost || !renderer || !scene || !camera");
     expect(depth).toContain("removeEventListener('webglcontextlost'");
   });
+
+  it("releases Game Foundry GPU resources and degrades instead of crashing on WebGL loss", () => {
+    expect(gameViewer).toContain("mobile ? 1.25 : 1.75");
+    expect(gameViewer).toContain("webglcontextlost");
+    expect(gameViewer).toContain("controls?.dispose?.()");
+    expect(gameViewer).toContain("disposeScene(scene)");
+    expect(gameViewer).toContain("renderer.forceContextLoss?.()");
+    expect(gameViewer).toContain("if (disposed || contextLost");
+  });
+
 });
