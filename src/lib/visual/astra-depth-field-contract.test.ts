@@ -49,9 +49,17 @@ describe("Blackstar Astra WebGL depth field contract", () => {
       "astra-room-hub",
       "astra-room-workforce",
       "astra-room-finance",
+      "astra-room-trading",
       "astra-room-legal",
-      "astra-room-studio",
+      "astra-room-compliance",
+      "astra-room-cinema",
+      "astra-room-game",
       "astra-room-memory",
+      "astra-room-knowledge",
+      "astra-room-company",
+      "astra-room-industry",
+      "astra-room-commerce",
+      "astra-room-builder",
       "astra-room-admin",
     ]) {
       expect(depth).toContain(room);
