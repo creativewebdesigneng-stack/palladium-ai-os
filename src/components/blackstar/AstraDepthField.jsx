@@ -61,6 +61,7 @@ export default function AstraDepthField({
     let disposed = false
     let frame = 0
     let resizeObserver = null
+    let fallbackResize = null
     let renderer = null
     let scene = null
     let camera = null
@@ -92,6 +93,16 @@ export default function AstraDepthField({
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const mobile = window.matchMedia('(max-width: 767px)').matches
+    const saveData = navigator.connection?.saveData === true
+    const deviceMemory = Number(navigator.deviceMemory || 0)
+    const hardwareConcurrency = Number(navigator.hardwareConcurrency || 0)
+    const constrained =
+      mobile ||
+      saveData ||
+      (deviceMemory > 0 && deviceMemory <= 4) ||
+      (hardwareConcurrency > 0 && hardwareConcurrency <= 4)
+    const targetFps = constrained ? 30 : 45
+    const frameInterval = 1000 / targetFps
     const palette = paletteFor(room)
     const mission = room === 'astra-room-mission'
 
@@ -107,7 +118,7 @@ export default function AstraDepthField({
           powerPreference: 'high-performance',
         })
         renderer.setClearColor(0x000000, 0)
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.15 : 1.5))
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1 : constrained ? 1.25 : 1.5))
         renderer.outputColorSpace = THREE.SRGBColorSpace
 
         scene = new THREE.Scene()
@@ -172,8 +183,8 @@ export default function AstraDepthField({
         root.add(ringB)
 
         const particleCount = Math.max(
-          28,
-          Math.round((mobile ? 58 : 118) * palette.density),
+          24,
+          Math.round((mobile ? 44 : constrained ? 82 : 118) * palette.density),
         )
         const positions = new Float32Array(particleCount * 3)
         const sizes = new Float32Array(particleCount)
@@ -212,13 +223,24 @@ export default function AstraDepthField({
           camera.updateProjectionMatrix()
         }
 
-        resizeObserver = new ResizeObserver(resize)
-        resizeObserver.observe(canvas)
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(resize)
+          resizeObserver.observe(canvas)
+        } else {
+          fallbackResize = resize
+          window.addEventListener('resize', fallbackResize)
+        }
         resize()
 
         let last = performance.now()
+        let lastPaint = 0
         const render = (now) => {
           if (disposed || contextLost || !renderer || !scene || !camera) return
+          if (!reduceMotion && lastPaint && now - lastPaint < frameInterval) {
+            frame = requestAnimationFrame(render)
+            return
+          }
+          lastPaint = now
           const dt = Math.min(40, now - last)
           last = now
           const t = now * 0.001
@@ -258,6 +280,7 @@ export default function AstraDepthField({
           cancelAnimationFrame(frame)
           if (!document.hidden && !reduceMotion) {
             last = performance.now()
+            lastPaint = 0
             frame = requestAnimationFrame(render)
           }
         }
@@ -279,6 +302,7 @@ export default function AstraDepthField({
       disposed = true
       cancelAnimationFrame(frame)
       resizeObserver?.disconnect()
+      if (fallbackResize) window.removeEventListener('resize', fallbackResize)
       canvas.removeEventListener('webglcontextlost', onContextLost, false)
       canvas.__astraCleanup?.()
       delete canvas.__astraCleanup
