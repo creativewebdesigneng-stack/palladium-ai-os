@@ -68,6 +68,8 @@ export default function NeuralSpace({
     let t0 = performance.now();
     let lastPaint = 0;
     let start = 0;
+    let inViewport = true;
+    let intersectionObserver = null;
     const mouse = { x: -9999, y: -9999 };
 
     const build = () => {
@@ -158,6 +160,7 @@ export default function NeuralSpace({
     };
 
     const draw = (now) => {
+      if (!reduce && !inViewport) return;
       if (!reduce && lastPaint && now - lastPaint < frameInterval) {
         rafRef.current = requestAnimationFrame(draw);
         return;
@@ -330,8 +333,26 @@ export default function NeuralSpace({
     const onLeave = () => { mouse.x = -9999; mouse.y = -9999; };
     const onVis = () => {
       if (document.hidden) cancelAnimationFrame(rafRef.current);
-      else if (!reduce) { t0 = performance.now(); lastPaint = 0; rafRef.current = requestAnimationFrame(draw); }
+      else if (!reduce && inViewport) { t0 = performance.now(); lastPaint = 0; rafRef.current = requestAnimationFrame(draw); }
     };
+
+    if (!reduce && typeof IntersectionObserver !== 'undefined') {
+      intersectionObserver = new IntersectionObserver(
+        ([entry]) => {
+          const nextVisible = entry?.isIntersecting ?? true;
+          if (nextVisible === inViewport) return;
+          inViewport = nextVisible;
+          cancelAnimationFrame(rafRef.current);
+          if (inViewport && !document.hidden) {
+            t0 = performance.now();
+            lastPaint = 0;
+            rafRef.current = requestAnimationFrame(draw);
+          }
+        },
+        { rootMargin: '120px 0px' },
+      );
+      intersectionObserver.observe(canvas);
+    }
 
     resize();
     if (reduce) { draw(performance.now()); cancelAnimationFrame(rafRef.current); }
@@ -341,6 +362,7 @@ export default function NeuralSpace({
     document.addEventListener('visibilitychange', onVis);
     return () => {
       cancelAnimationFrame(rafRef.current);
+      intersectionObserver?.disconnect();
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mouseleave', onLeave);
