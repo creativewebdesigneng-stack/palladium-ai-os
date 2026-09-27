@@ -17,7 +17,6 @@ import {
   ServerCog,
   ShieldAlert,
   Workflow,
-  Wrench,
   Zap,
 } from 'lucide-react';
 
@@ -83,9 +82,9 @@ function OrbitNode({ icon: Icon, label, value, className, delay = 0, tone = 'cya
   const toneClass = tone === 'emerald' ? 'text-emerald-300' : tone === 'violet' ? 'text-violet-300' : tone === 'amber' ? 'text-amber-300' : 'text-cyan-300';
   return (
     <motion.div
-      className={`absolute z-20 min-w-[130px] rounded-lg border border-white/10 bg-black/75 px-3 py-2 backdrop-blur-xl ${className}`}
-      animate={{ y: reduced ? [0, -1.5, 0] : [0, -6, 0], scale: reduced ? [1, 1.005, 1] : [1, 1.025, 1] }}
-      transition={{ duration: reduced ? 8 : 4.2, repeat: Infinity, delay, ease: 'easeInOut' }}
+      className={`absolute z-20 hidden min-w-[130px] rounded-lg border border-white/10 bg-black/75 px-3 py-2 backdrop-blur-xl lg:block ${className}`}
+      animate={reduced ? undefined : { y: [0, -6, 0], scale: [1, 1.025, 1] }}
+      transition={reduced ? undefined : { duration: 4.2, repeat: Infinity, delay, ease: 'easeInOut' }}
     >
       <div className="flex items-center gap-2 text-[8px] uppercase tracking-[.13em] text-zinc-500"><Icon className={`h-3 w-3 ${toneClass}`} />{label}</div>
       <div className="mt-1 flex items-center gap-1.5 text-[10px] text-zinc-200"><motion.span className={`h-1.5 w-1.5 rounded-full bg-current ${toneClass}`} animate={{ opacity: [0.35, 1, 0.35] }} transition={{ duration: 1.4, repeat: Infinity, delay }} />{value}</div>
@@ -93,27 +92,28 @@ function OrbitNode({ icon: Icon, label, value, className, delay = 0, tone = 'cya
   );
 }
 
-function HolographicCore({ metrics = {}, markState = 'ready' }) {
+function HolographicCore({ metrics = {}, markState = 'ready', connectedIntegrations = 0, pendingApprovals = 0, unreadSignals = 0 }) {
   const reduced = useReducedMotion();
   const activeAgents = Number(metrics.activeAgents || 0);
   const running = Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
+  const activeWorkforces = Number(metrics.activeWorkforces || 0);
   return (
     <div className="relative min-h-[430px] overflow-hidden rounded-xl border border-violet-300/15 bg-[#020712]">
-      <motion.div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(123,92,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(123,92,255,.05)_1px,transparent_1px)] [background-size:32px_32px]" animate={{ backgroundPosition: reduced ? ['0px 0px', '16px 16px'] : ['0px 0px', '32px 32px'] }} transition={{ duration: reduced ? 18 : 9, repeat: Infinity, ease: 'linear' }} />
-      <motion.div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(123,92,255,.16),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(124,58,237,.14),transparent_35%)]" animate={{ opacity: [0.55, 1, 0.55] }} transition={{ duration: reduced ? 7 : 3.4, repeat: Infinity }} />
-      <motion.div className="absolute left-1/2 top-[52%] h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/25 shadow-[0_0_70px_rgba(123,92,255,.18)] sm:h-[390px] sm:w-[390px]" animate={{ rotate: 360 }} transition={{ duration: reduced ? 50 : 22, repeat: Infinity, ease: 'linear' }}>
+      <motion.div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(123,92,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(123,92,255,.05)_1px,transparent_1px)] [background-size:32px_32px]" animate={reduced ? undefined : { backgroundPosition: ['0px 0px', '32px 32px'] }} transition={reduced ? undefined : { duration: 9, repeat: Infinity, ease: 'linear' }} />
+      <motion.div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(123,92,255,.16),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(124,58,237,.14),transparent_35%)]" animate={reduced ? undefined : { opacity: [0.55, 1, 0.55] }} transition={reduced ? undefined : { duration: 3.4, repeat: Infinity }} />
+      <motion.div className="absolute left-1/2 top-[52%] h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/25 shadow-[0_0_70px_rgba(123,92,255,.18)] sm:h-[390px] sm:w-[390px]" animate={reduced ? undefined : { rotate: 360 }} transition={reduced ? undefined : { duration: 22, repeat: Infinity, ease: 'linear' }}>
         {[0, 72, 144, 216, 288].map((deg) => <span key={deg} className="absolute left-1/2 top-1/2 h-2.5 w-2.5 rounded-full bg-violet-300 shadow-[0_0_18px_rgba(167,139,250,.9)]" style={{ transform: `rotate(${deg}deg) translateX(188px)` }} />)}
       </motion.div>
-      <motion.div className="absolute left-1/2 top-[52%] h-[270px] w-[270px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/25" animate={{ rotate: -360 }} transition={{ duration: reduced ? 38 : 15, repeat: Infinity, ease: 'linear' }} />
-      <motion.div className="absolute left-1/2 top-[52%] h-[205px] w-[205px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-violet-100/15" animate={{ rotate: 360 }} transition={{ duration: reduced ? 30 : 11, repeat: Infinity, ease: 'linear' }} />
+      <motion.div className="absolute left-1/2 top-[52%] h-[270px] w-[270px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/25" animate={reduced ? undefined : { rotate: -360 }} transition={reduced ? undefined : { duration: 15, repeat: Infinity, ease: 'linear' }} />
+      <motion.div className="absolute left-1/2 top-[52%] h-[205px] w-[205px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-violet-100/15" animate={reduced ? undefined : { rotate: 360 }} transition={reduced ? undefined : { duration: 11, repeat: Infinity, ease: 'linear' }} />
       <div className="absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2"><AstraMark size={108} state={markState} title="Blackstar Astra operational core" /></div>
-      <motion.div className="absolute inset-x-[18%] bottom-[10%] h-12 rounded-[50%] border border-violet-300/25" animate={{ scaleX: [0.92, 1.04, 0.92], opacity: [0.35, 0.9, 0.35] }} transition={{ duration: reduced ? 6 : 2.4, repeat: Infinity }} />
-      <OrbitNode icon={Bot} label="Agents" value={`${activeAgents} online`} className="left-[8%] top-[16%]" delay={0} />
-      <OrbitNode icon={ServerCog} label="MCP servers" value="Connected" className="right-[8%] top-[16%]" tone="emerald" delay={0.5} />
-      <OrbitNode icon={Wrench} label="Tools" value="Runtime ready" className="left-[6%] top-[48%]" tone="emerald" delay={1} />
-      <OrbitNode icon={Workflow} label="Workflows" value={`${running} running`} className="right-[6%] top-[48%]" tone="violet" delay={1.5} />
-      <OrbitNode icon={Database} label="Data pipelines" value="Realtime" className="left-[15%] bottom-[8%]" delay={2} />
-      <OrbitNode icon={Network} label="Infrastructure" value="Observed" className="right-[15%] bottom-[8%]" tone="emerald" delay={2.5} />
+      <motion.div className="absolute inset-x-[18%] bottom-[10%] h-12 rounded-[50%] border border-violet-300/25" animate={reduced ? undefined : { scaleX: [0.92, 1.04, 0.92], opacity: [0.35, 0.9, 0.35] }} transition={reduced ? undefined : { duration: 2.4, repeat: Infinity }} />
+      <OrbitNode icon={Bot} label="Agents" value={`${activeAgents} active`} className="left-[8%] top-[16%]" delay={0} />
+      <OrbitNode icon={ServerCog} label="Provider links" value={`${connectedIntegrations} connected`} className="right-[8%] top-[16%]" tone="emerald" delay={0.5} />
+      <OrbitNode icon={ShieldAlert} label="Approval gates" value={`${pendingApprovals} pending`} className="left-[6%] top-[48%]" tone="amber" delay={1} />
+      <OrbitNode icon={Workflow} label="Executions" value={`${running} in flight`} className="right-[6%] top-[48%]" tone="violet" delay={1.5} />
+      <OrbitNode icon={Bell} label="Signals" value={`${unreadSignals} unread`} className="left-[15%] bottom-[8%]" delay={2} />
+      <OrbitNode icon={Network} label="Workforces" value={`${activeWorkforces} active`} className="right-[15%] bottom-[8%]" tone="emerald" delay={2.5} />
     </div>
   );
 }
@@ -193,10 +193,11 @@ function RailButton({ icon: Icon, label, count, onClick }) {
   return <button type="button" onClick={onClick} className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left text-[9px] uppercase tracking-[.08em] text-zinc-500 transition hover:border-white/8 hover:bg-white/[.025] hover:text-zinc-200"><Icon className="h-3.5 w-3.5" /><span className="flex-1">{label}</span>{count ? <span className="rounded-full bg-amber-400/15 px-1.5 text-amber-200">{count}</span> : <ChevronRight className="h-3 w-3 opacity-40" />}</button>;
 }
 
-export default function BlackstarCommandDeck({ metrics = {}, approvals = [], notifications = [], tasks = [], activities = [], lastSync, loading = false, onNavigate }) {
+export default function BlackstarCommandDeck({ metrics = {}, approvals = [], notifications = [], tasks = [], activities = [], connectedIntegrations = [], lastSync, loading = false, onNavigate }) {
   const now = useMissionClock();
   const pendingApprovals = approvals.filter((approval) => approval.status === 'pending').length;
   const failedTasks = tasks.filter((task) => task.status === 'failed').length;
+  const unreadSignals = notifications.filter((notification) => !notification.read_at).length;
   const runningWork =
     Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
   const markState = loading
@@ -218,9 +219,9 @@ export default function BlackstarCommandDeck({ metrics = {}, approvals = [], not
       </div>
       <LiveTicker notifications={notifications} activities={activities} />
       <div className="grid xl:grid-cols-[180px_minmax(0,1fr)_300px]">
-        <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Global infrastructure</div><p className="mt-2 text-[9px] text-zinc-500">Realtime data plane connected.</p></div></aside>
+        <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Provider links</div><p className="mt-2 text-[9px] text-zinc-500">{connectedIntegrations.length ? `${connectedIntegrations.length} connected external provider${connectedIntegrations.length === 1 ? '' : 's'}.` : 'No external provider links detected.'}</p>{connectedIntegrations.length ? <div className="mt-2 flex flex-wrap gap-1">{connectedIntegrations.slice(0, 3).map((integration) => <span key={integration.provider} className="rounded border border-emerald-300/10 bg-emerald-300/[.03] px-1.5 py-0.5 text-[8px] text-emerald-200">{integration.name || integration.provider}</span>)}</div> : null}</div></aside>
         <main className="space-y-3 p-3">
-          <HolographicCore metrics={metrics} markState={markState} />
+          <HolographicCore metrics={metrics} markState={markState} connectedIntegrations={connectedIntegrations.length} pendingApprovals={pendingApprovals} unreadSignals={unreadSignals} />
           <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} /></div>
           <MissionFeed activities={activities} />
         </main>
