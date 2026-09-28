@@ -7,6 +7,7 @@ import { SectionHead } from '@/components/workforce/wfShared';
 import AgentCard from '@/components/workforce/AgentCard';
 import AgentProfileDrawer from '@/components/workforce/AgentProfileDrawer';
 import WorkforceCommandCentre from '@/components/workforce/WorkforceCommandCentre';
+import WorkforceConstellation from '@/components/workforce/WorkforceConstellation';
 import WorkforceOrchestrator from '@/components/workforce/WorkforceOrchestrator';
 import WorkforceOSPanel from '@/components/workforce/WorkforceOSPanel';
 import DepartmentGrid from '@/components/workforce/DepartmentGrid';
@@ -142,6 +143,7 @@ export default function Workforce() {
         </div>
       </div>
 
+      <WorkforceConstellation agents={wfAgents} tasks={tasks} teams={teams} />
       <WorkforceOSPanel />
       <WorkforceCommandCentre overview={overview} loading={loading} />
 
