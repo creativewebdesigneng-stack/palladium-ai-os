@@ -533,8 +533,30 @@ body::before {
   .blackstar-page-header { border-radius:20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .blackstar-orb, .blackstar-brand-core { animation:none !important; }
-  .blackstar-metric-card:hover, .blackstar-panel:hover, .blackstar-nav-item:hover { transform:none; }
+  .blackstar-orb,
+  .blackstar-auth-orb,
+  .blackstar-brand-core { animation:none !important; }
+
+  .blackstar-command,
+  .blackstar-nav-item,
+  .blackstar-panel,
+  .blackstar-metric-card,
+  .blackstar-core-page :is(section, article, .blackstar-panel, .blackstar-metric-card)[class*="rounded"],
+  .blackstar-dashboard [aria-label="AI usage over the last 7 days"] > div,
+  .blackstar-agents .grid.gap-4.sm\:grid-cols-2.xl\:grid-cols-3 > .relative {
+    transition:none !important;
+  }
+
+  .blackstar-command:hover,
+  .blackstar-nav-item:hover,
+  .blackstar-panel:hover,
+  .blackstar-metric-card:hover,
+  .blackstar-core-page :is(section, article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-dashboard .blackstar-metric-card:hover,
+  .blackstar-dashboard [aria-label="AI usage over the last 7 days"] > div:hover,
+  .blackstar-agents .grid.gap-4.sm\:grid-cols-2.xl\:grid-cols-3 > .relative:hover {
+    transform:none !important;
+  }
 }
 
 
