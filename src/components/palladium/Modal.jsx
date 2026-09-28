@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
 
-// Standardised reusable modal built on the PalladiumAI design system.
+// Standardised reusable modal built on the Blackstar design system.
 const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
 
 export default function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {
