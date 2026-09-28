@@ -6,6 +6,7 @@ import {join} from 'node:path';
 const routesDir=fileURLToPath(new URL('../../routes/',import.meta.url));
 const screensDir=fileURLToPath(new URL('../../screens/',import.meta.url));
 const siteDir=fileURLToPath(new URL('../../components/site/',import.meta.url));
+const shellComponentsDir=fileURLToPath(new URL('../../components/palladium/',import.meta.url));
 
 function uiSources(dir:string):string[]{
   return readdirSync(dir,{withFileTypes:true}).flatMap((entry)=>{
@@ -24,7 +25,7 @@ describe('Blackstar route metadata branding',()=>{
   });
 
   it('does not expose the retired product name in public or app screens',()=>{
-    const hits=[...uiSources(screensDir),...uiSources(siteDir)]
+    const hits=[...uiSources(screensDir),...uiSources(siteDir),...uiSources(shellComponentsDir)]
       .filter((path)=>readFileSync(path,'utf8').includes('PalladiumAI'))
       .map((path)=>path.replace(fileURLToPath(new URL('../../',import.meta.url)),'/'));
     expect(hits).toEqual([]);
