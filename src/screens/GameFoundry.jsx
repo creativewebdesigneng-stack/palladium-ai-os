@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { uploadGameFoundrySource } from '@/lib/game-foundry/uploadGameFoundrySource';
 import GameFoundryModelViewer from '@/components/game-foundry/GameFoundryModelViewer';
 import GameFoundryWebPreview from '@/components/game-foundry/GameFoundryWebPreview';
+import GameFoundryWorld from '@/components/game-foundry/GameFoundryWorld';
 import {
   auditGameFoundryProjectReadiness,
   checkGameFoundryConnections,
@@ -190,6 +191,7 @@ export default function GameFoundry() {
     />
     {session === 'no' && <Failed message="Sign in to use Blackstar Game Foundry." />}
     {overview.error && <Failed message={friendlyMessage(overview.error)} />}
+    <GameFoundryWorld capabilities={caps} projects={projects} assets={assets} integrations={integrations} />
 
     <div className="grid gap-4 2xl:grid-cols-[1.05fr_.95fr]">
       <section className="rounded-2xl border border-violet-300/15 bg-black/30 p-5">
