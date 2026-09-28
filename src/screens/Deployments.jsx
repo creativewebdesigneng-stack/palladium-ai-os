@@ -27,7 +27,7 @@ export default function Deployments() {
   };
 
   return <>
-    <PageHeader eyebrow="Workspace" title="Deployments" description="Coolify-style self-hosted deployment controls integrated into PalladiumAI rather than introducing a second dashboard or authentication system." />
+    <PageHeader eyebrow="Workspace" title="Deployments" description="Coolify-style self-hosted deployment controls integrated into Blackstar rather than introducing a second dashboard or authentication system." />
     <section className={`mb-4 rounded-2xl border p-4 ${data?.configured ? 'border-emerald-400/20 bg-emerald-500/[.05]' : 'border-amber-400/20 bg-amber-500/[.05]'}`}>
       <div className="flex items-center gap-3"><Server className={`h-5 w-5 ${data?.configured ? 'text-emerald-300' : 'text-amber-300'}`}/><div><p className="text-sm font-semibold text-white">Coolify provider {data?.configured ? 'connected' : 'not configured'}</p><p className="mt-1 text-[11px] text-zinc-500">Set COOLIFY_API_URL and COOLIFY_API_TOKEN server-side. Tokens are never persisted in deployment rows.</p></div></div>
     </section>

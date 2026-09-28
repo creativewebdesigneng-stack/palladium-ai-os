@@ -188,7 +188,7 @@ export function ContactSupport() {
 
 export function AIAssistant() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about PalladiumAI — answers come from live AI, not a script." },
+    { role: 'assistant', text: "Hi, I'm your AI support assistant. Ask me anything about Blackstar — answers come from live AI, not a script." },
   ]);
   const [input, setInput] = useState('');
   const [pending, setPending] = useState(false);

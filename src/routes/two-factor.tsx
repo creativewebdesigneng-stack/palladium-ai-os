@@ -4,12 +4,12 @@ import Screen from "@/screens/TwoFactor";
 export const Route = createFileRoute("/two-factor")({
   head: () => ({
     meta: [
-      { title: "Two-factor verification — PalladiumAI" },
+      { title: "Two-factor verification — Blackstar" },
       {
         name: "description",
         content: "Confirm your identity with a second factor to protect your workspace.",
       },
-      { property: "og:title", content: "Two-factor verification — PalladiumAI" },
+      { property: "og:title", content: "Two-factor verification — Blackstar" },
       {
         property: "og:description",
         content: "Confirm your identity with a second factor to protect your workspace.",

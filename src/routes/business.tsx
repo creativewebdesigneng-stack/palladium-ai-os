@@ -4,13 +4,13 @@ import Screen from "@/screens/Business";
 export const Route = createFileRoute("/business")({
   head: () => ({
     meta: [
-      { title: "For Business — PalladiumAI" },
+      { title: "For Business — Blackstar" },
       {
         name: "description",
         content:
           "Run finance, marketing, support and operations with an autonomous AI workforce built for business outcomes.",
       },
-      { property: "og:title", content: "For Business — PalladiumAI" },
+      { property: "og:title", content: "For Business — Blackstar" },
       {
         property: "og:description",
         content:

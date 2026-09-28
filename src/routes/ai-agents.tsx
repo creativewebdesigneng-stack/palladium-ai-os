@@ -4,13 +4,13 @@ import Screen from "@/screens/AIAgents";
 export const Route = createFileRoute("/ai-agents")({
   head: () => ({
     meta: [
-      { title: "AI Agents — PalladiumAI" },
+      { title: "AI Agents — Blackstar" },
       {
         name: "description",
         content:
           "Hire, configure and deploy specialised AI agents that plan, use tools and complete real work autonomously.",
       },
-      { property: "og:title", content: "AI Agents — PalladiumAI" },
+      { property: "og:title", content: "AI Agents — Blackstar" },
       {
         property: "og:description",
         content:

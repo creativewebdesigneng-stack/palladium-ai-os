@@ -24,8 +24,8 @@ export default function Terminal() {
   const [stack, setStack] = useState([]);
   const [stackIndex, setStackIndex] = useState(-1);
   const [history, setHistory] = useState([
-    { text: 'PalladiumAI isolated diagnostic terminal', tone: 'text-violet-300' },
-    { text: 'Type “help” for the allowed command policy. This is never the PalladiumAI host.', tone: 'text-zinc-500' },
+    { text: 'Blackstar isolated diagnostic terminal', tone: 'text-violet-300' },
+    { text: 'Type “help” for the allowed command policy. This is never the Blackstar host.', tone: 'text-zinc-500' },
   ]);
   const scrollRef = useRef(null);
 
@@ -83,7 +83,7 @@ export default function Terminal() {
       <PageHeader
         eyebrow="Workspace"
         title="Terminal"
-        description="Authenticated diagnostic commands executed in short-lived secure E2B sandboxes. No command runs on the PalladiumAI server, deployment host or your computer."
+        description="Authenticated diagnostic commands executed in short-lived secure E2B sandboxes. No command runs on the Blackstar server, deployment host or your computer."
       />
 
       {status.isError && (

@@ -16,7 +16,7 @@ export default function AssistantLifecycleBridge({ enabled, listening, pending, 
     const publish = () => {
       const current = propsRef.current;
       let state = 'idle';
-      let detail = 'PalladiumAI assistant is ready.';
+      let detail = 'Blackstar assistant is ready.';
       if (!current.enabled) {
         state = 'off';
         detail = 'Voice assistant is disabled.';

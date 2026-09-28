@@ -20,7 +20,7 @@ const blankStep = (kind = 'agent') => ({
 });
 
 const NODE_TYPES = [
-  { kind: 'agent', label: 'AI Agent', icon: Bot, help: 'Run one of your existing PalladiumAI agents.' },
+  { kind: 'agent', label: 'AI Agent', icon: Bot, help: 'Run one of your existing Blackstar agents.' },
   { kind: 'delay', label: 'Delay', icon: Clock3, help: 'Pause safely for a bounded duration.' },
   { kind: 'approval', label: 'Approval', icon: ShieldCheck, help: 'Require a human decision before continuing.' },
   { kind: 'notification', label: 'Notification', icon: Bell, help: 'Send a runtime notification step.' },
@@ -118,7 +118,7 @@ export default function AutomationStudio() {
       <PageHeader
         eyebrow="Automation"
         title="Automation Studio"
-        description="Langflow-inspired visual composition on PalladiumAI's existing validated workflow runtime — agents, delays, approvals and notifications without a second execution engine."
+        description="Langflow-inspired visual composition on Blackstar's existing validated workflow runtime — agents, delays, approvals and notifications without a second execution engine."
         action={(
           <button onClick={() => navigate('/workflows')} className="rounded-xl border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5">
             View workflows
@@ -132,7 +132,7 @@ export default function AutomationStudio() {
           <div>
             <p className="text-sm font-semibold text-emerald-100">One live workflow runtime</p>
             <p className="mt-1 max-w-4xl text-xs leading-5 text-emerald-100/70">
-              Visual nodes save real workflow and workflow-step rows. Agent references are revalidated server-side, approvals reuse PalladiumAI approval requests, and execution remains governed by the durable queue, MCP/tool policy, runtime limits and audit trail.
+              Visual nodes save real workflow and workflow-step rows. Agent references are revalidated server-side, approvals reuse Blackstar approval requests, and execution remains governed by the durable queue, MCP/tool policy, runtime limits and audit trail.
             </p>
           </div>
         </div>
@@ -170,7 +170,7 @@ export default function AutomationStudio() {
 
           <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-white">Component nodes</h2><p className="mt-1 text-[11px] text-zinc-600">Add native PalladiumAI components rather than running a parallel Langflow backend.</p></div>
+              <div><h2 className="text-sm font-semibold text-white">Component nodes</h2><p className="mt-1 text-[11px] text-zinc-600">Add native Blackstar components rather than running a parallel Langflow backend.</p></div>
               <div className="flex flex-wrap gap-1.5">{NODE_TYPES.map(({ kind, label, icon: Icon }) => <button key={kind} type="button" disabled={steps.length >= 25} onClick={() => setSteps((current) => [...current, blankStep(kind)])} title={`Add ${label}`} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1.5 text-[10px] text-zinc-400 hover:bg-white/5 disabled:opacity-40"><Icon className="h-3 w-3" />{label}</button>)}</div>
             </div>
 
@@ -217,7 +217,7 @@ export default function AutomationStudio() {
             </button>
           </section>
           <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5 text-xs leading-5 text-zinc-500">
-            <p className="font-medium text-zinc-300">Langflow capabilities, PalladiumAI systems</p>
+            <p className="font-medium text-zinc-300">Langflow capabilities, Blackstar systems</p>
             <p className="mt-2">Graph composition lives here; testing continues in Agent Playground; models remain in Model Hub/Arena; tools and MCP remain in Tools Framework and MCP Hub; production execution stays in Agent Runtime and Workflows.</p>
           </section>
         </aside>

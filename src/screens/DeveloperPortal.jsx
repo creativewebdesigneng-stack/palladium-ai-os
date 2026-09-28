@@ -28,7 +28,7 @@ export default function DeveloperPortal() {
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Developer Portal" description="Integrate with the PalladiumAI platform — keys, docs, explorer, webhooks, and SDKs." />
+      <PageHeader eyebrow="Workspace" title="Developer Portal" description="Integrate with the Blackstar platform — keys, docs, explorer, webhooks, and SDKs." />
       <div className="grid gap-4 lg:grid-cols-[200px_1fr]">
         <aside className="hidden lg:block">
           <div className="sticky top-4 rounded-2xl border border-white/10 bg-white/[.03] p-2">

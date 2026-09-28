@@ -4,13 +4,13 @@ import Screen from "@/screens/AIToolsPublic";
 export const Route = createFileRoute("/tools")({
   head: () => ({
     meta: [
-      { title: "AI Tools — PalladiumAI" },
+      { title: "AI Tools — Blackstar" },
       {
         name: "description",
         content:
           "A growing library of AI tools and integrations your agents can use across research, code, sales and operations.",
       },
-      { property: "og:title", content: "AI Tools — PalladiumAI" },
+      { property: "og:title", content: "AI Tools — Blackstar" },
       {
         property: "og:description",
         content:

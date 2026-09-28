@@ -4,9 +4,9 @@ import Screen from "@/screens/AgentDetail";
 export const Route = createFileRoute("/_shell/_app/agents/$id/")({
   head: () => ({
     meta: [
-      { title: "Agent detail — PalladiumAI" },
+      { title: "Agent detail — Blackstar" },
       { name: "description", content: "Inspect an agent’s configuration, tools and performance." },
-      { property: "og:title", content: "Agent detail — PalladiumAI" },
+      { property: "og:title", content: "Agent detail — Blackstar" },
       {
         property: "og:description",
         content: "Inspect an agent’s configuration, tools and performance.",

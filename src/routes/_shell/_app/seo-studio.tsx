@@ -4,10 +4,10 @@ import Screen from "@/screens/SEOStudio";
 export const Route = createFileRoute("/_shell/_app/seo-studio")({
   head: () => ({
     meta: [
-      { title: "SEO Studio — PalladiumAI" },
-      { name: "description", content: "Track keyword, ranking, backlink and site-audit intelligence in PalladiumAI." },
-      { property: "og:title", content: "SEO Studio — PalladiumAI" },
-      { property: "og:description", content: "Track keyword, ranking, backlink and site-audit intelligence in PalladiumAI." },
+      { title: "SEO Studio — Blackstar" },
+      { name: "description", content: "Track keyword, ranking, backlink and site-audit intelligence in Blackstar." },
+      { property: "og:title", content: "SEO Studio — Blackstar" },
+      { property: "og:description", content: "Track keyword, ranking, backlink and site-audit intelligence in Blackstar." },
       { property: "og:type", content: "website" },
     ],
   }),

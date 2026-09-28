@@ -72,7 +72,7 @@ export default function Workflows() {
 
   return (
     <>
-      <PageHeader eyebrow="Automation" title="Workflows" description="Native PalladiumAI automation with safe JSON interoperability for Langflow graphs and supported n8n workflows. Imported graphs become reviewable drafts and continue to use PalladiumAI agents, approvals, MCP, tools and runtime policies." />
+      <PageHeader eyebrow="Automation" title="Workflows" description="Native Blackstar automation with safe JSON interoperability for Langflow graphs and supported n8n workflows. Imported graphs become reviewable drafts and continue to use Blackstar agents, approvals, MCP, tools and runtime policies." />
       <div aria-hidden className="mb-4"><DataPulse active duration={2.2} /></div>
 
       <WorkflowsToolbar

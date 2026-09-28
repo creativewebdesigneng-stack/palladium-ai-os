@@ -66,7 +66,7 @@ export default function SEOStudio() {
   }
 
   return <>
-    <PageHeader eyebrow="Business growth" title="SEO Studio" description="Track keyword research, rankings, backlinks and technical site-audit findings in one provider-neutral workspace that AI agents can use through PalladiumAI's existing Tools Framework." />
+    <PageHeader eyebrow="Business growth" title="SEO Studio" description="Track keyword research, rankings, backlinks and technical site-audit findings in one provider-neutral workspace that AI agents can use through Blackstar's existing Tools Framework." />
 
     <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
       <aside className="space-y-4 rounded-2xl border border-white/10 bg-white/[.025] p-4">

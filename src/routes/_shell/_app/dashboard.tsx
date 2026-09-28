@@ -18,12 +18,12 @@ function DashboardRoute() {
 export const Route = createFileRoute("/_shell/_app/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — PalladiumAI" },
+      { title: "Dashboard — Blackstar" },
       {
         name: "description",
         content: "Your AI workforce at a glance: live missions, agents and outcomes.",
       },
-      { property: "og:title", content: "Dashboard — PalladiumAI" },
+      { property: "og:title", content: "Dashboard — Blackstar" },
       {
         property: "og:description",
         content: "Your AI workforce at a glance: live missions, agents and outcomes.",

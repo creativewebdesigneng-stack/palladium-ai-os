@@ -57,7 +57,7 @@ export default function AgentWorkspaces() {
         status: workspaceDraft.status,
       } });
       setWorkspaceDraft(EMPTY_WORKSPACE);
-      setNotice('Agent workspace saved. Git and runtime execution remain under PalladiumAI’s existing controls.');
+      setNotice('Agent workspace saved. Git and runtime execution remain under Blackstar’s existing controls.');
       await refresh();
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not save workspace.'); }
     finally { setBusy(false); }
@@ -78,7 +78,7 @@ export default function AgentWorkspaces() {
         pinned: cardDraft.pinned,
       } });
       setCardDraft(EMPTY_CARD);
-      setNotice('Context card saved to the PalladiumAI timeline.');
+      setNotice('Context card saved to the Blackstar timeline.');
       await refresh();
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not save context card.'); }
     finally { setBusy(false); }
@@ -98,7 +98,7 @@ export default function AgentWorkspaces() {
     <PageHeader
       eyebrow="Agent operations"
       title="Agent Workspaces"
-      description="Coordinate parallel agent work with optional worktree isolation metadata, then preserve durable events, tasks, progress and insights on a context timeline that can feed PalladiumAI Knowledge."
+      description="Coordinate parallel agent work with optional worktree isolation metadata, then preserve durable events, tasks, progress and insights on a context timeline that can feed Blackstar Knowledge."
       action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300"><RefreshCw className="h-3.5 w-3.5" />Refresh</button>}
     />
 
@@ -128,7 +128,7 @@ export default function AgentWorkspaces() {
         <div className="mt-4 grid grid-cols-2 gap-3"><div><label className="text-xs text-zinc-500">Isolation</label><select value={workspaceDraft.isolation_mode} onChange={(e) => setWorkspaceDraft({ ...workspaceDraft, isolation_mode: e.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"><option value="shared">Shared</option><option value="worktree">Git worktree</option></select></div><div><label className="text-xs text-zinc-500">Status</label><select value={workspaceDraft.status} onChange={(e) => setWorkspaceDraft({ ...workspaceDraft, status: e.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white">{['draft','running','paused','completed','archived'].map((status) => <option key={status} value={status}>{status}</option>)}</select></div></div>
         <label className="mt-4 block text-xs text-zinc-500">Branch / worktree label</label><input value={workspaceDraft.branch_name} onChange={(e) => setWorkspaceDraft({ ...workspaceDraft, branch_name: e.target.value })} placeholder="feat/my-agent-task" className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-sm text-white" />
         <button disabled={busy} onClick={saveWorkspace} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">Save workspace</button>
-        <p className="mt-3 text-[11px] leading-4 text-zinc-600">Worktree mode records isolation intent. Git commands and code changes still run only through PalladiumAI’s existing GitHub/runtime controls.</p>
+        <p className="mt-3 text-[11px] leading-4 text-zinc-600">Worktree mode records isolation intent. Git commands and code changes still run only through Blackstar’s existing GitHub/runtime controls.</p>
       </aside>
     </div> : <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
       <section>

@@ -35,7 +35,7 @@ export default function Research() {
       <PageHeader
         eyebrow="AI"
         title="Research"
-        description="Ask a research question and PalladiumAI will search the live web, compare sources and generate a cited AI report."
+        description="Ask a research question and Blackstar will search the live web, compare sources and generate a cited AI report."
       />
 
       <div className="mx-auto max-w-5xl space-y-4">
@@ -61,7 +61,7 @@ export default function Research() {
                 {pending ? 'Researching…' : 'Research'}
               </button>
             </div>
-            <p className="text-[11px] text-zinc-600">Research uses live public web results and the AI provider configured for your PalladiumAI account, with Groq fallback when available.</p>
+            <p className="text-[11px] text-zinc-600">Research uses live public web results and the AI provider configured for your Blackstar account, with Groq fallback when available.</p>
           </form>
         </section>
 

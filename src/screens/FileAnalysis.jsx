@@ -16,7 +16,7 @@ export default function FileAnalysis() {
 
   return (
     <>
-      <PageHeader eyebrow="AI" title="File Analysis" description="Upload documents and let PalladiumAI extract, summarize, and suggest actions." />
+      <PageHeader eyebrow="AI" title="File Analysis" description="Upload documents and let Blackstar extract, summarize, and suggest actions." />
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div>
           <div onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); add(e.dataTransfer.files); }} className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${drag ? 'border-violet-400/60 bg-violet-500/10' : 'border-white/15 bg-white/[.025]'}`}>

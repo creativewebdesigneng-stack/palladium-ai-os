@@ -56,7 +56,7 @@ export default function FitnessStudio() {
 
   const workouts = data?.workouts ?? [];
   return <>
-    <PageHeader eyebrow="Personal workspace" title="Fitness Studio" description="An openGym-inspired workout and body-weight workspace using PalladiumAI auth, RLS and audit instead of importing a second account/backend stack." />
+    <PageHeader eyebrow="Personal workspace" title="Fitness Studio" description="An openGym-inspired workout and body-weight workspace using Blackstar auth, RLS and audit instead of importing a second account/backend stack." />
     {error && <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
@@ -70,7 +70,7 @@ export default function FitnessStudio() {
       <aside className="space-y-4">
         <section className="rounded-2xl border border-white/10 bg-white/[.03] p-4"><h3 className="text-xs font-semibold text-white">Profile</h3><div className="mt-3 space-y-3"><Field label="Goal"><textarea rows={3} className="field resize-none" value={goal} onChange={(e)=>setGoal(e.target.value)} placeholder="Build strength and improve conditioning"/></Field><Field label="Units"><select className="field" value={units} onChange={(e)=>setUnits(e.target.value)}><option value="metric">Metric</option><option value="imperial">Imperial</option></select></Field><button onClick={saveProfile} disabled={busy} className="w-full rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5">Save profile</button></div></section>
         <section className="rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center gap-2"><Scale className="h-4 w-4 text-violet-300"/><h3 className="text-xs font-semibold text-white">Body weight</h3></div><p className="mt-2 text-2xl font-semibold text-white">{latestWeight ?? '—'}</p><p className="text-[10px] text-zinc-600">latest {units === 'metric' ? 'kg' : 'lb'} entry</p><div className="mt-3 flex gap-2"><input className="field" type="number" step="0.1" value={weight} onChange={(e)=>setWeight(e.target.value)} placeholder={units === 'metric' ? 'kg' : 'lb'}/><button onClick={addWeight} disabled={busy || !weight} className="rounded-xl bg-violet-600 px-3 text-xs text-white disabled:opacity-40">Log</button></div></section>
-        <section className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.05] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300"/>Fitness data stays in PalladiumAI's owner-scoped storage. No openGym authentication, server or account system is duplicated.</section>
+        <section className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.05] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300"/>Fitness data stays in Blackstar's owner-scoped storage. No openGym authentication, server or account system is duplicated.</section>
       </aside>
     </div>
     <style>{`.field{width:100%;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.22);border-radius:.75rem;padding:.65rem .75rem;font-size:.75rem;color:white;outline:none}.field:focus{border-color:rgba(167,139,250,.45)}.field option{background:#11131a}`}</style>

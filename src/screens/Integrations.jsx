@@ -176,10 +176,10 @@ export default function Integrations() {
       category: item.category,
       summary:
         item.capabilityCount > 0
-          ? `${item.capabilityCount} live Nango actions discovered. Read-only actions can run autonomously; writes and destructive actions use PalladiumAI approval controls.`
+          ? `${item.capabilityCount} live Nango actions discovered. Read-only actions can run autonomously; writes and destructive actions use Blackstar approval controls.`
           : item.agentReady
-            ? `Nango-managed ${item.name} authentication routed through PalladiumAI's bounded agent tools and approval controls.`
-            : `Connect ${item.name} securely. PalladiumAI discovers and activates its typed Nango actions on demand.`,
+            ? `Nango-managed ${item.name} authentication routed through Blackstar's bounded agent tools and approval controls.`
+            : `Connect ${item.name} securely. Blackstar discovers and activates its typed Nango actions on demand.`,
       scopes: [
         `${String(item.authMode || "Provider").replaceAll("_", " ")} authentication`,
         "Credentials remain server-side",
@@ -354,7 +354,7 @@ export default function Integrations() {
       <PageHeader
         eyebrow="Workspace"
         title="Integrations"
-        description="Connect real services to PalladiumAI, verify them live, and expose only server-backed capabilities to your agents. Credentials and tokens remain server-side."
+        description="Connect real services to Blackstar, verify them live, and expose only server-backed capabilities to your agents. Credentials and tokens remain server-side."
         action={
           <div className="flex gap-2">
             <button
@@ -387,7 +387,7 @@ export default function Integrations() {
           <div>
             <p className="text-sm font-semibold text-emerald-100">Live connection backend</p>
             <p className="mt-1 max-w-4xl text-xs leading-5 text-zinc-400">
-              PalladiumAI checks persisted OAuth status, granted permissions and refresh capability.
+              Blackstar checks persisted OAuth status, granted permissions and refresh capability.
               Connected cards can also run a bounded read-only provider test, so a green connection
               means the external API actually responded—not merely that a token row exists.
             </p>

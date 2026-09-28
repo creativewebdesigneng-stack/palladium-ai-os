@@ -96,7 +96,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const setOpen = (v) => onOpenChange?.(v);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: "Hi, I'm your PalladiumAI voice assistant. I'm hands-free: allow microphone access once, then just speak naturally and I'll answer or navigate for you." },
+    { role: 'assistant', text: "Hi, I'm your Blackstar voice assistant. I'm hands-free: allow microphone access once, then just speak naturally and I'll answer or navigate for you." },
   ]);
   const [pending, setPending] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_VOICE_ASSISTANT_PREFERENCES);
@@ -301,10 +301,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       if (event.error === 'audio-capture') {
         setListening(false);
         setListeningMode('reconnecting');
-        setMicError('Browser speech recognition lost the microphone. Cloud voice fallback will continue while PalladiumAI reconnects.');
+        setMicError('Browser speech recognition lost the microphone. Cloud voice fallback will continue while Blackstar reconnects.');
       } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         setListeningMode('cloud');
-        setMicError('Browser speech recognition is unavailable, so PalladiumAI is using the automatic cloud speech fallback.');
+        setMicError('Browser speech recognition is unavailable, so Blackstar is using the automatic cloud speech fallback.');
       }
       if (shouldListenRef.current && prefsRef.current.enabled && !speechActiveRef.current) resumeRecognition(650);
     };
@@ -390,7 +390,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         setListeningMode(recognitionRunningRef.current ? 'browser' : 'reconnecting');
         setMicError(message.includes('not configured')
           ? 'Cloud voice fallback is not configured on this deployment. Add the OpenAI API key for speech transcription.'
-          : 'Cloud voice fallback could not transcribe this audio. PalladiumAI will keep retrying automatically.');
+          : 'Cloud voice fallback could not transcribe this audio. Blackstar will keep retrying automatically.');
       } finally {
         cloudTranscriptionPendingRef.current = false;
       }
@@ -411,7 +411,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
           mediaRecorderRef.current = recorder;
           recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
           recorder.onerror = () => {
-            setMicError('The automatic cloud voice recorder hit a browser error. PalladiumAI will retry.');
+            setMicError('The automatic cloud voice recorder hit a browser error. Blackstar will retry.');
           };
           recorder.onstop = () => {
             if (mediaRecorderRef.current === recorder) mediaRecorderRef.current = null;
@@ -447,7 +447,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       if (!navigator.mediaDevices?.getUserMedia) {
         setListening(false);
         setListeningMode('reconnecting');
-        setMicError('This browser does not expose microphone capture to PalladiumAI.');
+        setMicError('This browser does not expose microphone capture to Blackstar.');
         return;
       }
       if (!micStreamRef.current) {
@@ -468,7 +468,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
             setListening(false);
             setListeningMode('reconnecting');
             if (!shouldListenRef.current || !prefsRef.current.enabled) return;
-            setMicError('The microphone input ended. PalladiumAI is reconnecting automatically.');
+            setMicError('The microphone input ended. Blackstar is reconnecting automatically.');
             if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
             micRetryTimerRef.current = window.setTimeout(() => {
               micRetryTimerRef.current = null;
@@ -485,10 +485,10 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
           setListeningMode('reconnecting');
           if (name === 'NotAllowedError' || name === 'SecurityError') {
             shouldListenRef.current = false;
-            setMicError('Microphone access is blocked. Allow microphone access for PalladiumAI in browser site permissions, then refresh.');
+            setMicError('Microphone access is blocked. Allow microphone access for Blackstar in browser site permissions, then refresh.');
             return;
           }
-          setMicError('The microphone is temporarily unavailable. PalladiumAI is retrying automatically.');
+          setMicError('The microphone is temporarily unavailable. Blackstar is retrying automatically.');
           if (micRetryTimerRef.current) window.clearTimeout(micRetryTimerRef.current);
           micRetryTimerRef.current = window.setTimeout(() => {
             micRetryTimerRef.current = null;

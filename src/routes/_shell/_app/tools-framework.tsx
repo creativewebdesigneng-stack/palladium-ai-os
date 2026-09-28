@@ -4,9 +4,9 @@ import Screen from "@/screens/ToolsFramework";
 export const Route = createFileRoute("/_shell/_app/tools-framework")({
   head: () => ({
     meta: [
-      { title: "Tools framework — PalladiumAI" },
+      { title: "Tools framework — Blackstar" },
       { name: "description", content: "Define, test and permission the tools agents can call." },
-      { property: "og:title", content: "Tools framework — PalladiumAI" },
+      { property: "og:title", content: "Tools framework — Blackstar" },
       {
         property: "og:description",
         content: "Define, test and permission the tools agents can call.",

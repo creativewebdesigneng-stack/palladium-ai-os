@@ -47,7 +47,7 @@ export default function CRMStudio() {
   const activeFields = useMemo(() => fields.filter((item) => item.is_active), [fields]);
 
   return <>
-    <PageHeader eyebrow="CRM" title="CRM Studio" description="Relaticle-style custom data fields and saved views layered onto PalladiumAI's existing contacts, pipeline and activity records—one CRM source of truth, not a second database." action={<span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-[11px] text-violet-200"><Settings2 className="h-3.5 w-3.5" />Custom schema</span>} />
+    <PageHeader eyebrow="CRM" title="CRM Studio" description="Relaticle-style custom data fields and saved views layered onto Blackstar's existing contacts, pipeline and activity records—one CRM source of truth, not a second database." action={<span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-[11px] text-violet-200"><Settings2 className="h-3.5 w-3.5" />Custom schema</span>} />
     {error && <div className="mb-5 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>}
     {(customQ.isLoading || crmQ.isLoading) && <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Loading CRM schema…</div>}
     {session === 'yes' && !customQ.isLoading && !crmQ.isLoading && <div className="grid gap-5 xl:grid-cols-2">

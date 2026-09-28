@@ -1,7 +1,7 @@
 /**
  * GitHub App installation + user-authorization callback.
  *
- * The signed PalladiumAI state identifies the authenticated PalladiumAI user.
+ * The signed Blackstar state identifies the authenticated Blackstar user.
  * GitHub's temporary user access token is then used only to prove that the
  * installation belongs to the consenting GitHub user. That user token is never
  * stored; only the verified installation id and account label are persisted.
@@ -32,7 +32,7 @@ async function publicGitHubAppClientId(): Promise<string> {
     headers: {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2026-03-10",
-      "User-Agent": "PalladiumAI",
+      "User-Agent": "Blackstar",
     },
   });
   const text = await response.text();
@@ -59,7 +59,7 @@ async function exchangeGitHubCode(code: string, redirectUri: string): Promise<st
     headers: {
       Accept: "application/json",
       "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "PalladiumAI",
+      "User-Agent": "Blackstar",
     },
     body: new URLSearchParams({
       client_id: clientId,
@@ -97,7 +97,7 @@ async function resolveCurrentAppUserInstallation(
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${userAccessToken}`,
       "X-GitHub-Api-Version": "2026-03-10",
-      "User-Agent": "PalladiumAI",
+      "User-Agent": "Blackstar",
     },
   });
   const text = await response.text();
@@ -129,16 +129,16 @@ async function resolveCurrentAppUserInstallation(
     }
     const match = installations.find((installation) => installation.id === suggested);
     if (!match) {
-      throw new Error("The PalladiumAI GitHub App installation is not accessible to the authorized GitHub user.");
+      throw new Error("The Blackstar GitHub App installation is not accessible to the authorized GitHub user.");
     }
     return match;
   }
 
   if (installations.length === 0) {
-    throw new Error("The PalladiumAI GitHub App is not installed for this GitHub user. Install it, then reconnect from PalladiumAI.");
+    throw new Error("The Blackstar GitHub App is not installed for this GitHub user. Install it, then reconnect from Blackstar.");
   }
   if (installations.length > 1) {
-    throw new Error("Multiple PalladiumAI GitHub App installations are available. Reconnect after selecting the intended GitHub account installation.");
+    throw new Error("Multiple Blackstar GitHub App installations are available. Reconnect after selecting the intended GitHub account installation.");
   }
   return installations[0]!;
 }

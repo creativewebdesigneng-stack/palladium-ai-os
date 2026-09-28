@@ -121,15 +121,15 @@ export default function Prompts() {
   };
 
   if (session === 'no') {
-    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live PalladiumAI model runtime." /><StateCard text="Sign in to use Prompt Workspace." /></>;
+    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live Blackstar model runtime." /><StateCard text="Sign in to use Prompt Workspace." /></>;
   }
 
   if (workspace.isLoading) {
-    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live PalladiumAI model runtime." /><StateCard icon={Loader2} spin text="Loading your prompt library…" /></>;
+    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live Blackstar model runtime." /><StateCard icon={Loader2} spin text="Loading your prompt library…" /></>;
   }
 
   if (workspace.isError) {
-    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live PalladiumAI model runtime." /><StateCard text={friendlyMessage(workspace.error)} /></>;
+    return <><PageHeader eyebrow="AI" title="Prompt Workspace" description="Save, version and run reusable prompts against the live Blackstar model runtime." /><StateCard text={friendlyMessage(workspace.error)} /></>;
   }
 
   return (
@@ -137,7 +137,7 @@ export default function Prompts() {
       <PageHeader
         eyebrow="AI"
         title="Prompt Workspace"
-        description="Saved prompts are private to your account, versioned on every save, and executed through the same entitlement, provider-failover, usage and audit controls as PalladiumAI Chat."
+        description="Saved prompts are private to your account, versioned on every save, and executed through the same entitlement, provider-failover, usage and audit controls as Blackstar Chat."
         action={
           <button
             onClick={() => { setDraft(EMPTY); setRunInput(''); setLatestOutput(''); }}

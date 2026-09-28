@@ -163,7 +163,7 @@ export default function AdminIntegrations() {
               <h2 className="text-sm font-semibold text-white">Nango provider provisioning</h2>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-400">
-              Creates only PalladiumAI's fixed provider records through Nango's server API. The
+              Creates only Blackstar's fixed provider records through Nango's server API. The
               Nango key and OAuth credentials never enter the browser.
             </p>
           </div>
@@ -231,7 +231,7 @@ export default function AdminIntegrations() {
         </div>
         <p className="mt-3 text-[10px] text-zinc-600">
           {nangoReady}/{nangoTotal} Nango provider records ready. Connecting an account still
-          happens from PalladiumAI's Integrations page.
+          happens from Blackstar's Integrations page.
         </p>
       </section>
 

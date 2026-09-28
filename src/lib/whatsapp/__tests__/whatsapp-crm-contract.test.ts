@@ -29,7 +29,7 @@ describe("WhatsApp CRM native contract", () => {
     expect(functions).toContain("listIntegrationCapabilities");
     expect(functions).toContain("normalizeIntegrationProvider");
     expect(functions).not.toContain("fetch(\"https://graph.facebook.com");
-    expect(screen).toContain("External send remains controlled by PalladiumAI integration approvals");
+    expect(screen).toContain("External send remains controlled by Blackstar integration approvals");
     expect(screen).toContain("Manage connector");
   });
 

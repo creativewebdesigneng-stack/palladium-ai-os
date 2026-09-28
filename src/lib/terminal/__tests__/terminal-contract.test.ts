@@ -33,7 +33,7 @@ describe("Terminal production contract", () => {
   });
 
   it("states the real safety boundary in the UI", () => {
-    expect(screen).toContain("No command runs on the PalladiumAI server, deployment host or your computer");
+    expect(screen).toContain("No command runs on the Blackstar server, deployment host or your computer");
     expect(screen).toContain("No network clients or arbitrary script execution");
     expect(screen).toContain("filesystem state does not persist");
   });

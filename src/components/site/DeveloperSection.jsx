@@ -27,7 +27,7 @@ export default function DeveloperSection() {
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-violet-400">For developers</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">A platform you can build on</h2>
-          <p className="mt-3 text-zinc-400">Everything in the dashboard is available programmatically. Ship integrations, internal tools, and whole products on top of PalladiumAI.</p>
+          <p className="mt-3 text-zinc-400">Everything in the dashboard is available programmatically. Ship integrations, internal tools, and whole products on top of Blackstar.</p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {features.map(([t, d, I]) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/[.025] p-4">

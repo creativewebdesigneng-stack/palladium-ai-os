@@ -119,7 +119,7 @@ export default function PublishedStudioApp({ appId }) {
         const modalOpen = openModals.includes(widget.id) || openModals.includes(widget.name);
         return <Widget key={widget.id} widget={widget} properties={properties} value={localValue} modalOpen={modalOpen} accent={accent} onValueChange={(value) => setValues((current) => ({ ...current, [widget.id]: value, [widget.name]: value }))} onEvent={handleEvent} />;
       })}{!widgets.length && <div className="col-span-12 py-20 text-center text-sm text-slate-400">This page has no components yet.</div>}</section>
-      <footer className="mx-auto max-w-7xl px-5 py-8 text-center text-[11px] text-slate-400">Built with PalladiumAI App Studio · v{document.version}</footer>
+      <footer className="mx-auto max-w-7xl px-5 py-8 text-center text-[11px] text-slate-400">Built with Blackstar App Studio · v{document.version}</footer>
     </main>
   );
 }

@@ -16,7 +16,7 @@ const TRACK_ICONS = {
 
 const SECTIONS = [
   ['Ready-to-Go Agents', 'agents', Bot, 'Specialist agents and the runtime surfaces that power them.'],
-  ['Tools & Studios', 'tools', Wrench, 'The existing PalladiumAI tools most useful for this Fast Track.'],
+  ['Tools & Studios', 'tools', Wrench, 'The existing Blackstar tools most useful for this Fast Track.'],
   ['Workflows & Automations', 'workflows', Workflow, 'Durable processes for moving the work from idea to result.'],
   ['Skills & Templates', 'skills', Sparkles, 'Reusable knowledge, playbooks and starting points.'],
   ['Integrations', 'integrations', Plug, 'Connect the external systems this type of work depends on.'],
@@ -86,7 +86,7 @@ function TrackDetail({ track, onBack }) {
       <section>
         <div className="mb-4 flex items-center gap-2">
           <Rocket className="h-5 w-5 text-violet-300" />
-          <div><h2 className="text-lg font-semibold text-white">Start Here</h2><p className="text-xs text-zinc-500">High-value actions that take you straight into the real PalladiumAI capability.</p></div>
+          <div><h2 className="text-lg font-semibold text-white">Start Here</h2><p className="text-xs text-zinc-500">High-value actions that take you straight into the real Blackstar capability.</p></div>
         </div>
         <div className="grid gap-3 md:grid-cols-3">{track.quickActions.map((item) => <ResourceCard key={item.id} item={item} />)}</div>
       </section>
@@ -109,7 +109,7 @@ function TrackDetail({ track, onBack }) {
         <div className="grid gap-3 md:grid-cols-2">{track.setup.map((item) => <ResourceCard key={item.id} item={item} />)}</div>
       </section>
 
-      <p className="pb-4 text-center text-xs text-zinc-600">Fast Track organises existing PalladiumAI systems. It does not create duplicate agents, workflows, integrations or studios.</p>
+      <p className="pb-4 text-center text-xs text-zinc-600">Fast Track organises existing Blackstar systems. It does not create duplicate agents, workflows, integrations or studios.</p>
     </div>
   );
 }
@@ -130,7 +130,7 @@ export default function FastTrackWorkspace() {
         <div className="max-w-3xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-200"><Zap className="h-3.5 w-3.5" /> Fast Track</span>
           <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Everything you need for the job, in one place.</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">Choose what you are trying to accomplish. PalladiumAI brings the right agents, tools, workflows, skills and integrations together while keeping the existing systems underneath as the source of truth.</p>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">Choose what you are trying to accomplish. Blackstar brings the right agents, tools, workflows, skills and integrations together while keeping the existing systems underneath as the source of truth.</p>
         </div>
       </section>
 
