@@ -348,9 +348,7 @@ export const saveRetailReturnItem = createServerFn({ method: 'POST' })
   .inputValidator((value: unknown) => returnItemSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const row = {
-      workspace_id: data.workspace_id,
-      return_id: data.return_id,
+    const editable = {
       item_id: data.item_id,
       location_id: nullify(data.location_id),
       quantity: data.quantity,
@@ -361,7 +359,7 @@ export const saveRetailReturnItem = createServerFn({ method: 'POST' })
     };
     if (data.id) {
       const { data: out, error } = await sb.from('retail_return_items')
-        .update(row)
+        .update(editable)
         .eq('id', data.id)
         .eq('workspace_id', data.workspace_id)
         .eq('user_id', context.userId)
@@ -372,7 +370,7 @@ export const saveRetailReturnItem = createServerFn({ method: 'POST' })
       return out;
     }
     const { data: out, error } = await sb.from('retail_return_items')
-      .insert({ ...row, user_id: context.userId })
+      .insert({ ...editable, workspace_id: data.workspace_id, return_id: data.return_id, user_id: context.userId })
       .select()
       .single();
     if (error) throw new Error(error.message);
