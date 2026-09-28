@@ -9,7 +9,7 @@ const steps = [
 
 export default function Onboarding() {
   return (
-    <div className="relative grid min-h-screen place-items-center overflow-hidden bg-[#050507] p-4 text-white">
+    <div className="blackstar-public-page blackstar-public-onboarding relative grid min-h-screen place-items-center overflow-hidden bg-[#050507] p-4 text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,.16),transparent_34%),linear-gradient(rgba(255,255,255,.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.018)_1px,transparent_1px)] bg-[size:auto,42px_42px,42px_42px]" />
       <div className="relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-violet-300/10 bg-black/55 p-6 shadow-[0_36px_120px_rgba(0,0,0,.48)] backdrop-blur-2xl sm:p-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/30 to-transparent" />
