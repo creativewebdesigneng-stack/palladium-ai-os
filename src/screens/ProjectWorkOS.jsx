@@ -76,7 +76,7 @@ export default function ProjectWorkOS() {
 
   return (
     <>
-      <PageHeader eyebrow="Projects" title="Work OS" description="A native delivery workspace for projects, cycles, modules and hierarchical work items—bringing Plane/OpenProject-style planning into PalladiumAI without a second project system." action={<span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-[11px] text-violet-200"><FolderKanban className="h-3.5 w-3.5" />Project-native planning</span>} />
+      <PageHeader eyebrow="Projects" title="Work OS" description="A native delivery workspace for projects, cycles, modules and hierarchical work items—bringing Plane/OpenProject-style planning into Blackstar without a second project system." action={<span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-[11px] text-violet-200"><FolderKanban className="h-3.5 w-3.5" />Project-native planning</span>} />
 
       <section className="mb-5 rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -86,7 +86,7 @@ export default function ProjectWorkOS() {
       </section>
 
       {error && <div className="mb-5 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>}
-      {projectsQ.isLoading || (projectId && osQ.isLoading) ? <Loading /> : !projects.length ? <Empty text="Create a project first. Work OS deliberately uses your existing PalladiumAI projects rather than creating a duplicate workspace." /> : projectId ? <>
+      {projectsQ.isLoading || (projectId && osQ.isLoading) ? <Loading /> : !projects.length ? <Empty text="Create a project first. Work OS deliberately uses your existing Blackstar projects rather than creating a duplicate workspace." /> : projectId ? <>
         <div className="mb-5 grid gap-3 lg:grid-cols-2">
           <PlannerCard icon={CalendarRange} title="Cycles" subtitle={`${cycles.length} cycle${cycles.length === 1 ? '' : 's'}`} value={cycleName} onChange={setCycleName} placeholder="e.g. Sprint 12" disabled={!cycleName.trim() || createCycle.isPending} onCreate={() => createCycle.mutate()} chips={cycles.map((cycle) => ({ id: cycle.id, text: `${cycle.name} · ${cycle.status}` }))} />
           <PlannerCard icon={Layers3} title="Modules" subtitle={`${modules.length} module${modules.length === 1 ? '' : 's'}`} value={moduleName} onChange={setModuleName} placeholder="e.g. Billing" disabled={!moduleName.trim() || createModule.isPending} onCreate={() => createModule.mutate()} chips={modules.map((module) => ({ id: module.id, text: `${module.name} · ${module.status}` }))} />
