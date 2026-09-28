@@ -11,6 +11,7 @@ import FinanceAlerts from '@/components/finance/FinanceAlerts';
 import FinanceReceivables from '@/components/finance/FinanceReceivables';
 import FinanceEconomicData from '@/components/finance/FinanceEconomicData';
 import FinanceOpenBanking from '@/components/finance/FinanceOpenBanking';
+import FinanceLedgerWorld from '@/components/finance/FinanceLedgerWorld';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -90,7 +91,7 @@ export default function Finance() {
         }
       />
 
-
+      <FinanceLedgerWorld transactions={transactions} summary={summary} currency={currency} />
       <FinanceKnowledgeHub />
       <div className="mt-5"><FinanceEconomicData /></div>
       <div className="mt-5"><FinanceOpenBanking /></div>
