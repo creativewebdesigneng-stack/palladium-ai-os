@@ -4,12 +4,12 @@ import Screen from "@/screens/Onboarding";
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Welcome — PalladiumAI" },
+      { title: "Welcome — Blackstar" },
       {
         name: "description",
         content: "Set up your workspace, pick departments and meet your AI workforce.",
       },
-      { property: "og:title", content: "Welcome — PalladiumAI" },
+      { property: "og:title", content: "Welcome — Blackstar" },
       {
         property: "og:description",
         content: "Set up your workspace, pick departments and meet your AI workforce.",
