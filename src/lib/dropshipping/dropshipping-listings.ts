@@ -81,6 +81,15 @@ export function assertDropshippingPublicationReady(item:CatalogLike,channel:Drop
   return readiness;
 }
 
+
+const LISTING_WRITE_HINT=/(?:listing|product|offer).*(?:create|update|publish|activate)|(?:create|update|publish|activate).*(?:listing|product|offer)/i;
+const NON_LISTING_WRITE_HINT=/(?:order|receipt|customer|refund|payout|payment|fulfill|shipment|shipping|message)/i;
+
+export function isDropshippingListingWriteAction(action:unknown){
+  const value=typeof action==='string'?action.trim():'';
+  return Boolean(value&&LISTING_WRITE_HINT.test(value)&&!NON_LISTING_WRITE_HINT.test(value));
+}
+
 export function buildListingDraftPrompt(item:CatalogLike,channel:DropshipChannel,locale='en-GB',notes=''){
   if(isDropshipProductBlocked(item))throw new Error('Blocked or rejected products cannot enter the listing-draft flow until the product decision is resolved.');
   const metadata=item.metadata??{};
