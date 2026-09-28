@@ -2,6 +2,9 @@ import {describe,expect,it} from 'vitest';
 import {readFileSync} from 'node:fs';
 
 const pages=[
+  ['Landing.jsx','blackstar-public-landing'],
+  ['Pricing.jsx','blackstar-public-pricing'],
+  ['AIToolsPublic.jsx','blackstar-public-tools'],
   ['Features.jsx','blackstar-public-features'],
   ['Business.jsx','blackstar-public-business'],
   ['Developers.jsx','blackstar-public-developers'],
