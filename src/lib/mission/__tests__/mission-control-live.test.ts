@@ -30,6 +30,7 @@ describe('Mission Control live wiring', () => {
     expect(missionScreen).toContain('notifications={data?.notifications ?? []}');
     expect(missionScreen).toContain('tasks={data?.tasks ?? []}');
     expect(missionScreen).toContain('activities={data?.activities ?? []}');
+    expect(missionScreen).toContain('connectedIntegrations={data?.connectedIntegrations ?? []}');
   });
 
   it('routes read-only product discovery to Live Explorer before the approval executor', () => {
@@ -63,7 +64,7 @@ describe('Mission Control live wiring', () => {
     expect(commandDeck).toContain('Mission execution queue');
     expect(commandDeck).toContain('Live mission feed');
     expect(commandDeck).toContain('Pending approvals');
-    expect(commandDeck).toContain('Global infrastructure');
+    expect(commandDeck).toContain('Provider links');
     expect(commandDeck).toContain('System health monitor');
   });
 

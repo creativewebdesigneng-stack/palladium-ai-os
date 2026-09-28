@@ -50,7 +50,7 @@ describe("Blackstar Astra motion identity", () => {
     expect(deck).toContain("? 'attention'");
     expect(deck).toContain(": 'ready'");
     expect(deck).toContain("<CommandDeckBrand state={markState} />");
-    expect(deck).toContain("<HolographicCore metrics={metrics} markState={markState} />");
+    expect(deck).toContain("<HolographicCore metrics={metrics} markState={markState} connectedIntegrations={connectedIntegrations.length} pendingApprovals={pendingApprovals} unreadSignals={unreadSignals} />");
     expect(brand).toContain('<AstraMark size={28} state={state}');
   });
 
