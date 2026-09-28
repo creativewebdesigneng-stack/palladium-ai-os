@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Building2, Save, Trash2, Bot, Target, ShieldAlert } from 'lucide-react';
+import { Building2, Save, Trash2, Bot, Target, ShieldAlert, BarChart3, CalendarClock } from 'lucide-react';
 import { deleteCompanyWorkspace, listCompanyWorkspaces, saveCompanyWorkspace } from '@/lib/company/company-workspaces.functions';
 
 const blank={name:'',industry:'',stage:'build',geography:'',mission:'',company_context:'',objectives:[],priorities:[],risks:[],department_plan:{},ai_workforce_plan:[],notes:''};
 const parseList=(v)=>String(v||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,50);
+const commandFor=(workspace)=>workspace?.department_plan?.command_intelligence??{};
+const commandList=(value)=>Array.isArray(value)?value.map(item=>typeof item==='string'?item:(item?.text||item?.name||item?.title||'')).filter(Boolean):[];
 
 export default function CompanyWorkspace(){
  const [items,setItems]=useState([]),[form,setForm]=useState(blank),[error,setError]=useState('');
+ const command=commandFor(form);
+ const setCommand=(key,value)=>setForm(current=>({...current,department_plan:{...(current.department_plan??{}),command_intelligence:{...commandFor(current),[key]:value}}}));
  const load=()=>listCompanyWorkspaces({data:{}}).then(setItems).catch(e=>setError(e instanceof Error?e.message:'Could not load company workspaces.'));
  useEffect(()=>{load()},[]);
  const save=async()=>{setError('');try{await saveCompanyWorkspace({data:form});setForm(blank);await load()}catch(e){setError(e instanceof Error?e.message:'Could not save company workspace.')}};
@@ -24,9 +28,26 @@ export default function CompanyWorkspace(){
     <Area label="Objectives (one per line)" value={form.objectives.join('\n')} set={v=>setForm({...form,objectives:parseList(v)})}/>
     <Area label="Current priorities (one per line)" value={form.priorities.join('\n')} set={v=>setForm({...form,priorities:parseList(v)})}/>
     <Area label="Key risks (one per line)" value={form.risks.join('\n')} set={v=>setForm({...form,risks:parseList(v)})}/>
+    <div className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[.025] p-4">
+      <div className="flex items-center gap-2 text-cyan-300"><BarChart3 className="h-4 w-4"/><span className="text-[10px] font-semibold uppercase tracking-[.14em]">Command intelligence context</span></div>
+      <p className="mt-2 text-[10px] leading-4 text-zinc-600">Persistent planning context only. Live/audited metrics remain sourced from Finance, CRM, BI and specialist systems.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Area label="Operating KPIs (one per line)" value={commandList(command.kpis).join('\n')} set={v=>setCommand('kpis',parseList(v))}/>
+        <Area label="Material decisions (one per line)" value={commandList(command.decisions).join('\n')} set={v=>setCommand('decisions',parseList(v))}/>
+        <Area label="Opportunity portfolio (one per line)" value={commandList(command.opportunities).join('\n')} set={v=>setCommand('opportunities',parseList(v))}/>
+        <div className="rounded-xl border border-white/[.06] p-3">
+          <div className="mb-2 flex items-center gap-2 text-zinc-500"><CalendarClock className="h-3.5 w-3.5"/><span className="text-[10px] uppercase tracking-[.1em]">Leadership cadence</span></div>
+          <div className="grid gap-2">
+            <Field label="Weekly review" value={command.leadership_cadence?.weekly} set={v=>setCommand('leadership_cadence',{...(command.leadership_cadence??{}),weekly:v})}/>
+            <Field label="Monthly review" value={command.leadership_cadence?.monthly} set={v=>setCommand('leadership_cadence',{...(command.leadership_cadence??{}),monthly:v})}/>
+            <Field label="Quarterly strategy" value={command.leadership_cadence?.quarterly} set={v=>setCommand('leadership_cadence',{...(command.leadership_cadence??{}),quarterly:v})}/>
+          </div>
+        </div>
+      </div>
+    </div>
     <button disabled={!form.name.trim()} onClick={save} className="flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[.06] px-4 py-2 text-xs text-emerald-100 disabled:opacity-40"><Save className="h-3.5 w-3.5"/>{form.id?'Update':'Save'} company workspace</button>
    </div>
-   <div className="space-y-2">{items.length===0?<div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No company workspaces saved yet.</div>:items.map(x=><article key={x.id} className="rounded-2xl border border-white/[.07] bg-white/[.02] p-4"><div className="flex items-start justify-between gap-3"><button onClick={()=>setForm({...blank,...x})} className="min-w-0 text-left"><h3 className="truncate text-sm font-medium text-white hover:text-emerald-200">{x.name}</h3><p className="mt-1 text-xs text-zinc-600">{x.industry||'Unspecified industry'}{x.stage?' · '+x.stage:''}{x.geography?' · '+x.geography:''}</p></button><button onClick={()=>remove(x.id)} className="text-zinc-700 hover:text-rose-300" aria-label="Delete company workspace"><Trash2 className="h-4 w-4"/></button></div><div className="mt-3 grid grid-cols-3 gap-2"><Metric icon={Target} label="Objectives" value={x.objectives?.length||0}/><Metric icon={Bot} label="AI plan" value={x.ai_workforce_plan?.length||0}/><Metric icon={ShieldAlert} label="Risks" value={x.risks?.length||0}/></div>{x.priorities?.length>0&&<p className="mt-3 line-clamp-2 text-xs leading-5 text-zinc-500">{x.priorities.join(' · ')}</p>}</article>)}</div>
+   <div className="space-y-2">{items.length===0?<div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No company workspaces saved yet.</div>:items.map(x=><article key={x.id} className="rounded-2xl border border-white/[.07] bg-white/[.02] p-4"><div className="flex items-start justify-between gap-3"><button onClick={()=>setForm({...blank,...x})} className="min-w-0 text-left"><h3 className="truncate text-sm font-medium text-white hover:text-emerald-200">{x.name}</h3><p className="mt-1 text-xs text-zinc-600">{x.industry||'Unspecified industry'}{x.stage?' · '+x.stage:''}{x.geography?' · '+x.geography:''}</p></button><button onClick={()=>remove(x.id)} className="text-zinc-700 hover:text-rose-300" aria-label="Delete company workspace"><Trash2 className="h-4 w-4"/></button></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric icon={Target} label="Objectives" value={x.objectives?.length||0}/><Metric icon={Bot} label="AI plan" value={x.ai_workforce_plan?.length||0}/><Metric icon={ShieldAlert} label="Risks" value={x.risks?.length||0}/><Metric icon={BarChart3} label="KPIs" value={commandList(commandFor(x).kpis).length}/></div>{x.priorities?.length>0&&<p className="mt-3 line-clamp-2 text-xs leading-5 text-zinc-500">{x.priorities.join(' · ')}</p>}</article>)}</div>
   </div>
  </section>
 }
