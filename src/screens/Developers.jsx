@@ -9,7 +9,7 @@ import { AstraMark } from '@/components/blackstar/AstraMark';
 
 export default function Developers() {
   return (
-    <div className="blackstar-public-page min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-developers min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-20 pt-32">
