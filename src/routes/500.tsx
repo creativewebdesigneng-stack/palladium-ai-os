@@ -4,9 +4,9 @@ import Screen from "@/screens/ServerError";
 export const Route = createFileRoute("/500")({
   head: () => ({
     meta: [
-      { title: "Something went wrong — PalladiumAI" },
+      { title: "Something went wrong — Blackstar" },
       { name: "description", content: "An unexpected error occurred. Our systems are on it." },
-      { property: "og:title", content: "Something went wrong — PalladiumAI" },
+      { property: "og:title", content: "Something went wrong — Blackstar" },
       {
         property: "og:description",
         content: "An unexpected error occurred. Our systems are on it.",
