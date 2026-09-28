@@ -10,6 +10,8 @@ const errorState=readFileSync(new URL('../../components/palladium/ErrorState.jsx
 const aiTools=readFileSync(new URL('../../screens/AIToolsPublic.jsx',import.meta.url),'utf8');
 const features=readFileSync(new URL('../../screens/Features.jsx',import.meta.url),'utf8');
 const legal=readFileSync(new URL('../../screens/Legal.jsx',import.meta.url),'utf8');
+const sectionReveal=readFileSync(new URL('../../components/site/SectionReveal.jsx',import.meta.url),'utf8');
+const featureShowcase=readFileSync(new URL('../../components/site/FeatureShowcase.jsx',import.meta.url),'utf8');
 
 describe('Blackstar final visual accessibility and performance guardrails',()=>{
   it('removes route transition motion when the OS requests reduced motion',()=>{
@@ -43,6 +45,13 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(features).toContain('initial={reducedMotion ? false');
     expect(legal).toContain("behavior: reducedMotion ? 'auto' : 'smooth'");
     expect(legal).toContain('initial={reducedMotion ? false');
+  });
+
+  it('propagates reduced motion through shared public reveal and showcase components',()=>{
+    expect(sectionReveal).toContain('useReducedMotion');
+    expect(sectionReveal).toContain('initial={reducedMotion ? false');
+    expect(featureShowcase).toContain('MotionConfig');
+    expect(featureShowcase).toContain('reducedMotion="user"');
   });
 
   it('reduces decorative CSS depth on mobile while preserving the scene identity',()=>{
