@@ -87,7 +87,7 @@ function Consent() {
         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
           <ShieldCheck className="w-6 h-6 text-primary" />
         </div>
-        <h1 className="text-2xl font-semibold mb-2">Connect {clientName} to PalladiumAI</h1>
+        <h1 className="text-2xl font-semibold mb-2">Connect {clientName} to Blackstar</h1>
         <p className="text-sm text-muted-foreground mb-6">
           {clientName} will be able to read and manage your agents, missions, approvals and personal
           memory as you. You can revoke access at any time.
