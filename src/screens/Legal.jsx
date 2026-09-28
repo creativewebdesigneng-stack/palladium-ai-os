@@ -45,7 +45,7 @@ export default function LegalLayout() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-legal min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
       <PublicNav />
 
       {/* Subtle background */}
