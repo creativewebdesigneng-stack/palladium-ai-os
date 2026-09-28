@@ -4,13 +4,13 @@ import Screen from "@/screens/MissionControl";
 export const Route = createFileRoute("/_shell/_app/mission-control")({
   head: () => ({
     meta: [
-      { title: "Mission Control — PalladiumAI" },
+      { title: "Mission Control — Blackstar" },
       {
         name: "description",
         content:
           "Command your personal and professional AI agents, approve sensitive actions, and track every task in one place.",
       },
-      { property: "og:title", content: "Mission Control — PalladiumAI" },
+      { property: "og:title", content: "Mission Control — Blackstar" },
       {
         property: "og:description",
         content:
