@@ -8,6 +8,9 @@ describe('Dropshipping listing approval revision safety',()=>{
     const expiry=functions.indexOf("status:'expired'");
     const save=functions.indexOf('const nextMetadata=withListingDraftMetadata');
     expect(expiry).toBeGreaterThan(-1);
+    const ownedLoad=functions.indexOf('const item=await loadOwnedDropshipItem');
+    expect(ownedLoad).toBeGreaterThan(-1);
+    expect(expiry).toBeGreaterThan(ownedLoad);
     expect(save).toBeGreaterThan(expiry);
     expect(functions).toContain('The linked Dropshipping Hub listing draft was revised before approval.');
   });
