@@ -29,6 +29,7 @@ describe('Retail connected email booking reminders',()=>{
 
   it('enforces one communication ledger row per booking reminder',()=>{
     expect(migration).toContain('create unique index if not exists retail_customer_communications_booking_reminder_uidx');
+    expect(migration).toContain("user_id, (metadata ->> 'retail_booking_reminder_id')");
     expect(migration).toContain("metadata ->> 'retail_booking_reminder_id'");
   });
 });
