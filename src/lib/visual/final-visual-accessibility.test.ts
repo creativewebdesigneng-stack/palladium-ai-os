@@ -7,6 +7,7 @@ const astra=readFileSync(new URL('../../components/blackstar/blackstar-astra.css
 const neural=readFileSync(new URL('../../components/visual/NeuralSpace.jsx',import.meta.url),'utf8');
 const depth=readFileSync(new URL('../../components/blackstar/AstraDepthField.jsx',import.meta.url),'utf8');
 const errorState=readFileSync(new URL('../../components/palladium/ErrorState.jsx',import.meta.url),'utf8');
+const twoFactor=readFileSync(new URL('../../screens/TwoFactor.jsx',import.meta.url),'utf8');
 const aiTools=readFileSync(new URL('../../screens/AIToolsPublic.jsx',import.meta.url),'utf8');
 const features=readFileSync(new URL('../../screens/Features.jsx',import.meta.url),'utf8');
 const legal=readFileSync(new URL('../../screens/Legal.jsx',import.meta.url),'utf8');
@@ -28,6 +29,13 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(astra).toContain('.blackstar-style-atmosphere::before');
     expect(astra).toContain('.blackstar-style-atmosphere::after');
     expect(astra).toContain('animation: none');
+  });
+
+  it('keeps unconfigured two-factor honest instead of simulating verification',()=>{
+    expect(twoFactor).toContain('AuthLayout');
+    expect(twoFactor).toContain('Two-factor verification is not enabled on this deployment.');
+    expect(twoFactor).toContain('will not accept or pretend to verify');
+    expect(twoFactor).not.toContain('Verify and continue');
   });
 
   it('keeps error surfaces cinematic without forcing motion',()=>{
