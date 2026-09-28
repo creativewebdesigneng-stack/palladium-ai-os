@@ -30,8 +30,12 @@ export default function PublicNav() {
             <span className="hidden text-[7px] font-medium uppercase tracking-[.24em] text-zinc-600 lg:block">Void observatory</span>
           </span>
         </Link>
-        <nav className="ml-10 hidden items-center gap-7 text-xs font-medium text-zinc-500 md:flex">
-          {links.map(([label, href]) => <a key={label} href={href} className="transition hover:text-violet-100">{label}</a>)}
+        <nav className="ml-10 hidden items-center gap-7 text-xs font-medium text-zinc-500 md:flex" aria-label="Primary navigation">
+          {links.map(([label, to]) => (
+            <Link key={label} to={to} className="transition hover:text-violet-100">
+              {label}
+            </Link>
+          ))}
         </nav>
         <div className="ml-auto hidden items-center gap-2 md:flex">
           {signedIn ? (
@@ -55,8 +59,12 @@ export default function PublicNav() {
       </div>
       {open && (
         <div className="border-t border-white/[.07] bg-[#050509]/96 px-4 py-4 backdrop-blur-2xl md:hidden">
-          <nav className="flex flex-col gap-1 text-sm text-zinc-300">
-            {links.map(([label, href]) => <a key={label} href={href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 hover:bg-white/[.04]">{label}</a>)}
+          <nav className="flex flex-col gap-1 text-sm text-zinc-300" aria-label="Mobile navigation">
+            {links.map(([label, to]) => (
+              <Link key={label} to={to} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 hover:bg-white/[.04]">
+                {label}
+              </Link>
+            ))}
           </nav>
           <div className="mt-3 flex gap-2">
             {signedIn ? (
