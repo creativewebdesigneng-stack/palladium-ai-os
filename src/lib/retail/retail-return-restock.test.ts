@@ -29,6 +29,9 @@ describe('Retail atomic return restocking',()=>{
     expect(migration).toContain("movement_type, quantity");
     expect(migration).toContain("'return', v_quantity");
     expect(migration).toContain('set processed_quantity = quantity');
+    expect(migration).toContain('where id = p_return_id and user_id = v_uid');
+    expect(migration).toContain('for update');
+    expect(migration).toContain('v_quantity := v_line.quantity - v_line.processed_quantity');
   });
 
   it('exposes the current Retail automation data and UI without reviving old receptionist schemas',()=>{
