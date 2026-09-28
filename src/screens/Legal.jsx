@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { FileText, ShieldCheck, Cookie, BookOpen, Sparkles, Lock, ScrollText, AlertTriangle } from 'lucide-react';
 import { POLICIES, ORDER } from '@/components/site/legalData';
 import PublicNav from '@/components/site/PublicNav';
@@ -20,6 +20,7 @@ export default function LegalLayout() {
   const { slug } = useParams();
   const policy = POLICIES[slug];
   const [activeId, setActiveId] = useState('');
+  const reducedMotion = useReducedMotion();
 
   // Track active section on scroll
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function LegalLayout() {
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
-    if (el) window.scrollTo({ top: el.offsetTop - 100, behavior: 'smooth' });
+    if (el) window.scrollTo({ top: el.offsetTop - 100, behavior: reducedMotion ? 'auto' : 'smooth' });
   };
 
   return (
@@ -109,9 +110,9 @@ export default function LegalLayout() {
 
           {/* Content */}
           <motion.article
-            initial={{ opacity: 0, y: 16 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.5 }}
             className="min-w-0"
           >
             {/* Placeholder notice */}
