@@ -5,7 +5,7 @@ import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegratio
 import {notify} from '@/lib/notifications/notify.server';
 import {DROPSHIP_CHANNELS} from './dropshipping';
 import {DROPSHIP_CHANNEL_TARGETS} from './dropshipping-readiness';
-import {isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {assertDropshippingPublicationReady,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
 
 type Sb={from:(table:string)=>any};
 const channelIds=DROPSHIP_CHANNELS.map(row=>row.id) as [string,...string[]];
@@ -105,6 +105,7 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     const sb=context.supabase as unknown as Sb;
     const item=await loadOwnedDropshipItem(sb,context.userId,data);
     if(data.channel==='blackstar-site')throw new Error('Website Studio publishing uses its native deployment workflow, not a marketplace listing approval.');
+    assertDropshippingPublicationReady(item,data.channel as any);
     if(!channelAllowsProvider(data.channel,data.provider))throw new Error('The selected provider does not belong to this dropshipping channel.');
 
     const drafts=record(item.metadata['listing_drafts']);
