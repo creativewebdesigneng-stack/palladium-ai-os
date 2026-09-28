@@ -51,8 +51,11 @@ describe("provider-neutral execution fabric", () => {
     expect(route.lanes).toEqual(["connector_transport"]);
   });
 
-  it("labels future providers without pretending they are already native", () => {
-    expect(capabilityProfile("shopify")?.status).toBe("planned");
+  it("distinguishes executable commerce connectors from still-planned providers", () => {
+    expect(capabilityProfile("shopify")?.status).toBe("hybrid");
+    expect(capabilityProfile("etsy")?.status).toBe("connector");
+    expect(capabilityProfile("ebay")?.status).toBe("connector");
+    expect(capabilityProfile("woocommerce")?.status).toBe("connector");
     expect(capabilityProfile("instagram")?.families).toContain("social_media");
     expect(capabilityProfile("deliveroo")?.status).toBe("planned");
   });
