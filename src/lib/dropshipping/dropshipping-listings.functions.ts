@@ -5,7 +5,7 @@ import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegratio
 import {notify} from '@/lib/notifications/notify.server';
 import {DROPSHIP_CHANNELS,type DropshipChannel} from './dropshipping';
 import {DROPSHIP_CHANNEL_TARGETS} from './dropshipping-readiness';
-import {assertDropshippingPublicationReady,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {assertDropshippingPublicationReady,isDropshipProductBlocked,isDropshippingListingWriteAction,withListingDraftMetadata} from './dropshipping-listings';
 
 type Sb={from:(table:string)=>any};
 const channelIds=DROPSHIP_CHANNELS.map(row=>row.id) as [string,...string[]];
@@ -84,6 +84,7 @@ export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
     const capabilities=await listIntegrationCapabilities(context.userId);
     return capabilities
       .filter(capability=>aliases.has(normalizeIntegrationProvider(capability.provider)))
+      .filter(capability=>capability.deployed&&capability.requiresApproval&&isDropshippingListingWriteAction(capability.action))
       .map(({provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema})=>({
         provider,action,description,risk,requiresApproval,deployed,transport,lane,
         inputSchemaJson:JSON.stringify(inputSchema).slice(0,30_000),
@@ -121,6 +122,7 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     });
 
     if(!channelAllowsProvider(data.channel,prepared.provider))throw new Error('The live integration resolved to a provider outside the selected channel.');
+    if(!isDropshippingListingWriteAction(prepared.action))throw new Error('The selected provider action is not a bounded listing/product/offer write.');
     if(!prepared.requiresApproval)throw new Error('The selected provider capability is not marked approval-required, so Blackstar will not use it for listing publication.');
 
     const draftGeneratedAt=typeof draft['generated_at']==='string'?draft['generated_at']:'';
