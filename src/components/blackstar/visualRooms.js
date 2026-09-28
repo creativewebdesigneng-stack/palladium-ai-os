@@ -6,10 +6,10 @@ const ROUTE_ROOMS = [
   [['/trading-hub', '/quant-studio'], 'astra-room-trading'],
   [['/legal', '/legal-hub'], 'astra-room-legal'],
   [['/compliance-sentinel'], 'astra-room-compliance'],
-  [['/cinema-studio', '/media-studio'], 'astra-room-cinema'],
+  [['/cinema-studio', '/media-studio', '/creator-hub', '/creator-marketplace', '/creators', '/trusted-social-video', '/voice-studio'], 'astra-room-cinema'],
   [['/game-foundry', '/three-d-studio'], 'astra-room-game'],
   [['/memory', '/recall-notes'], 'astra-room-memory'],
-  [['/knowledge', '/research', '/news-research'], 'astra-room-knowledge'],
+  [['/knowledge', '/research', '/news-research', '/search'], 'astra-room-knowledge'],
   [['/company-hub', '/organisation', '/team'], 'astra-room-company'],
   [['/industry-hub', '/construction-industrial-hub'], 'astra-room-industry'],
   [['/retail-hub', '/commerce-studio', '/dropshipping-hub'], 'astra-room-commerce'],
@@ -27,7 +27,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-trading-command',
   ],
   [
-    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/website-studio', '/html-studio', '/builder', '/marketing', '/seo-studio', '/social-operations', '/templates', '/prompts'],
+    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/creators', '/trusted-social-video', '/website-studio', '/html-studio', '/builder', '/marketing', '/seo-studio', '/social-operations', '/templates', '/prompts'],
     'blackstar-style-creative-universe',
   ],
   [
@@ -47,7 +47,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-neon-infrastructure',
   ],
   [
-    ['/knowledge', '/memory', '/recall-notes', '/research', '/news-research', '/discovery', '/documents', '/files', '/files-analysis', '/docs'],
+    ['/knowledge', '/memory', '/recall-notes', '/research', '/news-research', '/search', '/discovery', '/documents', '/files', '/files-analysis', '/docs'],
     'blackstar-style-orbital-elegance',
   ],
   [
@@ -97,6 +97,10 @@ export function blackstarRoomForPath(pathname = '') {
     if (prefixes.some((prefix) => pathname.startsWith(prefix))) return room
   }
   return 'astra-room-default'
+}
+
+export function blackstarHasExplicitVisualStyleForPath(pathname = '') {
+  return VISUAL_STYLE_ROUTES.some(([prefixes]) => prefixes.some((prefix) => pathname.startsWith(prefix)))
 }
 
 export function blackstarVisualStyleForPath(pathname = '') {
