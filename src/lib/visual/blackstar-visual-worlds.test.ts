@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { blackstarHasExplicitVisualStyleForPath, blackstarRoomForPath, blackstarVisualStyleForPath, VISUAL_STYLE_LABELS } from "../../components/blackstar/visualRooms";
 
 describe("Blackstar ten visual worlds", () => {
@@ -61,6 +61,19 @@ describe("Blackstar ten visual worlds", () => {
     for (const path of ["/creators/example", "/trusted-social-video", "/search"]) {
       expect(blackstarHasExplicitVisualStyleForPath(path)).toBe(true);
     }
+  });
+
+
+  it("assigns every shell app route to an explicit visual world", () => {
+    const routeDir = new URL("../../routes/_shell/_app/", import.meta.url);
+    const routePaths = readdirSync(routeDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\\.(?:tsx|ts|jsx|js)$/.test(entry.name))
+      .map((entry) => entry.name.replace(/\\.(?:tsx|ts|jsx|js)$/, ""))
+      .map((stem) => stem.split(".").filter((segment) => segment !== "index"))
+      .map((segments) => "/" + segments.map((segment) => segment.startsWith("$") ? "example" : segment).join("/"));
+
+    const missing = routePaths.filter((pathname) => !blackstarHasExplicitVisualStyleForPath(pathname));
+    expect(missing).toEqual([]);
   });
 
   it("mounts style identity on the shell and passes it into the WebGL depth field", () => {
