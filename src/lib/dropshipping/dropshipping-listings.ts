@@ -33,6 +33,54 @@ export function isDropshipProductBlocked(item:CatalogLike):boolean{
   return stage==='blocked'||stage==='rejected'||Boolean(compliance&&typeof compliance==='object'&&(compliance as Record<string,unknown>)['allowed']===false);
 }
 
+
+export type DropshippingPublicationReadiness={
+  ready:boolean;
+  status:'ready'|'wrong-source'|'blocked'|'needs-validation'|'needs-compliance'|'channel-mismatch';
+  blockers:string[];
+};
+
+export function assessDropshippingPublicationReadiness(item:CatalogLike,channel:DropshipChannel):DropshippingPublicationReadiness{
+  const metadata=item.metadata??{};
+  const blockers:string[]=[];
+  let status:DropshippingPublicationReadiness['status']='ready';
+
+  if(metadata['source']!=='dropshipping-hub'){
+    blockers.push('Only Dropshipping Hub products can enter the publication approval flow.');
+    status='wrong-source';
+  }
+  if(isDropshipProductBlocked(item)){
+    blockers.push('Resolve the persisted product compliance or lifecycle block before publication approval.');
+    status='blocked';
+  }
+  const stage=typeof metadata['lifecycle_stage']==='string'?metadata['lifecycle_stage']:'';
+  if(!['validated','testing'].includes(stage)){
+    blockers.push('Validate the product before requesting an external listing write.');
+    if(status==='ready')status='needs-validation';
+  }
+  const compliance=metadata['compliance'];
+  const complianceAllowed=Boolean(
+    compliance&&typeof compliance==='object'&&!Array.isArray(compliance)
+    &&(compliance as Record<string,unknown>)['allowed']===true
+  );
+  if(!complianceAllowed){
+    blockers.push('A positive persisted channel-compliance decision is required before publication approval.');
+    if(status==='ready')status='needs-compliance';
+  }
+  const validatedChannel=typeof metadata['channel']==='string'?metadata['channel']:'';
+  if(validatedChannel!==channel){
+    blockers.push(`This product is validated for ${validatedChannel||'no channel'}, not ${channel}. Save a channel-specific product decision first.`);
+    if(status==='ready')status='channel-mismatch';
+  }
+  return {ready:blockers.length===0,status,blockers};
+}
+
+export function assertDropshippingPublicationReady(item:CatalogLike,channel:DropshipChannel){
+  const readiness=assessDropshippingPublicationReadiness(item,channel);
+  if(!readiness.ready)throw new Error(readiness.blockers.join(' '));
+  return readiness;
+}
+
 export function buildListingDraftPrompt(item:CatalogLike,channel:DropshipChannel,locale='en-GB',notes=''){
   if(isDropshipProductBlocked(item))throw new Error('Blocked or rejected products cannot enter the listing-draft flow until the product decision is resolved.');
   const metadata=item.metadata??{};
