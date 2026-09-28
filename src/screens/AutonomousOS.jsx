@@ -6,6 +6,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-actions.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 
 const badge = (status) => {
@@ -43,6 +44,7 @@ export default function AutonomousOS() {
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
+  const recommendFn = useServerFn(recommendBlackstarOpportunityActions);
   const [draft, setDraft] = useState(emptyDraft);
 
   const goalsQuery = useQuery({
@@ -55,7 +57,8 @@ export default function AutonomousOS() {
     refetchInterval: 15000,
     retry: 1,
   });
-  const refresh = () => qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
+  const opportunitiesQuery = useQuery({ queryKey: ['autonomous-os-opportunities'], queryFn: () => recommendFn({ data: { maximumRecommendations: 6 } }), enabled: session === 'yes', refetchInterval: 30000, retry: 1 });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] }); qc.invalidateQueries({ queryKey: ['autonomous-os-opportunities'] }); };
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
@@ -144,6 +147,14 @@ export default function AutonomousOS() {
         <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled, event-triggered and continuous runs all hand execution to the same durable workflow worker.</div>
       </section>
     </div>
+
+    <section className="mt-4 rounded-[28px] border border-cyan-300/10 bg-cyan-300/[.025] p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Opportunity planner</p><h3 className="mt-1 text-xl font-semibold text-white">Governed next-action recommendations</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-white/40">Blackstar ranks signals from your own persistent goals and routes each recommendation only through your existing active agents and workflows. This panel plans; it does not execute actions or bypass approvals.</p></div><button onClick={() => opportunitiesQuery.refetch()} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white"><RefreshCw className={`h-4 w-4 ${opportunitiesQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
+      {opportunitiesQuery.isLoading && <p className="mt-4 text-sm text-white/35">Analysing goal portfolio…</p>}
+      {opportunitiesQuery.isError && <p className="mt-4 text-sm text-rose-300">{friendlyMessage(opportunitiesQuery.error)}</p>}
+      {!opportunitiesQuery.isLoading && !opportunitiesQuery.isError && !(opportunitiesQuery.data?.actions?.length) && <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-white/35">No recommendation currently clears the bounded confidence and score thresholds.</p>}
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">{(opportunitiesQuery.data?.actions ?? []).map((action) => <article key={action.goalId} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(action.routingStatus)}`}>{action.routingStatus}</span><span className="rounded-md border border-white/8 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-white/35">{action.kind}</span>{action.requiresApproval && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-amber-200">approval required</span>}</div><h4 className="mt-3 text-sm font-semibold text-white">{action.title}</h4><p className="mt-2 text-sm leading-6 text-white/45">{action.recommendedAction}</p><div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/30"><span>score {Math.round(Number(action.score ?? 0) * 100)}%</span><span>confidence {Math.round(Number(action.confidence ?? 0) * 100)}%</span><span>{action.routedCapabilityIds?.length ?? 0} routed capabilities</span></div></article>)}</div>
+    </section>
 
     <section className="mt-4 rounded-[28px] border border-white/10 bg-black/35 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-violet-300/70">Mission portfolio</p><h3 className="mt-1 text-xl font-semibold text-white">Persistent goals</h3></div><span className="text-xs text-white/30">{data.goals?.length ?? 0} total</span></div>
