@@ -17,6 +17,62 @@ const ROUTE_ROOMS = [
   [['/admin'], 'astra-room-admin'],
 ]
 
+const VISUAL_STYLE_ROUTES = [
+  [
+    ['/mission-control', '/tasks', '/workflows', '/automation', '/automations', '/computer-control', '/work-os'],
+    'blackstar-style-mission-control',
+  ],
+  [
+    ['/trading-hub', '/quant-studio', '/analytics', '/product-analytics'],
+    'blackstar-style-trading-command',
+  ],
+  [
+    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/website-studio', '/html-studio', '/builder'],
+    'blackstar-style-creative-universe',
+  ],
+  [
+    ['/ai-hub', '/ai-workbench', '/ai-model-hub', '/model-arena', '/models', '/agents', '/agent-builder', '/agent-runtime', '/agent-workspaces', '/workforce', '/mcp-hub', '/ai-tools', '/skills', '/tools-framework', '/ai-builder'],
+    'blackstar-style-ai-nexus',
+  ],
+  [
+    ['/industry-hub', '/construction-industrial-hub', '/retail-hub', '/commerce-studio', '/dropshipping-hub', '/shopify-connect', '/business-automation'],
+    'blackstar-style-industry-realism',
+  ],
+  [
+    ['/company-hub', '/finance', '/legal', '/legal-hub', '/compliance-sentinel', '/organisation', '/team', '/billing', '/admin', '/security', '/crm', '/crm-studio'],
+    'blackstar-style-elite-corporate',
+  ],
+  [
+    ['/projects', '/deployments', '/developer', '/developer-portal', '/developer-workspace', '/version-control', '/terminal', '/code-explorer', '/web-intelligence', '/integrations', '/sync-center', '/business-intelligence'],
+    'blackstar-style-neon-infrastructure',
+  ],
+  [
+    ['/knowledge', '/memory', '/recall-notes', '/research', '/news-research', '/discovery', '/documents', '/files', '/files-analysis', '/docs'],
+    'blackstar-style-orbital-elegance',
+  ],
+  [
+    ['/human-frontier', '/health-fitness', '/fitness-studio', '/support', '/notifications', '/settings'],
+    'blackstar-style-ethereal-luxury',
+  ],
+  [
+    ['/dashboard', '/autonomous-os', '/shared-intelligence', '/decision-studio', '/chat'],
+    'blackstar-style-cosmic-core',
+  ],
+]
+
+export const VISUAL_STYLE_LABELS = {
+  'blackstar-style-cosmic-core': 'Cosmic Core',
+  'blackstar-style-orbital-elegance': 'Orbital Elegance',
+  'blackstar-style-mission-control': 'Mission Control',
+  'blackstar-style-neon-infrastructure': 'Neon Infrastructure',
+  'blackstar-style-elite-corporate': 'Elite Corporate',
+  'blackstar-style-industry-realism': 'Industry Realism',
+  'blackstar-style-creative-universe': 'Creative Universe',
+  'blackstar-style-ai-nexus': 'AI Nexus',
+  'blackstar-style-trading-command': 'Trading Command',
+  'blackstar-style-ethereal-luxury': 'Ethereal Luxury',
+}
+
 export const ROOM_LABELS = {
   'astra-room-mission': 'Blackstar mission theatre',
   'astra-room-hub': 'Blackstar intelligence hub',
@@ -41,4 +97,11 @@ export function blackstarRoomForPath(pathname = '') {
     if (prefixes.some((prefix) => pathname.startsWith(prefix))) return room
   }
   return 'astra-room-default'
+}
+
+export function blackstarVisualStyleForPath(pathname = '') {
+  for (const [prefixes, style] of VISUAL_STYLE_ROUTES) {
+    if (prefixes.some((prefix) => pathname.startsWith(prefix))) return style
+  }
+  return 'blackstar-style-cosmic-core'
 }
