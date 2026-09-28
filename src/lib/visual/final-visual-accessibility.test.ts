@@ -7,6 +7,9 @@ const astra=readFileSync(new URL('../../components/blackstar/blackstar-astra.css
 const neural=readFileSync(new URL('../../components/visual/NeuralSpace.jsx',import.meta.url),'utf8');
 const depth=readFileSync(new URL('../../components/blackstar/AstraDepthField.jsx',import.meta.url),'utf8');
 const errorState=readFileSync(new URL('../../components/palladium/ErrorState.jsx',import.meta.url),'utf8');
+const aiTools=readFileSync(new URL('../../screens/AIToolsPublic.jsx',import.meta.url),'utf8');
+const features=readFileSync(new URL('../../screens/Features.jsx',import.meta.url),'utf8');
+const legal=readFileSync(new URL('../../screens/Legal.jsx',import.meta.url),'utf8');
 
 describe('Blackstar final visual accessibility and performance guardrails',()=>{
   it('removes route transition motion when the OS requests reduced motion',()=>{
@@ -28,6 +31,14 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(errorState).toContain('blackstar-error-state');
     expect(errorState).toContain('useReducedMotion');
     expect(errorState).toContain('initial={reducedMotion ? false');
+  });
+
+  it('removes direct public-page Framer Motion when reduced motion is requested',()=>{
+    expect(aiTools).toContain('useReducedMotion');
+    expect(aiTools).toContain('animate={reducedMotion ? undefined');
+    expect(features).toContain('initial={reducedMotion ? false');
+    expect(legal).toContain("behavior: reducedMotion ? 'auto' : 'smooth'");
+    expect(legal).toContain('initial={reducedMotion ? false');
   });
 
   it('reduces decorative CSS depth on mobile while preserving the scene identity',()=>{
