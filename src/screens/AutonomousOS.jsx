@@ -5,7 +5,7 @@ import { BrainCircuit, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Squa
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
-import { createAutonomousGoal, listAutonomousGoals, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 
 const badge = (status) => {
@@ -38,12 +38,23 @@ export default function AutonomousOS() {
   const session = useSessionReady();
   const qc = useQueryClient();
   const listFn = useServerFn(listAutonomousGoals);
+  const listRunsFn = useServerFn(listAutonomousGoalRuns);
+  const listFleetsFn = useServerFn(listAutonomousFleetAssignments);
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
   const [draft, setDraft] = useState(emptyDraft);
 
-  const goalsQuery = useQuery({ queryKey: ['autonomous-os-goals'], queryFn: () => listFn(), enabled: session === 'yes', refetchInterval: 15000, retry: 1 });
+  const goalsQuery = useQuery({
+    queryKey: ['autonomous-os-goals'],
+    queryFn: async () => {
+      const [goals, runs, fleets] = await Promise.all([listFn(), listRunsFn(), listFleetsFn()]);
+      return { goals, runs, events: [], fleets };
+    },
+    enabled: session === 'yes',
+    refetchInterval: 15000,
+    retry: 1,
+  });
   const refresh = () => qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
