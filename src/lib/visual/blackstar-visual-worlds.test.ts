@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { blackstarVisualStyleForPath, VISUAL_STYLE_LABELS } from "../../components/blackstar/visualRooms";
+import { blackstarHasExplicitVisualStyleForPath, blackstarRoomForPath, blackstarVisualStyleForPath, VISUAL_STYLE_LABELS } from "../../components/blackstar/visualRooms";
 
 describe("Blackstar ten visual worlds", () => {
   it("exposes all ten named visual identities", () => {
@@ -48,6 +48,18 @@ describe("Blackstar ten visual worlds", () => {
     }
     for (const path of ["/finance", "/compliance-sentinel", "/admin/users", "/organisation"]) {
       expect(blackstarVisualStyleForPath(path)).toBe("blackstar-style-elite-corporate");
+    }
+  });
+
+  it("explicitly covers the final formerly-generic routes", () => {
+    expect(blackstarVisualStyleForPath("/creators/example")).toBe("blackstar-style-creative-universe");
+    expect(blackstarRoomForPath("/creators/example")).toBe("astra-room-cinema");
+    expect(blackstarVisualStyleForPath("/trusted-social-video")).toBe("blackstar-style-creative-universe");
+    expect(blackstarRoomForPath("/trusted-social-video")).toBe("astra-room-cinema");
+    expect(blackstarVisualStyleForPath("/search")).toBe("blackstar-style-orbital-elegance");
+    expect(blackstarRoomForPath("/search")).toBe("astra-room-knowledge");
+    for (const path of ["/creators/example", "/trusted-social-video", "/search"]) {
+      expect(blackstarHasExplicitVisualStyleForPath(path)).toBe(true);
     }
   });
 
