@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Play, Scale, Search, ServerCog, Store, Users, Video, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import AiHubNetworkScene from '@/components/ai-hub/AiHubNetworkScene';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
@@ -101,6 +102,7 @@ export default function AIHub() {
   return <div className="blackstar-core-page blackstar-aihub">
     <PageHeader eyebrow="Blackstar Intelligence Hub" title="Universal AI Hub" description="Discover, route, govern and execute Blackstar intelligence capabilities through one live control surface while every underlying runtime remains authoritative." />
     <div className="mx-auto max-w-6xl space-y-5">
+      <AiHubNetworkScene resources={inventory.data?.resources ?? []} providers={providers} loading={inventory.isLoading} />
       <div className="grid gap-3 md:grid-cols-3"><HubMetric label="Native systems" value={providers.length} detail="Existing intelligence subsystems registered behind one canonical Hub contract." /><HubMetric label="Live resources" value={inventory.data?.counts.total ?? '—'} detail="Models, agents, media, MCP, skills, apps, datasets, compute and workflows." /><HubMetric label="Routing + policy" value="Capability-aware" detail="Actor-scoped discovery with protected approval and runtime policy enforcement." /></div>
       <section className="relative overflow-hidden rounded-[26px] border border-cyan-300/10 bg-black/35 p-5 shadow-[0_24px_80px_rgba(0,0,0,.20)] backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/20 to-transparent" />
