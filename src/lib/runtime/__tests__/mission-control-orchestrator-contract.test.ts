@@ -35,7 +35,7 @@ describe("Mission Control orchestrator surface", () => {
     expect(commandDeck).toContain("function Heartbeat");
     expect(commandDeck).toContain("function LiveTicker");
     expect(commandDeck).toContain("Pending approvals");
-    expect(commandDeck).toContain("Global infrastructure");
+    expect(commandDeck).toContain("Provider links");\n    expect(commandDeck).toContain("No external provider links detected.");\n    expect(commandDeck).not.toContain("Realtime data plane connected.");
     expect(commandDeck).toContain("System health monitor");
   });
 
