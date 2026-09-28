@@ -74,7 +74,7 @@ export default function HelpCentre() {
       <section className="py-12">
         <SectionReveal className="mx-auto mb-6 max-w-7xl px-6">
           <h2 className="text-xs uppercase tracking-[0.25em] text-violet-400">AI Support Assistant</h2>
-          <p className="mt-1 text-sm text-zinc-500">Get instant answers, 24/7.</p>
+          <p className="mt-1 text-sm text-zinc-500">Get answers from the connected Blackstar AI support service.</p>
         </SectionReveal>
         <AIAssistant />
       </section>
@@ -91,8 +91,8 @@ export default function HelpCentre() {
       {/* Contact Support */}
       <section id="contact" className="py-12">
         <SectionReveal className="mx-auto mb-6 max-w-7xl px-6">
-          <h2 className="text-xs uppercase tracking-[0.25em] text-violet-400">Contact Support</h2>
-          <p className="mt-1 text-sm text-zinc-500">Reach a human when you need one.</p>
+          <h2 className="text-xs uppercase tracking-[0.25em] text-violet-400">Support Options</h2>
+          <p className="mt-1 text-sm text-zinc-500">Use support channels that are actually connected on this deployment.</p>
         </SectionReveal>
         <ContactSupport />
       </section>
