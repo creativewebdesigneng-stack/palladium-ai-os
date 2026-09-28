@@ -93,7 +93,7 @@ export default function Files() {
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Files & Knowledge" description="Live private documents from PalladiumAI's knowledge storage. Files are opened only through short-lived signed URLs." action={headerAction} />
+      <PageHeader eyebrow="Workspace" title="Files & Knowledge" description="Live private documents from Blackstar's knowledge storage. Files are opened only through short-lived signed URLs." action={headerAction} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <Metric icon={FileText} label="Indexed documents" value={documents.length} />
