@@ -497,6 +497,7 @@
 }
 .blackstar-style-orbital-elegance .blackstar-style-atmosphere::before {
   inset: 6% 8%;
+  animation: none;
   border: 1px solid rgba(226,232,240,.055);
   border-radius: 50%;
   transform: rotateX(67deg) rotateZ(-18deg);
@@ -581,6 +582,7 @@
 }
 .blackstar-style-industry-realism .blackstar-style-atmosphere::before {
   inset: 0;
+  animation: none;
   background:
     repeating-linear-gradient(90deg, transparent 0 118px, rgba(148,163,184,.035) 119px 120px),
     repeating-linear-gradient(0deg, transparent 0 74px, rgba(245,158,11,.020) 75px 76px);
