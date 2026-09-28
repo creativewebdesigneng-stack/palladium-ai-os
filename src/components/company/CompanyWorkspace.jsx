@@ -4,7 +4,10 @@ import { deleteCompanyWorkspace, listCompanyWorkspaces, saveCompanyWorkspace } f
 
 const blank={name:'',industry:'',stage:'build',geography:'',mission:'',company_context:'',objectives:[],priorities:[],risks:[],department_plan:{},ai_workforce_plan:[],kpis:[],decisions:[],leadership_cadence:{notes:''},opportunities:[],notes:''};
 const parseList=(v)=>String(v||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,50);
-const parseObjects=(v,key='name')=>parseList(v).map(value=>({[key]:value}));
+const mergeObjectLines=(v,existing,key='name')=>{
+ const current=new Map((existing||[]).filter(x=>x&&typeof x==='object'&&typeof x[key]==='string').map(x=>[x[key].trim(),x]));
+ return parseList(v).map(value=>current.has(value)?{...current.get(value),[key]:value}:{[key]:value});
+};
 const objectLines=(arr,key='name')=>(arr||[]).map(x=>typeof x==='string'?x:x?.[key]||'').filter(Boolean).join('\n');
 
 export default function CompanyWorkspace(){
@@ -27,10 +30,10 @@ export default function CompanyWorkspace(){
     <Area label="Current priorities (one per line)" value={form.priorities.join('\n')} set={v=>setForm({...form,priorities:parseList(v)})}/>
     <Area label="Key risks (one per line)" value={form.risks.join('\n')} set={v=>setForm({...form,risks:parseList(v)})}/>
     <div className="grid gap-3 md:grid-cols-2">
-      <Area label="AI worker roles" value={objectLines(form.ai_workforce_plan,'role')} set={v=>setForm({...form,ai_workforce_plan:parseObjects(v,'role')})}/>
-      <Area label="Company KPIs" value={objectLines(form.kpis,'name')} set={v=>setForm({...form,kpis:parseObjects(v,'name')})}/>
-      <Area label="Material decisions" value={objectLines(form.decisions,'decision')} set={v=>setForm({...form,decisions:parseObjects(v,'decision')})}/>
-      <Area label="Opportunities" value={objectLines(form.opportunities,'name')} set={v=>setForm({...form,opportunities:parseObjects(v,'name')})}/>
+      <Area label="AI worker roles" value={objectLines(form.ai_workforce_plan,'role')} set={v=>setForm({...form,ai_workforce_plan:mergeObjectLines(v,form.ai_workforce_plan,'role')})}/>
+      <Area label="Company KPIs" value={objectLines(form.kpis,'name')} set={v=>setForm({...form,kpis:mergeObjectLines(v,form.kpis,'name')})}/>
+      <Area label="Material decisions" value={objectLines(form.decisions,'decision')} set={v=>setForm({...form,decisions:mergeObjectLines(v,form.decisions,'decision')})}/>
+      <Area label="Opportunities" value={objectLines(form.opportunities,'name')} set={v=>setForm({...form,opportunities:mergeObjectLines(v,form.opportunities,'name')})}/>
     </div>
     <Area label="Leadership cadence / review notes" value={form.leadership_cadence?.notes||''} set={v=>setForm({...form,leadership_cadence:{...(form.leadership_cadence||{}),notes:v}})}/>
     <Area label="Working notes" value={form.notes} set={v=>setForm({...form,notes:v})}/>

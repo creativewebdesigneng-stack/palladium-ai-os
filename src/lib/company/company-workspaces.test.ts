@@ -27,5 +27,10 @@ describe('Company workspace intelligence persistence',()=>{
     expect(workspace).toContain('Leadership cadence / review notes');
     expect(workspace).toContain('Opportunities');
     expect(workspace).not.toContain('executeAgent');
+    expect(workspace).toContain('const mergeObjectLines=');
+    expect(workspace).toContain("ai_workforce_plan:mergeObjectLines(v,form.ai_workforce_plan,'role')");
+    expect(workspace).toContain("kpis:mergeObjectLines(v,form.kpis,'name')");
+    expect(workspace).toContain("decisions:mergeObjectLines(v,form.decisions,'decision')");
+    expect(workspace).toContain("opportunities:mergeObjectLines(v,form.opportunities,'name')");
   });
 });
