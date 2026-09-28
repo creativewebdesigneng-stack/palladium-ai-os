@@ -17,6 +17,19 @@ const ROUTE_ROOMS = [
   [['/admin'], 'astra-room-admin'],
 ]
 
+const STYLE_ROOM_FALLBACKS = {
+  'blackstar-style-cosmic-core': 'astra-room-core',
+  'blackstar-style-orbital-elegance': 'astra-room-knowledge',
+  'blackstar-style-mission-control': 'astra-room-mission',
+  'blackstar-style-neon-infrastructure': 'astra-room-infrastructure',
+  'blackstar-style-elite-corporate': 'astra-room-company',
+  'blackstar-style-industry-realism': 'astra-room-industry',
+  'blackstar-style-creative-universe': 'astra-room-creative',
+  'blackstar-style-ai-nexus': 'astra-room-hub',
+  'blackstar-style-trading-command': 'astra-room-trading',
+  'blackstar-style-ethereal-luxury': 'astra-room-wellbeing',
+}
+
 const VISUAL_STYLE_ROUTES = [
   [
     ['/mission-control', '/tasks', '/workflows', '/automation', '/automations', '/computer-control', '/work-os'],
@@ -90,13 +103,17 @@ export const ROOM_LABELS = {
   'astra-room-commerce': 'Blackstar commerce network',
   'astra-room-builder': 'Blackstar creation studio',
   'astra-room-admin': 'Blackstar admin control',
+  'astra-room-core': 'Blackstar command core',
+  'astra-room-infrastructure': 'Blackstar infrastructure grid',
+  'astra-room-creative': 'Blackstar creative universe',
+  'astra-room-wellbeing': 'Blackstar human frontier',
 }
 
 export function blackstarRoomForPath(pathname = '') {
   for (const [prefixes, room] of ROUTE_ROOMS) {
     if (prefixes.some((prefix) => pathname.startsWith(prefix))) return room
   }
-  return 'astra-room-default'
+  return STYLE_ROOM_FALLBACKS[blackstarVisualStyleForPath(pathname)] || 'astra-room-default'
 }
 
 export function blackstarHasExplicitVisualStyleForPath(pathname = '') {
