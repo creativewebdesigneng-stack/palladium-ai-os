@@ -1,4 +1,5 @@
 import CommandDeckBrand from '@/components/mission/CommandDeckBrand';
+import OperationalTopology from '@/components/mission/OperationalTopology';
 import { AstraMark } from '@/components/blackstar/AstraMark';
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -222,6 +223,14 @@ export default function BlackstarCommandDeck({ metrics = {}, approvals = [], not
         <aside className="border-r border-white/7 p-3"><p className="px-3 pb-2 text-[8px] uppercase tracking-[.18em] text-zinc-700">Subsystems</p><RailButton icon={Activity} label="Overview" onClick={() => onNavigate?.('overview')} /><RailButton icon={Network} label="Orchestrator" onClick={() => onNavigate?.('orchestrator')} /><RailButton icon={ShieldAlert} label="Approvals" count={pendingApprovals} onClick={() => onNavigate?.('approvals')} /><RailButton icon={Bell} label="Signals" count={notifications.filter((n) => !n.read_at).length} onClick={() => onNavigate?.('signals')} /><RailButton icon={Database} label="Memory" onClick={() => onNavigate?.('memory')} /><div className="mt-5 rounded-lg border border-white/6 bg-white/[.015] p-3"><div className="flex items-center gap-2 text-[8px] uppercase text-zinc-600"><Globe2 className="h-3 w-3 text-violet-300" />Provider links</div><p className="mt-2 text-[9px] text-zinc-500">{connectedIntegrations.length ? `${connectedIntegrations.length} connected external provider${connectedIntegrations.length === 1 ? '' : 's'}.` : 'No external provider links detected.'}</p>{connectedIntegrations.length ? <div className="mt-2 flex flex-wrap gap-1">{connectedIntegrations.slice(0, 3).map((integration) => <span key={integration.provider} className="rounded border border-emerald-300/10 bg-emerald-300/[.03] px-1.5 py-0.5 text-[8px] text-emerald-200">{integration.name || integration.provider}</span>)}</div> : null}</div></aside>
         <main className="space-y-3 p-3">
           <HolographicCore metrics={metrics} markState={markState} connectedIntegrations={connectedIntegrations.length} pendingApprovals={pendingApprovals} unreadSignals={unreadSignals} />
+          <OperationalTopology
+            metrics={metrics}
+            tasks={tasks}
+            approvals={approvals}
+            notifications={notifications}
+            activities={activities}
+            connectedIntegrations={connectedIntegrations}
+          />
           <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} /></div>
           <MissionFeed activities={activities} />
         </main>
