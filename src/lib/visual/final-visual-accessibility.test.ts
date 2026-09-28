@@ -14,6 +14,7 @@ const legal=readFileSync(new URL('../../screens/Legal.jsx',import.meta.url),'utf
 const landing=readFileSync(new URL('../../screens/Landing.jsx',import.meta.url),'utf8');
 const sectionReveal=readFileSync(new URL('../../components/site/SectionReveal.jsx',import.meta.url),'utf8');
 const featureShowcase=readFileSync(new URL('../../components/site/FeatureShowcase.jsx',import.meta.url),'utf8');
+const commandDeck=readFileSync(new URL('../../components/mission/BlackstarCommandDeck.jsx',import.meta.url),'utf8');
 
 describe('Blackstar final visual accessibility and performance guardrails',()=>{
   it('removes route transition motion when the OS requests reduced motion',()=>{
@@ -64,6 +65,14 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(sectionReveal).toContain('initial={reducedMotion ? false');
     expect(featureShowcase).toContain('MotionConfig');
     expect(featureShowcase).toContain('reducedMotion="user"');
+  });
+
+  it('freezes Mission Control queue and feed motion without hiding live state',()=>{
+    expect(commandDeck).toContain('function MissionQueue');
+    expect(commandDeck).toContain('const reduced = useReducedMotion()');
+    expect(commandDeck).toContain('running ? (reduced ? <div');
+    expect(commandDeck).toContain('initial={reduced ? false');
+    expect(commandDeck).toContain('animate={reduced ? undefined');
   });
 
   it('reduces decorative CSS depth on mobile while preserving the scene identity',()=>{
