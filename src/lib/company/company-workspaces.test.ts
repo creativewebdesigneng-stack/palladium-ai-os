@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 
 const functions=readFileSync(new URL('./company-workspaces.functions.ts',import.meta.url),'utf8');
 const workspace=readFileSync(new URL('../../components/company/CompanyWorkspace.jsx',import.meta.url),'utf8');
+const migration=readFileSync('supabase/migrations/20260913230409_company_command_intelligence.sql','utf8');
 
 describe('Company workspace intelligence persistence',()=>{
   it('persists bounded KPI, decision, cadence and opportunity context',()=>{
@@ -10,6 +11,11 @@ describe('Company workspace intelligence persistence',()=>{
       expect(functions).toContain(field);
     }
     expect(functions).toContain(".eq('user_id',context.userId)");
+  });
+
+  it('restores the exact applied migration into repository history',()=>{
+    for(const field of ['kpis','decisions','leadership_cadence','opportunities']) expect(migration).toContain(field);
+    expect(migration).toContain('alter table public.company_workspaces');
   });
 
   it('exposes the persistent fields without creating another execution runtime',()=>{
