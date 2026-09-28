@@ -4,15 +4,15 @@ import Screen from "@/screens/Payment";
 export const Route = createFileRoute("/payment")({
   head: () => ({
     meta: [
-      { title: "Checkout — PalladiumAI" },
+      { title: "Checkout — Blackstar" },
       {
         name: "description",
-        content: "Complete your PalladiumAI subscription and activate your AI workforce.",
+        content: "Complete your Blackstar subscription and activate your AI workforce.",
       },
-      { property: "og:title", content: "Checkout — PalladiumAI" },
+      { property: "og:title", content: "Checkout — Blackstar" },
       {
         property: "og:description",
-        content: "Complete your PalladiumAI subscription and activate your AI workforce.",
+        content: "Complete your Blackstar subscription and activate your AI workforce.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
