@@ -434,6 +434,228 @@
     linear-gradient(180deg, rgba(4, 10, 18, 0.16), transparent 58%);
 }
 
+
+/* Ten Blackstar visual worlds — route-assigned identities, not separate apps. */
+.blackstar-style-atmosphere {
+  overflow: hidden;
+  opacity: 0.92;
+  transition: background 850ms var(--astra-ease), opacity 600ms var(--astra-ease);
+}
+.blackstar-style-atmosphere::before,
+.blackstar-style-atmosphere::after {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+}
+.blackstar-style-atmosphere::before {
+  animation: blackstar-world-drift 24s ease-in-out infinite alternate;
+}
+.blackstar-style-atmosphere::after {
+  opacity: 0.48;
+  animation: blackstar-world-counter 34s linear infinite;
+}
+@keyframes blackstar-world-drift {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 1.5%, 0) scale(1.045); }
+}
+@keyframes blackstar-world-counter {
+  to { transform: rotate(360deg) scale(1.02); }
+}
+@keyframes blackstar-command-scan {
+  0% { transform: translateY(-120%); opacity: 0; }
+  15% { opacity: .34; }
+  70% { opacity: .08; }
+  100% { transform: translateY(620%); opacity: 0; }
+}
+@keyframes blackstar-neon-rise {
+  from { background-position: 0 0, 0 0, 50% 100%; }
+  to { background-position: 0 -180px, 120px 0, 50% 100%; }
+}
+
+.blackstar-style-cosmic-core .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 68% 27%, rgba(139,92,246,.24), transparent 15%),
+    radial-gradient(circle at 68% 27%, rgba(76,29,149,.15), transparent 28%),
+    radial-gradient(ellipse at 38% 78%, rgba(76,29,149,.11), transparent 42%);
+}
+.blackstar-style-cosmic-core .blackstar-style-atmosphere::before {
+  background:
+    conic-gradient(from 20deg at 68% 27%, transparent 0 30%, rgba(196,181,253,.11) 38%, transparent 44% 68%, rgba(124,58,237,.09) 75%, transparent 82%),
+    radial-gradient(circle at 68% 27%, rgba(0,0,0,.96) 0 7%, transparent 8% 100%);
+  filter: blur(.2px);
+}
+.blackstar-style-cosmic-core .blackstar-orbit { border-color: rgba(167,139,250,.12); }
+.blackstar-style-cosmic-core .blackstar-perspective-grid { opacity: .34; }
+
+.blackstar-style-orbital-elegance .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(226,232,240,.10), transparent 20%),
+    radial-gradient(circle at 34% 75%, rgba(148,163,184,.065), transparent 30%),
+    linear-gradient(160deg, rgba(255,255,255,.018), transparent 42%);
+}
+.blackstar-style-orbital-elegance .blackstar-style-atmosphere::before {
+  inset: 6% 8%;
+  border: 1px solid rgba(226,232,240,.055);
+  border-radius: 50%;
+  transform: rotateX(67deg) rotateZ(-18deg);
+  box-shadow:
+    0 0 0 54px rgba(226,232,240,.012),
+    0 0 0 112px rgba(148,163,184,.010),
+    0 0 90px rgba(226,232,240,.025);
+}
+.blackstar-style-orbital-elegance .blackstar-orb { opacity: .28; filter: grayscale(.55) blur(3px); }
+.blackstar-style-orbital-elegance .blackstar-perspective-grid {
+  opacity: .2;
+  background-size: 92px 92px;
+}
+
+.blackstar-style-mission-control .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(59,130,246,.14), transparent 26%),
+    linear-gradient(180deg, rgba(2,10,22,.25), transparent 48%, rgba(245,158,11,.025));
+}
+.blackstar-style-mission-control .blackstar-style-atmosphere::before {
+  inset: 8% 3%;
+  background:
+    linear-gradient(rgba(96,165,250,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(96,165,250,.055) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), transparent 82%);
+}
+.blackstar-style-mission-control .blackstar-style-atmosphere::after {
+  left: 4%;
+  right: 4%;
+  top: 6%;
+  height: 9%;
+  background: linear-gradient(180deg, transparent, rgba(96,165,250,.16), transparent);
+  animation: blackstar-command-scan 8s linear infinite;
+}
+.blackstar-style-mission-control .astra-room-frame,
+.blackstar-style-mission-control .astra-command-theatre {
+  box-shadow: 0 0 0 1px rgba(96,165,250,.14), 0 42px 90px rgba(0,0,0,.38);
+}
+
+.blackstar-style-neon-infrastructure .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 72% 18%, rgba(168,85,247,.18), transparent 28%),
+    radial-gradient(circle at 26% 78%, rgba(34,211,238,.10), transparent 30%),
+    linear-gradient(180deg, rgba(20,4,34,.18), transparent 60%);
+}
+.blackstar-style-neon-infrastructure .blackstar-style-atmosphere::before {
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 72px, rgba(168,85,247,.045) 73px 74px, transparent 75px 124px),
+    repeating-linear-gradient(180deg, transparent 0 36px, rgba(34,211,238,.025) 37px 38px, transparent 39px 78px),
+    linear-gradient(180deg, transparent 34%, rgba(168,85,247,.055) 100%);
+  animation: blackstar-neon-rise 20s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.9) 24%, rgba(0,0,0,.6) 80%, transparent);
+}
+.blackstar-style-neon-infrastructure .blackstar-horizon {
+  background: linear-gradient(90deg, transparent, rgba(168,85,247,.20), rgba(34,211,238,.18), transparent);
+  box-shadow: 0 -24px 90px rgba(168,85,247,.12);
+}
+
+.blackstar-style-elite-corporate .blackstar-style-atmosphere {
+  background:
+    radial-gradient(ellipse at 78% 17%, rgba(214,179,106,.10), transparent 25%),
+    linear-gradient(135deg, rgba(255,255,255,.026), transparent 24% 72%, rgba(214,179,106,.025)),
+    linear-gradient(180deg, rgba(8,7,5,.30), transparent 55%);
+}
+.blackstar-style-elite-corporate .blackstar-style-atmosphere::before {
+  inset: 9% 7%;
+  border: 1px solid rgba(214,179,106,.055);
+  border-radius: 28px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 0 110px rgba(214,179,106,.025);
+  animation-duration: 34s;
+}
+.blackstar-style-elite-corporate .blackstar-orb { opacity: .20; }
+.blackstar-style-elite-corporate .astra-room-frame { box-shadow: 0 0 0 1px rgba(214,179,106,.065); }
+
+.blackstar-style-industry-realism .blackstar-style-atmosphere {
+  background:
+    linear-gradient(180deg, rgba(15,18,23,.34), transparent 62%),
+    radial-gradient(circle at 82% 76%, rgba(245,158,11,.075), transparent 26%),
+    radial-gradient(circle at 18% 18%, rgba(148,163,184,.065), transparent 28%);
+}
+.blackstar-style-industry-realism .blackstar-style-atmosphere::before {
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 118px, rgba(148,163,184,.035) 119px 120px),
+    repeating-linear-gradient(0deg, transparent 0 74px, rgba(245,158,11,.020) 75px 76px);
+  transform: perspective(900px) rotateX(63deg) scale(1.35);
+  transform-origin: 50% 84%;
+  mask-image: linear-gradient(to top, rgba(0,0,0,.85), transparent 72%);
+}
+.blackstar-style-industry-realism .blackstar-perspective-grid { opacity: .24; }
+
+.blackstar-style-creative-universe .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(232,121,249,.17), transparent 24%),
+    radial-gradient(circle at 76% 28%, rgba(139,92,246,.18), transparent 28%),
+    radial-gradient(circle at 52% 82%, rgba(59,130,246,.08), transparent 32%);
+}
+.blackstar-style-creative-universe .blackstar-style-atmosphere::before {
+  background:
+    conic-gradient(from 180deg at 50% 50%, rgba(232,121,249,.035), transparent 18%, rgba(139,92,246,.07) 34%, transparent 52%, rgba(34,211,238,.04) 72%, transparent 88%),
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(255,255,255,.025) 35%, transparent 36%);
+  filter: blur(1px) saturate(1.25);
+}
+.blackstar-style-creative-universe .blackstar-orb { opacity: .72; }
+.blackstar-style-creative-universe .blackstar-perspective-grid { opacity: .26; }
+
+.blackstar-style-ai-nexus .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(124,58,237,.19), transparent 28%),
+    radial-gradient(circle at 22% 74%, rgba(59,130,246,.09), transparent 30%),
+    radial-gradient(circle at 82% 70%, rgba(139,92,246,.08), transparent 27%);
+}
+.blackstar-style-ai-nexus .blackstar-style-atmosphere::before {
+  inset: 4%;
+  background-image:
+    radial-gradient(circle, rgba(167,139,250,.22) 0 1px, transparent 1.5px),
+    linear-gradient(60deg, transparent 48%, rgba(124,58,237,.03) 49% 51%, transparent 52%),
+    linear-gradient(-60deg, transparent 48%, rgba(59,130,246,.025) 49% 51%, transparent 52%);
+  background-size: 74px 74px, 148px 128px, 148px 128px;
+  mask-image: radial-gradient(circle at 50% 40%, black, transparent 82%);
+}
+.blackstar-style-ai-nexus .blackstar-orbit { border-color: rgba(124,58,237,.13); }
+
+.blackstar-style-trading-command .blackstar-style-atmosphere {
+  background:
+    radial-gradient(circle at 72% 20%, rgba(20,184,166,.14), transparent 26%),
+    radial-gradient(circle at 18% 72%, rgba(34,197,94,.08), transparent 28%),
+    linear-gradient(180deg, rgba(1,19,18,.20), transparent 58%);
+}
+.blackstar-style-trading-command .blackstar-style-atmosphere::before {
+  inset: 5%;
+  background:
+    linear-gradient(rgba(20,184,166,.040) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,184,166,.040) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.82), transparent 88%);
+}
+.blackstar-style-trading-command .blackstar-horizon {
+  background: linear-gradient(90deg, transparent, rgba(20,184,166,.18), rgba(34,197,94,.16), transparent);
+}
+
+.blackstar-style-ethereal-luxury .blackstar-style-atmosphere {
+  background:
+    radial-gradient(ellipse at 52% 7%, rgba(226,232,240,.17), transparent 30%),
+    radial-gradient(circle at 78% 66%, rgba(125,211,252,.07), transparent 26%),
+    linear-gradient(180deg, rgba(226,232,240,.025), transparent 48%);
+}
+.blackstar-style-ethereal-luxury .blackstar-style-atmosphere::before {
+  background:
+    radial-gradient(ellipse at 48% 48%, transparent 0 28%, rgba(226,232,240,.055) 31%, transparent 34%),
+    radial-gradient(ellipse at 52% 52%, transparent 0 46%, rgba(125,211,252,.025) 49%, transparent 52%);
+  filter: blur(1.5px);
+  animation-duration: 38s;
+}
+.blackstar-style-ethereal-luxury .blackstar-orb { opacity: .18; filter: grayscale(.45) blur(4px); }
+.blackstar-style-ethereal-luxury .blackstar-perspective-grid { opacity: .12; }
+
 @media (prefers-reduced-motion: reduce) {
   .astra-mark-live .astra-ring,
   .astra-mark-live .astra-core,
