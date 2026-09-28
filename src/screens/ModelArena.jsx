@@ -103,7 +103,7 @@ export default function ModelArena() {
   }, [result.data]);
 
   if (session !== 'yes') {
-    return <><PageHeader eyebrow="AI" title="Model Arena" description="Evaluate live model responses through PalladiumAI's model gateway." /><Loading text="Waiting for workspace session…" /></>;
+    return <><PageHeader eyebrow="AI" title="Model Arena" description="Evaluate live model responses through Blackstar's model gateway." /><Loading text="Waiting for workspace session…" /></>;
   }
 
   return (
