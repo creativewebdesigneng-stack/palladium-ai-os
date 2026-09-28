@@ -12,6 +12,22 @@ describe('Blackstar public navigation contract', () => {
     expect(footer).not.toContain('href="#"');
   });
 
+  it('does not publish invented support contact details or response-time promises', () => {
+    const help = read('../../components/site/HelpShowcase.jsx');
+    const helpPage = read('../../screens/HelpCentre.jsx');
+
+    for (const unsupported of [
+      'support@palladium.ai',
+      '+44 20 0000 0000',
+      'Average reply in under 4 hours',
+      'Mon–Fri, 9am–6pm GMT',
+      'Our support team and AI assistant are here 24/7',
+      'Get instant answers, 24/7',
+    ]) {
+      expect(help + helpPage).not.toContain(unsupported);
+    }
+  });
+
   it('uses client-side routing for first-party public navigation', () => {
     const nav = read('../../components/site/PublicNav.jsx');
 
