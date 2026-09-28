@@ -137,13 +137,13 @@ export default function GitControl() {
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200"><Github className="h-5 w-5" /></span>
             <div className="flex-1">
               <h2 className="text-base font-semibold text-white">Connect GitHub to Version Control</h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">Choose the repositories PalladiumAI may read. Branch and commit data will come directly from that installation rather than fixture records.</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">Choose the repositories Blackstar may read. Branch and commit data will come directly from that installation rather than fixture records.</p>
               <button onClick={connectGitHub} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-400"><Plug className="h-4 w-4" />Connect GitHub</button>
             </div>
           </div>
         </div>
       ) : repositories.length === 0 ? (
-        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[.06] p-5 text-sm text-amber-100">GitHub is connected, but this installation has no repositories available to PalladiumAI.</div>
+        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[.06] p-5 text-sm text-amber-100">GitHub is connected, but this installation has no repositories available to Blackstar.</div>
       ) : (
         <>
           <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -210,7 +210,7 @@ export default function GitControl() {
 
           <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-500/[.04] p-4">
             <p className="flex items-center gap-2 text-xs font-semibold text-emerald-200"><LockKeyhole className="h-4 w-4" />Write actions remain locked</p>
-            <p className="mt-1 text-xs leading-5 text-zinc-500">This GitHub App slice cannot create branches, commits, pull requests or issues. Those capabilities will only be introduced with explicit write permissions, exact diffs and PalladiumAI approval controls.</p>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">This GitHub App slice cannot create branches, commits, pull requests or issues. Those capabilities will only be introduced with explicit write permissions, exact diffs and Blackstar approval controls.</p>
           </div>
         </>
       )}
