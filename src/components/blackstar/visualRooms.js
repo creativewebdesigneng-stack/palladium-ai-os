@@ -113,6 +113,7 @@ export function blackstarRoomForPath(pathname = '') {
   for (const [prefixes, room] of ROUTE_ROOMS) {
     if (prefixes.some((prefix) => pathname.startsWith(prefix))) return room
   }
+  if (!blackstarHasExplicitVisualStyleForPath(pathname)) return 'astra-room-default'
   return STYLE_ROOM_FALLBACKS[blackstarVisualStyleForPath(pathname)] || 'astra-room-default'
 }
 
