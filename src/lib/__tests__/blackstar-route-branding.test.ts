@@ -7,10 +7,10 @@ const routesDir=fileURLToPath(new URL('../../routes/',import.meta.url));
 const screensDir=fileURLToPath(new URL('../../screens/',import.meta.url));
 const siteDir=fileURLToPath(new URL('../../components/site/',import.meta.url));
 
-function routeSources(dir:string):string[]{
+function uiSources(dir:string):string[]{
   return readdirSync(dir,{withFileTypes:true}).flatMap((entry)=>{
     const path=join(dir,entry.name);
-    if(entry.isDirectory())return routeSources(path);
+    if(entry.isDirectory())return uiSources(path);
     return /\.(?:ts|tsx|js|jsx)$/.test(entry.name)?[path]:[];
   });
 }
