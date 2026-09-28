@@ -23,7 +23,7 @@ export default function McpHub() {
       <PageHeader
         eyebrow="MCP"
         title="MCP Hub"
-        description="The live Model Context Protocol surface bundled with PalladiumAI. This page shows the server and tools that actually ship with the application."
+        description="The live Model Context Protocol surface bundled with Blackstar. This page shows the server and tools that actually ship with the application."
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
@@ -55,7 +55,7 @@ export default function McpHub() {
           <h3 className="text-sm font-semibold text-white">Protocol endpoints</h3>
         </div>
         <p className="mb-3 max-w-3xl text-xs leading-5 text-zinc-400">
-          PalladiumAI exposes an OAuth-protected MCP resource. External MCP clients must authenticate as the user; the browser UI does not store or reveal service-role credentials.
+          Blackstar exposes an OAuth-protected MCP resource. External MCP clients must authenticate as the user; the browser UI does not store or reveal service-role credentials.
         </p>
         <div className="grid gap-2 md:grid-cols-2">
           {[
