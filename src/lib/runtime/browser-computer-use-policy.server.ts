@@ -149,7 +149,7 @@ export function buildRecordedSessionComputerUsePlan(
       action,
       ...(kind === "prepare_checkout" ? { purpose: "prepare checkout — operator approval boundary" } : {}),
     };
-    if (/^https?:\\/\\//i.test(target)) mappedStep.url = target;
+    if (/^https?:\/\//i.test(target)) mappedStep.url = target;
     else if (target) mappedStep.selector = target;
     if (detail) mappedStep.purpose = mappedStep.purpose ? `${mappedStep.purpose}; ${detail}` : detail;
     mapped.push(mappedStep);
