@@ -1,4 +1,4 @@
-// Reusable skeleton loaders matching the PalladiumAI card/table/list shapes.
+// Reusable skeleton loaders matching the Blackstar card/table/list shapes.
 export function Skeleton({ className = '' }) {
   return <div className={`animate-pulse rounded-md bg-white/[.06] ${className}`} aria-hidden="true" />;
 }
