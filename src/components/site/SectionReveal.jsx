@@ -8,7 +8,7 @@ export default function SectionReveal({ children, delay = 0, className, y = 28, 
     <MotionTag
       className={className}
       initial={reducedMotion ? false : { opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={reducedMotion ? { duration: 0 } : { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
     >
