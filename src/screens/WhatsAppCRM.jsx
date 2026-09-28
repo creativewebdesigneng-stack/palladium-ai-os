@@ -52,7 +52,7 @@ export default function WhatsAppCRM() {
   async function saveDraft() {
     if (!selected || !draft.trim()) return;
     setBusy(true); setError("");
-    try { await saveWhatsAppDraft({ data: { conversationId: selected.id, text: draft } }); setDraft(""); setNotice("WhatsApp draft saved. External send remains controlled by PalladiumAI integration approvals."); await refresh(); }
+    try { await saveWhatsAppDraft({ data: { conversationId: selected.id, text: draft } }); setDraft(""); setNotice("WhatsApp draft saved. External send remains controlled by Blackstar integration approvals."); await refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not save draft."); }
     finally { setBusy(false); }
   }
@@ -75,7 +75,7 @@ export default function WhatsAppCRM() {
   }
 
   return <>
-    <PageHeader eyebrow="Customer operations" title="WhatsApp CRM" description="Shared WhatsApp inbox, CRM-linked conversations and broadcast planning built on PalladiumAI's existing CRM, integrations, workflows and approval controls." action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><RefreshCw className="h-4 w-4" />Refresh</button>} />
+    <PageHeader eyebrow="Customer operations" title="WhatsApp CRM" description="Shared WhatsApp inbox, CRM-linked conversations and broadcast planning built on Blackstar's existing CRM, integrations, workflows and approval controls." action={<button onClick={refresh} className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5"><RefreshCw className="h-4 w-4" />Refresh</button>} />
     {(error || notice) && <div className={`mb-5 rounded-xl border p-3 text-sm ${error ? "border-red-400/20 bg-red-500/[.06] text-red-200" : "border-emerald-400/20 bg-emerald-500/[.06] text-emerald-200"}`}>{error || notice}</div>}
 
     <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -87,7 +87,7 @@ export default function WhatsAppCRM() {
 
     <section className="mb-5 rounded-2xl border border-emerald-400/15 bg-emerald-500/[.035] p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="font-semibold text-white">WhatsApp connection</h2><p className="mt-1 text-xs text-zinc-400">{capabilities.length ? `${capabilities.length} live WhatsApp/Meta actions discovered from your PalladiumAI integrations.` : "No live WhatsApp action is connected yet. Connect or configure a WhatsApp/Meta provider in Integrations; credentials stay server-side."}</p></div>
+        <div><h2 className="font-semibold text-white">WhatsApp connection</h2><p className="mt-1 text-xs text-zinc-400">{capabilities.length ? `${capabilities.length} live WhatsApp/Meta actions discovered from your Blackstar integrations.` : "No live WhatsApp action is connected yet. Connect or configure a WhatsApp/Meta provider in Integrations; credentials stay server-side."}</p></div>
         <Link to="/integrations" className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3.5 py-2 text-xs font-medium text-emerald-100">Manage connector</Link>
       </div>
       {!!capabilities.length && <div className="mt-3 flex flex-wrap gap-2">{capabilities.slice(0, 12).map((cap) => <span key={`${cap.provider}:${cap.action}`} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-zinc-300">{cap.provider} · {cap.action}{cap.requiresApproval ? " · approval" : ""}</span>)}</div>}
