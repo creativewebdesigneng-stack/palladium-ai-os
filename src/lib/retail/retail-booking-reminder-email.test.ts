@@ -18,6 +18,9 @@ describe('Retail connected email booking reminders',()=>{
     expect(bridge).toContain('provider_outcome_unknown');
     expect(bridge).toContain("status: 'failed'");
     expect(bridge).not.toContain('localStorage');
+    expect(bridge).toContain(".eq('user_id', reminder.user_id)");
+    expect(bridge).toContain(".eq('workspace_id', reminder.workspace_id)");
+    expect(bridge).toContain(".eq('appointment_id', reminder.appointment_id)");
   });
 
   it('routes only email reminders through the bridge without replacing existing channels',()=>{
