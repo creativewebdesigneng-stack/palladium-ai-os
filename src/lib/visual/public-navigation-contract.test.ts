@@ -28,6 +28,19 @@ describe('Blackstar public navigation contract', () => {
     }
   });
 
+  it('does not expose fabricated public marketplace metrics or legacy vendor branding', () => {
+    const marketplace = read('../../components/site/MarketplaceSection.jsx');
+
+    expect(marketplace).not.toContain('Palladium Labs');
+    expect(marketplace).not.toContain('12.4k');
+    expect(marketplace).not.toContain('8.7k');
+    expect(marketplace).not.toContain('6.1k');
+    expect(marketplace).not.toContain('4.8k');
+    expect(marketplace).not.toContain('href="#"');
+    expect(marketplace).toContain('/agent-marketplace');
+    expect(marketplace).toContain('/tool-marketplace');
+  });
+
   it('uses client-side routing for first-party public navigation', () => {
     const nav = read('../../components/site/PublicNav.jsx');
 
