@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {readFileSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 
 const pages=[
   ['Landing.jsx','blackstar-public-landing'],
@@ -13,6 +13,8 @@ const pages=[
   ['Legal.jsx','blackstar-public-legal'],
   ['Onboarding.jsx','blackstar-public-onboarding'],
   ['Payment.jsx','blackstar-public-payment'],
+  ['Forbidden.jsx','blackstar-public-error'],
+  ['ServerError.jsx','blackstar-public-error'],
 ] as const;
 
 describe('Blackstar public visual coverage',()=>{
@@ -28,6 +30,17 @@ describe('Blackstar public visual coverage',()=>{
     const css=readFileSync(new URL('../../styles.css',import.meta.url),'utf8');
     for(const [,variant] of pages){
       expect(css).toContain(`.${variant}::before`);
+    }
+  });
+
+  it('keeps top-level route metadata free of the retired PalladiumAI brand',()=>{
+    const routeDir=new URL('../../routes/',import.meta.url);
+    const files=readdirSync(routeDir,{withFileTypes:true})
+      .filter(entry=>entry.isFile()&&/\.(?:tsx|ts|jsx|js)$/.test(entry.name))
+      .map(entry=>entry.name);
+    for(const file of files){
+      const source=readFileSync(new URL(`../../routes/${file}`,import.meta.url),'utf8');
+      expect(source).not.toMatch(/PalladiumAI/i);
     }
   });
 
