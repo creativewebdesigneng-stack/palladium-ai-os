@@ -8,6 +8,8 @@ const pages=[
   ['Resources.jsx','blackstar-public-resources'],
   ['HelpCentre.jsx','blackstar-public-help'],
   ['Legal.jsx','blackstar-public-legal'],
+  ['Onboarding.jsx','blackstar-public-onboarding'],
+  ['Payment.jsx','blackstar-public-payment'],
 ] as const;
 
 describe('Blackstar public visual coverage',()=>{
@@ -30,5 +32,8 @@ describe('Blackstar public visual coverage',()=>{
     const auth=readFileSync(new URL('../../components/AuthLayout.jsx',import.meta.url),'utf8');
     expect(auth).toContain('blackstar-auth-space');
     expect(auth).toContain('SpaceBackground');
+    const twoFactor=readFileSync(new URL('../../screens/TwoFactor.jsx',import.meta.url),'utf8');
+    expect(twoFactor).toContain("import AuthLayout from '@/components/AuthLayout'");
+    expect(twoFactor).toContain('<AuthLayout');
   });
 });
