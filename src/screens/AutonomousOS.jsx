@@ -7,6 +7,7 @@ import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
 import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-actions.functions';
+import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-approval.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 
 const badge = (status) => {
@@ -153,7 +154,7 @@ export default function AutonomousOS() {
       {opportunitiesQuery.isLoading && <p className="mt-4 text-sm text-white/35">Analysing goal portfolio…</p>}
       {opportunitiesQuery.isError && <p className="mt-4 text-sm text-rose-300">{friendlyMessage(opportunitiesQuery.error)}</p>}
       {!opportunitiesQuery.isLoading && !opportunitiesQuery.isError && !(opportunitiesQuery.data?.actions?.length) && <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-white/35">No recommendation currently clears the bounded confidence and score thresholds.</p>}
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">{(opportunitiesQuery.data?.actions ?? []).map((action) => <article key={action.goalId} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(action.routingStatus)}`}>{action.routingStatus}</span><span className="rounded-md border border-white/8 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-white/35">{action.kind}</span>{action.requiresApproval && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-amber-200">approval required</span>}</div><h4 className="mt-3 text-sm font-semibold text-white">{action.title}</h4><p className="mt-2 text-sm leading-6 text-white/45">{action.recommendedAction}</p><div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/30"><span>score {Math.round(Number(action.score ?? 0) * 100)}%</span><span>confidence {Math.round(Number(action.confidence ?? 0) * 100)}%</span><span>{action.routedCapabilityIds?.length ?? 0} routed capabilities</span></div></article>)}</div>
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">{(opportunitiesQuery.data?.actions ?? []).map((action) => <article key={action.goalId} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(action.routingStatus)}`}>{action.routingStatus}</span><span className="rounded-md border border-white/8 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-white/35">{action.kind}</span>{action.requiresApproval && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-amber-200">approval required</span>}</div><h4 className="mt-3 text-sm font-semibold text-white">{action.title}</h4><p className="mt-2 text-sm leading-6 text-white/45">{action.recommendedAction}</p><div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/30"><span>score {Math.round(Number(action.score ?? 0) * 100)}%</span><span>confidence {Math.round(Number(action.confidence ?? 0) * 100)}%</span><span>{action.routedCapabilityIds?.length ?? 0} routed capabilities</span></div><OpportunityApprovalAction action={action} onSettled={refresh} /></article>)}</div>
     </section>
 
     <section className="mt-4 rounded-[28px] border border-white/10 bg-black/35 p-5 sm:p-6">
@@ -174,4 +175,19 @@ export default function AutonomousOS() {
       </div>
     </section>
   </>;
+}
+
+
+function OpportunityApprovalAction({ action, onSettled }) {
+  const requestFn = useServerFn(requestBlackstarOpportunityApproval);
+  const approval = useMutation({
+    mutationFn: () => requestFn({ data: { goalId: action.goalId } }),
+    onSettled,
+  });
+  if (!action.requiresApproval || action.routingStatus !== 'waiting_for_approval') return null;
+  return <div className="mt-4 border-t border-white/[.06] pt-3">
+    <button disabled={approval.isPending} onClick={() => approval.mutate()} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[.05] px-3 py-2 text-xs font-medium text-amber-100 disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />{approval.isPending ? 'Opening approval…' : 'Request Mission Control approval'}</button>
+    {approval.data?.approvalRequestId && <p className="mt-2 text-[10px] text-emerald-200/70">Approval request opened in Mission Control. No action has executed.</p>}
+    {approval.isError && <p className="mt-2 text-[10px] text-rose-300">{friendlyMessage(approval.error)}</p>}
+  </div>;
 }
