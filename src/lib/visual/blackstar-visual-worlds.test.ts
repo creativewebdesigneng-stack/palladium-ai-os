@@ -60,6 +60,7 @@ describe("Blackstar ten visual worlds", () => {
     expect(blackstarRoomForPath("/search")).toBe("astra-room-knowledge");
     for (const path of ["/creators/example", "/trusted-social-video", "/search"]) {
       expect(blackstarHasExplicitVisualStyleForPath(path)).toBe(true);
+      expect(blackstarRoomForPath(path)).not.toBe("astra-room-default");
     }
   });
 
@@ -73,7 +74,9 @@ describe("Blackstar ten visual worlds", () => {
       .map((segments) => "/" + segments.map((segment) => segment.startsWith("$") ? "example" : segment).join("/"));
 
     const missing = routePaths.filter((pathname) => !blackstarHasExplicitVisualStyleForPath(pathname));
+    const genericRooms = routePaths.filter((pathname) => blackstarRoomForPath(pathname) === "astra-room-default");
     expect(missing).toEqual([]);
+    expect(genericRooms).toEqual([]);
   });
 
   it("mounts style identity on the shell and passes it into the WebGL depth field", () => {
