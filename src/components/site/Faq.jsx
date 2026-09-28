@@ -1,8 +1,8 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const faqs = [
-  ['What is PalladiumAI?', 'PalladiumAI is a unified AI operating system that lets you build agents, automate work, connect every major AI model, create apps, analyse files, and manage an AI workforce from one platform.'],
-  ['Can I use multiple AI models?', 'Yes. Connect Claude, GPT, Gemini, Llama, and more, then switch between them instantly or let PalladiumAI route to the best model for each task.'],
+  ['What is Blackstar?', 'Blackstar is a unified AI operating system that lets you build agents, automate work, connect every major AI model, create apps, analyse files, and manage an AI workforce from one platform.'],
+  ['Can I use multiple AI models?', 'Yes. Connect Claude, GPT, Gemini, Llama, and more, then switch between them instantly or let Blackstar route to the best model for each task.'],
   ['Do I need to code to build agents?', 'No. The agent wizard guides you through identity, model, capabilities, and permissions in five steps — no code required. Developers can also use the full SDK.'],
   ['Is my data secure?', 'All workspaces are isolated with role-based access. Enterprise plans add SSO, on-premise options, and priority infrastructure.'],
   ['Can I cancel anytime?', 'Yes. Plans are month-to-month and you can cancel or change tiers from billing at any time.'],
