@@ -13,6 +13,7 @@ import TradingMarketTerminal from '@/components/trading/TradingMarketTerminal';
 import TradingPortfolioRisk from '@/components/trading/TradingPortfolioRisk';
 import TradingRiskLab from '@/components/trading/TradingRiskLab';
 import TradingWorkspace from '@/components/trading/TradingWorkspace';
+import TradingGlobalWorld from '@/components/trading/TradingGlobalWorld';
 import {
   GLOBAL_TRADING_VENUES,
   TRADER_WORKFLOWS,
@@ -69,6 +70,7 @@ export default function TradingHub() {
 
   return (
     <div className="blackstar-core-page blackstar-trading-hub space-y-6">
+      <TradingGlobalWorld venues={GLOBAL_TRADING_VENUES} authorities={TRADING_AUTHORITIES} sessions={TRADING_SESSIONS} assetClasses={TRADING_ASSET_CLASSES} />
       <section className="relative overflow-hidden rounded-[30px] border border-white/[.08] bg-white/[.025] p-6 md:p-8">
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/3 h-40 w-80 rounded-full bg-cyan-400/[.06] blur-3xl" />
