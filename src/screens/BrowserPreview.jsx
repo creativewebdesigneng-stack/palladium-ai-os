@@ -62,7 +62,7 @@ export default function BrowserPreview() {
       <PageHeader
         eyebrow="Workspace"
         title="Browser Preview"
-        description="Live browser-provider health, recorded sessions and browser tool activity. Browser Use is an optional provider behind PalladiumAI's existing browser safety and audit layer."
+        description="Live browser-provider health, recorded sessions and browser tool activity. Browser Use is an optional provider behind Blackstar's existing browser safety and audit layer."
       />
 
       {control.isLoading ? (
@@ -101,7 +101,7 @@ export default function BrowserPreview() {
               </div>
               <span className={`rounded-full border px-2 py-1 text-[10px] ${browserUse?.configured ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300'}`}>{browserUse?.configured ? 'Configured' : 'Needs env'}</span>
             </div>
-            <p className="mt-3 text-[10px] text-zinc-600">Browser Use does not bypass PalladiumAI: sessions, domain restrictions, tool permissions and audit telemetry remain authoritative here.</p>
+            <p className="mt-3 text-[10px] text-zinc-600">Browser Use does not bypass Blackstar: sessions, domain restrictions, tool permissions and audit telemetry remain authoritative here.</p>
           </section>
 
           <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
