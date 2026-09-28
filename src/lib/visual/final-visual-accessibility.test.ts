@@ -6,6 +6,7 @@ const styles=readFileSync(new URL('../../styles.css',import.meta.url),'utf8');
 const astra=readFileSync(new URL('../../components/blackstar/blackstar-astra.css',import.meta.url),'utf8');
 const neural=readFileSync(new URL('../../components/visual/NeuralSpace.jsx',import.meta.url),'utf8');
 const depth=readFileSync(new URL('../../components/blackstar/AstraDepthField.jsx',import.meta.url),'utf8');
+const errorState=readFileSync(new URL('../../components/palladium/ErrorState.jsx',import.meta.url),'utf8');
 
 describe('Blackstar final visual accessibility and performance guardrails',()=>{
   it('removes route transition motion when the OS requests reduced motion',()=>{
@@ -21,6 +22,12 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(astra).toContain('.blackstar-style-atmosphere::before');
     expect(astra).toContain('.blackstar-style-atmosphere::after');
     expect(astra).toContain('animation: none');
+  });
+
+  it('keeps error surfaces cinematic without forcing motion',()=>{
+    expect(errorState).toContain('blackstar-error-state');
+    expect(errorState).toContain('useReducedMotion');
+    expect(errorState).toContain('initial={reducedMotion ? false');
   });
 
   it('keeps canvas ambience bounded on slower devices and when off-screen',()=>{
