@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const approval=readFileSync(new URL('../opportunity-approval.functions.ts',import.meta.url),'utf8');
+const approval=readFileSync(new URL('./opportunity-approval.functions.ts',import.meta.url),'utf8');
 const screen=readFileSync(new URL('../../../screens/AutonomousOS.jsx',import.meta.url),'utf8');
 
 describe('Autonomous OS governed opportunity approvals',()=>{
