@@ -35,11 +35,11 @@ export type ProviderCapabilityProfile = {
  * provider APIs are configured. Runtime connection state remains authoritative.
  */
 export const PROVIDER_CAPABILITY_PROFILES: ProviderCapabilityProfile[] = [
-  { id: "shopify", name: "Shopify", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
-  { id: "etsy", name: "Etsy", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
-  { id: "woocommerce", name: "WooCommerce", families: ["ecommerce"], preferredLanes: ["direct_api", "browser"], status: "planned" },
-  { id: "amazon_seller", name: "Amazon Seller", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
-  { id: "ebay", name: "eBay", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned" },
+  { id: "shopify", name: "Shopify", families: ["ecommerce"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "hybrid", notes: "Native and bounded connector actions are available when the user has a valid connection." },
+  { id: "etsy", name: "Etsy", families: ["ecommerce"], preferredLanes: ["connector_transport", "browser"], status: "connector", notes: "Bounded seller actions are available through an owned connector connection." },
+  { id: "woocommerce", name: "WooCommerce", families: ["ecommerce"], preferredLanes: ["connector_transport", "browser"], status: "connector", notes: "REST API v3 product and order actions are bounded through the connector runtime." },
+  { id: "amazon_seller", name: "Amazon Seller", families: ["ecommerce"], preferredLanes: ["connector_transport", "browser"], status: "connector", notes: "Execution depends on a connected provider advertising deployed SP-API actions; Blackstar does not emulate Amazon signing." },
+  { id: "ebay", name: "eBay", families: ["ecommerce"], preferredLanes: ["connector_transport", "browser"], status: "connector", notes: "Bounded Inventory and Fulfillment actions are available through an owned connector connection." },
   { id: "uber_eats", name: "Uber Eats", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
   { id: "deliveroo", name: "Deliveroo", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
   { id: "just_eat", name: "Just Eat", families: ["food_delivery"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Capabilities remain gated by approved provider access and live connection state." },
