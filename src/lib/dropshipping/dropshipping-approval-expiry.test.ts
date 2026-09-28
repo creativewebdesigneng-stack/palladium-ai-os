@@ -19,6 +19,7 @@ describe('Dropshipping listing approval revision safety',()=>{
     expect(functions).toContain(".eq('details->>dropshipping_item_id',item.id)");
     expect(functions).toContain(".eq('details->>dropshipping_workspace_id',item.workspace_id)");
     expect(functions).toContain(".eq('details->>dropshipping_channel',data.channel)");
+    expect(functions).not.toContain("execution_status:'executing'");
   });
 
   it('fails closed when stale approval invalidation cannot be completed',()=>{
