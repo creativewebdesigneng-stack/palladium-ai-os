@@ -56,7 +56,7 @@ export default function ProductAnalytics() {
   const totals = overview.data?.totals;
 
   return <>
-    <PageHeader eyebrow="Business" title="Product Analytics" description="Privacy-first product, funnel, experiment and revenue analytics inspired by Talivia and OpenPanel, implemented natively on PalladiumAI auth and RLS." action={<Tabs tabs={RANGES} active={range} onChange={setRange} />} />
+    <PageHeader eyebrow="Business" title="Product Analytics" description="Privacy-first product, funnel, experiment and revenue analytics inspired by Talivia and OpenPanel, implemented natively on Blackstar auth and RLS." action={<Tabs tabs={RANGES} active={range} onChange={setRange} />} />
     {session === 'no' && <Failed message="Sign in to use Product Analytics." />}
     {projects.error && <Failed message={friendlyMessage(projects.error)} />}
 
@@ -69,7 +69,7 @@ export default function ProductAnalytics() {
             </select>
             {selected && <span className="text-xs text-zinc-500">{selected.domain || 'No domain'} · {selected.currency}</span>}
           </div>
-          {selected && <div className="mt-3 rounded-xl border border-violet-400/15 bg-violet-400/[.04] p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-500">Project write key</p><code className="mt-1 block break-all text-xs text-violet-200">{selected.write_key}</code><p className="mt-1 text-[11px] text-zinc-500">Use this key when wiring a server-side or SDK ingestion adapter. The current workspace recorder is authenticated; PalladiumAI does not expose an unauthenticated tracking endpoint by default.</p></div>}
+          {selected && <div className="mt-3 rounded-xl border border-violet-400/15 bg-violet-400/[.04] p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-500">Project write key</p><code className="mt-1 block break-all text-xs text-violet-200">{selected.write_key}</code><p className="mt-1 text-[11px] text-zinc-500">Use this key when wiring a server-side or SDK ingestion adapter. The current workspace recorder is authenticated; Blackstar does not expose an unauthenticated tracking endpoint by default.</p></div>}
         </div>
 
         {overview.isFetching && <div className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Aggregating product events…</div>}
