@@ -164,6 +164,7 @@ function Telemetry({ metrics = {} }) {
 }
 
 function MissionQueue({ tasks = [], onNavigate }) {
+  const reduced = useReducedMotion();
   const rows = tasks.filter((task) => ['running', 'in_progress', 'pending', 'queued', 'waiting_for_approval'].includes(task.status)).slice(0, 6);
   return (
     <section className="rounded-xl border border-white/8 bg-[#030812] p-3">
@@ -171,7 +172,7 @@ function MissionQueue({ tasks = [], onNavigate }) {
       <div className="mt-3 space-y-2">
         {rows.length ? rows.map((task) => {
           const running = ['running', 'in_progress'].includes(task.status);
-          return <div key={task.id} className="rounded-lg border border-white/7 bg-black/30 p-3"><div className="flex items-center justify-between gap-3"><span className="truncate text-[10px] text-zinc-200">{task.title || task.request || 'Mission task'}</span><span className="font-mono text-[8px] uppercase text-violet-300">{task.status}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">{running ? <motion.div className="h-full w-1/3 rounded-full bg-violet-300" animate={{ x: ['-100%', '300%'] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} /> : <div className="h-full w-1/5 rounded-full bg-violet-300/70" />}</div></div>;
+          return <div key={task.id} className="rounded-lg border border-white/7 bg-black/30 p-3"><div className="flex items-center justify-between gap-3"><span className="truncate text-[10px] text-zinc-200">{task.title || task.request || 'Mission task'}</span><span className="font-mono text-[8px] uppercase text-violet-300">{task.status}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">{running ? (reduced ? <div className="h-full w-1/3 rounded-full bg-violet-300" /> : <motion.div className="h-full w-1/3 rounded-full bg-violet-300" animate={{ x: ['-100%', '300%'] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} />) : <div className="h-full w-1/5 rounded-full bg-violet-300/70" />}</div></div>;
         }) : <div className="rounded-lg border border-white/7 bg-black/30 px-3 py-4 text-center text-[9px] text-zinc-500">No missions currently in flight.</div>}
       </div>
     </section>
@@ -179,11 +180,12 @@ function MissionQueue({ tasks = [], onNavigate }) {
 }
 
 function MissionFeed({ activities = [] }) {
+  const reduced = useReducedMotion();
   return (
     <section className="rounded-xl border border-white/8 bg-[#030812] p-3">
       <div className="flex items-center justify-between"><h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">Live mission feed</h3><Heartbeat /></div>
       <div className="mt-2 max-h-[240px] space-y-1.5 overflow-y-auto">
-        <AnimatePresence initial={false}>{activities.slice(0, 10).map((item, index) => <motion.div key={item.id || `${item.created_at}-${index}`} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 rounded-lg border border-white/5 bg-white/[.015] px-3 py-2"><motion.span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-300" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: index * 0.1 }} /><div className="min-w-0 flex-1"><p className="truncate text-[9px] text-zinc-300">{item.message || item.title || item.action || 'Mission event'}</p><p className="mt-0.5 font-mono text-[8px] text-zinc-600">{fmtTime(item.created_at)}</p></div></motion.div>)}</AnimatePresence>
+        <AnimatePresence initial={false}>{activities.slice(0, 10).map((item, index) => <motion.div key={item.id || `${item.created_at}-${index}`} initial={reduced ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 rounded-lg border border-white/5 bg-white/[.015] px-3 py-2"><motion.span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-300" animate={reduced ? undefined : { opacity: [0.3, 1, 0.3] }} transition={reduced ? undefined : { duration: 1.5, repeat: Infinity, delay: index * 0.1 }} /><div className="min-w-0 flex-1"><p className="truncate text-[9px] text-zinc-300">{item.message || item.title || item.action || 'Mission event'}</p><p className="mt-0.5 font-mono text-[8px] text-zinc-600">{fmtTime(item.created_at)}</p></div></motion.div>)}</AnimatePresence>
         {!activities.length ? <div className="px-3 py-4 text-center text-[9px] text-zinc-500">Waiting for live mission events.</div> : null}
       </div>
     </section>
