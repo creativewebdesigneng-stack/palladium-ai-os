@@ -51,7 +51,7 @@ export default function AutomationSection() {
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Automation</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Automate the busywork end-to-end</h2>
-          <p className="mt-3 text-zinc-400">Chain triggers, agents, and actions into reliable workflows that run while you sleep. PalladiumAI handles orchestration, retries, and approvals — you set the rules.</p>
+          <p className="mt-3 text-zinc-400">Chain triggers, agents, and actions into reliable workflows that run while you sleep. Blackstar handles orchestration, retries, and approvals — you set the rules.</p>
           <ul className="mt-6 space-y-3 text-sm text-zinc-300">
             {['Visual, no-code workflow builder', 'Conditional branching & loops', 'Human-in-the-loop approvals', 'Scheduled & event-driven triggers'].map(f => (
               <li key={f} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-violet-400" />{f}</li>
