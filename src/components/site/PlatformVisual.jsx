@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Sparkles, Bot, Cpu, Workflow, Search, Code2, BarChart3, BookOpen, Globe, Plug, ArrowRight, CheckCircle2, Activity } from 'lucide-react';
 
-// Premium animated representation of the PalladiumAI platform — a floating
+// Premium animated representation of the Blackstar platform — a floating
 // glassmorphic command surface with live agent activity, metrics, and orbiting
 // capability nodes. Pure framer-motion, no external assets.
 
