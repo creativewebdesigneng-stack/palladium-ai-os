@@ -11,6 +11,9 @@ describe('Company workspace intelligence persistence',()=>{
       expect(functions).toContain(field);
     }
     expect(functions).toContain(".eq('user_id',context.userId)");
+    expect(functions).toContain("kpis:z.array(z.record(z.string(),z.unknown())).max(200)");
+    expect(functions).toContain("decisions:z.array(z.record(z.string(),z.unknown())).max(200)");
+    expect(functions).toContain("opportunities:z.array(z.record(z.string(),z.unknown())).max(200)");
   });
 
   it('restores the exact applied migration into repository history',()=>{
