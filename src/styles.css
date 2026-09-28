@@ -976,6 +976,43 @@ body::before {
   background-image:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.008) 54%,rgba(139,92,246,.018));
 }
 
+.blackstar-public-features::before {
+  background:
+    radial-gradient(circle at 18% 10%,rgba(124,58,237,.13),transparent 27%),
+    radial-gradient(circle at 82% 18%,rgba(59,130,246,.07),transparent 26%),
+    #020204;
+}
+.blackstar-public-business::before {
+  background:
+    radial-gradient(circle at 20% 8%,rgba(245,158,11,.085),transparent 25%),
+    radial-gradient(circle at 78% 16%,rgba(139,92,246,.095),transparent 28%),
+    #020204;
+}
+.blackstar-public-developers::before {
+  background:
+    radial-gradient(circle at 16% 14%,rgba(34,211,238,.09),transparent 24%),
+    radial-gradient(circle at 84% 10%,rgba(168,85,247,.105),transparent 26%),
+    #020204;
+}
+.blackstar-public-resources::before {
+  background:
+    radial-gradient(circle at 22% 12%,rgba(96,165,250,.085),transparent 24%),
+    radial-gradient(circle at 80% 22%,rgba(167,139,250,.09),transparent 27%),
+    #020204;
+}
+.blackstar-public-help::before {
+  background:
+    radial-gradient(circle at 22% 8%,rgba(139,92,246,.11),transparent 26%),
+    radial-gradient(circle at 78% 18%,rgba(34,211,238,.075),transparent 25%),
+    #020204;
+}
+.blackstar-public-legal::before {
+  background:
+    radial-gradient(circle at 18% 9%,rgba(214,179,106,.08),transparent 25%),
+    radial-gradient(circle at 82% 18%,rgba(148,163,184,.06),transparent 27%),
+    #020204;
+}
+
 .blackstar-public-tools section:first-of-type::before,
 .blackstar-public-pricing section:first-of-type::before {
   content:"";
