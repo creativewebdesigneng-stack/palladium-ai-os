@@ -15,7 +15,7 @@ const PIPELINE = [
 
 export default function AIAgents() {
   return (
-    <div className="min-h-screen overflow-hidden bg-[#050507] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-agents min-h-screen overflow-hidden bg-[#050507] text-zinc-100">
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-20 pt-32">
