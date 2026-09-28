@@ -171,7 +171,7 @@ export default function CodeExplorer() {
             <div className="flex-1">
               <h2 className="text-base font-semibold text-white">Connect GitHub</h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">
-                Install the PalladiumAI GitHub App on only the repositories you want available here. PalladiumAI requests repository metadata and contents read access only.
+                Install the Blackstar GitHub App on only the repositories you want available here. Blackstar requests repository metadata and contents read access only.
               </p>
               <button onClick={connectGitHub} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-400">
                 <Plug className="h-4 w-4" />Connect GitHub
@@ -182,7 +182,7 @@ export default function CodeExplorer() {
       ) : repositories.length === 0 ? (
         <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[.06] p-5">
           <p className="text-sm font-semibold text-amber-100">GitHub is connected, but no repositories are available.</p>
-          <p className="mt-1 text-xs leading-5 text-amber-100/70">Update the GitHub App installation and grant PalladiumAI access to at least one repository.</p>
+          <p className="mt-1 text-xs leading-5 text-amber-100/70">Update the GitHub App installation and grant Blackstar access to at least one repository.</p>
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-[21rem_1fr]">
@@ -250,7 +250,7 @@ export default function CodeExplorer() {
                   <div>
                     <FileCode2 className="mx-auto h-8 w-8 text-zinc-700" />
                     <p className="mt-3 text-sm font-medium text-zinc-300">Select a file to preview it</p>
-                    <p className="mt-1 text-xs text-zinc-600">PalladiumAI currently reads files up to 512 KB and cannot edit or commit from Code Explorer.</p>
+                    <p className="mt-1 text-xs text-zinc-600">Blackstar currently reads files up to 512 KB and cannot edit or commit from Code Explorer.</p>
                   </div>
                 </div>
               )}
@@ -270,7 +270,7 @@ function SetupState() {
         <div>
           <p className="text-sm font-semibold text-amber-100">GitHub App deployment setup is incomplete</p>
           <p className="mt-1 max-w-4xl text-xs leading-5 text-amber-100/70">
-            Add GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_SLUG, GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET to the server deployment, then configure the GitHub App callback for PalladiumAI. No repository credentials should be placed in browser environment variables.
+            Add GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_SLUG, GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET to the server deployment, then configure the GitHub App callback for Blackstar. No repository credentials should be placed in browser environment variables.
           </p>
         </div>
       </div>
