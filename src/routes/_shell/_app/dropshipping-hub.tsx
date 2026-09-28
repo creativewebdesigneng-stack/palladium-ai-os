@@ -6,6 +6,7 @@ const Extra = {
   ConnectionMatrix: lazy(() => import('@/screens/DropshippingConnectionMatrix')),
   GrowthLab: lazy(() => import('@/screens/DropshippingGrowthLab')),
   OpportunityWatchlist: lazy(() => import('@/screens/DropshippingOpportunityWatchlist')),
+  CatalogExplorer: lazy(() => import('@/screens/DropshippingCatalogExplorer')),
   ProductPipeline: lazy(() => import('@/screens/DropshippingProductPipeline')),
   ListingWorkbench: lazy(() => import('@/screens/DropshippingListingWorkbench')),
   ControlTower: lazy(() => import('@/screens/DropshippingControlTower')),
@@ -27,6 +28,7 @@ function DropshippingHubRoute() {
           <Extra.ConnectionMatrix />
           <Extra.GrowthLab />
           <Extra.OpportunityWatchlist />
+          <Extra.CatalogExplorer />
           <Extra.ProductPipeline />
           <Extra.ListingWorkbench />
           <Extra.ControlTower />
