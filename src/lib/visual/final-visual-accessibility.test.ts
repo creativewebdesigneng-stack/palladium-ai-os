@@ -30,6 +30,13 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(errorState).toContain('initial={reducedMotion ? false');
   });
 
+  it('reduces decorative CSS depth on mobile while preserving the scene identity',()=>{
+    expect(styles).toContain('.blackstar-orb-c,');
+    expect(styles).toContain('.blackstar-auth-orb-b,');
+    expect(styles).toContain('.blackstar-depth-rail { display:none; }');
+    expect(styles).toContain('.blackstar-style-atmosphere { opacity:.72; }');
+  });
+
   it('keeps canvas ambience bounded on slower devices and when off-screen',()=>{
     expect(depth).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
     expect(depth).toContain("window.matchMedia('(max-width: 767px)').matches");
