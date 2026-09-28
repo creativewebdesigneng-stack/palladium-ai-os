@@ -4,7 +4,7 @@ import PublishedStudioApp from "@/screens/PublishedStudioApp";
 export const Route = createFileRoute("/studio-app/$appId")({
   head: () => ({
     meta: [
-      { title: "Published App — PalladiumAI App Studio" },
+      { title: "Published App — Blackstar App Studio" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
