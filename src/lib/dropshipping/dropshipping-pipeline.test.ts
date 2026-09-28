@@ -32,6 +32,11 @@ describe('dropshipping durable product pipeline',()=>{
     expect(payload.metadata.unit_economics.marginPct).toBeGreaterThan(0);
   });
 
+  it('preserves connected provider provenance without credentials',()=>{
+    const payload=buildDropshipCatalogPayload({...base,sourceProvider:'shopify',sourceAction:'shopify_products_list',sourceItemId:'gid://shopify/Product/42'});
+    expect(payload.metadata.connected_source).toEqual({provider:'shopify',action:'shopify_products_list',item_id:'gid://shopify/Product/42'});
+  });
+
   it('forces policy-blocked products inactive even when the requested stage is validated',()=>{
     const payload=buildDropshipCatalogPayload({...base,channel:'ebay',fulfilmentModel:'retailer-arbitrage'});
     expect(payload.metadata.lifecycle_stage).toBe('blocked');
