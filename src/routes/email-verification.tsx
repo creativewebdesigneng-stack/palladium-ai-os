@@ -4,15 +4,15 @@ import Screen from "@/screens/EmailVerification";
 export const Route = createFileRoute("/email-verification")({
   head: () => ({
     meta: [
-      { title: "Verify your email — PalladiumAI" },
+      { title: "Verify your email — Blackstar" },
       {
         name: "description",
-        content: "Confirm your email address to activate your PalladiumAI workspace.",
+        content: "Confirm your email address to activate your Blackstar workspace.",
       },
-      { property: "og:title", content: "Verify your email — PalladiumAI" },
+      { property: "og:title", content: "Verify your email — Blackstar" },
       {
         property: "og:description",
-        content: "Confirm your email address to activate your PalladiumAI workspace.",
+        content: "Confirm your email address to activate your Blackstar workspace.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
