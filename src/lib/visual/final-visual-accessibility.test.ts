@@ -19,6 +19,7 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(transition).toContain('useReducedMotion');
     expect(transition).toContain('initial={reducedMotion ? false');
     expect(transition).toContain("transition={reducedMotion ? { duration: 0 }");
+    expect(sectionReveal).toContain('whileInView={reducedMotion ? undefined');
   });
 
   it('freezes auth, card depth and visual-world ambience under reduced motion',()=>{
