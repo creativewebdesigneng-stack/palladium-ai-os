@@ -12,6 +12,8 @@ describe('Retail atomic return restocking',()=>{
     expect(migration).toContain('grant update(item_id, location_id, quantity, condition, disposition, notes, updated_at)');
     expect(migration).not.toContain('grant update(processed_quantity');
     expect(functions).toContain(".eq('processed_quantity', 0)");
+    expect(functions).toContain('.update(editable)');
+    expect(functions).toContain(".insert({ ...editable, workspace_id: data.workspace_id, return_id: data.return_id, user_id: context.userId })");
   });
 
   it('restocks only received/refunded sellable restock lines with a real location',()=>{
