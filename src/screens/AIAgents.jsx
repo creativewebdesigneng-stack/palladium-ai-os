@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Bot, Cpu, Workflow, Network, Sparkles } from 'lucide-react';
 import PublicNav from '@/components/site/PublicNav';
 import SectionReveal from '@/components/site/SectionReveal';
@@ -14,6 +14,7 @@ const PIPELINE = [
 ];
 
 export default function AIAgents() {
+  const reducedMotion = useReducedMotion();
   return (
     <div className="blackstar-public-page blackstar-public-agents min-h-screen overflow-hidden bg-[#050507] text-zinc-100">
       <PublicNav />
@@ -57,10 +58,10 @@ export default function AIAgents() {
           {PIPELINE.map((p, i) => (
             <motion.div
               key={p.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+              whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
+              transition={reducedMotion ? { duration: 0 } : { duration: 0.5, delay: i * 0.08 }}
               className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[.025] p-5 text-left shadow-[0_22px_60px_rgba(0,0,0,.25)] backdrop-blur-xl"
             >
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/35 to-transparent" />
