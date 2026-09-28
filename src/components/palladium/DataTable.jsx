@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ArrowUp, ArrowDown, Search, Inbox } from 'lucide-react';
 import { EmptyState } from '@/components/palladium/ErrorState';
 
-// Standardised reusable data table with sort + search, built on the PalladiumAI design system.
+// Standardised reusable data table with sort + search, built on the Blackstar design system.
 export default function DataTable({ columns, data, searchable = true, searchKeys, emptyTitle, emptyDesc, onRowClick }) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' });
   const [query, setQuery] = useState('');
