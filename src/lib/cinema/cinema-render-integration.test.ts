@@ -22,10 +22,11 @@ describe('Cinema shot rendering integration',()=>{
   it('prevents duplicate project scene shot stage segments',()=>{
     expect(migration).toContain('cinema_shot_renders_unique_segment')
   })
-  it('surfaces real worker readiness and render evidence rather than fake outputs',()=>{
-    expect(screen).toContain('Blackstar server cannot see a fal credential')
-    expect(screen).toContain('Seedream provider unavailable for keyframes')
-    expect(screen).toContain('LTX provider unavailable for video segments')
+  it('surfaces actual provider lanes and render evidence rather than stale credential blockers',()=>{
+    expect(screen).toContain("seedreamCaps?.provider")
+    expect(screen).toContain("ltxCaps?.provider")
+    expect(screen).toContain('Blackstar-hosted fallbacks remain available')
+    expect(screen).not.toContain('Blackstar server cannot see a fal credential')
     expect(screen).toContain('Generate keyframes')
     expect(screen).toContain('Generate video')
   })
