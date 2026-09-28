@@ -12,12 +12,12 @@ describe("Blackstar visual performance contract", () => {
   it("keeps one shell-owned ambient canvas instead of stacking page-level full-screen canvases", () => {
     expect(agents).not.toContain("AnimatedBrain");
     expect(workforce).not.toContain("NeuralNetworkBackground");
-    expect(shell).toContain("<AstraDepthField room={room} />");
+    expect(shell).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
   });
 
   it("does not stack the shell WebGL depth field on Game Foundry's dedicated Three.js viewer", () => {
     expect(shell).toContain("const dedicatedWebGL = pathname.startsWith('/game-foundry')");
-    expect(shell).toContain("!dedicatedWebGL ? <AstraDepthField room={room} /> : null");
+    expect(shell).toContain("!dedicatedWebGL ? <AstraDepthField room={room} visualStyle={visualStyle} /> : null");
   });
 
   it("caps mobile 2D canvas pixel density and fails safely when a 2D context is unavailable", () => {

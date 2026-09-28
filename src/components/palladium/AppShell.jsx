@@ -9,7 +9,7 @@ import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
 import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
 import AstraDepthField from '@/components/blackstar/AstraDepthField'
-import { blackstarRoomForPath } from '@/components/blackstar/visualRooms'
+import { blackstarRoomForPath, blackstarVisualStyleForPath } from '@/components/blackstar/visualRooms'
 import BlackstarRouteErrorBoundary from '@/components/blackstar/BlackstarRouteErrorBoundary'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
@@ -24,6 +24,7 @@ export default function AppShell() {
   const { unread } = useRealtimeNotifications()
   const { pathname } = useLocation()
   const room = blackstarRoomForPath(pathname)
+  const visualStyle = blackstarVisualStyleForPath(pathname)
   const mission = pathname.startsWith('/mission-control')
   const dedicatedWebGL = pathname.startsWith('/game-foundry')
 
@@ -50,7 +51,10 @@ export default function AppShell() {
 
   return (
     <UpgradeProvider>
-      <div className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${room}`}>
+      <div
+        className={`blackstar-shell astra-shell relative min-h-screen overflow-x-hidden bg-[#020204] text-zinc-100 ${room} ${visualStyle}`}
+        data-blackstar-style={visualStyle}
+      >
         <div aria-hidden className="fixed inset-0 -z-50 bg-[#020204]" />
         <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-80' : 'opacity-55'}`}>
           <SpaceBackground intensity={mission ? 'medium' : 'low'} />
@@ -60,7 +64,7 @@ export default function AppShell() {
           className="pointer-events-none fixed inset-0 opacity-75"
           style={{ zIndex: -35 }}
         >
-          {!dedicatedWebGL ? <AstraDepthField room={room} /> : null}
+          {!dedicatedWebGL ? <AstraDepthField room={room} visualStyle={visualStyle} /> : null}
         </div>
         <div aria-hidden className="blackstar-spatial-field fixed inset-0 -z-30">
           <span className="blackstar-orb blackstar-orb-a" />
@@ -71,6 +75,7 @@ export default function AppShell() {
           <span className="blackstar-horizon" />
         </div>
         <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20" />
+        <div aria-hidden className="blackstar-style-atmosphere pointer-events-none fixed inset-0" style={{ zIndex: -15 }} />
         <div aria-hidden className="astra-room-wash pointer-events-none fixed inset-0 -z-10" />
 
         <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} />
