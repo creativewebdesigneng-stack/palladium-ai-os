@@ -15,7 +15,7 @@ const CATEGORIES = [
 
 export default function Features() {
   return (
-    <div className="blackstar-public-page min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-features min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-16 pt-32">
