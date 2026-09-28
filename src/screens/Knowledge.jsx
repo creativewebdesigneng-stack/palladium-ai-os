@@ -148,7 +148,7 @@ export default function Knowledge() {
             <div className="mb-8 grid place-items-center rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
               <BookOpen className="h-9 w-9 text-zinc-600" />
               <p className="mt-3 text-sm font-medium text-white">{documents.length ? 'No documents match that filter' : 'No knowledge indexed yet'}</p>
-              <p className="mt-1 max-w-md text-xs text-zinc-500">{documents.length ? 'Change the filter to see your indexed documents.' : 'Upload a supported document or paste trusted source text. PalladiumAI will chunk and index it for agent retrieval.'}</p>
+              <p className="mt-1 max-w-md text-xs text-zinc-500">{documents.length ? 'Change the filter to see your indexed documents.' : 'Upload a supported document or paste trusted source text. Blackstar will chunk and index it for agent retrieval.'}</p>
               {!documents.length ? <button onClick={() => setShowAdd(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white"><Plus className="h-3.5 w-3.5" />Add first document</button> : null}
             </div>
           )}
