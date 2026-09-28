@@ -65,8 +65,8 @@ describe("Blackstar Astra WebGL depth field contract", () => {
       expect(depth).toContain(room);
     }
     expect(shell).toContain("import AstraDepthField from '@/components/blackstar/AstraDepthField'");
-    expect(shell).toContain("<AstraDepthField room={room} />");
-    expect(shell.indexOf("<AstraDepthField room={room} />"))
+    expect(shell).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
+    expect(shell.indexOf("<AstraDepthField room={room} visualStyle={visualStyle} />"))
       .toBeLessThan(shell.indexOf("<Sidebar"));
   });
 });
