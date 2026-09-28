@@ -75,7 +75,7 @@ export default function AppShell() {
           <span className="blackstar-horizon" />
         </div>
         <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20" />
-        <div aria-hidden className="blackstar-style-atmosphere pointer-events-none fixed inset-0 -z-15" />
+        <div aria-hidden className="blackstar-style-atmosphere pointer-events-none fixed inset-0" style={{ zIndex: -15 }} />
         <div aria-hidden className="astra-room-wash pointer-events-none fixed inset-0 -z-10" />
 
         <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} />
