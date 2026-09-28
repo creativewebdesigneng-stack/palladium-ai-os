@@ -20,11 +20,34 @@ const ROOM_PALETTES = {
   'astra-room-default': { primary: 0x7b5cff, secondary: 0x7dd3fc, density: 0.65 },
 }
 
-function paletteFor(room) {
-  return ROOM_PALETTES[room] || ROOM_PALETTES['astra-room-default']
+
+const STYLE_PALETTES = {
+  'blackstar-style-cosmic-core': { primary: 0x7b5cff, secondary: 0xd8b4fe, density: 1.04 },
+  'blackstar-style-orbital-elegance': { primary: 0xe5e7eb, secondary: 0x94a3b8, density: 0.64 },
+  'blackstar-style-mission-control': { primary: 0x60a5fa, secondary: 0xf59e0b, density: 1.18 },
+  'blackstar-style-neon-infrastructure': { primary: 0xa855f7, secondary: 0x22d3ee, density: 1.0 },
+  'blackstar-style-elite-corporate': { primary: 0xd6b36a, secondary: 0xe5e7eb, density: 0.52 },
+  'blackstar-style-industry-realism': { primary: 0xf59e0b, secondary: 0x94a3b8, density: 0.68 },
+  'blackstar-style-creative-universe': { primary: 0xe879f9, secondary: 0x8b5cf6, density: 1.08 },
+  'blackstar-style-ai-nexus': { primary: 0x7c3aed, secondary: 0x3b82f6, density: 1.12 },
+  'blackstar-style-trading-command': { primary: 0x14b8a6, secondary: 0x22c55e, density: 0.9 },
+  'blackstar-style-ethereal-luxury': { primary: 0xe2e8f0, secondary: 0x7dd3fc, density: 0.42 },
 }
 
-function coreGeometryFor(THREE, room, size) {
+function paletteFor(room, visualStyle) {
+  return STYLE_PALETTES[visualStyle] || ROOM_PALETTES[room] || ROOM_PALETTES['astra-room-default']
+}
+
+function coreGeometryFor(THREE, room, size, visualStyle) {
+  if (visualStyle === 'blackstar-style-orbital-elegance') return new THREE.TorusKnotGeometry(size * 0.52, size * 0.12, 88, 10)
+  if (visualStyle === 'blackstar-style-mission-control') return new THREE.OctahedronGeometry(size, 1)
+  if (visualStyle === 'blackstar-style-neon-infrastructure') return new THREE.CylinderGeometry(size * 0.74, size * 1.04, size * 1.8, 6, 1)
+  if (visualStyle === 'blackstar-style-elite-corporate') return new THREE.BoxGeometry(size * 1.18, size * 1.18, size * 1.18, 2, 2, 2)
+  if (visualStyle === 'blackstar-style-industry-realism') return new THREE.BoxGeometry(size * 1.5, size * 0.72, size * 1.05, 3, 1, 2)
+  if (visualStyle === 'blackstar-style-creative-universe') return new THREE.TetrahedronGeometry(size, 1)
+  if (visualStyle === 'blackstar-style-ai-nexus') return new THREE.IcosahedronGeometry(size, 2)
+  if (visualStyle === 'blackstar-style-trading-command') return new THREE.ConeGeometry(size * 0.82, size * 1.8, 8, 2)
+  if (visualStyle === 'blackstar-style-ethereal-luxury') return new THREE.SphereGeometry(size * 0.92, 18, 12)
   if (room === 'astra-room-finance') return new THREE.OctahedronGeometry(size, 0)
   if (room === 'astra-room-trading') return new THREE.ConeGeometry(size * 0.85, size * 1.8, 6, 1)
   if (room === 'astra-room-legal') return new THREE.BoxGeometry(size * 1.15, size * 1.15, size * 1.15)
@@ -53,6 +76,7 @@ function coreGeometryFor(THREE, room, size) {
  */
 export default function AstraDepthField({
   room = 'astra-room-default',
+  visualStyle = 'blackstar-style-cosmic-core',
   className = 'h-full w-full',
 }) {
   const canvasRef = useRef(null)
@@ -103,7 +127,7 @@ export default function AstraDepthField({
       (hardwareConcurrency > 0 && hardwareConcurrency <= 4)
     const targetFps = constrained ? 30 : 45
     const frameInterval = 1000 / targetFps
-    const palette = paletteFor(room)
+    const palette = paletteFor(room, visualStyle)
     const mission = room === 'astra-room-mission'
 
     const boot = async () => {
@@ -130,7 +154,7 @@ export default function AstraDepthField({
         scene.add(root)
 
         const coreSize = mobile ? 0.72 : mission ? 1.02 : 0.92
-        coreGeometry = coreGeometryFor(THREE, room, coreSize)
+        coreGeometry = coreGeometryFor(THREE, room, coreSize, visualStyle)
         coreMaterial = new THREE.MeshBasicMaterial({
           color: palette.primary,
           wireframe: true,
@@ -319,13 +343,14 @@ export default function AstraDepthField({
       ringBMaterial?.dispose()
       renderer?.dispose()
     }
-  }, [room])
+  }, [room, visualStyle])
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden="true"
       data-astra-depth-room={room}
+      data-blackstar-depth-style={visualStyle}
       className={className}
     />
   )
