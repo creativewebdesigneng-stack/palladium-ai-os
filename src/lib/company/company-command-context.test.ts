@@ -1,8 +1,8 @@
 import {describe,expect,it} from 'vitest';
 import {readFileSync} from 'node:fs';
 
-const workspace=readFileSync(new URL('../../../components/company/CompanyWorkspace.jsx',import.meta.url),'utf8');
-const server=readFileSync(new URL('../company-workspaces.functions.ts',import.meta.url),'utf8');
+const workspace=readFileSync(new URL('../../components/company/CompanyWorkspace.jsx',import.meta.url),'utf8');
+const server=readFileSync(new URL('./company-workspaces.functions.ts',import.meta.url),'utf8');
 
 describe('Company command intelligence context',()=>{
   it('reuses the existing company workspace persistence instead of adding a duplicate system',()=>{
