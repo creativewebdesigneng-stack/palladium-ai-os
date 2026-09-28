@@ -57,8 +57,17 @@ export const saveDropshippingListingDraft=createServerFn({method:'POST'})
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     const item=await loadOwnedDropshipItem(sb,context.userId,data);
+    const expiry=await sb.from('approval_requests')
+      .update({status:'expired',decided_at:new Date().toISOString(),decision_note:'The linked Dropshipping Hub listing draft was revised before approval.'})
+      .eq('user_id',context.userId)
+      .eq('action_type','nango_dynamic_action')
+      .eq('status','pending')
+      .eq('details->>dropshipping_item_id',item.id)
+      .eq('details->>dropshipping_workspace_id',item.workspace_id)
+      .eq('details->>dropshipping_channel',data.channel);
+    if(expiry.error)throw new Error(`Could not invalidate the pending listing approval: ${expiry.error.message}`);
     const nextMetadata=withListingDraftMetadata(item.metadata,{
-      channel:data.channel as any,
+      channel:data.channel as DropshipChannel,
       text:data.text,
       ...(data.provider?{provider:data.provider}:{}),
       ...(data.model?{model:data.model}:{}),
