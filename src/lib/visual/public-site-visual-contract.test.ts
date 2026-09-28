@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 
 const pages=[
   ['Features.jsx','blackstar-public-features'],
+  ['AIAgents.jsx','blackstar-public-agents'],
   ['Business.jsx','blackstar-public-business'],
   ['Developers.jsx','blackstar-public-developers'],
   ['Resources.jsx','blackstar-public-resources'],
