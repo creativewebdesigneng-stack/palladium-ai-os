@@ -27,7 +27,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-trading-command',
   ],
   [
-    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/website-studio', '/html-studio', '/builder'],
+    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/website-studio', '/html-studio', '/builder', '/marketing', '/seo-studio', '/social-operations', '/templates', '/prompts'],
     'blackstar-style-creative-universe',
   ],
   [
@@ -35,15 +35,15 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-ai-nexus',
   ],
   [
-    ['/industry-hub', '/construction-industrial-hub', '/retail-hub', '/commerce-studio', '/dropshipping-hub', '/shopify-connect', '/business-automation'],
+    ['/industry-hub', '/construction-industrial-hub', '/retail-hub', '/commerce-studio', '/dropshipping-hub', '/shopify-connect', '/business-automation', '/marketplace', '/agent-marketplace', '/ai-marketplace', '/tool-marketplace'],
     'blackstar-style-industry-realism',
   ],
   [
-    ['/company-hub', '/finance', '/legal', '/legal-hub', '/compliance-sentinel', '/organisation', '/team', '/billing', '/admin', '/security', '/crm', '/crm-studio'],
+    ['/company-hub', '/finance', '/legal', '/legal-hub', '/compliance-sentinel', '/organisation', '/team', '/billing', '/admin', '/security', '/crm', '/crm-studio', '/phone-communications', '/whatsapp-crm', '/smart-tables'],
     'blackstar-style-elite-corporate',
   ],
   [
-    ['/projects', '/deployments', '/developer', '/developer-portal', '/developer-workspace', '/version-control', '/terminal', '/code-explorer', '/web-intelligence', '/integrations', '/sync-center', '/business-intelligence'],
+    ['/projects', '/deployments', '/developer', '/developer-portal', '/developer-workspace', '/version-control', '/terminal', '/code-explorer', '/web-intelligence', '/web', '/browser-preview', '/integrations', '/sync-center', '/business-intelligence'],
     'blackstar-style-neon-infrastructure',
   ],
   [
@@ -55,7 +55,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-ethereal-luxury',
   ],
   [
-    ['/dashboard', '/autonomous-os', '/shared-intelligence', '/decision-studio', '/chat'],
+    ['/dashboard', '/autonomous-os', '/shared-intelligence', '/decision-studio', '/chat', '/fast-track'],
     'blackstar-style-cosmic-core',
   ],
 ]
