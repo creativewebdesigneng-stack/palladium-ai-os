@@ -98,14 +98,14 @@ export default function SmartTables() {
       <PageHeader
         eyebrow="Data Workspace"
         title="Smart Tables"
-        description="APITable-inspired collaborative data structures, built on PalladiumAI auth, RLS, audit and workflow systems instead of a second platform stack."
+        description="APITable-inspired collaborative data structures, built on Blackstar auth, RLS, audit and workflow systems instead of a second platform stack."
         action={<button onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-violet-500"><Plus className="h-4 w-4" />New table</button>}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
         <Info icon={Database} title="Structured records" text="Typed fields and validated JSON records with owner-scoped RLS." />
         <Info icon={Grid3X3} title="Multiple views" text="Grid, Kanban and form view definitions share the same underlying records." />
-        <Info icon={Workflow} title="One automation engine" text="Automations reuse PalladiumAI Workflows rather than duplicating APITable's robot runtime." />
+        <Info icon={Workflow} title="One automation engine" text="Automations reuse Blackstar Workflows rather than duplicating APITable's robot runtime." />
       </div>
 
       {creating && (
