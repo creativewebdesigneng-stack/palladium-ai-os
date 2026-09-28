@@ -6,8 +6,8 @@ import { startShopifyOAuth } from "@/lib/integrations/shopify.functions";
 export const Route = createFileRoute("/_shell/_app/shopify-connect")({
   head: () => ({
     meta: [
-      { title: "Connect Shopify — PalladiumAI" },
-      { name: "description", content: "Connect a Shopify store directly to PalladiumAI using Shopify OAuth." },
+      { title: "Connect Shopify — Blackstar" },
+      { name: "description", content: "Connect a Shopify store directly to Blackstar using Shopify OAuth." },
     ],
   }),
   component: ShopifyConnectScreen,
@@ -49,7 +49,7 @@ function ShopifyConnectScreen() {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Connect Shopify directly</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-            PalladiumAI will connect to your store through Shopify's native Admin API. Nango and other connector providers remain optional fallbacks; your agent is not locked to them.
+            Blackstar will connect to your store through Shopify's native Admin API. Nango and other connector providers remain optional fallbacks; your agent is not locked to them.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ function ShopifyConnectScreen() {
             <div className="flex gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
               <div className="text-xs leading-5 text-zinc-400">
-                <p className="font-medium text-zinc-200">Your Shopify password is never shared with PalladiumAI.</p>
+                <p className="font-medium text-zinc-200">Your Shopify password is never shared with Blackstar.</p>
                 <p className="mt-1">Shopify handles sign-in and consent. The returned access token is encrypted server-side. Safe reads can run autonomously; product or inventory changes remain approval-gated according to your agent policy.</p>
               </div>
             </div>
