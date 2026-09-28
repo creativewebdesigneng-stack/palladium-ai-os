@@ -22,6 +22,7 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(styles).toContain('.blackstar-auth-orb');
     expect(styles).toContain('transition:none !important');
     expect(styles).toContain('transform:none !important');
+    expect(styles).toContain('.blackstar-public-page :is(section, article, div)[class*="rounded"][class*="border"]:hover');
     expect(astra).toContain('.blackstar-style-atmosphere::before');
     expect(astra).toContain('.blackstar-style-atmosphere::after');
     expect(astra).toContain('animation: none');
@@ -31,6 +32,9 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(errorState).toContain('blackstar-error-state');
     expect(errorState).toContain('useReducedMotion');
     expect(errorState).toContain('initial={reducedMotion ? false');
+    const agents=readFileSync(new URL('../../screens/AIAgents.jsx',import.meta.url),'utf8');
+    expect(agents).toContain('useReducedMotion');
+    expect(agents).toContain('blackstar-public-agents');
   });
 
   it('removes direct public-page Framer Motion when reduced motion is requested',()=>{
