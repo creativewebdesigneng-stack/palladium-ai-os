@@ -33,7 +33,7 @@ describe("Autonomous OS dynamic team fallback", () => {
 
     expect(plan.ready).toBe(true);
     expect(plan.agentIds).toEqual(["research"]);
-    expect(plan.capabilityAssignments.web_search).toBe("research");
+    expect(plan.capabilityAssignments['web_search']).toBe("research");
   });
 
   it("uses the highest-trust non-overloaded candidate when no capability name is explicit", () => {
