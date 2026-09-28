@@ -39,8 +39,8 @@ export default function Web() {
     <>
       <PageHeader
         eyebrow="Discovery"
-        title="PalladiumAI Web"
-        description="Search the live public web through PalladiumAI's server-side discovery layer. Every displayed result comes from a real provider response and links to its original source."
+        title="Blackstar Web"
+        description="Search the live public web through Blackstar's server-side discovery layer. Every displayed result comes from a real provider response and links to its original source."
       />
 
       <div className="mx-auto max-w-6xl space-y-4">
