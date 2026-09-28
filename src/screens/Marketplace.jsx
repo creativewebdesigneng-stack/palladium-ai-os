@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Sparkles, Wrench, Store } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ListingBrowser from '@/components/marketplace/ListingBrowser';
+import MarketplaceWorld from '@/components/marketplace/MarketplaceWorld';
 
 export default function Marketplace() {
   const headerActions = (
@@ -21,6 +22,7 @@ export default function Marketplace() {
   return (
     <>
       <PageHeader eyebrow="Marketplace" title="Marketplace" description="Discover AI agents built and published by the Blackstar community." action={headerActions} />
+      <MarketplaceWorld />
       <ListingBrowser />
     </>
   );

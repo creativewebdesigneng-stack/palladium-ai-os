@@ -1,4 +1,5 @@
 import IndustryOperatingSystem from '@/components/industry/IndustryOperatingSystem';
+import IndustryCommandWorld from '@/components/industry/IndustryCommandWorld';
 import IndustrySourceGateway from '@/components/industry/IndustrySourceGateway';
 import IndustryGrowthLab from '@/components/industry/IndustryGrowthLab';
 import IndustryMaturityAssessment from '@/components/industry/IndustryMaturityAssessment';
@@ -46,6 +47,7 @@ const capabilities = [
 export default function IndustryHub() {
   return (
     <div className="space-y-6 pb-12">
+      <IndustryCommandWorld industries={industries} capabilities={capabilities} />
       <section className="blackstar-panel relative overflow-hidden rounded-[28px] border border-white/[.08] bg-black/35 p-6 lg:p-8">
         <div aria-hidden className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
         <div className="relative">

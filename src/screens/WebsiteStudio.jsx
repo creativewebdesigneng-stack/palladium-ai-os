@@ -18,6 +18,7 @@ import WebsitePublishPreflight from '@/components/website-studio/WebsitePublishP
 import WebsiteGitSync from '@/components/website-studio/WebsiteGitSync';
 import WebsiteSectionCanvas from '@/components/website-studio/WebsiteSectionCanvas';
 import WebsiteSectionInspector from '@/components/website-studio/WebsiteSectionInspector';
+import WebsiteStudioWorld from '@/components/website-studio/WebsiteStudioWorld';
 import WebsiteTemplateGallery from '@/components/website-studio/WebsiteTemplateGallery';
 import {createWebsiteFromTemplate} from '@/lib/website-studio/website-templates';
 import WebsiteDeveloperTools from '@/components/website-studio/WebsiteDeveloperTools';
@@ -148,6 +149,7 @@ export default function WebsiteStudio(){
 
   return <div className="space-y-5 pb-10">
     <PageHeader eyebrow="Creator workspace" title="Website Studio" description="Prompt, design, edit, preview and prepare websites for deployment using Blackstar's existing HTML Studio, developer controls and deployment infrastructure." action={<button onClick={()=>{setDraft(blank);setPreviewPagePath('/')}} className="flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-medium text-white"><Plus className="h-4 w-4"/>New website</button>}/>
+    <WebsiteStudioWorld projects={projects} draft={draft} revisions={revisions} busy={busy} />
     {(error||notice)&&<div className={`rounded-xl border p-3 text-xs ${error?'border-rose-400/20 bg-rose-500/10 text-rose-200':'border-emerald-400/20 bg-emerald-500/10 text-emerald-200'}`}>{error||notice}</div>}
 
     <div className="grid gap-4 xl:grid-cols-[270px_minmax(0,1fr)]">

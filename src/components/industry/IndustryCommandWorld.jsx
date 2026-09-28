@@ -1,0 +1,18 @@
+import { motion, useReducedMotion } from 'framer-motion';
+import { Factory, Network, Rocket, Workflow } from 'lucide-react';
+
+export default function IndustryCommandWorld({ industries=[], capabilities=[] }) {
+  const reduced=useReducedMotion();
+  const nodes=industries.slice(0,10);
+  return <section className="relative overflow-hidden rounded-[30px] border border-orange-300/12 bg-[#090603]/92 shadow-[0_36px_110px_rgba(0,0,0,.42)]">
+    <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(249,115,22,.11),transparent_31%),radial-gradient(circle_at_80%_20%,rgba(34,211,238,.08),transparent_24%)]"/>
+    <div className="relative flex flex-wrap items-center gap-3 border-b border-white/7 px-5 py-4"><div><p className="text-[9px] font-semibold uppercase tracking-[.24em] text-orange-300/70">Industrial intelligence lattice</p><h2 className="mt-1 text-lg font-semibold text-white">Cross-sector operating world</h2></div><div className="ml-auto flex gap-2 font-mono text-[9px] text-zinc-400"><span>{industries.length} sectors</span><span>·</span><span>{capabilities.length} capability groups</span></div></div>
+    <div className="relative min-h-[330px] p-5">
+      <div aria-hidden className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(249,115,22,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(249,115,22,.04)_1px,transparent_1px)] [background-size:34px_34px]"/>
+      <motion.div aria-hidden className="absolute left-1/2 top-1/2 hidden h-40 w-40 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[28px] border border-orange-300/15 md:block" animate={reduced?undefined:{rotate:[45,405]}} transition={reduced?undefined:{duration:52,repeat:Infinity,ease:'linear'}}/>
+      <div className="relative hidden min-h-[290px] md:block"><div className="absolute left-1/2 top-1/2 z-10 w-44 -translate-x-1/2 -translate-y-1/2 text-center"><Factory className="mx-auto h-8 w-8 text-orange-200"/><p className="mt-2 text-[9px] uppercase tracking-[.18em] text-zinc-500">Industry OS</p><p className="mt-1 font-mono text-xl text-white">{industries.length}</p><p className="text-[9px] text-zinc-600">sector models</p></div>{nodes.map(([name,Icon],index)=>{const angle=(index/Math.max(nodes.length,1))*Math.PI*2;const left=50+Math.cos(angle)*39;const top=50+Math.sin(angle)*39;return <motion.div key={name} className="absolute w-[165px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/72 p-3 backdrop-blur-xl" style={{left:left+'%',top:top+'%'}} animate={reduced?undefined:{y:[0,-4,0]}} transition={reduced?undefined:{duration:4+(index%4)*.5,repeat:Infinity,delay:index*.08}}><div className="flex items-center gap-2"><Icon className="h-3.5 w-3.5 text-orange-200"/><span className="min-w-0 flex-1 truncate text-[9px] text-white">{name}</span></div></motion.div>})}</div>
+      <div className="grid gap-2 md:hidden">{nodes.map(([name,Icon])=><div key={name} className="rounded-xl border border-white/10 bg-black/45 p-3"><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-orange-200"/><span className="min-w-0 flex-1 truncate text-xs text-white">{name}</span></div></div>)}</div>
+    </div>
+    <div className="relative grid gap-2 border-t border-white/7 bg-black/20 px-5 py-3 text-[9px] uppercase tracking-[.12em] text-zinc-500 sm:grid-cols-2"><span className="flex items-center gap-1.5"><Workflow className="h-3 w-3"/>routes into existing Blackstar systems</span><span className="flex items-center gap-1.5"><Rocket className="h-3 w-3"/>sector layer · no duplicate execution runtime</span></div>
+  </section>;
+}

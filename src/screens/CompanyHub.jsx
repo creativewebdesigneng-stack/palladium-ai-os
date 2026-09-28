@@ -1,4 +1,5 @@
 import CompanyPlaybooks from '@/components/company/CompanyPlaybooks';
+import CompanyOperatingWorld from '@/components/company/CompanyOperatingWorld';
 import CompanyGrowthLab from '@/components/company/CompanyGrowthLab';
 import CompanyAIWorkforceBlueprint from '@/components/company/CompanyAIWorkforceBlueprint';
 import CompanyHealthAssessment from '@/components/company/CompanyHealthAssessment';
@@ -61,6 +62,7 @@ const systems=[
 
 export default function CompanyHub(){
  return <div className="space-y-6 pb-12">
+  <CompanyOperatingWorld departments={departments} lifecycle={lifecycle} systems={systems} />
   <section className="blackstar-panel relative overflow-hidden rounded-[28px] border border-white/[.08] bg-black/35 p-6 lg:p-8">
    <div aria-hidden className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl"/>
    <div className="relative">
