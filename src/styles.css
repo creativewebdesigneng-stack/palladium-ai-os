@@ -527,9 +527,14 @@ body::before {
 }
 
 @media (max-width: 767px) {
-  .blackstar-perspective-grid { opacity:.24; transform: perspective(700px) rotateX(72deg) scale(1.65); }
-  .blackstar-orb-a { width:320px; height:320px; right:-170px; }
-  .blackstar-orb-b { width:210px; height:210px; left:-80px; }
+  .blackstar-perspective-grid { opacity:.20; transform: perspective(700px) rotateX(72deg) scale(1.65); }
+  .blackstar-orb-a { width:320px; height:320px; right:-170px; opacity:.42; }
+  .blackstar-orb-b { width:210px; height:210px; left:-80px; opacity:.34; }
+  .blackstar-orb-c,
+  .blackstar-auth-orb-b,
+  .blackstar-depth-rail { display:none; }
+  .blackstar-style-atmosphere { opacity:.72; }
+  .blackstar-page-header-grid { opacity:.12; }
   .blackstar-page-header { border-radius:20px; }
 }
 @media (prefers-reduced-motion: reduce) {
