@@ -8,6 +8,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
+import {
+  buildRecordedSessionComputerUsePlan,
+  summarizeBrowserComputerUsePlan,
+  type BrowserComputerUseVerdict,
+} from "@/lib/runtime/browser-computer-use-policy.server";
 
 type Sb = {
   from: (table: string) => any;
@@ -36,10 +41,32 @@ export const getBrowserControl = createServerFn({ method: "POST" })
     ]);
 
     const rows: any[] = sessions.data ?? [];
+    const sessionVerdicts = rows.map((session) => {
+      const plan = buildRecordedSessionComputerUsePlan(
+        Array.isArray(session.steps) ? session.steps : [],
+        Array.isArray(session.allowed_domains) ? session.allowed_domains : [],
+      );
+      return {
+        sessionId: session.id,
+        ...summarizeBrowserComputerUsePlan(plan),
+      };
+    });
+    const policyPlan: BrowserComputerUseVerdict & { sessionsReviewed: number } = {
+      engine: "blackstar_computer_use",
+      executable: sessionVerdicts.every((verdict) => verdict.executable),
+      requiresApproval: sessionVerdicts.some((verdict) => verdict.requiresApproval),
+      blockedCount: sessionVerdicts.reduce((sum, verdict) => sum + verdict.blockedCount, 0),
+      allowedDomains: [...new Set(sessionVerdicts.flatMap((verdict) => verdict.allowedDomains))],
+      reviewedSteps: sessionVerdicts.reduce((sum, verdict) => sum + verdict.reviewedSteps, 0),
+      firstBlockReason: sessionVerdicts.find((verdict) => verdict.firstBlockReason)?.firstBlockReason ?? null,
+      sessionsReviewed: sessionVerdicts.length,
+    };
     return {
       browser,
       sessions: rows,
       executions: executions.data ?? [],
+      policyPlan,
+      sessionVerdicts,
       counts: {
         sessions: rows.length,
         active: rows.filter((s) => s.status === "running").length,
