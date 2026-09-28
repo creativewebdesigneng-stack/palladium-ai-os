@@ -15,6 +15,9 @@ export type DropshipPipelineInput={
   stage:DropshipPipelineStage;
   evidenceUrl?:string;
   evidenceNotes?:string;
+  sourceProvider?:string;
+  sourceAction?:string;
+  sourceItemId?:string;
   opportunityScore?:number|null;
   supplierScore?:number|null;
   originalDesign?:boolean;
@@ -93,6 +96,7 @@ export function buildDropshipCatalogPayload(input:DropshipPipelineInput){
       opportunity_score:clampScore(input.opportunityScore),
       supplier_score:clampScore(input.supplierScore),
       evidence:{url:evidenceUrl??null,notes:clean(input.evidenceNotes,4000)??null},
+      connected_source:{provider:clean(input.sourceProvider,80)??null,action:clean(input.sourceAction,160)??null,item_id:clean(input.sourceItemId,300)??null},
       compliance:{...compliance,checked_at:new Date().toISOString()},
       unit_economics:{...unitEconomics,inputs:{
         sell_price:Math.max(0,input.sellPrice||0),
