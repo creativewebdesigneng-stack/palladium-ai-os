@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
 import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegrationProvider} from '@/lib/integrations/agent-integration-runtime.server';
 import {notify} from '@/lib/notifications/notify.server';
-import {DROPSHIP_CHANNELS} from './dropshipping';
+import {DROPSHIP_CHANNELS,type DropshipChannel} from './dropshipping';
 import {DROPSHIP_CHANNEL_TARGETS} from './dropshipping-readiness';
 import {assertDropshippingPublicationReady,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
 
@@ -105,7 +105,7 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     const sb=context.supabase as unknown as Sb;
     const item=await loadOwnedDropshipItem(sb,context.userId,data);
     if(data.channel==='blackstar-site')throw new Error('Website Studio publishing uses its native deployment workflow, not a marketplace listing approval.');
-    assertDropshippingPublicationReady(item,data.channel as any);
+    assertDropshippingPublicationReady(item,data.channel as DropshipChannel);
     if(!channelAllowsProvider(data.channel,data.provider))throw new Error('The selected provider does not belong to this dropshipping channel.');
 
     const drafts=record(item.metadata['listing_drafts']);
