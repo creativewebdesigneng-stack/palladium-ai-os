@@ -44,7 +44,7 @@ export default function ModelSelector() {
                 </button>
               ))}
             </div>
-            <div className="border-t border-white/10 p-2 text-[11px] text-zinc-500"><Brain className="mr-1 inline h-3 w-3" />All models route through PalladiumAI</div>
+            <div className="border-t border-white/10 p-2 text-[11px] text-zinc-500"><Brain className="mr-1 inline h-3 w-3" />All models route through Blackstar</div>
           </div>
         </>
       )}
