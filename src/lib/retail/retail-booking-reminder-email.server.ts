@@ -1,7 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
-import { executeApprovedAction } from '@/lib/integrations/approved-action.server';
-import { retailProviderMessageId } from './retail-connected-delivery';
+import { tryExecuteRetailConnectedCommunication } from './retail-connected-delivery.server';
 
 type AdminSb = { from: (table: string) => any };
 const adminSb = supabaseAdmin as unknown as AdminSb;
@@ -59,7 +58,7 @@ export async function executeRetailBookingReminderEmail(reminderId: string) {
 
   const { data: reminder, error: reminderError } = await adminSb
     .from('retail_booking_reminders')
-    .select('id,user_id,workspace_id,appointment_id,channel,status,scheduled_for,last_attempt_at,next_attempt_at,attempt_count,max_attempts,provider_message_id,sent_at')
+    .select('id,user_id,workspace_id,appointment_id,channel,status,scheduled_for,last_attempt_at,next_attempt_at,attempt_count,max_attempts,provider_message_id,sent_at,created_at')
     .eq('id', reminderId)
     .maybeSingle();
   if (reminderError) throw new Error(reminderError.message);
@@ -168,107 +167,147 @@ export async function executeRetailBookingReminderEmail(reminderId: string) {
   const when = formatAppointmentTime(String(appointment.starts_at), String(workspace.timezone || 'Europe/London'));
   const subject = `Appointment reminder — ${businessName}`.slice(0, 200);
   const body = `Hi ${customerName},\n\nThis is a reminder that your appointment${serviceName ? ` for ${serviceName}` : ''} at ${businessName} is ${when}.\n\nIf you need to change your appointment, please contact ${businessName}.`.slice(0, 4000);
-  const startedAt = new Date().toISOString();
+  // The authenticated owner explicitly scheduled this reminder. Materialize that
+  // durable intent as the existing Retail approval primitive so connected email
+  // delivery still has to claim an approved Retail action before provider I/O.
+  const loadReminderAction = async () => {
+    const { data, error } = await adminSb
+      .from('retail_reception_actions')
+      .select('id,status,last_error,executed_at')
+      .eq('user_id', reminder.user_id)
+      .eq('workspace_id', reminder.workspace_id)
+      .eq('appointment_id', reminder.appointment_id)
+      .eq('action_type', 'send_communication')
+      .contains('payload', { retail_booking_reminder_id: reminderId })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  };
 
-  const { data: communication, error: communicationError } = await adminSb
-    .from('retail_customer_communications')
-    .insert({
-      user_id: reminder.user_id,
-      workspace_id: reminder.workspace_id,
-      appointment_id: reminder.appointment_id,
-      direction: 'outbound',
-      channel: 'email',
-      purpose: 'appointment_confirmation',
-      recipient,
-      subject,
-      body,
-      scheduled_for: reminder.scheduled_for,
-      status: 'ready',
-      metadata: {
-        source: 'retail_booking_reminder',
-        retail_booking_reminder_id: reminderId,
-        provider_delivery_required: true,
-        provider_accepted: false,
-        delivery_confirmed: null,
-        provider_call_started_at: startedAt,
-        attempt: reminder.attempt_count,
-      },
-    })
-    .select('id')
-    .single();
-  if (communicationError || !communication) {
-    const reason = communicationError?.code === '23505'
-      ? 'provider_outcome_unknown:communication_dedupe_conflict'
-      : (communicationError?.message || 'communication_insert_failed');
-    await updateReminder(reminderId, { status: 'failed', next_attempt_at: null, last_error: reason.slice(0, 1800) });
-    return { reminder_id: reminderId, status: 'failed' as const, reason };
+  let action = await loadReminderAction();
+  if (!action) {
+    const { data: created, error: createError } = await adminSb
+      .from('retail_reception_actions')
+      .insert({
+        user_id: reminder.user_id,
+        workspace_id: reminder.workspace_id,
+        appointment_id: reminder.appointment_id,
+        source: 'integration',
+        action_type: 'send_communication',
+        status: 'approved',
+        summary: `Send the owner-scheduled email reminder for ${customerName}`.slice(0, 2000),
+        payload: {
+          channel: 'email',
+          purpose: 'appointment_confirmation',
+          recipient,
+          subject,
+          body,
+          retail_booking_reminder_id: reminderId,
+          authorization_source: 'owner_scheduled_booking_reminder',
+          scheduled_for: reminder.scheduled_for,
+        },
+        reviewed_at: reminder.created_at || new Date().toISOString(),
+      })
+      .select('id,status,last_error,executed_at')
+      .single();
+
+    if (createError?.code === '23505') {
+      action = await loadReminderAction();
+    } else if (createError) {
+      throw new Error(createError.message);
+    } else {
+      action = created;
+    }
   }
 
-  const delivery = await executeApprovedAction(String(reminder.user_id), {
-    actionType: 'email_send',
-    details: { to: recipient, subject, body, provider: 'auto' },
-  });
+  if (!action) throw new Error('booking_reminder_retail_action_unavailable');
 
-  if (!delivery.ok) {
-    const reason = (delivery.error || 'connected_email_delivery_failed').slice(0, 1800);
-    await adminSb.from('retail_customer_communications').update({
-      status: 'failed',
-      provider: delivery.provider ?? null,
-      last_error: reason,
-      metadata: {
-        source: 'retail_booking_reminder',
-        retail_booking_reminder_id: reminderId,
-        provider_delivery_required: false,
-        provider_accepted: false,
-        delivery_confirmed: null,
-        provider_call_started_at: startedAt,
-        provider_outcome_unknown: true,
-        attempt: reminder.attempt_count,
-      },
-      updated_at: new Date().toISOString(),
-    }).eq('id', communication.id).eq('user_id', reminder.user_id);
+  if (action.status !== 'approved') {
+    const refreshed = await adminSb
+      .from('retail_customer_communications')
+      .select('id,status,provider,provider_message_id,sent_at')
+      .eq('user_id', reminder.user_id)
+      .eq('action_id', action.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (refreshed.error) throw new Error(refreshed.error.message);
+    if (action.status === 'executed' && refreshed.data?.status === 'sent') {
+      const messageId = refreshed.data.provider_message_id || `email-ledger:${refreshed.data.id}`;
+      await updateReminder(reminderId, {
+        status: 'sent',
+        next_attempt_at: null,
+        sent_at: reminder.sent_at || refreshed.data.sent_at || new Date().toISOString(),
+        provider_message_id: messageId,
+        last_error: null,
+      });
+      return {
+        reminder_id: reminderId,
+        status: 'reconciled' as const,
+        provider: refreshed.data.provider ?? null,
+        provider_message_id: messageId,
+      };
+    }
+    const reason = `provider_outcome_unknown:retail_action_${String(action.status)}`;
     await updateReminder(reminderId, { status: 'failed', next_attempt_at: null, last_error: reason });
-    return { reminder_id: reminderId, status: 'failed' as const, provider: delivery.provider ?? null, reason };
+    return { reminder_id: reminderId, status: 'failed' as const, reason: 'provider_outcome_unknown' };
   }
 
-  const completedAt = new Date().toISOString();
-  const providerMessageId = retailProviderMessageId(delivery.result);
-  const reminderMessageId = providerMessageId || `email-ledger:${String(communication.id)}`;
-  const { error: finalizeError } = await adminSb.from('retail_customer_communications').update({
-    status: 'sent',
-    provider: delivery.provider ?? null,
-    provider_message_id: providerMessageId,
-    sent_at: completedAt,
-    last_error: null,
-    metadata: {
-      source: 'retail_booking_reminder',
-      retail_booking_reminder_id: reminderId,
-      provider_delivery_required: false,
-      provider_accepted: true,
-      delivery_confirmed: null,
-      provider_call_started_at: startedAt,
-      provider_accepted_at: completedAt,
-      attempt: reminder.attempt_count,
-    },
-    updated_at: completedAt,
-  }).eq('id', communication.id).eq('user_id', reminder.user_id).eq('status', 'ready');
-
-  if (finalizeError) {
+  const delivery = await tryExecuteRetailConnectedCommunication(String(reminder.user_id), String(action.id));
+  if (!delivery) {
     await updateReminder(reminderId, {
       status: 'failed',
       next_attempt_at: null,
-      provider_message_id: reminderMessageId,
-      last_error: 'provider_accepted_but_ledger_finalize_failed',
+      last_error: 'connected_email_delivery_unavailable',
     });
-    return { reminder_id: reminderId, status: 'failed' as const, provider: delivery.provider ?? null, provider_message_id: reminderMessageId, reason: 'provider_accepted_but_ledger_finalize_failed' };
+    return { reminder_id: reminderId, status: 'failed' as const, reason: 'connected_email_delivery_unavailable' };
   }
 
+  const { data: communication, error: communicationError } = await adminSb
+    .from('retail_customer_communications')
+    .select('id,status,provider,provider_message_id,sent_at,last_error')
+    .eq('user_id', reminder.user_id)
+    .eq('action_id', action.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (communicationError) throw new Error(communicationError.message);
+
+  if (delivery.status === 'executed' && communication?.status === 'sent') {
+    const completedAt = communication.sent_at || new Date().toISOString();
+    const reminderMessageId = communication.provider_message_id || `email-ledger:${String(communication.id)}`;
+    await updateReminder(reminderId, {
+      status: 'sent',
+      next_attempt_at: null,
+      sent_at: completedAt,
+      provider_message_id: reminderMessageId,
+      last_error: null,
+    });
+    return {
+      reminder_id: reminderId,
+      status: 'sent' as const,
+      provider: communication.provider ?? delivery.provider ?? null,
+      provider_message_id: reminderMessageId,
+    };
+  }
+
+  const reason = (
+    delivery.provider_accepted
+      ? 'provider_outcome_unknown:provider_accepted_before_retail_finalize'
+      : delivery.reason || communication?.last_error || 'connected_email_delivery_failed'
+  ).slice(0, 1800);
   await updateReminder(reminderId, {
-    status: 'sent',
+    status: 'failed',
     next_attempt_at: null,
-    sent_at: completedAt,
-    provider_message_id: reminderMessageId,
-    last_error: null,
+    ...(communication?.provider_message_id ? { provider_message_id: communication.provider_message_id } : {}),
+    last_error: reason,
   });
-  return { reminder_id: reminderId, status: 'sent' as const, provider: delivery.provider ?? null, provider_message_id: reminderMessageId };
+  return {
+    reminder_id: reminderId,
+    status: 'failed' as const,
+    provider: communication?.provider ?? delivery.provider ?? null,
+    reason,
+  };
 }
