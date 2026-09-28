@@ -54,7 +54,7 @@ export const recommendBlackstarOpportunityActions = createServerFn({ method: 'PO
       goals: (goalsRes.data ?? []) as GoalSignalSource[],
       runs: (runsRes.data ?? []) as GoalRunSignalSource[],
       capabilities,
-      maximumRecommendations: data.maximumRecommendations,
+      ...(data.maximumRecommendations !== undefined ? { maximumRecommendations: data.maximumRecommendations } : {}),
     })
 
     return {
