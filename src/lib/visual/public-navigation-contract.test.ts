@@ -60,6 +60,24 @@ describe('Blackstar public navigation contract', () => {
     }
   });
 
+  it('does not publish unsupported social proof, certifications or fake resource counts', () => {
+    const tools = read('../../components/site/ToolsDirectory.jsx');
+    const logos = read('../../components/site/TrustedLogos.jsx');
+    const enterprise = read('../../components/site/EnterpriseSection.jsx');
+    const resources = read('../../components/site/resourcesData.jsx');
+
+    expect(tools).not.toContain('rating:');
+    expect(tools).not.toContain('Pay per use');
+    expect(logos).not.toContain('Trusted by teams');
+    expect(enterprise).not.toContain('SOC2');
+    expect(enterprise).not.toContain('uptime guarantees');
+    expect(enterprise).not.toContain('Data residency');
+    expect(resources).not.toContain('1,000+ teams');
+    expect(resources).not.toContain('Acme');
+    expect(resources).not.toContain('32 stories');
+    expect(resources).not.toContain('120+ posts');
+  });
+
   it('uses client-side routing for first-party public navigation', () => {
     const nav = read('../../components/site/PublicNav.jsx');
 
