@@ -1,2 +1,25 @@
-import { Link } from 'react-router-dom'; import { ShieldCheck } from 'lucide-react';
-export default function TwoFactor(){return <div className="grid min-h-screen place-items-center bg-[#0c0d13] p-4 text-white"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.04] p-7 text-center"><ShieldCheck className="mx-auto h-9 w-9 text-violet-400"/><h1 className="mt-4 text-2xl font-semibold">Two-factor authentication</h1><p className="mt-2 text-sm text-zinc-500">Enter the six-digit code from your authenticator app.</p><div className="mt-6 flex justify-center gap-2">{[0,1,2,3,4,5].map(i=><input key={i} maxLength="1" className="h-12 w-10 rounded-lg border border-white/10 bg-black/20 text-center outline-none focus:border-violet-500"/>)}</div><Link to="/onboarding" className="mt-6 block rounded-xl bg-violet-600 py-3 text-sm font-medium">Verify and continue</Link><button className="mt-4 text-xs text-zinc-500">Use a recovery code</button></div></div>;}
+import { Link } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
+import AuthLayout from '@/components/AuthLayout';
+
+export default function TwoFactor() {
+  return (
+    <AuthLayout
+      icon={ShieldCheck}
+      title="Two-factor authentication"
+      subtitle="This Blackstar screen is not connected to a standalone MFA verifier on this deployment."
+      footer={
+        <Link to="/login" className="font-medium text-violet-300 hover:text-violet-200 hover:underline">
+          Return to sign in
+        </Link>
+      }
+    >
+      <div
+        role="status"
+        className="rounded-xl border border-amber-300/15 bg-amber-300/[.045] p-4 text-sm leading-6 text-amber-100/80"
+      >
+        Blackstar will not accept or pretend to verify authenticator or recovery codes here. If a connected identity provider requires a second factor, complete that challenge in the provider-authenticated flow.
+      </div>
+    </AuthLayout>
+  );
+}
