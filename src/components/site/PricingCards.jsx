@@ -100,12 +100,12 @@ export default function PricingCards() {
         </span>
       </div>
 
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-5">
+      <div className="mx-auto grid max-w-5xl items-stretch gap-5 md:grid-cols-2">
         {PLANS.map((p) => <PlanCard key={p.id} plan={p} billing={billing} />)}
       </div>
 
       <p className="mt-8 text-center text-xs text-zinc-600">
-        All prices in GBP (£). VAT may apply. Free and Pro plans are available above — premium tiers scale for teams and enterprises.
+        All prices in GBP (£). VAT may apply. Pro/Builder is shown above; Business and Enterprise scale for larger teams and governed automation.
       </p>
     </div>
   );
