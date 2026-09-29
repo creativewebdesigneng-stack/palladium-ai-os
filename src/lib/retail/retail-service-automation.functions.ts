@@ -76,6 +76,19 @@ const communicationSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
+
+const returnItemSchema = z.object({
+  id: uuid.optional(),
+  workspace_id: uuid,
+  return_id: uuid,
+  item_id: uuid,
+  location_id: nullableUuid,
+  quantity: z.coerce.number().positive().max(1_000_000_000),
+  condition: z.enum(['sellable','opened','damaged','defective','unknown']).optional().default('sellable'),
+  disposition: z.enum(['restock','quarantine','discard','return_to_supplier','inspect']).optional().default('restock'),
+  notes: optionalText(4000),
+});
+
 function nullify(value: string | null | undefined) {
   return value ? value : null;
 }
@@ -95,6 +108,8 @@ export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
       sb.from('retail_reception_profiles').select('*').eq('workspace_id', wid).order('updated_at', { ascending: false }),
       sb.from('retail_reception_actions').select('*').eq('workspace_id', wid).order('created_at', { ascending: false }).limit(200),
       sb.from('retail_customer_communications').select('*').eq('workspace_id', wid).order('created_at', { ascending: false }).limit(200),
+      sb.from('retail_returns').select('id,return_number,customer_name,status,restock,notes,requested_at,received_at,refunded_at').eq('workspace_id', wid).order('requested_at', { ascending: false }).limit(300),
+      sb.from('retail_return_items').select('id,return_id,item_id,location_id,quantity,condition,disposition,processed_quantity,processed_at,notes,created_at,updated_at').eq('workspace_id', wid).order('created_at', { ascending: true }).limit(1000),
       sb.from('retail_locations').select('id,name,kind,active').eq('workspace_id', wid).eq('active', true).order('name'),
       sb.from('retail_appointments').select('id,customer_name,customer_phone,customer_email,starts_at,ends_at,status,service_item_id,staff_id,location_id').eq('workspace_id', wid).order('starts_at', { ascending: false }).limit(300),
       sb.from('retail_orders').select('id,order_number,customer_name,customer_phone,customer_email,status,fulfilment_status,tracking_number,carrier').eq('workspace_id', wid).order('placed_at', { ascending: false }).limit(300),
@@ -103,11 +118,13 @@ export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
     ]);
     const error = queries.find((query: any) => query.error)?.error;
     if (error) throw new Error(error.message);
-    const [profiles, actions, communications, locations, appointments, orders, calls, catalog] = queries.map((query: any) => query.data ?? []);
+    const [profiles, actions, communications, returns, returnItems, locations, appointments, orders, calls, catalog] = queries.map((query: any) => query.data ?? []);
     return {
       profiles,
       actions,
       communications,
+      returns,
+      returnItems,
       locations,
       appointments,
       orders,
@@ -325,3 +342,70 @@ export const saveRetailCustomerCommunication = createServerFn({ method: 'POST' }
     if (error) throw new Error(error.message);
     return out;
   });
+
+export const saveRetailReturnItem = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value: unknown) => returnItemSchema.parse(value))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const editable = {
+      item_id: data.item_id,
+      location_id: nullify(data.location_id),
+      quantity: data.quantity,
+      condition: data.condition,
+      disposition: data.disposition,
+      notes: nullify(data.notes),
+      updated_at: new Date().toISOString(),
+    };
+    if (data.id) {
+      const { data: out, error } = await sb.from('retail_return_items')
+        .update(editable)
+        .eq('id', data.id)
+        .eq('workspace_id', data.workspace_id)
+        .eq('user_id', context.userId)
+        .eq('processed_quantity', 0)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return out;
+    }
+    const { data: out, error } = await sb.from('retail_return_items')
+      .insert({ ...editable, workspace_id: data.workspace_id, return_id: data.return_id, user_id: context.userId })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return out;
+  });
+
+export const deleteRetailReturnItem = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { error } = await sb.from('retail_return_items')
+      .delete()
+      .eq('id', data.id)
+      .eq('user_id', context.userId)
+      .eq('processed_quantity', 0);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const processRetailReturnRestock = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((value: unknown) => z.object({ return_id: uuid }).parse(value))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: out, error } = await sb.rpc('retail_process_return_restock', { p_return_id: data.return_id });
+    if (error) throw new Error(error.message);
+    await writeAudit({
+      userId: context.userId,
+      action: 'retail.return.restock_processed',
+      targetType: 'retail_return',
+      targetId: data.return_id,
+      status: 'success',
+      metadata: out && typeof out === 'object' ? out as Record<string, unknown> : {},
+    });
+    return out;
+  });
+
