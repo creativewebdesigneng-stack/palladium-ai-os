@@ -51,6 +51,12 @@ function payloadChannel(value: unknown): string {
   return typeof channel === 'string' ? channel.trim().toLowerCase() : '';
 }
 
+function payloadBookingReminderId(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const id = (value as Record<string, unknown>)['retail_booking_reminder_id'];
+  return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+}
+
 export async function getRetailExternalDeliveryCapabilities(
   userId: string,
 ): Promise<RetailExternalDeliveryCapabilities> {
@@ -160,6 +166,7 @@ export async function tryExecuteRetailConnectedCommunication(
   }
 
   const action = claimed as RetailActionRow;
+  const bookingReminderId = payloadBookingReminderId(action.payload);
   if (action.profile_id) {
     const { data: profile, error: profileError } = await adminSb
       .from('retail_reception_profiles')
@@ -203,6 +210,7 @@ export async function tryExecuteRetailConnectedCommunication(
       status: 'ready',
       metadata: {
         source: 'retail_reception_action',
+        ...(bookingReminderId ? { retail_booking_reminder_id: bookingReminderId } : {}),
         provider_delivery_required: true,
         execution_claimed_at: claimedAt,
       },
@@ -251,6 +259,7 @@ export async function tryExecuteRetailConnectedCommunication(
       last_error: null,
       metadata: {
         source: 'retail_reception_action',
+        ...(bookingReminderId ? { retail_booking_reminder_id: bookingReminderId } : {}),
         provider_delivery_required: false,
         execution_claimed_at: claimedAt,
         provider_accepted: true,
