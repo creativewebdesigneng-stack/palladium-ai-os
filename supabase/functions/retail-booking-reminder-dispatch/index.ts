@@ -532,7 +532,7 @@ async function dispatchOne(supabase: any, reminder: any, schedulerToken: string)
 
   try {
     const [{ data: appointment, error: appointmentError }, { data: workspace, error: workspaceError }] = await Promise.all([
-      supabase.from("retail_appointments").select("id,customer_name,customer_phone,customer_email,starts_at,status,service_item_id").eq("id", reminder.appointment_id).eq("user_id", reminder.user_id).maybeSingle(),
+      supabase.from("retail_appointments").select("id,customer_name,customer_phone,customer_email,starts_at,status,service_item_id").eq("id", reminder.appointment_id).eq("user_id", reminder.user_id).eq("workspace_id", reminder.workspace_id).maybeSingle(),
       supabase.from("retail_workspaces").select("id,business_name,timezone").eq("id", reminder.workspace_id).eq("user_id", reminder.user_id).maybeSingle(),
     ]);
     if (appointmentError) throw new Error(`appointment_load_failed:${appointmentError.message}`);
