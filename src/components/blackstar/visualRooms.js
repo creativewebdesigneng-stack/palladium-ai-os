@@ -6,16 +6,29 @@ const ROUTE_ROOMS = [
   [['/trading-hub', '/quant-studio'], 'astra-room-trading'],
   [['/legal', '/legal-hub'], 'astra-room-legal'],
   [['/compliance-sentinel'], 'astra-room-compliance'],
-  [['/cinema-studio', '/media-studio'], 'astra-room-cinema'],
+  [['/cinema-studio', '/media-studio', '/creator-hub', '/creator-marketplace', '/creators', '/trusted-social-video', '/voice-studio'], 'astra-room-cinema'],
   [['/game-foundry', '/three-d-studio'], 'astra-room-game'],
   [['/memory', '/recall-notes'], 'astra-room-memory'],
-  [['/knowledge', '/research', '/news-research'], 'astra-room-knowledge'],
+  [['/knowledge', '/research', '/news-research', '/search'], 'astra-room-knowledge'],
   [['/company-hub', '/organisation', '/team'], 'astra-room-company'],
   [['/industry-hub', '/construction-industrial-hub'], 'astra-room-industry'],
   [['/retail-hub', '/commerce-studio', '/dropshipping-hub'], 'astra-room-commerce'],
   [['/website-studio', '/builder', '/ai-builder', '/html-studio'], 'astra-room-builder'],
   [['/admin'], 'astra-room-admin'],
 ]
+
+const STYLE_ROOM_FALLBACKS = {
+  'blackstar-style-cosmic-core': 'astra-room-core',
+  'blackstar-style-orbital-elegance': 'astra-room-knowledge',
+  'blackstar-style-mission-control': 'astra-room-mission',
+  'blackstar-style-neon-infrastructure': 'astra-room-infrastructure',
+  'blackstar-style-elite-corporate': 'astra-room-company',
+  'blackstar-style-industry-realism': 'astra-room-industry',
+  'blackstar-style-creative-universe': 'astra-room-creative',
+  'blackstar-style-ai-nexus': 'astra-room-hub',
+  'blackstar-style-trading-command': 'astra-room-trading',
+  'blackstar-style-ethereal-luxury': 'astra-room-wellbeing',
+}
 
 const VISUAL_STYLE_ROUTES = [
   [
@@ -27,7 +40,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-trading-command',
   ],
   [
-    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/website-studio', '/html-studio', '/builder', '/marketing', '/seo-studio', '/social-operations', '/templates', '/prompts'],
+    ['/cinema-studio', '/game-foundry', '/three-d-studio', '/media-studio', '/voice-studio', '/creator-hub', '/creator-marketplace', '/creators', '/trusted-social-video', '/website-studio', '/html-studio', '/builder', '/marketing', '/seo-studio', '/social-operations', '/templates', '/prompts'],
     'blackstar-style-creative-universe',
   ],
   [
@@ -47,7 +60,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-neon-infrastructure',
   ],
   [
-    ['/knowledge', '/memory', '/recall-notes', '/research', '/news-research', '/discovery', '/documents', '/files', '/files-analysis', '/docs'],
+    ['/knowledge', '/memory', '/recall-notes', '/research', '/news-research', '/search', '/discovery', '/documents', '/files', '/files-analysis', '/docs'],
     'blackstar-style-orbital-elegance',
   ],
   [
@@ -90,13 +103,22 @@ export const ROOM_LABELS = {
   'astra-room-commerce': 'Blackstar commerce network',
   'astra-room-builder': 'Blackstar creation studio',
   'astra-room-admin': 'Blackstar admin control',
+  'astra-room-core': 'Blackstar command core',
+  'astra-room-infrastructure': 'Blackstar infrastructure grid',
+  'astra-room-creative': 'Blackstar creative universe',
+  'astra-room-wellbeing': 'Blackstar human frontier',
 }
 
 export function blackstarRoomForPath(pathname = '') {
   for (const [prefixes, room] of ROUTE_ROOMS) {
     if (prefixes.some((prefix) => pathname.startsWith(prefix))) return room
   }
-  return 'astra-room-default'
+  if (!blackstarHasExplicitVisualStyleForPath(pathname)) return 'astra-room-default'
+  return STYLE_ROOM_FALLBACKS[blackstarVisualStyleForPath(pathname)] || 'astra-room-default'
+}
+
+export function blackstarHasExplicitVisualStyleForPath(pathname = '') {
+  return VISUAL_STYLE_ROUTES.some(([prefixes]) => prefixes.some((prefix) => pathname.startsWith(prefix)))
 }
 
 export function blackstarVisualStyleForPath(pathname = '') {

@@ -527,14 +527,43 @@ body::before {
 }
 
 @media (max-width: 767px) {
-  .blackstar-perspective-grid { opacity:.24; transform: perspective(700px) rotateX(72deg) scale(1.65); }
-  .blackstar-orb-a { width:320px; height:320px; right:-170px; }
-  .blackstar-orb-b { width:210px; height:210px; left:-80px; }
+  .blackstar-perspective-grid { opacity:.20; transform: perspective(700px) rotateX(72deg) scale(1.65); }
+  .blackstar-orb-a { width:320px; height:320px; right:-170px; opacity:.42; }
+  .blackstar-orb-b { width:210px; height:210px; left:-80px; opacity:.34; }
+  .blackstar-orb-c,
+  .blackstar-auth-orb-b,
+  .blackstar-depth-rail { display:none; }
+  .blackstar-style-atmosphere { opacity:.72; }
+  .blackstar-page-header-grid { opacity:.12; }
   .blackstar-page-header { border-radius:20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .blackstar-orb, .blackstar-brand-core { animation:none !important; }
-  .blackstar-metric-card:hover, .blackstar-panel:hover, .blackstar-nav-item:hover { transform:none; }
+  .blackstar-orb,
+  .blackstar-auth-orb,
+  .blackstar-brand-core { animation:none !important; }
+
+  .blackstar-command,
+  .blackstar-nav-item,
+  .blackstar-panel,
+  .blackstar-metric-card,
+  .blackstar-core-page :is(section, article, .blackstar-panel, .blackstar-metric-card)[class*="rounded"],
+  .blackstar-public-page :is(section, article, div)[class*="rounded"][class*="border"],
+  .blackstar-dashboard [aria-label="AI usage over the last 7 days"] > div,
+  .blackstar-agents .grid.gap-4.sm\:grid-cols-2.xl\:grid-cols-3 > .relative {
+    transition:none !important;
+  }
+
+  .blackstar-command:hover,
+  .blackstar-nav-item:hover,
+  .blackstar-panel:hover,
+  .blackstar-metric-card:hover,
+  .blackstar-core-page :is(section, article)[class*="rounded"][class*="border"]:hover,
+  .blackstar-public-page :is(section, article, div)[class*="rounded"][class*="border"]:hover,
+  .blackstar-dashboard .blackstar-metric-card:hover,
+  .blackstar-dashboard [aria-label="AI usage over the last 7 days"] > div:hover,
+  .blackstar-agents .grid.gap-4.sm\:grid-cols-2.xl\:grid-cols-3 > .relative:hover {
+    transform:none !important;
+  }
 }
 
 
@@ -974,6 +1003,70 @@ body::before {
 .blackstar-public-pricing :is(section,div)[class*="rounded"][class*="border"],
 .blackstar-public-tools :is(section,div)[class*="rounded"][class*="border"] {
   background-image:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.008) 54%,rgba(139,92,246,.018));
+}
+
+.blackstar-public-features::before {
+  background:
+    radial-gradient(circle at 18% 10%,rgba(124,58,237,.13),transparent 27%),
+    radial-gradient(circle at 82% 18%,rgba(59,130,246,.07),transparent 26%),
+    #020204;
+}
+.blackstar-public-agents::before {
+  background:
+    radial-gradient(circle at 50% 8%,rgba(124,58,237,.16),transparent 28%),
+    radial-gradient(circle at 16% 64%,rgba(59,130,246,.065),transparent 25%),
+    radial-gradient(circle at 84% 62%,rgba(34,211,238,.055),transparent 24%),
+    #020204;
+}
+.blackstar-public-business::before {
+  background:
+    radial-gradient(circle at 20% 8%,rgba(245,158,11,.085),transparent 25%),
+    radial-gradient(circle at 78% 16%,rgba(139,92,246,.095),transparent 28%),
+    #020204;
+}
+.blackstar-public-developers::before {
+  background:
+    radial-gradient(circle at 16% 14%,rgba(34,211,238,.09),transparent 24%),
+    radial-gradient(circle at 84% 10%,rgba(168,85,247,.105),transparent 26%),
+    #020204;
+}
+.blackstar-public-resources::before {
+  background:
+    radial-gradient(circle at 22% 12%,rgba(96,165,250,.085),transparent 24%),
+    radial-gradient(circle at 80% 22%,rgba(167,139,250,.09),transparent 27%),
+    #020204;
+}
+.blackstar-public-error::before {
+  background:
+    radial-gradient(circle at 50% 16%,rgba(139,92,246,.12),transparent 28%),
+    radial-gradient(circle at 22% 78%,rgba(244,63,94,.035),transparent 22%),
+    #020204;
+}
+
+.blackstar-public-onboarding::before {
+  background:
+    radial-gradient(circle at 50% 6%,rgba(139,92,246,.15),transparent 30%),
+    radial-gradient(circle at 18% 72%,rgba(56,189,248,.055),transparent 24%),
+    #020204;
+}
+.blackstar-public-payment::before {
+  background:
+    radial-gradient(circle at 78% 8%,rgba(139,92,246,.13),transparent 28%),
+    radial-gradient(circle at 18% 18%,rgba(34,197,94,.045),transparent 24%),
+    #020204;
+}
+
+.blackstar-public-help::before {
+  background:
+    radial-gradient(circle at 22% 8%,rgba(139,92,246,.11),transparent 26%),
+    radial-gradient(circle at 78% 18%,rgba(34,211,238,.075),transparent 25%),
+    #020204;
+}
+.blackstar-public-legal::before {
+  background:
+    radial-gradient(circle at 18% 9%,rgba(214,179,106,.08),transparent 25%),
+    radial-gradient(circle at 82% 18%,rgba(148,163,184,.06),transparent 27%),
+    #020204;
 }
 
 .blackstar-public-tools section:first-of-type::before,

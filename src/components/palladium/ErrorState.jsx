@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Home, ArrowLeft, RefreshCw, Lock, WifiOff, ShieldAlert, Search, Inbox } from 'lucide-react';
 
@@ -13,12 +13,15 @@ const MAP = {
 export default function ErrorState({ variant = '404', message, onRetry, showHome = true }) {
   const cfg = MAP[variant] || MAP['404'];
   const Icon = cfg.icon;
+  const reducedMotion = useReducedMotion();
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+    <div className="blackstar-error-state relative flex min-h-[60vh] flex-col items-center justify-center overflow-hidden rounded-[28px] border border-white/[.06] bg-black/25 px-6 py-12 text-center shadow-[0_28px_90px_rgba(0,0,0,.28)]">
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(139,92,246,.12),transparent_28%),radial-gradient(circle_at_82%_72%,rgba(56,189,248,.05),transparent_26%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.03)_1px,transparent_1px)] [background-size:48px_48px]" />
+      <motion.div className="relative w-full max-w-xl" initial={reducedMotion ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { duration: 0.5 }}>
         <div className="relative">
           <div className="pointer-events-none absolute inset-0 -z-10 mx-auto h-40 w-40 rounded-full bg-violet-600/15 blur-3xl" />
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/10 bg-white/[.04] text-violet-300">
+          <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-violet-300/15 bg-violet-300/[.055] text-violet-200 shadow-[0_0_36px_rgba(139,92,246,.12)]">
             <Icon className="h-7 w-7" />
           </span>
         </div>

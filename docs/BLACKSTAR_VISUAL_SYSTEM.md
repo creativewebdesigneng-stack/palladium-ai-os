@@ -25,14 +25,18 @@ Mounted on:
 - Mission Control deck header and holographic core
 - Document title in `src/routes/__root.tsx`
 
-## Rooms
+## Rooms and visual worlds
 
-`AppShell` assigns `astra-room-*` by route.
+`AppShell` assigns both `astra-room-*` environments and one of Blackstar's ten visual worlds by route.
 
-- Mission Control uses `CommandTheatre` on a 1920px stage
-- Hub, workforce, finance, legal, studio, memory and admin use `AstraRoomFrame`
+- Mission Control uses `CommandTheatre` plus its live operational topology
+- AI Hub uses the live neural capability topology; Agents and Workforce use runtime-backed execution/constellation scenes
+- Cinema Studio, Game Foundry, Trading Hub, Finance, Legal, Industry, Company, Website Studio and Marketplace each mount a dedicated flagship world component
+- Related secondary routes inherit the matching visual world rather than falling back to a generic SaaS shell
+- Creator/video routes use the Cinema room; Search uses the Knowledge room
 - Each named room has a wash, scanline, caption and inset
-- CSS motion is disabled under `prefers-reduced-motion`
+- Heavy ambience follows the adaptive visual-performance budget and pauses off-screen
+- CSS/WebGL motion is disabled or reduced under `prefers-reduced-motion`
 
 ## Depth field
 
@@ -54,5 +58,6 @@ Mounted on:
 
 ## Honesty
 
-Owner-scoped live data only. No fabricated globe or market feed. External writes stay on existing approval gates.
-This layer is not 100% of the original 3D brief. Unique full scenes and a rebuilt command-room page are still open.
+Owner-scoped live data only. No fabricated globe, infrastructure state, market feed or execution state. External writes stay on existing approval gates.
+
+The flagship scene programme is implemented across the major product areas, including the rebuilt Mission Control command room. Remaining visual work is production polish and acceptance: route-by-route visual QA, responsive tuning, performance checks on slower devices, accessibility verification and final operator review.

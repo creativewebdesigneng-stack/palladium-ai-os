@@ -34,7 +34,7 @@ const destinations = [
 
 export default function Resources() {
   return (
-    <div className="blackstar-public-page min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-resources min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-14 pt-32">

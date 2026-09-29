@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, MotionConfig } from 'framer-motion';
 import {
   Bot, Users, WandSparkles, Globe2, Monitor, MousePointer2,
   Search, BookOpen, BrainCircuit, Workflow, GitBranch, Plug,
@@ -283,8 +283,10 @@ function FeatureCard({ feature, index }) {
 
 export default function FeatureShowcase() {
   return (
-    <div className="mx-auto grid max-w-7xl gap-4 px-6 sm:grid-cols-2 lg:grid-cols-3">
-      {FEATURES.map((f, i) => <FeatureCard key={f.key} feature={f} index={i} />)}
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="mx-auto grid max-w-7xl gap-4 px-6 sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((f, i) => <FeatureCard key={f.key} feature={f} index={i} />)}
+      </div>
+    </MotionConfig>
   );
 }

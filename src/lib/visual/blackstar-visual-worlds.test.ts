@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { blackstarVisualStyleForPath, VISUAL_STYLE_LABELS } from "../../components/blackstar/visualRooms";
+import { readFileSync, readdirSync } from "node:fs";
+import { blackstarHasExplicitVisualStyleForPath, blackstarRoomForPath, blackstarVisualStyleForPath, VISUAL_STYLE_LABELS } from "../../components/blackstar/visualRooms";
 
 describe("Blackstar ten visual worlds", () => {
   it("exposes all ten named visual identities", () => {
@@ -49,6 +49,33 @@ describe("Blackstar ten visual worlds", () => {
     for (const path of ["/finance", "/compliance-sentinel", "/admin/users", "/organisation"]) {
       expect(blackstarVisualStyleForPath(path)).toBe("blackstar-style-elite-corporate");
     }
+  });
+
+  it("explicitly covers the final formerly-generic routes", () => {
+    expect(blackstarVisualStyleForPath("/creators/example")).toBe("blackstar-style-creative-universe");
+    expect(blackstarRoomForPath("/creators/example")).toBe("astra-room-cinema");
+    expect(blackstarVisualStyleForPath("/trusted-social-video")).toBe("blackstar-style-creative-universe");
+    expect(blackstarRoomForPath("/trusted-social-video")).toBe("astra-room-cinema");
+    expect(blackstarVisualStyleForPath("/search")).toBe("blackstar-style-orbital-elegance");
+    expect(blackstarRoomForPath("/search")).toBe("astra-room-knowledge");
+    for (const path of ["/creators/example", "/trusted-social-video", "/search"]) {
+      expect(blackstarHasExplicitVisualStyleForPath(path)).toBe(true);
+      expect(blackstarRoomForPath(path)).not.toBe("astra-room-default");
+    }
+  });
+
+  it("assigns every shell app route to an explicit visual world", () => {
+    const routeDir = new URL("../../routes/_shell/_app/", import.meta.url);
+    const routePaths = readdirSync(routeDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.(?:tsx|ts|jsx|js)$/.test(entry.name))
+      .map((entry) => entry.name.replace(/\.(?:tsx|ts|jsx|js)$/, ""))
+      .map((stem) => stem.split(".").filter((segment) => segment !== "index"))
+      .map((segments) => "/" + segments.map((segment) => segment.startsWith("$") ? "example" : segment).join("/"));
+
+    const missing = routePaths.filter((pathname) => !blackstarHasExplicitVisualStyleForPath(pathname));
+    const genericRooms = routePaths.filter((pathname) => blackstarRoomForPath(pathname) === "astra-room-default");
+    expect(missing).toEqual([]);
+    expect(genericRooms).toEqual([]);
   });
 
   it("mounts style identity on the shell and passes it into the WebGL depth field", () => {

@@ -22,9 +22,10 @@ describe("Blackstar distinct 3D room identities", () => {
     expect(blackstarRoomForPath("/admin")).toBe("astra-room-admin");
   });
 
-  it("keeps unknown areas on the stable default environment", () => {
-    expect(blackstarRoomForPath("/settings")).toBe("astra-room-default");
-    expect(blackstarRoomForPath("/billing")).toBe("astra-room-default");
+  it("gives registered secondary areas a world-level room while keeping unknown paths stable", () => {
+    expect(blackstarRoomForPath("/settings")).toBe("astra-room-wellbeing");
+    expect(blackstarRoomForPath("/billing")).toBe("astra-room-company");
+    expect(blackstarRoomForPath("/this-route-is-not-registered")).toBe("astra-room-default");
   });
 
   it("uses Blackstar-specific labels for the new visual rooms", () => {
@@ -32,6 +33,7 @@ describe("Blackstar distinct 3D room identities", () => {
       "astra-room-trading", "astra-room-compliance", "astra-room-cinema",
       "astra-room-game", "astra-room-knowledge", "astra-room-company",
       "astra-room-industry", "astra-room-commerce", "astra-room-builder",
+      "astra-room-core", "astra-room-infrastructure", "astra-room-creative", "astra-room-wellbeing",
     ]) {
       expect(ROOM_LABELS[room as keyof typeof ROOM_LABELS]).toMatch(/^Blackstar /);
     }
