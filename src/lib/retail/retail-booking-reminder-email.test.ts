@@ -26,6 +26,8 @@ describe('Retail connected email booking reminders',()=>{
     expect(bridge).toContain(".eq('appointment_id', reminder.appointment_id)");
     expect(delivery).toContain('payloadBookingReminderId');
     expect(delivery).toContain('retail_booking_reminder_id');
+    expect(bridge).toContain(".eq('id', reminder.appointment_id).eq('user_id', reminder.user_id).eq('workspace_id', reminder.workspace_id)");
+    expect(worker).toContain('.eq("id", reminder.appointment_id).eq("user_id", reminder.user_id).eq("workspace_id", reminder.workspace_id)');
   });
 
   it('routes only email reminders through the bridge without replacing existing channels',()=>{
@@ -40,5 +42,7 @@ describe('Retail connected email booking reminders',()=>{
     expect(migration).toContain('create unique index if not exists retail_reception_actions_booking_reminder_uidx');
     expect(migration).toContain("user_id, (metadata ->> 'retail_booking_reminder_id')");
     expect(migration).toContain("user_id, (payload ->> 'retail_booking_reminder_id')");
+    expect(migration).toContain('a.workspace_id = retail_booking_reminders.workspace_id');
+    expect(migration).not.toContain('a.workspace_id = a.workspace_id');
   });
 });
