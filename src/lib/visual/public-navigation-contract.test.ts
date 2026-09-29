@@ -41,6 +41,25 @@ describe('Blackstar public navigation contract', () => {
     expect(marketplace).toContain('/tool-marketplace');
   });
 
+  it('does not invent Help Centre engagement metrics or unsupported enterprise promises', () => {
+    const helpData = read('../../components/site/helpData.jsx');
+    const help = read('../../components/site/HelpShowcase.jsx');
+
+    expect(helpData).not.toContain('views:');
+    expect(helpData).not.toContain('helpful:');
+    expect(help).not.toContain('a.views');
+    expect(help).not.toContain('a.helpful');
+
+    for (const unsupported of [
+      'regional data residency',
+      'unused credits do not roll over',
+      'prorated',
+      'Average reply in under 4 hours',
+    ]) {
+      expect(helpData + help).not.toContain(unsupported);
+    }
+  });
+
   it('uses client-side routing for first-party public navigation', () => {
     const nav = read('../../components/site/PublicNav.jsx');
 

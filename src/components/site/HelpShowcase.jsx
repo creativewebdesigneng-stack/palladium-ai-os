@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   Search, Rocket, Bot, FolderKanban, CreditCard, Plug, Code2, ShieldCheck,
-  Workflow, ChevronDown, Clock, Eye, ThumbsUp, ArrowUpRight, ArrowRight,
+  Workflow, ChevronDown, Clock, ArrowUpRight, ArrowRight,
   Send, Sparkles, MessageSquare, LifeBuoy,
 } from 'lucide-react';
 import { TOPICS, ARTICLES, FAQ, AI_SUGGESTIONS } from '@/components/site/helpData';
@@ -51,6 +51,7 @@ export function TopicGrid() {
     <div className="mx-auto grid max-w-7xl gap-3 px-6 sm:grid-cols-2 lg:grid-cols-4">
       {TOPICS.map((t, i) => {
         const Icon = TOPIC_ICONS[t.icon];
+        const articleCount = ARTICLES.filter((article) => article.topic === t.key).length;
         return (
           <motion.div
             key={t.key}
@@ -65,7 +66,7 @@ export function TopicGrid() {
               <span className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${t.tone} shadow-lg`}>
                 <Icon className="h-5 w-5 text-white" />
               </span>
-              <span className="text-[11px] text-zinc-500">{t.count} articles</span>
+              <span className="text-[11px] text-zinc-500">{articleCount} guides</span>
             </div>
             <h3 className="relative mt-4 text-base font-semibold text-white">{t.label}</h3>
             <span className="relative mt-3 flex items-center gap-1 text-xs text-zinc-500 transition group-hover:text-white">
@@ -110,12 +111,8 @@ export function ArticleGrid({ query, active }) {
               </div>
               <h3 className="mt-3 text-base font-semibold leading-snug text-white group-hover:text-violet-200">{a.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">{a.excerpt}</p>
-              <div className="mt-auto flex items-center justify-between pt-4 text-[11px] text-zinc-500">
+              <div className="mt-auto pt-4 text-[11px] text-zinc-500">
                 <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {a.read}</span>
-                <span className="flex items-center gap-3">
-                  <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> {a.views}</span>
-                  <span className="flex items-center gap-1"><ThumbsUp className="h-3 w-3" /> {a.helpful}%</span>
-                </span>
               </div>
             </motion.article>
           ))}
