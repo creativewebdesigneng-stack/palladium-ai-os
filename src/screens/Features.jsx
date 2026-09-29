@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import PublicNav from '@/components/site/PublicNav';
 import SectionReveal from '@/components/site/SectionReveal';
@@ -14,8 +14,9 @@ const CATEGORIES = [
 ];
 
 export default function Features() {
+  const reducedMotion = useReducedMotion();
   return (
-    <div className="blackstar-public-page min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-features min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-16 pt-32">
@@ -47,9 +48,9 @@ export default function Features() {
             {CATEGORIES.map((c, i) => (
               <motion.span
                 key={c}
-                initial={{ opacity: 0, y: 8 }}
+                initial={reducedMotion ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + i * 0.03 }}
+                transition={reducedMotion ? { duration: 0 } : { delay: 0.2 + i * 0.03 }}
                 className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1 text-[11px] text-zinc-400 transition hover:border-violet-400/30 hover:text-white"
               >
                 {c}

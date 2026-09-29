@@ -27,11 +27,11 @@ export default function Payment() {
   };
 
   if (!plan) {
-    return <div className="grid min-h-screen place-items-center bg-[#07070a] px-4 text-zinc-100"><div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.05] p-6 text-sm text-rose-200">No purchasable Blackstar plan is currently available.</div></div>;
+    return <div className="blackstar-public-page blackstar-public-payment grid min-h-screen place-items-center bg-[#07070a] px-4 text-zinc-100"><div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.05] p-6 text-sm text-rose-200">No purchasable Blackstar plan is currently available.</div></div>;
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#07070a] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-payment relative min-h-screen overflow-hidden bg-[#07070a] text-zinc-100">
       <PaymentTestModeBanner />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,.13),transparent_30%),linear-gradient(rgba(255,255,255,.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.015)_1px,transparent_1px)] bg-[size:auto,42px_42px,42px_42px]" />
       <div className="relative px-4 py-10">

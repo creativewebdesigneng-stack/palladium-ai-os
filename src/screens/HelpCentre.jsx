@@ -20,7 +20,7 @@ export default function HelpCentre() {
   }, [query, active]);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-help min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
       <PublicNav />
 
       {/* Hero */}

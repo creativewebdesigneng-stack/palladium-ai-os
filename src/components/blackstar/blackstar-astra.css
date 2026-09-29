@@ -671,10 +671,13 @@
   .astra-room-memory .astra-room-wash::before,
   .astra-room-legal .astra-room-wash::before,
   .astra-room-admin .astra-room-wash::before,
-  .astra-command-theatre {
+  .astra-command-theatre,
+  .blackstar-style-atmosphere::before,
+  .blackstar-style-atmosphere::after {
     animation: none;
   }
-  .astra-room-wash {
+  .astra-room-wash,
+  .blackstar-style-atmosphere {
     transition: none;
   }
 }

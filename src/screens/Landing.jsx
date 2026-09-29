@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Orbit, ShieldCheck, Network, Bot, Boxes } from 'lucide-react';
 import PublicNav from '@/components/site/PublicNav';
 import NeuralSpace from '@/components/visual/NeuralSpace';
@@ -17,6 +17,7 @@ const pillars = [
 ];
 
 export default function Landing() {
+  const reducedMotion = useReducedMotion();
   return (
     <div className="blackstar-public-page blackstar-public-landing min-h-screen overflow-hidden bg-[#050508] text-zinc-100">
       <PublicNav />
@@ -30,22 +31,22 @@ export default function Landing() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-5xl text-center">
-          <motion.div initial={{ opacity: 0, scale: .85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .8 }} className="mx-auto mb-8 grid place-items-center">
+          <motion.div initial={reducedMotion ? false : { opacity: 0, scale: .85 }} animate={{ opacity: 1, scale: 1 }} transition={reducedMotion ? { duration: 0 } : { duration: .8 }} className="mx-auto mb-8 grid place-items-center">
             <AstraMark size={80} title="Blackstar" />
           </motion.div>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-medium uppercase tracking-[.42em] text-zinc-500 sm:text-sm">
+          <motion.p initial={reducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-medium uppercase tracking-[.42em] text-zinc-500 sm:text-sm">
             Void observatory
           </motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .06 }} className="mt-5 text-5xl font-semibold leading-none tracking-[.12em] text-white sm:text-7xl md:text-8xl">
+          <motion.h1 initial={reducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: .06 }} className="mt-5 text-5xl font-semibold leading-none tracking-[.12em] text-white sm:text-7xl md:text-8xl">
             BLACKSTAR
           </motion.h1>
-          <motion.h2 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .12 }} className="mt-8 text-2xl font-medium tracking-tight text-white sm:text-4xl">
+          <motion.h2 initial={reducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: .12 }} className="mt-8 text-2xl font-medium tracking-tight text-white sm:text-4xl">
             Intelligence, <span className="text-violet-300">under command.</span>
           </motion.h2>
-          <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .18 }} className="mx-auto mt-5 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
+          <motion.p initial={reducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: .18 }} className="mx-auto mt-5 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
             Blackstar is a bounded general-intelligence platform with an Astra-class engine. It unifies models, agents, tools and infrastructure so operations stay governed — not unattended.
           </motion.p>
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .24 }} className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <motion.div initial={reducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: .24 }} className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link to="/register?returnTo=/dashboard" className="blackstar-button group flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white">
               Launch Blackstar <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </Link>
@@ -56,7 +57,7 @@ export default function Landing() {
           <p className="mt-4 text-xs text-zinc-600">Astra-class engine · Secure execution · Not claimed as AGI</p>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .35, duration: 1 }} className="relative z-10 mt-16 w-full px-2">
+        <motion.div initial={reducedMotion ? false : { opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: .35, duration: 1 }} className="relative z-10 mt-16 w-full px-2">
           <VoidObservatoryDeck />
         </motion.div>
       </section>

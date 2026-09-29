@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Wrench, Sparkles } from 'lucide-react';
 import PublicNav from '@/components/site/PublicNav';
 import SectionReveal from '@/components/site/SectionReveal';
@@ -7,6 +7,7 @@ import ToolsDirectory from '@/components/site/ToolsDirectory';
 import Footer from '@/components/site/Footer';
 
 export default function AIToolsPublic() {
+  const reducedMotion = useReducedMotion();
   return (
     <div className="blackstar-public-page blackstar-public-tools min-h-screen overflow-hidden bg-[#020204] text-zinc-100">
       <PublicNav />
@@ -43,7 +44,7 @@ export default function AIToolsPublic() {
         <SectionReveal className="mx-auto max-w-5xl px-6">
           <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-600/25 via-[#0c0d14] to-cyan-500/15 p-12 text-center">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,.3),transparent_60%)]" />
-            <motion.div animate={{ y: [0, -6, 0] }} transition={{ duration: 4, repeat: Infinity }} className="relative mx-auto mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-[0_0_40px_rgba(139,92,246,.5)]">
+            <motion.div animate={reducedMotion ? undefined : { y: [0, -6, 0] }} transition={reducedMotion ? undefined : { duration: 4, repeat: Infinity }} className="relative mx-auto mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-[0_0_40px_rgba(139,92,246,.5)]">
               <Sparkles className="h-7 w-7 text-white" />
             </motion.div>
             <h2 className="relative text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-5xl">Explore AI</h2>
