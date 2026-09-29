@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildDropshippingActionInputTemplate,buildListingDraftPrompt,isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {assessDropshippingPublicationReadiness,buildDropshippingActionInputTemplate,buildListingDraftPrompt,isDropshipProductBlocked,isDropshippingListingWriteAction,withListingDraftMetadata} from './dropshipping-listings';
 
 const item={
   name:'Compression Packing Cubes',sku:'TRAVEL-01',category:'Travel accessories',description:'Validated candidate from supplier research.',sale_price:39.99,currency:'GBP',
@@ -45,5 +45,23 @@ describe('dropshipping listing drafts',()=>{
   it('caps stored generated text',()=>{
     const metadata=withListingDraftMetadata({}, {channel:'shopify',text:'x'.repeat(20000)});
     expect(metadata.listing_drafts['shopify']?.text).toHaveLength(16000);
+  });
+
+  it('requires validated testing state, explicit compliance and matching channel before publication approval',()=>{
+    const validated={...item,metadata:{...item.metadata,lifecycle_stage:'validated'}};
+    expect(assessDropshippingPublicationReadiness(validated,'shopify')).toMatchObject({ready:true,status:'ready'});
+
+    expect(assessDropshippingPublicationReadiness({...validated,metadata:{...validated.metadata,lifecycle_stage:'researching'}},'shopify')).toMatchObject({ready:false,status:'needs-validation'});
+    expect(assessDropshippingPublicationReadiness({...validated,metadata:{...validated.metadata,compliance:{status:'unknown'}}},'shopify')).toMatchObject({ready:false,status:'needs-compliance'});
+    expect(assessDropshippingPublicationReadiness(validated,'etsy')).toMatchObject({ready:false,status:'channel-mismatch'});
+  });
+
+  it('admits listing/product/offer writes but rejects unrelated commerce mutations',()=>{
+    for(const action of ['shopify_product_create_draft','etsy_listing_update','ebay_offer_publish','woocommerce_product_update']){
+      expect(isDropshippingListingWriteAction(action)).toBe(true);
+    }
+    for(const action of ['woocommerce_order_update','shopify_fulfillment_create','etsy_shop_receipts_update','ebay_orders_list']){
+      expect(isDropshippingListingWriteAction(action)).toBe(false);
+    }
   });
 });

@@ -3,9 +3,9 @@ import {z} from 'zod';
 import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
 import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegrationProvider} from '@/lib/integrations/agent-integration-runtime.server';
 import {notify} from '@/lib/notifications/notify.server';
-import {DROPSHIP_CHANNELS} from './dropshipping';
+import {DROPSHIP_CHANNELS,type DropshipChannel} from './dropshipping';
 import {DROPSHIP_CHANNEL_TARGETS} from './dropshipping-readiness';
-import {isDropshipProductBlocked,withListingDraftMetadata} from './dropshipping-listings';
+import {assertDropshippingPublicationReady,isDropshipProductBlocked,isDropshippingListingWriteAction,withListingDraftMetadata} from './dropshipping-listings';
 
 type Sb={from:(table:string)=>any};
 const channelIds=DROPSHIP_CHANNELS.map(row=>row.id) as [string,...string[]];
@@ -57,8 +57,17 @@ export const saveDropshippingListingDraft=createServerFn({method:'POST'})
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     const item=await loadOwnedDropshipItem(sb,context.userId,data);
+    const expiry=await sb.from('approval_requests')
+      .update({status:'expired',decided_at:new Date().toISOString(),decision_note:'The linked Dropshipping Hub listing draft was revised before approval.'})
+      .eq('user_id',context.userId)
+      .eq('action_type','nango_dynamic_action')
+      .eq('status','pending')
+      .eq('details->>dropshipping_item_id',item.id)
+      .eq('details->>dropshipping_workspace_id',item.workspace_id)
+      .eq('details->>dropshipping_channel',data.channel);
+    if(expiry.error)throw new Error(`Could not invalidate the pending listing approval: ${expiry.error.message}`);
     const nextMetadata=withListingDraftMetadata(item.metadata,{
-      channel:data.channel as any,
+      channel:data.channel as DropshipChannel,
       text:data.text,
       ...(data.provider?{provider:data.provider}:{}),
       ...(data.model?{model:data.model}:{}),
@@ -84,6 +93,7 @@ export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
     const capabilities=await listIntegrationCapabilities(context.userId);
     return capabilities
       .filter(capability=>aliases.has(normalizeIntegrationProvider(capability.provider)))
+      .filter(capability=>capability.deployed&&capability.requiresApproval&&isDropshippingListingWriteAction(capability.action))
       .map(({provider,action,description,risk,requiresApproval,deployed,transport,lane,inputSchema})=>({
         provider,action,description,risk,requiresApproval,deployed,transport,lane,
         inputSchemaJson:JSON.stringify(inputSchema).slice(0,30_000),
@@ -105,6 +115,7 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     const sb=context.supabase as unknown as Sb;
     const item=await loadOwnedDropshipItem(sb,context.userId,data);
     if(data.channel==='blackstar-site')throw new Error('Website Studio publishing uses its native deployment workflow, not a marketplace listing approval.');
+    assertDropshippingPublicationReady(item,data.channel as DropshipChannel);
     if(!channelAllowsProvider(data.channel,data.provider))throw new Error('The selected provider does not belong to this dropshipping channel.');
 
     const drafts=record(item.metadata['listing_drafts']);
@@ -120,6 +131,7 @@ export const queueDropshippingListingApproval=createServerFn({method:'POST'})
     });
 
     if(!channelAllowsProvider(data.channel,prepared.provider))throw new Error('The live integration resolved to a provider outside the selected channel.');
+    if(!isDropshippingListingWriteAction(prepared.action))throw new Error('The selected provider action is not a bounded listing/product/offer write.');
     if(!prepared.requiresApproval)throw new Error('The selected provider capability is not marked approval-required, so Blackstar will not use it for listing publication.');
 
     const draftGeneratedAt=typeof draft['generated_at']==='string'?draft['generated_at']:'';
