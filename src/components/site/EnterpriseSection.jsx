@@ -1,14 +1,22 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building2, ShieldCheck, KeyRound, Server, Gauge, Headset, ArrowRight, Check } from 'lucide-react';
+import {
+  Activity,
+  Building2,
+  KeyRound,
+  Network,
+  Route,
+  ShieldCheck,
+  ArrowRight,
+} from 'lucide-react';
 
-const PERKS = [
-  { icon: KeyRound, title: 'SSO & SAML', desc: 'Single sign-on with your identity provider.' },
-  { icon: ShieldCheck, title: 'Security & compliance', desc: 'SOC2, audit logs and data residency options.' },
-  { icon: Server, title: 'On-premise options', desc: 'Deploy in your cloud or on your infrastructure.' },
-  { icon: Gauge, title: 'Dedicated infrastructure', desc: 'Isolated capacity with guaranteed performance.' },
-  { icon: Headset, title: 'Priority support & SLA', desc: 'Dedicated success manager and uptime guarantees.' },
-  { icon: Building2, title: 'Custom models', desc: 'Bring or fine-tune models for your use case.' },
+const CAPABILITIES = [
+  { icon: ShieldCheck, title: 'Approval governance', desc: 'Keep consequential external writes on Blackstar’s existing approval and policy rails.' },
+  { icon: Activity, title: 'Operational visibility', desc: 'Inspect live runtime state, failures, activity and audit evidence across governed work.' },
+  { icon: Network, title: 'Multi-provider integrations', desc: 'Connect services through provider-specific OAuth, APIs and MCP without locking the platform to one connector.' },
+  { icon: KeyRound, title: 'Authenticated workspaces', desc: 'Use signed-in workspace boundaries and scoped data access across supported product surfaces.' },
+  { icon: Route, title: 'Existing workflow infrastructure', desc: 'Reuse durable workflows, agents, approvals and runtime routing instead of duplicating control systems.' },
+  { icon: Building2, title: 'Business operating surfaces', desc: 'Coordinate Company, Industry, Finance, Retail and other operating hubs from the same Blackstar platform.' },
 ];
 
 export default function EnterpriseSection() {
@@ -21,40 +29,38 @@ export default function EnterpriseSection() {
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-1 text-xs text-zinc-300">
               <Building2 className="h-3.5 w-3.5 text-amber-400" /> Enterprise
             </span>
-            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Need scale, security and control?</h2>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              Governed intelligence infrastructure for larger operations.
+            </h2>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-zinc-400">
-              Enterprise is built for organisations running AI across hundreds or thousands of users — with the governance, infrastructure and support to match.
+              Blackstar’s enterprise direction builds on the same bounded intelligence, provider routing, approval, audit and runtime architecture already used across the platform.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link to="/payment?plan=enterprise-plus" className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90">
-                Contact Sales <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              <Link to="/pricing" className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                Review plans <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
-              <Link to="/pricing" className="rounded-xl border border-white/15 bg-white/[.03] px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10">
-                View Plans
+              <Link to="/business" className="rounded-xl border border-white/15 bg-white/[.03] px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10">
+                Explore business
               </Link>
             </div>
           </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            {PERKS.map((p, i) => (
+            {CAPABILITIES.map((capability, index) => (
               <motion.div
-                key={p.title}
+                key={capability.title}
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.45, delay: i * 0.06 }}
+                transition={{ duration: 0.45, delay: index * 0.06 }}
                 className="rounded-2xl border border-white/10 bg-white/[.03] p-4"
               >
-                <p.icon className="h-5 w-5 text-amber-300" />
-                <p className="mt-3 text-sm font-semibold text-white">{p.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{p.desc}</p>
+                <capability.icon className="h-5 w-5 text-amber-300" />
+                <p className="mt-3 text-sm font-semibold text-white">{capability.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{capability.desc}</p>
               </motion.div>
             ))}
           </div>
-        </div>
-        <div className="relative mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-6 text-xs text-zinc-400">
-          {['SOC2 Type II', 'GDPR ready', 'Custom SLAs', 'Data residency', 'Dedicated support'].map((t) => (
-            <span key={t} className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-400" /> {t}</span>
-          ))}
         </div>
       </div>
     </div>

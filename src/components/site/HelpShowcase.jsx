@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   Search, Rocket, Bot, FolderKanban, CreditCard, Plug, Code2, ShieldCheck,
-  Workflow, ChevronDown, Clock, Eye, ThumbsUp, ArrowUpRight, ArrowRight,
-  Send, Sparkles, Mail, MessageSquare, Phone, LifeBuoy,
+  Workflow, ChevronDown, Clock, ArrowUpRight, ArrowRight,
+  Send, Sparkles, MessageSquare, LifeBuoy,
 } from 'lucide-react';
 import { TOPICS, ARTICLES, FAQ, AI_SUGGESTIONS } from '@/components/site/helpData';
 
@@ -51,6 +51,7 @@ export function TopicGrid() {
     <div className="mx-auto grid max-w-7xl gap-3 px-6 sm:grid-cols-2 lg:grid-cols-4">
       {TOPICS.map((t, i) => {
         const Icon = TOPIC_ICONS[t.icon];
+        const articleCount = ARTICLES.filter((article) => article.topic === t.key).length;
         return (
           <motion.div
             key={t.key}
@@ -65,7 +66,7 @@ export function TopicGrid() {
               <span className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${t.tone} shadow-lg`}>
                 <Icon className="h-5 w-5 text-white" />
               </span>
-              <span className="text-[11px] text-zinc-500">{t.count} articles</span>
+              <span className="text-[11px] text-zinc-500">{articleCount} guides</span>
             </div>
             <h3 className="relative mt-4 text-base font-semibold text-white">{t.label}</h3>
             <span className="relative mt-3 flex items-center gap-1 text-xs text-zinc-500 transition group-hover:text-white">
@@ -110,12 +111,8 @@ export function ArticleGrid({ query, active }) {
               </div>
               <h3 className="mt-3 text-base font-semibold leading-snug text-white group-hover:text-violet-200">{a.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">{a.excerpt}</p>
-              <div className="mt-auto flex items-center justify-between pt-4 text-[11px] text-zinc-500">
+              <div className="mt-auto pt-4 text-[11px] text-zinc-500">
                 <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {a.read}</span>
-                <span className="flex items-center gap-3">
-                  <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> {a.views}</span>
-                  <span className="flex items-center gap-1"><ThumbsUp className="h-3 w-3" /> {a.helpful}%</span>
-                </span>
               </div>
             </motion.article>
           ))}
@@ -163,22 +160,33 @@ export function FaqList() {
 
 export function ContactSupport() {
   const channels = [
-    { icon: Mail, label: 'Email Support', desc: 'Average reply in under 4 hours', action: 'support@palladium.ai', tone: 'text-violet-300' },
-    { icon: MessageSquare, label: 'Live Chat', desc: 'Mon–Fri, 9am–6pm GMT', action: 'Start a chat', tone: 'text-cyan-300' },
-    { icon: Phone, label: 'Priority Line', desc: 'Business & Enterprise plans', action: '+44 20 0000 0000', tone: 'text-emerald-300' },
+    {
+      icon: MessageSquare,
+      label: 'AI Support Assistant',
+      desc: 'Connected support for signed-in Blackstar operators.',
+      action: 'Use the assistant above',
+      tone: 'text-violet-300',
+    },
+    {
+      icon: LifeBuoy,
+      label: 'Help Centre',
+      desc: 'Search the support articles and current platform guidance on this page.',
+      action: 'Browse verified guidance',
+      tone: 'text-cyan-300',
+    },
   ];
   return (
-    <div className="mx-auto grid max-w-5xl gap-4 px-6 md:grid-cols-3">
-      {channels.map((c) => {
-        const Icon = c.icon;
+    <div className="mx-auto grid max-w-3xl gap-4 px-6 md:grid-cols-2">
+      {channels.map((channel) => {
+        const Icon = channel.icon;
         return (
-          <div key={c.label} className="rounded-2xl border border-white/10 bg-white/[.025] p-6 text-center transition hover:border-white/20 hover:bg-white/[.04]">
-            <span className={`mx-auto grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[.04] ${c.tone}`}>
+          <div key={channel.label} className="rounded-2xl border border-white/10 bg-white/[.025] p-6 text-center transition hover:border-white/20 hover:bg-white/[.04]">
+            <span className={`mx-auto grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[.04] ${channel.tone}`}>
               <Icon className="h-5 w-5" />
             </span>
-            <h3 className="mt-4 text-sm font-semibold text-white">{c.label}</h3>
-            <p className="mt-1 text-xs text-zinc-500">{c.desc}</p>
-            <p className={`mt-3 text-sm ${c.tone}`}>{c.action}</p>
+            <h3 className="mt-4 text-sm font-semibold text-white">{channel.label}</h3>
+            <p className="mt-1 text-xs text-zinc-500">{channel.desc}</p>
+            <p className={`mt-3 text-sm ${channel.tone}`}>{channel.action}</p>
           </div>
         );
       })}
@@ -287,7 +295,7 @@ export function HelpCta() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,.3),transparent_60%)]" />
         <LifeBuoy className="relative mx-auto h-8 w-8 text-violet-300" />
         <h2 className="relative mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Still need help?</h2>
-        <p className="relative mx-auto mt-4 max-w-xl text-zinc-400">Our support team and AI assistant are here 24/7 to get you unstuck.</p>
+        <p className="relative mx-auto mt-4 max-w-xl text-zinc-400">Use the connected Help Centre and signed-in AI support assistant to troubleshoot Blackstar.</p>
         <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/register?returnTo=/dashboard" className="group flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200">
             Get Started <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
