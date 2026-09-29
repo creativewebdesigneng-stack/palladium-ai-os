@@ -36,7 +36,7 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
 
   it('keeps unconfigured two-factor honest instead of simulating verification',()=>{
     expect(twoFactor).toContain('AuthLayout');
-    expect(twoFactor).toContain('Two-factor verification is not enabled on this deployment.');
+    expect(twoFactor).toContain('not connected to a standalone MFA verifier');
     expect(twoFactor).toContain('will not accept or pretend to verify');
     expect(twoFactor).not.toContain('Verify and continue');
   });
@@ -54,8 +54,9 @@ describe('Blackstar final visual accessibility and performance guardrails',()=>{
     expect(aiTools).toContain('useReducedMotion');
     expect(aiTools).toContain('animate={reducedMotion ? undefined');
     expect(features).toContain('initial={reducedMotion ? false');
-    expect(legal).toContain("behavior: reducedMotion ? 'auto' : 'smooth'");
-    expect(legal).toContain('initial={reducedMotion ? false');
+    expect(legal).toContain('blackstar-public-legal');
+    expect(legal).toContain('Draft — not in force');
+    expect(legal).not.toContain('motion.');
     expect(landing).toContain('useReducedMotion');
     expect(landing).toContain('initial={reducedMotion ? false');
   });
