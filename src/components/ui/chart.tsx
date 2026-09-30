@@ -182,7 +182,9 @@ const ChartTooltipContent = React.forwardRef<
                 >
                   {formatter && item?.value !== undefined && item.name ? (
                     formatter(
-                      Array.isArray(item.value) ? item.value.join(" – ") : item.value,
+                      typeof item.value === "string" || typeof item.value === "number"
+                        ? item.value
+                        : item.value?.join(" – "),
                       item.name,
                       item,
                       index,
