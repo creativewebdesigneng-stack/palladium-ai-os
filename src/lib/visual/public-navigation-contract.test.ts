@@ -23,9 +23,18 @@ describe('Blackstar public navigation contract', () => {
       'Mon–Fri, 9am–6pm GMT',
       'Our support team and AI assistant are here 24/7',
       'Get instant answers, 24/7',
+      'sales@palladiumai.com',
     ]) {
-      expect(help + helpPage).not.toContain(unsupported);
+      expect(help + helpPage + read('../../screens/Payment.jsx')).not.toContain(unsupported);
     }
+  });
+
+  it('routes enterprise checkout enquiries through a real Blackstar support surface', () => {
+    const payment = read('../../screens/Payment.jsx');
+
+    expect(payment).toContain('to="/help#contact"');
+    expect(payment).toContain('Review support options');
+    expect(payment).not.toContain('mailto:');
   });
 
   it('does not expose fabricated public marketplace metrics or legacy vendor branding', () => {
