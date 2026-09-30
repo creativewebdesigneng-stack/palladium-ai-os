@@ -1,6 +1,6 @@
 import { useServerFn } from '@tanstack/react-start';
 import { useQuery } from '@tanstack/react-query';
-import { Lock, Info, Loader2, ShieldOff, ShieldAlert, KeyRound, Globe, Ban } from 'lucide-react';
+import { Lock, Info, Loader2, ShieldOff, ShieldAlert, KeyRound, Globe, Ban, ExternalLink, ClipboardCheck } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { getSecurityOverview } from '@/lib/admin/admin.functions';
@@ -47,6 +47,50 @@ export default function AdminSecurity() {
     <>
       <PageHeader eyebrow="Admin" title="Security Dashboard" description="Platform-wide security posture, threats, and audit activity — restricted to administrators." action={headerAction} />
       <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Restricted area. Figures are read live from audit logs, API keys and request logs, last 7 days.</p></div>
+
+      <section className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/[.045] p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-amber-300" />
+              <p className="text-sm font-semibold text-white">U23 · Hosted Auth password security</p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-zinc-400">
+              Leaked Password Protection is controlled by the hosted Supabase Auth project settings, not by Blackstar's application database or this admin page. Blackstar must not mark U23 Verified merely because the application code is healthy.
+            </p>
+            <p className="mt-2 text-[11px] leading-5 text-amber-100/75">
+              Open the official hosted Auth settings, review the password policy, enable leaked-password protection if it is available for the project, then verify the hosted setting before recording U23 in Operational Acceptance. Do not paste Supabase credentials or access tokens into Blackstar notes.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <a
+              href="https://supabase.com/dashboard/project/piwhiuangitqvwvwwcga/auth/providers?provider=Email"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/20 bg-amber-400/[.08] px-3 py-2 text-[11px] font-medium text-amber-100 transition hover:border-amber-300/35 hover:bg-amber-400/[.12]"
+            >
+              Open hosted Auth settings
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.025] px-3 py-2 text-[11px] font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[.05]"
+            >
+              Official guidance
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="/admin/acceptance"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300/15 bg-violet-500/[.06] px-3 py-2 text-[11px] font-medium text-violet-100 transition hover:border-violet-300/30 hover:bg-violet-500/[.1]"
+            >
+              Record U23 outcome
+              <ClipboardCheck className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Card icon={ShieldAlert} label="Permission denials (7d)" value={d.permission_denied_7d} />
