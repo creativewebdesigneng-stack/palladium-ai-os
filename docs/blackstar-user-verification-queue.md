@@ -1,6 +1,6 @@
 # Blackstar — owner verification and external activation queue
 
-Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-22.
+Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-30 against production main `342eb4f4ecec2ea775b46acbb458662efb062ecc`.
 
 **Nothing in this document is a request for the owner to fix coding, CI, broken migrations, model hallucination, deployment or permissions defects.** Engineering completes those first. The owner only handles access, devices, qualified approvals, real external accounts or acceptance of their own experience. An item is complete only after the stated real-world evidence is recorded, not after a checkbox is clicked without a test.
 
@@ -32,6 +32,20 @@ Separate from the [engineering completion ledger](blackstar-completion-ledger.md
 | U22 | Engineering completes route-by-route responsive/a11y audit | Review Blackstar's appearance on the owner's actual device; note visual issues with page/viewport rather than credentials. | Owner accepts the intended dark/violet 3D experience on the real device; functional/a11y testing remains engineering-owned. | LATER — visual sign-off |
 | U23 | Platform admin readiness audit identifies specific account-only settings | The Supabase Security Advisor on 2026-09-22 reported that **leaked-password protection is disabled**; review and enable it in the official hosted Auth password-security settings if appropriate for your account. Also confirm email-verification policy and any real Stripe/Google/provider business settings in official dashboards. Use authorised secret management for missing credentials. [Official password-security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). | Observe actual hosted Auth behavior and provider capability; do not paste credentials into chat. | OWNER SETTINGS — specific Auth review pending |
 | U24 | Engineering has bounded remaining enterprise/general hub scope | Decide whether a specific paid on-prem/enterprise service, region or feature is in the intended release scope when required. | Approved scope and available environment are explicit; unsupported ambitions remain labelled future work. | LATER — strategic scope decision |
+
+## Production evidence baseline — 2026-09-30
+
+The exact-main production deployment for `342eb4f4ecec2ea775b46acbb458662efb062ecc` was READY, the canonical production alias was attached without error, the 13-route production smoke contract passed 13/13, and no warning/error/fatal runtime logs or runtime-error clusters were found in the verification window.
+
+A read-only production evidence check found zero records in `agent_skills`, `agent_memories`, `marketplace_orders`, `marketplace_payment_events`, `cinema_shot_renders`, `media_generation_jobs`, `game_foundry_projects`, `three_d_jobs`, `communication_call_sessions`, `mobile_intelligence_devices`, `retail_call_inbox`, `trading_simulations`, `trading_watchlists`, and `trading_journal_entries`. These zero counts are evidence that the corresponding real-owner/provider acceptance has not happened yet; they are not engineering failures and must not be replaced with synthetic records.
+
+### Release classification
+
+- **Current engineering release gate:** complete. Do not reopen completed architecture merely because an optional external provider has not been activated.
+- **First real-owner product acceptance:** U01 memory recall and U04 skill installation. These require genuine owner workspace activity and must not be simulated.
+- **Owner security setting:** U23 leaked-password protection remains an explicit hosted Auth setting review.
+- **Conditional external certification:** U02–U22 and U24 apply only when that provider, device, regulated workflow, collaborator, domain, paid service, or release scope is actually selected. A conditional item is not a generic blocker to the current engineering release.
+- **Evidence rule:** only provider/device/user evidence from a real authorised run can move an item to Verified. Empty production tables, mocks, seeded rows, screenshots without provider evidence, or code-only tests cannot.
 
 ## Current owner-action shortlist
 
