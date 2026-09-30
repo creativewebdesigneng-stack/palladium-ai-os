@@ -36,7 +36,7 @@ describe('dropshipping opportunity watchlist',()=>{
       {role:'backup',unit_cost:11,shipping_cost:1,supplier_score:90},
       {role:'rejected',unit_cost:1,shipping_cost:0,supplier_score:99},
     ];
-    expect(supplierLandedCost(offers[0])).toBe(13);
+    expect(supplierLandedCost(offers[0]!)).toBe(13);
     expect(supplierEvidenceSummary(offers)).toMatchObject({count:2,backups:1,bestScore:90,lowestLandedCost:12});
   });
 
