@@ -47,7 +47,7 @@ export default function Payment() {
           <Link to="/pricing" className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-violet-200"><ArrowLeft className="h-3.5 w-3.5" />Back to pricing</Link>
           <p className="mt-6 text-[10px] font-semibold uppercase tracking-[.26em] text-violet-300/65">Blackstar Commerce</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-.04em] text-white">{isContact ? 'Enterprise access' : 'Secure checkout'}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">{isContact ? `Tell us about your infrastructure requirements and we'll prepare a tailored ${plan.name} proposal.` : <>Activate <span className="text-violet-200">{plan.name}</span> with <span className="text-zinc-300">{billing}</span> billing through the protected payment flow.</>}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">{isContact ? `${plan.name} access is not self-serve on this deployment. Review the current Blackstar support options for enterprise enquiries.` : <>Activate <span className="text-violet-200">{plan.name}</span> with <span className="text-zinc-300">{billing}</span> billing through the protected payment flow.</>}</p>
 
           <div className="mt-8 grid gap-5 md:grid-cols-[1fr_320px]">
             <section className="relative overflow-hidden rounded-[24px] border border-violet-300/10 bg-[linear-gradient(145deg,rgba(13,10,20,.94),rgba(5,5,9,.97))] p-6 shadow-[0_22px_70px_rgba(0,0,0,.25)] backdrop-blur-xl">
@@ -56,8 +56,8 @@ export default function Payment() {
                 <div className="text-center">
                   <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-violet-300/15 bg-violet-400/[.07]"><Mail className="h-5 w-5 text-violet-300" /></span>
                   <h2 className="mt-4 text-lg font-semibold text-white">{plan.name} infrastructure enquiry</h2>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">The enterprise team can scope dedicated intelligence infrastructure, governance, integrations and deployment requirements for your organisation.</p>
-                  <a href="mailto:sales@palladiumai.com" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-violet-200/20 bg-violet-300 px-6 py-3 text-sm font-semibold text-[#09070d] hover:bg-violet-200"><Mail className="h-4 w-4" />Contact sales</a>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">Blackstar does not publish an unverified sales mailbox or direct sales number. Use the current Help Centre support options for enterprise access enquiries.</p>
+                  <Link to="/help#contact" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-violet-200/20 bg-violet-300 px-6 py-3 text-sm font-semibold text-[#09070d] hover:bg-violet-200"><Mail className="h-4 w-4" />Review support options</Link>
                 </div>
               ) : isLegacyFreePlan ? (
                 <><p className="text-sm font-medium text-white">Legacy Explorer entitlement</p><p className="mt-2 text-[11px] leading-relaxed text-zinc-500">This route remains available only for backwards compatibility with existing accounts. Blackstar's current public plans are paid.</p><button onClick={continueLegacyFree} disabled={legacyLoading} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200/20 bg-violet-300 py-3 text-sm font-semibold text-[#09070d] hover:bg-violet-200 disabled:opacity-60">{legacyLoading ? 'Continuing…' : 'Continue to Blackstar'}</button></>
