@@ -53,6 +53,10 @@ The current engineering/dependency-hardening release gate is complete. Do not re
 
 ## Evidence log
 
+- 2026-10-01: PR #816 merged as `9759b512015c7ad49fd06aac46667b8c45020e05`, adding persisted owner-scoped operational-acceptance outcomes to the existing admin console. Exact-head Backend Check `36791324227` and post-merge Backend Check `36791532282` were SUCCESS. Production migration `20260930232603 operational_acceptance_results` created the RLS-enabled result table with U01–U24/status/evidence constraints. A read-only verification found zero rows; no synthetic outcome was created.
+
+- 2026-10-01: Follow-up migration `20260930233257 operational_acceptance_results_privilege_hardening` revoked Supabase default broad table privileges and left authenticated users with exactly INSERT, SELECT and UPDATE. This removes DELETE/TRUNCATE/REFERENCES/TRIGGER privileges; the three owner-only RLS policies remain in place. Supabase Security/Performance Advisor categories did not worsen. Application deployment of the newer main remains pending solely because Vercel reports its Git build-rate limit.
+
 - 2026-09-30: Operational Acceptance Console implemented through PR #813 and owner-scope hardening PR #814. #813 merge `66ffe1639424765b03b9e60cea3ba157673483ae`; post-merge Backend Check `36789241970` SUCCESS. #814 head `dbaae979e83a3e9c5cf483ec90de6b90e78481b6` passed Backend Check `36789501181` and Vercel preview `dpl_Ak711UE8DdfwTKAHjYKhwDTWQ13N` READY; `/admin/acceptance` returned HTTP 200. #814 merged as `84c2a510c6708ab6557abf2e21579c02b2733724`; post-merge Backend Check `36789777845` SUCCESS. The console reuses existing admin authentication, RLS, routes and module surfaces; it does not create duplicate approvals, workflows, audit, memory or certification authority. Counts are owner-scoped and explicitly non-certifying.
 
 
