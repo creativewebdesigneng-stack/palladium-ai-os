@@ -43,6 +43,9 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
       return { forbidden: true as const };
     }
 
+    // Count through the caller-scoped client so row-level security remains
+    // authoritative. A platform admin must not see another user's acceptance
+    // records merely because this page lives in the control plane.
     const [entries, resultResponse] = await Promise.all([
       Promise.all(
         Object.entries(ACCEPTANCE_EVIDENCE_TABLES).map(async ([key, table]) => {
