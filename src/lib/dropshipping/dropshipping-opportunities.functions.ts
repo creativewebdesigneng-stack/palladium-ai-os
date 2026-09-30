@@ -27,6 +27,39 @@ const opportunitySchema=z.object({
   last_checked_at:z.string().datetime({offset:true}).nullish(),
 });
 
+const secretEvidenceAssignment=/(?:api[_ -]?key|apikey|access[_ -]?token|refresh[_ -]?token|secret|password|credential|authorization)\s*[:=]|bearer\s+[a-z0-9._~-]{12,}/i;
+const supplierEvidenceSchema=z.object({
+  id:uuid.optional(),
+  opportunity_id:uuid,
+  retail_supplier_id:uuid,
+  supplier_sku:z.string().trim().max(240).nullish(),
+  role:z.enum(['candidate','primary','backup','rejected']).default('candidate'),
+  currency:z.string().trim().min(3).max(8).default('GBP'),
+  unit_cost:z.coerce.number().min(0).max(1_000_000_000).nullish(),
+  shipping_cost:z.coerce.number().min(0).max(1_000_000_000).nullish(),
+  minimum_order_quantity:z.coerce.number().int().min(0).max(1_000_000_000).nullish(),
+  estimated_delivery_days:z.coerce.number().int().min(0).max(3650).nullish(),
+  stock_status:z.enum(['unknown','in_stock','low_stock','out_of_stock','backorder']).default('unknown'),
+  supplier_score:score,
+  evidence_urls:z.array(z.union([z.string(),z.object({url:z.string(),label:z.string().optional()})])).max(12).optional(),
+  evidence_note:z.string().trim().max(4000).nullish().refine(value=>!value||!secretEvidenceAssignment.test(value),'Store credentials in Blackstar Integrations, not supplier evidence.'),
+  observed_at:z.string().datetime({offset:true}).nullish(),
+});
+
+async function loadSupplierContext(sb:Sb,userId:string,opportunityId:string,supplierId:string){
+  const [opportunityResult,supplierResult]=await Promise.all([
+    sb.from('dropshipping_opportunities').select('id,workspace_id').eq('id',opportunityId).eq('user_id',userId).maybeSingle(),
+    sb.from('retail_suppliers').select('id,workspace_id,name,status,website,lead_time_days,currency').eq('id',supplierId).eq('user_id',userId).maybeSingle(),
+  ]);
+  if(opportunityResult.error||supplierResult.error)throw new Error(opportunityResult.error?.message??supplierResult.error?.message??'Supplier context could not be verified.');
+  if(!opportunityResult.data)throw new Error('Dropshipping opportunity not found.');
+  if(!supplierResult.data)throw new Error('Retail supplier not found.');
+  if(opportunityResult.data.workspace_id&&supplierResult.data.workspace_id!==opportunityResult.data.workspace_id){
+    throw new Error('Retail supplier must belong to the opportunity workspace.');
+  }
+  return {opportunity:opportunityResult.data,supplier:supplierResult.data};
+}
+
 async function assertWorkspace(sb:Sb,userId:string,workspaceId:string|null|undefined){
   if(!workspaceId)return;
   const {data,error}=await sb.from('retail_workspaces').select('id').eq('id',workspaceId).eq('user_id',userId).maybeSingle();
@@ -115,6 +148,76 @@ async function loadOwnedOpportunity(sb:Sb,userId:string,id:string){
   return data;
 }
 
+export const listDropshippingSupplierEvidence=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>z.object({opportunity_id:uuid.optional()}).parse(value??{}))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    let offersQuery=sb.from('dropshipping_opportunity_suppliers').select('*').eq('user_id',context.userId).order('updated_at',{ascending:false}).limit(1000);
+    if(data.opportunity_id)offersQuery=offersQuery.eq('opportunity_id',data.opportunity_id);
+    const [offersResult,suppliersResult]=await Promise.all([
+      offersQuery,
+      sb.from('retail_suppliers').select('id,workspace_id,name,status,website,lead_time_days,currency').eq('user_id',context.userId).order('name',{ascending:true}).limit(1000),
+    ]);
+    if(offersResult.error||suppliersResult.error)throw new Error(offersResult.error?.message??suppliersResult.error?.message??'Supplier evidence could not be loaded.');
+    return {offers:offersResult.data??[],suppliers:suppliersResult.data??[]};
+  });
+
+export const saveDropshippingSupplierEvidence=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>supplierEvidenceSchema.parse(value))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    await loadSupplierContext(sb,context.userId,data.opportunity_id,data.retail_supplier_id);
+    if(data.role==='primary'){
+      let primaryQuery=sb.from('dropshipping_opportunity_suppliers')
+        .select('id')
+        .eq('user_id',context.userId)
+        .eq('opportunity_id',data.opportunity_id)
+        .eq('role','primary');
+      if(data.id)primaryQuery=primaryQuery.neq('id',data.id);
+      const {data:existingPrimary,error:primaryError}=await primaryQuery.limit(1).maybeSingle();
+      if(primaryError)throw new Error(primaryError.message);
+      if(existingPrimary)throw new Error('This opportunity already has a primary supplier. Mark that offer as backup or candidate first.');
+    }
+    const evidence=normalizeOpportunityEvidence(data.evidence_urls??[]);
+    const now=new Date().toISOString();
+    const row={
+      opportunity_id:data.opportunity_id,
+      retail_supplier_id:data.retail_supplier_id,
+      supplier_sku:data.supplier_sku||null,
+      role:data.role,
+      currency:data.currency.toUpperCase(),
+      unit_cost:data.unit_cost??null,
+      shipping_cost:data.shipping_cost??null,
+      minimum_order_quantity:data.minimum_order_quantity??null,
+      estimated_delivery_days:data.estimated_delivery_days??null,
+      stock_status:data.stock_status,
+      supplier_score:data.supplier_score??null,
+      evidence_urls:evidence,
+      evidence_note:data.evidence_note||null,
+      observed_at:data.observed_at??now,
+      last_checked_at:now,
+      updated_at:now,
+    };
+    const result=data.id
+      ? await sb.from('dropshipping_opportunity_suppliers').update(row).eq('id',data.id).eq('opportunity_id',data.opportunity_id).eq('user_id',context.userId).select().single()
+      : await sb.from('dropshipping_opportunity_suppliers').insert({...row,user_id:context.userId}).select().single();
+    if(result.error)throw new Error(result.error.message);
+    return result.data;
+  });
+
+export const deleteDropshippingSupplierEvidence=createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .validator((value:unknown)=>z.object({id:uuid,opportunity_id:uuid}).parse(value))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const {error}=await sb.from('dropshipping_opportunity_suppliers').delete().eq('id',data.id).eq('opportunity_id',data.opportunity_id).eq('user_id',context.userId);
+    if(error)throw new Error(error.message);
+    return {ok:true};
+  });
+
+
 export const listDropshippingOpportunitySnapshots=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
   .validator((value:unknown)=>z.object({opportunity_id:uuid.optional()}).parse(value??{}))
@@ -137,6 +240,26 @@ export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'
     const existingEvidence=normalizeOpportunityEvidence(opportunity.evidence_urls??[]);
     const evidence=normalizeOpportunityEvidence([...suppliedEvidence,...existingEvidence]);
     const checkedAt=new Date().toISOString();
+    const supplierResult=await sb.from('dropshipping_opportunity_suppliers')
+      .select('retail_supplier_id,supplier_sku,role,currency,unit_cost,shipping_cost,minimum_order_quantity,estimated_delivery_days,stock_status,supplier_score,evidence_urls,evidence_note,observed_at,last_checked_at')
+      .eq('opportunity_id',opportunity.id).eq('user_id',context.userId).order('updated_at',{ascending:false}).limit(100);
+    if(supplierResult.error)throw new Error(supplierResult.error.message);
+    const supplierSummary=(supplierResult.data??[]).map((row:any)=>({
+      retail_supplier_id:row.retail_supplier_id,
+      supplier_sku:row.supplier_sku,
+      role:row.role,
+      currency:row.currency,
+      unit_cost:row.unit_cost,
+      shipping_cost:row.shipping_cost,
+      minimum_order_quantity:row.minimum_order_quantity,
+      estimated_delivery_days:row.estimated_delivery_days,
+      stock_status:row.stock_status,
+      supplier_score:row.supplier_score,
+      evidence_urls:normalizeOpportunityEvidence(row.evidence_urls??[]),
+      evidence_note:row.evidence_note,
+      observed_at:row.observed_at,
+      last_checked_at:row.last_checked_at,
+    }));
     const {data:out,error}=await sb.from('dropshipping_opportunity_snapshots').insert({
       user_id:context.userId,
       opportunity_id:opportunity.id,
@@ -150,6 +273,7 @@ export const recordDropshippingOpportunitySnapshot=createServerFn({method:'POST'
       compliance_risk:opportunity.compliance_risk,
       evidence_urls:evidence,
       source_count:suppliedEvidence.length,
+      supplier_summary:supplierSummary,
       research_report:data.research_report||null,
       checked_at:checkedAt,
     }).select().single();
