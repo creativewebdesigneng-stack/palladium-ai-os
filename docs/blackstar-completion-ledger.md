@@ -1,5 +1,8 @@
 # Blackstar — engineering completion ledger
 
+> **Current engineering release checkpoint (30 September 2026):** the premium redesign / production-hardening phase is certified complete at main `7a88385ef2aa59e648fa0861c9deea01181093b1`, production deployment `dpl_2HZhy8gEhH1fR4MoH1XGTWbJeib7`, post-merge Backend Check `36710308030` SUCCESS, with no error/fatal logs observed on the exact deployment in the certification window. See [blackstar-hardening-completion-2026-09-30.md](blackstar-hardening-completion-2026-09-30.md). The historical module rows below remain useful as acceptance evidence tracking, especially for provider/device/operator checks; do not interpret their 22 September wording as current engineering implementation status.
+
+
 Last reconciled: 2026-09-22. Baseline: production `dd041e146debb8eefc603663d7246447d7d9b093` READY. This ledger tracks the **requested full Blackstar vision**, not just whether a screen or code branch exists. It is deliberately not a numerical estimate of overall product completion.
 
 ## How to mark an item complete
