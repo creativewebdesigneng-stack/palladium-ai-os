@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MailCheck, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
@@ -11,8 +11,12 @@ export default function EmailVerification() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const params = new URLSearchParams(window.location.search);
-  const email = params.get('email') || '';
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEmail(params.get('email') || '');
+  }, []);
 
   const verify = async (e) => {
     e.preventDefault();
