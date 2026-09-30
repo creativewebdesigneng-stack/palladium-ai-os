@@ -16,12 +16,12 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
       return { forbidden: true as const };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as Sb;
-
+    // Count through the caller-scoped client so row-level security remains
+    // authoritative. A platform admin must not see another user's acceptance
+    // records merely because this page lives in the control plane.
     const entries = await Promise.all(
       Object.entries(ACCEPTANCE_EVIDENCE_TABLES).map(async ([key, table]) => {
-        const { count, error } = await admin
+        const { count, error } = await scoped
           .from(table)
           .select("*", { count: "exact", head: true });
 
