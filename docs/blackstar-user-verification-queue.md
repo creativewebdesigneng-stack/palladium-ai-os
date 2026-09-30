@@ -1,6 +1,6 @@
 # Blackstar — owner verification and external activation queue
 
-Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-30. Latest fully certified application production commit is `c1b9616725ece26f45082a993658a54a07b2e15b`; repository main has advanced to `35aa5bd59d5ebb30374a1520344590561e76124c` via CI-green PR #811, with its production Supabase migration applied and matching Vercel application deployment still pending.
+Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-30 after the Operational Acceptance Console milestone. Application main reached `84c2a510c6708ab6557abf2e21579c02b2733724`; its post-merge Backend Check `36789777845` succeeded. The exact hardened preview `dpl_Ak711UE8DdfwTKAHjYKhwDTWQ13N` was READY and served `/admin/acceptance` successfully. The console exposes U01–U24 from one admin control-plane page and reads evidence counts through the signed-in caller's existing RLS scope. Counts do not certify an item.
 
 **Nothing in this document is a request for the owner to fix coding, CI, broken migrations, model hallucination, deployment or permissions defects.** Engineering completes those first. The owner only handles access, devices, qualified approvals, real external accounts or acceptance of their own experience. An item is complete only after the stated real-world evidence is recorded, not after a checkbox is clicked without a test.
 
@@ -46,6 +46,10 @@ The latest read-only production evidence audit for owner/provider acceptance fou
 - **Owner security setting:** U23 leaked-password protection remains an explicit hosted Auth setting review.
 - **Conditional external certification:** U02–U22 and U24 apply only when that provider, device, regulated workflow, collaborator, domain, paid service, or release scope is actually selected. A conditional item is not a generic blocker to the current engineering release.
 - **Evidence rule:** only provider/device/user evidence from a real authorised run can move an item to Verified. Empty production tables, mocks, seeded rows, screenshots without provider evidence, or code-only tests cannot.
+
+## Operational Acceptance Console
+
+The admin-only `/admin/acceptance` console is the execution surface for this queue. It highlights U01, U04 and U23 as the first owner-controlled checks, links every U-item to its existing Blackstar module, and shows only RLS-scoped evidence counts where an existing evidence table is available. It never turns a row count into Verified status.
 
 ## Current owner-action shortlist
 
