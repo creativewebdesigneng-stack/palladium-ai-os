@@ -64,12 +64,14 @@ describe("operational acceptance result policy", () => {
         status: "verified",
         evidenceKind: "provider",
         evidenceReference: "provider-run-123",
+        notes: "Real provider evidence was reviewed and matched the gate.",
       }),
     ).toEqual({
       previousStatus: "waiting",
       status: "verified",
       evidenceKind: "provider",
-      evidenceReference: "provider-run-123",
+      hasEvidenceReference: true,
+      notesLength: 55,
     });
   });
 });
