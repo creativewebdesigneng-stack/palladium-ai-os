@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -11,13 +12,18 @@ import {
   ExternalLink,
   Loader2,
   Lock,
+  Save,
   ShieldCheck,
 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import Panel from '@/components/palladium/Panel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { OPERATIONAL_ACCEPTANCE_ITEMS } from '@/lib/admin/acceptance-catalog';
-import { getOperationalAcceptanceSnapshot } from '@/lib/admin/acceptance.functions';
+import {
+  getOperationalAcceptanceSnapshot,
+  saveOperationalAcceptanceResult,
+} from '@/lib/admin/acceptance.functions';
+import { friendlyMessage } from '@/lib/errors';
 
 const TONES = {
   owner: 'border-violet-400/20 bg-violet-400/[.055] text-violet-200',
@@ -27,6 +33,20 @@ const TONES = {
   professional: 'border-rose-400/20 bg-rose-400/[.055] text-rose-200',
   independent: 'border-indigo-400/20 bg-indigo-400/[.055] text-indigo-200',
   conditional: 'border-zinc-400/20 bg-white/[.035] text-zinc-300',
+};
+
+const RESULT_TONES = {
+  verified: 'border-emerald-400/20 bg-emerald-400/[.07] text-emerald-300',
+  failed: 'border-rose-400/20 bg-rose-400/[.07] text-rose-300',
+  declined: 'border-zinc-400/20 bg-white/[.035] text-zinc-400',
+  waiting: 'border-amber-400/20 bg-amber-400/[.06] text-amber-300',
+};
+
+const RESULT_LABELS = {
+  verified: 'Verified',
+  failed: 'Failed',
+  declined: 'Declined',
+  waiting: 'Waiting',
 };
 
 function evidenceFor(item, snapshot) {
@@ -47,13 +67,25 @@ function evidenceFor(item, snapshot) {
 
 export default function AdminAcceptance() {
   const { session } = useWorkspace();
+  const qc = useQueryClient();
   const snapshotFn = useServerFn(getOperationalAcceptanceSnapshot);
+  const saveResultFn = useServerFn(saveOperationalAcceptanceResult);
   const snapshot = useQuery({
     queryKey: ['admin-operational-acceptance'],
     queryFn: () => snapshotFn(),
     enabled: session === 'yes',
     retry: false,
     refetchInterval: 60_000,
+  });
+  const saveResult = useMutation({
+    mutationFn: async (payload) => {
+      const result = await saveResultFn({ data: payload });
+      if (result?.forbidden) throw new Error('Administrative access is required.');
+      return result;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['admin-operational-acceptance'] });
+    },
   });
 
   if (session !== 'yes' || snapshot.isLoading) {
@@ -94,13 +126,15 @@ export default function AdminAcceptance() {
   const linkedEvidence = OPERATIONAL_ACCEPTANCE_ITEMS.filter((item) => (item.evidenceKeys ?? []).length > 0);
   const withEvidence = linkedEvidence.filter((item) => evidenceFor(item, data).count > 0);
   const zeroEvidence = linkedEvidence.length - withEvidence.length;
+  const recordedResults = Object.values(data?.results ?? {});
+  const verifiedResults = recordedResults.filter((result) => result.status === 'verified').length;
 
   return (
     <>
       <PageHeader
         eyebrow="Blackstar Control Plane"
         title="Operational Acceptance"
-        description="Execute the remaining owner, provider, device and independent certification gates without reopening completed engineering."
+        description="Execute and record the remaining owner, provider, device and independent certification gates without reopening completed engineering."
         action={
           <span className="flex items-center gap-1.5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-medium text-emerald-300">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -111,13 +145,13 @@ export default function AdminAcceptance() {
 
       <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-300/10 bg-amber-400/[.035] px-3 py-2 text-[11px] text-amber-100/80">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
-        <p>Production record counts are evidence availability only. They never convert an item to Verified without the required authorised provider, device, owner, transaction, professional or independent evidence.</p>
+        <p>Production record counts are evidence availability only. A recorded result documents the signed-in owner's observation; it never manufactures provider, device, transaction, professional or independent evidence. Verified requires an evidence reference and explanatory note.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Engineering gate" value="100%" detail="certified release scope" icon={CheckCircle2} />
         <Metric label="Acceptance gates" value={String(OPERATIONAL_ACCEPTANCE_ITEMS.length)} detail="U01–U24" icon={ClipboardCheck} />
-        <Metric label="Owner-first" value={String(ownerFirst.length)} detail="U01 · U04 · U23" icon={ArrowRight} />
+        <Metric label="Recorded outcomes" value={String(recordedResults.length)} detail={`${verifiedResults} verified`} icon={Save} />
         <Metric label="Evidence-linked zeroes" value={String(zeroEvidence)} detail="not engineering failures" icon={Database} />
       </div>
 
@@ -143,10 +177,17 @@ export default function AdminAcceptance() {
       </div>
 
       <div className="mt-5">
-        <Panel title="Real-world certification queue" subtitle="Every remaining acceptance gate, its dependency, evidence standard and existing Blackstar execution surface.">
+        <Panel title="Real-world certification queue" subtitle="Every remaining acceptance gate, its dependency, evidence standard, current recorded outcome and existing Blackstar execution surface.">
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {OPERATIONAL_ACCEPTANCE_ITEMS.map((item) => (
-              <AcceptanceRow key={item.id} item={item} snapshot={data} />
+              <AcceptanceRow
+                key={item.id}
+                item={item}
+                snapshot={data}
+                onSave={(payload) => saveResult.mutateAsync(payload)}
+                saving={saveResult.isPending && saveResult.variables?.itemId === item.id}
+                saveError={saveResult.error && saveResult.variables?.itemId === item.id ? saveResult.error : null}
+              />
             ))}
           </div>
         </Panel>
@@ -180,10 +221,50 @@ function Policy({ icon: Icon, title, text }) {
   );
 }
 
-function AcceptanceRow({ item, snapshot, compact = false }) {
+function AcceptanceRow({
+  item,
+  snapshot,
+  compact = false,
+  onSave,
+  saving = false,
+  saveError = null,
+}) {
   const evidence = evidenceFor(item, snapshot);
+  const result = snapshot?.results?.[item.id] ?? null;
   const hasCount = evidence.count != null;
   const hasEvidence = hasCount && evidence.count > 0;
+  const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState(result?.status ?? 'waiting');
+  const [reference, setReference] = useState(result?.evidenceReference ?? '');
+  const [notes, setNotes] = useState(result?.notes ?? '');
+
+  useEffect(() => {
+    setStatus(result?.status ?? 'waiting');
+    setReference(result?.evidenceReference ?? '');
+    setNotes(result?.notes ?? '');
+  }, [result?.status, result?.evidenceReference, result?.notes]);
+
+  const valid =
+    status === 'verified'
+      ? reference.trim().length >= 3 && notes.trim().length >= 10
+      : status === 'failed'
+        ? notes.trim().length >= 10
+        : true;
+
+  const submit = async () => {
+    if (!onSave || !valid) return;
+    try {
+      await onSave({
+        itemId: item.id,
+        status,
+        evidenceReference: reference.trim(),
+        notes: notes.trim(),
+      });
+      setEditing(false);
+    } catch {
+      // Mutation error is rendered below without converting it into acceptance.
+    }
+  };
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/[.07] bg-black/25 p-4">
@@ -197,6 +278,11 @@ function AcceptanceRow({ item, snapshot, compact = false }) {
             {item.priority === 'owner-first' && (
               <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[.07] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.12em] text-emerald-300">
                 next
+              </span>
+            )}
+            {result && (
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.12em] ${RESULT_TONES[result.status] ?? RESULT_TONES.waiting}`}>
+                {RESULT_LABELS[result.status] ?? result.status}
               </span>
             )}
           </div>
@@ -218,7 +304,78 @@ function AcceptanceRow({ item, snapshot, compact = false }) {
         </p>
       )}
 
-      <div className="mt-auto pt-4">
+      {result && (
+        <div className="mt-3 rounded-xl border border-white/[.06] bg-white/[.02] p-3 text-[10px] leading-5 text-zinc-500">
+          <p><span className="text-zinc-300">Recorded:</span> {RESULT_LABELS[result.status] ?? result.status}{result.observedAt ? ` · ${new Date(result.observedAt).toLocaleString('en-GB')}` : ''}</p>
+          {result.evidenceReference && <p className="break-words"><span className="text-zinc-300">Reference:</span> {result.evidenceReference}</p>}
+          {result.notes && <p className="break-words"><span className="text-zinc-300">Note:</span> {result.notes}</p>}
+        </div>
+      )}
+
+      {!compact && editing && (
+        <div className="mt-3 space-y-3 rounded-xl border border-violet-300/10 bg-violet-500/[.035] p-3">
+          <div>
+            <label className="text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-600">Outcome</label>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0b0c12] px-2.5 py-2 text-xs text-zinc-200 outline-none focus:border-violet-400/40"
+            >
+              <option value="waiting">Waiting</option>
+              <option value="verified">Verified</option>
+              <option value="failed">Failed</option>
+              <option value="declined">Declined / out of scope</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-600">Evidence reference</label>
+            <input
+              value={reference}
+              onChange={(event) => setReference(event.target.value.slice(0, 500))}
+              placeholder="Provider ID, deployment, device test, review record…"
+              className="mt-1.5 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-violet-400/40"
+            />
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-600">Observation / symptom</label>
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value.slice(0, 2000))}
+              rows={3}
+              placeholder="Describe what was genuinely observed. Do not paste secrets or private customer data."
+              className="mt-1.5 w-full resize-none rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs leading-5 text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-violet-400/40"
+            />
+          </div>
+          {status === 'verified' && !valid && (
+            <p className="text-[10px] text-amber-300">Verified requires a reference plus an explanatory note of at least 10 characters.</p>
+          )}
+          {status === 'failed' && !valid && (
+            <p className="text-[10px] text-amber-300">Failed requires a reproducible symptom or explanatory note of at least 10 characters.</p>
+          )}
+          {saveError && <p className="text-[10px] text-rose-300">{friendlyMessage(saveError)}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!valid || saving}
+              onClick={submit}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-[10px] font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? 'Saving…' : 'Save outcome'}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setEditing(false)}
+              className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-medium text-zinc-400 hover:text-white disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-auto flex flex-wrap gap-2 pt-4">
         <Link
           to={item.path}
           className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300/15 bg-violet-500/[.06] px-3 py-2 text-[11px] font-medium text-violet-100 transition hover:border-violet-300/30 hover:bg-violet-500/[.1]"
@@ -226,6 +383,16 @@ function AcceptanceRow({ item, snapshot, compact = false }) {
           {item.action}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+        {!compact && (
+          <button
+            type="button"
+            onClick={() => setEditing((value) => !value)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.025] px-3 py-2 text-[11px] font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[.05]"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {result ? 'Update result' : 'Record result'}
+          </button>
+        )}
       </div>
     </div>
   );
