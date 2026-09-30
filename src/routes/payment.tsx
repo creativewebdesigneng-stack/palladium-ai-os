@@ -4,6 +4,7 @@ import Screen from "@/screens/Payment";
 export const Route = createFileRoute("/payment")({
   head: () => ({
     meta: [
+      { name: "robots", content: "noindex,nofollow" },
       { title: "Checkout — Blackstar" },
       {
         name: "description",
