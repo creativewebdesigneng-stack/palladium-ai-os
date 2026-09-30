@@ -128,6 +128,26 @@ async function runMonitorCheck(sb:Sb,row:Opportunity){
   const evidence=normalizeOpportunityEvidence(search.results.map(source=>({url:source.url,label:source.title})));
   const checkedAt=new Date().toISOString();
   const report=`Confidence: ${s.confidence}. ${s.rationale}`;
+  const supplierEvidence=await sb.from('dropshipping_opportunity_suppliers')
+    .select('retail_supplier_id,supplier_sku,role,currency,unit_cost,shipping_cost,minimum_order_quantity,estimated_delivery_days,stock_status,supplier_score,evidence_urls,evidence_note,observed_at,last_checked_at')
+    .eq('opportunity_id',row.id).eq('user_id',row.user_id).order('updated_at',{ascending:false}).limit(100);
+  if(supplierEvidence.error)throw new Error(supplierEvidence.error.message);
+  const supplierSummary=(supplierEvidence.data??[]).map((offer:any)=>({
+    retail_supplier_id:offer.retail_supplier_id,
+    supplier_sku:offer.supplier_sku,
+    role:offer.role,
+    currency:offer.currency,
+    unit_cost:offer.unit_cost,
+    shipping_cost:offer.shipping_cost,
+    minimum_order_quantity:offer.minimum_order_quantity,
+    estimated_delivery_days:offer.estimated_delivery_days,
+    stock_status:offer.stock_status,
+    supplier_score:offer.supplier_score,
+    evidence_urls:normalizeOpportunityEvidence(offer.evidence_urls??[]),
+    evidence_note:offer.evidence_note,
+    observed_at:offer.observed_at,
+    last_checked_at:offer.last_checked_at,
+  }));
 
   const snapshot=await sb.from('dropshipping_opportunity_snapshots').insert({
     user_id:row.user_id,
@@ -142,6 +162,7 @@ async function runMonitorCheck(sb:Sb,row:Opportunity){
     compliance_risk:s.compliance_risk,
     evidence_urls:evidence,
     source_count:evidence.length,
+    supplier_summary:supplierSummary,
     research_report:report,
     checked_at:checkedAt,
   }).select('id').single();
