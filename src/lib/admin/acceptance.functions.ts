@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { ACCEPTANCE_EVIDENCE_TABLES } from "@/lib/admin/acceptance-catalog";
-import { prepareOperationalAcceptanceResult } from "@/lib/admin/acceptance-results";
+import { buildAcceptanceAuditMetadata, prepareOperationalAcceptanceResult } from "@/lib/admin/acceptance-results";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = {
@@ -103,6 +104,15 @@ export const saveOperationalAcceptanceResult = createServerFn({ method: "POST" }
       .eq("item_id", data.itemId)
       .maybeSingle();
 
+    if (previousError) {
+      throw new Error(previousError.message);
+    }
+
+    const { data: previous, error: previousError } = await scoped
+      .from("operational_acceptance_results")
+      .select("status")
+      .eq("item_id", data.itemId)
+      .maybeSingle();
     if (previousError) {
       throw new Error(previousError.message);
     }
