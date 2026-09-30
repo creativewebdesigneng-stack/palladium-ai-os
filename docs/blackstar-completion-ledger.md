@@ -1,9 +1,9 @@
 # Blackstar — engineering completion ledger
 
-> **Current engineering release checkpoint (30 September 2026):** the premium redesign / production-hardening phase is certified complete at main `7a88385ef2aa59e648fa0861c9deea01181093b1`, production deployment `dpl_2HZhy8gEhH1fR4MoH1XGTWbJeib7`, post-merge Backend Check `36710308030` SUCCESS, with no error/fatal logs observed on the exact deployment in the certification window. See [blackstar-hardening-completion-2026-09-30.md](blackstar-hardening-completion-2026-09-30.md). The historical module rows below remain useful as acceptance evidence tracking, especially for provider/device/operator checks; do not interpret their 22 September wording as current engineering implementation status.
+> **Current engineering release checkpoint (30 September 2026): the dependency-hardening scope was certified complete at production commit `c1b9616725ece26f45082a993658a54a07b2e15b`, deployment `dpl_DNeadGCcpUKzmTAuaKmEspmFiB1J`, post-merge Backend Check `36778498987` SUCCESS, with Vercel `READY/READY` and `aliasError=null`. Repository main then advanced to `35aa5bd59d5ebb30374a1520344590561e76124c` via PR #811 (Dropshipping multi-supplier evidence). Its post-merge Backend Check `36785072582` succeeded and production Supabase migration `dropshipping_multi_supplier_evidence` is applied; a matching Vercel production application deployment had not yet appeared at the time of this reconciliation. The historical module rows below remain useful as acceptance evidence tracking, especially for provider/device/operator checks; do not interpret earlier checkpoint wording as current engineering implementation status.
 
 
-Last reconciled: 2026-09-30. Current production reconciliation baseline: main `d7e45f208debe1330a6ed4d7592dc2860113ac2f`, exact production deployment `dpl_41GGYz2GGf7nGcnqW4WjSkU3vC3k` READY, with no runtime errors observed in the checked 30-minute window. Historical evidence below remains dated where explicitly stated. This ledger tracks the **requested full Blackstar vision**, not just whether a screen or code branch exists. It is deliberately not a numerical estimate of overall product completion.
+Last reconciled: 2026-09-30. Latest fully certified application production baseline: commit `c1b9616725ece26f45082a993658a54a07b2e15b`, exact deployment `dpl_DNeadGCcpUKzmTAuaKmEspmFiB1J` READY/READY with `aliasError=null`, Backend Check `36778498987` successful. Repository main is `35aa5bd59d5ebb30374a1520344590561e76124c`; PR #811 CI is green and its Supabase migration is live, but application deployment certification for that newer main remains pending. Historical evidence below remains dated where explicitly stated. This ledger tracks the **requested full Blackstar vision**, not just whether a screen or code branch exists. It is deliberately not a numerical estimate of overall product completion.
 
 ## How to mark an item complete
 
@@ -44,12 +44,19 @@ The separate [operator verification queue](blackstar-user-verification-queue.md)
 
 ## Immediate engineering sequence
 
-1. Finish E02's minimal current-main recovery patch; run Backend Check and exact-head preview, merge, and verify matching production SHA. Do not merge stale PR #646 on top of newer main without reconciliation.
-2. Run E01's signed-in read-only recall and privacy tests when appropriate owner-authorised data exists; otherwise mark **no data available** and keep it open without creating fictional user records.
-3. Audit each stale PR against main before implementing or merging. A PR remaining open is a **review item**, not proof that its changes are missing.
-4. Iterate through E03–E24 in bounded, individually tested and deployed batches. Transfer only provider/device/owner-specific checks to the operator queue; never hide engineering failures as user dependencies.
+The current engineering/dependency-hardening release gate is complete. Do not reopen completed architecture solely because optional external acceptance remains outstanding.
+
+1. Keep automated Backend Check, dependency audit, production smoke, scheduled security audit and Vercel production monitoring active.
+2. Treat U01 memory recall and U04 skill installation as the first real-owner product acceptance checks when the owner chooses to perform them; never seed synthetic owner evidence.
+3. Treat U23 leaked-password protection as an explicit owner-controlled hosted Auth setting review.
+4. Move U02–U22 and U24 only when the relevant provider, device, collaborator, qualified reviewer or strategic scope is actually selected.
+5. Record future evidence against the exact production SHA/provider/device/user run that produced it.
 
 ## Evidence log
+
+- 2026-09-30: PR #811 merged as `35aa5bd59d5ebb30374a1520344590561e76124c`, extending Dropshipping watchlist multi-supplier evidence. Post-merge Backend Check `36785072582` succeeded. Production Supabase migration `dropshipping_multi_supplier_evidence` is applied. Security advisors show only the pre-existing three internal RLS-without-policy INFO findings, four intentional authenticated Marketplace SECURITY DEFINER WARN findings, and leaked-password protection owner-setting WARN; performance remains dominated by immature-traffic unused-index INFO findings. Matching Vercel production app deployment was still pending at reconciliation time.
+
+- 2026-09-30: Dependency-hardening closure merged through PR #808. Certified application production commit `c1b9616725ece26f45082a993658a54a07b2e15b`; Vercel deployment `dpl_DNeadGCcpUKzmTAuaKmEspmFiB1J` READY/READY with `aliasError=null`; Backend Check `36778498987` passed install, high-severity dependency audit, production build/route generation, strict TypeScript, tests, and browser worker syntax/policy. Current-deployment observability showed only HTTP 200 responses in the checked window and no current runtime-error cluster.
 
 - 2026-09-22: E12 PR #666 merged `69ba9ee8`; Vercel production `dpl_NFg8fdXcoqgYHXAdoZqp3xjUfvvQ` READY matching SHA. Applied `construction_relational_owner_scope` (migration history `20260922220822`); SQL verified 52/52 valid deferred FKs, 8 scoped parent indexes, 24 owner + 27 parent indexes, all 24 Construction tables still RLS-enabled. The post-migration advisor surfaced 25 newly added composite FKs without covering indexes. PR #667 merged `ab1feab0`, production `dpl_GPaHCv3oK5Xhb22cXJGmh6b3gHYM` READY matching SHA, and `construction_composite_fk_indexes` (migration history `20260922221544`) added the missing 25 indexes. Post-change advisors: 0 unindexed Construction FKs and 0 Construction-specific security findings. All 24 tables had zero rows at preflight; this does not replace real signed-in CRUD/cross-workspace or competent-person tests.\n
 
