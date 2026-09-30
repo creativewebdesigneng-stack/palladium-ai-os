@@ -174,14 +174,20 @@ const ChartTooltipContent = React.forwardRef<
 
               return (
                 <div
-                  key={item.dataKey}
+                  key={typeof item.dataKey === "string" || typeof item.dataKey === "number" ? item.dataKey : index}
                   className={cn(
                     "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                     indicator === "dot" && "items-center",
                   )}
                 >
                   {formatter && item?.value !== undefined && item.name ? (
-                    formatter(item.value, item.name, item, index, item.payload)
+                    formatter(
+                      Array.isArray(item.value) ? item.value.join(" – ") : item.value,
+                      item.name,
+                      item,
+                      index,
+                      payload,
+                    )
                   ) : (
                     <>
                       {itemConfig?.icon ? (
