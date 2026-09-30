@@ -1,5 +1,8 @@
 export type OpportunityEvidence={url:string;label?:string};
 export type OpportunityScores={demand?:number|null|undefined;searchMomentum?:number|null|undefined;competition?:number|null|undefined;margin?:number|null|undefined;supplier?:number|null|undefined;complianceRisk?:number|null|undefined};
+export type SupplierOfferLike={unit_cost?:number|null;shipping_cost?:number|null;role?:string|null;supplier_score?:number|null};
+
+const secretQueryKey=/^(?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret|password|credential|authorization|auth|signature|sig)$/i;
 
 const clamp=(value:number|null|undefined)=>value==null?null:Math.max(0,Math.min(100,Number.isFinite(value)?value:0));
 const round=(value:number)=>Math.round(value*100)/100;
@@ -25,6 +28,10 @@ export function normalizeOpportunityEvidence(values:unknown):OpportunityEvidence
     try{
       const url=new URL(raw.trim());
       if(!['http:','https:'].includes(url.protocol))continue;
+      url.username='';
+      url.password='';
+      url.hash='';
+      for(const key of [...url.searchParams.keys()])if(secretQueryKey.test(key))url.searchParams.delete(key);
       const normalized=url.toString().slice(0,2000);
       if(out.some(row=>row.url===normalized))continue;
       const label=typeof record?.['label']==='string'?record['label'].trim().slice(0,200):undefined;
@@ -32,6 +39,24 @@ export function normalizeOpportunityEvidence(values:unknown):OpportunityEvidence
     }catch{}
   }
   return out;
+}
+
+export function supplierLandedCost(offer:SupplierOfferLike){
+  const unit=offer.unit_cost==null?null:Number(offer.unit_cost);
+  const shipping=offer.shipping_cost==null?null:Number(offer.shipping_cost);
+  if((unit==null||!Number.isFinite(unit))&&(shipping==null||!Number.isFinite(shipping)))return null;
+  return round(Math.max(0,Number.isFinite(unit as number)?unit as number:0)+Math.max(0,Number.isFinite(shipping as number)?shipping as number:0));
+}
+
+export function supplierEvidenceSummary(offers:SupplierOfferLike[]){
+  const active=offers.filter(row=>row.role!=='rejected');
+  const primary=active.find(row=>row.role==='primary')??null;
+  const backups=active.filter(row=>row.role==='backup').length;
+  const scored=active.map(row=>Number(row.supplier_score)).filter(Number.isFinite);
+  const bestScore=scored.length?Math.max(...scored):null;
+  const costs=active.map(supplierLandedCost).filter((value):value is number=>value!=null);
+  const lowestLandedCost=costs.length?Math.min(...costs):null;
+  return {count:active.length,primary,backups,bestScore,lowestLandedCost};
 }
 
 export function watchlistBand(score:number){
