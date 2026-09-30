@@ -4,6 +4,7 @@ import Screen from "@/screens/EmailVerification";
 export const Route = createFileRoute("/email-verification")({
   head: () => ({
     meta: [
+      { name: "robots", content: "noindex,nofollow" },
       { title: "Verify your email — Blackstar" },
       {
         name: "description",
