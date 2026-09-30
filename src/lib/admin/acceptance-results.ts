@@ -69,11 +69,13 @@ export function buildAcceptanceAuditMetadata(args: {
   status: AcceptanceResultStatus;
   evidenceKind: AcceptanceCategory;
   evidenceReference?: string | null;
+  notes?: string | null;
 }) {
   return {
     previousStatus: args.previousStatus ?? null,
     status: args.status,
     evidenceKind: args.evidenceKind,
-    evidenceReference: args.evidenceReference ?? null,
+    hasEvidenceReference: Boolean(args.evidenceReference),
+    notesLength: args.notes?.length ?? 0,
   };
 }
