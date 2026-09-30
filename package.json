@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "backend:check": "tsc --noEmit && vitest run"
+    "backend:check": "tsc --noEmit && vitest run",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
