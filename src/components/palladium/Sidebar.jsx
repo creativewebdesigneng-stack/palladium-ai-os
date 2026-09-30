@@ -4,7 +4,7 @@ import {
   Plug, Store, Globe, Wrench, Code2, BarChart3, Bell, LifeBuoy, Settings, Blocks,
   ShieldCheck, CreditCard, Building2, ScrollText, Cpu, Lock, ChevronRight, Radar,
   Brain, BrainCircuit, Hammer, HardHat, Banknote, Contact, Megaphone, LineChart, CalendarClock, MessageCircle,
-  FileText, Layers3, Search, FlaskConical, Scale, Factory, Mic2, Hand, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn, PhoneCall, Sparkles,
+  FileText, Layers3, Search, FlaskConical, Scale, Factory, Mic2, Hand, Settings2, Clapperboard, Table2, Dumbbell, Zap, Gamepad2, Popcorn, PhoneCall, Sparkles, ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import Brand from '@/components/palladium/Brand';
@@ -89,6 +89,7 @@ const BOTTOM = [
 
 const ADMIN = [
   ['Admin Dashboard', '/admin', ShieldCheck],
+  ['Acceptance', '/admin/acceptance', ClipboardCheck],
   ['Users', '/admin/users', Users],
   ['Organisations', '/admin/organisations', Building2],
   ['Subscriptions', '/admin/subscriptions', CreditCard],
