@@ -1,6 +1,6 @@
 # Blackstar — owner verification and external activation queue
 
-Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-30 against certified production main `c1b9616725ece26f45082a993658a54a07b2e15b`.
+Separate from the [engineering completion ledger](blackstar-completion-ledger.md). Last reconciled 2026-09-30. Latest fully certified application production commit is `c1b9616725ece26f45082a993658a54a07b2e15b`; repository main has advanced to `35aa5bd59d5ebb30374a1520344590561e76124c` via CI-green PR #811, with its production Supabase migration applied and matching Vercel application deployment still pending.
 
 **Nothing in this document is a request for the owner to fix coding, CI, broken migrations, model hallucination, deployment or permissions defects.** Engineering completes those first. The owner only handles access, devices, qualified approvals, real external accounts or acceptance of their own experience. An item is complete only after the stated real-world evidence is recorded, not after a checkbox is clicked without a test.
 
@@ -35,7 +35,7 @@ Separate from the [engineering completion ledger](blackstar-completion-ledger.md
 
 ## Production evidence baseline — 2026-09-30
 
-Certified production main is `c1b9616725ece26f45082a993658a54a07b2e15b`. Exact Vercel deployment `dpl_DNeadGCcpUKzmTAuaKmEspmFiB1J` is READY/READY with `aliasError=null`. Post-merge Backend Check `36778498987` passed install, high-severity dependency audit, production build and route generation, strict TypeScript, tests, and browser worker syntax/policy. There are zero open pull requests. Current-deployment observability in the final verification window reported only HTTP 200 responses and no current runtime-error cluster.
+Latest fully certified application production commit is `c1b9616725ece26f45082a993658a54a07b2e15b`. Exact Vercel deployment `dpl_DNeadGCcpUKzmTAuaKmEspmFiB1J` is READY/READY with `aliasError=null`; Backend Check `36778498987` passed install, high-severity dependency audit, production build and route generation, strict TypeScript, tests, and browser worker syntax/policy. Repository main subsequently advanced to `35aa5bd59d5ebb30374a1520344590561e76124c` through PR #811; Backend Check `36785072582` passed and Supabase migration `dropshipping_multi_supplier_evidence` is applied, but a matching Vercel production application deployment was still pending when this queue was reconciled.
 
 The latest read-only production evidence audit for owner/provider acceptance found zero records in `agent_skills`, `agent_memories`, `marketplace_orders`, `marketplace_payment_events`, `cinema_shot_renders`, `media_generation_jobs`, `game_foundry_projects`, `three_d_jobs`, `communication_call_sessions`, `mobile_intelligence_devices`, `retail_call_inbox`, `trading_simulations`, `trading_watchlists`, and `trading_journal_entries`. These zero counts remain evidence that the corresponding real-owner/provider acceptance has not happened yet; they are not engineering failures and must not be replaced with synthetic records.
 
