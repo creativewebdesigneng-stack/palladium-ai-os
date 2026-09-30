@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareOperationalAcceptanceResult } from "../acceptance-results";
+import { buildAcceptanceAuditMetadata, prepareOperationalAcceptanceResult } from "../acceptance-results";
 
 describe("operational acceptance result policy", () => {
   it("derives evidence kind from the canonical gate rather than caller input", () => {
@@ -55,5 +55,21 @@ describe("operational acceptance result policy", () => {
         notes: "broken",
       }),
     ).toThrow(/reproducible symptom/i);
+  });
+
+  it("keeps audit metadata bounded and excludes free-form notes", () => {
+    expect(
+      buildAcceptanceAuditMetadata({
+        previousStatus: "waiting",
+        status: "verified",
+        evidenceKind: "provider",
+        evidenceReference: "provider-run-123",
+      }),
+    ).toEqual({
+      previousStatus: "waiting",
+      status: "verified",
+      evidenceKind: "provider",
+      evidenceReference: "provider-run-123",
+    });
   });
 });
