@@ -62,3 +62,18 @@ export function prepareOperationalAcceptanceResult(
     notes: parsed.notes || null,
   };
 }
+
+
+export function buildAcceptanceAuditMetadata(args: {
+  previousStatus?: string | null;
+  status: AcceptanceResultStatus;
+  evidenceKind: AcceptanceCategory;
+  evidenceReference?: string | null;
+}) {
+  return {
+    previousStatus: args.previousStatus ?? null,
+    status: args.status,
+    evidenceKind: args.evidenceKind,
+    evidenceReference: args.evidenceReference ?? null,
+  };
+}
