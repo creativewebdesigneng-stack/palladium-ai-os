@@ -1,7 +1,7 @@
-import { Users, CreditCard, Plug, Settings, ShieldCheck, ScrollText, Circle } from 'lucide-react';
+import { Users, CreditCard, Plug, Settings, ShieldCheck, ScrollText, ClipboardCheck, Circle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const ICONS = { Users, CreditCard, Plug, Settings, ShieldCheck, ScrollText };
+const ICONS = { Users, CreditCard, Plug, Settings, ShieldCheck, ScrollText, ClipboardCheck };
 
 export default function QuickActions({ actions }) {
   return (
