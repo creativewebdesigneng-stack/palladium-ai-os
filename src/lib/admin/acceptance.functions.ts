@@ -2,8 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { ACCEPTANCE_EVIDENCE_TABLES } from "@/lib/admin/acceptance-catalog";
-import { buildAcceptanceAuditMetadata, prepareOperationalAcceptanceResult } from "@/lib/admin/acceptance-results";
-import { writeAudit } from "@/lib/platform/audit.server";
+import {
+  buildAcceptanceAuditMetadata,
+  prepareOperationalAcceptanceResult,
+} from "@/lib/admin/acceptance-results";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = {
@@ -41,9 +43,6 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
       return { forbidden: true as const };
     }
 
-    // Count through the caller-scoped client so row-level security remains
-    // authoritative. A platform admin must not see another user's acceptance
-    // records merely because this page lives in the control plane.
     const [entries, resultResponse] = await Promise.all([
       Promise.all(
         Object.entries(ACCEPTANCE_EVIDENCE_TABLES).map(async ([key, table]) => {
@@ -108,15 +107,6 @@ export const saveOperationalAcceptanceResult = createServerFn({ method: "POST" }
       throw new Error(previousError.message);
     }
 
-    const { data: previous, error: previousError } = await scoped
-      .from("operational_acceptance_results")
-      .select("status")
-      .eq("item_id", data.itemId)
-      .maybeSingle();
-    if (previousError) {
-      throw new Error(previousError.message);
-    }
-
     const now = new Date().toISOString();
     const { data: row, error } = await scoped
       .from("operational_acceptance_results")
@@ -150,13 +140,13 @@ export const saveOperationalAcceptanceResult = createServerFn({ method: "POST" }
       targetType: "operational_acceptance",
       targetId: data.itemId,
       status: "success",
-      metadata: {
+      metadata: buildAcceptanceAuditMetadata({
         previousStatus: previous?.status ? String(previous.status) : null,
         status: data.status,
         evidenceKind: data.evidenceKind,
-        hasEvidenceReference: Boolean(data.evidenceReference),
-        notesLength: data.notes?.length ?? 0,
-      },
+        evidenceReference: data.evidenceReference,
+        notes: data.notes,
+      }),
     });
 
     return {
