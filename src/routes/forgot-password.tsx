@@ -4,6 +4,7 @@ import Screen from "@/screens/ForgotPassword";
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
     meta: [
+      { name: "robots", content: "noindex,nofollow" },
       { title: "Reset password — Blackstar" },
       {
         name: "description",
