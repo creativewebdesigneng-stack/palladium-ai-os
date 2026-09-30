@@ -22,7 +22,7 @@ describe('Dropshipping multi-supplier evidence migration',()=>{
   });
 
   it('requires opportunity and Retail supplier workspace compatibility',()=>{
-    expect(migration).toContain('join public.retail_suppliers supplier on supplier.id = retail_supplier_id');
+    expect(migration).toContain('join public.retail_suppliers supplier on supplier.id = dropshipping_opportunity_suppliers.retail_supplier_id');
     expect(migration).toContain('(opportunity.workspace_id is null or supplier.workspace_id = opportunity.workspace_id)');
   });
 
