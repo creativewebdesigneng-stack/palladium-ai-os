@@ -65,8 +65,8 @@ create policy "dropshipping_opportunity_suppliers_insert_own"
     and exists (
       select 1
       from public.dropshipping_opportunities opportunity
-      join public.retail_suppliers supplier on supplier.id = retail_supplier_id
-      where opportunity.id = opportunity_id
+      join public.retail_suppliers supplier on supplier.id = dropshipping_opportunity_suppliers.retail_supplier_id
+      where opportunity.id = dropshipping_opportunity_suppliers.opportunity_id
         and opportunity.user_id = (select auth.uid())
         and supplier.user_id = (select auth.uid())
         and (opportunity.workspace_id is null or supplier.workspace_id = opportunity.workspace_id)
@@ -87,8 +87,8 @@ create policy "dropshipping_opportunity_suppliers_update_own"
     and exists (
       select 1
       from public.dropshipping_opportunities opportunity
-      join public.retail_suppliers supplier on supplier.id = retail_supplier_id
-      where opportunity.id = opportunity_id
+      join public.retail_suppliers supplier on supplier.id = dropshipping_opportunity_suppliers.retail_supplier_id
+      where opportunity.id = dropshipping_opportunity_suppliers.opportunity_id
         and opportunity.user_id = (select auth.uid())
         and supplier.user_id = (select auth.uid())
         and (opportunity.workspace_id is null or supplier.workspace_id = opportunity.workspace_id)
