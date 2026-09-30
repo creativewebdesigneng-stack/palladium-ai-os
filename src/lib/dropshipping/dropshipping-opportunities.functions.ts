@@ -1,6 +1,7 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
 import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {writeAudit} from '@/lib/platform/audit.server';
 import {calculateWatchlistScore,normalizeOpportunityEvidence} from './dropshipping-opportunities';
 
 type Sb={from:(table:string)=>any};
@@ -204,6 +205,19 @@ export const saveDropshippingSupplierEvidence=createServerFn({method:'POST'})
       ? await sb.from('dropshipping_opportunity_suppliers').update(row).eq('id',data.id).eq('opportunity_id',data.opportunity_id).eq('user_id',context.userId).select().single()
       : await sb.from('dropshipping_opportunity_suppliers').insert({...row,user_id:context.userId}).select().single();
     if(result.error)throw new Error(result.error.message);
+    await writeAudit({
+      userId:context.userId,
+      action:data.id?'dropshipping.supplier_evidence_updated':'dropshipping.supplier_evidence_added',
+      targetType:'dropshipping_opportunity_supplier',
+      targetId:result.data?.id??data.id??null,
+      metadata:{
+        opportunity_id:data.opportunity_id,
+        retail_supplier_id:data.retail_supplier_id,
+        role:data.role,
+        stock_status:data.stock_status,
+        evidence_count:evidence.length,
+      },
+    });
     return result.data;
   });
 
@@ -214,6 +228,13 @@ export const deleteDropshippingSupplierEvidence=createServerFn({method:'POST'})
     const sb=context.supabase as unknown as Sb;
     const {error}=await sb.from('dropshipping_opportunity_suppliers').delete().eq('id',data.id).eq('opportunity_id',data.opportunity_id).eq('user_id',context.userId);
     if(error)throw new Error(error.message);
+    await writeAudit({
+      userId:context.userId,
+      action:'dropshipping.supplier_evidence_deleted',
+      targetType:'dropshipping_opportunity_supplier',
+      targetId:data.id,
+      metadata:{opportunity_id:data.opportunity_id},
+    });
     return {ok:true};
   });
 
