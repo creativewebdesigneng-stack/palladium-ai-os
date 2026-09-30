@@ -71,7 +71,7 @@ describe("operational acceptance result policy", () => {
       status: "verified",
       evidenceKind: "provider",
       hasEvidenceReference: true,
-      notesLength: 55,
+      notesLength: 57,
     });
   });
 });
