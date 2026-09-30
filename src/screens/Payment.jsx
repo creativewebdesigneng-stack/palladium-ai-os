@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft, ShieldCheck, Sparkles, Mail } from 'lucide-react';
 import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
@@ -7,9 +7,17 @@ import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
 import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
 
 export default function Payment() {
-  const params = new URLSearchParams(window.location.search);
-  const planId = params.get('plan') || 'pro';
-  const billing = params.get('billing') === 'yearly' ? 'yearly' : 'monthly';
+  const [selection, setSelection] = useState({ planId: 'pro', billing: 'monthly' });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setSelection({
+      planId: params.get('plan') || 'pro',
+      billing: params.get('billing') === 'yearly' ? 'yearly' : 'monthly',
+    });
+  }, []);
+
+  const { planId, billing } = selection;
   const allPlans = [...FREEMIUM_PLANS, ...PLANS];
   const plan = allPlans.find((p) => p.id === planId) || FREEMIUM_PLANS[0] || PLANS[0];
   const isContact = !!plan?.contactSales;
