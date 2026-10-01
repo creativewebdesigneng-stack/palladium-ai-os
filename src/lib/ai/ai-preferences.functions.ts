@@ -7,7 +7,8 @@ import {
   isProviderConfigured,
   resolveAssistantModelPreference,
 } from "@/lib/ai/ai-preferences.server";
-import { normaliseProvider } from "@/lib/runtime/model-gateway.server";
+import { normaliseProvider, resolveModel } from "@/lib/runtime/model-gateway.server";
+import { isProviderAvailableForUser } from "@/lib/runtime/model-provider-credentials.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -27,7 +28,18 @@ export const getAIPreferences = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
 
-    const effective = resolveAssistantModelPreference(data);
+    let effective = resolveAssistantModelPreference(data);
+    if (data?.default_provider) {
+      const requestedProvider = normaliseProvider(String(data.default_provider));
+      if (await isProviderAvailableForUser({ userId: context.userId, provider: requestedProvider })) {
+        const requestedModel = typeof data.default_model === "string" ? data.default_model.trim() : "";
+        effective = {
+          provider: requestedProvider,
+          model: resolveModel(requestedProvider, requestedModel || defaultModelFor(requestedProvider)),
+          source: "user",
+        };
+      }
+    }
     return {
       preference: data
         ? {
@@ -46,8 +58,8 @@ export const updateAIPreferences = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => updateInput.parse(input))
   .handler(async ({ data, context }) => {
     const provider = normaliseProvider(data.provider);
-    if (!isProviderConfigured(provider)) {
-      throw new Error("That AI provider is not configured on this deployment.");
+    if (!(await isProviderAvailableForUser({ userId: context.userId, provider }))) {
+      throw new Error("That AI provider is not configured on this deployment or connected to your account.");
     }
 
     const model = data.model.trim() || defaultModelFor(provider);
@@ -68,6 +80,6 @@ export const updateAIPreferences = createServerFn({ method: "POST" })
     return {
       provider,
       model,
-      effective: resolveAssistantModelPreference({ default_provider: provider, default_model: model }),
+      effective: { provider, model, source: "user" as const },
     };
   });
