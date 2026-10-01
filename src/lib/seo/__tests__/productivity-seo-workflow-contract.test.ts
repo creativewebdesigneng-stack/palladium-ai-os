@@ -5,7 +5,7 @@ import { adaptN8nWorkflowDefinition, isN8nWorkflowDefinition } from "@/lib/workf
 const migration = readFileSync("supabase/migrations/20260828213000_productivity_seo_native.sql", "utf8");
 const tools = readFileSync("src/lib/runtime/tools.server.ts", "utf8");
 const seoTool = readFileSync("src/lib/seo/seo-agent-tool.server.ts", "utf8");
-const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
+const navigation = readFileSync("src/components/palladium/navigationData.jsx", "utf8");
 const tasks = readFileSync("src/screens/Tasks.jsx", "utf8");
 const seoRoute = readFileSync("src/routes/_shell/_app/seo-studio.tsx", "utf8");
 
@@ -30,7 +30,7 @@ describe("n8n + Super Productivity + OpenSEO native integration", () => {
     expect(tools).toContain("assertHarnessToolInput");
     expect(tools).toContain('from("tool_executions")');
     expect(seoTool).toContain('.from("seo_projects").select("id").eq("id", projectId).eq("user_id", ctx.userId).maybeSingle()');
-    expect(sidebar).toContain("['SEO Studio', '/seo-studio', Search]");
+    expect(navigation).toContain("{ label: 'SEO Studio', path: '/seo-studio', icon: Search }");
     expect(seoRoute).toContain('createFileRoute("/_shell/_app/seo-studio")');
   });
 
