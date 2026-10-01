@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Play, Scale, Search, ServerCog, Store, Users, Video, Workflow, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import AiHubNetworkScene from '@/components/ai-hub/AiHubNetworkScene';
+import RuntimeTargetsPanel from '@/components/ai-hub/RuntimeTargetsPanel';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
 import { createPalladiumAiHubRegistry } from '@/lib/ai-hub';
@@ -104,6 +105,7 @@ export default function AIHub() {
     <div className="mx-auto max-w-6xl space-y-5">
       <AiHubNetworkScene resources={inventory.data?.resources ?? []} providers={providers} loading={inventory.isLoading} />
       <div className="grid gap-3 md:grid-cols-3"><HubMetric label="Native systems" value={providers.length} detail="Existing intelligence subsystems registered behind one canonical Hub contract." /><HubMetric label="Live resources" value={inventory.data?.counts.total ?? '—'} detail="Models, agents, media, MCP, skills, apps, datasets, compute and workflows." /><HubMetric label="Routing + policy" value="Capability-aware" detail="Actor-scoped discovery with protected approval and runtime policy enforcement." /></div>
+      <RuntimeTargetsPanel session={session} />
       <section className="relative overflow-hidden rounded-[26px] border border-cyan-300/10 bg-black/35 p-5 shadow-[0_24px_80px_rgba(0,0,0,.20)] backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/20 to-transparent" />
         <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/15 bg-cyan-400/[.07]"><Users className="h-4 w-4 text-cyan-300" /></div><div><p className="text-[9px] font-semibold uppercase tracking-[.24em] text-cyan-300/60">Dynamic agent teams</p><h2 className="mt-1 text-lg font-semibold text-white">Mission team planner</h2><p className="mt-1 text-sm text-zinc-500">Form a bounded team from your active agents using their existing skills/tools, real execution reliability and current workload. Planning does not bypass Agent Runtime or approvals.</p></div></div>
