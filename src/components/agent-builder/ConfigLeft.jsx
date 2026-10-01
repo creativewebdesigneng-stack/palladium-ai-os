@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Settings2, Cpu, Wrench, Brain, BookOpen, ShieldCheck, X, Plus, Globe, AppWindow, Code2, SquareTerminal, FileText, Database, Send, Mail, Calendar, Github, MessageSquare, MessagesSquare, Clock, FolderKanban, Users, Folder, Library } from 'lucide-react';
+import { Settings2, Cpu, Wrench, Brain, BookOpen, ShieldCheck, X, Plus, Globe, AppWindow, Code2, SquareTerminal, FileText, Database, Send, Mail, Calendar, Github, MessageSquare, MessagesSquare, Clock, FolderKanban, Users, Folder, Library, Palette, UserRound, Volume2 } from 'lucide-react';
 import { SectionTitle, Field, inputCls, Toggle, Pill } from './shared';
 import { TOOLS, PROVIDERS, CONTEXT_OPTIONS, REASONING_OPTIONS, MEMORY_TYPES, KNOWLEDGE_SOURCES, ATTACHED, PERMISSIONS } from './builderData';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES } from '@/lib/agents/agent-identity';
 
 const SECTIONS = [
   { id: 'config', label: 'Configuration', icon: Settings2 },
+  { id: 'identity', label: 'Identity', icon: Palette },
   { id: 'model', label: 'Model', icon: Cpu },
   { id: 'tools', label: 'Tools', icon: Wrench },
   { id: 'memory', label: 'Memory', icon: Brain },
@@ -22,6 +25,7 @@ export default function ConfigLeft({ config, update }) {
   const toggleTool = (id) => set('tools', config.tools.includes(id) ? config.tools.filter((t) => t !== id) : [...config.tools, id]);
   const togglePerm = (id) => set('permissions', config.permissions.includes(id) ? config.permissions.filter((p) => p !== id) : [...config.permissions, id]);
   const toggleMem = (id) => set('memory', config.memory.includes(id) ? config.memory.filter((m) => m !== id) : [...config.memory, id]);
+  const setIdentity = (key, value) => set('identity', { ...(config.identity || {}), [key]: value, disclosure: 'AI agent' });
 
   return (
     <div className="flex h-full min-h-0">
@@ -44,6 +48,52 @@ export default function ConfigLeft({ config, update }) {
             <Field label="Instructions"><textarea value={config.instructions} onChange={(e) => set('instructions', e.target.value)} rows={3} placeholder="Step-by-step guidance…" className={`${inputCls()} resize-none`} /></Field>
             <Field label="Goals"><textarea value={config.goals} onChange={(e) => set('goals', e.target.value)} rows={2} placeholder="One goal per line" className={`${inputCls()} resize-none`} /></Field>
             <Field label="Rules"><textarea value={config.rules} onChange={(e) => set('rules', e.target.value)} rows={2} placeholder="Constraints & guardrails" className={`${inputCls()} resize-none`} /></Field>
+          </div>
+        )}
+
+        {section === 'identity' && (
+          <div className="space-y-4">
+            <SectionTitle icon={Palette} title="Agent identity" desc="Customise how this AI agent looks and presents itself without changing its permissions or runtime authority." />
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+              <AgentIdentityAvatar name={config.name} identity={config.identity} size="lg" showDisclosure />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-white">{config.identity?.tagline || config.role || 'Blackstar AI agent'}</p>
+                <p className="mt-1 text-[10px] leading-4 text-zinc-500">The AI-agent disclosure is fixed. Humanised presentation never grants new tools, approvals or financial authority.</p>
+              </div>
+            </div>
+            <Field label="Skin">
+              <div className="grid grid-cols-2 gap-2">
+                {AGENT_SKINS.map((skin) => (
+                  <button key={skin.id} type="button" onClick={() => setIdentity('skin', skin.id)} className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${config.identity?.skin === skin.id ? 'border-violet-300/35 bg-violet-400/[.08]' : 'border-white/10 hover:bg-white/[.04]'}`}>
+                    <span className="h-7 w-7 rounded-lg border border-white/10" style={{ background: `linear-gradient(145deg,${skin.from},${skin.to})` }} />
+                    <span className="text-[10px] text-zinc-300">{skin.label}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Avatar style">
+              <div className="flex flex-wrap gap-1.5">{AGENT_AVATAR_STYLES.map((item) => <Pill key={item.id} active={config.identity?.avatarStyle === item.id} onClick={() => setIdentity('avatarStyle', item.id)}><UserRound className="mr-1 inline h-3 w-3" />{item.label}</Pill>)}</div>
+            </Field>
+            <Field label="Presentation style">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {AGENT_PRESENTATION_STYLES.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setIdentity('presentationStyle', item.id)} className={`rounded-xl border p-2.5 text-left transition ${config.identity?.presentationStyle === item.id ? 'border-violet-300/30 bg-violet-400/[.07]' : 'border-white/10 bg-black/20 hover:bg-white/[.04]'}`}>
+                    <p className="text-[11px] font-medium text-white">{item.label}</p>
+                    <p className="mt-1 text-[9px] leading-4 text-zinc-600">{item.description}</p>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Voice style">
+              <div className="flex flex-wrap gap-1.5">{AGENT_VOICE_STYLES.map((item) => <Pill key={item.id} active={config.identity?.voiceStyle === item.id} onClick={() => setIdentity('voiceStyle', item.id)}><Volume2 className="mr-1 inline h-3 w-3" />{item.label}</Pill>)}</div>
+            </Field>
+            <Field label="Identity tagline">
+              <input value={config.identity?.tagline || ''} onChange={(e) => setIdentity('tagline', e.target.value)} maxLength={140} placeholder="e.g. Your calm operations analyst" className={inputCls()} />
+            </Field>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+              <div className="min-w-0 flex-1"><p className="text-[11px] font-medium text-white">Humanised presentation</p><p className="text-[9px] leading-4 text-zinc-500">Uses a more person-like avatar/presentation while retaining the fixed AI-agent disclosure.</p></div>
+              <Toggle checked={config.identity?.humanised === true} onChange={() => setIdentity('humanised', config.identity?.humanised !== true)} />
+            </div>
           </div>
         )}
 
