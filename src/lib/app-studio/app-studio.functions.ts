@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
 import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
 
@@ -119,9 +120,9 @@ export const createStudioApp = createServerFn({ method: "POST" })
       await sb.from("app_studio_apps").delete().eq("id", app.data.id).eq("user_id", context.userId);
       throw new Error(page.error.message);
     }
-    await sb.from("mission_audit_logs").insert({
-      user_id: context.userId, action: "app_studio_created", target_type: "app_studio_app",
-      target_id: app.data.id, status: "success", metadata: { slug: data.slug, application_type: data.applicationType },
+    await writeAudit({
+      userId: context.userId, action: "app_studio_created", targetType: "app_studio_app",
+      targetId: app.data.id, status: "success", metadata: { slug: data.slug, application_type: data.applicationType },
     });
     return { app: app.data, page: page.data };
   });
@@ -238,7 +239,7 @@ export const createStudioRelease = createServerFn({ method: "POST" })
       const updated = await sb.from("app_studio_apps").update({ status: "published", published_release_id: release.data.id }).eq("id", data.appId).eq("user_id", context.userId);
       if (updated.error) throw new Error(updated.error.message);
     }
-    await sb.from("mission_audit_logs").insert({ user_id: context.userId, action: data.publish ? "app_studio_published" : "app_studio_release_created", target_type: "app_studio_app", target_id: data.appId, status: "success", metadata: { release_id: release.data.id, version } });
+    await writeAudit({ userId: context.userId, action: data.publish ? "app_studio_published" : "app_studio_release_created", targetType: "app_studio_app", targetId: data.appId, status: "success", metadata: { release_id: release.data.id, version } });
     return release.data;
   });
 
@@ -251,15 +252,15 @@ export const runStudioQuery = createServerFn({ method: "POST" })
     const startedAt = Date.now();
     try {
       const result = await executeStudioQuery({ sb, userId: context.userId, queryId: data.queryId, input: data.input });
-      await sb.from("mission_audit_logs").insert({
-        user_id: context.userId, action: "app_studio_query_executed", target_type: "app_studio_query",
-        target_id: data.queryId, status: "success", metadata: { duration_ms: Date.now() - startedAt },
+      await writeAudit({
+        userId: context.userId, action: "app_studio_query_executed", targetType: "app_studio_query",
+        targetId: data.queryId, status: "success", metadata: { duration_ms: Date.now() - startedAt },
       });
       return serializable(result);
     } catch (error) {
-      await sb.from("mission_audit_logs").insert({
-        user_id: context.userId, action: "app_studio_query_failed", target_type: "app_studio_query",
-        target_id: data.queryId, status: "failed", metadata: { duration_ms: Date.now() - startedAt },
+      await writeAudit({
+        userId: context.userId, action: "app_studio_query_failed", targetType: "app_studio_query",
+        targetId: data.queryId, status: "failed", metadata: { duration_ms: Date.now() - startedAt },
       });
       throw error;
     }
