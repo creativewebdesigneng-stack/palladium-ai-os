@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { prepareCheckoutDraft, runShoppingResearch } from "@/lib/mission/mission.server";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
 import { assertWithinLimits, checkAgainstLimits, resolveSpendLimits } from "./limits.server";
@@ -16,14 +17,20 @@ const DEFAULT_DOMAINS = [
   "sainsburys.co.uk",
 ];
 
+function auditStatus(value: unknown): "success" | "denied" | "failed" {
+  if (value === "failed") return "failed";
+  if (value === "denied" || value === "blocked") return "denied";
+  return "success";
+}
+
 async function audit(sb: Sb, userId: string, action: string, extra: Record<string, unknown> = {}) {
-  await sb.from("mission_audit_logs").insert({
-    user_id: userId,
+  await writeAudit({
+    userId: userId,
     action,
-    agent_id: (extra["agent_id"] as string | null) ?? null,
-    target_type: (extra["target_type"] as string | null) ?? null,
-    target_id: (extra["target_id"] as string | null) ?? null,
-    status: (extra["status"] as string | null) ?? "success",
+    agentId: (extra["agent_id"] as string | null) ?? null,
+    targetType: (extra["target_type"] as string | null) ?? null,
+    targetId: (extra["target_id"] as string | null) ?? null,
+    status: auditStatus(extra["status"]),
     metadata: (extra["metadata"] as Record<string, unknown>) ?? {},
   });
 }
