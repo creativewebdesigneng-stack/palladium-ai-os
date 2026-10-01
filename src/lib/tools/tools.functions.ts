@@ -8,6 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { executeTool, resolveGrantedTools, TOOL_MANIFEST } from "@/lib/runtime/tools.server";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
@@ -129,10 +130,10 @@ export const saveToolPermission = createServerFn({ method: "POST" })
 
     if (result.error) throw new Error("Could not save that tool permission.");
 
-    await sb.from("mission_audit_logs").insert({
-      user_id: userId,
+    await writeAudit({
+      userId: userId,
       action: "tool_permission_updated",
-      target_type: "tool",
+      targetType: "tool",
       status: "success",
       metadata: { tool: data.tool, agent_id: data.agentId ?? null, enabled: row.enabled },
     });
