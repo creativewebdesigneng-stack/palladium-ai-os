@@ -18,6 +18,11 @@ import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serv
 
 export type Provider = "lovable" | "gemini" | "openai" | "anthropic" | "groq" | "deepseek" | "compatible";
 
+export type ProviderAccess = {
+  provider: Provider;
+  apiKey: string;
+};
+
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
@@ -109,7 +114,8 @@ export function resolveModel(provider: Provider, model?: string | null): string 
 
 type Endpoint = { url: string; headers: Record<string, string>; kind: "chat" | "anthropic" };
 
-function endpointFor(provider: Provider): Endpoint {
+function endpointFor(provider: Provider, access?: ProviderAccess | null): Endpoint {
+  const personalKey = access?.provider === provider ? access.apiKey.trim() : "";
   if (provider === "gemini") {
     const key = process.env["GEMINI_API_KEY"];
     if (!key) throw new ProviderError("Google Gemini is not configured for this workspace.", 503, false);
@@ -120,7 +126,7 @@ function endpointFor(provider: Provider): Endpoint {
     };
   }
   if (provider === "openai") {
-    const key = process.env["OPENAI_API_KEY"];
+    const key = personalKey || process.env["OPENAI_API_KEY"];
     if (!key) throw new ProviderError("OpenAI is not configured for this workspace.", 503, false);
     return {
       url: "https://api.openai.com/v1/chat/completions",
@@ -129,7 +135,7 @@ function endpointFor(provider: Provider): Endpoint {
     };
   }
   if (provider === "anthropic") {
-    const key = process.env["ANTHROPIC_API_KEY"];
+    const key = personalKey || process.env["ANTHROPIC_API_KEY"];
     if (!key)
       throw new ProviderError("Anthropic is not configured for this workspace.", 503, false);
     return {
@@ -302,6 +308,7 @@ export type RunArgs = {
   reasoningEffort?: ReasoningEffort | null;
   maxAttempts?: number;
   signal?: AbortSignal;
+  providerAccess?: ProviderAccess | null;
 };
 
 const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -343,7 +350,7 @@ function providerError(status: number, body: string) {
 }
 
 async function send(args: RunArgs, stream: boolean): Promise<Response> {
-  const ep = endpointFor(args.provider);
+  const ep = endpointFor(args.provider, args.providerAccess);
   const body = ep.kind === "anthropic" ? anthropicBody(args, stream) : chatBody(args, stream);
   const timeout = args.timeoutMs ?? 90_000;
   const maxAttempts = Math.min(3, Math.max(1, Math.trunc(args.maxAttempts ?? 3)));
