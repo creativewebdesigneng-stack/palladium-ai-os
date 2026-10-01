@@ -1158,7 +1158,7 @@ body::before {
   --bx-a: 123, 92, 255;
   --bx-b: 56, 189, 248;
   --bx-c: 232, 121, 249;
-  z-index: -35;
+  z-index: 0;
   background: #010103;
   transform-style: preserve-3d;
   perspective: 1800px;
