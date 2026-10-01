@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { AGENT_PROCEDURE_PLAYBOOKS_160 } from './agent-procedure-playbooks';
+import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
 const BATCH_SIZE = 20;
@@ -83,11 +84,11 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
 
 
     const nextCursor = data.cursor + BATCH_SIZE;
-    const audit = await sb.from('mission_audit_logs').insert({
-      user_id: context.userId,
+    await writeAudit({
+      userId: context.userId,
       action: 'agent_skill_procedure_pack_batch_installed',
-      target_type: 'agent_skill_pack',
-      target_id: null,
+      targetType: 'agent_skill_pack',
+      targetId: null,
       status: 'success',
       metadata: {
         pack: 'blackstar-agent-procedures-160-v1',
@@ -98,7 +99,6 @@ export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
         skipped,
       },
     });
-    if (audit.error) throw new Error('Skill batch installed but its audit record could not be saved.');
 
     return {
       processed: entries.length,
