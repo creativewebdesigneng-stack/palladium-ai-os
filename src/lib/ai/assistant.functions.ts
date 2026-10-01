@@ -256,7 +256,7 @@ export const assistantChat = createServerFn({ method: "POST" })
       ...(memoryContext.prompt ? [{ role: "system" as const, content: memoryContext.prompt }] : []),
       ...(connectionContext.prompt ? [{ role: "system" as const, content: connectionContext.prompt }] : []),
       ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
-      ...conversation.history.map((t) => ({ role: t.role, content: t.content }) as ChatMessage),
+      ...conversation.history.map((t: Turn) => ({ role: t.role, content: t.content }) as ChatMessage),
       { role: "user", content: data.message },
     ];
 
