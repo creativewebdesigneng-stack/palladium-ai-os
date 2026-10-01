@@ -52,18 +52,18 @@ Deno.serve(async (request: Request) => {
       health: string;
       attested_at: string;
       expires_at: string;
-    }[]>\`
+    }[]>`
       update public.ai_hub_runtime_targets
-      set health = \${health},
+      set health = ${health},
           last_seen_at = now(),
           attested_at = now(),
           expires_at = now() + interval '10 minutes',
           updated_at = now()
-      where id = \${targetId}::uuid
+      where id = ${targetId}::uuid
         and revoked_at is null
-        and token_sha256 = encode(extensions.digest(\${token}, 'sha256'), 'hex')
+        and token_sha256 = encode(extensions.digest(${token}, 'sha256'), 'hex')
       returning id, deployment_target, region, health, attested_at, expires_at
-    \`;
+    `;
 
     const target = rows[0];
     if (!target) return json({ error: "Unauthorized" }, 401);
