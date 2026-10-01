@@ -19,7 +19,7 @@ describe('agent provider configuration preflight', () => {
     const providerResolution = prepareRunSource.indexOf(
       'const provider = normaliseProvider(agent.model_provider)',
     )
-    const providerGuard = prepareRunSource.indexOf('if (!isProviderConfigured(provider))')
+    const providerGuard = prepareRunSource.indexOf('if (!(await isProviderAvailableForUser({ userId: args.userId, provider })))')
     const taskWrite = prepareRunSource.indexOf('.from("agent_tasks")', providerGuard)
 
     expect(providerResolution).toBeGreaterThan(-1)
@@ -28,7 +28,7 @@ describe('agent provider configuration preflight', () => {
   })
 
   it('returns a safe 503 configuration error without silent provider failover', () => {
-    const providerGuard = prepareRunSource.indexOf('if (!isProviderConfigured(provider))')
+    const providerGuard = prepareRunSource.indexOf('if (!(await isProviderAvailableForUser({ userId: args.userId, provider })))')
     const taskWrite = prepareRunSource.indexOf('.from("agent_tasks")', providerGuard)
     const preflight = prepareRunSource.slice(providerGuard, taskWrite)
 
@@ -36,7 +36,7 @@ describe('agent provider configuration preflight', () => {
     expect(taskWrite).toBeGreaterThan(providerGuard)
     expect(preflight).toContain('"PROVIDER_NOT_CONFIGURED"')
     expect(preflight).toContain('503')
-    expect(preflight).toContain('select another configured provider')
+    expect(preflight).toContain('configured for this workspace or connected by this user')
     expect(preflight).not.toMatch(/fallback|normaliseProvider\([^)]*groq|normaliseProvider\([^)]*lovable/i)
   })
 })

@@ -13,11 +13,11 @@ import remember from "./tools/remember";
 const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-unset";
 
 export default defineMcp({
-  name: "palladiumai",
-  title: "PalladiumAI",
+  name: "blackstar",
+  title: "Blackstar",
   version: "0.1.0",
   instructions:
-    "Tools for PalladiumAI, an AI workforce operating system. Use list_agents/create_agent to manage the user's personal AI agents, list_tasks/create_task for Mission Control missions, list_approvals/decide_approval for the Approval Centre (approvals may authorise spending — always confirm with the user first), and list_memories/remember for the personal memory vault.",
+    "Tools for Blackstar, a bounded intelligence infrastructure platform. Use list_agents/create_agent to manage the user's personal AI agents, list_tasks/create_task for Mission Control missions, list_approvals/decide_approval for governed approvals (approvals may authorise spending — always confirm with the user first), and list_memories/remember for the personal memory vault. Never claim an external action completed unless the corresponding Blackstar tool confirms it.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",

@@ -6,6 +6,7 @@ import { Bot, CheckCircle2, Cpu, KeyRound, Loader2, Search, Server, ShieldCheck,
 import PageHeader from '@/components/palladium/PageHeader';
 import BlackstarAstraActivationPanel from '@/components/models/BlackstarAstraActivationPanel';
 import DeepSeekRuntimePanel from '@/components/models/DeepSeekRuntimePanel';
+import APIManagement from '@/components/models/APIManagement';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
@@ -75,10 +76,12 @@ export default function Models() {
       <BlackstarAstraActivationPanel readiness={astra} />
       <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
 
+      <div className="mb-6"><APIManagement /></div>
+
       <section className="mb-6">
         <div className="mb-3">
-          <h2 className="text-sm font-semibold text-white">Server providers</h2>
-          <p className="mt-1 text-[11px] text-zinc-500">Configuration status comes from server environment variables. Secret values are never returned to the browser.</p>
+          <h2 className="text-sm font-semibold text-white">Available model providers</h2>
+          <p className="mt-1 text-[11px] text-zinc-500">Readiness includes deployment credentials and your encrypted personal OpenAI/Anthropic connections. Secret values are never returned to the browser.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {providers.map((provider) => (
@@ -92,7 +95,7 @@ export default function Models() {
               <code className="mt-1 block truncate rounded-lg bg-black/30 px-2 py-1.5 text-[11px] text-violet-200">{provider.defaultModel}</code>
               {provider.integrations?.length ? <p className="mt-2 text-[10px] text-zinc-400">Compatible integrations: <span className="text-violet-200">{provider.integrations.join(' · ')}</span></p> : null}
               {provider.routingNote ? <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">{provider.routingNote}</p> : null}
-              <p className={`mt-2 text-[10px] font-medium ${provider.configured ? 'text-emerald-300' : 'text-zinc-500'}`}>{provider.configured ? 'Configured for runtime' : 'Not configured on this deployment'}</p>
+              <p className={`mt-2 text-[10px] font-medium ${provider.configured ? 'text-emerald-300' : 'text-zinc-500'}`}>{provider.personalConnected ? 'Connected with your personal credential' : provider.deploymentConfigured ? 'Configured for workspace runtime' : 'Not configured for this account'}</p>
             </article>
           ))}
         </div>

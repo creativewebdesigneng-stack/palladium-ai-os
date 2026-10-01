@@ -43,6 +43,14 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       lastUsedAt: string | null;
     };
 
+    const { listUserModelProviderCredentials } = await import("./model-provider-credentials.server");
+    const personalConnections = await listUserModelProviderCredentials(context.userId);
+    const personalProviderIds = new Set(
+      personalConnections
+        .filter((item: { enabled: boolean }) => item.enabled)
+        .map((item: { provider: "openai" | "anthropic" }) => item.provider),
+    );
+
     const usageByModel = new Map<string, UsageRow>();
     for (const task of tasks ?? []) {
       const provider = String(task.provider ?? "unknown");
@@ -91,16 +99,24 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       name: string;
       defaultModel: string;
       configured: boolean;
+      deploymentConfigured: boolean;
+      personalConnected: boolean;
       integrations?: string[];
       routingNote?: string;
-    }> = listModelProviderDefinitions().map((provider) => ({
+    }> = listModelProviderDefinitions().map((provider) => {
+      const deploymentConfigured = isModelProviderConfigured(provider.id);
+      const personalConnected = personalProviderIds.has(provider.id as "openai" | "anthropic");
+      return {
       id: provider.id,
       name: provider.name,
       defaultModel: provider.defaultModel,
-      configured: isModelProviderConfigured(provider.id),
+      configured: deploymentConfigured || personalConnected,
+      deploymentConfigured,
+      personalConnected,
       ...(provider.integrations ? { integrations: [...provider.integrations] } : {}),
       ...(provider.routingNote ? { routingNote: provider.routingNote } : {}),
-    }));
+    };
+    });
 
     return {
       providers,

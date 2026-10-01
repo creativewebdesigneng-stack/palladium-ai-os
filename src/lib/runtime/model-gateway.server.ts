@@ -133,7 +133,8 @@ async function tryProviderModels(args: RunArgs, provider: Provider, model: strin
   let lastError: unknown;
   for (const candidate of modelCandidates(provider, model)) {
     try {
-      const callArgs = { ...args, provider, model: candidate };
+      const providerAccess = args.providerAccess?.provider === provider ? args.providerAccess : null;
+      const callArgs = { ...args, provider, model: candidate, providerAccess };
       if (isAstraGroqBootstrapRequest(provider, candidate)) return await runAstraGroqBootstrap(callArgs);
       return provider === "gemini" ? await runGeminiNative(callArgs) : await base.runChat(callArgs);
     } catch (error) {

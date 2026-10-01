@@ -17,7 +17,7 @@ import {
   resolveAssistantModelPreference,
 } from "@/lib/ai/ai-preferences.server";
 import { searchPublicWeb, type LiveLocation, type WebSource } from "@/lib/ai/web-access.server";
-import { ProviderError, runChat, type ChatMessage, type Provider } from "@/lib/runtime/model-gateway.server";
+import { ProviderError, normaliseProvider, resolveModel, runChat, type ChatMessage, type Provider, type ProviderAccess } from "@/lib/runtime/model-gateway.server";
 
 const SYSTEM_PROMPT = [
   "You are a capable general-purpose AI personal assistant built into the Blackstar intelligence platform.",
@@ -91,9 +91,10 @@ async function runAssistantWithFallback(args: {
   provider: Provider;
   model: string;
   messages: ChatMessage[];
+  providerAccess?: ProviderAccess | null;
 }): Promise<AssistantRun> {
   try {
-    const primary = await runChat({ provider: args.provider, model: args.model, messages: args.messages, maxTokens: 1100 });
+    const primary = await runChat({ provider: args.provider, model: args.model, messages: args.messages, maxTokens: 1100, ...(args.providerAccess ? { providerAccess: args.providerAccess } : {}) });
     const text = primary.text.trim();
     if (!text) throw new ProviderError("The model returned an empty response.", 502, true);
     return { text, provider: primary.provider, model: primary.model, usage: primary.usage };
@@ -102,7 +103,7 @@ async function runAssistantWithFallback(args: {
     if (!canUseGroq) throw primaryError;
     console.warn("[assistant] primary provider failed; retrying with Groq", args.provider, primaryError instanceof Error ? primaryError.message : String(primaryError));
     const fallbackModel = defaultModelFor("groq");
-    const fallback = await runChat({ provider: "groq", model: fallbackModel, messages: args.messages, maxTokens: 1100 });
+    const fallback = await runChat({ provider: "groq", model: fallbackModel, messages: args.messages, maxTokens: 1100, ...(args.providerAccess ? { providerAccess: args.providerAccess } : {}) });
     const text = fallback.text.trim();
     if (!text) throw new ProviderError("The fallback model returned an empty response.", 502, true);
     return { text, provider: fallback.provider, model: fallback.model, usage: fallback.usage, fallbackFrom: args.provider };
@@ -148,7 +149,22 @@ export const assistantChat = createServerFn({ method: "POST" })
     let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
     if (preferenceResult.error) console.warn("[assistant] AI preference lookup failed; using deployment default", preferenceResult.error.message);
     else storedPreference = preferenceResult.data;
-    const { provider, model, source: preferenceSource } = resolveAssistantModelPreference(storedPreference);
+    const deploymentPreference = resolveAssistantModelPreference(storedPreference);
+    let provider = deploymentPreference.provider;
+    let model = deploymentPreference.model;
+    let preferenceSource: "user" | "deployment" = deploymentPreference.source;
+    let providerAccess: ProviderAccess | null = null;
+    if (storedPreference && typeof storedPreference.default_provider === "string") {
+      const requestedProvider = normaliseProvider(storedPreference.default_provider);
+      const { resolveUserModelProviderAccess } = await import("@/lib/runtime/model-provider-credentials.server");
+      providerAccess = await resolveUserModelProviderAccess({ userId: context.userId, provider: requestedProvider });
+      if (providerAccess) {
+        provider = requestedProvider;
+        const requestedModel = typeof storedPreference.default_model === "string" ? storedPreference.default_model.trim() : "";
+        model = resolveModel(provider, requestedModel || defaultModelFor(provider));
+        preferenceSource = "user";
+      }
+    }
 
     const profile = profileResult.error ? null : profileResult.data;
     const personal = personalResult.error ? null : personalResult.data;
@@ -199,7 +215,7 @@ export const assistantChat = createServerFn({ method: "POST" })
     ];
 
     try {
-      const result = await runAssistantWithFallback({ provider, model, messages });
+      const result = await runAssistantWithFallback({ provider, model, messages, providerAccess });
       await recordUsage({
         userId: context.userId,
         metric: "assistant_message",

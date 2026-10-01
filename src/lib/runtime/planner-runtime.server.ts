@@ -38,6 +38,11 @@ import {
 } from "./run-checkpoint.server";
 import type { BlackstarAstraReasoningControl } from "./blackstar-astra-reasoning";
 import {
+  markUserModelProviderUsed,
+  resolveUserModelProviderAccess,
+} from "./model-provider-credentials.server";
+import type { ProviderAccess } from "./model-gateway.base";
+import {
   combineBlackstarAstraVerificationDecisions,
   resolveBlackstarAstraPlannerPolicy,
 } from "./blackstar-astra-planner-policy";
@@ -102,7 +107,7 @@ function verifierInstruction(plan: AgentPlan, candidate: string) {
   ].join("\n");
 }
 
-async function buildPlan(run: PreparedRun): Promise<AgentPlan> {
+async function buildPlan(run: PreparedRun, providerAccess: ProviderAccess | null): Promise<AgentPlan> {
   const agent = run.agent as PlannerAgent;
   const profile = agent.operating_profile ?? null;
   const objective = taskObjective(run);
@@ -122,6 +127,7 @@ async function buildPlan(run: PreparedRun): Promise<AgentPlan> {
       tools: [],
       temperature: 0.1,
       maxTokens: Math.min(Math.max(run.agent.max_tokens ?? 1200, 500), 1800),
+      providerAccess,
     });
     const parsed = extractJsonObject(result.text);
     if (!parsed) return fallback;
@@ -193,7 +199,7 @@ async function saveCheckpoint(args: {
   });
 }
 
-async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: string, signal: AbortSignal) {
+async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: string, signal: AbortSignal, providerAccess: ProviderAccess | null) {
   if (!plan.verification_required) {
     return normaliseVerificationDecision({ passed: true, score: 1, next_action: "complete" });
   }
@@ -209,6 +215,7 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
       temperature: 0,
       maxTokens: 1400,
       signal,
+      providerAccess,
     });
     const parsed = extractJsonObject(result.text);
     return normaliseVerificationDecision(parsed ?? { passed: false, score: 0, issues: ["Verifier returned invalid structured output"], next_action: "replan" });
@@ -230,10 +237,11 @@ async function verifyCandidateWithDepth(
   candidate: string,
   signal: AbortSignal,
   passes: number,
+  providerAccess: ProviderAccess | null,
 ) {
   const decisions: VerificationDecision[] = [];
   for (let index = 0; index < passes; index += 1) {
-    decisions.push(await verifyCandidate(run, plan, candidate, signal));
+    decisions.push(await verifyCandidate(run, plan, candidate, signal, providerAccess));
   }
   return combineBlackstarAstraVerificationDecisions(decisions);
 }
@@ -417,8 +425,10 @@ export async function executePlannedRun(args: {
   }, Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS));
 
   const astraPolicy = resolveBlackstarAstraPlannerPolicy(args.reasoningControl);
+  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
   const resumed = args.resumeCheckpoint ?? null;
-  let plan = resumed ? resumed.plan : await buildPlan(args.run);
+  let plan = resumed ? resumed.plan : await buildPlan(args.run, providerAccess);
   await persistPlan(args.sb, args.run.taskId, plan);
   const messages: ChatMessage[] = resumed
     ? resumed.messages.map((message) => ({ ...message }))
@@ -468,6 +478,7 @@ export async function executePlannedRun(args: {
         temperature: args.run.agent.temperature,
         maxTokens: args.run.agent.max_tokens,
         signal: controller.signal,
+        providerAccess,
       });
       usage.input += result.usage.input;
       usage.output += result.usage.output;
@@ -511,6 +522,7 @@ export async function executePlannedRun(args: {
         result.text,
         controller.signal,
         astraPolicy.verification_passes,
+        providerAccess,
       );
       await persistVerification(args.sb, args.run.taskId, decision);
 
