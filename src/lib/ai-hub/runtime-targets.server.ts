@@ -12,6 +12,7 @@ type RuntimeTargetRow = {
   health: 'healthy' | 'degraded' | 'offline'
   attested_at?: string | null
   expires_at?: string | null
+  updated_at: string
   metadata?: Record<string, unknown> | null
 }
 
@@ -21,7 +22,7 @@ export async function loadAiHubRuntimeTargetRegistry(
 ): Promise<AiHubRuntimeTargetRegistry> {
   const { data, error } = await sb
     .from('ai_hub_runtime_targets')
-    .select('id,user_id,org_id,deployment_target,region,health,attested_at,expires_at,metadata')
+    .select('id,user_id,org_id,deployment_target,region,health,attested_at,expires_at,updated_at,metadata')
     .is('revoked_at', null)
 
   if (error) throw new Error(error.message)
@@ -39,6 +40,7 @@ export async function loadAiHubRuntimeTargetRegistry(
       health: raw.health,
       attestedAt: raw.attested_at,
       ...(raw.expires_at ? { expiresAt: raw.expires_at } : {}),
+      configurationUpdatedAt: raw.updated_at,
       ...(raw.metadata ? { metadata: raw.metadata } : {}),
     })
   }
