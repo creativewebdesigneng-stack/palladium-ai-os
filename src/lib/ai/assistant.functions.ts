@@ -18,7 +18,6 @@ import {
 } from "@/lib/ai/ai-preferences.server";
 import { searchPublicWeb, type LiveLocation, type WebSource } from "@/lib/ai/web-access.server";
 import { ProviderError, normaliseProvider, resolveModel, runChat, type ChatMessage, type Provider, type ProviderAccess } from "@/lib/runtime/model-gateway.server";
-import { resolveUserModelProviderAccess } from "@/lib/runtime/model-provider-credentials.server";
 
 const SYSTEM_PROMPT = [
   "You are a capable general-purpose AI personal assistant built into the Blackstar intelligence platform.",
@@ -157,6 +156,7 @@ export const assistantChat = createServerFn({ method: "POST" })
     let providerAccess: ProviderAccess | null = null;
     if (storedPreference && typeof storedPreference.default_provider === "string") {
       const requestedProvider = normaliseProvider(storedPreference.default_provider);
+      const { resolveUserModelProviderAccess } = await import("@/lib/runtime/model-provider-credentials.server");
       providerAccess = await resolveUserModelProviderAccess({ userId: context.userId, provider: requestedProvider });
       if (providerAccess) {
         provider = requestedProvider;
