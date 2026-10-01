@@ -64,7 +64,7 @@ export function assessIntegrationHealth(input: HealthInput): IntegrationHealth {
       healthy: false,
       reconnectRequired: true,
       missingScopes,
-      reason: `${input.providerName} is connected but is missing permissions required by the current PalladiumAI integration. Reconnect to grant the updated permissions.`,
+      reason: `${input.providerName} is connected but is missing permissions required by the current Blackstar integration. Reconnect to grant the updated permissions.`,
     };
   }
 
