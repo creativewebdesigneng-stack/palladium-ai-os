@@ -6,19 +6,15 @@ import {
 } from '@/components/site/DeveloperShowcase';
 import Footer from '@/components/site/Footer';
 import { AstraMark } from '@/components/blackstar/AstraMark';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 export default function Developers() {
   return (
-    <div className="blackstar-public-page blackstar-public-developers min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-developers blackstar-style-neon-infrastructure relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
+      <PublicExperienceBackdrop room="astra-room-infrastructure" visualStyle="blackstar-style-neon-infrastructure" />
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-20 pt-32">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/3 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/18 blur-[150px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(123,92,255,.12),transparent_60%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.03)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-        </div>
-
         <SectionReveal className="relative mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-4 py-1.5 text-xs text-zinc-300 backdrop-blur">
             <AstraMark size={16} /> For developers
