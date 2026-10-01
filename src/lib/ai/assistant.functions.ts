@@ -112,13 +112,18 @@ async function runAssistantWithFallback(args: {
 
 export const assistantChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { message: string; history?: Turn[]; location?: unknown }) => {
+  .inputValidator((input: { message: string; history?: Turn[]; location?: unknown; conversationId?: string | null }) => {
     const message = String(input?.message ?? "").trim();
     if (!message) throw new Error("A message is required.");
-    const history = Array.isArray(input?.history) ? input.history.slice(-8) : [];
+    const history = Array.isArray(input?.history) ? input.history.slice(-12) : [];
     const location = parseLocation(input?.location);
+    const rawConversationId = typeof input?.conversationId === "string" ? input.conversationId.trim() : "";
+    const conversationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawConversationId)
+      ? rawConversationId
+      : null;
     return {
       message: message.slice(0, 4000),
+      conversationId,
       history: history
         .filter((t) => t && (t.role === "user" || t.role === "assistant") && t.content)
         .map((t) => ({ role: t.role, content: String(t.content).slice(0, 4000) })),
@@ -136,14 +141,13 @@ export const assistantChat = createServerFn({ method: "POST" })
       throw error;
     }
 
-    const [preferenceResult, profileResult, personalResult, tasksResult, workflowsResult, approvalsResult, notificationsResult] = await Promise.all([
+    const [preferenceResult, profileResult, personalResult] = await Promise.all([
       sb.from("user_ai_preferences").select("default_provider,default_model").eq("user_id", context.userId).maybeSingle(),
       sb.from("profiles").select("full_name,email").eq("id", context.userId).maybeSingle(),
-      sb.from("personal_assistant_preferences").select("assistant_name,location_name,timezone").eq("user_id", context.userId).maybeSingle(),
-      sb.from("agent_tasks").select("title,status,output_text,error,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(8),
-      sb.from("workflow_runs").select("status,input,output,error,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(8),
-      sb.from("approval_requests").select("title,action_type,risk_level,status,created_at").eq("user_id", context.userId).eq("status", "pending").order("created_at", { ascending: false }).limit(6),
-      sb.from("notifications").select("title,body,severity,created_at").eq("user_id", context.userId).is("read_at", null).order("created_at", { ascending: false }).limit(6),
+      sb.from("personal_assistant_preferences")
+        .select("assistant_name,location_name,timezone,conversation_history_enabled,memory_context_enabled,workspace_context_enabled,live_web_enabled,response_style")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
     ]);
 
     let storedPreference: { default_provider?: unknown; default_model?: unknown } | null = null;
@@ -179,22 +183,55 @@ export const assistantChat = createServerFn({ method: "POST" })
       "Address the user naturally by their name when appropriate, but do not overuse it.",
     ].join("\n");
 
-    const tasks = tasksResult.error ? [] : tasksResult.data ?? [];
-    const workflows = workflowsResult.error ? [] : workflowsResult.data ?? [];
-    const approvals = approvalsResult.error ? [] : approvalsResult.data ?? [];
-    const notifications = notificationsResult.error ? [] : notificationsResult.data ?? [];
-    const workspaceContext = [
-      "WORKSPACE CONTEXT",
-      `Recent agent tasks: ${JSON.stringify(tasks)}`,
-      `Recent workflow runs: ${JSON.stringify(workflows)}`,
-      `Pending approvals: ${JSON.stringify(approvals)}`,
-      `Unread notifications: ${JSON.stringify(notifications)}`,
-      "Use this only when relevant to the user's request. Summarise rather than dumping raw JSON.",
-    ].join("\n\n").slice(0, 14000);
+    const {
+      loadAssistantMemoryContext,
+      loadAssistantWorkspaceContext,
+      persistAssistantMessage,
+      resolveAssistantConversation,
+      responseStyleInstruction,
+    } = await import("@/lib/ai/assistant-context.server");
+
+    const conversationHistoryEnabled = personal?.conversation_history_enabled !== false;
+    const memoryContextEnabled = personal?.memory_context_enabled !== false;
+    const workspaceContextEnabled = personal?.workspace_context_enabled !== false;
+    const liveWebEnabled = personal?.live_web_enabled !== false;
+    const responseStyle = typeof personal?.response_style === "string" ? personal.response_style : "balanced";
+
+    const conversation = await resolveAssistantConversation({
+      sb,
+      userId: context.userId,
+      conversationId: data.conversationId,
+      seedMessage: data.message,
+      historyEnabled: conversationHistoryEnabled,
+      fallbackHistory: data.history,
+    });
+
+    await persistAssistantMessage({
+      sb,
+      userId: context.userId,
+      conversationId: conversation.conversationId,
+      role: "user",
+      content: data.message,
+    }).catch((error) => console.warn("[assistant] could not persist user turn", error));
+
+    const [memoryContext, workspaceContext] = await Promise.all([
+      loadAssistantMemoryContext({
+        sb,
+        userId: context.userId,
+        query: data.message,
+        enabled: memoryContextEnabled,
+      }),
+      loadAssistantWorkspaceContext({
+        sb,
+        userId: context.userId,
+        query: data.message,
+        enabled: workspaceContextEnabled,
+      }),
+    ]);
 
     let webSources: WebSource[] = [];
     let webSearchAttempted = false;
-    if (shouldUseLiveWeb(data.message)) {
+    if (liveWebEnabled && shouldUseLiveWeb(data.message)) {
       webSearchAttempted = true;
       try {
         const web = await searchPublicWeb(data.message, 6, undefined, data.location ?? undefined);
@@ -208,14 +245,31 @@ export const assistantChat = createServerFn({ method: "POST" })
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "system", content: personalContext },
-      { role: "system", content: workspaceContext },
+      { role: "system", content: responseStyleInstruction(responseStyle) },
+      ...(workspaceContext.prompt ? [{ role: "system" as const, content: workspaceContext.prompt }] : []),
+      ...(memoryContext.prompt ? [{ role: "system" as const, content: memoryContext.prompt }] : []),
       ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
-      ...data.history.map((t) => ({ role: t.role, content: t.content }) as ChatMessage),
+      ...conversation.history.map((t) => ({ role: t.role, content: t.content }) as ChatMessage),
       { role: "user", content: data.message },
     ];
 
     try {
       const result = await runAssistantWithFallback({ provider, model, messages, providerAccess });
+      await persistAssistantMessage({
+        sb,
+        userId: context.userId,
+        conversationId: conversation.conversationId,
+        role: "assistant",
+        content: result.text,
+        provider: result.provider,
+        model: result.model,
+        metadata: {
+          fallbackFrom: result.fallbackFrom ?? null,
+          liveWebSources: webSources.length,
+          memoryHits: memoryContext.hits,
+          agentMatches: workspaceContext.agentMatches,
+        },
+      }).catch((error) => console.warn("[assistant] could not persist assistant turn", error));
       await recordUsage({
         userId: context.userId,
         metric: "assistant_message",
@@ -229,6 +283,13 @@ export const assistantChat = createServerFn({ method: "POST" })
           live_web_attempted: webSearchAttempted,
           live_web_sources: webSources.length,
           live_location_used: Boolean(data.location),
+          conversation_id: conversation.conversationId,
+          conversation_history_enabled: conversationHistoryEnabled,
+          memory_context_enabled: memoryContextEnabled,
+          memory_context_hits: memoryContext.hits,
+          workspace_context_enabled: workspaceContextEnabled,
+          agent_matches: workspaceContext.agentMatches,
+          response_style: responseStyle,
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
         },
@@ -238,9 +299,9 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "success",
-        metadata: { provider: result.provider, model: result.model, assistantName, preferenceSource, fallbackFrom: result.fallbackFrom ?? null, liveWebAttempted: webSearchAttempted, liveWebSources: webSources.length, liveLocationUsed: Boolean(data.location) },
+        metadata: { provider: result.provider, model: result.model, assistantName, preferenceSource, fallbackFrom: result.fallbackFrom ?? null, liveWebAttempted: webSearchAttempted, liveWebSources: webSources.length, liveLocationUsed: Boolean(data.location), conversationId: conversation.conversationId, memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches, responseStyle },
       });
-      return { text: result.text, provider: result.provider, model: result.model, assistantName, sources: webSources.map(({ title, url }) => ({ title, url })), webSearchAttempted, liveLocationUsed: Boolean(data.location) };
+      return { text: result.text, provider: result.provider, model: result.model, assistantName, conversationId: conversation.conversationId, sources: webSources.map(({ title, url }) => ({ title, url })), webSearchAttempted, liveLocationUsed: Boolean(data.location), memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches };
     } catch (error) {
       const status = error instanceof ProviderError ? error.status : 500;
       console.error("[assistant] provider failure", status, error);
