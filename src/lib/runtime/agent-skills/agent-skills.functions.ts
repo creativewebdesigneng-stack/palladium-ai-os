@@ -4,6 +4,7 @@ import { prepareAgentSkillPackage } from "./skill-package";
 import { compileAgentSkillCapability } from "./capability-compiler";
 import { createPalladiumAiHubRegistry } from "@/lib/ai-hub/registry";
 import { createSkillCandidateFromVerifiedExperience } from "./skill-reflection.server";
+import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -84,11 +85,11 @@ export const installAgentSkill = createServerFn({ method: "POST" })
       : await sb.from("agent_skills").insert(row).select(SAFE_COLUMNS).maybeSingle();
     if (result.error || !result.data) throw new Error("Could not install that agent skill.");
 
-    await sb.from("mission_audit_logs").insert({
-      user_id: userId,
+    await writeAudit({
+      userId,
       action: existing ? "agent_skill_updated" : "agent_skill_installed",
-      target_type: "agent_skill",
-      target_id: result.data.id,
+      targetType: "agent_skill",
+      targetId: result.data.id,
       status: "success",
       metadata: {
         name: prepared.name,
@@ -128,11 +129,11 @@ export const setAgentSkillEnabled = createServerFn({ method: "POST" })
       .select(SAFE_COLUMNS)
       .maybeSingle();
     if (result.error || !result.data) throw new Error("That skill is not available to you.");
-    await sb.from("mission_audit_logs").insert({
-      user_id: userId,
+    await writeAudit({
+      userId,
       action: data.enabled ? "agent_skill_enabled" : "agent_skill_disabled",
-      target_type: "agent_skill",
-      target_id: data.id,
+      targetType: "agent_skill",
+      targetId: data.id,
       status: "success",
       metadata: { enabled: data.enabled },
     });
@@ -149,11 +150,11 @@ export const deleteAgentSkill = createServerFn({ method: "POST" })
     if (!row) throw new Error("That skill is not available to you.");
     const deleted = await sb.from("agent_skills").delete().eq("id", data.id).eq("user_id", userId);
     if (deleted.error) throw new Error("Could not delete that agent skill.");
-    await sb.from("mission_audit_logs").insert({
-      user_id: userId,
+    await writeAudit({
+      userId,
       action: "agent_skill_deleted",
-      target_type: "agent_skill",
-      target_id: data.id,
+      targetType: "agent_skill",
+      targetId: data.id,
       status: "success",
       metadata: { name: row.name },
     });
