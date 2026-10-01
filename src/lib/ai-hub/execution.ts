@@ -1,5 +1,6 @@
 import type { AiHubOrchestrationPlan } from './orchestrator'
 import type { AiHubProviderDefinition, AiHubRegistry } from './registry'
+import { requiresRuntimeTargetAttestation, type AiHubRuntimeTargetRegistry } from './runtime-targets'
 
 export interface AiHubExecutionContext {
   tenantId: string
@@ -34,6 +35,7 @@ export class AiHubExecutionGateway {
   constructor(
     private readonly registry: AiHubRegistry,
     private readonly approvalGate?: AiHubApprovalGate,
+    private readonly runtimeTargets?: AiHubRuntimeTargetRegistry,
   ) {}
 
   registerAdapter(adapter: AiHubProviderDefinition['adapter'], execute: AiHubExecutionAdapter) {
@@ -44,7 +46,7 @@ export class AiHubExecutionGateway {
     if (!context.tenantId || !context.actorId) {
       throw new Error('AI Hub execution requires tenant and actor identity')
     }
-    this.assertPlacement(plan)
+    this.assertPlacement(plan, context)
 
     if (plan.requiresApproval) {
       const provider = this.resolveProvider(plan)
@@ -91,7 +93,7 @@ export class AiHubExecutionGateway {
     }
   }
 
-  private assertPlacement(plan: AiHubOrchestrationPlan) {
+  private assertPlacement(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext) {
     const capability = plan.route.capability
     if (plan.placement.workloadId !== plan.workloadId || plan.route.workloadId !== plan.workloadId) {
       throw new Error('AI Hub placement does not match the routed workload')
@@ -101,6 +103,20 @@ export class AiHubExecutionGateway {
     }
     if (!capability.deploymentTargets.includes(plan.placement.deploymentTarget)) {
       throw new Error('AI Hub placement uses a deployment target not allowed by the routed capability')
+    }
+
+    if (requiresRuntimeTargetAttestation(plan.placement.deploymentTarget)) {
+      if (!this.runtimeTargets) {
+        throw new Error('AI Hub portable runtime target registry is not configured')
+      }
+      const target = this.runtimeTargets.resolve({
+        tenantId: context.tenantId,
+        deploymentTarget: plan.placement.deploymentTarget,
+        ...(plan.placement.region ? { region: plan.placement.region } : {}),
+      })
+      if (!target) {
+        throw new Error('AI Hub portable runtime target is not healthy and attested for this tenant')
+      }
     }
   }
 
