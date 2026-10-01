@@ -9,7 +9,6 @@
  * Runs are never left stuck: stale runs are reaped, every model call is
  * time-boxed and retried, and every failure path closes the task row.
  */
-import { isProviderConfigured } from "@/lib/ai/ai-preferences.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { captureCompletedAgentRunMemory } from "./agent-run-memory.server";
 import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
@@ -35,6 +34,11 @@ import {
   RunLoopGuard,
 } from "./atomic-loop-guard.server";
 import { applyRunSteering, createSteeringCursor } from "./run-steering.server";
+import {
+  isProviderAvailableForUser,
+  markUserModelProviderUsed,
+  resolveUserModelProviderAccess,
+} from "./model-provider-credentials.server";
 
 type Sb = { from: (t: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -264,9 +268,9 @@ export async function prepareRun(args: {
   const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
   const provider = normaliseProvider(agent.model_provider);
   const model = resolveModel(provider, agent.model);
-  if (!isProviderConfigured(provider)) {
+  if (!(await isProviderAvailableForUser({ userId: args.userId, provider }))) {
     throw new RuntimeError(
-      `The '${provider}' model provider is not configured on this server. Configure it or select another configured provider for this agent.`,
+      `The '${provider}' model provider is not configured for this workspace or connected by this user.`,
       "PROVIDER_NOT_CONFIGURED",
       503,
     );
@@ -741,6 +745,8 @@ export async function executeRun(args: {
   const usage = { input: 0, output: 0 };
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
+  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
 
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -766,6 +772,7 @@ export async function executeRun(args: {
           temperature: args.run.agent.temperature,
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
+          providerAccess,
         });
       } catch (error) {
         if (externalFailure) throw externalFailure;
@@ -830,6 +837,8 @@ export async function* streamRun(args: {
   let toolCallCount = 0;
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
+  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
 
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
@@ -857,6 +866,7 @@ export async function* streamRun(args: {
           temperature: args.run.agent.temperature,
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
+          providerAccess,
         })) {
           if (event.type === "text") yield { type: "delta", text: event.delta };
           if (event.type === "done") final = event.result;
