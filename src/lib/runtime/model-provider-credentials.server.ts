@@ -24,7 +24,7 @@ function assertConnectableProvider(provider: Provider): asserts provider is User
 }
 
 function hasSupabaseAdminEnvironment() {
-  const url = process.env['SUPABASE_URL'] || process.env['VITE_SUPABASE_URL']
+  const url = process.env['SUPABASE_URL']
   const secret =
     process.env['SUPABASE_SECRET_KEY'] ||
     process.env['SUPABASE_SECRET_KEYS'] ||
