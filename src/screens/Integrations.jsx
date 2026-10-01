@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import PageHeader from "@/components/palladium/PageHeader";
+import { PROVIDER_CAPABILITY_PROFILES } from "@/lib/integrations/capability-catalog";
 import {
   disconnectIntegration,
   listIntegrations,
@@ -80,6 +81,12 @@ export default function Integrations() {
   const [visibleLimit, setVisibleLimit] = useState(48);
   const [error, setError] = useState("");
   const nangoConnectRef = useRef(null);
+  const creativeProviders = useMemo(
+    () => PROVIDER_CAPABILITY_PROFILES.filter((provider) =>
+      provider.families.some((family) => ["creative_design", "media_generation", "three_d"].includes(family)),
+    ),
+    [],
+  );
 
   async function refresh() {
     setLoading(true);
@@ -409,6 +416,38 @@ export default function Integrations() {
           </div>
         </div>
       </div>
+
+      <section className="mb-5 overflow-hidden rounded-[24px] border border-fuchsia-300/10 bg-gradient-to-br from-fuchsia-500/[.045] via-violet-500/[.025] to-cyan-500/[.025] p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-fuchsia-200/60">Creative intelligence network</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">Design and generation connector targets</h2>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-500">
+              Blackstar now has explicit capability identities for the creative providers below. They remain connector targets until a user-owned provider route is configured and its executable actions pass the normal approval and capability checks.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/ai-hub")}
+            className="rounded-xl border border-fuchsia-300/15 bg-fuchsia-400/[.055] px-4 py-2.5 text-xs font-medium text-fuchsia-100 hover:bg-fuchsia-400/[.09]"
+          >
+            Open Intelligence Hub
+          </button>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {creativeProviders.map((provider) => (
+            <div key={provider.id} className="rounded-2xl border border-white/[.065] bg-black/20 p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">{provider.name}</p>
+                <span className="rounded-full border border-white/[.07] bg-white/[.035] px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-500">
+                  {provider.status === "planned" ? "Connector target" : provider.status}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] leading-5 text-zinc-500">{provider.notes}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Provider adapters" value={providers.length} icon={Wrench} />
