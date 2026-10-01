@@ -8,7 +8,6 @@ import {
   resolveAssistantModelPreference,
 } from "@/lib/ai/ai-preferences.server";
 import { normaliseProvider, resolveModel } from "@/lib/runtime/model-gateway.server";
-import { isProviderAvailableForUser } from "@/lib/runtime/model-provider-credentials.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -31,6 +30,7 @@ export const getAIPreferences = createServerFn({ method: "POST" })
     let effective = resolveAssistantModelPreference(data);
     if (data?.default_provider) {
       const requestedProvider = normaliseProvider(String(data.default_provider));
+      const { isProviderAvailableForUser } = await import("@/lib/runtime/model-provider-credentials.server");
       if (await isProviderAvailableForUser({ userId: context.userId, provider: requestedProvider })) {
         const requestedModel = typeof data.default_model === "string" ? data.default_model.trim() : "";
         effective = {
@@ -58,6 +58,7 @@ export const updateAIPreferences = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => updateInput.parse(input))
   .handler(async ({ data, context }) => {
     const provider = normaliseProvider(data.provider);
+    const { isProviderAvailableForUser } = await import("@/lib/runtime/model-provider-credentials.server");
     if (!(await isProviderAvailableForUser({ userId: context.userId, provider }))) {
       throw new Error("That AI provider is not configured on this deployment or connected to your account.");
     }
