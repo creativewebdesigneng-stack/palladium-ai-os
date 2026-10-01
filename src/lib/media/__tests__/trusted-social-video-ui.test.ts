@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const screen = readFileSync("src/screens/TrustedSocialVideo.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/trusted-social-video.tsx", "utf8");
-const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
+const navigation = readFileSync("src/components/palladium/navigationData.jsx", "utf8");
 
 describe("Trusted Social Video browser contract", () => {
   it("uses the authenticated signed-upload and server verification path", () => {
@@ -25,7 +25,7 @@ describe("Trusted Social Video browser contract", () => {
   it("is a first-class Blackstar route and navigation destination", () => {
     expect(route).toContain('createFileRoute("/_shell/_app/trusted-social-video")');
     expect(route).toContain("Trusted Social Video — Blackstar");
-    expect(sidebar).toContain("['Trusted Social Video', '/trusted-social-video', Clapperboard]");
+    expect(navigation).toContain("{ label: 'Trusted Social Video', path: '/trusted-social-video', icon: Clapperboard }");
     expect(screen).toContain('to="/social-operations"');
   });
 });

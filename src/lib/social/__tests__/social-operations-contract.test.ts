@@ -7,7 +7,7 @@ const externalApprovals = readFileSync("src/lib/mission/external-action-approval
 const screen = readFileSync("src/screens/SocialOperations.jsx", "utf8");
 const connectors = readFileSync("src/components/social/SocialConnectorPanel.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/social-operations.tsx", "utf8");
-const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
+const navigation = readFileSync("src/components/palladium/navigationData.jsx", "utf8");
 
 describe("Social Operations native contract", () => {
   it("persists owner-scoped posts and provider targets without credential columns", () => {
@@ -82,7 +82,7 @@ describe("Social Operations native contract", () => {
     expect(screen).toContain("listLiveSocialCapabilities");
     expect(screen).toContain("addSocialPostTarget");
     expect(screen).not.toMatch(/placeholder=["'][^"']*(token|secret|api key|password)/i);
-    expect(sidebar).toContain("['Social Operations', '/social-operations', CalendarClock]");
+    expect(navigation).toContain("{ label: 'Social Operations', path: '/social-operations', icon: CalendarClock }");
   });
 
   it("connects social accounts through existing OAuth and Nango systems without browser credentials", () => {

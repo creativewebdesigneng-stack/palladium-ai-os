@@ -5,7 +5,7 @@ const migration = readFileSync("supabase/migrations/20260828190000_whatsapp_crm.
 const functions = readFileSync("src/lib/whatsapp/whatsapp-crm.functions.ts", "utf8");
 const screen = readFileSync("src/screens/WhatsAppCRM.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/whatsapp-crm.tsx", "utf8");
-const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
+const navigation = readFileSync("src/components/palladium/navigationData.jsx", "utf8");
 
 describe("WhatsApp CRM native contract", () => {
   it("reuses canonical CRM contacts and adds only WhatsApp-specific persistence", () => {
@@ -39,6 +39,6 @@ describe("WhatsApp CRM native contract", () => {
     expect(screen).toContain('title="WhatsApp CRM"');
     expect(screen).toContain("Broadcast planner");
     expect(screen).toContain("Inbox");
-    expect(sidebar).toContain("['WhatsApp CRM', '/whatsapp-crm', MessageCircle]");
+    expect(navigation).toContain("{ label: 'WhatsApp CRM', path: '/whatsapp-crm', icon: MessageCircle }");
   });
 });
