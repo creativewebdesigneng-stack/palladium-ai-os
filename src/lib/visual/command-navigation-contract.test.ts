@@ -14,8 +14,10 @@ const commandSource = readFileSync(
   'utf8',
 )
 
-function registeredPaths() {
-  return [...registrySource.matchAll(/path:\s*'([^']+)'/g)].map((match) => match[1])
+function registeredPaths(): string[] {
+  return [...registrySource.matchAll(/path:\s*'([^']+)'/g)]
+    .map((match) => match[1])
+    .filter((path): path is string => typeof path === 'string' && path.length > 0)
 }
 
 function routeRootFromFile(name: string) {
