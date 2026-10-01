@@ -1373,3 +1373,16 @@ body::before {
   .blackstar-experience-aurora { animation: none !important; }
   .blackstar-page-header::after { transition: none !important; }
 }
+
+
+/* Experience palette inheritance for shell surfaces */
+.blackstar-style-cosmic-core { --bx-a: 123,92,255; --bx-b: 216,180,254; --bx-c: 56,189,248; }
+.blackstar-style-orbital-elegance { --bx-a: 226,232,240; --bx-b: 148,163,184; --bx-c: 167,139,250; }
+.blackstar-style-mission-control { --bx-a: 96,165,250; --bx-b: 245,158,11; --bx-c: 139,92,246; }
+.blackstar-style-neon-infrastructure { --bx-a: 168,85,247; --bx-b: 34,211,238; --bx-c: 59,130,246; }
+.blackstar-style-elite-corporate { --bx-a: 214,179,106; --bx-b: 229,231,235; --bx-c: 123,92,255; }
+.blackstar-style-industry-realism { --bx-a: 245,158,11; --bx-b: 148,163,184; --bx-c: 56,189,248; }
+.blackstar-style-creative-universe { --bx-a: 232,121,249; --bx-b: 139,92,246; --bx-c: 34,211,238; }
+.blackstar-style-ai-nexus { --bx-a: 124,58,237; --bx-b: 59,130,246; --bx-c: 167,139,250; }
+.blackstar-style-trading-command { --bx-a: 20,184,166; --bx-b: 34,197,94; --bx-c: 56,189,248; }
+.blackstar-style-ethereal-luxury { --bx-a: 226,232,240; --bx-b: 125,211,252; --bx-c: 196,181,253; }
