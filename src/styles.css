@@ -1572,3 +1572,58 @@ body::before {
   opacity: 1;
   transform: translateX(20%);
 }
+
+
+/* Experience Layer v2 — unified public journey */
+.blackstar-public-page[class*="blackstar-style-"]::before {
+  background: none !important;
+}
+.blackstar-public-page[class*="blackstar-style-"] {
+  background: #010103;
+  font-family: var(--font-body);
+}
+.blackstar-public-page[class*="blackstar-style-"] > section,
+.blackstar-public-page[class*="blackstar-style-"] > header,
+.blackstar-public-page[class*="blackstar-style-"] > main,
+.blackstar-public-page[class*="blackstar-style-"] > nav {
+  position: relative;
+}
+.blackstar-public-page[class*="blackstar-style-"] :is(h1,h2,h3) {
+  font-family: var(--font-heading);
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+.blackstar-public-page[class*="blackstar-style-"] > section:first-of-type {
+  min-height: min(720px, 78vh);
+  display: grid;
+  align-items: center;
+}
+.blackstar-public-page.blackstar-public-pricing > section:first-of-type,
+.blackstar-public-page.blackstar-public-tools > section:first-of-type,
+.blackstar-public-page.blackstar-public-help > section:first-of-type,
+.blackstar-public-page.blackstar-public-resources > section:first-of-type {
+  min-height: 520px;
+}
+.blackstar-public-page[class*="blackstar-style-"] :is(.blackstar-panel,section,article,div)[class*="rounded"][class*="border"] {
+  border-color: rgba(255,255,255,.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 22px 64px rgba(0,0,0,.20);
+}
+.blackstar-public-page[class*="blackstar-style-"] :is(.blackstar-panel,section,article,div)[class*="rounded"][class*="border"]:hover {
+  border-color: rgba(var(--bx-a,123,92,255),.15);
+}
+.blackstar-public-page[class*="blackstar-style-"] :is(input,textarea,select) {
+  border-color: rgba(255,255,255,.075);
+  background: linear-gradient(180deg,rgba(0,0,0,.42),rgba(5,5,10,.60));
+  box-shadow: inset 0 2px 7px rgba(0,0,0,.26);
+}
+.blackstar-public-pricing section:first-of-type::before,
+.blackstar-public-tools section:first-of-type::before {
+  opacity: .42;
+}
+@media (max-width: 767px) {
+  .blackstar-public-page[class*="blackstar-style-"] > section:first-of-type {
+    min-height: auto;
+  }
+}

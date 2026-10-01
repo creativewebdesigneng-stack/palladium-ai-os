@@ -4,21 +4,16 @@ import PricingCards from '@/components/site/PricingCards';
 import PricingFaq from '@/components/site/PricingFaq';
 import EnterpriseSection from '@/components/site/EnterpriseSection';
 import SectionReveal from '@/components/site/SectionReveal';
-import NeuralNetworkBackground from '@/components/visual/NeuralNetworkBackground';
 import FreemiumPlans from '@/components/site/FreemiumPlans';
 import { AstraMark } from '@/components/blackstar/AstraMark';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 export default function Pricing() {
   return (
-    <div className="blackstar-public-page blackstar-public-pricing relative min-h-screen text-zinc-100">
-      <div aria-hidden className="fixed inset-0 -z-20 bg-[#090a0f]" />
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 opacity-50"><NeuralNetworkBackground /></div>
+    <div className="blackstar-public-page blackstar-public-pricing blackstar-style-orbital-elegance relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
+      <PublicExperienceBackdrop room="astra-room-company" visualStyle="blackstar-style-orbital-elegance" />
       <PublicNav />
       <section className="relative overflow-hidden pt-32 pb-12">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-0 h-80 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-[140px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(123,92,255,.1),transparent_60%)]" />
-        </div>
         <SectionReveal className="relative mx-auto max-w-7xl px-6 text-center">
           <div className="mb-5 flex justify-center"><AstraMark size={40} /></div>
           <p className="text-xs uppercase tracking-[0.25em] text-violet-400">Pricing</p>

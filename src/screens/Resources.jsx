@@ -4,6 +4,7 @@ import PublicNav from '@/components/site/PublicNav';
 import SectionReveal from '@/components/site/SectionReveal';
 import Footer from '@/components/site/Footer';
 import { AstraMark } from '@/components/blackstar/AstraMark';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 const destinations = [
   {
@@ -34,13 +35,11 @@ const destinations = [
 
 export default function Resources() {
   return (
-    <div className="blackstar-public-page blackstar-public-resources min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-resources blackstar-style-orbital-elegance relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
+      <PublicExperienceBackdrop room="astra-room-knowledge" visualStyle="blackstar-style-orbital-elegance" />
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-14 pt-32">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/3 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-[150px]" />
-        </div>
         <SectionReveal className="relative mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-4 py-1.5 text-xs text-zinc-300 backdrop-blur">
             <AstraMark size={16} /> Resources

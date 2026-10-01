@@ -12,6 +12,7 @@ import {
 import { POLICIES, ORDER } from '@/components/site/legalData';
 import PublicNav from '@/components/site/PublicNav';
 import Footer from '@/components/site/Footer';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 const ICONS = {
   'terms-of-service': ScrollText,
@@ -32,13 +33,10 @@ export default function LegalLayout() {
   const Icon = ICONS[slug] || FileText;
 
   return (
-    <div className="blackstar-public-page blackstar-public-legal min-h-screen overflow-hidden bg-[#090a0f] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-legal blackstar-style-elite-corporate relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
       <PublicNav />
 
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-1/4 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-violet-600/10 blur-[140px]" />
-        <div className="absolute right-1/4 top-40 h-72 w-72 translate-x-1/2 rounded-full bg-cyan-500/10 blur-[140px]" />
-      </div>
+      <PublicExperienceBackdrop room="astra-room-legal" visualStyle="blackstar-style-elite-corporate" />
 
       <header className="relative border-b border-white/10 bg-white/[.02] px-6 pb-10 pt-32">
         <div className="mx-auto max-w-5xl">
