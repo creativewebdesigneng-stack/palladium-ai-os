@@ -7,6 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normaliseAutonomyLevel } from "./agent-autonomy";
+import { normaliseAgentIdentity } from "./agent-identity";
 import {
   compileAgentSystemPrompt,
   hasAgentSpecV2,
@@ -66,6 +67,14 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     : normaliseOperatingProfile(input.operating_profile);
   const baseSystemPrompt = (input.system_prompt ?? "").slice(0, 8000);
 
+  const rawPreferences = input.preferences && typeof input.preferences === "object" && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const preferences = {
+    ...rawPreferences,
+    identity: normaliseAgentIdentity((rawPreferences as Record<string, unknown>)["identity"]),
+  };
+
   return {
     name: name.slice(0, 80),
     description: (input.description ?? "").slice(0, 2000),
@@ -84,7 +93,7 @@ function normaliseAgentWrite(input: AgentWriteInput) {
     autonomy: normaliseAutonomyLevel(input.autonomy),
     instructions: (input.instructions ?? "").slice(0, 8000),
     allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
-    preferences: input.preferences ?? {},
+    preferences,
     status,
     operating_profile: operatingProfile,
     spec_version: operatingProfile && hasAgentSpecV2(operatingProfile) ? 2 : undefined,
