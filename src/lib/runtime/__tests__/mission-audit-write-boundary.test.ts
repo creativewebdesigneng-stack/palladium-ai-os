@@ -42,6 +42,10 @@ describe("mission audit write boundary", () => {
       .map(({ path }) => path)
       .sort();
 
+    if (offenders.length) {
+      process.stderr.write(`\nMISSION_AUDIT_DIRECT_WRITERS=${JSON.stringify(offenders)}\n`);
+    }
+
     expect(offenders).toEqual([]);
   });
 });
