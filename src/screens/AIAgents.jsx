@@ -5,6 +5,7 @@ import PublicNav from '@/components/site/PublicNav';
 import SectionReveal from '@/components/site/SectionReveal';
 import { HowAgentsWork, AgentExamples, AgentCta } from '@/components/site/AgentsShowcase';
 import Footer from '@/components/site/Footer';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 const PIPELINE = [
   { icon: Sparkles, label: 'Intent', desc: 'Set the objective in plain language and define the outcome that matters.' },
@@ -16,16 +17,11 @@ const PIPELINE = [
 export default function AIAgents() {
   const reducedMotion = useReducedMotion();
   return (
-    <div className="blackstar-public-page blackstar-public-agents min-h-screen overflow-hidden bg-[#050507] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-agents blackstar-style-ai-nexus relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
+      <PublicExperienceBackdrop room="astra-room-workforce" visualStyle="blackstar-style-ai-nexus" />
       <PublicNav />
 
       <section className="relative overflow-hidden px-6 pb-20 pt-32">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(139,92,246,.14),transparent_42%)]" />
-          <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(255,255,255,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.025)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]" />
-        </div>
-
         <SectionReveal className="relative mx-auto max-w-5xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-violet-300/15 bg-violet-300/[.055] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80 backdrop-blur-xl">
             <Bot className="h-3.5 w-3.5" /> Blackstar Agent Infrastructure
