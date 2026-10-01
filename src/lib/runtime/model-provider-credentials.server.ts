@@ -23,12 +23,22 @@ function assertConnectableProvider(provider: Provider): asserts provider is User
   }
 }
 
+function hasSupabaseAdminEnvironment() {
+  const url = process.env['SUPABASE_URL'] || process.env['VITE_SUPABASE_URL']
+  const secret =
+    process.env['SUPABASE_SECRET_KEY'] ||
+    process.env['SUPABASE_SECRET_KEYS'] ||
+    process.env['SUPABASE_SERVICE_ROLE_KEY']
+  return Boolean(url && secret)
+}
+
 async function admin() {
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
   return supabaseAdmin as unknown as { from: (table: string) => any }
 }
 
 export async function listUserModelProviderCredentials(userId: string) {
+  if (!hasSupabaseAdminEnvironment()) return []
   const sb = await admin()
   const { data, error } = await sb
     .from('model_provider_credentials')
@@ -114,6 +124,7 @@ export async function resolveUserModelProviderAccess(args: {
   provider: Provider
 }): Promise<ProviderAccess | null> {
   if (args.provider !== 'openai' && args.provider !== 'anthropic') return null
+  if (!hasSupabaseAdminEnvironment()) return null
   const sb = await admin()
   const { data, error } = await sb
     .from('model_provider_credentials')
@@ -140,6 +151,7 @@ export async function markUserModelProviderUsed(args: {
   error?: string | null
 }) {
   if (args.provider !== 'openai' && args.provider !== 'anthropic') return
+  if (!hasSupabaseAdminEnvironment()) return
   const sb = await admin()
   const now = new Date().toISOString()
   await sb
