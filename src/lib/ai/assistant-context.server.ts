@@ -1,6 +1,9 @@
 import { assistantAgentDiscoveryContext, discoverAssistantAgents } from './assistant-agent-discovery'
 import { searchMemory, type MemoryType } from '@/lib/memory/memory.server'
 import { loadMemoryPreferences } from '@/lib/memory/preferences.server'
+import { INTEGRATION_PROVIDERS } from '@/lib/integrations/providers'
+import { assessIntegrationHealth } from '@/lib/integrations/integration-health'
+import { assistantConnectionContext, summariseAssistantConnections } from './assistant-connection-inspection'
 
 type Sb = { from: (table: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any }
 export type AssistantTurn = { role: 'user' | 'assistant'; content: string }
@@ -186,4 +189,63 @@ export function responseStyleInstruction(style: string) {
   if (style === 'concise') return 'RESPONSE STYLE: Be concise and action-oriented. Prefer short answers unless detail is requested.'
   if (style === 'detailed') return 'RESPONSE STYLE: Be thorough and structured when useful, while avoiding repetition.'
   return 'RESPONSE STYLE: Balance clarity and detail. Be concise by default and expand when complexity requires it.'
+}
+
+
+export async function loadAssistantConnectionContext(args: {
+  sb: Sb
+  userId: string
+  enabled: boolean
+}) {
+  if (!args.enabled) return { prompt: '', connected: 0, attention: 0 }
+  try {
+    const { data: rows, error } = await args.sb.from('integrations')
+      .select('provider,status,granted_scopes,expires_at,last_error')
+      .eq('user_id', args.userId)
+    if (error) return { prompt: '', connected: 0, attention: 0 }
+
+    let credentialRows: any[] = []
+    try {
+      const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+      const result = await supabaseAdmin.from('integration_credentials')
+        .select('provider,refresh_token_ciphertext,expires_at')
+        .eq('user_id', args.userId)
+      credentialRows = result.data ?? []
+    } catch (error) {
+      console.warn('[assistant] connection credential metadata unavailable', error)
+    }
+
+    const credentials = new Map(credentialRows.map((row: any) => [String(row.provider), row]))
+    const byProvider = new Map((rows ?? []).map((row: any) => [String(row.provider), row]))
+    const observations = INTEGRATION_PROVIDERS
+      .filter((provider) => byProvider.has(provider.id))
+      .map((provider) => {
+        const row: any = byProvider.get(provider.id)
+        const credential: any = credentials.get(provider.id)
+        return {
+          providerId: provider.id,
+          health: assessIntegrationHealth({
+            providerName: provider.name,
+            requiredScopes: provider.scopes,
+            status: row?.status ?? null,
+            grantedScopes: row?.granted_scopes ?? [],
+            expiresAt: credential?.expires_at ?? row?.expires_at ?? null,
+            hasRefreshToken: Boolean(credential?.refresh_token_ciphertext),
+            lastError: row?.last_error ?? null,
+          }),
+        }
+      })
+
+    const summaries = summariseAssistantConnections(observations)
+      .filter((item) => item.state !== 'disconnected')
+    if (!summaries.length) return { prompt: '', connected: 0, attention: 0 }
+    return {
+      prompt: assistantConnectionContext(summaries),
+      connected: summaries.filter((item) => item.healthy).length,
+      attention: summaries.filter((item) => item.reconnectRequired || item.state === 'pending').length,
+    }
+  } catch (error) {
+    console.warn('[assistant] connection context unavailable', error)
+    return { prompt: '', connected: 0, attention: 0 }
+  }
 }
