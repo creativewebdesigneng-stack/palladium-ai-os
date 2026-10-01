@@ -2,9 +2,10 @@
  * Embedding layer for the PalladiumAI memory system.
  *
  * The runtime is never hard-coded to one embedding vendor: the model is chosen
- * per call and can come from the Lovable AI gateway (default, no keys needed),
- * OpenAI directly, or any OpenAI-compatible endpoint. All keys are read inside
- * the request, server-side only.
+ * per call and can come from the Lovable AI gateway, OpenAI directly, or an
+ * explicitly selected OpenAI-compatible endpoint. Automatic selection uses a
+ * configured hosted embedding lane instead of assuming the deployment host.
+ * All keys are read inside the request, server-side only.
  */
 
 /** Every store/search in this system uses the same dimensionality. */
