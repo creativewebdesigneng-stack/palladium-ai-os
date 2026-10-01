@@ -45,7 +45,11 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
 
     const { listUserModelProviderCredentials } = await import("./model-provider-credentials.server");
     const personalConnections = await listUserModelProviderCredentials(context.userId);
-    const personalProviderIds = new Set(personalConnections.filter((item) => item.enabled).map((item) => item.provider));
+    const personalProviderIds = new Set(
+      personalConnections
+        .filter((item: { enabled: boolean }) => item.enabled)
+        .map((item: { provider: "openai" | "anthropic" }) => item.provider),
+    );
 
     const usageByModel = new Map<string, UsageRow>();
     for (const task of tasks ?? []) {
