@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 const uuid = z.string().uuid();
@@ -66,11 +67,11 @@ export const publishExistingStudioRelease = createServerFn({ method: "POST" })
         .eq("status", "published");
     }
 
-    await sb.from("mission_audit_logs").insert({
-      user_id: context.userId,
+    await writeAudit({
+      userId: context.userId,
       action: "app_studio_release_activated",
-      target_type: "app_studio_app",
-      target_id: data.appId,
+      targetType: "app_studio_app",
+      targetId: data.appId,
       status: "success",
       metadata: {
         release_id: release.data.id,
