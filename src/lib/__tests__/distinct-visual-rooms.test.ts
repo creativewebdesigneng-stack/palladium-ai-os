@@ -41,9 +41,12 @@ describe("Blackstar distinct 3D room identities", () => {
 
   it("uses one shell depth renderer rather than page-specific 3D stacks", () => {
     const shell = readFileSync(new URL("../../components/palladium/AppShell.jsx", import.meta.url), "utf8");
+    const experience = readFileSync(new URL("../../components/blackstar/BlackstarExperienceField.jsx", import.meta.url), "utf8");
     expect(shell).toContain("blackstarRoomForPath(pathname)");
-    expect(shell.match(/<AstraDepthField/g)?.length).toBe(1);
+    expect(shell.match(/<BlackstarExperienceField/g)?.length).toBe(1);
+    expect(experience.match(/<AstraDepthField/g)?.length).toBe(1);
     expect(shell).toContain("const dedicatedWebGL = pathname.startsWith('/game-foundry')");
+    expect(shell).toContain("dedicatedWebGL={dedicatedWebGL}");
   });
 
   it("defines distinct geometry/palette and atmosphere for the new rooms", () => {

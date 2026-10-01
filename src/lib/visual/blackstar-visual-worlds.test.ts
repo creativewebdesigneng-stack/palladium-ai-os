@@ -85,7 +85,8 @@ describe("Blackstar ten visual worlds", () => {
     );
     expect(shell).toContain("blackstarVisualStyleForPath(pathname)");
     expect(shell).toContain("data-blackstar-style={visualStyle}");
-    expect(shell).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
+    expect(shell).toContain("<BlackstarExperienceField");
+    expect(shell).toContain("visualStyle={visualStyle}");
     expect(shell).toContain('className="blackstar-style-atmosphere pointer-events-none fixed inset-0" style={{ zIndex: -15 }}');
   });
 

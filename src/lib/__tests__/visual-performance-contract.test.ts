@@ -7,17 +7,21 @@ describe("Blackstar visual performance contract", () => {
   const workforce = readFileSync(new URL("../../screens/Workforce.jsx", import.meta.url), "utf8");
   const neuralSpace = readFileSync(new URL("../../components/visual/NeuralSpace.jsx", import.meta.url), "utf8");
   const depth = readFileSync(new URL("../../components/blackstar/AstraDepthField.jsx", import.meta.url), "utf8");
+  const experience = readFileSync(new URL("../../components/blackstar/BlackstarExperienceField.jsx", import.meta.url), "utf8");
   const gameViewer = readFileSync(new URL("../../components/game-foundry/GameFoundryModelViewer.jsx", import.meta.url), "utf8");
 
   it("keeps one shell-owned ambient canvas instead of stacking page-level full-screen canvases", () => {
     expect(agents).not.toContain("AnimatedBrain");
     expect(workforce).not.toContain("NeuralNetworkBackground");
-    expect(shell).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
+    expect(shell).toContain("<BlackstarExperienceField");
+    expect(experience).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
   });
 
   it("does not stack the shell WebGL depth field on Game Foundry's dedicated Three.js viewer", () => {
     expect(shell).toContain("const dedicatedWebGL = pathname.startsWith('/game-foundry')");
-    expect(shell).toContain("!dedicatedWebGL ? <AstraDepthField room={room} visualStyle={visualStyle} /> : null");
+    expect(shell).toContain("dedicatedWebGL={dedicatedWebGL}");
+    expect(experience).toContain("!dedicatedWebGL ? (");
+    expect(experience).toContain("<AstraDepthField room={room} visualStyle={visualStyle} />");
   });
 
   it("caps mobile 2D canvas pixel density and fails safely when a 2D context is unavailable", () => {
