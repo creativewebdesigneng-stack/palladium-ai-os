@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useServerFn } from '@tanstack/react-start';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles, Send, X, Mic, Volume2, VolumeX, Settings2, Power, Bell,
+  Archive, Bell, History, Mic, Plus, Power, Send, Settings2, Sparkles,
+  Trash2, Volume2, VolumeX, X,
 } from 'lucide-react';
 import { assistantChat } from '@/lib/ai/assistant.functions';
+import {
+  archiveAssistantConversation,
+  deleteAssistantConversation,
+  getAssistantConversation,
+  listAssistantConversations,
+} from '@/lib/ai/assistant-conversations.functions';
+import { getPersonalAssistantPreferences } from '@/lib/ai/personal-assistant.functions';
 import {
   DEFAULT_VOICE_ASSISTANT_PREFERENCES,
   getVoiceAssistantPreferences,
@@ -93,12 +101,22 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
   const savePrefsFn = useServerFn(saveVoiceAssistantPreferences);
   const briefFn = useServerFn(getVoiceWorkspaceBrief);
   const transcribeFn = useServerFn(transcribeVoiceAssistantAudio);
+  const listConversationsFn = useServerFn(listAssistantConversations);
+  const getConversationFn = useServerFn(getAssistantConversation);
+  const archiveConversationFn = useServerFn(archiveAssistantConversation);
+  const deleteConversationFn = useServerFn(deleteAssistantConversation);
+  const personalPrefsFn = useServerFn(getPersonalAssistantPreferences);
   const setOpen = (v) => onOpenChange?.(v);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
     { role: 'assistant', text: "Hi, I'm your Blackstar voice assistant. I'm hands-free: allow microphone access once, then just speak naturally and I'll answer or navigate for you." },
   ]);
   const [pending, setPending] = useState(false);
+  const [assistantName, setAssistantName] = useState('Blackstar');
+  const [conversationId, setConversationId] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [conversationPanel, setConversationPanel] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_VOICE_ASSISTANT_PREFERENCES);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [voices, setVoices] = useState([]);
@@ -127,6 +145,77 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
 
   useEffect(() => { prefsRef.current = prefs; }, [prefs]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, open]);
+
+  const welcomeMessage = useCallback((name = assistantName) => ({
+    role: 'assistant',
+    text: `Hi, I'm ${name || 'Blackstar'}, your Blackstar personal assistant. I can keep conversation threads, use your permitted workspace and memory context, search current information when enabled, and continue hands-free voice conversations.`,
+  }), [assistantName]);
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const result = await listConversationsFn({ data: { limit: 30 } });
+      setConversations(result?.conversations ?? []);
+    } catch (error) {
+      console.error('[assistant] conversation list', error);
+    }
+  }, [listConversationsFn]);
+
+  useEffect(() => {
+    if (!open) return;
+    void refreshConversations();
+    personalPrefsFn()
+      .then((result) => {
+        const name = result?.preferences?.assistantName || 'Blackstar';
+        setAssistantName(name);
+      })
+      .catch((error) => console.error('[assistant] personal preferences', error));
+  }, [open, personalPrefsFn, refreshConversations]);
+
+  const startNewConversation = useCallback(() => {
+    setConversationId(null);
+    setMessages([welcomeMessage()]);
+    setConversationPanel(false);
+  }, [welcomeMessage]);
+
+  const openConversation = useCallback(async (id) => {
+    setConversationLoading(true);
+    try {
+      const result = await getConversationFn({ data: { conversationId: id, limit: 120 } });
+      const restored = (result?.messages ?? []).map((message) => ({
+        role: message.role,
+        text: message.content,
+      }));
+      setConversationId(id);
+      setMessages(restored.length ? restored : [welcomeMessage()]);
+      setConversationPanel(false);
+    } catch (error) {
+      console.error('[assistant] load conversation', error);
+      setMicError(error?.message || 'That conversation could not be loaded.');
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [getConversationFn, welcomeMessage]);
+
+  const archiveCurrentConversation = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      await archiveConversationFn({ data: { conversationId, archived: true } });
+      startNewConversation();
+      await refreshConversations();
+    } catch (error) {
+      setMicError(error?.message || 'Could not archive that conversation.');
+    }
+  }, [archiveConversationFn, conversationId, refreshConversations, startNewConversation]);
+
+  const deleteConversation = useCallback(async (id) => {
+    try {
+      await deleteConversationFn({ data: { conversationId: id } });
+      if (id === conversationId) startNewConversation();
+      await refreshConversations();
+    } catch (error) {
+      setMicError(error?.message || 'Could not delete that conversation.');
+    }
+  }, [conversationId, deleteConversationFn, refreshConversations, startNewConversation]);
 
   useEffect(() => {
     let alive = true;
@@ -248,17 +337,20 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       const res = await assistantChat({ data: {
         message: content,
         history,
+        ...(conversationId ? { conversationId } : {}),
         ...(location ? { location } : {}),
       } });
+      if (res?.conversationId) setConversationId(res.conversationId);
       setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
       speak(res.text);
+      void refreshConversations();
     } catch (e) {
       console.error('[assistant]', e);
       const reply = e?.message || 'AI service temporarily unavailable.';
       setMessages((m) => [...m, { role: 'assistant', error: true, text: reply }]);
       speak(reply);
     } finally { setPending(false); }
-  }, [briefFn, input, messages, navigate, pending, setOpen, speak]);
+  }, [briefFn, conversationId, input, messages, navigate, pending, refreshConversations, setOpen, speak]);
 
   useEffect(() => { sendRef.current = send; }, [send]);
 
@@ -553,7 +645,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
       />
       <motion.button
         initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        onClick={() => setOpen(true)} aria-label="Open Palladium voice assistant"
+        onClick={() => setOpen(true)} aria-label="Open Blackstar personal assistant"
         className="fixed bottom-6 right-6 z-[70] grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-2xl shadow-violet-500/30 transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
       >
         {prefs.enabled ? <Mic className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
@@ -568,17 +660,48 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
               <div className="flex items-center gap-3 border-b border-white/10 bg-white/[.03] px-4 py-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles className="h-4 w-4 text-white" /></span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white">Palladium Voice Assistant</p>
+                  <p className="truncate text-sm font-semibold text-white">{assistantName || 'Blackstar'} <span className="font-normal text-zinc-600">· Personal Assistant</span></p>
                   <p className={`flex items-center gap-1.5 text-[11px] ${prefs.enabled ? (listening ? 'text-emerald-400' : 'text-amber-300') : 'text-zinc-500'}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${prefs.enabled ? (listening ? 'bg-emerald-400' : 'bg-amber-300') : 'bg-zinc-600'}`} />
                     {voiceStatus}
                   </p>
                 </div>
-                <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
+                <button onClick={() => setConversationPanel((value) => !value)} title="Conversation history" className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><History className="h-4 w-4" /></button>
+                <button onClick={startNewConversation} title="New conversation" className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Plus className="h-4 w-4" /></button>
+                                <button onClick={() => persistPrefs({ enabled: !prefs.enabled })} title={prefs.enabled ? 'Turn assistant off' : 'Turn assistant on'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Power className="h-4 w-4" /></button>
                 <button onClick={() => persistPrefs({ muted: !prefs.muted })} title={prefs.muted ? 'Unmute voice' : 'Mute voice'} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white">{prefs.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
                 <button onClick={() => setVoiceSettings((v) => !v)} title="Voice settings" className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><Settings2 className="h-4 w-4" /></button>
                 <button onClick={() => setOpen(false)} aria-label="Close assistant" className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
               </div>
+
+              {conversationPanel && (
+                <div className="max-h-52 overflow-y-auto border-b border-white/10 bg-black/30 px-3 py-3">
+                  <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-zinc-500">Recent conversations</p>
+                      <p className="mt-0.5 text-[9px] text-zinc-700">Threads are separate from long-term memory.</p>
+                    </div>
+                    {conversationId && <button onClick={archiveCurrentConversation} className="flex items-center gap-1 rounded-lg border border-white/[.07] px-2 py-1.5 text-[9px] text-zinc-500 hover:text-white"><Archive className="h-3 w-3" />Archive</button>}
+                  </div>
+                  {conversationLoading ? (
+                    <p className="px-2 py-4 text-center text-[10px] text-zinc-600">Loading conversation…</p>
+                  ) : conversations.length ? (
+                    <div className="space-y-1">
+                      {conversations.map((conversation) => (
+                        <div key={conversation.id} className={`group flex items-center gap-1 rounded-xl border px-1.5 py-1 ${conversation.id === conversationId ? 'border-violet-300/15 bg-violet-400/[.06]' : 'border-transparent hover:border-white/[.06] hover:bg-white/[.025]'}`}>
+                          <button onClick={() => openConversation(conversation.id)} className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left">
+                            <p className="truncate text-[11px] font-medium text-zinc-300">{conversation.title}</p>
+                            <p className="mt-0.5 text-[9px] text-zinc-700">{new Date(conversation.last_message_at).toLocaleString()}</p>
+                          </button>
+                          <button onClick={() => deleteConversation(conversation.id)} title="Delete conversation" className="grid h-7 w-7 place-items-center rounded-lg text-zinc-700 opacity-0 transition hover:bg-rose-400/[.06] hover:text-rose-300 group-hover:opacity-100 focus:opacity-100"><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="px-2 py-4 text-center text-[10px] text-zinc-600">No saved conversations yet.</p>
+                  )}
+                </div>
+              )}
 
               {voiceSettings && (
                 <div className="border-b border-white/10 bg-black/20 px-4 py-3 text-xs text-zinc-300">
