@@ -18,13 +18,18 @@ create table if not exists public.model_provider_credentials (
   constraint model_provider_credentials_label_check check (char_length(label) <= 120)
 );
 
-create index if not exists model_provider_credentials_user_enabled_idx
-  on public.model_provider_credentials(user_id, enabled, provider);
-
 alter table public.model_provider_credentials enable row level security;
 
 revoke all privileges on table public.model_provider_credentials from public, anon, authenticated;
 grant all privileges on table public.model_provider_credentials to service_role;
+
+drop policy if exists model_provider_credentials_deny_browser_roles on public.model_provider_credentials;
+create policy model_provider_credentials_deny_browser_roles
+on public.model_provider_credentials
+for all
+to anon, authenticated
+using (false)
+with check (false);
 
 comment on table public.model_provider_credentials is
   'Server-only owner-scoped encrypted OpenAI/Anthropic API credentials. Browser roles receive no direct table privileges; authenticated Blackstar server functions enforce ownership.';
