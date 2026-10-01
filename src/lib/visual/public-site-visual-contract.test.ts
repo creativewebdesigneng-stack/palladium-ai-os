@@ -47,6 +47,7 @@ describe('Blackstar public visual coverage',()=>{
   it('keeps auth on its dedicated cinematic space rather than flattening it into public cards',()=>{
     const auth=readFileSync(new URL('../../components/AuthLayout.jsx',import.meta.url),'utf8');
     expect(auth).toContain('blackstar-auth-space');
-    expect(auth).toContain('SpaceBackground');
+    expect(auth).toContain('BlackstarExperienceField');
+    expect(auth).toContain('blackstar-style-orbital-elegance');
   });
 });
