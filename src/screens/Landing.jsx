@@ -21,8 +21,8 @@ const pillars = [
 export default function Landing() {
   const reducedMotion = useReducedMotion();
   return (
-    <div className="blackstar-public-page blackstar-public-landing blackstar-style-cosmic-core min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
-      <div className="fixed inset-0 -z-20">
+    <div className="blackstar-public-page blackstar-public-landing blackstar-style-cosmic-core relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
+      <div className="fixed inset-0 z-0">
         <BlackstarExperienceField room="astra-room-core" visualStyle="blackstar-style-cosmic-core" />
       </div>
       <PublicNav />
