@@ -57,9 +57,13 @@ describe('Blackstar personal assistant v2 contract', () => {
     expect(ui).toContain('assistantChat')
   })
 
-  it('keeps agent discovery read-only and workspace context bounded', () => {
+  it('keeps agent and integration discovery read-only and workspace context bounded', () => {
     expect(context).toContain('discoverAssistantAgents')
+    expect(context).toContain('loadAssistantConnectionContext')
+    expect(context).toContain('assistantConnectionContext')
     expect(context).toContain('Never claim an action completed from this read-only context')
     expect(context).toContain('agentMatches')
+    expect(context).toContain('connected')
+    expect(context).not.toContain('access_token_ciphertext')
   })
 })
