@@ -5,6 +5,7 @@ import { PLANS, FREEMIUM_PLANS } from '@/components/site/pricingPlans';
 import { useAuth } from '@/lib/AuthContext';
 import PalladiumCheckout from '@/components/payments/PalladiumCheckout';
 import { PaymentTestModeBanner } from '@/components/payments/PaymentTestModeBanner';
+import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 export default function Payment() {
   const [selection, setSelection] = useState({ planId: 'pro', billing: 'monthly' });
@@ -39,9 +40,9 @@ export default function Payment() {
   }
 
   return (
-    <div className="blackstar-public-page blackstar-public-payment relative min-h-screen overflow-hidden bg-[#07070a] text-zinc-100">
+    <div className="blackstar-public-page blackstar-public-payment blackstar-style-elite-corporate relative isolate min-h-screen overflow-hidden bg-[#010103] text-zinc-100">
       <PaymentTestModeBanner />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,.13),transparent_30%),linear-gradient(rgba(255,255,255,.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.015)_1px,transparent_1px)] bg-[size:auto,42px_42px,42px_42px]" />
+      <PublicExperienceBackdrop room="astra-room-company" visualStyle="blackstar-style-elite-corporate" />
       <div className="relative px-4 py-10">
         <div className="mx-auto max-w-3xl">
           <Link to="/pricing" className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-violet-200"><ArrowLeft className="h-3.5 w-3.5" />Back to pricing</Link>
