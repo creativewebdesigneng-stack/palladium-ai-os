@@ -67,7 +67,6 @@ export const registerAiHubRuntimeTarget = createServerFn({ method: 'POST' })
       deployment_target: data.deploymentTarget,
       region: data.region ?? null,
       token_sha256: tokenSha256,
-      health: 'offline',
       metadata: data.metadata ?? {},
     }
 
@@ -105,14 +104,7 @@ export const rotateAiHubRuntimeTargetToken = createServerFn({ method: 'POST' })
     const now = new Date().toISOString()
 
     const { data: updated, error } = await sb.from('ai_hub_runtime_targets')
-      .update({
-        token_sha256: tokenSha256,
-        health: 'offline',
-        attested_at: null,
-        expires_at: null,
-        last_seen_at: null,
-        updated_at: now,
-      })
+      .update({ token_sha256: tokenSha256, updated_at: now })
       .eq('id', data.targetId)
       .is('revoked_at', null)
       .select('id,org_id,deployment_target,region')
@@ -146,12 +138,7 @@ export const revokeAiHubRuntimeTarget = createServerFn({ method: 'POST' })
     const sb = context.supabase as unknown as Sb
     const revokedAt = new Date().toISOString()
     const { data: revoked, error } = await sb.from('ai_hub_runtime_targets')
-      .update({
-        revoked_at: revokedAt,
-        health: 'offline',
-        expires_at: revokedAt,
-        updated_at: revokedAt,
-      })
+      .update({ revoked_at: revokedAt, updated_at: revokedAt })
       .eq('id', data.targetId)
       .is('revoked_at', null)
       .select('id,org_id,deployment_target,region')
