@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { encryptToken } from "@/lib/integrations/oauth.server";
 import { listExternalMcpTools, validateExternalMcpEndpoint } from "./external-mcp.server";
 
@@ -96,11 +97,11 @@ export const saveExternalMcpServer = createServerFn({ method: "POST" })
     }
     if (result.error || !result.data) throw new Error("Could not save the external MCP server.");
 
-    await sb.from("mission_audit_logs").insert({
-      user_id: userId,
+    await writeAudit({
+      userId: userId,
       action: data.id ? "external_mcp_server_updated" : "external_mcp_server_created",
-      target_type: "external_mcp_server",
-      target_id: result.data.id,
+      targetType: "external_mcp_server",
+      targetId: result.data.id,
       status: "success",
       metadata: {
         slug: result.data.slug,
@@ -134,11 +135,11 @@ export const deleteExternalMcpServer = createServerFn({ method: "POST" })
       .eq("id", data.serverId)
       .eq("user_id", context.userId);
     if (error) throw new Error("Could not delete the external MCP server.");
-    await sb.from("mission_audit_logs").insert({
-      user_id: context.userId,
+    await writeAudit({
+      userId: context.userId,
       action: "external_mcp_server_deleted",
-      target_type: "external_mcp_server",
-      target_id: data.serverId,
+      targetType: "external_mcp_server",
+      targetId: data.serverId,
       status: "success",
     });
     return { deleted: true };

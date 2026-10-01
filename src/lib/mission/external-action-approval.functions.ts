@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import {
   executeApprovedAction,
   type ApprovedActionType,
@@ -97,15 +98,15 @@ async function audit(
   userId: string,
   approval: any,
   action: string,
-  status: string,
+  status: "success" | "denied" | "failed",
   metadata: Record<string, unknown>,
 ) {
-  await sb.from("mission_audit_logs").insert({
-    user_id: userId,
-    agent_id: approval.agent_id ?? null,
+  await writeAudit({
+    userId: userId,
+    agentId: approval.agent_id ?? null,
     action,
-    target_type: "approval_request",
-    target_id: approval.id,
+    targetType: "approval_request",
+    targetId: approval.id,
     status,
     metadata: { task_id: approval.task_id ?? null, action_type: approval.action_type, ...metadata },
   });

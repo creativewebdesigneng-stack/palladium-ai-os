@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { INTEGRATION_PLAYBOOKS } from './builtin-integration-playbooks';
+import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
 
@@ -48,11 +49,11 @@ export const installIntegrationPlaybookPack = createServerFn({ method: 'POST' })
       installed.push(result.data);
     }
 
-    await sb.from('mission_audit_logs').insert({
-      user_id: context.userId,
+    await writeAudit({
+      userId: context.userId,
       action: 'agent_skill_builtin_pack_installed',
-      target_type: 'agent_skill_pack',
-      target_id: null,
+      targetType: 'agent_skill_pack',
+      targetId: null,
       status: 'success',
       metadata: {
         pack: '2026-08-30-integration-playbooks',

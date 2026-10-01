@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 const uuid = z.string().uuid();
@@ -147,11 +148,11 @@ export const cloneStudioApp = createServerFn({ method: "POST" })
         if (copied.error) throw new Error(copied.error.message);
       }
 
-      await sb.from("mission_audit_logs").insert({
-        user_id: context.userId,
+      await writeAudit({
+        userId: context.userId,
         action: "app_studio_cloned",
-        target_type: "app_studio_app",
-        target_id: newAppId,
+        targetType: "app_studio_app",
+        targetId: newAppId,
         status: "success",
         metadata: {
           source_app_id: data.sourceAppId,

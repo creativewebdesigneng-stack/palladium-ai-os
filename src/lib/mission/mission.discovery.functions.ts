@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
 import {
   isPersonalReminderRequest,
@@ -51,12 +52,12 @@ async function audit(
   action: string,
   extra: Record<string, unknown> = {},
 ) {
-  await sb.from("mission_audit_logs").insert({
-    user_id: userId,
+  await writeAudit({
+    userId: userId,
     action,
-    agent_id: (extra["agent_id"] as string | null) ?? null,
-    target_type: (extra["target_type"] as string | null) ?? null,
-    target_id: (extra["target_id"] as string | null) ?? null,
+    agentId: (extra["agent_id"] as string | null) ?? null,
+    targetType: (extra["target_type"] as string | null) ?? null,
+    targetId: (extra["target_id"] as string | null) ?? null,
     status: "success",
     metadata: (extra["metadata"] as Record<string, unknown>) ?? {},
   });

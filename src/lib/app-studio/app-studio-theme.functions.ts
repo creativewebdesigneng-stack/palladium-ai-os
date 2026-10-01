@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 const uuid = z.string().uuid();
@@ -33,11 +34,11 @@ export const updateStudioTheme = createServerFn({ method: "POST" })
     if (result.error) throw new Error(result.error.message);
     if (!result.data) throw new Error("App Studio application not found.");
 
-    await sb.from("mission_audit_logs").insert({
-      user_id: context.userId,
+    await writeAudit({
+      userId: context.userId,
       action: "app_studio_theme_updated",
-      target_type: "app_studio_app",
-      target_id: data.appId,
+      targetType: "app_studio_app",
+      targetId: data.appId,
       status: "success",
       metadata: { theme },
     });

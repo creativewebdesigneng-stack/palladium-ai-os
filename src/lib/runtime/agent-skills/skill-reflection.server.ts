@@ -1,4 +1,5 @@
 import { scanAgentSkillFiles } from "./skill-security-scanner";
+import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -99,11 +100,11 @@ export async function createSkillCandidateFromVerifiedExperience(args: {
     .maybeSingle();
   if (error || !skill) throw new Error("Could not create the reusable skill candidate.");
 
-  await args.sb.from("mission_audit_logs").insert({
-    user_id: args.userId,
+  await writeAudit({
+    userId: args.userId,
     action: "agent_skill_reflected",
-    target_type: "agent_skill",
-    target_id: skill.id,
+    targetType: "agent_skill",
+    targetId: skill.id,
     status: "success",
     metadata: {
       source_task_id: args.taskId,
