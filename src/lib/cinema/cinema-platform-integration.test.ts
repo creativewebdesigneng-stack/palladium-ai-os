@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const sidebar=readFileSync('src/components/palladium/Sidebar.jsx','utf8')
+const navigation=readFileSync('src/components/palladium/navigationData.jsx','utf8')
 const registry=readFileSync('src/lib/runtime/tools.server.ts','utf8')
 const tool=readFileSync('src/lib/cinema/cinema-agent-tool.server.ts','utf8')
 
 describe('Cinema Studio platform integration',()=>{
   it('adds Cinema Studio as a first-class Blackstar workspace destination',()=>{
-    expect(sidebar).toContain("['Cinema Studio', '/cinema-studio'")
+    expect(navigation).toContain("{ label: 'Cinema Studio', path: '/cinema-studio', icon: Popcorn }")
   })
   it('registers the bounded Cinema tool through the existing Harness/audit registry',()=>{
     expect(registry).toContain('CINEMA_STUDIO_TOOL_DEF')
