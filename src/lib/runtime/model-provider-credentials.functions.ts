@@ -2,13 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
-import {
-  deleteUserModelProviderCredential,
-  listUserModelProviderCredentials,
-  resolveUserModelProviderAccess,
-  saveUserModelProviderCredential,
-  type UserConnectableModelProvider,
-} from './model-provider-credentials.server'
+import type { UserConnectableModelProvider } from './model-provider-credentials.server'
 
 const providerSchema = z.enum(['openai', 'anthropic'])
 const saveSchema = z.object({
@@ -63,6 +57,7 @@ async function probeProviderKey(provider: UserConnectableModelProvider, apiKey: 
 export const listModelProviderConnections = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { listUserModelProviderCredentials } = await import('./model-provider-credentials.server')
     const connections = await listUserModelProviderCredentials(context.userId)
     return {
       providers: [
@@ -87,6 +82,7 @@ export const saveModelProviderConnection = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => saveSchema.parse(input))
   .handler(async ({ data, context }) => {
     const probe = await probeProviderKey(data.provider, data.apiKey)
+    const { saveUserModelProviderCredential } = await import('./model-provider-credentials.server')
     const connection = await saveUserModelProviderCredential({
       userId: context.userId,
       provider: data.provider,
@@ -109,6 +105,7 @@ export const testModelProviderConnection = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
+    const { resolveUserModelProviderAccess } = await import('./model-provider-credentials.server')
     const access = await resolveUserModelProviderAccess({ userId: context.userId, provider: data.provider })
     if (!access?.apiKey) throw new Error('No personal API key is connected for that provider.')
     const probe = await probeProviderKey(data.provider, access.apiKey)
@@ -119,6 +116,7 @@ export const deleteModelProviderConnection = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
+    const { deleteUserModelProviderCredential } = await import('./model-provider-credentials.server')
     await deleteUserModelProviderCredential({ userId: context.userId, provider: data.provider })
     await writeAudit({
       userId: context.userId,
