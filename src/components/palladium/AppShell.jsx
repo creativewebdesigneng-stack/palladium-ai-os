@@ -8,7 +8,7 @@ import SpaceBackground from '@/components/visual/SpaceBackground'
 import PageTransition from '@/components/visual/PageTransition'
 import CommandTheatre from '@/components/mission/CommandTheatre'
 import AstraRoomFrame from '@/components/blackstar/AstraRoomFrame'
-import AstraDepthField from '@/components/blackstar/AstraDepthField'
+import BlackstarExperienceField from '@/components/blackstar/BlackstarExperienceField'
 import { blackstarRoomForPath, blackstarVisualStyleForPath } from '@/components/blackstar/visualRooms'
 import BlackstarRouteErrorBoundary from '@/components/blackstar/BlackstarRouteErrorBoundary'
 import { UpgradeProvider } from '@/lib/upgradeContext'
@@ -59,22 +59,13 @@ export default function AppShell() {
         <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-80' : 'opacity-55'}`}>
           <SpaceBackground intensity={mission ? 'medium' : 'low'} />
         </div>
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 opacity-75"
-          style={{ zIndex: -35 }}
-        >
-          {!dedicatedWebGL ? <AstraDepthField room={room} visualStyle={visualStyle} /> : null}
+        <div className="fixed inset-0 -z-35">
+          <BlackstarExperienceField
+            room={room}
+            visualStyle={visualStyle}
+            dedicatedWebGL={dedicatedWebGL}
+          />
         </div>
-        <div aria-hidden className="blackstar-spatial-field fixed inset-0 -z-30">
-          <span className="blackstar-orb blackstar-orb-a" />
-          <span className="blackstar-orb blackstar-orb-b" />
-          <span className="blackstar-orb blackstar-orb-c" />
-          <span className="blackstar-orbit blackstar-orbit-a" />
-          <span className="blackstar-orbit blackstar-orbit-b" />
-          <span className="blackstar-horizon" />
-        </div>
-        <div aria-hidden className="blackstar-perspective-grid pointer-events-none fixed inset-0 -z-20" />
         <div aria-hidden className="blackstar-style-atmosphere pointer-events-none fixed inset-0" style={{ zIndex: -15 }} />
         <div aria-hidden className="astra-room-wash pointer-events-none fixed inset-0 -z-10" />
 
