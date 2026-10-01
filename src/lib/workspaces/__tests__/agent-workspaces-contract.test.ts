@@ -7,7 +7,7 @@ const tool = readFileSync("src/lib/workspaces/agent-workspace-tool.server.ts", "
 const runtime = readFileSync("src/lib/runtime/tools.server.ts", "utf8");
 const screen = readFileSync("src/screens/AgentWorkspaces.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/agent-workspaces.tsx", "utf8");
-const sidebar = readFileSync("src/components/palladium/Sidebar.jsx", "utf8");
+const navigation = readFileSync("src/components/palladium/navigationData.jsx", "utf8");
 
 describe("Crystal + Memex native concept transfer", () => {
   it("adds owner-scoped orchestration/context stores without credentials", () => {
@@ -38,7 +38,7 @@ describe("Crystal + Memex native concept transfer", () => {
 
   it("exposes a first-class workspace and timeline UI", () => {
     expect(route).toContain('createFileRoute("/_shell/_app/agent-workspaces")');
-    expect(sidebar).toContain("['Agent Workspaces', '/agent-workspaces', Layers3]");
+    expect(navigation).toContain("{ label: 'Agent Workspaces', path: '/agent-workspaces', icon: Layers3 }");
     expect(screen).toContain('title="Agent Workspaces"');
     expect(screen).toContain("Git worktree");
     expect(screen).toContain("Promote");
