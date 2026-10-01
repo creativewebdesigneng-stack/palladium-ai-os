@@ -59,7 +59,7 @@ export default function AppShell() {
         <div aria-hidden className={`pointer-events-none fixed inset-0 -z-40 ${mission ? 'opacity-80' : 'opacity-55'}`}>
           <SpaceBackground intensity={mission ? 'medium' : 'low'} />
         </div>
-        <div className="fixed inset-0 -z-35">
+        <div className="fixed inset-0" style={{ zIndex: -35 }}>
           <BlackstarExperienceField
             room={room}
             visualStyle={visualStyle}
