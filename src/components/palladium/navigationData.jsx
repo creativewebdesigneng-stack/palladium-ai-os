@@ -5,7 +5,7 @@ import {
   FolderKanban, Gamepad2, Globe, Hammer, Hand, HardHat, Home, Layers3, LifeBuoy,
   LineChart, Link2, ListChecks, Lock, Megaphone, MessageCircle, Mic2, Orbit, PhoneCall,
   Plug, Popcorn, Radar, Rocket, Scale, ScrollText, Search, Settings, Settings2, ShieldCheck,
-  ShoppingBag, Sparkles, Store, Table2, TerminalSquare, Users, WandSparkles, Workflow,
+  ShoppingBag, Sparkles, SquareTerminal, Store, Table2, Users, WandSparkles, Workflow,
   Wrench, Zap,
 } from 'lucide-react'
 
@@ -137,7 +137,7 @@ export const SYSTEM_GROUPS = [
       { label: 'Developer', path: '/developer', icon: Code2 },
       { label: 'Code Explorer', path: '/code-explorer', icon: Code2 },
       { label: 'Version Control', path: '/version-control', icon: Link2 },
-      { label: 'Terminal', path: '/terminal', icon: TerminalSquare },
+      { label: 'Terminal', path: '/terminal', icon: SquareTerminal },
       { label: 'AI Web', path: '/web', icon: Globe },
       { label: 'Web Intelligence', path: '/web-intelligence', icon: Search },
     ],
