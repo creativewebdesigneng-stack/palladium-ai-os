@@ -47,6 +47,27 @@ describe('AI Hub portable runtime target attestations', () => {
     })).toBeNull()
   })
 
+  it('invalidates an attestation after target configuration or secret rotation changes', () => {
+    const registry = new AiHubRuntimeTargetRegistry()
+    registry.register({
+      id: 'rotated-onprem',
+      deploymentTarget: 'on-prem',
+      tenantId: 'tenant-a',
+      region: 'uk',
+      health: 'healthy',
+      attestedAt: '2026-10-01T18:00:00.000Z',
+      expiresAt: '2026-10-01T22:00:00.000Z',
+      configurationUpdatedAt: '2026-10-01T19:00:00.000Z',
+    })
+
+    expect(registry.resolve({
+      tenantId: 'tenant-a',
+      deploymentTarget: 'on-prem',
+      region: 'uk',
+      now: new Date('2026-10-01T20:00:00.000Z'),
+    })).toBeNull()
+  })
+
   it('fails closed for degraded, offline or expired targets', () => {
     const registry = new AiHubRuntimeTargetRegistry()
     registry.register({

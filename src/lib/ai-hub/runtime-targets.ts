@@ -17,6 +17,7 @@ export interface AiHubRuntimeTargetAttestation {
   health: AiHubRuntimeTargetHealth
   attestedAt: string
   expiresAt?: string
+  configurationUpdatedAt?: string
   metadata?: Record<string, unknown>
 }
 
@@ -45,6 +46,9 @@ export class AiHubRuntimeTargetRegistry {
     if (target.expiresAt && parseTimestamp(target.expiresAt) === null) {
       throw new Error('AI Hub runtime target expiry timestamp is invalid')
     }
+    if (target.configurationUpdatedAt && parseTimestamp(target.configurationUpdatedAt) === null) {
+      throw new Error('AI Hub runtime target configuration timestamp is invalid')
+    }
     this.targets.set(target.id, target)
     return target
   }
@@ -67,6 +71,10 @@ export class AiHubRuntimeTargetRegistry {
       if (target.health !== 'healthy') return false
       const attestedAt = parseTimestamp(target.attestedAt)
       if (attestedAt === null || attestedAt > now) return false
+      if (target.configurationUpdatedAt) {
+        const configuredAt = parseTimestamp(target.configurationUpdatedAt)
+        if (configuredAt === null || configuredAt > attestedAt) return false
+      }
       if (target.expiresAt) {
         const expiresAt = parseTimestamp(target.expiresAt)
         if (expiresAt === null || expiresAt <= now) return false
