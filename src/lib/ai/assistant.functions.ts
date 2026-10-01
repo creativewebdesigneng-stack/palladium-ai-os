@@ -94,7 +94,7 @@ async function runAssistantWithFallback(args: {
   providerAccess?: ProviderAccess | null;
 }): Promise<AssistantRun> {
   try {
-    const primary = await runChat({ provider: args.provider, model: args.model, messages: args.messages, maxTokens: 1100, providerAccess: args.providerAccess });
+    const primary = await runChat({ provider: args.provider, model: args.model, messages: args.messages, maxTokens: 1100, ...(args.providerAccess ? { providerAccess: args.providerAccess } : {}) });
     const text = primary.text.trim();
     if (!text) throw new ProviderError("The model returned an empty response.", 502, true);
     return { text, provider: primary.provider, model: primary.model, usage: primary.usage };
@@ -103,7 +103,7 @@ async function runAssistantWithFallback(args: {
     if (!canUseGroq) throw primaryError;
     console.warn("[assistant] primary provider failed; retrying with Groq", args.provider, primaryError instanceof Error ? primaryError.message : String(primaryError));
     const fallbackModel = defaultModelFor("groq");
-    const fallback = await runChat({ provider: "groq", model: fallbackModel, messages: args.messages, maxTokens: 1100, providerAccess: args.providerAccess });
+    const fallback = await runChat({ provider: "groq", model: fallbackModel, messages: args.messages, maxTokens: 1100, ...(args.providerAccess ? { providerAccess: args.providerAccess } : {}) });
     const text = fallback.text.trim();
     if (!text) throw new ProviderError("The fallback model returned an empty response.", 502, true);
     return { text, provider: fallback.provider, model: fallback.model, usage: fallback.usage, fallbackFrom: args.provider };
