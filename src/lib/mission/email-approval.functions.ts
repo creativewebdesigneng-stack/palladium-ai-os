@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/platform/audit.server";
 import { createApprovedMissionEmailDraft } from "./mission.server";
 import { notify } from "@/lib/notifications/notify.server";
 
@@ -95,12 +96,12 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
       if (approval.task_id) {
         await sb.from("personal_tasks").update({ status: "cancelled" }).eq("id", approval.task_id).eq("user_id", userId);
       }
-      await sb.from("mission_audit_logs").insert({
-        user_id: userId,
-        agent_id: approval.agent_id ?? null,
+      await writeAudit({
+        userId: userId,
+        agentId: approval.agent_id ?? null,
         action: "email_draft_rejected",
-        target_type: "approval_request",
-        target_id: approval.id,
+        targetType: "approval_request",
+        targetId: approval.id,
         status: "success",
         metadata: { task_id: approval.task_id ?? null },
       });
@@ -181,12 +182,12 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
         message: `Approved email saved as a ${provider === "google" ? "Gmail" : "Outlook"} draft`,
         metadata: { provider, approval_request_id: approval.id },
       });
-      await sb.from("mission_audit_logs").insert({
-        user_id: userId,
-        agent_id: approval.agent_id ?? null,
+      await writeAudit({
+        userId: userId,
+        agentId: approval.agent_id ?? null,
         action: "email_draft_created",
-        target_type: "approval_request",
-        target_id: approval.id,
+        targetType: "approval_request",
+        targetId: approval.id,
         status: "success",
         metadata: { provider, draft_id: draft.draftId, task_id: approval.task_id ?? null },
       });
@@ -210,12 +211,12 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
       if (approval.task_id) {
         await sb.from("personal_tasks").update({ status: "failed", result: { error: message.slice(0, 500) } }).eq("id", approval.task_id).eq("user_id", userId);
       }
-      await sb.from("mission_audit_logs").insert({
-        user_id: userId,
-        agent_id: approval.agent_id ?? null,
+      await writeAudit({
+        userId: userId,
+        agentId: approval.agent_id ?? null,
         action: "email_draft_failed",
-        target_type: "approval_request",
-        target_id: approval.id,
+        targetType: "approval_request",
+        targetId: approval.id,
         status: "failed",
         metadata: { provider, error: message.slice(0, 500), task_id: approval.task_id ?? null },
       });
