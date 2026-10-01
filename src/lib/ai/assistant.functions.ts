@@ -273,6 +273,7 @@ export const assistantChat = createServerFn({ method: "POST" })
         metadata: {
           fallbackFrom: result.fallbackFrom ?? null,
           liveWebSources: webSources.length,
+          sources: webSources.slice(0, 6).map(({ title, url }) => ({ title, url })),
           memoryHits: memoryContext.hits,
           agentMatches: workspaceContext.agentMatches,
           connectedIntegrations: connectionContext.connected,
