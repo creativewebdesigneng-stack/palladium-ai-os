@@ -65,13 +65,13 @@ export const listModelProviderConnections = createServerFn({ method: 'POST' })
           id: 'openai' as const,
           name: 'OpenAI',
           deploymentConfigured: Boolean(process.env['OPENAI_API_KEY']),
-          connection: connections.find((item) => item.provider === 'openai') ?? null,
+          connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'openai') ?? null,
         },
         {
           id: 'anthropic' as const,
           name: 'Anthropic',
           deploymentConfigured: Boolean(process.env['ANTHROPIC_API_KEY']),
-          connection: connections.find((item) => item.provider === 'anthropic') ?? null,
+          connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'anthropic') ?? null,
         },
       ],
     }
@@ -87,7 +87,7 @@ export const saveModelProviderConnection = createServerFn({ method: 'POST' })
       userId: context.userId,
       provider: data.provider,
       apiKey: data.apiKey,
-      label: data.label,
+      ...(data.label ? { label: data.label } : {}),
       verifiedAt: probe.checkedAt,
     })
     await writeAudit({
