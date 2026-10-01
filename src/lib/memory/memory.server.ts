@@ -55,7 +55,25 @@ export type StoreMemoryInput = {
 
 const SHORT_TERM_TTL_MINUTES = 12 * 60;
 
-export class MemoryError extends Error {}
+export type MemoryErrorCode = "embedding_configuration";
+
+export class MemoryError extends Error {
+  constructor(
+    message: string,
+    readonly code?: MemoryErrorCode,
+  ) {
+    super(message);
+    this.name = "MemoryError";
+  }
+}
+
+function logMemoryIndexFailure(message: string, error: unknown) {
+  if (error instanceof MemoryError && error.code === "embedding_configuration") {
+    console.warn(message, error.message);
+    return;
+  }
+  console.error(message, error);
+}
 
 // Strips NUL bytes from ingested content before storage (Postgres text rejects them).
 /* eslint-disable no-control-regex */
@@ -146,7 +164,7 @@ export async function storeMemory(args: {
   // Indexing failures must not lose the memory — the row stays searchable by text.
   const indexed = await indexMemory({ sb: args.sb, userId: args.userId, memory: data }).catch(
     (e) => {
-      console.error("[memory] index failed", e);
+      logMemoryIndexFailure("[memory] vector indexing unavailable", e);
       return null;
     },
   );
@@ -209,7 +227,12 @@ export async function indexMemory(args: {
       .from("agent_memories")
       .update({ vector_status: "failed" })
       .eq("id", args.memory.id);
-    throw error instanceof EmbeddingError ? new MemoryError(error.message) : error;
+    throw error instanceof EmbeddingError
+      ? new MemoryError(
+          error.message,
+          error.code === "configuration" ? "embedding_configuration" : undefined,
+        )
+      : error;
   }
 }
 
@@ -250,7 +273,7 @@ export async function updateMemory(args: {
 
   if (patch["vector_status"] === "pending") {
     await indexMemory({ sb: args.sb, userId: args.userId, memory: data }).catch((e) =>
-      console.error("[memory] reindex failed", e),
+      logMemoryIndexFailure("[memory] vector reindexing unavailable", e),
     );
   }
   return data;
@@ -381,7 +404,11 @@ export async function searchMemory(args: {
       }
     }
   } catch (error) {
-    console.error("[memory] semantic search unavailable", error);
+    if (error instanceof EmbeddingError && error.code === "configuration") {
+      console.warn("[memory] semantic search using keyword fallback", error.message);
+    } else {
+      console.error("[memory] semantic search unavailable", error);
+    }
   }
 
   const [keywordHits, documentKeywordHits] = await Promise.all([keywordPromise, documentKeywordPromise]);
