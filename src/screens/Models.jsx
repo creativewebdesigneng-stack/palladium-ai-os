@@ -7,6 +7,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import BlackstarAstraActivationPanel from '@/components/models/BlackstarAstraActivationPanel';
 import DeepSeekRuntimePanel from '@/components/models/DeepSeekRuntimePanel';
 import APIManagement from '@/components/models/APIManagement';
+import GroqEvidencePanel from '@/components/models/GroqEvidencePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
@@ -75,6 +76,7 @@ export default function Models() {
 
       <BlackstarAstraActivationPanel readiness={astra} />
       <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
+      <GroqEvidencePanel />
 
       <div className="mb-6"><APIManagement /></div>
 
