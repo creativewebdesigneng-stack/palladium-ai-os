@@ -64,7 +64,6 @@ export async function generateHuggingFaceCinemaPreview(args: {
       guidance_scale: 5.0,
       ...(Number.isInteger(args.seed) ? { seed: args.seed } : {}),
     },
-    ...(args.modelId?.trim() ? { model: args.modelId.trim() } : {}),
   }
 
   const response = await fetch(endpoint, {
