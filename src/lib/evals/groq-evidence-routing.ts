@@ -49,8 +49,8 @@ export function summariseGroqEvidence(
   // Evidence-qualified routing is deliberately conservative. A model must
   // demonstrate quality and enough samples; tool-use workloads also require
   // observed tool-use reliability. Cost never qualifies a route by itself.
-  if (rows.length < 10) reasons.push('Need at least 10 same-class Groq benchmark samples.')
-  if (averageScore === null || averageScore < 0.85) reasons.push('Average judged quality must be at least 0.85.')
+  if (rows.length < 20) reasons.push('Need at least 20 same-class Groq benchmark samples.')
+  if (averageScore === null || averageScore < 0.75) reasons.push('Average judged quality must be at least 0.75.')
   if (taskClass === 'tool_use' || taskClass === 'agentic') {
     if (toolUseRate === null || toolUseRate < 0.9) reasons.push('Tool-use success evidence must be at least 90%.')
   }
