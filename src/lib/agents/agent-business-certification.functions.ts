@@ -44,7 +44,7 @@ export const getAgentBusinessCertification = createServerFn({ method: "POST" })
         .limit(500),
       sb
         .from("approval_requests")
-        .select("task_id,action_type,status,execution_status,created_at")
+        .select("task_id,action_type,status,execution_status,execution_result,created_at")
         .eq("agent_id", data.agentId)
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true })
