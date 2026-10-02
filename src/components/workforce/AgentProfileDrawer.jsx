@@ -279,7 +279,9 @@ function BusinessCertification({ agent }) {
         </div>
       </div>
       <div className="space-y-2">
-        {data.capabilities.map((capability) => (
+        {data.capabilities.map((capability) => {
+          const benchmarks = data.benchmarks.filter((benchmark) => benchmark.capability === capability.id);
+          return (
           <div key={capability.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -299,8 +301,23 @@ function BusinessCertification({ agent }) {
               <EvidencePill ok={capability.connectedProviderObserved} label="Provider evidence" />
             </div>
             {capability.notes.length > 0 && <p className="mt-2 text-[9px] leading-4 text-zinc-600">{capability.notes.join(' ')}</p>}
+            {benchmarks.length > 0 && (
+              <details className="mt-3 rounded-xl border border-white/[.06] bg-white/[.015] p-2">
+                <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-600">Certification benchmarks · {benchmarks.length}</summary>
+                <div className="mt-2 space-y-2">
+                  {benchmarks.map((benchmark) => (
+                    <div key={benchmark.id} className="rounded-lg border border-white/[.05] bg-black/20 p-2">
+                      <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-medium text-zinc-300">{benchmark.title}</p><span className="text-[8px] uppercase tracking-[.1em] text-zinc-700">{benchmark.kind.replace('_', ' ')}</span></div>
+                      <p className="mt-1 text-[9px] leading-4 text-zinc-600">{benchmark.objective}</p>
+                      <p className="mt-1 text-[8px] text-zinc-700">External side effect: {benchmark.externalSideEffect === 'approval_only' ? 'approval request only' : 'none'}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
       <p className="text-[9px] leading-4 text-zinc-700">Financial certification is research/simulation/governed-workflow certification only. Blackstar agents are not certified for unrestricted autonomous movement of user funds.</p>
     </div>
