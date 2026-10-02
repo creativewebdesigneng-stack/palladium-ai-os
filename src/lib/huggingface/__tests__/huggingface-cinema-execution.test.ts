@@ -71,6 +71,8 @@ describe('Hugging Face Cinema execution lane', () => {
     expect(panel).not.toContain('HF_TOKEN')
     expect(panel).not.toContain('HUGGINGFACE_TOKEN')
     expect(cinema).toContain('HuggingFaceCinemaExecutionPanel')
+    expect(cinema).toContain('HuggingFaceModelDiscoveryPanel')
+    expect(cinema).toContain("tasks={['text-to-video','image-to-video']}")
   })
 
   it('does not replace existing production workers', () => {
