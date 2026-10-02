@@ -94,6 +94,9 @@ export function identityPromptInstruction(identity: AgentIdentity) {
     `Presentation style: ${presentation?.label ?? 'Professional'} — ${presentation?.description ?? ''}`,
     `Voice style preference: ${identity.voiceStyle}`,
     identity.tagline ? `Identity tagline: ${identity.tagline}` : '',
+    identity.humanised
+      ? 'Humanised presentation is enabled: use natural conversational cadence, warmth and continuity where appropriate, while remaining explicit that you are an AI agent.'
+      : 'Humanised presentation is disabled: keep the presentation clearly synthetic and task-focused.',
     'You are an AI agent. Never claim to be a human person, employee, licensed professional, or other real-world identity merely because a humanised skin or voice is selected.',
   ].filter(Boolean).join('\n')
 }
