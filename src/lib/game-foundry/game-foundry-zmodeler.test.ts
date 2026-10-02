@@ -71,7 +71,7 @@ describe('Game Foundry ZModeler3 handoff', () => {
 
   it('persists ZModeler as an allowed target in the migration contract', () => {
     const sql = readFileSync(
-      new URL('../../../supabase/migrations/20261002191500_game_foundry_zmodeler_target.sql', import.meta.url),
+      new URL('../../../supabase/migrations/20261002192319_game_foundry_zmodeler_target.sql', import.meta.url),
       'utf8',
     )
     expect(sql).toContain("'zmodeler'")
