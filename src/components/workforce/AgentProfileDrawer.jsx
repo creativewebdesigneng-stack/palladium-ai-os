@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, CheckCircle2, TrendingUp, Wrench, Plug, Brain, BookOpen, ShieldCheck, Activity, FolderKanban, Bot } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
-import { MiniAvatar } from './wfShared';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { STATUS_STYLE, PROFILE_TABS, TASK_STATUS_STYLE, PRIORITY_STYLE, TOOL_ICON } from './wfData';
 
 export default function AgentProfileDrawer({ agent, onClose }) {
@@ -20,13 +20,14 @@ export default function AgentProfileDrawer({ agent, onClose }) {
       >
         {/* header */}
         <div className="flex items-start gap-3 border-b border-white/10 p-4">
-          <MiniAvatar letter={agent.letter} grad={agent.grad} size="h-12 w-12" text="text-lg" />
+          <AgentIdentityAvatar name={agent.name} identity={agent.identity} size="lg" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-white">{agent.name}</h2>
               <span className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${st.bg} ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{agent.status}</span>
             </div>
-            <p className="text-xs text-zinc-400">{agent.role} · {agent.department}</p>
+            <p className="text-xs text-zinc-400">{agent.identity?.tagline || agent.role}{agent.department ? ` · ${agent.department}` : ''}</p>
+            <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[.14em] text-violet-300/60">AI agent · {agent.identity?.presentationStyle || 'professional'} · {agent.identity?.voiceStyle || 'neutral'} voice</p>
             <p className="mt-0.5 text-[10px] text-zinc-600">{agent.model} · Team {agent.team}</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
