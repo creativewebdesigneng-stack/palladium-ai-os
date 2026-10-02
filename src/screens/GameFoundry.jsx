@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Box, Download, FileUp, Gamepad2, Image as ImageIcon, Loader2, Network, PackageCheck, Play, RefreshCw, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import HuggingFaceModelDiscoveryPanel from '@/components/huggingface/HuggingFaceModelDiscoveryPanel'
 import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
 import { Failed, Empty } from '@/components/business/live';
@@ -193,6 +194,7 @@ export default function GameFoundry() {
     {overview.error && <Failed message={friendlyMessage(overview.error)} />}
     <GameFoundryWorld capabilities={caps} projects={projects} assets={assets} integrations={integrations} />
 
+    <div className="mb-4"><HuggingFaceModelDiscoveryPanel tasks={['text-to-3d','image-to-3d']} title="Hugging Face game-asset intelligence" description="Discover candidate text/image-to-3D models for future provider lanes while Blackstar's hosted 3D worker remains the authoritative asset execution path."/></div>
     <div className="grid gap-4 2xl:grid-cols-[1.05fr_.95fr]">
       <section className="rounded-2xl border border-violet-300/15 bg-black/30 p-5">
         <div className="flex items-start gap-3">
