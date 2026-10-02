@@ -2,7 +2,7 @@
 import {
   Bot, Moon, Activity, CheckCircle2, AlertTriangle, Globe, Wrench, Mail, Calendar,
   Github, MessageSquare, Database, FileText, Brain, BookOpen, ShieldCheck, Plug,
-  TrendingUp, FolderKanban, Send, Server,
+  TrendingUp, FolderKanban, Send, Server, BadgeCheck,
 } from 'lucide-react';
 
 export const OVERVIEW = [
@@ -193,6 +193,7 @@ export const PROFILE_TABS = [
   { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'performance', label: 'Performance', icon: TrendingUp },
   { id: 'activity', label: 'Activity', icon: Activity },
+  { id: 'certification', label: 'Certification', icon: BadgeCheck },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
 ];
 
