@@ -221,6 +221,18 @@ export const runModelArena = createServerFn({ method: "POST" })
         const executionPrompt = isExactAstraCandidate
           ? buildAstraCertificationExecutionPrompt(safePrompt, astraExecutionProfile!)
           : safePrompt;
+        const benchmarkTools = effectiveTaskClass === "tool_use" || effectiveTaskClass === "agentic"
+          ? [{
+              name: "blackstar_evidence_probe",
+              description: "Schema-only benchmark tool. Use it only when the benchmark prompt requires a tool call. It has no external side effects.",
+              parameters: {
+                type: "object",
+                properties: { query: { type: "string" } },
+                required: ["query"],
+                additionalProperties: false,
+              },
+            }]
+          : [];
         const result = await runChatPinned({
           provider: contestant.provider as Provider,
           model: contestant.model,
@@ -229,6 +241,7 @@ export const runModelArena = createServerFn({ method: "POST" })
             { role: "user", content: executionPrompt },
           ],
           maxTokens: isExactAstraCandidate ? astraExecutionProfile!.maxTokens : 1600,
+          tools: benchmarkTools,
           ...(isExactAstraCandidate ? { timeoutMs: astraExecutionProfile!.timeoutMs } : {}),
         });
         if (result.provider !== contestant.provider || result.model !== contestant.model) {
