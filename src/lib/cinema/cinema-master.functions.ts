@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { cinemaSegmentDurations } from './cinema-render.functions'
-import { getCinemaMasterAssembly, submitCinemaMasterAssembly } from './cinema-runtime.server'
+import { getCinemaMasterAssembly, probeCinemaMasterConnection, submitCinemaMasterAssembly } from './cinema-runtime.server'
 
 type Sb={from:(table:string)=>any}
 
@@ -63,12 +63,82 @@ async function loadProjectAndRenders(sb:Sb,userId:string,id:string){
   return {project:project.data,renders:renders.data??[]}
 }
 
+async function loadLatestMasterEvidence(sb:Sb,userId:string,id:string){
+  const job=await sb.from('media_generation_jobs')
+    .select('id,status,output_url,worker_job_id,error_message,metadata,completed_at,updated_at')
+    .eq('user_id',userId)
+    .eq('provider','cinema')
+    .contains('metadata',{cinemaProjectId:id,stage:'master'})
+    .order('created_at',{ascending:false})
+    .limit(1)
+    .maybeSingle()
+  if(job.error) throw new Error(job.error.message)
+  return job.data??null
+}
+
+function validateMasterResult(result:any){
+  if(result?.status==='completed'&&!result.outputUrl){
+    return {...result,status:'failed',errorMessage:'Cinema master worker reported completed without an output URL.'}
+  }
+  return result
+}
+
 export const auditCinemaMasterReadiness=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
     const {project,renders}=await loadProjectAndRenders(sb,context.userId,data.id)
     return buildCinemaAssemblyManifest(project,renders)
+  })
+
+export const certifyCinemaProject=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+  .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb
+    const {project,renders}=await loadProjectAndRenders(sb,context.userId,data.id)
+    const manifest=buildCinemaAssemblyManifest(project,renders)
+    const [worker,latestMaster]=await Promise.all([
+      probeCinemaMasterConnection(),
+      loadLatestMasterEvidence(sb,context.userId,data.id),
+    ])
+    const readyForMaster=manifest.ready&&worker.healthy
+    const finalOutputCertified=Boolean(
+      latestMaster?.status==='completed'&&
+      latestMaster?.output_url&&
+      project.status==='completed'
+    )
+    const readinessBlockers=[
+      ...manifest.blockers,
+      ...(worker.healthy?[]:[worker.error||'Cinema master worker is not healthy.']),
+    ]
+    const certificationBlockers=[
+      ...readinessBlockers,
+      ...(finalOutputCertified?[]:['Complete a real Cinema master job with a persisted output URL.']),
+    ]
+    return {
+      projectId:data.id,
+      codeReady:true,
+      readyForMaster,
+      finalOutputCertified,
+      worker,
+      latestMaster:latestMaster?{
+        id:latestMaster.id,
+        status:latestMaster.status,
+        outputUrl:latestMaster.output_url,
+        workerJobId:latestMaster.worker_job_id,
+        completedAt:latestMaster.completed_at,
+        updatedAt:latestMaster.updated_at,
+        errorMessage:latestMaster.error_message,
+      }:null,
+      readinessBlockers,
+      certificationBlockers,
+      certifiedAt:finalOutputCertified?latestMaster.completed_at:null,
+      note:finalOutputCertified
+        ? 'Cinema has persisted completed master evidence with an output URL and a healthy live master worker.'
+        : readyForMaster
+          ? 'Cinema is operationally ready for a real master job, but no final rendered-film certification is claimed yet.'
+          : 'Cinema engineering is present, but operational certification remains blocked until persisted render evidence and live worker health are both satisfied.',
+    }
   })
 
 export const submitCinemaMaster=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
@@ -84,7 +154,7 @@ export const submitCinemaMaster=createServerFn({method:'POST'}).middleware([requ
     }).select('id').single()
     if(row.error) throw new Error(row.error.message)
     try{
-      const result=await submitCinemaMasterAssembly({projectId:data.id,title:project.title,aspectRatio:project.aspect_ratio,quality:project.quality,manifest})
+      const result=validateMasterResult(await submitCinemaMasterAssembly({projectId:data.id,title:project.title,aspectRatio:project.aspect_ratio,quality:project.quality,manifest}))
       const terminal=['completed','failed','cancelled'].includes(result.status)
       const update=await sb.from('media_generation_jobs').update({worker_job_id:result.workerJobId,status:result.status,output_url:result.outputUrl,completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',row.data.id).eq('user_id',context.userId)
       if(update.error) throw new Error(update.error.message)
@@ -103,12 +173,12 @@ export const refreshCinemaMaster=createServerFn({method:'POST'}).middleware([req
   .inputValidator((v:unknown)=>z.object({jobId:z.string().uuid(),projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
-    const job=await sb.from('media_generation_jobs').select('id,worker_job_id').eq('id',data.jobId).eq('user_id',context.userId).eq('provider','cinema').maybeSingle()
+    const job=await sb.from('media_generation_jobs').select('id,worker_job_id,metadata').eq('id',data.jobId).eq('user_id',context.userId).eq('provider','cinema').maybeSingle()
     if(job.error) throw new Error(job.error.message)
     if(!job.data?.worker_job_id) throw new Error('Cinema master job has no worker id.')
-    const result=await getCinemaMasterAssembly(String(job.data.worker_job_id))
+    const result=validateMasterResult(await getCinemaMasterAssembly(String(job.data.worker_job_id)))
     const terminal=['completed','failed','cancelled'].includes(result.status)
-    const update=await sb.from('media_generation_jobs').update({status:result.status,output_url:result.outputUrl,error_message:result.errorMessage,metadata:result.metadata,completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',data.jobId).eq('user_id',context.userId)
+    const update=await sb.from('media_generation_jobs').update({status:result.status,output_url:result.outputUrl,error_message:result.errorMessage,metadata:{...((job.data.metadata&&typeof job.data.metadata==='object')?job.data.metadata:{}),...((result.metadata&&typeof result.metadata==='object')?result.metadata:{}),cinemaProjectId:data.projectId,stage:'master'},completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',data.jobId).eq('user_id',context.userId)
     if(update.error) throw new Error(update.error.message)
     const p=await sb.from('cinema_projects').update({status:result.status==='completed'?'completed':result.status==='failed'?'failed':'rendering',error_message:result.errorMessage,updated_at:new Date().toISOString()}).eq('id',data.projectId).eq('user_id',context.userId)
     if(p.error) throw new Error(p.error.message)
