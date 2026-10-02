@@ -2,18 +2,72 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
-import { getThreeDJob, getThreeDRuntimeCapabilities, submitThreeDJob } from "./three-d-runtime.server";
+import { getThreeDJob, getThreeDRuntimeCapabilities, probeThreeDWorker, submitThreeDJob } from "./three-d-runtime.server";
 
 type Sb = { from: (table: string) => any };
 const outputFormat = z.enum(["glb","gltf","obj","ply","stl","vox"]);
+
+function validateThreeDWorkerEvidence(worker: any) {
+  if (worker?.status === "completed" && !worker.outputUrl) {
+    return { ...worker, status: "failed", errorMessage: "3D worker reported completed without an output URL." };
+  }
+  return worker;
+}
 
 export const getThreeDStudioOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
-    const result = await sb.from("three_d_jobs").select("id,input_name,source_url,workflow,requested_format,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at").order("created_at", { ascending: false }).limit(100);
+    const result = await sb.from("three_d_jobs").select("id,input_name,source_url,workflow,requested_format,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(100);
     if (result.error) throw new Error(result.error.message);
     return { capabilities: getThreeDRuntimeCapabilities(), jobs: result.data ?? [] };
+  });
+
+export const certifyThreeDStudio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const [worker, evidence] = await Promise.all([
+      probeThreeDWorker(),
+      sb.from("three_d_jobs")
+        .select("id,input_name,requested_format,status,worker_job_id,output_url,preview_url,completed_at,updated_at")
+        .eq("user_id", context.userId)
+        .eq("status", "completed")
+        .not("output_url", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (evidence.error) throw new Error(evidence.error.message);
+    const operationallyReady = worker.healthy;
+    const executionCertified = Boolean(worker.healthy && evidence.data?.output_url);
+    const blockers = [
+      ...(worker.healthy ? [] : [worker.error || "3D worker is not healthy."]),
+      ...(evidence.data?.output_url ? [] : ["Complete at least one real 3D Studio job with a persisted output URL."]),
+    ];
+    return {
+      codeReady: true,
+      operationallyReady,
+      executionCertified,
+      worker,
+      latestEvidence: evidence.data ? {
+        id: evidence.data.id,
+        inputName: evidence.data.input_name,
+        requestedFormat: evidence.data.requested_format,
+        outputUrl: evidence.data.output_url,
+        previewUrl: evidence.data.preview_url,
+        workerJobId: evidence.data.worker_job_id,
+        completedAt: evidence.data.completed_at,
+        updatedAt: evidence.data.updated_at,
+      } : null,
+      blockers,
+      certifiedAt: executionCertified ? evidence.data.completed_at : null,
+      note: executionCertified
+        ? "3D Studio has a healthy live worker and persisted completed output evidence."
+        : operationallyReady
+          ? "The live 3D worker is healthy, but execution certification still requires a real completed output owned by this user."
+          : "3D Studio engineering is present, but operational certification remains blocked until the live worker is healthy.",
+    };
   });
 
 export const createThreeDJob = createServerFn({ method: "POST" })
@@ -24,7 +78,7 @@ export const createThreeDJob = createServerFn({ method: "POST" })
     const created = await sb.from("three_d_jobs").insert({ user_id: context.userId, input_name: data.inputName, source_url: data.sourceUrl, workflow: "image-to-mesh", requested_format: data.outputFormat, status: "queued" }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     try {
-      const worker = await submitThreeDJob(data);
+      const worker = validateThreeDWorkerEvidence(await submitThreeDJob(data));
       const completedAt = ["completed","failed","cancelled"].includes(worker.status) ? new Date().toISOString() : null;
       const update = await sb.from("three_d_jobs").update({ worker_job_id: worker.workerJobId, status: worker.status, output_url: worker.outputUrl, preview_url: worker.previewUrl, error_message: worker.errorMessage, metadata: worker.metadata, completed_at: completedAt, updated_at: new Date().toISOString() }).eq("id", created.data.id);
       if (update.error) throw new Error(update.error.message);
@@ -46,7 +100,7 @@ export const refreshThreeDJob = createServerFn({ method: "POST" })
     if (job.error) throw new Error(job.error.message);
     if (!job.data) throw new Error("3D job not found or access denied.");
     if (!job.data.worker_job_id) throw new Error("This 3D job was not accepted by the worker.");
-    const worker = await getThreeDJob(String(job.data.worker_job_id));
+    const worker = validateThreeDWorkerEvidence(await getThreeDJob(String(job.data.worker_job_id)));
     const completedAt = ["completed","failed","cancelled"].includes(worker.status) ? new Date().toISOString() : null;
     const updated = await sb.from("three_d_jobs").update({ status: worker.status, output_url: worker.outputUrl, preview_url: worker.previewUrl, error_message: worker.errorMessage, metadata: worker.metadata, completed_at: completedAt, updated_at: new Date().toISOString() }).eq("id", data.id);
     if (updated.error) throw new Error(updated.error.message);

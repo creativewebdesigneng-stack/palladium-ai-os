@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { getThreeDRuntimeCapabilities, submitThreeDJob } from './three-d-runtime.server';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getThreeDRuntimeCapabilities, probeThreeDWorker, submitThreeDJob } from './three-d-runtime.server';
 import { THREE_D_STUDIO_TOOL_DEF } from './three-d-agent-tool.server';
 
 const originalUrl = process.env['MODLY_API_URL'];
 const originalToken = process.env['MODLY_API_TOKEN'];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (originalUrl === undefined) delete process.env['MODLY_API_URL'];
   else process.env['MODLY_API_URL'] = originalUrl;
   if (originalToken === undefined) delete process.env['MODLY_API_TOKEN'];
@@ -21,6 +22,21 @@ describe('3D Studio runtime', () => {
     expect(capabilities.workflows).toEqual(['image-to-mesh']);
     expect(capabilities.formats).toContain('glb');
     expect(capabilities.formats).toContain('vox');
+  });
+
+  it('probes the real worker health contract without treating configuration as proof', async () => {
+    process.env['MODLY_API_URL'] = 'https://modly-worker.example';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      ready: true,
+      provider: 'blackstar-game-foundry-3d',
+      workflows: ['image-to-mesh', 'prompt-to-mesh'],
+      formats: ['glb', 'obj'],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const result = await probeThreeDWorker();
+    expect(result.healthy).toBe(true);
+    expect(result.readySignal).toBe(true);
+    expect(result.workflows).toContain('image-to-mesh');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/health');
   });
 
   it('blocks local/private image sources before contacting a worker', async () => {

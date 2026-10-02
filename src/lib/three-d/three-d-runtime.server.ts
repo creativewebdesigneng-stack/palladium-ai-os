@@ -19,6 +19,70 @@ function workerConfig() {
   return { base, token };
 }
 
+export async function probeThreeDWorker() {
+  const { base, token } = workerConfig();
+  const started = Date.now();
+  if (!base) {
+    return {
+      provider: "modly-compatible",
+      configured: false,
+      reachable: false,
+      healthy: false,
+      readySignal: null,
+      httpStatus: null,
+      latencyMs: 0,
+      checkedAt: new Date().toISOString(),
+      workflows: [] as string[],
+      formats: [] as string[],
+      error: "3D Studio execution worker is unavailable.",
+    };
+  }
+  try {
+    const response = await fetch(`${base}/health`, {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      redirect: "manual",
+      signal: AbortSignal.timeout(8000),
+    });
+    const text = await response.text();
+    let payload: any = null;
+    try { payload = text ? JSON.parse(text) : null; } catch {}
+    const readySignal = payload && typeof payload === "object" && "ready" in payload ? payload.ready === true : null;
+    const healthy = response.ok && readySignal !== false;
+    return {
+      provider: typeof payload?.provider === "string" ? payload.provider : "modly-compatible",
+      configured: true,
+      reachable: true,
+      healthy,
+      readySignal,
+      httpStatus: response.status,
+      latencyMs: Math.max(0, Date.now() - started),
+      checkedAt: new Date().toISOString(),
+      workflows: Array.isArray(payload?.workflows) ? payload.workflows.filter((item: unknown) => typeof item === "string").slice(0, 20) : [],
+      formats: Array.isArray(payload?.formats) ? payload.formats.filter((item: unknown) => typeof item === "string").slice(0, 20) : [],
+      error: healthy
+        ? null
+        : readySignal === false
+          ? "3D worker health endpoint reported ready=false."
+          : `3D worker health endpoint returned HTTP ${response.status}.`,
+    };
+  } catch (error) {
+    return {
+      provider: "modly-compatible",
+      configured: true,
+      reachable: false,
+      healthy: false,
+      readySignal: null,
+      httpStatus: null,
+      latencyMs: Math.max(0, Date.now() - started),
+      checkedAt: new Date().toISOString(),
+      workflows: [] as string[],
+      formats: [] as string[],
+      error: error instanceof Error ? error.message.slice(0, 240) : "3D worker health probe failed.",
+    };
+  }
+}
+
 export function getThreeDRuntimeCapabilities() {
   const { base } = workerConfig();
   return {
