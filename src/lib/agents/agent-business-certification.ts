@@ -21,6 +21,7 @@ export type BusinessCapabilityBenchmark = {
   configuredTools: readonly string[];
   approvalActions: readonly string[];
   connectedProviderEvidence: boolean;
+  evidenceMode?: "verified_task" | "approval_boundary";
   requiredVerifiedTasks: 3;
   requiredAverageScore: 0.9;
 };
@@ -45,6 +46,7 @@ export type ApprovalEvidence = {
   action_type?: string | null;
   status?: string | null;
   execution_status?: string | null;
+  execution_result?: unknown;
 };
 
 export type AgentBusinessCertificationInput = {
@@ -147,6 +149,7 @@ export const BUSINESS_CAPABILITY_BENCHMARKS: readonly BusinessCapabilityBenchmar
     evidenceTools: ["prepare_purchase"],
     approvalActions: ["purchase"],
     connectedProviderEvidence: false,
+    evidenceMode: "approval_boundary",
     requiredVerifiedTasks: 3,
     requiredAverageScore: 0.9,
   },
@@ -194,34 +197,57 @@ export function buildAgentBusinessCertification(
       succeeded.map((row) => row.agent_task_id).filter((value): value is string => Boolean(value)),
     );
 
-    const verified = tasks.flatMap((task) => {
+    const verifierBacked = tasks.flatMap((task) => {
       if (task.status !== "completed" || !succeededTaskIds.has(task.id)) return [];
       const decision = verification(task.verification_state);
       if (!decision.passed || decision.score === null) return [];
       return [{ taskId: task.id, score: decision.score }];
     });
+    const matchingApprovals = approvals.filter(
+      (row) => row.action_type && benchmark.approvalActions.includes(row.action_type),
+    );
+    const approvalTaskIds = new Set(
+      matchingApprovals.map((row) => row.task_id).filter((value): value is string => Boolean(value)),
+    );
+    const approvalBoundaryEvidence = succeeded.filter(
+      (row) => row.agent_task_id && approvalTaskIds.has(row.agent_task_id),
+    );
+    const verified = benchmark.evidenceMode === "approval_boundary"
+      ? approvalBoundaryEvidence.slice(0, benchmark.requiredVerifiedTasks).map((row) => ({
+          taskId: String(row.agent_task_id),
+          score: 1,
+        }))
+      : verifierBacked;
     const verifierFailures = tasks.filter((task) => {
       const decision = verification(task.verification_state);
       return task.verification_state != null && !decision.passed;
     }).length;
     const recent = verified.slice(-benchmark.requiredVerifiedTasks);
-    const avg = average(recent.map((item) => item.score));
-    const approvalBoundaryObserved = benchmark.approvalActions.length === 0 || approvals.some(
-      (row) => row.action_type && benchmark.approvalActions.includes(row.action_type),
-    );
-    const connectedProviderObserved = !benchmark.connectedProviderEvidence || succeeded.some(
-      (row) => outputSignalsProvider(row.output),
-    );
+    const avg = benchmark.evidenceMode === "approval_boundary"
+      ? (recent.length ? 1 : null)
+      : average(recent.map((item) => item.score));
+    const approvalBoundaryObserved = benchmark.approvalActions.length === 0 || matchingApprovals.length > 0;
+    const connectedProviderObserved = !benchmark.connectedProviderEvidence ||
+      succeeded.some((row) => outputSignalsProvider(row.output)) ||
+      matchingApprovals.some((row) => row.execution_status === "succeeded" && outputSignalsProvider(row.execution_result));
 
     const qualityMet =
       recent.length === benchmark.requiredVerifiedTasks &&
-      avg !== null &&
-      avg >= benchmark.requiredAverageScore;
+      (benchmark.evidenceMode === "approval_boundary" ||
+        (avg !== null && avg >= benchmark.requiredAverageScore));
     const notes: string[] = [];
     if (!configured) notes.push("Required capability tools are not enabled for this agent.");
-    if (configured && verified.length === 0) notes.push("Configured, but no completed verifier-backed runtime task is recorded yet.");
-    if (verified.length > 0 && verified.length < benchmark.requiredVerifiedTasks) notes.push("More successful verifier-backed tasks are required.");
-    if (recent.length === benchmark.requiredVerifiedTasks && avg !== null && avg < benchmark.requiredAverageScore) notes.push("Recent verifier score is below the 0.90 certification floor.");
+    if (configured && verified.length === 0) notes.push(
+      benchmark.evidenceMode === "approval_boundary"
+        ? "Configured, but no linked safe approval-boundary run is recorded yet."
+        : "Configured, but no completed verifier-backed runtime task is recorded yet.",
+    );
+    if (verified.length > 0 && verified.length < benchmark.requiredVerifiedTasks) notes.push(
+      benchmark.evidenceMode === "approval_boundary"
+        ? "More repeated safe approval-boundary runs are required."
+        : "More successful verifier-backed tasks are required.",
+    );
+    if (benchmark.evidenceMode !== "approval_boundary" && recent.length === benchmark.requiredVerifiedTasks && avg !== null && avg < benchmark.requiredAverageScore) notes.push("Recent verifier score is below the 0.90 certification floor.");
     if (!approvalBoundaryObserved) notes.push("No evidence has yet demonstrated the required approval boundary for sensitive actions.");
     if (!connectedProviderObserved) notes.push("No successful non-simulated connected-provider execution is recorded yet.");
     if (failed.length || verifierFailures) notes.push("Recent runtime/tool failures remain visible and count against certification readiness.");
