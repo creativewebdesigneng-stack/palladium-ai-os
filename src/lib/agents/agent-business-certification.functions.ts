@@ -5,6 +5,7 @@ import {
   buildAgentBusinessCertification,
   summariseAgentBusinessCertification,
 } from "./agent-business-certification";
+import { AGENT_BUSINESS_BENCHMARKS } from "./agent-business-benchmarks";
 
 type Sb = { from: (table: string) => any };
 
@@ -70,6 +71,17 @@ export const getAgentBusinessCertification = createServerFn({ method: "POST" })
         autonomy: agentResult.data.autonomy ?? null,
       },
       capabilities,
+      benchmarks: AGENT_BUSINESS_BENCHMARKS.map((benchmark) => ({
+        id: benchmark.id,
+        capability: benchmark.capability,
+        kind: benchmark.kind,
+        title: benchmark.title,
+        objective: benchmark.objective,
+        prompt: benchmark.prompt,
+        expectedTools: [...benchmark.expectedTools],
+        successCriteria: [...benchmark.successCriteria],
+        externalSideEffect: benchmark.externalSideEffect,
+      })),
       summary: summariseAgentBusinessCertification(capabilities),
       policy: {
         evidenceFloor: 0.9,
