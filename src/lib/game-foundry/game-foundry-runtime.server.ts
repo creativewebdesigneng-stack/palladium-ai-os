@@ -249,6 +249,7 @@ export function getGameReadyProcessingCapabilities() {
   const custom = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   return {
     configured: true,
+    specialistConfigured: Boolean(custom),
     provider: custom ? "game-foundry-3d" : "blackstar-hosted-3d",
     operations: custom
       ? ["pbr_materials","uv_unwrap","lod_generation","collision_generation","topology_optimization","auto_rigging","basic_animation","validation"]
@@ -282,15 +283,20 @@ export async function submitGameReadyProcessing(input: {
   });
   const workerJobId = String(json.id ?? json.job_id ?? json.run_id ?? "").trim();
   if (!workerJobId) throw new Error("Game Foundry 3D processor did not return a job id.");
+  const status = normalizeStatus(json.status);
+  const outputUrl = safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url);
+  const missingOutput = status === "completed" && !outputUrl;
   return {
     workerJobId,
-    status: normalizeStatus(json.status),
-    outputUrl: safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url),
+    status: missingOutput ? "failed" as const : status,
+    outputUrl,
     previewUrl: safeUrl(json.preview_url ?? json.thumbnail_url),
-    errorMessage: typeof json.error === "string" ? json.error.slice(0, 1000) : null,
+    errorMessage: missingOutput
+      ? "Game Foundry processor reported completed without an output URL."
+      : typeof json.error === "string" ? json.error.slice(0, 1000) : null,
     validationReport: asJson(json.validation_report ?? json.validation ?? {}),
     metadata: asJson(json),
-    provider:"game-foundry-3d" as const,
+    provider: custom ? "game-foundry-3d" as const : "blackstar-hosted-3d" as const,
   };
 }
 
@@ -300,14 +306,19 @@ export async function getGameReadyProcessingJob(workerJobId:string) {
   const custom=cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const base=custom||BLACKSTAR_HOSTED_3D_WORKER;
   const json=await request(base,custom?process.env["GAME_FOUNDRY_3D_API_TOKEN"]:undefined,`/v1/assets/process/${encodeURIComponent(id)}`,{method:"GET"});
+  const status=normalizeStatus(json.status);
+  const outputUrl=safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url);
+  const missingOutput=status==="completed"&&!outputUrl;
   return {
     workerJobId:id,
-    status:normalizeStatus(json.status),
-    outputUrl:safeUrl(json.output_url ?? json.asset_url ?? json.processed_output_url),
+    status:missingOutput?"failed" as const:status,
+    outputUrl,
     previewUrl:safeUrl(json.preview_url ?? json.thumbnail_url),
-    errorMessage:typeof json.error==="string"?json.error.slice(0,1000):null,
+    errorMessage:missingOutput
+      ?"Game Foundry processor reported completed without an output URL."
+      :typeof json.error==="string"?json.error.slice(0,1000):null,
     validationReport:asJson(json.validation_report ?? json.validation ?? {}),
     metadata:asJson(json),
-    provider:"game-foundry-3d" as const,
+    provider:custom?"game-foundry-3d" as const:"blackstar-hosted-3d" as const,
   };
 }

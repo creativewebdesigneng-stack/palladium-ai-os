@@ -19,9 +19,41 @@ describe('Game Foundry game-ready processing', () => {
     const caps = getGameReadyProcessingCapabilities()
     expect(caps.configured).toBe(true)
     expect(caps.provider).toBe('blackstar-hosted-3d')
+    expect(caps.specialistConfigured).toBe(false)
     expect(caps.operations).toContain('pbr_materials')
     expect(caps.operations).toContain('lod_generation')
     expect(caps.operations).not.toContain('auto_rigging')
+  })
+
+  it('surfaces specialist rigging and animation only when a real custom worker is configured', () => {
+    process.env['GAME_FOUNDRY_3D_API_URL']='https://private-worker.example.com'
+    const caps=getGameReadyProcessingCapabilities()
+    expect(caps.specialistConfigured).toBe(true)
+    expect(caps.provider).toBe('game-foundry-3d')
+    expect(caps.operations).toContain('auto_rigging')
+    expect(caps.operations).toContain('basic_animation')
+  })
+
+  it('fails closed when a processor says completed without returning an output URL', async () => {
+    delete process.env['GAME_FOUNDRY_3D_API_URL']
+    vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({
+      id:'process-missing-output',
+      status:'completed',
+      validation_report:{valid:false},
+    }),{status:200}))
+    const result=await submitGameReadyProcessing({
+      sourceUrl:'https://example.com/model.glb',
+      targetEngine:'unreal',
+      outputFormat:'glb',
+      profile:{
+        generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,
+        rigging:'none',animation:'none',textureResolution:2048,targetPolycount:null,
+      },
+    })
+    expect(result.status).toBe('failed')
+    expect(result.outputUrl).toBeNull()
+    expect(result.errorMessage).toContain('completed without an output URL')
+    expect(result.provider).toBe('blackstar-hosted-3d')
   })
 
   it('submits bounded hosted GLB processing instead of simulating it', async () => {
