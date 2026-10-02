@@ -9,7 +9,10 @@ import {
 const agents = readFileSync(new URL('../agents.functions.ts', import.meta.url), 'utf8')
 const runtime = readFileSync(new URL('../../runtime/runtime.server.ts', import.meta.url), 'utf8')
 const builder = readFileSync(new URL('../../../screens/AgentBuilder.jsx', import.meta.url), 'utf8')
+const wizard = readFileSync(new URL('../../../screens/AgentWizard.jsx', import.meta.url), 'utf8')
 const config = readFileSync(new URL('../../../components/agent-builder/ConfigLeft.jsx', import.meta.url), 'utf8')
+const missionBuilder = readFileSync(new URL('../../../components/mission/AgentBuilder.jsx', import.meta.url), 'utf8')
+const missionFunctions = readFileSync(new URL('../../mission/mission.functions.ts', import.meta.url), 'utf8')
 
 describe('Blackstar agent identity boundary', () => {
   it('normalises untrusted identity values to the governed catalogue', () => {
@@ -41,7 +44,12 @@ describe('Blackstar agent identity boundary', () => {
   it('stores identity inside existing preferences instead of creating a shadow agent model', () => {
     expect(agents).toContain('identity: normaliseAgentIdentity')
     expect(builder).toContain('identity: config.identity')
+    expect(wizard).toContain('identity: d.identity')
+    expect(missionBuilder).toContain('identity: form.identity')
+    expect(missionFunctions).toContain('normaliseAgentIdentity')
     expect(config).toContain("disclosure: 'AI agent'")
+    expect(wizard).toContain("disclosure: 'AI agent'")
+    expect(missionBuilder).toContain("disclosure: 'AI agent'")
   })
 
   it('does not derive tools approvals or autonomy from identity', () => {
