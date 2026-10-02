@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Activity, AlertTriangle, BrainCircuit, CircleStop, Clock3, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
+import { Activity, AlertTriangle, BrainCircuit, CircleStop, Clock3, Pause, Play, Plus, Power, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -9,6 +9,7 @@ import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, list
 import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-actions.functions';
 import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-approval.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
+import { getAutonomousRuntimeControlPlane, setAutonomousRuntimeEnabled } from '@/lib/runtime/autonomous-control-plane.functions';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
@@ -45,6 +46,8 @@ export default function AutonomousOS() {
   const listEventsFn = useServerFn(listAutonomousGoalEvents);
   const healthFn = useServerFn(getAutonomousOperationsHealth);
   const emergencyStopFn = useServerFn(emergencyStopAutonomousWork);
+  const controlPlaneFn = useServerFn(getAutonomousRuntimeControlPlane);
+  const masterControlFn = useServerFn(setAutonomousRuntimeEnabled);
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
@@ -61,12 +64,30 @@ export default function AutonomousOS() {
     refetchInterval: 15000,
     retry: 1,
   });
+  const controlPlaneQuery = useQuery({
+    queryKey: ['autonomous-runtime-control-plane'],
+    queryFn: () => controlPlaneFn(),
+    enabled: session === 'yes',
+    refetchInterval: 10000,
+    retry: 1,
+  });
   const opportunitiesQuery = useQuery({ queryKey: ['autonomous-os-opportunities'], queryFn: () => recommendFn({ data: { maximumRecommendations: 6 } }), enabled: session === 'yes', refetchInterval: 30000, retry: 1 });
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] }); qc.invalidateQueries({ queryKey: ['autonomous-os-opportunities'] }); };
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
+    qc.invalidateQueries({ queryKey: ['autonomous-os-opportunities'] });
+    qc.invalidateQueries({ queryKey: ['autonomous-runtime-control-plane'] });
+  };
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
   const emergencyStop = useMutation({ mutationFn: () => emergencyStopFn({ data: { confirm: true } }), onSettled: refresh });
+  const masterControl = useMutation({
+    mutationFn: (enabled) => masterControlFn({ data: {
+      enabled,
+      reason: enabled ? null : 'Operator engaged the Autonomous OS master stop from the control plane.',
+    } }),
+    onSettled: refresh,
+  });
 
   const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [], health: null };
   const latestRun = useMemo(() => {
@@ -151,8 +172,13 @@ export default function AutonomousOS() {
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Activity className="h-5 w-5 text-emerald-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.staleRuns ?? 0}</p><p className="text-xs text-white/35">Stale-heartbeat runs</p></div>
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><AlertTriangle className="h-5 w-5 text-amber-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.guardrailEvents ?? 0}</p><p className="text-xs text-white/35">Recent guardrail stops</p></div>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Health comes from persisted worker heartbeats, queues and guardrail evidence. Manual, scheduled, event-triggered and continuous runs use the same durable workflow worker.</div>
+          <div className={`rounded-2xl border p-4 ${controlPlaneQuery.data?.control?.enabled === false ? 'border-rose-300/18 bg-rose-300/[.035]' : 'border-violet-300/12 bg-violet-300/[.025]'}`}>
+            <div className="flex items-center gap-2 text-xs font-semibold text-white"><Power className="h-4 w-4 text-violet-300" />Always-on control plane</div>
+            <p className="mt-2 text-[10px] leading-5 text-white/35">{controlPlaneQuery.data?.control?.enabled === false ? (controlPlaneQuery.data?.control?.stopReason || 'Master stop is engaged. New scheduler claims and manual runs are blocked.') : 'Runtime enabled. Existing approvals, spend/runtime ceilings and the same scheduler/worker remain authoritative; this does not create a second scheduler.'}</p>
+            <button onClick={() => masterControl.mutate(controlPlaneQuery.data?.control?.enabled === false)} disabled={masterControl.isPending} className={`mt-3 rounded-lg border px-3 py-2 text-[10px] font-semibold disabled:opacity-35 ${controlPlaneQuery.data?.control?.enabled === false ? 'border-emerald-300/20 bg-emerald-400/[.06] text-emerald-100' : 'border-rose-300/20 bg-rose-400/[.05] text-rose-100'}`}>{masterControl.isPending ? 'Updating…' : controlPlaneQuery.data?.control?.enabled === false ? 'Re-enable always-on runtime' : 'Engage master stop'}</button>
+          </div>
           <div className="rounded-2xl border border-rose-300/12 bg-rose-300/[.025] p-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-rose-100"><CircleStop className="h-4 w-4" />Owner emergency stop</div>
             <p className="mt-2 text-[10px] leading-5 text-white/35">Pauses every active autonomous goal and cancels its active runs. Existing database cancellation propagation requests stop on linked workflow workers.</p>
