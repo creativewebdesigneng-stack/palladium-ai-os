@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Send, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2, AlertTriangle } from 'lucide-react';
 import { streamAgentRun } from '@/lib/runtime/run-client';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 /**
  * Real agent test console. Runs the saved agent through the production runtime —
