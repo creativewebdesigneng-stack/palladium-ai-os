@@ -141,6 +141,47 @@ describe("agent business capability certification", () => {
     expect(governed?.approvalActions).toContain("purchase");
   });
 
+  it("certifies bounded task/job execution only after repeated verifier-backed evidence", () => {
+    const result = buildAgentBusinessCertification({
+      allowedTools: ["file_analysis", "code_exec"],
+      tasks: [task("j1", 0.94), task("j2", 0.93), task("j3", 0.95)],
+      toolExecutions: [
+        execution("j1", "file_analysis"),
+        execution("j2", "code_exec"),
+        execution("j3", "file_analysis"),
+      ],
+    }).find((item) => item.id === "task_job_execution");
+    expect(result?.status).toBe("verified");
+    expect(result?.verifiedTasks).toBe(3);
+  });
+
+  it("keeps customer support unverified until connected-provider evidence and approval boundaries exist", () => {
+    const tasks = [task("s1", 0.95), task("s2", 0.95), task("s3", 0.96)];
+    const base = {
+      allowedTools: ["connected_service", "email_draft"],
+      tasks,
+      toolExecutions: [
+        execution("s1", "connected_service", { provider: "gmail", data: { threads: [] } }),
+        execution("s2", "connected_service", { provider: "gmail", data: { threads: [] } }),
+        execution("s3", "connected_service", { provider: "gmail", data: { threads: [] } }),
+      ],
+    };
+    const before = buildAgentBusinessCertification(base).find((item) => item.id === "customer_support");
+    expect(before?.connectedProviderObserved).toBe(true);
+    expect(before?.approvalBoundaryObserved).toBe(false);
+    expect(before?.status).not.toBe("verified");
+
+    const after = buildAgentBusinessCertification({
+      ...base,
+      approvals: [
+        { task_id: "s1", action_type: "email_draft", status: "pending" },
+        { task_id: "s2", action_type: "email_draft", status: "pending" },
+        { task_id: "s3", action_type: "email_draft", status: "pending" },
+      ],
+    }).find((item) => item.id === "customer_support");
+    expect(after?.status).toBe("verified");
+  });
+
   it("surfaces verifier or tool failures as attention when evidence is incomplete", () => {
     const result = buildAgentBusinessCertification({
       allowedTools: ["web_search"],
