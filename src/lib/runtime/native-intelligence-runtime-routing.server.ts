@@ -11,6 +11,7 @@ import {
 } from '@/lib/ai/native-intelligence-model-platform'
 import type { Agent, PreparedRun } from './runtime.server'
 import { blackstarNativeModelDescriptor } from './blackstar-native-inference-profile'
+import { GROQ_EVIDENCE_MODEL_ID } from '@/lib/evals/groq-evaluation-verifier.server'
 import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelDescriptorForTaskClass,
@@ -67,6 +68,22 @@ function capabilitiesForRun(run: PreparedRun, taskClass: NativeIntelligenceTaskC
   if (taskClass === 'tool_use' || taskClass === 'agentic' || run.tools.grants.size > 0) capabilities.add('tools')
   if (taskClass === 'vision') capabilities.add('vision')
   return [...capabilities]
+}
+
+function groqEvidenceDescriptor(): NativeIntelligenceModelDescriptor | null {
+  if (!process.env['GROQ_API_KEY']?.trim()) return null
+  return {
+    id: GROQ_EVIDENCE_MODEL_ID,
+    provider: 'groq',
+    model: process.env['GROQ_ROUTING_MODEL']?.trim() || 'openai/gpt-oss-120b',
+    ownership: 'external',
+    lifecycle: 'candidate',
+    capabilities: ['text', 'reasoning', 'coding', 'tools', 'structured_output'],
+    context_window: 128_000,
+    streaming: true,
+    latency_class: 'low',
+    cost_class: 'standard',
+  }
 }
 
 function configuredDescriptor(run: PreparedRun): NativeIntelligenceModelDescriptor {
@@ -162,6 +179,9 @@ export async function resolveNativeIntelligenceRuntimeRouting(args: {
   const native = blackstarNativeModelDescriptor()
   const nativeConfigured = Boolean(process.env['OPENAI_COMPATIBLE_BASE_URL']?.trim())
   if (nativeConfigured) pushDistinctModel(models, native)
+
+  const groq = groqEvidenceDescriptor()
+  if (groq) pushDistinctModel(models, groq)
 
   if (isBlackstarAstraEngineConfigured()) {
     pushDistinctModel(models, blackstarAstraModelDescriptorForTaskClass(taskClass))
