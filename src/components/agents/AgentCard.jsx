@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ExternalLink, Pencil, Copy, Trash2, Play, Brain, Clock, Cpu, Radio } from 'lucide-react';
 import { STATUS_STYLE } from './agentsData';
 import AgentActivityEffect from '@/components/visual/AgentActivityEffect';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 function Cap({ label }) {
   return <span className="rounded-md border border-violet-300/10 bg-violet-400/[.025] px-1.5 py-0.5 text-[9px] uppercase tracking-[.08em] text-zinc-500">{label}</span>;
@@ -22,12 +23,12 @@ export default function AgentCard({ agent, onEdit, onDuplicate, onDelete, onRun 
 
       <div className="flex items-start gap-3">
         <div className="relative">
-          <div className={`grid h-12 w-12 place-items-center rounded-xl border border-white/[.08] bg-gradient-to-br ${agent.grad} text-base font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,.35)]`}>{agent.letter}</div>
+          <AgentIdentityAvatar name={agent.name} identity={agent.identity} size="lg" />
           <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#09080d] ${st.dot}`} />
           {agent.status === 'Running' && <span aria-hidden className="absolute -bottom-1 -right-1 h-5 w-5 animate-ping rounded-full border border-violet-300/35" />}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold tracking-tight text-white">{agent.name}</h3>
+          <div className="flex items-center gap-2"><h3 className="truncate text-sm font-semibold tracking-tight text-white">{agent.name}</h3><span className="shrink-0 rounded-full border border-violet-300/10 bg-violet-400/[.04] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[.12em] text-violet-200/55">AI agent</span></div>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
             <span className={`grid h-4 w-4 place-items-center rounded bg-gradient-to-br ${agent.modelGrad} text-[8px] font-bold text-white`}>{agent.model[0]}</span>
             <span className="truncate">{agent.model}</span>
@@ -36,7 +37,8 @@ export default function AgentCard({ agent, onEdit, onDuplicate, onDelete, onRun 
         </div>
       </div>
 
-      <p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-zinc-400">{agent.desc}</p>
+      <p className="mt-2 text-[10px] text-zinc-600">{agent.identity?.tagline || agent.identity?.presentationStyle || 'Professional presentation'}</p>
+      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-zinc-400">{agent.desc}</p>
 
       <div className="mt-3 flex flex-wrap gap-1">{agent.caps.slice(0, 4).map(c => <Cap key={c} label={c} />)}</div>
 
