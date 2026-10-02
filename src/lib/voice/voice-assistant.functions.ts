@@ -88,7 +88,7 @@ export const saveVoiceAssistantPreferences = createServerFn({ method: "POST" })
 /**
  * Low-latency STT lane used only by the ambient assistant. The audio is sent
  * directly to the configured OpenAI-compatible transcription endpoint and is
- * never inserted into Voice Studio jobs or persisted by PalladiumAI.
+ * never inserted into Voice Studio jobs or persisted by Blackstar.
  */
 export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -105,7 +105,7 @@ export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
         filename: data.filename,
         mimeType: data.mimeType,
         language: data.language,
-        prompt: "Short hands-free command or conversational request to the PalladiumAI assistant.",
+        prompt: "Short hands-free command or conversational request to the Blackstar assistant.",
       });
       return { text: result.text.trim(), model: result.model };
     } catch (error) {

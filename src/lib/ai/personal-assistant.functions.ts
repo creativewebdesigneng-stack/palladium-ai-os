@@ -10,6 +10,11 @@ const updateSchema = z.object({
   timezone: z.string().trim().max(100).nullable().optional(),
   welcomeEnabled: z.boolean(),
   briefingEnabled: z.boolean(),
+  conversationHistoryEnabled: z.boolean(),
+  memoryContextEnabled: z.boolean(),
+  workspaceContextEnabled: z.boolean(),
+  liveWebEnabled: z.boolean(),
+  responseStyle: z.enum(["concise", "balanced", "detailed"]),
 });
 
 export const getPersonalAssistantPreferences = createServerFn({ method: "POST" })
@@ -19,7 +24,7 @@ export const getPersonalAssistantPreferences = createServerFn({ method: "POST" }
     const [profileRes, prefsRes] = await Promise.all([
       sb.from("profiles").select("id,email,full_name").eq("id", context.userId).maybeSingle(),
       sb.from("personal_assistant_preferences")
-        .select("assistant_name,location_name,timezone,welcome_enabled,briefing_enabled,updated_at")
+        .select("assistant_name,location_name,timezone,welcome_enabled,briefing_enabled,conversation_history_enabled,memory_context_enabled,workspace_context_enabled,live_web_enabled,response_style,updated_at")
         .eq("user_id", context.userId)
         .maybeSingle(),
     ]);
@@ -34,6 +39,11 @@ export const getPersonalAssistantPreferences = createServerFn({ method: "POST" }
         timezone: prefs?.timezone ?? "",
         welcomeEnabled: prefs?.welcome_enabled ?? true,
         briefingEnabled: prefs?.briefing_enabled ?? true,
+        conversationHistoryEnabled: prefs?.conversation_history_enabled ?? true,
+        memoryContextEnabled: prefs?.memory_context_enabled ?? true,
+        workspaceContextEnabled: prefs?.workspace_context_enabled ?? true,
+        liveWebEnabled: prefs?.live_web_enabled ?? true,
+        responseStyle: prefs?.response_style ?? "balanced",
       },
     };
   });
@@ -52,9 +62,14 @@ export const updatePersonalAssistantPreferences = createServerFn({ method: "POST
         timezone: data.timezone || null,
         welcome_enabled: data.welcomeEnabled,
         briefing_enabled: data.briefingEnabled,
+        conversation_history_enabled: data.conversationHistoryEnabled,
+        memory_context_enabled: data.memoryContextEnabled,
+        workspace_context_enabled: data.workspaceContextEnabled,
+        live_web_enabled: data.liveWebEnabled,
+        response_style: data.responseStyle,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" })
-      .select("assistant_name,location_name,timezone,welcome_enabled,briefing_enabled")
+      .select("assistant_name,location_name,timezone,welcome_enabled,briefing_enabled,conversation_history_enabled,memory_context_enabled,workspace_context_enabled,live_web_enabled,response_style")
       .single();
     if (error) throw new Error(error.message);
     return { ok: true, preferences: row };
