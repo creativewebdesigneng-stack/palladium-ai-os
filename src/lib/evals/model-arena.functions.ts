@@ -148,6 +148,7 @@ export const runModelArena = createServerFn({ method: "POST" })
     judge: judgeSchema,
     criteria: z.array(z.string().trim().min(1).max(200)).min(1).max(12).optional(),
     astraTaskClass: taskClassSchema.nullish(),
+    taskClass: taskClassSchema.nullish(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -190,8 +191,10 @@ export const runModelArena = createServerFn({ method: "POST" })
     }
 
     const criteria = data.criteria ?? ["correctness", "helpfulness", "clarity"];
+    const effectiveTaskClass = data.astraTaskClass ?? data.taskClass ?? "general";
     const runMetadata = {
       criteria,
+      taskClass: effectiveTaskClass,
       complianceApplied: Boolean(policy),
       ...(astraActivation ? { astra_activation: astraActivation } : {}),
     };
@@ -243,6 +246,9 @@ export const runModelArena = createServerFn({ method: "POST" })
           output_tokens: result.usage.output,
           metadata: {
             complianceApplied: Boolean(policy),
+            taskClass: effectiveTaskClass,
+            toolCallCount: result.toolCalls.length,
+            toolUseObserved: result.toolCalls.length > 0,
             ...(isExactAstraCandidate ? { astraExecutionProfileId: astraExecutionProfile!.id } : {}),
           },
         };
