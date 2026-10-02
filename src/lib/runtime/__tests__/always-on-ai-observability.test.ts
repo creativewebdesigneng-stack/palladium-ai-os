@@ -12,7 +12,7 @@ describe('Always-on AI observability and control', () => {
     expect(functions).toContain('.from("autonomous_goal_events")')
     expect(functions).toContain('.eq("user_id", context.userId)')
     expect(screen).toContain('listAutonomousGoalEvents')
-    expect(screen).not.toContain('events: [], fleets')
+    expect(screen).not.toContain('return { goals, runs, events: [], fleets };')
     expect(screen).toContain('Scheduler & guardrail event stream')
   })
 
