@@ -5,6 +5,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import CommandCenter from '@/components/runtime/CommandCenter';
 import TaskHistory from '@/components/runtime/TaskHistory';
 import AgentConfigPanel from '@/components/runtime/AgentConfigPanel';
+import AgentBusinessCertificationPanel from '@/components/agents/AgentBusinessCertificationPanel';
 import { getAgentRuntime, reapStuckRuns } from '@/lib/runtime/runtime.functions';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -87,6 +88,7 @@ export default function AgentDetail() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <CommandCenter agent={agent} onFinished={load} />
+          <AgentBusinessCertificationPanel agentId={agent.id} />
           <TaskHistory tasks={tasks} />
         </div>
         <AgentConfigPanel agent={agent} onAgentUpdated={setAgent} />
