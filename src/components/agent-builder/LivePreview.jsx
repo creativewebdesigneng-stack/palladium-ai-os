@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Send, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2, AlertTriangle } from 'lucide-react';
 import { streamAgentRun } from '@/lib/runtime/run-client';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 /**
  * Real agent test console. Runs the saved agent through the production runtime —
@@ -99,8 +100,12 @@ export default function LivePreview({ config, agentId }) {
             <I className="h-3.5 w-3.5" />{label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] text-zinc-400">
-          <Bot className="h-3.5 w-3.5 text-violet-400" />{config.model || 'No model'}
+        <div className="ml-auto flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-2 py-1">
+          <AgentIdentityAvatar name={config.name} identity={config.identity} size="sm" />
+          <div className="min-w-0">
+            <p className="max-w-36 truncate text-[10px] font-medium text-zinc-300">{config.name || 'Agent'}</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[.14em] text-zinc-700">AI agent · {config.model || 'No model'}</p>
+          </div>
         </div>
       </div>
 
