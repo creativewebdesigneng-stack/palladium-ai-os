@@ -5,7 +5,7 @@ const scheduler = readFileSync(new URL('../autonomous-os.scheduler.server.ts', i
 const manual = readFileSync(new URL('../autonomous-os.manual.functions.ts', import.meta.url), 'utf8')
 const control = readFileSync(new URL('../autonomous-control-plane.functions.ts', import.meta.url), 'utf8')
 const screen = readFileSync(new URL('../../../screens/AutonomousOS.jsx', import.meta.url), 'utf8')
-const migration = readFileSync(new URL('../../../../supabase/migrations/20261002113000_autonomous_runtime_control_plane.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../../../../supabase/migrations/20261002111410_autonomous_runtime_control_plane.sql', import.meta.url), 'utf8')
 
 describe('Always-on Autonomous OS control plane', () => {
   it('adds a user-owned master runtime control behind RLS', () => {
@@ -13,6 +13,7 @@ describe('Always-on Autonomous OS control plane', () => {
     expect(migration).toContain('enable row level security')
     expect(migration).toContain("using ((select auth.uid()) = user_id)")
     expect(migration).toContain('with check ((select auth.uid()) = user_id)')
+    expect(migration).not.toContain('grant select, insert, update, delete')
   })
 
   it('blocks scheduler claims while the master stop is engaged', () => {
