@@ -10,6 +10,15 @@ type Sb = {
   rpc: (fn: string, args?: Record<string, unknown>) => any
 }
 
+const OUTCOME_TOOL_ALIASES: Record<string, string[]> = {
+  web: ['web_search', 'web_fetch', 'browser'],
+  files: ['file_analysis'],
+}
+
+function executableTools(labels: string[]) {
+  return [...new Set(labels.flatMap((label) => OUTCOME_TOOL_ALIASES[label] ?? [label]))]
+}
+
 export const getOutcomePackOverview = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -61,7 +70,7 @@ export const launchOutcomePack = createServerFn({ method: 'POST' })
         priority: pack.tier === 'premium' ? 'high' : 'normal',
         involves_money: pack.involvesMoney,
         requires_approval: pack.involvesMoney,
-        required_tools: pack.requiredTools,
+        required_tools: executableTools(pack.requiredTools),
       })
       .select('id,title,status,category,requires_approval,created_at')
       .single()
