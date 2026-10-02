@@ -3,7 +3,8 @@ export type BusinessCapabilityId =
   | "communications"
   | "commerce_operations"
   | "crm_project_tasks"
-  | "financial_analysis";
+  | "financial_analysis"
+  | "governed_financial_workflows";
 
 export type BusinessCapabilityStatus =
   | "not_configured"
@@ -129,10 +130,21 @@ export const BUSINESS_CAPABILITY_BENCHMARKS: readonly BusinessCapabilityBenchmar
   },
   {
     id: "financial_analysis",
-    title: "Financial analysis & governed financial workflows",
-    description: "Performs research, calculations, scenarios and risk analysis while keeping real-money movement outside autonomous agent authority.",
-    configuredTools: ["calculator", "web_search", "web_fetch", "database_query", "prepare_purchase"],
-    evidenceTools: ["calculator", "web_search", "web_fetch", "database_query", "prepare_purchase"],
+    title: "Financial analysis & risk research",
+    description: "Performs calculations, evidence-backed research, scenarios and risk analysis without implying real-money execution.",
+    configuredTools: ["calculator", "web_search", "web_fetch", "database_query"],
+    evidenceTools: ["calculator", "web_search", "web_fetch", "database_query"],
+    approvalActions: [],
+    connectedProviderEvidence: false,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
+  {
+    id: "governed_financial_workflows",
+    title: "Governed money-affecting workflows",
+    description: "Prepares bounded money-affecting actions but proves the operator approval boundary before any payment or purchase can proceed.",
+    configuredTools: ["prepare_purchase"],
+    evidenceTools: ["prepare_purchase"],
     approvalActions: ["purchase"],
     connectedProviderEvidence: false,
     requiredVerifiedTasks: 3,
