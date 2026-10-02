@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, MessagesSquare, ShieldCheck } from 'lucide-react';
-import { SectionHead, MiniAvatar } from './wfShared';
+import { SectionHead } from './wfShared';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import { agentIdentityFromPreferences } from '@/lib/agents/agent-identity';
 
 const TYPE_CLS = {
   handoff: 'bg-violet-500/15 text-violet-300',
@@ -19,6 +21,8 @@ function relTime(iso) {
 }
 
 export default function AgentCommsFeed({ messages, agents }) {
+  const agentById = {};
+  for (const a of agents || []) agentById[a.id] = a;
   const nameById = {};
   for (const a of agents || []) nameById[a.id] = a.name;
 
@@ -40,7 +44,11 @@ export default function AgentCommsFeed({ messages, agents }) {
                     transition={{ delay: i * 0.04 }}
                     className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5"
                   >
-                    <MiniAvatar letter={(nameById[c.from_agent_id] || '?').charAt(0)} grad="from-violet-500 to-indigo-600" size="h-8 w-8" text="text-xs" />
+                    <AgentIdentityAvatar
+                      name={nameById[c.from_agent_id] || 'Workflow step'}
+                      identity={agentIdentityFromPreferences(agentById[c.from_agent_id]?.preferences)}
+                      size="sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 text-[11px]">
                         <span className="font-medium text-white">{nameById[c.from_agent_id] || 'Workflow step'}</span>
