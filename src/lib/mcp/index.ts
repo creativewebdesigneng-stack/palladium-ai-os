@@ -1,4 +1,5 @@
 import { auth, defineMcp } from "@lovable.dev/mcp-js";
+import { runtimeMcpSupabaseProjectRef } from "./oauth-config";
 import listAgents from "./tools/list-agents";
 import createAgent from "./tools/create-agent";
 import listTasks from "./tools/list-tasks";
@@ -8,9 +9,9 @@ import decideApproval from "./tools/decide-approval";
 import listMemories from "./tools/list-memories";
 import remember from "./tools/remember";
 
-// Issuer must be the direct Supabase host; the project ref is the only value
-// that survives publish unchanged.
-const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-unset";
+// Issuer must be the direct Supabase host. Resolve it from runtime/public
+// Supabase configuration rather than emitting an invalid empty-host issuer.
+const projectRef = runtimeMcpSupabaseProjectRef();
 
 export default defineMcp({
   name: "blackstar",
