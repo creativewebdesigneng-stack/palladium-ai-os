@@ -25,6 +25,7 @@ const bridgeEnv: Partial<Record<GameFoundryEngine,string>> = {
   unreal:"GAME_FOUNDRY_UNREAL_BRIDGE_URL",
   godot:"GAME_FOUNDRY_GODOT_BRIDGE_URL",
   blender:"GAME_FOUNDRY_BLENDER_BRIDGE_URL",
+  zmodeler:"GAME_FOUNDRY_ZMODELER_BRIDGE_URL",
 };
 
 function cleanBase(value: string | undefined) {
@@ -41,6 +42,7 @@ function importRoot(engine: GameFoundryEngine) {
   if (engine === "unreal") return "/Game/BlackstarGameFoundry";
   if (engine === "godot") return "res://blackstar_game_foundry";
   if (engine === "blender") return "//BlackstarGameFoundry";
+  if (engine === "zmodeler") return "./BlackstarGameFoundry-ZModeler3";
   return "./BlackstarGameFoundry";
 }
 
