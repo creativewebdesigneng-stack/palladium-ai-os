@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { STATUS_STYLE, TOOL_ICON } from './wfData';
-import { MiniAvatar } from './wfShared';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 export default function AgentCard({ agent, onOpen }) {
   const st = STATUS_STYLE[agent.status];
@@ -14,10 +14,11 @@ export default function AgentCard({ agent, onOpen }) {
       className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[.03] p-4 text-left transition hover:border-violet-400/30 hover:bg-white/[.05]"
     >
       <div className="flex items-center gap-3">
-        <MiniAvatar letter={agent.letter} grad={agent.grad} />
+        <AgentIdentityAvatar name={agent.name} identity={agent.identity} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{agent.name}</p>
-          <p className="truncate text-xs text-zinc-400">{agent.role}</p>
+          <p className="truncate text-xs text-zinc-400">{agent.identity?.tagline || agent.role}</p>
+          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-700">AI agent · {agent.identity?.presentationStyle || 'professional'}</p>
         </div>
         <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium ${st.bg} ${st.text}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{agent.status}
