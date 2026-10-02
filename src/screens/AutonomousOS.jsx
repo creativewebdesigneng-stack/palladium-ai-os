@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BrainCircuit, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
+import { Activity, AlertTriangle, BrainCircuit, CircleStop, Clock3, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
-import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
+import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, listAutonomousFleetAssignments, listAutonomousGoalEvents, getAutonomousOperationsHealth, emergencyStopAutonomousWork, controlAutonomousGoal } from '@/lib/runtime/autonomous-os.functions';
 import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-actions.functions';
 import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-approval.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
@@ -42,6 +42,9 @@ export default function AutonomousOS() {
   const listFn = useServerFn(listAutonomousGoals);
   const listRunsFn = useServerFn(listAutonomousGoalRuns);
   const listFleetsFn = useServerFn(listAutonomousFleetAssignments);
+  const listEventsFn = useServerFn(listAutonomousGoalEvents);
+  const healthFn = useServerFn(getAutonomousOperationsHealth);
+  const emergencyStopFn = useServerFn(emergencyStopAutonomousWork);
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
@@ -51,8 +54,8 @@ export default function AutonomousOS() {
   const goalsQuery = useQuery({
     queryKey: ['autonomous-os-goals'],
     queryFn: async () => {
-      const [goals, runs, fleets] = await Promise.all([listFn(), listRunsFn(), listFleetsFn()]);
-      return { goals, runs, events: [], fleets };
+      const [goals, runs, fleets, events, health] = await Promise.all([listFn(), listRunsFn(), listFleetsFn(), listEventsFn(), healthFn()]);
+      return { goals, runs, events, fleets, health };
     },
     enabled: session === 'yes',
     refetchInterval: 15000,
@@ -63,8 +66,9 @@ export default function AutonomousOS() {
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
+  const emergencyStop = useMutation({ mutationFn: () => emergencyStopFn({ data: { confirm: true } }), onSettled: refresh });
 
-  const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [] };
+  const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [], health: null };
   const latestRun = useMemo(() => {
     const map = new Map();
     for (const run of data.runs ?? []) if (!map.has(run.goal_id)) map.set(run.goal_id, run);
@@ -142,10 +146,19 @@ export default function AutonomousOS() {
       <section className="rounded-[28px] border border-white/10 bg-white/[.02] p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Runtime posture</p><h3 className="mt-1 text-lg font-semibold text-white">Agent fleet control</h3></div><button onClick={() => goalsQuery.refetch()} className="rounded-lg border border-white/10 p-2 text-white/45 hover:text-white"><RefreshCw className={`h-4 w-4 ${goalsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.goals?.filter((g) => g.status === 'active').length ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.runs?.filter((r) => ['queued','planning','running','waiting_for_approval'].includes(r.status)).length ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.activeGoals ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.activeRuns ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Activity className="h-5 w-5 text-emerald-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.staleRuns ?? 0}</p><p className="text-xs text-white/35">Stale-heartbeat runs</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><AlertTriangle className="h-5 w-5 text-amber-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.guardrailEvents ?? 0}</p><p className="text-xs text-white/35">Recent guardrail stops</p></div>
         </div>
-        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled, event-triggered and continuous runs all hand execution to the same durable workflow worker.</div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Health comes from persisted worker heartbeats, queues and guardrail evidence. Manual, scheduled, event-triggered and continuous runs use the same durable workflow worker.</div>
+          <div className="rounded-2xl border border-rose-300/12 bg-rose-300/[.025] p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-rose-100"><CircleStop className="h-4 w-4" />Owner emergency stop</div>
+            <p className="mt-2 text-[10px] leading-5 text-white/35">Pauses every active autonomous goal and cancels its active runs. Existing database cancellation propagation requests stop on linked workflow workers.</p>
+            <button onClick={() => emergencyStop.mutate()} disabled={emergencyStop.isPending || !(data.health?.activeGoals > 0)} className="mt-3 rounded-lg border border-rose-300/20 bg-rose-400/[.06] px-3 py-2 text-[10px] font-semibold text-rose-100 disabled:opacity-35">{emergencyStop.isPending ? 'Stopping…' : 'Stop all autonomous work'}</button>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -155,6 +168,17 @@ export default function AutonomousOS() {
       {opportunitiesQuery.isError && <p className="mt-4 text-sm text-rose-300">{friendlyMessage(opportunitiesQuery.error)}</p>}
       {!opportunitiesQuery.isLoading && !opportunitiesQuery.isError && !(opportunitiesQuery.data?.actions?.length) && <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-white/35">No recommendation currently clears the bounded confidence and score thresholds.</p>}
       <div className="mt-4 grid gap-3 xl:grid-cols-2">{(opportunitiesQuery.data?.actions ?? []).map((action) => <article key={action.goalId} className="rounded-2xl border border-white/8 bg-black/25 p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] ${badge(action.routingStatus)}`}>{action.routingStatus}</span><span className="rounded-md border border-white/8 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-white/35">{action.kind}</span>{action.requiresApproval && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-[9px] uppercase tracking-[.12em] text-amber-200">approval required</span>}</div><h4 className="mt-3 text-sm font-semibold text-white">{action.title}</h4><p className="mt-2 text-sm leading-6 text-white/45">{action.recommendedAction}</p><div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/30"><span>score {Math.round(Number(action.score ?? 0) * 100)}%</span><span>confidence {Math.round(Number(action.confidence ?? 0) * 100)}%</span><span>{action.routedCapabilityIds?.length ?? 0} routed capabilities</span></div><OpportunityApprovalAction action={action} onSettled={refresh} /></article>)}</div>
+    </section>
+
+    <section className="mt-4 rounded-[28px] border border-white/10 bg-black/35 p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-emerald-300/70">Always-on evidence</p><h3 className="mt-1 text-xl font-semibold text-white">Scheduler & guardrail event stream</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-white/40">Real owner-scoped events emitted by scheduling, worker reconciliation, approvals and hard guardrails.</p></div>
+        <div className="text-right text-[10px] text-white/30"><p><Clock3 className="mr-1 inline h-3 w-3" />Latest heartbeat: {when(data.health?.latestHeartbeat) || 'none active'}</p><p className="mt-1">Observed workflow cost: £{((data.health?.observedCostPence ?? 0) / 100).toFixed(2)}</p></div>
+      </div>
+      <div className="mt-4 space-y-2">
+        {(data.events ?? []).slice(0, 18).map((event) => <div key={event.id} className="flex items-start gap-3 rounded-xl border border-white/[.06] bg-white/[.015] px-3 py-2.5"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${event.severity === 'error' ? 'bg-rose-400' : event.severity === 'warning' ? 'bg-amber-300' : event.severity === 'success' ? 'bg-emerald-300' : 'bg-violet-300'}`} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-semibold uppercase tracking-[.13em] text-zinc-500">{event.event_type}</p><span className="text-[9px] text-zinc-700">{when(event.created_at)}</span></div><p className="mt-1 text-[11px] leading-5 text-zinc-300">{event.message}</p></div></div>)}
+        {!(data.events?.length) && <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-white/30">No autonomous events recorded yet.</p>}
+      </div>
     </section>
 
     <section className="mt-4 rounded-[28px] border border-white/10 bg-black/35 p-5 sm:p-6">
