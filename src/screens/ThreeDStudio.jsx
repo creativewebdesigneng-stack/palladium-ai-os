@@ -8,6 +8,7 @@ import { friendlyMessage } from '@/lib/errors';
 import { useToast } from '@/components/ui/use-toast';
 import { Empty, Failed } from '@/components/business/live';
 import { createThreeDJob, getThreeDStudioOverview, refreshThreeDJob } from '@/lib/three-d/three-d-studio.functions';
+import HuggingFaceModelDiscoveryPanel from '@/components/huggingface/HuggingFaceModelDiscoveryPanel'
 
 export default function ThreeDStudio() {
   const session = useSessionReady();
@@ -31,6 +32,7 @@ export default function ThreeDStudio() {
     <PageHeader eyebrow="AI Workforce" title="3D Studio" description="Generate production 3D meshes from images through a real Modly-compatible worker, then hand VOX assets into Blackstar Voxel Studio when voxel editing is needed." />
     {session === 'no' && <Failed message="Sign in to use 3D Studio." />}
     {overview.error && <Failed message={friendlyMessage(overview.error)} />}
+    <div className="mb-4"><HuggingFaceModelDiscoveryPanel tasks={['image-to-3d','text-to-3d']} title="Hugging Face 3D model intelligence" description="Discover Hub 3D candidates separately from the real Modly-compatible execution worker. 3D Hub discovery never implies a standardized executable endpoint."/></div>
     <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
       <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
         <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Box className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold text-white">Image to 3D mesh</h2><p className="text-xs text-zinc-500">Local-first generation without bundling model weights into Blackstar.</p></div></div>
