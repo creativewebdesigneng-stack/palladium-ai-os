@@ -33,7 +33,7 @@ import {
 } from '@/lib/game-foundry/game-foundry.functions';
 
 const control = 'w-full rounded-xl border border-white/10 bg-[#10121a] px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/40';
-const engines = ['generic','unity','unreal','godot','web','blender'];
+const engines = ['generic','unity','unreal','godot','web','blender','zmodeler'];
 const projectTypes = ['game','environment','character','prop','vehicle','asset_pack'];
 
 export default function GameFoundry() {
@@ -73,6 +73,8 @@ export default function GameFoundry() {
   const [assetQuality,setAssetQuality] = useState('game_ready');
   const [assetEngine,setAssetEngine] = useState('unreal');
   const [assetProjectId,setAssetProjectId] = useState('');
+  const [processingRigging,setProcessingRigging] = useState('none');
+  const [processingAnimation,setProcessingAnimation] = useState('none');
 
   const overview = useQuery({ queryKey:['game-foundry'], queryFn:()=>overviewFn(), enabled:session==='yes', retry:false });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
@@ -151,7 +153,7 @@ export default function GameFoundry() {
   const processAsset = useMutation({
     mutationFn:(id)=>processAssetFn({data:{id,profile:{
       generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,
-      rigging:'none',animation:'none',textureResolution:2048,targetPolycount:null,
+      rigging:processingRigging,animation:processingAnimation,textureResolution:2048,targetPolycount:null,
     }}}),
     onSuccess:async()=>{ await refresh(); toast({title:'Game-ready processing submitted'}); },
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'Game-ready processing failed',description:friendlyMessage(error)}); },
@@ -183,6 +185,10 @@ export default function GameFoundry() {
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
   const integrations = useMemo(()=>caps?.integrations ?? [],[caps]);
   const formats = caps?.assetGeneration?.formats ?? ['glb','gltf','obj','ply','stl','vox'];
+  const specialistProcessing = caps?.gameReadyProcessing?.specialistConfigured === true;
+  const availableFormats = assetEngine === 'zmodeler'
+    ? formats.filter((item)=>['fbx','obj'].includes(String(item).toLowerCase()))
+    : formats;
 
   return <>
     <PageHeader
@@ -222,8 +228,8 @@ export default function GameFoundry() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Asset name"><input value={assetName} onChange={(e)=>setAssetName(e.target.value)} className={control} placeholder="Alien rifle" /></Field>
           <Field label="Source"><select value={sourceKind} onChange={(e)=>setSourceKind(e.target.value)} className={control}><option value="prompt">Prompt</option><option value="image">Image URL</option><option value="model">Model URL</option></select></Field>
-          <Field label="Engine"><select value={assetEngine} onChange={(e)=>setAssetEngine(e.target.value)} className={control}>{engines.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
-          <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{formats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
+          <Field label="Engine"><select value={assetEngine} onChange={(e)=>{const next=e.target.value;setAssetEngine(next);if(next==='zmodeler'&&!['fbx','obj'].includes(String(format).toLowerCase()))setFormat(formats.includes('fbx')?'fbx':'obj')}} className={control}>{engines.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
+          <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{availableFormats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
           <Field label="Quality"><select value={assetQuality} onChange={(e)=>setAssetQuality(e.target.value)} className={control}><option value="draft">Draft</option><option value="game_ready">Game ready</option><option value="cinematic">Cinematic</option></select></Field>
           <Field label="Game project"><select value={assetProjectId} onChange={(e)=>setAssetProjectId(e.target.value)} className={control}><option value="">Standalone asset</option>{projects.map((project)=><option key={project.id} value={project.id}>{project.name}</option>)}</select></Field>
         </div>
@@ -238,6 +244,15 @@ export default function GameFoundry() {
       {checkConnections.data&&<div className="mt-3 rounded-xl border border-white/[.06] bg-black/20 p-3"><div className="flex flex-wrap gap-2 text-[10px] text-zinc-500"><span>{checkConnections.data.summary.configured}/{checkConnections.data.summary.total} configured</span><span>·</span><span>{checkConnections.data.summary.reachable} reachable</span><span>·</span><span>{checkConnections.data.summary.healthy} healthy</span></div><div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checkConnections.data.results.map((item)=><div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/[.05] px-2.5 py-2"><div><p className="text-[11px] text-zinc-300">{item.name}</p><p className="text-[10px] text-zinc-600">{item.configured?(item.healthy?'Healthy':item.reachable?`Reachable · HTTP ${item.httpStatus}`:'Configured · unreachable'):'Not configured'}</p></div><span className={`h-2 w-2 rounded-full ${item.healthy?'bg-emerald-400':item.reachable?'bg-amber-400':item.configured?'bg-rose-400':'bg-zinc-700'}`}/></div>)}</div></div>}
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{integrations.map((item)=><div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-white">{item.name}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] ${item.bridgeConfigured?'border-emerald-400/20 text-emerald-300':'border-white/10 text-zinc-500'}`}>{item.bridgeConfigured?'Bridge configured':'Export only'}</span></div><p className="mt-1 text-[11px] text-zinc-500">{item.mechanism}</p><p className="mt-2 text-[11px] text-zinc-400">{item.formats.join(' · ')}</p></div>)}</div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{engineCards.map((item)=><div key={item.id} className="rounded-xl border border-white/[.06] bg-white/[.015] p-3"><p className="text-xs font-medium text-zinc-200">{labelize(item.id)}</p><p className="mt-1 text-[10px] text-zinc-500">{item.exports.join(' · ')}</p></div>)}</div>
+    </section>
+
+    <section className="mt-4 rounded-2xl border border-cyan-300/10 bg-white/[.02] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-cyan-300/60">Game-ready processing profile</p><p className="mt-1 text-xs text-zinc-500">Topology, PBR, UV, LOD and collision use the hosted processor. Rigging and animation are enabled only when a real specialist Game Foundry 3D worker is configured.</p></div><span className={`rounded-full border px-2.5 py-1 text-[10px] ${specialistProcessing?'border-emerald-300/20 text-emerald-300':'border-white/10 text-zinc-500'}`}>{specialistProcessing?'Specialist worker configured':'Hosted geometry processing only'}</span></div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Field label="Rigging"><select value={processingRigging} onChange={(e)=>setProcessingRigging(e.target.value)} disabled={!specialistProcessing} className={control+' disabled:cursor-not-allowed disabled:opacity-40'}><option value="none">None</option><option value="auto">Auto rig · specialist worker</option></select></Field>
+        <Field label="Animation"><select value={processingAnimation} onChange={(e)=>setProcessingAnimation(e.target.value)} disabled={!specialistProcessing} className={control+' disabled:cursor-not-allowed disabled:opacity-40'}><option value="none">None</option><option value="idle">Idle · specialist worker</option><option value="basic">Basic · specialist worker</option></select></Field>
+      </div>
+      {!specialistProcessing&&<p className="mt-2 text-[11px] text-amber-200/70">Blackstar will not claim rigging or animation from the hosted geometry worker. Configure GAME_FOUNDRY_3D_API_URL to unlock those real specialist operations.</p>}
     </section>
 
     <div className="mt-4 grid gap-4 xl:grid-cols-2">
