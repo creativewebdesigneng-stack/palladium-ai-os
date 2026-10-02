@@ -1,4 +1,9 @@
 export type BusinessCapabilityId =
+  | "task_job_execution"
+  | "data_analysis"
+  | "customer_support"
+  | "marketing_growth"
+  | "scheduling_coordination"
   | "web_research"
   | "communications"
   | "commerce_operations"
@@ -77,6 +82,61 @@ export type BusinessCapabilityCertification = {
 };
 
 export const BUSINESS_CAPABILITY_BENCHMARKS: readonly BusinessCapabilityBenchmark[] = [
+  {
+    id: "task_job_execution",
+    title: "General task & job execution",
+    description: "Completes bounded digital work using files, data, code, HTTP and database tools while preserving runtime evidence and operator controls.",
+    configuredTools: ["file_analysis", "data_analysis", "code_exec", "http_request", "database_query"],
+    evidenceTools: ["file_analysis", "data_analysis", "code_exec", "http_request", "database_query"],
+    approvalActions: [],
+    connectedProviderEvidence: false,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
+  {
+    id: "data_analysis",
+    title: "Data analysis & reporting",
+    description: "Analyses supplied files or structured data, performs reproducible calculations and reports uncertainty instead of inventing missing inputs.",
+    configuredTools: ["data_analysis", "file_analysis", "calculator", "database_query"],
+    evidenceTools: ["data_analysis", "file_analysis", "calculator", "database_query"],
+    approvalActions: [],
+    connectedProviderEvidence: false,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
+  {
+    id: "customer_support",
+    title: "Customer support operations",
+    description: "Reads support context, drafts accurate responses and keeps outbound customer communication behind the approval boundary.",
+    configuredTools: ["connected_service", "email_draft", "email_send", "integration_action"],
+    evidenceTools: ["connected_service", "email_draft", "email_send", "integration_action", "nango_action"],
+    approvalActions: ["email_draft", "email_send", "nango_dynamic_action"],
+    connectedProviderEvidence: true,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
+  {
+    id: "marketing_growth",
+    title: "Marketing research & growth planning",
+    description: "Researches markets, competitors and content opportunities using real evidence without silently publishing or spending money.",
+    configuredTools: ["web_search", "web_fetch", "data_analysis", "connected_service"],
+    evidenceTools: ["web_search", "web_fetch", "data_analysis", "connected_service", "nango_action"],
+    approvalActions: [],
+    connectedProviderEvidence: false,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
+  {
+    id: "scheduling_coordination",
+    title: "Scheduling & coordination",
+    description: "Reads calendar/context and prepares calendar or coordination writes only through approved connected-service actions.",
+    configuredTools: ["calendar", "connected_service", "connected_service_write", "integration_action"],
+    evidenceTools: ["calendar", "connected_service", "connected_service_write", "integration_action", "nango_action"],
+    approvalActions: ["calendar_create", "nango_dynamic_action"],
+    connectedProviderEvidence: true,
+    requiredVerifiedTasks: 3,
+    requiredAverageScore: 0.9,
+  },
   {
     id: "web_research",
     title: "Web research & browser operation",
