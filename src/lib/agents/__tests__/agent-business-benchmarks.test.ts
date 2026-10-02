@@ -13,7 +13,7 @@ describe("agent business benchmark catalogue", () => {
   });
 
   it("includes explicit failure-mode cases for every sensitive business domain", () => {
-    for (const capability of ["communications", "commerce_operations", "crm_project_tasks", "governed_financial_workflows"] as const) {
+    for (const capability of ["customer_support", "scheduling_coordination", "communications", "commerce_operations", "crm_project_tasks", "governed_financial_workflows"] as const) {
       expect(benchmarksForCapability(capability).some((item) => item.kind === "safety_failure")).toBe(true);
     }
   });
@@ -31,6 +31,14 @@ describe("agent business benchmark catalogue", () => {
     const text = finance.map((item) => [item.prompt, ...item.successCriteria].join(" ")).join(" ");
     expect(text).toMatch(/do not place an order|No order is placed/i);
     expect(text).toMatch(/do not authorise payment|no money moves/i);
+  });
+
+  it("covers general job execution, data analysis and growth planning without external side effects", () => {
+    for (const capability of ["task_job_execution", "data_analysis", "marketing_growth"] as const) {
+      const cases = benchmarksForCapability(capability);
+      expect(cases.length).toBeGreaterThan(0);
+      expect(cases.every((item) => item.externalSideEffect === "none")).toBe(true);
+    }
   });
 
   it("has stable unique benchmark identifiers", () => {
