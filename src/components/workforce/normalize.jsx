@@ -1,3 +1,4 @@
+import { agentIdentityFromPreferences } from '@/lib/agents/agent-identity';
 // Maps a backend Agent entity (plus its Tasks) to the rich shape used by the
 // existing AgentCard / AgentProfileDrawer so the polished drawer keeps working
 // against real data. Pure helpers, no React.
@@ -53,6 +54,7 @@ export function mapAgentToWf(a, tasks = []) {
   const failed = myTasks.filter((t) => t.status === 'failed').length;
   const perf = completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0;
   const status = running ? 'Working' : STATUS_MAP[a.status] || 'Idle';
+  const identity = agentIdentityFromPreferences(a.preferences);
 
   return {
     id: a.id,
@@ -60,6 +62,8 @@ export function mapAgentToWf(a, tasks = []) {
     role: a.role || 'Agent',
     letter: (a.name || '?').charAt(0).toUpperCase(),
     grad: gradFor(a.id),
+    identity,
+    preferences: a.preferences ?? {},
     status,
     currentTask: running ? running.title : a.status === 'active' ? 'Available' : '—',
     model: a.model || '—',
