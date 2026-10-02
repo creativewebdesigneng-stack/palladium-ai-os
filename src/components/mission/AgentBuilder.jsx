@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, Plug, ShieldAlert, Wand2 } from 'lucide-react';
+import { X, Loader2, Plug, ShieldAlert, Wand2, Palette } from 'lucide-react';
 import {
   PERSONAL_CATEGORIES, AUTONOMY_LEVELS, PERSONALITIES, TOOL_CATALOG,
   DEFAULT_ALLOWED_DOMAINS, ADVISORY_NOTICE,
 } from '@/lib/mission/catalog';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES, DEFAULT_AGENT_IDENTITY, normaliseAgentIdentity } from '@/lib/agents/agent-identity';
 
 const EMPTY = {
   name: '',
@@ -22,6 +24,7 @@ const EMPTY = {
   schedule: '',
   scope: 'personal',
   allowed_domains: DEFAULT_ALLOWED_DOMAINS.join(', '),
+  identity: DEFAULT_AGENT_IDENTITY,
 };
 
 export default function AgentBuilder({ open, initial, connectedIntegrations = [], saving, onClose, onSave }) {
@@ -40,7 +43,10 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = []
           : initial?.allowed_tools?.includes('connected_service')
             ? connectedIntegrations.map((integration) => integration.provider)
             : [],
-      preferencesText: initial?.preferences ? Object.entries(initial.preferences).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
+      preferencesText: initial?.preferences
+        ? Object.entries(initial.preferences).filter(([key]) => key !== 'identity').map(([k, v]) => `${k}: ${v}`).join('\n')
+        : '',
+      identity: normaliseAgentIdentity(initial?.preferences?.identity),
       allowed_domains: initial?.allowed_domains?.join?.(', ') ?? EMPTY.allowed_domains,
     });
   }, [open, initial, connectedIntegrations]);
@@ -48,6 +54,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = []
   if (!open) return null;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const setIdentity = (key, value) => setForm((f) => ({ ...f, identity: { ...f.identity, [key]: value, disclosure: 'AI agent' } }));
   const toggleTool = (id) => setForm((f) => {
     const enabling = !f.allowed_tools.includes(id);
     return {
@@ -83,7 +90,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = []
       purpose: form.purpose,
       personality: form.personality,
       instructions: form.instructions,
-      preferences,
+      preferences: { ...preferences, identity: form.identity },
       budget_limit: form.budget_limit === '' ? null : Number(form.budget_limit),
       currency: form.currency,
       allowed_tools: form.allowed_tools,
@@ -157,6 +164,24 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = []
                 <option value="Hourly">Hourly</option>
               </select>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[.025] p-4">
+            <div className="mb-3 flex items-center gap-2"><Palette className="h-4 w-4 text-violet-300" /><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-zinc-400">Agent identity</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-3">
+              <AgentIdentityAvatar name={form.name || 'New agent'} identity={form.identity} size="lg" showDisclosure />
+              <p className="min-w-0 flex-1 text-[10px] leading-4 text-zinc-500">Humanised presentation never changes tools, approvals, autonomy or spend controls.</p>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {AGENT_SKINS.map((skin) => <button key={skin.id} type="button" onClick={() => setIdentity('skin', skin.id)} className={`flex items-center gap-2 rounded-xl border p-2 text-left ${form.identity.skin === skin.id ? 'border-violet-300/35 bg-violet-400/[.08]' : 'border-white/10 bg-black/20'}`}><span className="h-7 w-7 rounded-lg border border-white/10" style={{background:`linear-gradient(145deg,${skin.from},${skin.to})`}}/><span className="text-[9px] text-zinc-300">{skin.label}</span></button>)}
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div><label className={label}>Avatar style</label><select value={form.identity.avatarStyle} onChange={(e) => setIdentity('avatarStyle', e.target.value)} className={field}>{AGENT_AVATAR_STYLES.map((item)=><option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+              <div><label className={label}>Presentation</label><select value={form.identity.presentationStyle} onChange={(e) => setIdentity('presentationStyle', e.target.value)} className={field}>{AGENT_PRESENTATION_STYLES.map((item)=><option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+              <div><label className={label}>Voice style</label><select value={form.identity.voiceStyle} onChange={(e) => setIdentity('voiceStyle', e.target.value)} className={field}>{AGENT_VOICE_STYLES.map((item)=><option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+              <div><label className={label}>Tagline</label><input value={form.identity.tagline} onChange={(e) => setIdentity('tagline', e.target.value)} maxLength={140} placeholder="Calm operations partner" className={field}/></div>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-[10px] text-zinc-400"><input type="checkbox" checked={form.identity.humanised} onChange={(e) => setIdentity('humanised', e.target.checked)} className="accent-violet-500"/>Humanised conversational presentation <span className="text-zinc-600">· AI disclosure stays on</span></label>
           </div>
 
           <div>
