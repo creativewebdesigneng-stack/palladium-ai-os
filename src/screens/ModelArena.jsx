@@ -10,6 +10,8 @@ import { getModelRuntimeOverview } from '@/lib/runtime/model-management.function
 import { astraEvaluationContestants, parseAstraEvaluationHandoff } from '@/lib/evals/astra-evaluation-handoff';
 import { certifyAstraTaskClass, getAstraCertificationStatus } from '@/lib/evals/astra-evaluation-verifier.functions';
 import { getModelEvalRun, listModelEvalRuns, runModelArena } from '@/lib/evals/model-arena.functions';
+import { getGroqEvaluationStatus } from '@/lib/evals/groq-evaluation.functions';
+import { certifyGroqTaskClass, getGroqCertificationStatus } from '@/lib/evals/groq-evaluation-verifier.functions';
 
 const DEFAULT_CONTESTANTS = [
   { provider: 'openai', model: 'gpt-5-mini', label: 'Candidate A' },
@@ -29,6 +31,9 @@ export default function ModelArena() {
   const runFn = useServerFn(runModelArena);
   const astraStatusFn = useServerFn(getAstraCertificationStatus);
   const astraCertifyFn = useServerFn(certifyAstraTaskClass);
+  const groqStatusFn = useServerFn(getGroqEvaluationStatus);
+  const groqCertificationFn = useServerFn(getGroqCertificationStatus);
+  const groqCertifyFn = useServerFn(certifyGroqTaskClass);
   const [name, setName] = useState(() => astraHandoff?.runName ?? 'Model comparison');
   const [prompt, setPrompt] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -36,6 +41,7 @@ export default function ModelArena() {
   const [contestants, setContestants] = useState(() => astraHandoff ? astraEvaluationContestants(astraHandoff) : DEFAULT_CONTESTANTS);
   const [judge, setJudge] = useState({ provider: 'openai', model: 'gpt-5-mini', label: 'Judge' });
   const [selectedRunId, setSelectedRunId] = useState(null);
+  const [taskClass, setTaskClass] = useState('general');
 
   const overview = useQuery({
     queryKey: ['model-runtime-overview', 'arena'],
@@ -53,6 +59,18 @@ export default function ModelArena() {
     queryKey: ['model-arena-run', selectedRunId],
     queryFn: () => getFn({ data: { id: selectedRunId } }),
     enabled: session === 'yes' && Boolean(selectedRunId),
+    retry: false,
+  });
+  const groqEvidence = useQuery({
+    queryKey: ['groq-evaluation-status', taskClass],
+    queryFn: () => groqStatusFn({ data: { taskClass } }),
+    enabled: session === 'yes',
+    retry: false,
+  });
+  const groqCertification = useQuery({
+    queryKey: ['groq-certification-status', taskClass],
+    queryFn: () => groqCertificationFn({ data: { taskClass } }),
+    enabled: session === 'yes',
     retry: false,
   });
   const astraStatus = useQuery({
@@ -74,6 +92,7 @@ export default function ModelArena() {
         judge: { provider: judge.provider, model: judge.model.trim(), label: judge.label },
         criteria: criteria.split(',').map((item) => item.trim()).filter(Boolean),
         astraTaskClass: astraHandoff?.taskClass ?? null,
+        taskClass,
       },
     }),
     onSuccess: async (data) => {
@@ -81,6 +100,14 @@ export default function ModelArena() {
       await queryClient.invalidateQueries({ queryKey: ['model-arena-runs'] });
       await queryClient.invalidateQueries({ queryKey: ['model-arena-run', data.runId] });
       if (astraHandoff) await queryClient.invalidateQueries({ queryKey: ['astra-certification-status', astraHandoff.taskClass] });
+    },
+  });
+  const groqCertifyMutation = useMutation({
+    mutationFn: () => groqCertifyFn({ data: { taskClass } }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['groq-certification-status', taskClass] });
+      await queryClient.invalidateQueries({ queryKey: ['groq-evaluation-status', taskClass] });
+      await queryClient.invalidateQueries({ queryKey: ['model-runtime-overview'] });
     },
   });
   const certifyMutation = useMutation({
@@ -146,8 +173,13 @@ export default function ModelArena() {
           <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-violet-300" /><h2 className="text-sm font-semibold text-white">New evaluation</h2></div>
           <p className="mt-1 text-[11px] text-zinc-500">Only providers configured on this deployment can execute successfully. Credentials remain server-side.</p>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             <Field label="Run name"><input value={name} onChange={(e) => setName(e.target.value)} className="input" maxLength={160} /></Field>
+            <Field label="Task class">
+              <select value={taskClass} onChange={(e) => setTaskClass(e.target.value)} className="input">
+                {['general','reasoning','coding','tool_use','agentic'].map((value) => <option key={value} value={value}>{value.replace('_',' ')}</option>)}
+              </select>
+            </Field>
             <Field label="Scoring criteria"><input value={criteria} onChange={(e) => setCriteria(e.target.value)} className="input" placeholder="correctness, helpfulness, clarity" /></Field>
           </div>
           <div className="mt-3"><Field label="Prompt"><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="input min-h-32 resize-y" placeholder="Enter the prompt every candidate should answer…" maxLength={12000} /></Field></div>
@@ -188,6 +220,33 @@ export default function ModelArena() {
         </section>
       </div>
 
+      <section className="mt-5 rounded-2xl border border-cyan-400/15 bg-cyan-400/[.025] p-5">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2"><Gauge className="h-4 w-4 text-cyan-300" /><h2 className="text-sm font-semibold text-white">Groq evidence-qualified routing</h2></div>
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Blackstar measures exact Groq runs by task class. Routing stays provider-neutral and Groq is not auto-selected until verifier-controlled evidence meets the Native Intelligence trust floor.</p>
+            {groqEvidence.data?.requested && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <Metric label="Samples" value={String(groqEvidence.data.requested.sampleCount)} />
+                <Metric label="Quality" value={groqEvidence.data.requested.averageScore == null ? '—' : `${(groqEvidence.data.requested.averageScore * 100).toFixed(1)}%`} />
+                <Metric label="P50 latency" value={groqEvidence.data.requested.p50LatencyMs == null ? '—' : `${groqEvidence.data.requested.p50LatencyMs} ms`} />
+                <Metric label="Cost evidence" value={groqEvidence.data.requested.costEvidenceAvailable ? 'configured' : 'not configured'} />
+              </div>
+            )}
+          </div>
+          <div className="w-full rounded-xl border border-white/10 bg-black/20 p-3 sm:w-64">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Certification · {taskClass}</p>
+            <p className="mt-2 text-lg font-semibold text-white">{groqCertification.data?.completedRuns ?? 0}/{groqCertification.data?.minimumRuns ?? 20}</p>
+            <p className="text-[10px] text-zinc-500">independently judged exact-model runs</p>
+            <button type="button" disabled={!groqCertification.data?.readyToCertify || groqCertifyMutation.isPending} onClick={() => groqCertifyMutation.mutate()} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/20 bg-cyan-400/[.07] px-3 py-2 text-[10px] font-medium text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+              {groqCertifyMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+              {groqCertifyMutation.isPending ? 'Certifying…' : groqCertification.data?.readyToCertify ? 'Issue routing evidence' : 'More evidence required'}
+            </button>
+            {groqCertifyMutation.error && <p className="mt-2 text-[10px] text-rose-300">{friendlyMessage(groqCertifyMutation.error)}</p>}
+          </div>
+        </div>
+      </section>
+
       {selectedRunId && <section className="mt-5 rounded-2xl border border-white/10 bg-white/[.03] p-5">
         <div className="flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-300" /><h2 className="text-sm font-semibold text-white">Evaluation results</h2></div>
         {result.isLoading ? <Loading text="Loading scores…" /> : result.error ? <ErrorBox error={result.error} /> : scored.length ? (
@@ -207,6 +266,7 @@ export default function ModelArena() {
   }
 }
 
+function Metric({ label, value }) { return <div className="rounded-xl border border-white/[.06] bg-black/20 p-3"><p className="text-[9px] uppercase tracking-wide text-zinc-600">{label}</p><p className="mt-1 text-sm font-semibold text-white">{value}</p></div>; }
 function Field({ label, children }) { return <label className="block"><span className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}</span>{children}</label>; }
 function Loading({ text }) { return <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />{text}</div>; }
 function ErrorBox({ error }) { return <div className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">{friendlyMessage(error)}</div>; }
