@@ -185,6 +185,7 @@ export const assistantChat = createServerFn({ method: "POST" })
 
     const {
       loadAssistantConnectionContext,
+      loadAssistantExternalWorkspaceContext,
       loadAssistantMemoryContext,
       loadAssistantWorkspaceContext,
       persistAssistantMessage,
@@ -215,7 +216,7 @@ export const assistantChat = createServerFn({ method: "POST" })
       content: data.message,
     }).catch((error) => console.warn("[assistant] could not persist user turn", error));
 
-    const [memoryContext, workspaceContext, connectionContext] = await Promise.all([
+    const [memoryContext, workspaceContext, connectionContext, externalWorkspaceContext] = await Promise.all([
       loadAssistantMemoryContext({
         sb,
         userId: context.userId,
@@ -231,6 +232,12 @@ export const assistantChat = createServerFn({ method: "POST" })
       loadAssistantConnectionContext({
         sb,
         userId: context.userId,
+        enabled: workspaceContextEnabled,
+      }),
+      loadAssistantExternalWorkspaceContext({
+        sb,
+        userId: context.userId,
+        query: data.message,
         enabled: workspaceContextEnabled,
       }),
     ]);
@@ -255,6 +262,7 @@ export const assistantChat = createServerFn({ method: "POST" })
       ...(workspaceContext.prompt ? [{ role: "system" as const, content: workspaceContext.prompt }] : []),
       ...(memoryContext.prompt ? [{ role: "system" as const, content: memoryContext.prompt }] : []),
       ...(connectionContext.prompt ? [{ role: "system" as const, content: connectionContext.prompt }] : []),
+      ...(externalWorkspaceContext.prompt ? [{ role: "system" as const, content: externalWorkspaceContext.prompt }] : []),
       ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
       ...conversation.history.map((t: Turn) => ({ role: t.role, content: t.content }) as ChatMessage),
       { role: "user", content: data.message },
@@ -276,8 +284,14 @@ export const assistantChat = createServerFn({ method: "POST" })
           sources: webSources.slice(0, 6).map(({ title, url }) => ({ title, url })),
           memoryHits: memoryContext.hits,
           agentMatches: workspaceContext.agentMatches,
+          projects: workspaceContext.projects,
+          fileRefs: workspaceContext.fileRefs,
+          upcomingItems: workspaceContext.upcomingItems,
+          communications: workspaceContext.communications,
           connectedIntegrations: connectionContext.connected,
           integrationAttention: connectionContext.attention,
+          externalWorkspaceReads: externalWorkspaceContext.reads,
+          externalWorkspaceProviders: externalWorkspaceContext.providers,
         },
       }).catch((error) => console.warn("[assistant] could not persist assistant turn", error));
       await recordUsage({
@@ -299,8 +313,14 @@ export const assistantChat = createServerFn({ method: "POST" })
           memory_context_hits: memoryContext.hits,
           workspace_context_enabled: workspaceContextEnabled,
           agent_matches: workspaceContext.agentMatches,
+          projects: workspaceContext.projects,
+          file_refs: workspaceContext.fileRefs,
+          upcoming_items: workspaceContext.upcomingItems,
+          communications: workspaceContext.communications,
           connected_integrations: connectionContext.connected,
           integration_attention: connectionContext.attention,
+          external_workspace_reads: externalWorkspaceContext.reads,
+          external_workspace_providers: externalWorkspaceContext.providers,
           response_style: responseStyle,
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
@@ -311,9 +331,9 @@ export const assistantChat = createServerFn({ method: "POST" })
         action: "assistant.message",
         targetType: "assistant",
         status: "success",
-        metadata: { provider: result.provider, model: result.model, assistantName, preferenceSource, fallbackFrom: result.fallbackFrom ?? null, liveWebAttempted: webSearchAttempted, liveWebSources: webSources.length, liveLocationUsed: Boolean(data.location), conversationId: conversation.conversationId, memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches, connectedIntegrations: connectionContext.connected, integrationAttention: connectionContext.attention, responseStyle },
+        metadata: { provider: result.provider, model: result.model, assistantName, preferenceSource, fallbackFrom: result.fallbackFrom ?? null, liveWebAttempted: webSearchAttempted, liveWebSources: webSources.length, liveLocationUsed: Boolean(data.location), conversationId: conversation.conversationId, memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches, projects: workspaceContext.projects, fileRefs: workspaceContext.fileRefs, upcomingItems: workspaceContext.upcomingItems, communications: workspaceContext.communications, connectedIntegrations: connectionContext.connected, integrationAttention: connectionContext.attention, externalWorkspaceReads: externalWorkspaceContext.reads, externalWorkspaceProviders: externalWorkspaceContext.providers, responseStyle },
       });
-      return { text: result.text, provider: result.provider, model: result.model, assistantName, conversationId: conversation.conversationId, sources: webSources.map(({ title, url }) => ({ title, url })), webSearchAttempted, liveLocationUsed: Boolean(data.location), memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches, connectedIntegrations: connectionContext.connected, integrationAttention: connectionContext.attention };
+      return { text: result.text, provider: result.provider, model: result.model, assistantName, conversationId: conversation.conversationId, sources: webSources.map(({ title, url }) => ({ title, url })), webSearchAttempted, liveLocationUsed: Boolean(data.location), memoryHits: memoryContext.hits, agentMatches: workspaceContext.agentMatches, projects: workspaceContext.projects, fileRefs: workspaceContext.fileRefs, upcomingItems: workspaceContext.upcomingItems, communications: workspaceContext.communications, connectedIntegrations: connectionContext.connected, integrationAttention: connectionContext.attention, externalWorkspaceReads: externalWorkspaceContext.reads, externalWorkspaceProviders: externalWorkspaceContext.providers };
     } catch (error) {
       const status = error instanceof ProviderError ? error.status : 500;
       console.error("[assistant] provider failure", status, error);
