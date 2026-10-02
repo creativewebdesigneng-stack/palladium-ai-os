@@ -195,12 +195,45 @@ export const controlAutonomousGoal = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !goal) throw new Error(error?.message ?? "Autonomous goal not found.");
     if (data.action === "cancel") {
-      await sb
+      const { data: activeRuns } = await sb
         .from("autonomous_goal_runs")
-        .update({ status: "cancelled", completed_at: new Date().toISOString() })
+        .select("id,workflow_run_id")
         .eq("goal_id", data.id)
         .eq("user_id", context.userId)
         .in("status", ["planning", "queued", "running", "waiting_for_approval"]);
+
+      const now = new Date().toISOString();
+      const workflowRunIds = [...new Set(
+        (activeRuns ?? []).map((run: any) => run.workflow_run_id).filter(Boolean),
+      )];
+
+      if (workflowRunIds.length) {
+        await sb
+          .from("workflow_runs")
+          .update({
+            cancel_requested: true,
+            worker_error: "Operator cancelled the owning autonomous goal.",
+          })
+          .in("id", workflowRunIds)
+          .eq("user_id", context.userId)
+          .in("status", ["queued", "running", "waiting_for_approval"]);
+      }
+
+      await sb
+        .from("autonomous_goal_runs")
+        .update({ status: "cancelled", completed_at: now, heartbeat_at: now })
+        .eq("goal_id", data.id)
+        .eq("user_id", context.userId)
+        .in("status", ["planning", "queued", "running", "waiting_for_approval"]);
+
+      for (const run of activeRuns ?? []) {
+        await sb
+          .from("autonomous_goal_fleet_assignments")
+          .update({ status: "cancelled" })
+          .eq("run_id", run.id)
+          .eq("user_id", context.userId)
+          .in("status", ["queued", "running", "waiting_for_approval"]);
+      }
     }
     return goal;
   });
