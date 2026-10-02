@@ -7,7 +7,7 @@ const conversations = readFileSync(new URL('../assistant-conversations.functions
 const preferences = readFileSync(new URL('../personal-assistant.functions.ts', import.meta.url), 'utf8')
 const ui = readFileSync(new URL('../../../components/palladium/GlobalAIAssistant.jsx', import.meta.url), 'utf8')
 const settings = readFileSync(new URL('../../../components/settings/PersonalAssistantSection.jsx', import.meta.url), 'utf8')
-const migration = readFileSync(new URL('../../../../supabase/migrations/20261001224500_personal_assistant_v2.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../../../../supabase/migrations/20261001223259_personal_assistant_v2.sql', import.meta.url), 'utf8')
 
 describe('Blackstar personal assistant v2 contract', () => {
   it('persists owner-scoped conversation threads separately from memory', () => {
