@@ -9,7 +9,7 @@ import {
 const verifier = readFileSync(new URL('../groq-evaluation-verifier.server.ts', import.meta.url), 'utf8')
 const arena = readFileSync(new URL('../model-arena.functions.ts', import.meta.url), 'utf8')
 const routing = readFileSync(new URL('../../runtime/native-intelligence-runtime-routing.server.ts', import.meta.url), 'utf8')
-const reconciliation = readFileSync(new URL('../../../../supabase/migrations/20261002110000_evaluation_foundation_reconciliation.sql', import.meta.url), 'utf8')
+const reconciliation = readFileSync(new URL('../../../../supabase/migrations/20261002110406_evaluation_foundation_reconciliation.sql', import.meta.url), 'utf8')
 
 function samples(count: number, patch: Partial<GroqEvidenceSample> = {}): GroqEvidenceSample[] {
   return Array.from({ length: count }, () => ({
