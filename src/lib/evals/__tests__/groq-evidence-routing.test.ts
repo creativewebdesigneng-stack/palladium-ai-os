@@ -9,6 +9,7 @@ import {
 const verifier = readFileSync(new URL('../groq-evaluation-verifier.server.ts', import.meta.url), 'utf8')
 const arena = readFileSync(new URL('../model-arena.functions.ts', import.meta.url), 'utf8')
 const routing = readFileSync(new URL('../../runtime/native-intelligence-runtime-routing.server.ts', import.meta.url), 'utf8')
+const reconciliation = readFileSync(new URL('../../../../supabase/migrations/20261002110000_evaluation_foundation_reconciliation.sql', import.meta.url), 'utf8')
 
 function samples(count: number, patch: Partial<GroqEvidenceSample> = {}): GroqEvidenceSample[] {
   return Array.from({ length: count }, () => ({
@@ -63,5 +64,13 @@ describe('Groq evidence-qualified routing', () => {
     expect(routing).toContain('GROQ_EVIDENCE_MODEL_ID')
     expect(routing).toContain("lifecycle: 'candidate'")
     expect(routing).not.toContain("fallbackId: GROQ_EVIDENCE_MODEL_ID")
+  })
+
+  it('reconciles the missing evaluation foundation with correct score normalization', () => {
+    expect(reconciliation).toContain('create table if not exists public.model_eval_runs')
+    expect(reconciliation).toContain('create table if not exists public.model_eval_verified_evidence')
+    expect(reconciliation).toContain('avg(scores.score)::numeric / 100')
+    expect(reconciliation).not.toContain('avg(scores.score)::numeric / 10')
+    expect(reconciliation).toContain('to service_role')
   })
 })
