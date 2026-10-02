@@ -1,5 +1,6 @@
 const ROUTE_ROOMS = [
   [['/mission-control'], 'astra-room-mission'],
+  [['/outcomes'], 'astra-room-core'],
   [['/ai-hub', '/ai-workbench', '/ai-model-hub', '/models', '/mcp-hub'], 'astra-room-hub'],
   [['/agents', '/workforce', '/autonomous-os'], 'astra-room-workforce'],
   [['/finance'], 'astra-room-finance'],
@@ -68,7 +69,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-ethereal-luxury',
   ],
   [
-    ['/dashboard', '/autonomous-os', '/shared-intelligence', '/decision-studio', '/chat', '/fast-track'],
+    ['/dashboard', '/autonomous-os', '/shared-intelligence', '/decision-studio', '/chat', '/fast-track', '/outcomes'],
     'blackstar-style-cosmic-core',
   ],
 ]
