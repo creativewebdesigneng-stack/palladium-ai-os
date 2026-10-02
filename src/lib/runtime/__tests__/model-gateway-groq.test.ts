@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { normaliseProvider, resolveModel } from "../model-gateway.server";
+import { ProviderError, isRetiredGroqModel, normaliseProvider, resolveModel } from "../model-gateway.server";
 
 const originalGroqKey = process.env["GROQ_API_KEY"];
 const originalOpenAiKey = process.env["OPENAI_API_KEY"];
@@ -23,6 +23,14 @@ describe("Groq model gateway", () => {
 
   it("uses GPT-OSS 120B as the Groq default model", () => {
     expect(resolveModel("groq", null)).toBe("openai/gpt-oss-120b");
+  });
+
+  it("rejects retired Compound identifiers before execution", () => {
+    expect(isRetiredGroqModel("groq/compound")).toBe(true);
+    expect(isRetiredGroqModel("groq/compound-mini")).toBe(true);
+    expect(isRetiredGroqModel("compound-beta")).toBe(true);
+    expect(() => resolveModel("groq", "groq/compound")).toThrow(ProviderError);
+    expect(() => resolveModel("groq", "openai/gpt-oss-120b")).not.toThrow();
   });
 
   it("prefers Groq when GROQ_API_KEY is configured and no provider is selected", () => {

@@ -100,8 +100,22 @@ export function normaliseProvider(value?: string | null): Provider {
   return "lovable";
 }
 
+const RETIRED_GROQ_MODEL_PREFIXES = ["groq/compound", "compound-beta"] as const;
+
+export function isRetiredGroqModel(model: string) {
+  const value = model.trim().toLowerCase();
+  return RETIRED_GROQ_MODEL_PREFIXES.some((prefix) => value.startsWith(prefix));
+}
+
 export function resolveModel(provider: Provider, model?: string | null): string {
   const m = (model ?? "").trim();
+  if (provider === "groq" && m && isRetiredGroqModel(m)) {
+    throw new ProviderError(
+      "That Groq model/system has been retired. Select a currently active Groq model from Runtime Models.",
+      400,
+      false,
+    );
+  }
   if (!m && provider === "compatible" && blackstarNativePrimaryEnabled()) {
     const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
     if (nativeModel) return nativeModel;
