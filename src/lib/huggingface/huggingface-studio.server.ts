@@ -108,7 +108,8 @@ export async function discoverHuggingFaceStudioModels(args: {
 export async function getHuggingFaceStudioModelProviders(modelId: string) {
   const id = modelId.trim()
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(id)) throw new Error('Invalid Hugging Face model id.')
-  const response = await fetch(`${HF_API}/models/${encodeURIComponent(id)}?expand=inferenceProviderMapping`, {
+  const encodedId = id.split('/').map((part) => encodeURIComponent(part)).join('/')
+  const response = await fetch(`${HF_API}/models/${encodedId}?expand=inferenceProviderMapping`, {
     headers: headers(),
     redirect: 'manual',
     signal: AbortSignal.timeout(12_000),
