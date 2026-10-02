@@ -43,6 +43,65 @@ function masterBase() { return ((process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] 
 function token() { return (process.env['CINEMA_STUDIO_WORKER_TOKEN'] ?? '').trim() }
 function headers() { return token() ? {'content-type':'application/json',authorization:`Bearer ${token()}`} : {'content-type':'application/json'} }
 
+function healthHeaders() { return token() ? {authorization:`Bearer ${token()}`} : {} }
+
+export async function probeCinemaMasterConnection() {
+  const url=masterBase()
+  const provider=getCinemaCapabilities().masterProvider
+  const started=Date.now()
+  try{
+    const response=await fetch(`${url}/health`,{
+      method:'GET',
+      headers:healthHeaders(),
+      redirect:'manual',
+      signal:AbortSignal.timeout(8000),
+    })
+    const raw=await response.text()
+    let payload:any=null
+    try{payload=raw?JSON.parse(raw):null}catch{}
+    const readySignal=payload&&typeof payload==='object'&&'ready' in payload
+      ? payload.ready===true
+      : null
+    const healthy=response.ok&&readySignal!==false
+    return {
+      id:'master-worker',
+      name:'Cinema Master Worker',
+      provider,
+      configured:Boolean(url),
+      reachable:true,
+      healthy,
+      readySignal,
+      httpStatus:response.status,
+      latencyMs:Math.max(0,Date.now()-started),
+      checkedAt:new Date().toISOString(),
+      capabilities:{
+        ffmpeg:payload?.ffmpeg===true?true:payload?.ffmpeg===false?false:null,
+        cinema:payload?.cinema&&typeof payload.cinema==='object'?payload.cinema:null,
+      },
+      error:healthy
+        ? null
+        : readySignal===false
+          ? 'Health endpoint reported ready=false.'
+          : `Health endpoint returned HTTP ${response.status}.`,
+    }
+  }catch(error){
+    return {
+      id:'master-worker',
+      name:'Cinema Master Worker',
+      provider,
+      configured:Boolean(url),
+      reachable:false,
+      healthy:false,
+      readySignal:null,
+      httpStatus:null,
+      latencyMs:Math.max(0,Date.now()-started),
+      checkedAt:new Date().toISOString(),
+      capabilities:{ffmpeg:null,cinema:null},
+      error:error instanceof Error?error.message.slice(0,240):'Cinema master health probe failed.',
+    }
+  }
+}
+
 export async function submitCinemaRender(input: {
   title:string; prompt:string; screenplay:string; durationMinutes:number; aspectRatio:CinemaAspect; quality:CinemaQuality;
   references?:string[]; seed?:number|null
