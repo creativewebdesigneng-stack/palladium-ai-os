@@ -54,6 +54,15 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    const { data: control, error: controlError } = await sb
+      .from("autonomous_runtime_controls")
+      .select("enabled,stop_reason")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (controlError) throw new Error(controlError.message);
+    if (control?.enabled === false) {
+      throw new Error(control.stop_reason || "Autonomous OS master stop is engaged. Re-enable autonomous runtime before starting a run.");
+    }
     const { data: goal, error } = await sb
       .from("autonomous_goals")
       .select("id,user_id,org_id,workforce_id,name,objective,status,autonomy_level,max_parallel_agents")
