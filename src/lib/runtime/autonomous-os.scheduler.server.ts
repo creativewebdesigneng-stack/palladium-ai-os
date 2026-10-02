@@ -125,6 +125,16 @@ async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
   await db.from("autonomous_goal_fleet_assignments").insert(rows);
 }
 
+async function autonomousRuntimeEnabled(db: Sb, userId: string) {
+  const { data, error } = await db
+    .from("autonomous_runtime_controls")
+    .select("enabled")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.enabled !== false;
+}
+
 async function hasActiveGoalRun(db: Sb, goalId: string) {
   const { data } = await db
     .from("autonomous_goal_runs")
@@ -405,6 +415,13 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
   let failed = 0;
   for (const candidate of (candidates ?? []) as GoalRow[]) {
     if (claimed >= batch) break;
+    if (!(await autonomousRuntimeEnabled(db, candidate.user_id))) {
+      await db.from("autonomous_goals")
+        .update({ scheduler_claimed_at: null, scheduler_lease_until: null })
+        .eq("id", candidate.id)
+        .eq("user_id", candidate.user_id);
+      continue;
+    }
     if (await hasActiveGoalRun(db, candidate.id)) {
       await deferBusyGoal(db, candidate);
       deferred += 1;
