@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs'
 import {
   getGameFoundryCapabilities,
   preferredGameFoundryAssetFormat,
-} from '../game-foundry-runtime.server'
+} from './game-foundry-runtime.server'
 import {
   buildGameFoundryExportManifest,
   gameFoundryBridgeBase,
-} from '../game-foundry-package.server'
-import { gameFoundryEngineGuidance } from '../game-foundry-source.server'
+} from './game-foundry-package.server'
+import { gameFoundryEngineGuidance } from './game-foundry-source.server'
 
 describe('Game Foundry ZModeler3 handoff', () => {
   it('exposes ZModeler as a real target with truthful interchange formats', () => {
