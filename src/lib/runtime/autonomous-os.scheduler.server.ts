@@ -15,6 +15,8 @@ type GoalRow = {
   status: string;
   autonomy_level: string;
   max_parallel_agents: number | null;
+  max_runtime_seconds: number | null;
+  budget_pence: number | null;
   trigger_type: string;
   schedule_cron: string | null;
   timezone: string | null;
@@ -28,6 +30,7 @@ type AutonomousRunRow = {
   user_id: string;
   status: string;
   workflow_run_id: string | null;
+  started_at?: string | null;
 };
 
 const MAX_BATCH = 2;
@@ -123,6 +126,102 @@ async function persistFleet(db: Sb, goal: GoalRow, runId: string, plan: any) {
 
   if (!rows.length) return;
   await db.from("autonomous_goal_fleet_assignments").insert(rows);
+}
+
+async function goalSpendPence(db: Sb, goalId: string) {
+  const { data: goalRuns, error: runError } = await db
+    .from("autonomous_goal_runs")
+    .select("workflow_run_id")
+    .eq("goal_id", goalId)
+    .not("workflow_run_id", "is", null)
+    .limit(500);
+  if (runError) throw new Error(runError.message);
+  const ids = [...new Set((goalRuns ?? []).map((row: any) => row.workflow_run_id).filter(Boolean))];
+  if (!ids.length) return 0;
+  const { data: workflowRuns, error } = await db
+    .from("workflow_runs")
+    .select("id,cost_pence")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+  return (workflowRuns ?? []).reduce((sum: number, row: any) => {
+    const value = Number(row.cost_pence ?? 0);
+    return sum + (Number.isFinite(value) && value > 0 ? value : 0);
+  }, 0);
+}
+
+async function enforceGoalBudget(db: Sb, goal: GoalRow) {
+  if (goal.budget_pence == null) return { allowed: true, spentPence: 0 };
+  const limit = Math.max(0, Number(goal.budget_pence));
+  const spentPence = await goalSpendPence(db, goal.id);
+  if (spentPence < limit) return { allowed: true, spentPence };
+
+  await db.from("autonomous_goals")
+    .update({
+      status: "paused",
+      next_run_at: null,
+      scheduler_claimed_at: null,
+      scheduler_lease_until: null,
+      last_scheduler_error: "Autonomous budget limit reached.",
+    })
+    .eq("id", goal.id)
+    .eq("status", "active");
+
+  await writeEvent(db, {
+    goalId: goal.id,
+    userId: goal.user_id,
+    eventType: "budget_limit_reached",
+    severity: "warning",
+    message: "Blackstar paused this autonomous goal because its configured AI runtime budget was reached.",
+    payload: { budget_pence: limit, spent_pence: spentPence },
+  });
+  return { allowed: false, spentPence };
+}
+
+async function enforceRunRuntimeLimit(db: Sb, run: AutonomousRunRow) {
+  if (!run.started_at) return false;
+  const { data: goal } = await db
+    .from("autonomous_goals")
+    .select("max_runtime_seconds")
+    .eq("id", run.goal_id)
+    .maybeSingle();
+  const maxSeconds = Number(goal?.max_runtime_seconds ?? 0);
+  if (!Number.isFinite(maxSeconds) || maxSeconds <= 0) return false;
+  const started = new Date(run.started_at).getTime();
+  if (!Number.isFinite(started) || Date.now() - started <= maxSeconds * 1000) return false;
+
+  const now = new Date().toISOString();
+  if (run.workflow_run_id) {
+    await db.from("workflow_runs")
+      .update({
+        cancel_requested: true,
+        worker_error: "Autonomous run exceeded its configured maximum runtime.",
+      })
+      .eq("id", run.workflow_run_id)
+      .in("status", ["queued", "running", "waiting_for_approval"]);
+  }
+  await db.from("autonomous_goal_runs")
+    .update({
+      status: "cancelled",
+      error: "Configured maximum runtime exceeded.",
+      completed_at: now,
+      heartbeat_at: now,
+    })
+    .eq("id", run.id)
+    .in("status", ACTIVE_AUTONOMOUS_STATES);
+  await db.from("autonomous_goal_fleet_assignments")
+    .update({ status: "cancelled" })
+    .eq("run_id", run.id)
+    .in("status", ACTIVE_AUTONOMOUS_STATES);
+  await writeEvent(db, {
+    goalId: run.goal_id,
+    runId: run.id,
+    userId: run.user_id,
+    eventType: "runtime_limit_reached",
+    severity: "warning",
+    message: "Blackstar stopped this autonomous run because it exceeded the configured maximum runtime.",
+    payload: { max_runtime_seconds: maxSeconds, workflow_run_id: run.workflow_run_id },
+  });
+  return true;
 }
 
 async function hasActiveGoalRun(db: Sb, goalId: string) {
@@ -307,7 +406,7 @@ export async function reconcileAutonomousGoalRuns(dbOverride?: Sb) {
   const db = dbOverride ?? (await admin());
   const { data: active, error } = await db
     .from("autonomous_goal_runs")
-    .select("id,goal_id,user_id,status,workflow_run_id")
+    .select("id,goal_id,user_id,status,workflow_run_id,started_at")
     .in("status", ["queued", "running", "waiting_for_approval"])
     .not("workflow_run_id", "is", null)
     .order("created_at", { ascending: true })
@@ -318,6 +417,10 @@ export async function reconcileAutonomousGoalRuns(dbOverride?: Sb) {
   let completed = 0;
   let failed = 0;
   for (const run of (active ?? []) as AutonomousRunRow[]) {
+    if (await enforceRunRuntimeLimit(db, run)) {
+      updated += 1;
+      continue;
+    }
     const { data: workflowRun } = await db
       .from("workflow_runs")
       .select("id,status,error,worker_error,completed_at,worker_heartbeat_at")
@@ -402,9 +505,15 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
   let claimed = 0;
   let queued = 0;
   let deferred = 0;
+  let budgetPaused = 0;
   let failed = 0;
   for (const candidate of (candidates ?? []) as GoalRow[]) {
     if (claimed >= batch) break;
+    const budget = await enforceGoalBudget(db, candidate);
+    if (!budget.allowed) {
+      budgetPaused += 1;
+      continue;
+    }
     if (await hasActiveGoalRun(db, candidate.id)) {
       await deferBusyGoal(db, candidate);
       deferred += 1;
@@ -429,5 +538,5 @@ export async function processDueAutonomousGoals(limit = 1, dbOverride?: Sb) {
       failed += 1;
     }
   }
-  return { claimed, queued, deferred, failed, reconciliation };
+  return { claimed, queued, deferred, budget_paused: budgetPaused, failed, reconciliation };
 }
