@@ -25,6 +25,14 @@ describe("Groq model gateway", () => {
     expect(resolveModel("groq", null)).toBe("openai/gpt-oss-120b");
   });
 
+  it("rejects retired Compound identifiers before execution", () => {
+    expect(isRetiredGroqModel("groq/compound")).toBe(true);
+    expect(isRetiredGroqModel("groq/compound-mini")).toBe(true);
+    expect(isRetiredGroqModel("compound-beta")).toBe(true);
+    expect(() => resolveModel("groq", "groq/compound")).toThrow(ProviderError);
+    expect(() => resolveModel("groq", "openai/gpt-oss-120b")).not.toThrow();
+  });
+
   it("prefers Groq when GROQ_API_KEY is configured and no provider is selected", () => {
     process.env["GROQ_API_KEY"] = "test-groq-key";
     process.env["OPENAI_API_KEY"] = "test-openai-key";
