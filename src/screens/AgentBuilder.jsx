@@ -21,6 +21,15 @@ const DEFAULT_CONFIG = {
   tools: ['web_search', 'web_fetch', 'file_analysis', 'memory_search'],
   memory: ['short', 'long', 'project'],
   permissions: ['read', 'write', 'execute'],
+  identity: {
+    skin: 'violet-core',
+    avatarStyle: 'core',
+    presentationStyle: 'professional',
+    voiceStyle: 'neutral',
+    tagline: '',
+    humanised: false,
+    disclosure: 'AI agent',
+  },
 };
 
 export default function AgentBuilder() {
@@ -53,6 +62,7 @@ export default function AgentBuilder() {
       reasoning: config.reasoning,
       memory_types: config.memory || [],
       permissions: config.permissions || [],
+      identity: config.identity,
     },
     status,
   });

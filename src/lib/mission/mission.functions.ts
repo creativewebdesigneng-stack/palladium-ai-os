@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { normaliseAgentIdentity } from "@/lib/agents/agent-identity";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import {
@@ -358,6 +359,14 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
       );
       allowedProviders = requestedProviders.filter((provider) => connectedProviders.has(provider));
     }
+    const rawPreferences = data.preferences && typeof data.preferences === "object" && !Array.isArray(data.preferences)
+      ? data.preferences
+      : {};
+    const preferences = {
+      ...rawPreferences,
+      identity: normaliseAgentIdentity((rawPreferences as Record<string, unknown>)["identity"]),
+    };
+
     const row = {
       user_id: userId,
       name: data.name.trim(),
@@ -365,7 +374,7 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
       purpose: data.purpose ?? null,
       personality: data.personality ?? "professional",
       instructions: data.instructions ?? null,
-      preferences: data.preferences ?? {},
+      preferences,
       budget_limit: data.budget_limit ?? null,
       currency: data.currency ?? "GBP",
       allowed_tools: tools,

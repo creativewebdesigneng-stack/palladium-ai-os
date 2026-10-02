@@ -6,7 +6,9 @@ import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Wrench, Shield, User, MessageSquare, MemoryStick, BadgeCheck } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { WIZARD_MODELS, WIZARD_TOOLS, AVATAR_COLORS, DEPARTMENTS } from '@/components/agents/agentsData';
+import { WIZARD_MODELS, WIZARD_TOOLS, DEPARTMENTS } from '@/components/agents/agentsData';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
+import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES } from '@/lib/agents/agent-identity';
 
 const STEPS = [
   ['identity', 'Identity', User],
@@ -40,7 +42,16 @@ function splitList(value) {
 export default function AgentWizard() {
   const [step, setStep] = useState(0);
   const [d, setD] = useState({
-    name: '', desc: '', letter: 'A', color: AVATAR_COLORS[0], dept: 'Research',
+    name: '', desc: '', letter: 'A', dept: 'Research',
+    identity: {
+      skin: 'violet-core',
+      avatarStyle: 'core',
+      presentationStyle: 'professional',
+      voiceStyle: 'neutral',
+      tagline: '',
+      humanised: false,
+      disclosure: 'AI agent',
+    },
     model: 'gpt',
     role: '', goals: '', rules: '', behaviour: '', personality: '',
     mem: { long: true, short: true, history: false, kb: true },
@@ -55,6 +66,7 @@ export default function AgentWizard() {
   const [creating, setCreating] = useState(false);
   const set = (patch) => setD(p => ({ ...p, ...patch }));
   const setMem = (k) => setD(p => ({ ...p, mem: { ...p.mem, [k]: !p.mem[k] } }));
+  const setIdentity = (key, value) => setD(p => ({ ...p, identity: { ...p.identity, [key]: value, disclosure: 'AI agent' } }));
   const setPerm = (k) => setD(p => ({ ...p, perms: { ...p.perms, [k]: !p.perms[k] } }));
   const toggleTool = (id) => setD(p => ({ ...p, tools: p.tools.includes(id) ? p.tools.filter(t => t !== id) : [...p.tools, id] }));
   const next = () => setStep(s => Math.min(s + 1, STEPS.length - 1));
@@ -118,7 +130,7 @@ export default function AgentWizard() {
           skills_registry: skillsRegistry,
           verification_required: true,
         },
-        preferences: { grad: d.color, letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality },
+        preferences: { letter: d.letter, category: d.dept, memory: d.mem, perms: d.perms, role: d.role, goals: d.goals, rules: d.rules, behaviour: d.behaviour, personality: d.personality, identity: d.identity },
       });
       const id = persistedAgentId(result);
       if (!id) {
@@ -160,17 +172,39 @@ export default function AgentWizard() {
         <div className="rounded-2xl border border-white/10 bg-white/[.035] p-6">
           {step === 0 && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
-                <div className={`grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br ${d.color} text-lg font-semibold text-white`}>{d.letter || 'A'}</div>
-                <div className="text-xs text-zinc-400">Live preview of your agent avatar</div>
+              <div className="flex items-center gap-3 rounded-2xl border border-violet-300/15 bg-black/25 p-4">
+                <AgentIdentityAvatar name={d.name || 'New agent'} identity={d.identity} size="lg" showDisclosure />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white">{d.identity.tagline || 'Design this AI agent’s identity'}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-zinc-500">Skins, avatar style and presentation change how the agent appears and communicates. They never change tools, approvals or autonomy.</p>
+                </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Agent name"><input value={d.name} onChange={e => set({ name: e.target.value, letter: (e.target.value[0] || 'A').toUpperCase() })} placeholder="e.g. Research Analyst" className={inputCls} /></Field>
                 <Field label="Department"><select value={d.dept} onChange={e => set({ dept: e.target.value })} className={inputCls}>{DEPARTMENTS.map(x => <option key={x}>{x}</option>)}</select></Field>
               </div>
               <Field label="Description"><textarea value={d.desc} onChange={e => set({ desc: e.target.value })} placeholder="What does this agent do?" className={`${areaCls} h-20`} /></Field>
-              <Field label="Avatar letter"><input value={d.letter} maxLength={2} onChange={e => set({ letter: e.target.value.toUpperCase() })} className={inputCls} /></Field>
-              <Field label="Avatar colour"><div className="flex flex-wrap gap-2">{AVATAR_COLORS.map(c => <button key={c} onClick={() => set({ color: c })} className={`h-9 w-9 rounded-xl bg-gradient-to-br ${c} ${d.color === c ? 'ring-2 ring-white' : ''}`} />)}</div></Field>
+              <Field label="Skin">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {AGENT_SKINS.map(skin => (
+                    <button key={skin.id} type="button" onClick={() => setIdentity('skin', skin.id)} className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${d.identity.skin === skin.id ? 'border-violet-300/35 bg-violet-400/[.08]' : 'border-white/10 bg-black/20 hover:bg-white/[.04]'}`}>
+                      <span className="h-8 w-8 rounded-lg border border-white/10" style={{ background: `linear-gradient(145deg,${skin.from},${skin.to})` }} />
+                      <span className="text-[10px] text-zinc-300">{skin.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Avatar style">
+                <div className="flex flex-wrap gap-2">{AGENT_AVATAR_STYLES.map(item => <button key={item.id} type="button" onClick={() => setIdentity('avatarStyle', item.id)} className={`rounded-full border px-3 py-1.5 text-[10px] transition ${d.identity.avatarStyle === item.id ? 'border-violet-300/35 bg-violet-400/[.1] text-violet-100' : 'border-white/10 text-zinc-500 hover:text-zinc-300'}`}>{item.label}</button>)}</div>
+              </Field>
+              <Field label="Presentation style">
+                <div className="grid gap-2 sm:grid-cols-2">{AGENT_PRESENTATION_STYLES.map(item => <button key={item.id} type="button" onClick={() => setIdentity('presentationStyle', item.id)} className={`rounded-xl border p-2.5 text-left transition ${d.identity.presentationStyle === item.id ? 'border-violet-300/30 bg-violet-400/[.07]' : 'border-white/10 bg-black/20 hover:bg-white/[.04]'}`}><p className="text-[11px] font-medium text-white">{item.label}</p><p className="mt-1 text-[9px] leading-4 text-zinc-600">{item.description}</p></button>)}</div>
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Voice style"><select value={d.identity.voiceStyle} onChange={e => setIdentity('voiceStyle', e.target.value)} className={inputCls}>{AGENT_VOICE_STYLES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
+                <Field label="Identity tagline"><input value={d.identity.tagline} maxLength={140} onChange={e => setIdentity('tagline', e.target.value)} placeholder="Your calm operations analyst" className={inputCls} /></Field>
+              </div>
+              <Toggle label="Humanised presentation" desc="Use a more person-like presentation while always retaining the AI-agent disclosure." on={d.identity.humanised} onToggle={() => setIdentity('humanised', !d.identity.humanised)} />
             </div>
           )}
 
@@ -257,6 +291,7 @@ export default function AgentWizard() {
                   <p><span className="text-zinc-600">Skills:</span> {splitList(d.skills).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Connectors:</span> {splitList(d.connectors).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Memory:</span> {Object.entries(d.mem).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}</p>
+                  <p><span className="text-zinc-600">Identity:</span> {d.identity.presentationStyle} · {d.identity.voiceStyle} voice · <span className="font-semibold text-violet-300/70">AI agent</span></p>
                 </div>
               </div>
             </div>

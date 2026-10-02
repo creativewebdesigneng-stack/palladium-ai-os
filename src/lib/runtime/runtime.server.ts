@@ -10,6 +10,7 @@
  * time-boxed and retried, and every failure path closes the task row.
  */
 import { writeAudit } from "@/lib/platform/audit.server";
+import { agentIdentityFromPreferences, identityPromptInstruction } from "@/lib/agents/agent-identity";
 import { captureCompletedAgentRunMemory } from "./agent-run-memory.server";
 import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
 import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
@@ -64,6 +65,7 @@ export type Agent = {
   autonomy: string | null;
   status: string | null;
   category: string | null;
+  preferences?: Record<string, unknown> | null;
 };
 
 export class RuntimeError extends Error {
@@ -106,8 +108,10 @@ async function loadAgent(sb: Sb, agentId: string): Promise<Agent> {
 
 async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMessage[]> {
   const system: string[] = [
-    `You are ${agent.name}, an autonomous agent inside PalladiumAI, the operator's AI workforce OS.`,
+    `You are ${agent.name}, an AI agent inside Blackstar, the operator's bounded intelligence infrastructure.`,
   ];
+  const identity = agentIdentityFromPreferences(agent.preferences);
+  system.push(identityPromptInstruction(identity));
   if (agent.description) system.push(`About you: ${agent.description}`);
   if (agent.purpose) system.push(`Your purpose: ${agent.purpose}`);
   if (agent.personality) system.push(`Personality and tone: ${agent.personality}`);

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { Bot, Building2, Network, Workflow } from 'lucide-react';
+import { Building2, Network, Workflow } from 'lucide-react';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 const LIVE_TASKS=new Set(['running','queued','waiting_for_approval','awaiting_approval']);
 
@@ -22,11 +23,11 @@ export default function WorkforceConstellation({ agents=[], tasks=[], teams=[] }
       </motion.div>
       <div className="hidden md:block">
         {nodes.map((agent,index)=>{const angle=(index/Math.max(nodes.length,1))*Math.PI*2;const left=50+Math.cos(angle)*37;const top=50+Math.sin(angle)*37;const executing=activeIds.has(agent.id);return <motion.div key={agent.id} className={'absolute w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-xl border p-3 backdrop-blur-xl '+(executing?'border-cyan-300/25 bg-cyan-300/[.06]':'border-white/10 bg-black/70')} style={{left:left+'%',top:top+'%'}} animate={reduced||!executing?undefined:{y:[0,-5,0],boxShadow:['0 0 0 rgba(34,211,238,0)','0 0 24px rgba(34,211,238,.14)','0 0 0 rgba(34,211,238,0)']}} transition={reduced||!executing?undefined:{duration:3.4+(index%3),repeat:Infinity,delay:index*.1}}>
-          <div className="flex items-center gap-2"><Bot className={executing?'h-3.5 w-3.5 text-cyan-200':'h-3.5 w-3.5 text-violet-200'}/><p className="min-w-0 flex-1 truncate text-[9px] font-medium text-white">{agent.name}</p><span className={'h-1.5 w-1.5 rounded-full '+(executing?'bg-cyan-300':'bg-zinc-700')}/></div><p className="mt-1 truncate text-[8px] uppercase tracking-[.1em] text-zinc-600">{executing?'executing':'ready'} · {agent.status}</p>
+          <div className="flex items-center gap-2"><AgentIdentityAvatar name={agent.name} identity={agent.identity} size="sm" /><div className="min-w-0 flex-1"><p className="truncate text-[9px] font-medium text-white">{agent.name}</p><p className="truncate text-[7px] font-semibold uppercase tracking-[.12em] text-zinc-700">AI agent</p></div><span className={'h-1.5 w-1.5 rounded-full '+(executing?'bg-cyan-300':'bg-zinc-700')}/></div><p className="mt-1 truncate text-[8px] uppercase tracking-[.1em] text-zinc-600">{executing?'executing':'ready'} · {agent.status}</p>
         </motion.div>;})}
       </div>
       <div className="grid gap-2 md:hidden">
-        {nodes.map((agent)=>{const executing=activeIds.has(agent.id);return <div key={agent.id} className="rounded-xl border border-white/10 bg-black/45 p-3"><div className="flex items-center gap-2"><Bot className={executing?'h-4 w-4 text-cyan-200':'h-4 w-4 text-violet-200'}/><span className="min-w-0 flex-1 truncate text-xs text-white">{agent.name}</span><span className="text-[9px] uppercase text-zinc-500">{executing?'executing':agent.status}</span></div></div>;})}
+        {nodes.map((agent)=>{const executing=activeIds.has(agent.id);return <div key={agent.id} className="rounded-xl border border-white/10 bg-black/45 p-3"><div className="flex items-center gap-2"><AgentIdentityAvatar name={agent.name} identity={agent.identity} size="sm" /><span className="min-w-0 flex-1 truncate text-xs text-white">{agent.name}<span className="ml-1.5 text-[8px] font-semibold uppercase tracking-[.12em] text-zinc-700">AI</span></span><span className="text-[9px] uppercase text-zinc-500">{executing?'executing':agent.status}</span></div></div>;})}
         {!nodes.length&&<div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-zinc-500">Deploy an agent to bring the workforce constellation online.</div>}
       </div>
     </div>

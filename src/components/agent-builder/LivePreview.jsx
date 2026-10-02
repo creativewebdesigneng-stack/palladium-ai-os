@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2, AlertTriangle } from 'lucide-react';
+import { Send, Brain, Wrench, CheckCircle2, Bot, User, Activity, MessageSquare, Loader2, AlertTriangle } from 'lucide-react';
 import { streamAgentRun } from '@/lib/runtime/run-client';
+import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 /**
  * Real agent test console. Runs the saved agent through the production runtime —
@@ -98,8 +99,12 @@ export default function LivePreview({ config, agentId }) {
             <I className="h-3.5 w-3.5" />{label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] text-zinc-400">
-          <Bot className="h-3.5 w-3.5 text-violet-400" />{config.model || 'No model'}
+        <div className="ml-auto flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-2 py-1">
+          <AgentIdentityAvatar name={config.name} identity={config.identity} size="sm" />
+          <div className="min-w-0">
+            <p className="max-w-36 truncate text-[10px] font-medium text-zinc-300">{config.name || 'Agent'}</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[.14em] text-zinc-700">AI agent · {config.model || 'No model'}</p>
+          </div>
         </div>
       </div>
 
@@ -117,11 +122,12 @@ export default function LivePreview({ config, agentId }) {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.length === 0 && !running && (
               <div className="grid place-items-center py-10 text-center">
-                <Bot className="h-6 w-6 text-zinc-600" />
-                <p className="mt-2 text-xs text-zinc-400">{agentId ? 'Send a task to run this agent for real.' : 'Save this agent to run a real test.'}</p>
+                <AgentIdentityAvatar name={config.name} identity={config.identity} size="lg" showDisclosure />
+                <p className="mt-3 text-xs text-zinc-400">{agentId ? 'Send a task to run this agent for real.' : 'Save this agent to run a real test.'}</p>
+                {config.identity?.tagline && <p className="mt-1 text-[10px] text-zinc-600">{config.identity.tagline}</p>}
               </div>
             )}
-            {messages.map((m, i) => <Message key={i} m={m} />)}
+            {messages.map((m, i) => <Message key={i} m={m} config={config} />)}
             {running && (
               <div className="flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /> Agent is thinking…</div>
             )}
@@ -139,7 +145,7 @@ export default function LivePreview({ config, agentId }) {
   );
 }
 
-function Message({ m }) {
+function Message({ m, config }) {
   if (m.role === 'user') {
     return (
       <div className="flex justify-end gap-2">
@@ -150,7 +156,7 @@ function Message({ m }) {
   }
   return (
     <div className="flex gap-2">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600"><Sparkles className="h-3.5 w-3.5 text-white" /></span>
+      <AgentIdentityAvatar name={config.name} identity={config.identity} size="sm" />
       <div className="max-w-[85%] space-y-2">
         {m.steps && (
           <div className="space-y-1.5">
