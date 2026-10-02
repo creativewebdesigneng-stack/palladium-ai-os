@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, CheckCircle2, TrendingUp, Wrench, Plug, Brain, BookOpen, ShieldCheck, Activity, FolderKanban, Bot } from 'lucide-react';
+import { X, Clock, CheckCircle2, TrendingUp, Wrench, Plug, Brain, BookOpen, ShieldCheck, Activity, FolderKanban, Bot, BadgeCheck, AlertTriangle, Loader2 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { STATUS_STYLE, PROFILE_TABS, TASK_STATUS_STYLE, PRIORITY_STYLE, TOOL_ICON } from './wfData';
+import { useServerFn } from '@tanstack/react-start';
+import { getAgentBusinessCertification } from '@/lib/agents/agent-business-certification.functions';
 
 export default function AgentProfileDrawer({ agent, onClose }) {
   const [tab, setTab] = useState('overview');
@@ -55,6 +57,7 @@ export default function AgentProfileDrawer({ agent, onClose }) {
               {tab === 'integrations' && <Integrations agent={agent} />}
               {tab === 'performance' && <Performance agent={agent} />}
               {tab === 'activity' && <ActivityTab agent={agent} />}
+              {tab === 'certification' && <BusinessCertification agent={agent} />}
               {tab === 'permissions' && <Permissions agent={agent} />}
             </motion.div>
           </AnimatePresence>
@@ -233,4 +236,98 @@ function Permissions({ agent }) {
       ))}
     </div>
   );
+}
+
+const CERT_STYLE = {
+  verified: 'border-emerald-300/20 bg-emerald-400/[.06] text-emerald-200',
+  building_evidence: 'border-violet-300/20 bg-violet-400/[.06] text-violet-200',
+  ready_for_evidence: 'border-cyan-300/20 bg-cyan-400/[.06] text-cyan-200',
+  attention_required: 'border-amber-300/20 bg-amber-400/[.06] text-amber-200',
+  not_configured: 'border-white/10 bg-white/[.025] text-zinc-500',
+};
+
+function BusinessCertification({ agent }) {
+  const getCertification = useServerFn(getAgentBusinessCertification);
+  const [state, setState] = useState({ loading: true, error: '', data: null });
+
+  useEffect(() => {
+    let alive = true;
+    if (!/^[0-9a-f-]{36}$/i.test(String(agent?.id || ''))) {
+      setState({ loading: false, error: 'Certification evidence is available for saved Blackstar agents.', data: null });
+      return () => { alive = false; };
+    }
+    setState({ loading: true, error: '', data: null });
+    getCertification({ data: { agentId: agent.id } })
+      .then((data) => { if (alive) setState({ loading: false, error: '', data }); })
+      .catch((error) => { if (alive) setState({ loading: false, error: error?.message || 'Certification evidence could not be loaded.', data: null }); });
+    return () => { alive = false; };
+  }, [agent?.id, getCertification]);
+
+  if (state.loading) return <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-xs text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Loading runtime certification evidence…</div>;
+  if (state.error) return <div className="flex items-start gap-2 rounded-xl border border-amber-300/15 bg-amber-400/[.05] p-4 text-xs text-amber-100/80"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{state.error}</div>;
+
+  const data = state.data;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[.035] p-4">
+        <div className="flex items-center gap-2"><BadgeCheck className="h-4 w-4 text-violet-300" /><p className="text-xs font-semibold text-white">Blackstar business capability certification</p></div>
+        <p className="mt-1 text-[10px] leading-4 text-zinc-500">Verification requires 3 completed runtime tasks with verifier evidence averaging at least 0.90, plus tool/provider/approval evidence where the capability needs it. Certification never grants new permissions.</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Stat label="Verified" value={String(data.summary.verified)} icon={CheckCircle2} />
+          <Stat label="Building" value={String(data.summary.building + data.summary.ready)} icon={Activity} />
+          <Stat label="Attention" value={String(data.summary.attention)} icon={AlertTriangle} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        {data.capabilities.map((capability) => {
+          const benchmarks = data.benchmarks.filter((benchmark) => benchmark.capability === capability.id);
+          return (
+          <div key={capability.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-white">{capability.title}</p>
+                <p className="mt-1 text-[10px] leading-4 text-zinc-600">{capability.description}</p>
+              </div>
+              <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.1em] ${CERT_STYLE[capability.status] || CERT_STYLE.not_configured}`}>{capability.status.replaceAll('_', ' ')}</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MiniEvidence label="Verified tasks" value={`${capability.verifiedTasks}/${capability.requiredVerifiedTasks}`} />
+              <MiniEvidence label="Avg score" value={capability.recentAverageScore == null ? '—' : capability.recentAverageScore.toFixed(2)} />
+              <MiniEvidence label="Tool successes" value={String(capability.successfulToolExecutions)} />
+              <MiniEvidence label="Tool failures" value={String(capability.failedToolExecutions)} />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              <EvidencePill ok={capability.approvalBoundaryObserved} label="Approval boundary" />
+              <EvidencePill ok={capability.connectedProviderObserved} label="Provider evidence" />
+            </div>
+            {capability.notes.length > 0 && <p className="mt-2 text-[9px] leading-4 text-zinc-600">{capability.notes.join(' ')}</p>}
+            {benchmarks.length > 0 && (
+              <details className="mt-3 rounded-xl border border-white/[.06] bg-white/[.015] p-2">
+                <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-600">Certification benchmarks · {benchmarks.length}</summary>
+                <div className="mt-2 space-y-2">
+                  {benchmarks.map((benchmark) => (
+                    <div key={benchmark.id} className="rounded-lg border border-white/[.05] bg-black/20 p-2">
+                      <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-medium text-zinc-300">{benchmark.title}</p><span className="text-[8px] uppercase tracking-[.1em] text-zinc-700">{benchmark.kind.replace('_', ' ')}</span></div>
+                      <p className="mt-1 text-[9px] leading-4 text-zinc-600">{benchmark.objective}</p>
+                      <p className="mt-1 text-[8px] text-zinc-700">External side effect: {benchmark.externalSideEffect === 'approval_only' ? 'approval request only' : 'none'}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+          );
+        })}
+      </div>
+      <p className="text-[9px] leading-4 text-zinc-700">Financial certification is research/simulation/governed-workflow certification only. Blackstar agents are not certified for unrestricted autonomous movement of user funds.</p>
+    </div>
+  );
+}
+
+function MiniEvidence({ label, value }) {
+  return <div className="rounded-xl border border-white/[.06] bg-white/[.02] p-2"><p className="text-[8px] uppercase tracking-[.12em] text-zinc-700">{label}</p><p className="mt-1 text-[11px] font-medium text-zinc-300">{value}</p></div>;
+}
+
+function EvidencePill({ ok, label }) {
+  return <span className={`rounded-full border px-2 py-0.5 text-[8px] font-medium ${ok ? 'border-emerald-300/10 bg-emerald-400/[.05] text-emerald-300/70' : 'border-white/[.06] bg-white/[.02] text-zinc-700'}`}>{ok ? '✓' : '○'} {label}</span>;
 }
