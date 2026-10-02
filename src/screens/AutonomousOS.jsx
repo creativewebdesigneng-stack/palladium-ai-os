@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BrainCircuit, Pause, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
+import { Activity, BrainCircuit, Pause, Play, Plus, Power, RefreshCw, ShieldCheck, Sparkles, Square, TimerReset, Users } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
@@ -9,6 +9,7 @@ import { createAutonomousGoal, listAutonomousGoals, listAutonomousGoalRuns, list
 import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-actions.functions';
 import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-approval.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
+import { getAutonomousRuntimeControlPlane, setAutonomousRuntimeEnabled } from '@/lib/runtime/autonomous-control-plane.functions';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
@@ -45,6 +46,8 @@ export default function AutonomousOS() {
   const createFn = useServerFn(createAutonomousGoal);
   const runFn = useServerFn(queueAutonomousGoalNow);
   const controlFn = useServerFn(controlAutonomousGoal);
+  const controlPlaneFn = useServerFn(getAutonomousRuntimeControlPlane);
+  const masterControlFn = useServerFn(setAutonomousRuntimeEnabled);
   const recommendFn = useServerFn(recommendBlackstarOpportunityActions);
   const [draft, setDraft] = useState(emptyDraft);
 
@@ -58,11 +61,29 @@ export default function AutonomousOS() {
     refetchInterval: 15000,
     retry: 1,
   });
+  const controlPlaneQuery = useQuery({
+    queryKey: ['autonomous-runtime-control-plane'],
+    queryFn: () => controlPlaneFn(),
+    enabled: session === 'yes',
+    refetchInterval: 10000,
+    retry: 1,
+  });
   const opportunitiesQuery = useQuery({ queryKey: ['autonomous-os-opportunities'], queryFn: () => recommendFn({ data: { maximumRecommendations: 6 } }), enabled: session === 'yes', refetchInterval: 30000, retry: 1 });
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] }); qc.invalidateQueries({ queryKey: ['autonomous-os-opportunities'] }); };
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['autonomous-os-goals'] });
+    qc.invalidateQueries({ queryKey: ['autonomous-os-opportunities'] });
+    qc.invalidateQueries({ queryKey: ['autonomous-runtime-control-plane'] });
+  };
   const createGoal = useMutation({ mutationFn: (data) => createFn({ data }), onSuccess: () => { setDraft(emptyDraft()); refresh(); } });
   const runGoal = useMutation({ mutationFn: (id) => runFn({ data: { id } }), onSettled: refresh });
   const controlGoal = useMutation({ mutationFn: ({ id, action }) => controlFn({ data: { id, action } }), onSettled: refresh });
+  const masterControl = useMutation({
+    mutationFn: (enabled) => masterControlFn({ data: {
+      enabled,
+      reason: enabled ? null : 'Operator engaged the Autonomous OS master stop from the control plane.',
+    } }),
+    onSettled: refresh,
+  });
 
   const data = goalsQuery.data ?? { goals: [], runs: [], events: [], fleets: [] };
   const latestRun = useMemo(() => {
@@ -140,12 +161,37 @@ export default function AutonomousOS() {
       </section>
 
       <section className="rounded-[28px] border border-white/10 bg-white/[.02] p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Runtime posture</p><h3 className="mt-1 text-lg font-semibold text-white">Agent fleet control</h3></div><button onClick={() => goalsQuery.refetch()} className="rounded-lg border border-white/10 p-2 text-white/45 hover:text-white"><RefreshCw className={`h-4 w-4 ${goalsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.goals?.filter((g) => g.status === 'active').length ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.runs?.filter((r) => ['queued','planning','running','waiting_for_approval'].includes(r.status)).length ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Runtime posture</p><h3 className="mt-1 text-lg font-semibold text-white">Always-on control plane</h3></div>
+          <button onClick={() => { goalsQuery.refetch(); controlPlaneQuery.refetch(); }} className="rounded-lg border border-white/10 p-2 text-white/45 hover:text-white"><RefreshCw className={`h-4 w-4 ${goalsQuery.isFetching || controlPlaneQuery.isFetching ? 'animate-spin' : ''}`} /></button>
         </div>
-        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing agent tool grants, memory boundaries, approvals and workforce verification remain authoritative. Manual, scheduled, event-triggered and continuous runs all hand execution to the same durable workflow worker.</div>
+        <div className={`mt-4 rounded-2xl border p-4 ${controlPlaneQuery.data?.control?.enabled === false ? 'border-rose-300/20 bg-rose-300/[.05]' : 'border-emerald-300/15 bg-emerald-300/[.035]'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className={`grid h-10 w-10 place-items-center rounded-xl ${controlPlaneQuery.data?.control?.enabled === false ? 'bg-rose-400/10 text-rose-200' : 'bg-emerald-400/10 text-emerald-200'}`}><Power className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">{controlPlaneQuery.data?.control?.enabled === false ? 'Master stop engaged' : 'Autonomous runtime enabled'}</p>
+              <p className="mt-1 text-[10px] leading-4 text-white/35">{controlPlaneQuery.data?.control?.enabled === false ? (controlPlaneQuery.data?.control?.stopReason || 'No new autonomous run may be claimed or manually queued.') : 'Scheduled, continuous, event and manual autonomous goals may enter the governed queue.'}</p>
+            </div>
+            <button
+              disabled={masterControl.isPending || controlPlaneQuery.isLoading}
+              onClick={() => masterControl.mutate(controlPlaneQuery.data?.control?.enabled === false)}
+              className={`rounded-xl border px-3 py-2 text-xs font-semibold disabled:opacity-40 ${controlPlaneQuery.data?.control?.enabled === false ? 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-100' : 'border-rose-300/20 bg-rose-300/[.06] text-rose-100'}`}
+            >{masterControl.isPending ? 'Applying…' : controlPlaneQuery.data?.control?.enabled === false ? 'Restore autonomous runtime' : 'Engage master stop'}</button>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <RuntimeMetric icon={Users} label="Active goals" value={controlPlaneQuery.data?.health?.activeGoals ?? 0} />
+          <RuntimeMetric icon={Activity} label="Live autonomous runs" value={controlPlaneQuery.data?.health?.activeAutonomousRuns ?? 0} />
+          <RuntimeMetric icon={TimerReset} label="Due goals" value={controlPlaneQuery.data?.health?.dueGoals ?? 0} />
+          <RuntimeMetric icon={Activity} label="Live workflow runs" value={controlPlaneQuery.data?.health?.activeWorkflowRuns ?? 0} />
+          <RuntimeMetric icon={ShieldCheck} label="Cancel requested" value={controlPlaneQuery.data?.health?.cancellationRequested ?? 0} />
+          <RuntimeMetric icon={TimerReset} label="Stale workflows" value={controlPlaneQuery.data?.health?.staleWorkflowRuns ?? 0} warn={(controlPlaneQuery.data?.health?.staleWorkflowRuns ?? 0) > 0} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/30">
+          <span>Latest worker heartbeat: {when(controlPlaneQuery.data?.health?.latestHeartbeat) || 'none active'}</span>
+          <span>Scheduler errors: {controlPlaneQuery.data?.health?.schedulerErrors ?? 0}</span>
+        </div>
+        <div className="mt-4 rounded-2xl border border-emerald-300/12 bg-emerald-300/[.035] p-4 text-sm leading-6 text-white/55"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-300" />Existing tool grants, approvals, spend/runtime ceilings, durable queues and checkpoints remain authoritative. The master stop adds an operator-wide halt; it does not create a second scheduler.</div>
       </section>
     </div>
 
@@ -189,5 +235,13 @@ function OpportunityApprovalAction({ action, onSettled }) {
     <button disabled={approval.isPending} onClick={() => approval.mutate()} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/20 bg-amber-300/[.05] px-3 py-2 text-xs font-medium text-amber-100 disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />{approval.isPending ? 'Opening approval…' : 'Request Mission Control approval'}</button>
     {approval.data?.approvalRequestId && <p className="mt-2 text-[10px] text-emerald-200/70">Approval request opened in Mission Control. No action has executed.</p>}
     {approval.isError && <p className="mt-2 text-[10px] text-rose-300">{friendlyMessage(approval.error)}</p>}
+  </div>;
+}
+
+function RuntimeMetric({ icon: Icon, label, value, warn = false }) {
+  return <div className={`rounded-xl border p-3 ${warn ? 'border-amber-300/15 bg-amber-300/[.04]' : 'border-white/8 bg-black/20'}`}>
+    <Icon className={`h-4 w-4 ${warn ? 'text-amber-200' : 'text-cyan-300'}`} />
+    <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+    <p className="text-[10px] text-white/35">{label}</p>
   </div>;
 }
