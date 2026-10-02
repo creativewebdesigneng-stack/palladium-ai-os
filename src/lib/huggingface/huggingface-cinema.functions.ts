@@ -73,9 +73,9 @@ export const createHuggingFaceCinemaPreview = createServerFn({ method: 'POST' })
         userId: context.userId,
         jobId: created.data.id,
         prompt: data.prompt,
-        modelId: data.modelId,
+        ...(data.modelId ? { modelId: data.modelId } : {}),
         numFrames: data.numFrames,
-        seed: data.seed,
+        ...(data.seed !== undefined ? { seed: data.seed } : {}),
       })
       const now = new Date().toISOString()
       const updated = await sb.from('media_generation_jobs').update({
@@ -124,7 +124,7 @@ export const createHuggingFaceCinemaPreview = createServerFn({ method: 'POST' })
         action: 'cinema.huggingface_preview.failed',
         targetType: 'media_generation_job',
         targetId: created.data.id,
-        status: 'failure',
+        status: 'failed',
         metadata: { provider: 'huggingface', reason: message.slice(0, 300) },
       }).catch(() => undefined)
       throw error
