@@ -91,3 +91,83 @@ export const getGroqEvaluationStatus = createServerFn({ method: 'POST' })
       note: 'Evidence status is observational. It never changes model routing by itself.',
     }
   })
+
+
+const GROQ_RETIRED_MODEL_PREFIXES = [
+  'groq/compound',
+  'compound-beta',
+] as const
+
+function isRetiredGroqModel(id: string) {
+  const value = id.trim().toLowerCase()
+  return GROQ_RETIRED_MODEL_PREFIXES.some((prefix) => value.startsWith(prefix))
+}
+
+export const getGroqRuntimeIntelligence = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    limit: z.number().int().min(10).max(500).optional().default(200),
+  }).parse(input ?? {}))
+  .handler(async ({ data, context }) => {
+    const evaluation = await getGroqEvaluationStatus({
+      data: { limit: data.limit },
+      context,
+    } as any)
+
+    const apiKey = process.env['GROQ_API_KEY']?.trim()
+    if (!apiKey) {
+      return {
+        configured: false,
+        activeModels: [] as string[],
+        retiredModelsBlocked: [...GROQ_RETIRED_MODEL_PREFIXES],
+        evaluation,
+        note: 'Groq is not configured on this deployment. No routing recommendation is inferred.',
+      }
+    }
+
+    let activeModels: string[] = []
+    let catalogError: string | null = null
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!response.ok) {
+        catalogError = `Groq model catalogue returned HTTP ${response.status}.`
+      } else {
+        const payload = await response.json() as { data?: Array<{ id?: unknown; active?: unknown }> }
+        activeModels = (payload.data ?? [])
+          .map((row) => typeof row?.id === 'string' ? row.id : '')
+          .filter((id) => id && !isRetiredGroqModel(id))
+          .sort()
+      }
+    } catch (error) {
+      catalogError = error instanceof Error ? error.message : 'Groq model catalogue is unavailable.'
+    }
+
+    const qualifiedClasses = (evaluation.classes ?? [])
+      .filter((item) => item.qualified)
+      .map((item) => item.taskClass)
+
+    return {
+      configured: true,
+      activeModels,
+      catalogError,
+      retiredModelsBlocked: [...GROQ_RETIRED_MODEL_PREFIXES],
+      evaluation,
+      qualifiedClasses,
+      routingPolicy: {
+        providerNeutral: true,
+        evidenceRequired: true,
+        minimumSamplesPerClass: 20,
+        qualityFloor: 0.75,
+        toolUseFloor: 0.9,
+      },
+      note: qualifiedClasses.length
+        ? 'Groq is evidence-qualified only for the listed task classes. Other classes stay on normal provider-neutral routing.'
+        : 'Groq is configured, but no task class is evidence-qualified yet.',
+    }
+  })
