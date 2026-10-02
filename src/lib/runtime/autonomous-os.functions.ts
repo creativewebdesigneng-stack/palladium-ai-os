@@ -90,6 +90,172 @@ export const listAutonomousFleetAssignments = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const listAutonomousGoalEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data, error } = await sb
+      .from("autonomous_goal_events")
+      .select("id,goal_id,run_id,event_type,severity,message,payload,created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(120);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const getAutonomousOperationsHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const [goalsResult, runsResult, eventsResult] = await Promise.all([
+      sb.from("autonomous_goals")
+        .select("id,status,trigger_type,next_run_at,budget_pence,max_runtime_seconds")
+        .eq("user_id", context.userId),
+      sb.from("autonomous_goal_runs")
+        .select("id,goal_id,status,workflow_run_id,heartbeat_at,started_at,completed_at,created_at")
+        .eq("user_id", context.userId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      sb.from("autonomous_goal_events")
+        .select("event_type,severity,created_at")
+        .eq("user_id", context.userId)
+        .order("created_at", { ascending: false })
+        .limit(120),
+    ]);
+    if (goalsResult.error) throw new Error(goalsResult.error.message);
+    if (runsResult.error) throw new Error(runsResult.error.message);
+    if (eventsResult.error) throw new Error(eventsResult.error.message);
+
+    const goals = goalsResult.data ?? [];
+    const runs = runsResult.data ?? [];
+    const events = eventsResult.data ?? [];
+    const workflowIds = [...new Set(
+      runs.map((run: any) => run.workflow_run_id).filter(Boolean),
+    )];
+
+    let workflowRuns: any[] = [];
+    if (workflowIds.length) {
+      const { data, error } = await sb.from("workflow_runs")
+        .select("id,status,cost_pence,cancel_requested,worker_heartbeat_at,worker_error,created_at")
+        .in("id", workflowIds);
+      if (error) throw new Error(error.message);
+      workflowRuns = data ?? [];
+    }
+
+    const activeRunStates = new Set(["queued", "planning", "running", "waiting_for_approval"]);
+    const activeRuns = runs.filter((run: any) => activeRunStates.has(String(run.status)));
+    const staleBefore = Date.now() - 15 * 60 * 1000;
+    const staleRuns = activeRuns.filter((run: any) => {
+      const heartbeat = run.heartbeat_at ? new Date(run.heartbeat_at).getTime() : 0;
+      return heartbeat > 0 && heartbeat < staleBefore;
+    });
+    const recentFailureSince = Date.now() - 24 * 60 * 60 * 1000;
+    const recentFailures = runs.filter((run: any) =>
+      run.status === "failed" &&
+      new Date(run.completed_at ?? run.created_at).getTime() >= recentFailureSince,
+    );
+    const latestHeartbeat = activeRuns
+      .map((run: any) => run.heartbeat_at)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? null;
+    const spendPence = workflowRuns.reduce((sum: number, run: any) => {
+      const value = Number(run.cost_pence ?? 0);
+      return sum + (Number.isFinite(value) && value > 0 ? value : 0);
+    }, 0);
+    const guardrailEvents = events.filter((event: any) =>
+      event.event_type === "guardrail_cancel_requested",
+    ).length;
+
+    return {
+      activeGoals: goals.filter((goal: any) => goal.status === "active").length,
+      pausedGoals: goals.filter((goal: any) => goal.status === "paused").length,
+      continuousGoals: goals.filter((goal: any) => goal.status === "active" && goal.trigger_type === "continuous").length,
+      scheduledGoals: goals.filter((goal: any) => goal.status === "active" && goal.trigger_type === "schedule").length,
+      eventGoals: goals.filter((goal: any) => goal.status === "active" && goal.trigger_type === "event").length,
+      activeRuns: activeRuns.length,
+      waitingForApproval: activeRuns.filter((run: any) => run.status === "waiting_for_approval").length,
+      staleRuns: staleRuns.length,
+      recentFailures: recentFailures.length,
+      guardrailEvents,
+      observedCostPence: Math.round(spendPence),
+      latestHeartbeat,
+      workflowQueue: {
+        queued: workflowRuns.filter((run: any) => run.status === "queued").length,
+        running: workflowRuns.filter((run: any) => run.status === "running").length,
+        cancellationRequested: workflowRuns.filter((run: any) => run.cancel_requested === true).length,
+      },
+      health: staleRuns.length > 0 || recentFailures.length > 0 ? "attention" : "healthy",
+      note: "Health is derived from persisted owner-scoped scheduler, workflow and heartbeat evidence; it is not simulated.",
+    };
+  });
+
+export const emergencyStopAutonomousWork = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    confirm: z.literal(true),
+  }).parse(input))
+  .handler(async ({ context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const { data: activeGoals, error: goalError } = await sb.from("autonomous_goals")
+      .select("id,name")
+      .eq("user_id", context.userId)
+      .eq("status", "active");
+    if (goalError) throw new Error(goalError.message);
+
+    const now = new Date().toISOString();
+    const goalIds = (activeGoals ?? []).map((goal: any) => String(goal.id));
+    if (!goalIds.length) return { pausedGoals: 0, cancelledRuns: 0 };
+
+    const { data: activeRuns, error: runError } = await sb.from("autonomous_goal_runs")
+      .select("id,goal_id")
+      .eq("user_id", context.userId)
+      .in("goal_id", goalIds)
+      .in("status", ["planning", "queued", "running", "waiting_for_approval"]);
+    if (runError) throw new Error(runError.message);
+
+    const { error: pauseError } = await sb.from("autonomous_goals")
+      .update({
+        status: "paused",
+        next_run_at: null,
+        scheduler_claimed_at: null,
+        scheduler_lease_until: null,
+      })
+      .eq("user_id", context.userId)
+      .in("id", goalIds)
+      .eq("status", "active");
+    if (pauseError) throw new Error(pauseError.message);
+
+    const runIds = (activeRuns ?? []).map((run: any) => String(run.id));
+    if (runIds.length) {
+      const { error: cancelError } = await sb.from("autonomous_goal_runs")
+        .update({
+          status: "cancelled",
+          error: "Operator emergency stop requested.",
+          heartbeat_at: now,
+          completed_at: now,
+        })
+        .eq("user_id", context.userId)
+        .in("id", runIds)
+        .in("status", ["planning", "queued", "running", "waiting_for_approval"]);
+      if (cancelError) throw new Error(cancelError.message);
+    }
+
+    for (const goal of activeGoals ?? []) {
+      await sb.from("autonomous_goal_events").insert({
+        goal_id: goal.id,
+        user_id: context.userId,
+        event_type: "operator_emergency_stop",
+        severity: "warning",
+        message: "Operator paused all autonomous work and cancelled active runs.",
+        payload: { requested_at: now },
+      });
+    }
+
+    return { pausedGoals: goalIds.length, cancelledRuns: runIds.length };
+  });
+
 export const createAutonomousGoal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => createGoalInput.parse(input))
