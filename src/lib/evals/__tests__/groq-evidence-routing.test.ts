@@ -70,7 +70,7 @@ describe('Groq evidence-qualified routing', () => {
     expect(reconciliation).toContain('create table if not exists public.model_eval_runs')
     expect(reconciliation).toContain('create table if not exists public.model_eval_verified_evidence')
     expect(reconciliation).toContain('avg(scores.score)::numeric / 100')
-    expect(reconciliation).not.toContain('avg(scores.score)::numeric / 10')
+    expect(reconciliation).not.toMatch(/avg\(scores\.score\)::numeric \/ 10(?!0)/)
     expect(reconciliation).toContain('to service_role')
   })
 })
