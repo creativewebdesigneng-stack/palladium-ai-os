@@ -1,6 +1,6 @@
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-export type GameFoundryEngine = "generic" | "unity" | "unreal" | "godot" | "web" | "blender";
+export type GameFoundryEngine = "generic" | "unity" | "unreal" | "godot" | "web" | "blender" | "zmodeler";
 export type GameFoundryQuality = "prototype" | "game_ready" | "cinematic";
 export type AssetSourceKind = "prompt" | "image" | "model";
 
@@ -11,6 +11,7 @@ const ENGINE_EXPORTS: Record<GameFoundryEngine, string[]> = {
   godot: ["glb","gltf","obj"],
   web: ["glb","gltf"],
   blender: ["glb","gltf","fbx","obj","usd"],
+  zmodeler: ["fbx","obj"],
 };
 
 export const BLACKSTAR_HOSTED_3D_WORKER = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
@@ -34,6 +35,7 @@ function normalizeStatus(value: unknown) {
 
 export function preferredGameFoundryAssetFormat(targetEngine:GameFoundryEngine) {
   const custom=Boolean(cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]));
+  if (targetEngine === "zmodeler") return custom ? "fbx" : "obj";
   return custom && ["unity","unreal"].includes(targetEngine) ? "fbx" : "glb";
 }
 
@@ -61,11 +63,11 @@ export function getGameFoundryCapabilities() {
       exports: ENGINE_EXPORTS[id],
       integration:
         id === "generic" || id === "web" ? "export" :
-        id === "blender" ? "export-or-bridge" :
+        id === "blender" || id === "zmodeler" ? "export-or-bridge" :
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Prompt-to-3D and game-ready geometry processing use Blackstar-hosted execution by default. Blackstar's native game compiler produces bounded engine source and portable project packages without an external game worker; GAME_FOUNDRY_GAME_API_URL remains an optional external build lane. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
+    note: "Prompt-to-3D and game-ready geometry processing use Blackstar-hosted execution by default. Blackstar's native game compiler produces bounded engine source and portable project packages without an external game worker; GAME_FOUNDRY_GAME_API_URL remains an optional external build lane. ZModeler3 uses FBX/OBJ interchange and an optional configured bridge; Blackstar does not claim native .z3d generation. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
   };
 }
 

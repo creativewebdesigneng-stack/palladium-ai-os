@@ -141,7 +141,7 @@ async function compileNativeGameFoundryBuild(args:{
   };
 }
 
-const engine = z.enum(["generic","unity","unreal","godot","web","blender"]);
+const engine = z.enum(["generic","unity","unreal","godot","web","blender","zmodeler"]);
 const quality = z.enum(["prototype","game_ready","cinematic"]);
 const assetQuality = z.enum(["draft","game_ready","cinematic"]);
 const projectType = z.enum(["game","environment","character","prop","vehicle","asset_pack"]);
