@@ -82,11 +82,23 @@ describe("agent business capability certification", () => {
     expect(before?.status).not.toBe("verified");
     expect(before?.approvalBoundaryObserved).toBe(false);
 
-    const after = buildAgentBusinessCertification({
+    const oneBoundary = buildAgentBusinessCertification({
       ...base,
       approvals: [{ task_id: "t3", action_type: "purchase", status: "pending" }],
     }).find((item) => item.id === "governed_financial_workflows");
+    expect(oneBoundary?.status).toBe("building_evidence");
+    expect(oneBoundary?.verifiedTasks).toBe(1);
+
+    const after = buildAgentBusinessCertification({
+      ...base,
+      approvals: [
+        { task_id: "t1", action_type: "purchase", status: "pending" },
+        { task_id: "t2", action_type: "purchase", status: "pending" },
+        { task_id: "t3", action_type: "purchase", status: "pending" },
+      ],
+    }).find((item) => item.id === "governed_financial_workflows");
     expect(after?.status).toBe("verified");
+    expect(after?.verifiedTasks).toBe(3);
     expect(after?.approvalBoundaryObserved).toBe(true);
   });
 
