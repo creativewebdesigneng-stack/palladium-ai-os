@@ -169,7 +169,7 @@ export default function AutonomousOS() {
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Users className="h-5 w-5 text-violet-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.activeGoals ?? 0}</p><p className="text-xs text-white/35">Active persistent goals</p></div>
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><TimerReset className="h-5 w-5 text-cyan-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.activeRuns ?? 0}</p><p className="text-xs text-white/35">Queued / live governed runs</p></div>
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Activity className="h-5 w-5 text-emerald-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.staleRuns ?? 0}</p><p className="text-xs text-white/35">Stale-heartbeat runs</p></div>
+          <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><Activity className="h-5 w-5 text-emerald-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.staleRuns ?? 0}</p><p className="text-xs text-white/35">Stale workflows · Stale-heartbeat runs</p></div>
           <div className="rounded-2xl border border-white/8 bg-black/20 p-4"><AlertTriangle className="h-5 w-5 text-amber-300" /><p className="mt-3 text-2xl font-semibold text-white">{data.health?.guardrailEvents ?? 0}</p><p className="text-xs text-white/35">Recent guardrail stops</p></div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
