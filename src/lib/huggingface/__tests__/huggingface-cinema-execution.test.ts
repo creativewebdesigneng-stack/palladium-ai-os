@@ -57,7 +57,7 @@ describe('Hugging Face Cinema execution lane', () => {
   it('keeps output private and owner-signed in the source contract', () => {
     const server = readFileSync(new URL('../huggingface-cinema.server.ts', import.meta.url), 'utf8')
     const functions = readFileSync(new URL('../huggingface-cinema.functions.ts', import.meta.url), 'utf8')
-    const migration = readFileSync(new URL('../../../supabase/migrations/20261002174500_huggingface_cinema_execution.sql', import.meta.url), 'utf8')
+    const migration = readFileSync(new URL('../../../../supabase/migrations/20261002174500_huggingface_cinema_execution.sql', import.meta.url), 'utf8')
     const panel = readFileSync(new URL('../../../components/huggingface/HuggingFaceCinemaExecutionPanel.jsx', import.meta.url), 'utf8')
     const cinema = readFileSync(new URL('../../../screens/CinemaStudio.jsx', import.meta.url), 'utf8')
 
