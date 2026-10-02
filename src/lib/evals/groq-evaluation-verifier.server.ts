@@ -66,7 +66,14 @@ async function matchingGroqRuns(scope: Scope) {
     run?.judge_provider &&
     run.judge_provider !== 'groq',
   )
-  if (!tagged.length) return { model, runs: [] as any[] }
+  if (!tagged.length) {
+    return {
+      model,
+      runs: [] as any[],
+      responseByRun: new Map<string, any>(),
+      scoreByResponse: new Map<string, any>(),
+    }
+  }
 
   const runIds = tagged.map((run: any) => run.id)
   const [{ data: responses, error: responseError }, { data: scores, error: scoreError }] = await Promise.all([
@@ -86,7 +93,7 @@ async function matchingGroqRuns(scope: Scope) {
   for (const response of responses ?? []) {
     if (!responseByRun.has(String(response.run_id))) responseByRun.set(String(response.run_id), response)
   }
-  const scoreByResponse = new Map((scores ?? []).map((score: any) => [String(score.response_id), score]))
+  const scoreByResponse = new Map<string, any>((scores ?? []).map((score: any) => [String(score.response_id), score]))
 
   const verified = tagged.filter((run: any) => {
     const response = responseByRun.get(String(run.id))
