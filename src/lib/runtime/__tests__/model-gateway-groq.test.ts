@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { normaliseProvider, resolveModel } from "../model-gateway.server";
+import { ProviderError, isRetiredGroqModel, normaliseProvider, resolveModel } from "../model-gateway.server";
 
 const originalGroqKey = process.env["GROQ_API_KEY"];
 const originalOpenAiKey = process.env["OPENAI_API_KEY"];
