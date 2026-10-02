@@ -35,6 +35,15 @@ function mapAcceptanceResult(row: AcceptanceResultRow) {
   };
 }
 
+function scopeAcceptanceEvidenceQuery(key: string, query: any) {
+  if (key === "agentSkills") {
+    return query
+      .eq("source_kind", "builtin")
+      .like("source_ref", "blackstar-agent-procedures:v1:%");
+  }
+  return query;
+}
+
 export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -49,9 +58,11 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
     const [entries, resultResponse] = await Promise.all([
       Promise.all(
         Object.entries(ACCEPTANCE_EVIDENCE_TABLES).map(async ([key, table]) => {
-          const { count, error } = await scoped
-            .from(table)
-            .select("*", { count: "exact", head: true });
+          const query = scopeAcceptanceEvidenceQuery(
+            key,
+            scoped.from(table).select("*", { count: "exact", head: true }),
+          );
+          const { count, error } = await query;
 
           return [
             key,
@@ -84,7 +95,7 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
         resultRows.map((row) => [row.item_id, mapAcceptanceResult(row)]),
       ),
       evidenceRule:
-        "A non-zero record count means evidence exists for review. It does not automatically certify the acceptance item.",
+        "A non-zero scoped record count means relevant evidence exists for review. It does not automatically certify the acceptance item.",
       resultRule:
         "A recorded outcome documents the signed-in owner's acceptance decision. Verified still requires the authoritative evidence described by the gate.",
     };

@@ -28,7 +28,7 @@ export const OPERATIONAL_ACCEPTANCE_ITEMS: AcceptanceItem[] = [
   { id: "U06", title: "Connected actions", category: "provider", dependency: "Official OAuth or provider grant", evidence: "Blackstar detects actual scopes and a permitted read or approved write returns provider evidence.", path: "/integrations", action: "Open Integrations" },
   { id: "U07", title: "Cinema rendering", category: "provider", dependency: "Genuine rendering worker/provider", evidence: "A provider actually renders and assembles a playable agreed sample.", path: "/cinema-studio", action: "Open Cinema Studio", evidenceKeys: ["cinemaShotRenders", "mediaGenerationJobs"] },
   { id: "U08", title: "Game Foundry runtime", category: "provider", dependency: "Real worker or licensed external engine", evidence: "A generated asset or game export opens or runs in the selected supported engine.", path: "/game-foundry", action: "Open Game Foundry", evidenceKeys: ["gameFoundryProjects", "threeDJobs"] },
-  { id: "U09", title: "Trading provider coverage", category: "provider", dependency: "Official market feed or authorised brokerage", evidence: "The provider advertises the requested capability and returns verified current observations or authorised status.", path: "/trading-hub", action: "Open Trading Hub", evidenceKeys: ["tradingSimulations", "tradingWatchlists", "tradingJournalEntries"] },
+  { id: "U09", title: "Trading provider coverage", category: "provider", dependency: "Official market feed or authorised brokerage", evidence: "The provider advertises the requested capability and returns verified current observations or authorised status.", path: "/trading-hub", action: "Open Trading Hub" },
   { id: "U10", title: "Marketplace settlement", category: "transaction", dependency: "Stripe business onboarding and approved real-money test", evidence: "Provider-confirmed listing fee, webhook, payout/refund and dispute lifecycle matches the commercial rules.", path: "/marketplace", action: "Open Marketplace", evidenceKeys: ["marketplaceOrders", "marketplacePaymentEvents"] },
   { id: "U11", title: "Website publication", category: "provider", dependency: "Real hosting/domain control", evidence: "The reviewed site resolves and displays at the intended published domain.", path: "/website-studio", action: "Open Website Studio" },
   { id: "U12", title: "Construction acceptance", category: "professional", dependency: "Qualified reviewer and authorised real-world data/hardware", evidence: "The exact safety-critical workflow receives competent-person review and recorded human sign-off.", path: "/construction-industrial-hub", action: "Open Construction Hub" },
@@ -58,7 +58,4 @@ export const ACCEPTANCE_EVIDENCE_TABLES = {
   communicationCallSessions: "communication_call_sessions",
   mobileIntelligenceDevices: "mobile_intelligence_devices",
   retailCallInbox: "retail_call_inbox",
-  tradingSimulations: "trading_simulations",
-  tradingWatchlists: "trading_watchlists",
-  tradingJournalEntries: "trading_journal_entries",
 } as const;

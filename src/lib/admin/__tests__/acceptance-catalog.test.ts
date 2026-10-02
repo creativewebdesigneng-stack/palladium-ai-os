@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ACCEPTANCE_EVIDENCE_TABLES, OPERATIONAL_ACCEPTANCE_ITEMS } from "../acceptance-catalog";
+import { readFileSync } from "node:fs";
 
 describe("operational acceptance catalogue", () => {
   it("contains every U01-U24 gate exactly once", () => {
@@ -25,6 +26,24 @@ describe("operational acceptance catalogue", () => {
     }
   });
 
+  it("does not present simulation/research ledgers as trading-provider evidence", () => {
+    const trading = OPERATIONAL_ACCEPTANCE_ITEMS.find((item) => item.id === "U09");
+    expect(trading?.evidenceKeys ?? []).toEqual([]);
+    expect(Object.values(ACCEPTANCE_EVIDENCE_TABLES)).not.toContain("trading_simulations");
+    expect(Object.values(ACCEPTANCE_EVIDENCE_TABLES)).not.toContain("trading_watchlists");
+    expect(Object.values(ACCEPTANCE_EVIDENCE_TABLES)).not.toContain("trading_journal_entries");
+  });
+
+  it("scopes the 160-skill acceptance counter to the actual builtin procedure pack", () => {
+    const functions = readFileSync(
+      new URL("../acceptance.functions.ts", import.meta.url),
+      "utf8",
+    );
+    expect(functions).toContain('key === "agentSkills"');
+    expect(functions).toContain('.eq("source_kind", "builtin")');
+    expect(functions).toContain('.like("source_ref", "blackstar-agent-procedures:v1:%")');
+  });
+
   it("uses only the approved production evidence table set", () => {
     expect(Object.values(ACCEPTANCE_EVIDENCE_TABLES)).toEqual([
       "agent_memories",
@@ -38,9 +57,6 @@ describe("operational acceptance catalogue", () => {
       "communication_call_sessions",
       "mobile_intelligence_devices",
       "retail_call_inbox",
-      "trading_simulations",
-      "trading_watchlists",
-      "trading_journal_entries",
     ]);
   });
 });
