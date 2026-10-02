@@ -86,6 +86,7 @@ export const SYSTEM_GROUPS = [
     description: 'Tasks, workflows, automation and execution',
     items: [
       { label: 'Fast Track', path: '/fast-track', icon: Zap },
+      { label: 'Outcome Packs', path: '/outcomes', icon: Sparkles },
       { label: 'Work OS', path: '/work-os', icon: Layers3 },
       { label: 'Smart Tables', path: '/smart-tables', icon: Table2 },
       { label: 'Tasks', path: '/tasks', icon: ListChecks },
