@@ -50,24 +50,24 @@ export function normalizeOperationalProbe(
 
   return {
     kind,
-    name: safeText(probe.name, defaultName, 80),
-    provider: safeText(probe.provider, "unknown", 80),
-    configured: probe.configured === true,
-    reachable: probe.reachable === true,
-    healthy: probe.healthy === true,
-    readySignal: typeof probe.readySignal === "boolean" ? probe.readySignal : null,
-    httpStatus: safeStatus(probe.httpStatus),
-    latencyMs: safeLatency(probe.latencyMs),
-    checkedAt: safeCheckedAt(probe.checkedAt),
-    error: typeof probe.error === "string" && probe.error.trim()
-      ? probe.error.trim().slice(0, 240)
+    name: safeText(probe['name'], defaultName, 80),
+    provider: safeText(probe['provider'], "unknown", 80),
+    configured: probe['configured'] === true,
+    reachable: probe['reachable'] === true,
+    healthy: probe['healthy'] === true,
+    readySignal: typeof probe['readySignal'] === "boolean" ? probe['readySignal'] : null,
+    httpStatus: safeStatus(probe['httpStatus']),
+    latencyMs: safeLatency(probe['latencyMs']),
+    checkedAt: safeCheckedAt(probe['checkedAt']),
+    error: typeof probe['error'] === "string" && probe['error'].trim()
+      ? probe['error'].trim().slice(0, 240)
       : null,
   };
 }
 
 export function operationalProbeLabel(probe: OperationalProbeSummary) {
-  if (!probe.configured) return "Not configured";
-  if (!probe.reachable) return "Unreachable";
-  if (!probe.healthy) return "Needs attention";
+  if (!probe['configured']) return "Not configured";
+  if (!probe['reachable']) return "Unreachable";
+  if (!probe['healthy']) return "Needs attention";
   return "Ready";
 }
