@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { ACCEPTANCE_EVIDENCE_TABLES } from "@/lib/admin/acceptance-catalog";
+import { normalizeOperationalProbe } from "@/lib/admin/acceptance-preflight";
+import { probeCinemaMasterConnection } from "@/lib/cinema/cinema-runtime.server";
+import { probeThreeDWorker } from "@/lib/three-d/three-d-runtime.server";
 import {
   buildAcceptanceAuditMetadata,
   prepareOperationalAcceptanceResult,
@@ -87,6 +90,29 @@ export const getOperationalAcceptanceSnapshot = createServerFn({ method: "POST" 
         "A non-zero record count means evidence exists for review. It does not automatically certify the acceptance item.",
       resultRule:
         "A recorded outcome documents the signed-in owner's acceptance decision. Verified still requires the authoritative evidence described by the gate.",
+    };
+  });
+
+export const runOperationalAcceptancePreflight = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const scoped = context.supabase as unknown as Sb;
+    if (!(await isPlatformAdmin(scoped, context.userId))) {
+      return { forbidden: true as const };
+    }
+
+    const [cinemaProbe, threeDProbe] = await Promise.all([
+      probeCinemaMasterConnection(),
+      probeThreeDWorker(),
+    ]);
+
+    return {
+      forbidden: false as const,
+      checkedAt: new Date().toISOString(),
+      cinema: normalizeOperationalProbe("cinema", cinemaProbe),
+      threeD: normalizeOperationalProbe("three-d", threeDProbe),
+      evidenceRule:
+        "Worker readiness is a read-only operational preflight. It does not create a render, output, transaction, acceptance result or certification.",
     };
   });
 
