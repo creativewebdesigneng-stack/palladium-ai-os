@@ -20,6 +20,10 @@ import Panel from '@/components/palladium/Panel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { OPERATIONAL_ACCEPTANCE_ITEMS } from '@/lib/admin/acceptance-catalog';
 import {
+  recordedVerificationHasLinkedEvidence,
+  summarizeAcceptanceEvidence,
+} from '@/lib/admin/acceptance-evidence';
+import {
   getOperationalAcceptanceSnapshot,
   saveOperationalAcceptanceResult,
 } from '@/lib/admin/acceptance.functions';
@@ -48,22 +52,6 @@ const RESULT_LABELS = {
   declined: 'Declined',
   waiting: 'Waiting',
 };
-
-function evidenceFor(item, snapshot) {
-  const keys = item.evidenceKeys ?? [];
-  if (!keys.length) return { count: null, available: true };
-  return keys.reduce(
-    (acc, key) => {
-      const entry = snapshot?.evidence?.[key];
-      if (!entry) return acc;
-      return {
-        count: acc.count + Number(entry.count ?? 0),
-        available: acc.available && entry.available !== false,
-      };
-    },
-    { count: 0, available: true },
-  );
-}
 
 export default function AdminAcceptance() {
   const { session } = useWorkspace();
@@ -124,10 +112,18 @@ export default function AdminAcceptance() {
   const data = snapshot.data;
   const ownerFirst = OPERATIONAL_ACCEPTANCE_ITEMS.filter((item) => item.priority === 'owner-first');
   const linkedEvidence = OPERATIONAL_ACCEPTANCE_ITEMS.filter((item) => (item.evidenceKeys ?? []).length > 0);
-  const withEvidence = linkedEvidence.filter((item) => evidenceFor(item, data).count > 0);
+  const withEvidence = linkedEvidence.filter(
+    (item) => (summarizeAcceptanceEvidence(item.evidenceKeys, data?.evidence).total ?? 0) > 0,
+  );
   const zeroEvidence = linkedEvidence.length - withEvidence.length;
   const recordedResults = Object.values(data?.results ?? {});
   const verifiedResults = recordedResults.filter((result) => result.status === 'verified').length;
+  const verifiedWithLinkedEvidence = OPERATIONAL_ACCEPTANCE_ITEMS.filter((item) =>
+    recordedVerificationHasLinkedEvidence(
+      data?.results?.[item.id]?.status,
+      summarizeAcceptanceEvidence(item.evidenceKeys, data?.evidence),
+    ),
+  ).length;
 
   return (
     <>
@@ -151,7 +147,7 @@ export default function AdminAcceptance() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Engineering gate" value="100%" detail="certified release scope" icon={CheckCircle2} />
         <Metric label="Acceptance gates" value={String(OPERATIONAL_ACCEPTANCE_ITEMS.length)} detail="U01–U24" icon={ClipboardCheck} />
-        <Metric label="Recorded outcomes" value={String(recordedResults.length)} detail={`${verifiedResults} verified`} icon={Save} />
+        <Metric label="Recorded outcomes" value={String(recordedResults.length)} detail={`${verifiedResults} recorded verified · ${verifiedWithLinkedEvidence} with linked evidence`} icon={Save} />
         <Metric label="Evidence-linked zeroes" value={String(zeroEvidence)} detail="not engineering failures" icon={Database} />
       </div>
 
@@ -229,10 +225,10 @@ function AcceptanceRow({
   saving = false,
   saveError = null,
 }) {
-  const evidence = evidenceFor(item, snapshot);
+  const evidence = summarizeAcceptanceEvidence(item.evidenceKeys, snapshot?.evidence);
   const result = snapshot?.results?.[item.id] ?? null;
-  const hasCount = evidence.count != null;
-  const hasEvidence = hasCount && evidence.count > 0;
+  const hasCount = evidence.linked;
+  const hasEvidence = hasCount && (evidence.total ?? 0) > 0;
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState(result?.status ?? 'waiting');
   const [reference, setReference] = useState(result?.evidenceReference ?? '');
@@ -290,7 +286,9 @@ function AcceptanceRow({
         </div>
         {hasCount && (
           <span className={`shrink-0 rounded-lg border px-2 py-1 text-[10px] ${hasEvidence ? 'border-emerald-400/20 bg-emerald-400/[.06] text-emerald-300' : 'border-white/[.08] bg-white/[.02] text-zinc-500'}`}>
-            {evidence.available ? `${evidence.count} record${evidence.count === 1 ? '' : 's'}` : 'count unavailable'}
+            {evidence.available
+              ? `${evidence.total} record${evidence.total === 1 ? '' : 's'} · ${evidence.presentSources}/${evidence.sourceCount} sources`
+              : 'evidence incomplete'}
           </span>
         )}
       </div>
@@ -302,6 +300,50 @@ function AcceptanceRow({
         <p className="mt-2 text-[11px] leading-5 text-zinc-500">
           <span className="text-zinc-300">Acceptance:</span> {item.evidence}
         </p>
+      )}
+
+      {!compact && evidence.linked && (
+        <div className="mt-3 rounded-xl border border-white/[.06] bg-white/[.018] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-300">
+              <Database className="h-3.5 w-3.5 text-violet-300" />
+              Linked production evidence
+            </p>
+            <span className="text-[9px] uppercase tracking-[.12em] text-zinc-600">
+              {evidence.presentSources}/{evidence.sourceCount} sources
+            </span>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {evidence.sources.map((source) => (
+              <div
+                key={source.key}
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/[.05] bg-black/20 px-2.5 py-1.5 text-[10px]"
+              >
+                <span className="min-w-0 truncate font-mono text-zinc-500">{source.table}</span>
+                <span className={source.present ? 'text-emerald-300' : source.available ? 'text-zinc-600' : 'text-amber-300'}>
+                  {source.available ? `${source.count} record${source.count === 1 ? '' : 's'}` : 'unavailable'}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[9px] leading-4 text-zinc-600">
+            {!evidence.available
+              ? 'At least one linked evidence source could not be read. Blackstar will not treat an incomplete snapshot as corroboration.'
+              : hasEvidence
+                ? 'Records exist for review. Their presence supports investigation but does not automatically certify this gate.'
+                : 'No linked production evidence is currently visible for this gate.'}
+          </p>
+        </div>
+      )}
+
+      {!compact && result?.status === 'verified' && evidence.linked && (!evidence.available || !hasEvidence) && (
+        <div className="mt-3 flex gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.055] p-3 text-[10px] leading-5 text-amber-100/80">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+          <p>
+            This gate is recorded as Verified, but Blackstar cannot currently see linked production evidence for it.
+            Treat the saved result as an owner observation, not evidence-backed certification.
+          </p>
+        </div>
       )}
 
       {result && (
