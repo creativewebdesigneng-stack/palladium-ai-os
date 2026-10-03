@@ -11,7 +11,7 @@ describe("operational acceptance read-only preflight contract", () => {
     expect(functions).toContain("probeThreeDWorker");
     expect(functions).toContain("normalizeOperationalProbe");
     expect(screen).toContain("Run read-only preflight");
-    expect(screen).toContain("Readiness is not render certification");
+    expect(screen).toContain("Readiness is not external-client connection or render certification");
   });
 
   it("does not write acceptance outcomes or queue execution from the preflight server function", () => {
