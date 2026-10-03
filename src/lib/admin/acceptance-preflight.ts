@@ -1,4 +1,4 @@
-export type OperationalProbeKind = "cinema" | "three-d";
+export type OperationalProbeKind = "mcp" | "cinema" | "three-d";
 
 export type OperationalProbeSummary = {
   kind: OperationalProbeKind;
@@ -44,9 +44,11 @@ export function normalizeOperationalProbe(
     ? value as Record<string, unknown>
     : {};
 
-  const defaultName = kind === "cinema"
-    ? "Cinema master worker"
-    : "3D Studio worker";
+  const defaultName = kind === "mcp"
+    ? "Blackstar remote MCP"
+    : kind === "cinema"
+      ? "Cinema master worker"
+      : "3D Studio worker";
 
   return {
     kind,
