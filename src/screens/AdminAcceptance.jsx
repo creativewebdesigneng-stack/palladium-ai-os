@@ -3,8 +3,10 @@ import { useServerFn } from '@tanstack/react-start';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
+  Box,
   CheckCircle2,
   CircleDashed,
   ClipboardCheck,
@@ -23,8 +25,10 @@ import {
   recordedVerificationHasLinkedEvidence,
   summarizeAcceptanceEvidence,
 } from '@/lib/admin/acceptance-evidence';
+import { operationalProbeLabel } from '@/lib/admin/acceptance-preflight';
 import {
   getOperationalAcceptanceSnapshot,
+  runOperationalAcceptancePreflight,
   saveOperationalAcceptanceResult,
 } from '@/lib/admin/acceptance.functions';
 import { friendlyMessage } from '@/lib/errors';
@@ -57,6 +61,7 @@ export default function AdminAcceptance() {
   const { session } = useWorkspace();
   const qc = useQueryClient();
   const snapshotFn = useServerFn(getOperationalAcceptanceSnapshot);
+  const preflightFn = useServerFn(runOperationalAcceptancePreflight);
   const saveResultFn = useServerFn(saveOperationalAcceptanceResult);
   const snapshot = useQuery({
     queryKey: ['admin-operational-acceptance'],
@@ -64,6 +69,13 @@ export default function AdminAcceptance() {
     enabled: session === 'yes',
     retry: false,
     refetchInterval: 60_000,
+  });
+  const preflight = useMutation({
+    mutationFn: async () => {
+      const result = await preflightFn();
+      if (result?.forbidden) throw new Error('Administrative access is required.');
+      return result;
+    },
   });
   const saveResult = useMutation({
     mutationFn: async (payload) => {
@@ -151,6 +163,61 @@ export default function AdminAcceptance() {
         <Metric label="Evidence-linked zeroes" value={String(zeroEvidence)} detail="not engineering failures" icon={Database} />
       </div>
 
+      <div className="mt-5">
+        <Panel
+          title="Read-only operational preflight"
+          subtitle="Probe current Cinema and 3D worker readiness without creating jobs, outputs or acceptance results."
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-3xl">
+              <p className="text-xs leading-5 text-zinc-400">
+                This calls the existing bounded worker health probes on demand. A healthy worker means the execution path is reachable now; it does not prove a render, persisted output, ZModeler handoff or final certification.
+              </p>
+              <p className="mt-1 text-[10px] text-zinc-600">
+                Relevant gates: U07 Cinema provider/worker acceptance and U08 3D/Game Foundry provider/worker acceptance.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={preflight.isPending}
+              onClick={() => preflight.mutate()}
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-300/20 bg-sky-400/[.06] px-3 py-2 text-[11px] font-medium text-sky-100 transition hover:border-sky-300/35 hover:bg-sky-400/[.1] disabled:opacity-50"
+            >
+              {preflight.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
+              {preflight.isPending ? 'Checking…' : 'Run read-only preflight'}
+            </button>
+          </div>
+
+          {preflight.error && (
+            <p className="mt-3 text-[11px] text-rose-300">{friendlyMessage(preflight.error)}</p>
+          )}
+
+          {preflight.data && !preflight.data.forbidden ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <PreflightCard
+                icon={ShieldCheck}
+                title="Cinema master worker"
+                probe={preflight.data.cinema}
+              />
+              <PreflightCard
+                icon={Box}
+                title="3D Studio worker"
+                probe={preflight.data.threeD}
+              />
+              <p className="md:col-span-2 text-[10px] leading-4 text-zinc-600">
+                Checked {preflight.data.checkedAt ? new Date(preflight.data.checkedAt).toLocaleString('en-GB') : 'now'} · Readiness is not render certification. No acceptance outcome was saved by this preflight.
+              </p>
+            </div>
+          ) : (
+            !preflight.isPending && (
+              <div className="mt-4 rounded-xl border border-white/[.06] bg-white/[.018] p-4 text-[11px] text-zinc-500">
+                No live preflight has been run in this session.
+              </div>
+            )
+          )}
+        </Panel>
+      </div>
+
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
         <Panel title="First real-owner acceptance" subtitle="These are the next product behaviours that require genuine owner action.">
           <div className="space-y-3">
@@ -189,6 +256,46 @@ export default function AdminAcceptance() {
         </Panel>
       </div>
     </>
+  );
+}
+
+function PreflightCard({ icon: Icon, title, probe }) {
+  const label = operationalProbeLabel(probe);
+  const ready = label === 'Ready';
+  const tone = ready
+    ? 'border-emerald-400/15 bg-emerald-400/[.035]'
+    : probe?.reachable
+      ? 'border-amber-400/15 bg-amber-400/[.035]'
+      : 'border-rose-400/15 bg-rose-400/[.035]';
+
+  return (
+    <div className={`rounded-2xl border p-4 ${tone}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${ready ? 'text-emerald-300' : 'text-zinc-400'}`} />
+          <div>
+            <p className="text-xs font-medium text-zinc-200">{title}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-600">{probe?.provider ?? 'unknown provider'}</p>
+          </div>
+        </div>
+        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.12em] ${
+          ready
+            ? 'border-emerald-400/20 text-emerald-300'
+            : probe?.reachable
+              ? 'border-amber-400/20 text-amber-300'
+              : 'border-rose-400/20 text-rose-300'
+        }`}>
+          {label}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-zinc-500">
+        <span>Configured <strong className="font-medium text-zinc-300">{probe?.configured ? 'yes' : 'no'}</strong></span>
+        <span>Reachable <strong className="font-medium text-zinc-300">{probe?.reachable ? 'yes' : 'no'}</strong></span>
+        <span>HTTP <strong className="font-medium text-zinc-300">{probe?.httpStatus ?? '—'}</strong></span>
+        <span>Latency <strong className="font-medium text-zinc-300">{probe?.latencyMs != null ? `${probe.latencyMs} ms` : '—'}</strong></span>
+      </div>
+      {probe?.error && <p className="mt-2 text-[10px] leading-4 text-amber-200/75">{probe.error}</p>}
+    </div>
   );
 }
 
