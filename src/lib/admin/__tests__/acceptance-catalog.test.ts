@@ -27,20 +27,20 @@ describe("operational acceptance catalogue", () => {
 
   it("tracks the current external acceptance gaps inside the existing gates", () => {
     const byId = Object.fromEntries(OPERATIONAL_ACCEPTANCE_ITEMS.map((item) => [item.id, item]));
-    expect(byId.U03?.title).toMatch(/Groq/);
-    expect(byId.U03?.evidenceKeys).toEqual([
+    expect(byId['U03']?.title).toMatch(/Groq/);
+    expect(byId['U03']?.evidenceKeys).toEqual([
       "modelEvalRuns",
       "modelEvalResponses",
       "modelEvalVerifiedEvidence",
     ]);
-    expect(byId.U06?.title).toMatch(/MCP/);
-    expect(byId.U06?.evidenceKeys).toEqual([
+    expect(byId['U06']?.title).toMatch(/MCP/);
+    expect(byId['U06']?.evidenceKeys).toEqual([
       "syncConnections",
       "modelProviderCredentials",
     ]);
-    expect(byId.U08?.title).toMatch(/3D/);
-    expect(byId.U08?.evidence).toMatch(/ZModeler/);
-    expect(byId.U10?.evidenceKeys).toEqual(
+    expect(byId['U08']?.title).toMatch(/3D/);
+    expect(byId['U08']?.evidence).toMatch(/ZModeler/);
+    expect(byId['U10']?.evidenceKeys).toEqual(
       expect.arrayContaining([
         "marketplaceRefundEvents",
         "marketplaceProviderDisputes",
