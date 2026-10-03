@@ -5,6 +5,7 @@ import { ACCEPTANCE_EVIDENCE_TABLES } from "@/lib/admin/acceptance-catalog";
 import { normalizeOperationalProbe } from "@/lib/admin/acceptance-preflight";
 import { probeCinemaMasterConnection } from "@/lib/cinema/cinema-runtime.server";
 import { probeThreeDWorker } from "@/lib/three-d/three-d-runtime.server";
+import { probeBlackstarMcpRemoteIdentity } from "@/lib/mcp/mcp-readiness.server";
 import {
   buildAcceptanceAuditMetadata,
   prepareOperationalAcceptanceResult,
@@ -101,7 +102,8 @@ export const runOperationalAcceptancePreflight = createServerFn({ method: "POST"
       return { forbidden: true as const };
     }
 
-    const [cinemaProbe, threeDProbe] = await Promise.all([
+    const [mcpProbe, cinemaProbe, threeDProbe] = await Promise.all([
+      probeBlackstarMcpRemoteIdentity(),
       probeCinemaMasterConnection(),
       probeThreeDWorker(),
     ]);
@@ -109,10 +111,11 @@ export const runOperationalAcceptancePreflight = createServerFn({ method: "POST"
     return {
       forbidden: false as const,
       checkedAt: new Date().toISOString(),
+      mcp: normalizeOperationalProbe("mcp", mcpProbe),
       cinema: normalizeOperationalProbe("cinema", cinemaProbe),
       threeD: normalizeOperationalProbe("three-d", threeDProbe),
       evidenceRule:
-        "Worker readiness is a read-only operational preflight. It does not create a render, output, transaction, acceptance result or certification.",
+        "Endpoint and worker readiness are read-only operational preflight signals. They do not prove an external client connection, render, output, transaction, acceptance result or certification.",
     };
   });
 

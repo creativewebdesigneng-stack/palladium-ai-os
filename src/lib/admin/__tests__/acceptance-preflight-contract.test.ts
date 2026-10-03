@@ -6,11 +6,12 @@ const screen = readFileSync("src/screens/AdminAcceptance.jsx", "utf8");
 
 describe("operational acceptance read-only preflight contract", () => {
   it("reuses the existing Cinema and 3D health probes", () => {
+    expect(functions).toContain("probeBlackstarMcpRemoteIdentity");
     expect(functions).toContain("probeCinemaMasterConnection");
     expect(functions).toContain("probeThreeDWorker");
     expect(functions).toContain("normalizeOperationalProbe");
     expect(screen).toContain("Run read-only preflight");
-    expect(screen).toContain("Readiness is not render certification");
+    expect(screen).toContain("Readiness is not external-client connection or render certification");
   });
 
   it("does not write acceptance outcomes or queue execution from the preflight server function", () => {
@@ -27,6 +28,7 @@ describe("operational acceptance read-only preflight contract", () => {
     expect(block).not.toContain("writeAudit(");
     expect(block).not.toContain("submitCinema");
     expect(block).not.toContain("submitThreeD");
-    expect(block).toContain("does not create a render, output, transaction, acceptance result or certification");
+    expect(block).not.toContain("createTask");
+    expect(block).toContain("do not prove an external client connection, render, output, transaction, acceptance result or certification");
   });
 });

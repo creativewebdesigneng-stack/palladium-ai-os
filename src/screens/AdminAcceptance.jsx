@@ -166,15 +166,15 @@ export default function AdminAcceptance() {
       <div className="mt-5">
         <Panel
           title="Read-only operational preflight"
-          subtitle="Probe current Cinema and 3D worker readiness without creating jobs, outputs or acceptance results."
+          subtitle="Probe current remote MCP, Cinema and 3D readiness without creating jobs, outputs or acceptance results."
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-3xl">
               <p className="text-xs leading-5 text-zinc-400">
-                This calls the existing bounded worker health probes on demand. A healthy worker means the execution path is reachable now; it does not prove a render, persisted output, ZModeler handoff or final certification.
+                This calls the governed remote MCP discovery check and existing bounded worker health probes on demand. Healthy means the advertised endpoint or worker path is reachable now; it does not prove an external client connected, a render completed, a persisted output exists, a ZModeler handoff ran or final certification passed.
               </p>
               <p className="mt-1 text-[10px] text-zinc-600">
-                Relevant gates: U07 Cinema provider/worker acceptance and U08 3D/Game Foundry provider/worker acceptance.
+                Relevant gates: U06 external AI/MCP acceptance, U07 Cinema provider/worker acceptance and U08 3D/Game Foundry provider/worker acceptance.
               </p>
             </div>
             <button
@@ -193,7 +193,12 @@ export default function AdminAcceptance() {
           )}
 
           {preflight.data && !preflight.data.forbidden ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <PreflightCard
+                icon={ExternalLink}
+                title="Remote MCP identity"
+                probe={preflight.data.mcp}
+              />
               <PreflightCard
                 icon={ShieldCheck}
                 title="Cinema master worker"
@@ -204,8 +209,8 @@ export default function AdminAcceptance() {
                 title="3D Studio worker"
                 probe={preflight.data.threeD}
               />
-              <p className="md:col-span-2 text-[10px] leading-4 text-zinc-600">
-                Checked {preflight.data.checkedAt ? new Date(preflight.data.checkedAt).toLocaleString('en-GB') : 'now'} · Readiness is not render certification. No acceptance outcome was saved by this preflight.
+              <p className="md:col-span-3 text-[10px] leading-4 text-zinc-600">
+                Checked {preflight.data.checkedAt ? new Date(preflight.data.checkedAt).toLocaleString('en-GB') : 'now'} · Readiness is not external-client connection or render certification. No acceptance outcome was saved by this preflight.
               </p>
             </div>
           ) : (
