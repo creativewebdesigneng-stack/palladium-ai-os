@@ -401,7 +401,7 @@ const ROUTE_RULES: RouteConnectorRule[] = [
 function routeMatches(pathname: string, pattern: string) {
   if (pattern.endsWith("*")) {
     const prefix = pattern.slice(0, -1);
-    return pathname === prefix.slice(0, -1) || pathname.startsWith(prefix);
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
   }
   return pathname === pattern || pathname.startsWith(`${pattern}/`);
 }
