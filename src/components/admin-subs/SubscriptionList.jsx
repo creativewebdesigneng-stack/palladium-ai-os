@@ -1,4 +1,5 @@
 import { Search, Eye, CreditCard, Calendar, User, Building2, Activity, Info } from 'lucide-react';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', past_due: 'text-amber-300 bg-amber-400/10 border-amber-400/20', canceled: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trialing: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 
@@ -27,7 +28,7 @@ export default function SubscriptionList({ subscriptions, onView, filters, setFi
         <select value={filters.status} onChange={e => set('status', e.target.value)} className="rounded-lg border border-white/10 bg-white/[.03] px-2 py-2 text-[11px] capitalize text-zinc-200 [&>option]:bg-[#10121a]"><option value="all">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <TableSurface label="Subscriptions" minWidth={980}>
         <table className="w-full text-left text-[12px]">
           <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-zinc-500">
             <tr>
@@ -52,10 +53,10 @@ export default function SubscriptionList({ subscriptions, onView, filters, setFi
                 <td className="px-3 py-2.5 text-right"><button onClick={() => onView(s)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5"><Eye className="h-3 w-3" />View</button></td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={7} className="px-3 py-10 text-center text-zinc-500">No subscriptions match your filters.</td></tr>}
+            {filtered.length === 0 && <TableEmptyRow colSpan={7} title="No subscriptions found" description="No subscriptions match the current filters." />}
           </tbody>
         </table>
-      </div>
+      </TableSurface>
     </div>
   );
 }
