@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Bell, Briefcase, Network } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 import { toast } from '@/components/ui/use-toast';
 import BlackstarCommandDeck from '@/components/mission/BlackstarCommandDeck';
 import BriefingConsole from '@/components/mission/BriefingConsole';
@@ -388,9 +389,9 @@ export default function MissionControl() {
           <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><ScrollText className="h-4 w-4 text-cyan-300" />Audit trail</h2>
             <p className="mt-1 text-[11px] text-zinc-500">Every sensitive action is recorded server-side.</p>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-[11px]"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="pb-2 pr-3 font-medium">Action</th><th className="pb-2 pr-3 font-medium">Target</th><th className="pb-2 pr-3 font-medium">Status</th><th className="pb-2 font-medium">When</th></tr></thead><tbody>{(data?.audit ?? []).map((entry) => <tr key={entry.id} className="border-t border-white/5 text-zinc-400"><td className="py-2 pr-3 text-zinc-200">{entry.action}</td><td className="py-2 pr-3">{entry.target_type}{entry.target_id ? ` · ${String(entry.target_id).slice(0, 8)}` : ''}</td><td className="py-2 pr-3">{entry.status}</td><td className="py-2">{new Date(entry.created_at).toLocaleString('en-GB')}</td></tr>)}</tbody></table>
-            </div>
+            <div className="mt-3"><TableSurface label="Mission Control audit trail" minWidth={620} maxHeight={520} className="rounded-xl">
+              <table className="text-left text-[11px]"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="pb-2 pr-3 font-medium">Action</th><th className="pb-2 pr-3 font-medium">Target</th><th className="pb-2 pr-3 font-medium">Status</th><th className="pb-2 font-medium">When</th></tr></thead><tbody>{(data?.audit ?? []).map((entry) => <tr key={entry.id} className="border-t border-white/5 text-zinc-400"><td className="py-2 pr-3 text-zinc-200">{entry.action}</td><td className="py-2 pr-3">{entry.target_type}{entry.target_id ? ` · ${String(entry.target_id).slice(0, 8)}` : ''}</td><td className="py-2 pr-3">{entry.status}</td><td className="py-2">{new Date(entry.created_at).toLocaleString('en-GB')}</td></tr>)}{(data?.audit ?? []).length === 0 && <TableEmptyRow colSpan={4} title="No audit events" description="Sensitive Mission Control actions will appear here." />}</tbody></table>
+              </TableSurface></div>
           </div>
         )}
       </div>
