@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const fmtTime = (iso) => {
   const d = new Date(iso);
@@ -7,7 +8,7 @@ const fmtTime = (iso) => {
 
 export default function AuditTable({ rows, onSelect, selectedId }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.03]">
+    <TableSurface label="Audit log" minWidth={980} maxHeight={640}>
       <table className="w-full text-left text-[12px]">
         <thead>
           <tr className="text-[10px] uppercase text-zinc-500">
@@ -39,6 +40,6 @@ export default function AuditTable({ rows, onSelect, selectedId }) {
           {rows.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-[12px] text-zinc-600">No audit events match your filters.</td></tr>}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
