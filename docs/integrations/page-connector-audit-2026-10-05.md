@@ -50,7 +50,7 @@ Already registered as governed creative connector targets:
 
 ## Strong ChatGPT catalogue matches found during this audit
 
-The current ChatGPT catalogue also exposed useful matches including Vercel, Supabase, Lovable, Atlassian, Semrush, Ahrefs, Supermetrics, Metricool, Airtable, Dropbox, Box, SharePoint, Mercury, Datadog, Amplitude, Vanta, RingCentral, COROS, Caliber, Klaviyo and vidIQ.
+The current ChatGPT catalogue also exposed useful matches including Vercel, Supabase, Lovable, Webflow, Atlassian, Semrush, Ahrefs, Supermetrics, Metricool, Airtable, Coda, Dropbox, Box, SharePoint, Mercury, Datadog, Amplitude, PostHog, Vanta, RingCentral, HeyGen, COROS, Caliber, Klaviyo and vidIQ.
 
 These are not Blackstar integrations merely because they exist in ChatGPT.
 
@@ -65,8 +65,8 @@ Routes:
 `/company-hub`.
 
 Best fit:
-Google Workspace, Microsoft 365, Slack, Notion, Asana, Linear, HubSpot.
-Airtable is a strong catalogue candidate for structured operational data.
+Google Workspace, Microsoft 365, Slack, Notion, Asana, Linear and HubSpot.
+Airtable and Coda are strong catalogue candidates for structured operational data and operating documents.
 
 ### Agents, Workforce and AI pages
 
@@ -100,7 +100,8 @@ Routes:
 
 Best fit:
 Canva, Figma, Hugging Face, Adobe, Runway, Higgsfield and GitHub.
-Lovable is a strong catalogue candidate for app/site-building workflows.
+Lovable and Webflow are strong catalogue candidates for app/site-building, CMS and publishing workflows.
+HeyGen is a strong candidate for avatar-led video, speech, lip-sync and multilingual localization.
 
 Execution boundary:
 creative model discovery or a configured endpoint is not evidence that media or 3D output was generated.
@@ -116,7 +117,7 @@ Best fit:
 Meta, YouTube, LinkedIn, Pinterest, TikTok, X, Threads and Canva.
 
 Strong current ChatGPT candidates:
-Semrush, Ahrefs, Supermetrics, Metricool, Klaviyo and vidIQ.
+Semrush, Ahrefs, Supermetrics, Metricool, Amplitude, PostHog, HeyGen, Klaviyo and vidIQ.
 
 ### CRM, customer support and communications pages
 
@@ -166,7 +167,7 @@ Best fit:
 Google Workspace, Microsoft 365 and Notion.
 
 Strong current ChatGPT candidates:
-Dropbox, Box, SharePoint and Airtable.
+Dropbox, Box, SharePoint, Airtable and Coda.
 
 ### Projects and collaboration pages
 
@@ -207,7 +208,7 @@ Routes:
 `/admin/acceptance`, `/admin/platform-analytics`.
 
 Best fit:
-GitHub plus current ChatGPT candidates Vercel, Supabase, Datadog, Amplitude and Vanta.
+GitHub plus current ChatGPT candidates Vercel, Supabase, Datadog, Amplitude, PostHog and Vanta.
 
 These are operational data sources only; readiness data is not acceptance certification.
 
