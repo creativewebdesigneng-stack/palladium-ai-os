@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { History, Check, X } from 'lucide-react';
 import { SectionHead } from './shared';
 import { dateTime } from './format';
+import TableSurface from '@/components/palladium/TableSurface';
 
 // Real audit trail for the signed-in account, read under row-level security.
 export default function AuditLog({ logs = [], total = 0, query = '' }) {
@@ -21,9 +22,9 @@ export default function AuditLog({ logs = [], total = 0, query = '' }) {
           No audit events recorded yet.
         </p>
       ) : (
-        <motion.div layout className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left">
+        <motion.div layout>
+          <TableSurface label="Security audit log" minWidth={720} maxHeight={600}>
+            <table className="text-left">
               <thead className="border-b border-white/10 bg-white/[.02] text-[10px] uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Action</th>
@@ -66,7 +67,7 @@ export default function AuditLog({ logs = [], total = 0, query = '' }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableSurface>
         </motion.div>
       )}
     </div>
