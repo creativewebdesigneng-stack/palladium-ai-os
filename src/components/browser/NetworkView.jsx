@@ -1,4 +1,5 @@
 import { NETWORK, STATUS_STYLE } from './browserData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 const TYPE_STYLE = { xhr: 'text-sky-400', js: 'text-amber-400', css: 'text-violet-400', img: 'text-emerald-400', ws: 'text-zinc-400' };
 
@@ -6,8 +7,9 @@ export default function NetworkView() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/60">
       <div className="border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">Network <span className="ml-1 text-zinc-500">{NETWORK.length} requests</span></div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <table className="w-full text-[11px]">
+      <div className="min-h-0 flex-1 p-2">
+        <TableSurface label="Browser network requests" minWidth={760} maxHeight="100%" className="h-full rounded-xl">
+        <table className="text-[11px]">
           <thead>
             <tr className="text-left text-zinc-500">
               <th className="px-2 py-1.5 font-medium">METHOD</th>
@@ -29,8 +31,10 @@ export default function NetworkView() {
                 <td className="px-2 py-2 font-mono text-zinc-400">{r.size}</td>
               </tr>
             ))}
+            {NETWORK.length === 0 && <TableEmptyRow colSpan={6} title="No network requests" description="Requests will appear here while the browser session is active." />}
           </tbody>
         </table>
+        </TableSurface>
       </div>
     </div>
   );
