@@ -1,8 +1,9 @@
 import { STATUS_STYLE, PRIORITY_STYLE } from './jobsData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function TaskListView({ tasks, onOpen }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.03]">
+    <TableSurface label="Task list" minWidth={940} maxHeight={620}>
       <table className="w-full min-w-[940px] text-left text-xs">
         <thead className="border-b border-white/10 text-[10px] uppercase tracking-wider text-zinc-500">
           <tr>
@@ -40,8 +41,9 @@ export default function TaskListView({ tasks, onOpen }) {
               </tr>
             );
           })}
+          {tasks.length === 0 && <TableEmptyRow colSpan={8} title="No tasks found" description="No tasks match the current view." />}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
