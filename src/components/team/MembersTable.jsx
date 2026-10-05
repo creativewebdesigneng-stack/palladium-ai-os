@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Eye, Trash2, AlertCircle } from 'lucide-react';
 import { SectionHead, RoleBadge, Avatar, EmptyState, nameInitials } from './shared';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const ROLE_OPTIONS = ['owner', 'admin', 'member'];
 
@@ -22,9 +23,9 @@ export default function MembersTable({ members = [], isLoading, error, canManage
   return (
     <div>
       <SectionHead icon={Eye} title="Members" grad="from-sky-500 to-blue-500" count={members.length} />
-      <motion.div layout className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left">
+      <motion.div layout>
+        <TableSurface label="Organisation members" minWidth={720}>
+          <table className="text-left">
             <thead className="border-b border-white/10 bg-white/[.02] text-[10px] uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Member</th>
@@ -83,7 +84,7 @@ export default function MembersTable({ members = [], isLoading, error, canManage
               })}
             </tbody>
           </table>
-        </div>
+        </TableSurface>
       </motion.div>
     </div>
   );
