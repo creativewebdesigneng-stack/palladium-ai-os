@@ -203,6 +203,20 @@ const CONNECTORS: Record<string, PageConnectorRecommendation> = {
     source: "chatgpt-catalogue",
     reason: "Current ChatGPT app-building connector that matches Blackstar website/app-building surfaces.",
   },
+  webflow: {
+    id: "webflow",
+    name: "Webflow",
+    state: "candidate",
+    source: "chatgpt-catalogue",
+    reason: "Current ChatGPT website/CMS connector for page building, publishing, localization, forms, assets and site operations.",
+  },
+  heygen: {
+    id: "heygen",
+    name: "HeyGen",
+    state: "candidate",
+    source: "chatgpt-catalogue",
+    reason: "Current ChatGPT video connector for avatars, presenter videos, speech, lip-sync, clipping and multilingual localization.",
+  },
   atlassian: {
     id: "atlassian",
     name: "Atlassian",
@@ -245,6 +259,13 @@ const CONNECTORS: Record<string, PageConnectorRecommendation> = {
     source: "chatgpt-catalogue",
     reason: "Current ChatGPT connector for structured operational data and record workflows.",
   },
+  coda: {
+    id: "coda",
+    name: "Coda",
+    state: "candidate",
+    source: "chatgpt-catalogue",
+    reason: "Current ChatGPT connector for operating documents that combine narrative, structured tables, formulas, controls and collaboration.",
+  },
   dropbox: {
     id: "dropbox",
     name: "Dropbox",
@@ -286,6 +307,13 @@ const CONNECTORS: Record<string, PageConnectorRecommendation> = {
     state: "candidate",
     source: "chatgpt-catalogue",
     reason: "Current ChatGPT product-intelligence connector for metrics, experiments and behavioural analytics.",
+  },
+  posthog: {
+    id: "posthog",
+    name: "PostHog",
+    state: "candidate",
+    source: "chatgpt-catalogue",
+    reason: "Current ChatGPT product-engineering connector for analytics, experiments, feature flags, error tracking, replay and LLM observability.",
   },
   vanta: {
     id: "vanta",
@@ -333,8 +361,20 @@ const CONNECTORS: Record<string, PageConnectorRecommendation> = {
 
 const ROUTE_RULES: RouteConnectorRule[] = [
   {
+    routes: ["/website-studio", "/html-studio"],
+    connectors: ["figma", "canva", "adobe", "webflow", "lovable", "github", "semrush", "amplitude"],
+  },
+  {
+    routes: ["/cinema-studio", "/media-studio", "/creator-hub", "/trusted-social-video", "/voice-studio"],
+    connectors: ["runway", "adobe", "higgsfield", "heygen", "canva", "huggingface", "figma", "metricool"],
+  },
+  {
+    routes: ["/product-analytics", "/analytics", "/admin/platform-analytics"],
+    connectors: ["amplitude", "posthog", "semrush", "metricool", "github", "vercel", "supabase", "datadog"],
+  },
+  {
     routes: ["/dashboard", "/mission-control", "/outcomes", "/business-intelligence", "/decision-studio", "/business-automation", "/work-os", "/tasks", "/automation", "/automations", "/workflows", "/organisation", "/team", "/company-hub"],
-    connectors: ["google", "microsoft", "slack", "notion", "asana", "linear", "hubspot", "airtable"],
+    connectors: ["google", "microsoft", "hubspot", "notion", "airtable", "coda", "linear", "slack", "asana"],
   },
   {
     routes: ["/agents*", "/agent-builder", "/agent-runtime", "/agent-workspaces", "/workforce", "/skills", "/ai-tools", "/ai-workbench", "/ai-builder", "/ai-hub", "/ai-model-hub", "/models", "/model-arena", "/mcp-hub", "/autonomous-os", "/prompts", "/chat", "/tools-framework"],
@@ -346,11 +386,11 @@ const ROUTE_RULES: RouteConnectorRule[] = [
   },
   {
     routes: ["/creator-hub", "/creator-marketplace", "/creators*", "/media-studio", "/cinema-studio", "/three-d-studio", "/game-foundry", "/voice-studio", "/html-studio", "/website-studio", "/templates"],
-    connectors: ["canva", "figma", "huggingface", "adobe", "runway", "higgsfield", "github", "lovable"],
+    connectors: ["canva", "figma", "huggingface", "adobe", "runway", "higgsfield", "heygen", "webflow", "github", "lovable"],
   },
   {
     routes: ["/marketing", "/social-operations", "/trusted-social-video", "/seo-studio", "/product-analytics", "/analytics", "/news-research", "/web-intelligence", "/research", "/web"],
-    connectors: ["meta", "youtube", "linkedin", "pinterest", "tiktok", "x", "threads", "canva", "semrush", "ahrefs", "supermetrics", "metricool", "klaviyo", "vidiq"],
+    connectors: ["meta", "youtube", "linkedin", "pinterest", "tiktok", "x", "threads", "canva", "semrush", "ahrefs", "supermetrics", "metricool", "amplitude", "posthog", "heygen", "klaviyo", "vidiq"],
   },
   {
     routes: ["/crm", "/crm-studio", "/whatsapp-crm", "/phone-communications", "/support", "/notifications"],
@@ -366,7 +406,7 @@ const ROUTE_RULES: RouteConnectorRule[] = [
   },
   {
     routes: ["/files", "/files-analysis", "/documents", "/knowledge", "/memory", "/recall-notes", "/smart-tables", "/shared-intelligence", "/search"],
-    connectors: ["google", "microsoft", "notion", "dropbox", "box", "sharepoint", "airtable"],
+    connectors: ["google", "microsoft", "notion", "airtable", "coda", "dropbox", "sharepoint", "box"],
   },
   {
     routes: ["/projects*", "/project*", "/developer-workspace"],
@@ -382,7 +422,7 @@ const ROUTE_RULES: RouteConnectorRule[] = [
   },
   {
     routes: ["/security", "/admin/security", "/admin/monitoring", "/admin/audit-logs", "/admin/acceptance", "/admin/platform-analytics"],
-    connectors: ["github", "vercel", "supabase", "datadog", "amplitude", "vanta"],
+    connectors: ["github", "vercel", "supabase", "datadog", "amplitude", "posthog", "vanta"],
   },
   {
     routes: ["/integrations", "/sync-center", "/admin/integrations"],
