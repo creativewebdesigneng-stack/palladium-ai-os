@@ -84,6 +84,7 @@ describe("route-aware page connector recommendations", () => {
     expect(candidates.length).toBeGreaterThan(0);
     expect(candidates.every((item) => item.state === "candidate")).toBe(true);
     expect(candidates.every((item) => !/connected|verified|certified/i.test(item.reason))).toBe(true);
+    expect(candidates.every((item) => !/chatgpt/i.test(item.reason))).toBe(true);
   });
 
   it("returns no recommendation for a route with no meaningful connector match", () => {
