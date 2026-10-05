@@ -1,11 +1,13 @@
 import { PORTS } from './terminalData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function PortsView() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/60">
       <div className="border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">Ports <span className="ml-1 text-zinc-500">({PORTS.filter(p => p.status === 'listening').length} listening)</span></div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <table className="w-full text-[11px]">
+      <div className="min-h-0 flex-1 p-2">
+        <TableSurface label="Listening ports" minWidth={620} maxHeight="100%" className="h-full rounded-xl">
+        <table className="text-[11px]">
           <thead>
             <tr className="text-left text-zinc-500">
               <th className="px-2 py-1.5 font-medium">PORT</th>
@@ -29,8 +31,10 @@ export default function PortsView() {
                 </td>
               </tr>
             ))}
+            {PORTS.length === 0 && <TableEmptyRow colSpan={5} title="No ports found" description="Listening ports will appear here when detected." />}
           </tbody>
         </table>
+        </TableSurface>
       </div>
     </div>
   );
