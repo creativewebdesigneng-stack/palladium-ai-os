@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Building2, Users, ShieldCheck, Plus, Trash2, Crown, Gauge, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 import { toast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
 import {
@@ -217,8 +218,8 @@ export default function Organisation() {
                 </div>
               )}
 
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-[11px]">
+              <div className="mt-3"><TableSurface label="Organisation members" minWidth={600} maxHeight={520} className="rounded-xl">
+                <table className="text-left text-[11px]">
                   <thead className="text-[10px] uppercase tracking-wider text-zinc-600">
                     <tr><th className="pb-2 pr-3 font-medium">Person</th><th className="pb-2 pr-3 font-medium">Role</th><th className="pb-2 font-medium" /></tr>
                   </thead>
@@ -255,8 +256,10 @@ export default function Organisation() {
                         </td>
                       </tr>
                     ))}
+                    {(members.data ?? []).length === 0 && <TableEmptyRow colSpan={3} title="No organisation members" description="Members will appear here when they are added." />}
                   </tbody>
                 </table>
+                </TableSurface>
                 {members.isLoading && <p className="mt-2 text-xs text-zinc-500">Loading members…</p>}
                 {members.error && <p className="mt-2 text-xs text-red-300">{members.error.message}</p>}
               </div>
