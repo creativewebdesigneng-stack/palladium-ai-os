@@ -1,10 +1,15 @@
 import { BUILDS, BUILD_STATUS_STYLE } from './deploymentsData';
+import TableSurface from '@/components/palladium/TableSurface';
 
 export default function BuildsTable() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-      <div className="border-b border-white/10 px-4 py-2.5 text-sm font-semibold text-white">Builds <span className="ml-1 text-[11px] text-zinc-500">({BUILDS.length})</span></div>
-      <div className="overflow-x-auto">
+    <TableSurface
+      label="Deployment builds"
+      minWidth={780}
+      maxHeight={520}
+      className="bg-black/60"
+      toolbar={<div className="px-4 py-2.5 text-sm font-semibold text-white">Builds <span className="ml-1 text-[11px] text-zinc-500">({BUILDS.length})</span></div>}
+    >
         <table className="w-full text-[11px]">
           <thead>
             <tr className="text-left text-zinc-500">
@@ -31,7 +36,6 @@ export default function BuildsTable() {
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
+    </TableSurface>
   );
 }
