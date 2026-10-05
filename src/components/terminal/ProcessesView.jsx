@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { PROCESSES } from './terminalData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function ProcessesView({ onToast }) {
   const [procs, setProcs] = useState(PROCESSES);
@@ -9,8 +10,9 @@ export default function ProcessesView({ onToast }) {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/60">
       <div className="border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">Processes <span className="ml-1 text-zinc-500">({procs.length})</span></div>
-      <div className="flex-1 overflow-y-auto p-2">
-        <table className="w-full text-[11px]">
+      <div className="min-h-0 flex-1 p-2">
+        <TableSurface label="Running processes" minWidth={760} maxHeight="100%" className="h-full rounded-xl">
+        <table className="text-[11px]">
           <thead>
             <tr className="text-left text-zinc-500">
               <th className="px-2 py-1.5 font-medium">PID</th>
@@ -36,9 +38,10 @@ export default function ProcessesView({ onToast }) {
                 </td>
               </tr>
             ))}
-            {!procs.length && <tr><td colSpan={7} className="px-2 py-6 text-center text-zinc-600">No running processes</td></tr>}
+            {!procs.length && <TableEmptyRow colSpan={7} title="No running processes" description="Processes will appear here when the runtime reports them." />}
           </tbody>
         </table>
+        </TableSurface>
       </div>
     </div>
   );
