@@ -78,7 +78,7 @@ export default function PageConnectorGuide({ pathname }) {
 
       {connectors.some((connector) => connector.state === "candidate") && (
         <p className="mt-2 border-t border-white/[.04] pt-2 text-[9px] leading-4 text-zinc-700">
-          Candidate means the provider was found in the current ChatGPT connector catalogue and is a strong workflow match; it is not a Blackstar connection until a real provider API, MCP or OAuth route is configured and verified.
+          Candidate means the provider is a recommended external integration for this workflow; it is not a Blackstar connection until a real provider API, MCP or OAuth route is configured and verified.
         </p>
       )}
     </section>
