@@ -7,6 +7,7 @@ const EXTENSIONS = new Set<string>(['.jsx', '.tsx']);
 const EXEMPT = new Set<string>([
   path.normalize('src/components/palladium/TableSurface.jsx'),
   path.normalize('src/components/ui/table.tsx'),
+  path.normalize('src/screens/PublishedStudioApp.jsx'),
 ]);
 
 function collect(dir: string, files: string[] = []): string[] {
@@ -29,6 +30,15 @@ describe('Blackstar universal table system', () => {
       })
       .map((file) => file.replaceAll('\\', '/'));
     expect(offenders).toEqual([]);
+  });
+
+  it('keeps public Studio table widgets theme-neutral but equally scroll/accessibility safe', () => {
+    const source = fs.readFileSync('src/screens/PublishedStudioApp.jsx', 'utf8');
+    expect(source).toContain('data-public-studio-table');
+    expect(source).toContain('role="region"');
+    expect(source).toContain('tabIndex={0}');
+    expect(source).toContain('overscroll-contain');
+    expect(source).toContain('sticky top-8');
   });
 
   it('keeps the universal table surface accessible and mobile-safe', () => {
