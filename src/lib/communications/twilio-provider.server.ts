@@ -8,6 +8,7 @@ import {
 
 const CALL_SID = /^CA[0-9a-fA-F]{32}$/;
 const VERIFY_SERVICE_SID = /^VA[0-9a-fA-F]{32}$/;
+const TWILIO_REQUEST_TIMEOUT_MS = 8_000;
 
 function config() {
   return resolveRetailTwilioConfig({
@@ -48,20 +49,55 @@ function authHeader(accountSid: string, authToken: string) {
   return `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`;
 }
 
+function ambiguousTwilioDispatchError(message: string, cause?: unknown) {
+  return Object.assign(new Error(message), {
+    name: 'TwilioDispatchAmbiguousError',
+    dispatchOutcome: 'ambiguous' as const,
+    ...(cause === undefined ? {} : { cause }),
+  });
+}
+
+export function isAmbiguousTwilioDispatchError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'dispatchOutcome' in error &&
+    (error as { dispatchOutcome?: unknown }).dispatchOutcome === 'ambiguous',
+  );
+}
+
 async function postForm(url: string, body: URLSearchParams) {
   const twilio = config();
   if (!twilio) throw new Error('Twilio is not configured on this deployment.');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: authHeader(twilio.accountSid, twilio.authToken),
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    },
-    body: body.toString(),
-    signal: AbortSignal.timeout(15_000),
-  });
-  const raw = await response.text();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader(twilio.accountSid, twilio.authToken),
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: body.toString(),
+      signal: AbortSignal.timeout(TWILIO_REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw ambiguousTwilioDispatchError(
+      'Twilio did not return a definitive response before the delivery deadline. Provider acceptance is unknown and automatic retry is blocked until callback reconciliation.',
+      error,
+    );
+  }
+  let raw = '';
+  try {
+    raw = await response.text();
+  } catch (error) {
+    if (response.ok) {
+      throw ambiguousTwilioDispatchError(
+        'Twilio returned success but Blackstar could not read the provider response. Provider acceptance is unknown and automatic retry is blocked until callback reconciliation.',
+        error,
+      );
+    }
+  }
   let parsed: Record<string, unknown> = {};
   if (raw) {
     try { parsed = JSON.parse(raw) as Record<string, unknown>; }
@@ -107,7 +143,11 @@ export async function sendTwilioSms(input: {
   if (input.statusCallbackUrl) form.set('StatusCallback', input.statusCallbackUrl);
   const result = await postForm(`https://api.twilio.com/2010-04-01/Accounts/${twilio.accountSid}/Messages.json`, form);
   const sid = String(result['sid'] ?? '');
-  if (!/^SM[0-9a-fA-F]{32}$/.test(sid)) throw new Error('Twilio did not return a valid message identifier.');
+  if (!/^SM[0-9a-fA-F]{32}$/.test(sid)) {
+    throw ambiguousTwilioDispatchError(
+      'Twilio returned success without a valid message identifier. Provider acceptance is unknown and automatic retry is blocked until callback reconciliation.',
+    );
+  }
   return { sid, status: String(result['status'] ?? 'accepted').slice(0, 80) };
 }
 
@@ -140,7 +180,11 @@ export async function startTwilioAiCall(input: {
   for (const event of ['initiated', 'ringing', 'answered', 'completed']) form.append('StatusCallbackEvent', event);
   const result = await postForm(`https://api.twilio.com/2010-04-01/Accounts/${twilio.accountSid}/Calls.json`, form);
   const sid = String(result['sid'] ?? '');
-  if (!CALL_SID.test(sid)) throw new Error('Twilio did not return a valid call identifier.');
+  if (!CALL_SID.test(sid)) {
+    throw ambiguousTwilioDispatchError(
+      'Twilio returned success without a valid call identifier. Provider acceptance is unknown and automatic retry is blocked until callback reconciliation.',
+    );
+  }
   return { sid, status: String(result['status'] ?? 'queued').slice(0, 80) };
 }
 
