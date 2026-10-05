@@ -441,15 +441,28 @@ const ROUTE_RULES: RouteConnectorRule[] = [
 ];
 
 function resolvedConnector(item: PageConnectorRecommendation): PageConnectorRecommendation {
-  if (item.state !== "candidate") return item;
   const profile = capabilityProfile(item.id);
-  if (profile?.status !== "planned") return item;
-  return {
-    ...item,
-    state: "target",
-    source: "blackstar",
-    reason: `Registered Blackstar provider target. ${item.reason} Runtime access still requires a user-owned connection and a deployed provider route.`,
-  };
+  if (!profile) return item;
+  if (profile.status === "native") {
+    return { ...item, state: "native", source: "blackstar" };
+  }
+  if (profile.status === "connector" || profile.status === "hybrid") {
+    return {
+      ...item,
+      state: "supported",
+      source: "blackstar",
+      reason: `${profile.notes || item.reason} Runtime execution still requires a healthy user-owned connection and advertised capability.`,
+    };
+  }
+  if (profile.status === "planned" && item.state === "candidate") {
+    return {
+      ...item,
+      state: "target",
+      source: "blackstar",
+      reason: `Registered Blackstar provider target. ${item.reason} Runtime access still requires a user-owned connection and a deployed provider route.`,
+    };
+  }
+  return item;
 }
 
 const RESOLVED_CONNECTORS: Record<string, PageConnectorRecommendation> = Object.fromEntries(
