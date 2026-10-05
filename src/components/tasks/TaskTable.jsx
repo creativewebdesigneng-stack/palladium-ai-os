@@ -1,5 +1,6 @@
 import { ArrowRight, Copy, Pause, Play, X } from 'lucide-react';
 import { PRIORITY_STYLE, STATUS_STYLE } from './tasksData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 function Avatar({ agent, grad = 'from-violet-500 to-indigo-500' }) {
   return (
@@ -22,9 +23,8 @@ const AGENT_GRAD = {
 
 export default function TaskTable({ tasks, onOpen, onAction }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-      <div className="max-h-[560px] overflow-auto">
-        <table className="w-full text-sm">
+    <TableSurface label="Tasks" minWidth={1180} maxHeight={560}>
+        <table className="text-sm">
           <thead className="sticky top-0 z-10 border-b border-white/10 bg-[#0c0d13]/95 text-left text-[11px] uppercase tracking-wider text-zinc-500 backdrop-blur">
             <tr>
               {['Task', 'Priority', 'Agent', 'Team', 'Dept', 'Status', 'Progress', 'Due', 'Est. Done', '', ''].map(h => (
@@ -90,9 +90,9 @@ export default function TaskTable({ tasks, onOpen, onAction }) {
                 </tr>
               );
             })}
+            {tasks.length === 0 && <TableEmptyRow colSpan={11} title="No tasks found" description="No tasks match the current filters." />}
           </tbody>
         </table>
-      </div>
-    </div>
+    </TableSurface>
   );
 }
