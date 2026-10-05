@@ -81,11 +81,17 @@ export default function Integrations() {
   const [visibleLimit, setVisibleLimit] = useState(48);
   const [error, setError] = useState("");
   const nangoConnectRef = useRef(null);
-  const creativeProviders = useMemo(
-    () => PROVIDER_CAPABILITY_PROFILES.filter((provider) =>
-      provider.families.some((family) => ["creative_design", "media_generation", "three_d"].includes(family)),
-    ),
+  const plannedTargets = useMemo(
+    () => PROVIDER_CAPABILITY_PROFILES.filter((provider) => provider.status === "planned"),
     [],
+  );
+  const targetRoutes = useMemo(
+    () =>
+      plannedTargets.map((provider) => ({
+        ...provider,
+        nango: nangoConnections.find((item) => item.id === provider.id) ?? null,
+      })),
+    [plannedTargets, nangoConnections],
   );
 
   async function refresh() {
@@ -420,32 +426,83 @@ export default function Integrations() {
       <section className="mb-5 overflow-hidden rounded-[24px] border border-fuchsia-300/10 bg-gradient-to-br from-fuchsia-500/[.045] via-violet-500/[.025] to-cyan-500/[.025] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-fuchsia-200/60">Creative intelligence network</p>
-            <h2 className="mt-2 text-lg font-semibold text-white">Design and generation connector targets</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-fuchsia-200/60">Provider target network</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">Registered Blackstar connector targets</h2>
             <p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-500">
-              Blackstar now has explicit capability identities for the creative providers below. They remain connector targets until a user-owned provider route is configured and its executable actions pass the normal approval and capability checks.
+              These providers are mapped into Blackstar&apos;s canonical capability model. A target is not a live connection: execution is enabled only when a user-owned provider route exists and its real actions pass Blackstar&apos;s normal scope, approval and audit checks.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => navigate("/ai-hub")}
+            onClick={() => navigate("/mcp-hub")}
             className="rounded-xl border border-fuchsia-300/15 bg-fuchsia-400/[.055] px-4 py-2.5 text-xs font-medium text-fuchsia-100 hover:bg-fuchsia-400/[.09]"
           >
-            Open Intelligence Hub
+            Inspect MCP surface
           </button>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {creativeProviders.map((provider) => (
-            <div key={provider.id} className="rounded-2xl border border-white/[.065] bg-black/20 p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-white">{provider.name}</p>
-                <span className="rounded-full border border-white/[.07] bg-white/[.035] px-2 py-1 text-[9px] font-semibold uppercase tracking-[.14em] text-zinc-500">
-                  {provider.status === "planned" ? "Connector target" : provider.status}
-                </span>
+          {targetRoutes.map((provider) => {
+            const nangoAvailable = Boolean(provider.nango?.configured);
+            const nangoConnected = provider.nango?.connected === true;
+            const targetCardId = `${provider.id}-target`;
+            return (
+              <div key={provider.id} className="flex min-h-[12rem] flex-col rounded-2xl border border-white/[.065] bg-black/20 p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{provider.name}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {provider.families.slice(0, 3).map((family) => (
+                        <span key={family} className="rounded-md bg-white/[.035] px-1.5 py-0.5 text-[9px] uppercase tracking-[.08em] text-zinc-600">
+                          {family.replaceAll("_", " ")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[.12em] ${
+                    nangoConnected
+                      ? "border-emerald-400/20 bg-emerald-400/[.07] text-emerald-300"
+                      : nangoAvailable
+                        ? "border-cyan-400/20 bg-cyan-400/[.06] text-cyan-300"
+                        : "border-white/[.07] bg-white/[.035] text-zinc-500"
+                  }`}>
+                    {nangoConnected ? "Connected via Nango" : nangoAvailable ? "Nango route available" : "Connector target"}
+                  </span>
+                </div>
+                <p className="mt-3 text-[11px] leading-5 text-zinc-500">{provider.notes}</p>
+                <div className="mt-auto pt-3">
+                  {nangoAvailable && !nangoConnected ? (
+                    <button
+                      type="button"
+                      disabled={busyProvider === targetCardId}
+                      onClick={() =>
+                        connect({
+                          id: targetCardId,
+                          providerId: provider.id,
+                          name: `${provider.name} via Nango`,
+                          nangoProvider: true,
+                        })
+                      }
+                      className="rounded-lg border border-cyan-300/15 bg-cyan-400/[.05] px-2.5 py-1.5 text-[10px] font-medium text-cyan-200 hover:bg-cyan-400/[.09] disabled:opacity-50"
+                    >
+                      {busyProvider === targetCardId ? "Opening…" : "Connect via Nango"}
+                    </button>
+                  ) : nangoConnected ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery(provider.name)}
+                      className="rounded-lg border border-emerald-300/15 bg-emerald-400/[.05] px-2.5 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-400/[.09]"
+                    >
+                      View live provider
+                    </button>
+                  ) : (
+                    <p className="text-[10px] leading-4 text-zinc-600">
+                      No live marketplace route is advertised yet. Keep this target provider-gated until an approved API, Nango or MCP route exists.
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="mt-2 text-[11px] leading-5 text-zinc-500">{provider.notes}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
