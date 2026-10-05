@@ -1,4 +1,5 @@
-import { Check, X, Brain, Eye, Wrench, Sparkles } from 'lucide-react';
+import { Check, X } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const ROWS = [
   { key: 'provider', label: 'Provider' },
@@ -13,7 +14,7 @@ const ROWS = [
 export default function CompareTable({ models, onRemove }) {
   if (models.length === 0) return null;
   return (
-    <div className="mb-6 overflow-x-auto rounded-2xl border border-white/10 bg-white/[.03]">
+    <TableSurface label="Model comparison" minWidth={520} className="mb-6">
       <table className="w-full min-w-[520px] text-left text-[12px]">
         <thead>
           <tr className="border-b border-white/10">
@@ -59,6 +60,6 @@ export default function CompareTable({ models, onRemove }) {
           </tr>
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScrollText, Loader2 } from 'lucide-react';
 import { getApiUsage } from './api';
 import { METHOD_STYLE, LOG_STATUS_STYLE } from './devPortalData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function LogsPanel() {
   const [logs, setLogs] = useState([]);
@@ -15,9 +16,8 @@ export default function LogsPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><ScrollText className="h-5 w-5 text-violet-400" /><h2 className="text-lg font-semibold text-white">API Request Logs</h2></div>
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
+      <TableSurface label="API request logs" minWidth={900} maxHeight={560} className="bg-black/60">
+          <table className="text-[11px]">
             <thead>
               <tr className="text-left text-zinc-500">
                 <th className="px-4 py-2 font-medium">TIME</th>
@@ -33,7 +33,7 @@ export default function LogsPanel() {
               {loading ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-500"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></td></tr>
               ) : logs.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-500">No API requests logged yet.</td></tr>
+                <TableEmptyRow colSpan={7} title="No API requests logged yet" description="Live API request logs will appear here after traffic is recorded." />
               ) : logs.map((l, i) => (
                 <tr key={i} className="border-t border-white/5 hover:bg-white/5">
                   <td className="px-4 py-2 font-mono text-zinc-400">{l.t}</td>
@@ -47,8 +47,7 @@ export default function LogsPanel() {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
+      </TableSurface>
     </div>
   );
 }

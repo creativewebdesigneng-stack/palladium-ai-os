@@ -1,10 +1,11 @@
 import { Eye, Pencil } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const STATUS_CLS = { active: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20', suspended: 'text-rose-300 bg-rose-400/10 border-rose-400/20', trial: 'text-sky-300 bg-sky-400/10 border-sky-400/20' };
 
 export default function OrgsTable({ orgs, onView, onEdit }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
+    <TableSurface label="Organisations" minWidth={1040}>
       <table className="w-full text-left text-[12px]">
         <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-zinc-500">
           <tr>
@@ -46,7 +47,7 @@ export default function OrgsTable({ orgs, onView, onEdit }) {
           {orgs.length === 0 && <tr><td colSpan={9} className="px-3 py-10 text-center text-zinc-500">No organisations match your filters.</td></tr>}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
 

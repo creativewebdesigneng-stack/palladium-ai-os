@@ -1,8 +1,9 @@
 import { STATUS_STYLE } from './workflowsData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function RunHistoryTable({ runs }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.03]">
+    <TableSurface label="Workflow run history" minWidth={820} maxHeight={560}>
       <table className="w-full min-w-[820px] text-left text-xs">
         <thead className="border-b border-white/10 text-[10px] uppercase tracking-wider text-zinc-500">
           <tr>
@@ -30,8 +31,9 @@ export default function RunHistoryTable({ runs }) {
               </tr>
             );
           })}
+          {runs.length === 0 && <TableEmptyRow colSpan={7} title="No workflow runs yet" description="Run history will appear here after the workflow executes." />}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }

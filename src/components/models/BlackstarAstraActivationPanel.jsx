@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Cpu, Database, FlaskConical, Route, Server, ShieldCheck, XCircle } from 'lucide-react';
 import { deriveAstraActivationSummary } from '@/lib/runtime/blackstar-astra-activation-status';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const stageIcons = {
   configured: Server,
@@ -102,9 +103,8 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
       </div>
 
       {readiness.models?.length ? (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-600">Serving identities</p>
-          <table className="w-full min-w-[760px] text-left text-xs">
+        <div className="mt-4"><TableSurface label="Astra serving identities" minWidth={760} className="rounded-xl" toolbar={<p className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-zinc-600">Serving identities</p>}>
+          <table className="text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
               <tr><th className="pb-2 font-medium">Task classes</th><th className="pb-2 font-medium">Model</th><th className="pb-2 font-medium">Serving</th><th className="pb-2 font-medium">Health</th><th className="pb-2 font-medium">Latency</th><th className="pb-2 font-medium">Probe</th></tr>
             </thead>
@@ -121,17 +121,15 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableSurface></div>
       ) : null}
 
       {readiness.certification?.length ? (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="mt-4">
+          <TableSurface label="Astra verifier-backed certification" minWidth={1040} className="rounded-xl" toolbar={<div className="px-3 py-2"><div className="flex flex-wrap items-center gap-2">
             <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-600">Verifier-backed certification</p>
-            <span className="text-[10px] text-zinc-500">{readiness.certified_task_classes ?? 0}/{readiness.certification.length} eligible · {readiness.routable_task_classes ?? 0}/{readiness.certification.length} routable</span>
-          </div>
-          <p className="mb-3 rounded-lg border border-white/10 bg-white/[.025] px-3 py-2 text-[10px] leading-relaxed text-zinc-500">Missing, stale or unqualified evidence must be refreshed through the existing Model Arena. Blackstar's trusted verifier requires at least 20 distinct completed runs for the exact provider/model before it can issue routing evidence. Running evaluations does not itself certify or grant execution authority.</p>
-          <table className="w-full min-w-[1040px] text-left text-xs">
+            <span className="text-[10px] text-zinc-500">{readiness.certified_task_classes ?? 0}/{readiness.certification.length} eligible · {readiness.routable_task_classes ?? 0}/{readiness.certification.length} routable</span></div><p className="mt-2 rounded-lg border border-white/10 bg-white/[.025] px-3 py-2 text-[10px] leading-relaxed text-zinc-500">Missing, stale or unqualified evidence must be refreshed through the existing Model Arena. Blackstar&apos;s trusted verifier requires at least 20 distinct completed runs for the exact provider/model before it can issue routing evidence. Running evaluations does not itself certify or grant execution authority.</p></div>}>
+          <table className="text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
               <tr><th className="pb-2 font-medium">Task class</th><th className="pb-2 font-medium">Exact model</th><th className="pb-2 font-medium">Evidence</th><th className="pb-2 font-medium">Certified / eligible</th><th className="pb-2 font-medium">Actually routable</th><th className="pb-2 font-medium">Qualified score</th><th className="pb-2 font-medium">Evaluation action</th></tr>
             </thead>
@@ -156,7 +154,7 @@ export default function BlackstarAstraActivationPanel({ readiness }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableSurface></div>
       ) : null}
 
       <div className="mt-4 grid gap-2 lg:grid-cols-2">

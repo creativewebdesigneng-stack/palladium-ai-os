@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Check, Copy, ExternalLink, Globe2, Sparkles } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 function CodeBlock({ children, lang }) {
   const [copied, setCopied] = useState(false);
@@ -14,12 +15,12 @@ function CodeBlock({ children, lang }) {
     const rows = String(children).trim().split('\n').map((row) => row.split('|'));
     if (!rows.length) return null;
     return (
-      <div className="my-3 overflow-x-auto rounded-xl border border-white/10">
+      <TableSurface label="Assistant table" minWidth={Math.max(480, rows[0].length * 140)} className="my-3 rounded-xl">
         <table className="w-full text-xs">
           <thead className="bg-white/5 text-zinc-300"><tr>{rows[0].map((heading, index) => <th key={index} className="px-3 py-2 text-left font-medium">{heading.trim()}</th>)}</tr></thead>
           <tbody className="text-zinc-400">{rows.slice(1).map((row, index) => <tr key={index} className="border-t border-white/5">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2">{cell.trim()}</td>)}</tr>)}</tbody>
         </table>
-      </div>
+      </TableSurface>
     );
   }
 

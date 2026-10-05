@@ -3,13 +3,13 @@ import { KeyRound, Plug, Webhook, ArrowRight } from 'lucide-react';
 import { Link } from '@/lib/router-compat';
 import { SectionHead, StatusPill } from './shared';
 import { shortDate, timeAgo } from './format';
+import TableSurface from '@/components/palladium/TableSurface';
 
 function Table({ head, rows, empty }) {
   if (!rows.length) return <p className="rounded-2xl border border-white/10 bg-white/[.025] p-4 text-xs text-zinc-500">{empty}</p>;
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left">
+    <TableSurface label="Security data" minWidth={640}>
+        <table className="text-left">
           <thead className="border-b border-white/10 bg-white/[.02] text-[10px] uppercase tracking-wide text-zinc-500">
             <tr>
               {head.map((h) => (
@@ -21,8 +21,7 @@ function Table({ head, rows, empty }) {
           </thead>
           <tbody className="divide-y divide-white/5">{rows}</tbody>
         </table>
-      </div>
-    </div>
+    </TableSurface>
   );
 }
 

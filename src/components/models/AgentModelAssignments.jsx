@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { AGENT_ASSIGNMENTS } from './modelsData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 export default function AgentModelAssignments({ onSwitch }) {
   return (
@@ -9,7 +10,7 @@ export default function AgentModelAssignments({ onSwitch }) {
         <h2 className="text-sm font-semibold text-white">Agent Model Assignments</h2>
         <p className="mt-0.5 text-xs text-zinc-500">Models powering each agent, with fallbacks.</p>
       </div>
-      <div className="overflow-hidden rounded-xl border border-white/5">
+      <TableSurface label="Agent model assignments" minWidth={820} className="rounded-xl">
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 text-left text-[11px] text-zinc-500">
             <tr>{['Agent', 'Current Model', 'Fallback', 'Provider', 'Status', ''].map(h => <th key={h} className="px-3 py-2.5 font-medium">{h}</th>)}</tr>
@@ -32,9 +33,10 @@ export default function AgentModelAssignments({ onSwitch }) {
                 </td>
               </motion.tr>
             ))}
+            {AGENT_ASSIGNMENTS.length === 0 && <TableEmptyRow colSpan={6} title="No model assignments" description="Agent model assignments will appear here when configured." />}
           </tbody>
         </table>
-      </div>
+      </TableSurface>
     </div>
   );
 }

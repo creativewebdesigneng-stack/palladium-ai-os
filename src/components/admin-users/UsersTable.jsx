@@ -1,4 +1,5 @@
 import { Eye } from 'lucide-react';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 const PLAN_CLS = {
   free: 'text-zinc-300 bg-white/5',
@@ -17,7 +18,7 @@ const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : 'â
 /** Read-only admin directory table. Mutating actions live behind audited server functions. */
 export default function UsersTable({ users, onView, planLabels = {} }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
+    <TableSurface label="Users" minWidth={860}>
       <table className="w-full text-left text-[12px]">
         <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-zinc-500">
           <tr>
@@ -70,8 +71,9 @@ export default function UsersTable({ users, onView, planLabels = {} }) {
               </td>
             </tr>
           ))}
+          {users.length === 0 && <TableEmptyRow colSpan={6} title="No users found" description="No users match the current directory view." />}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }

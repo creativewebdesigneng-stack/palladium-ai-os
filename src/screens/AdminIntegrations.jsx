@@ -11,6 +11,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import PageHeader from "@/components/palladium/PageHeader";
+import TableSurface, { TableEmptyRow } from "@/components/palladium/TableSurface";
 import { useWorkspace } from "@/hooks/use-workspace";
 import {
   listAdminIntegrationOverview,
@@ -273,20 +274,14 @@ export default function AdminIntegrations() {
         </div>
       </section>
 
-      <section className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[.03]">
-        <div className="border-b border-white/10 p-4">
-          <h2 className="text-sm font-semibold text-white">Recent connection activity</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Latest persisted integration rows across the platform.
-          </p>
-        </div>
-        {recent.length === 0 ? (
-          <div className="p-10 text-center text-sm text-zinc-500">
-            No integration connections have been created yet.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+      <section className="mt-4">
+        <TableSurface
+          label="Recent integration connection activity"
+          minWidth={900}
+          maxHeight={560}
+          toolbar={<div className="p-4"><h2 className="text-sm font-semibold text-white">Recent connection activity</h2><p className="mt-1 text-xs text-zinc-500">Latest persisted integration rows across the platform.</p></div>}
+        >
+            <table className="text-left text-xs">
               <thead className="bg-black/20 text-[10px] uppercase tracking-wide text-zinc-600">
                 <tr>
                   <th className="px-4 py-2">Provider</th>
@@ -320,10 +315,10 @@ export default function AdminIntegrations() {
                     </td>
                   </tr>
                 ))}
+                {recent.length === 0 && <TableEmptyRow colSpan={6} title="No integration connections yet" description="Recent persisted integration activity will appear here." />}
               </tbody>
             </table>
-          </div>
-        )}
+        </TableSurface>
       </section>
     </>
   );

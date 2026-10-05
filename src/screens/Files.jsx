@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { ExternalLink, FileText, HardDrive, Loader2, Search, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import TableSurface from '@/components/palladium/TableSurface';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useToast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
@@ -110,8 +111,8 @@ export default function Files() {
       </div>
 
       {visible.length ? (
-        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.02]">
-          <table className="w-full min-w-[760px] text-left text-xs">
+        <TableSurface label="Files and knowledge documents" minWidth={860} maxHeight={640}>
+          <table className="text-left text-xs">
             <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-zinc-600"><tr><th className="px-3 py-2 font-medium">Document</th><th className="px-3 py-2 font-medium">Source</th><th className="px-3 py-2 font-medium">Size</th><th className="px-3 py-2 font-medium">Chunks</th><th className="px-3 py-2 font-medium">Index status</th><th className="px-3 py-2 font-medium">Created</th><th className="px-3 py-2 text-right font-medium">Actions</th></tr></thead>
             <tbody className="divide-y divide-white/5">
               {visible.map((doc) => (
@@ -127,7 +128,7 @@ export default function Files() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableSurface>
       ) : (
         <div className="grid place-items-center rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center"><HardDrive className="h-9 w-9 text-zinc-600" /><p className="mt-3 text-sm font-medium text-white">{documents.length ? 'No documents match that search' : 'No files or knowledge documents yet'}</p><p className="mt-1 max-w-lg text-xs text-zinc-500">Upload a supported file to store it privately and index its readable text for your agents. Pasted-only knowledge also appears here as an indexed document without a source file.</p>{!documents.length ? <button onClick={() => setShowUpload(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white"><Upload className="h-3.5 w-3.5" />Upload first file</button> : null}</div>
       )}

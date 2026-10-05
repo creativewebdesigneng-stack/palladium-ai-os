@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Database, Grid3X3, KanbanSquare, ListPlus, Loader2, Plus, RefreshCw, Save, Trash2, Workflow } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -134,8 +135,21 @@ export default function SmartTables() {
           {busy && !detail ? <div className="grid min-h-64 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-zinc-500" /></div> : !detail ? <div className="grid min-h-64 place-items-center text-sm text-zinc-600">Choose or create a Smart Table.</div> : <>
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-semibold text-white">{detail.table.name}</h2><p className="mt-1 text-xs text-zinc-500">{detail.table.description || 'Structured workspace data'}</p></div><div className="flex flex-wrap gap-1.5">{detail.views.map((view) => <span key={view.id} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-400">{view.kind} · {view.name}</span>)}<button onClick={() => addView('kanban')} className="rounded-lg border border-white/10 p-1.5 text-zinc-500" title="Add Kanban view"><KanbanSquare className="h-3.5 w-3.5" /></button><button onClick={() => addView('form')} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-500">+ form</button></div></div>
 
-            <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-black/25 text-zinc-500"><tr>{currentFields.map((field) => <th key={field.key} className="px-3 py-2.5 font-medium">{field.name}<span className="ml-1 text-[9px] text-zinc-700">{field.type}</span></th>)}<th className="w-10" /></tr></thead><tbody>{detail.records.map((record) => <tr key={record.id} className="border-t border-white/5 text-zinc-300">{currentFields.map((field) => <td key={field.key} className="max-w-[260px] truncate px-3 py-2.5">{renderValue(record.values?.[field.key])}</td>)}<td><button onClick={() => removeRecord(record.id)} className="p-2 text-zinc-700 hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}{detail.records.length === 0 && <tr><td colSpan={currentFields.length + 1} className="px-3 py-8 text-center text-zinc-600">No records yet.</td></tr>}</tbody></table>
+            <div className="mt-4">
+              <TableSurface label={`${detail.table.name} records`} minWidth={Math.max(700, currentFields.length * 180 + 64)} maxHeight={560} className="rounded-xl">
+                <table className="text-left text-xs">
+                  <thead className="text-zinc-500">
+                    <tr>
+                      {currentFields.map((field) => <th key={field.key} className="px-3 py-2.5">{field.name}<span className="ml-1 text-[9px] text-zinc-700">{field.type}</span></th>)}
+                      <th className="w-10 px-2 py-2.5"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.records.map((record) => <tr key={record.id} className="text-zinc-300">{currentFields.map((field) => <td key={field.key} className="max-w-[260px] truncate px-3 py-2.5" title={renderValue(record.values?.[field.key])}>{renderValue(record.values?.[field.key])}</td>)}<td><button aria-label="Delete record" title="Delete record" onClick={() => removeRecord(record.id)} className="p-2 text-zinc-700 hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}
+                    {detail.records.length === 0 && <TableEmptyRow colSpan={currentFields.length + 1} title="No records yet" description="Add the first record below." />}
+                  </tbody>
+                </table>
+              </TableSurface>
             </div>
 
             <form onSubmit={addRecord} className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4"><p className="mb-3 text-xs font-semibold text-white">Add record</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{currentFields.map((field) => <RecordField key={field.key} field={field} value={draftValues[field.key]} onChange={(value) => setDraftValues((current) => ({ ...current, [field.key]: value }))} />)}</div><button disabled={busy} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"><Plus className="h-3.5 w-3.5" />Add record</button></form>

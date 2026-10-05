@@ -4,6 +4,7 @@
  * unavailable the components show "No data yet" rather than a placeholder.
  */
 import { Inbox } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 export const NO_DATA = 'No data yet';
 
@@ -119,7 +120,7 @@ export function Failed({ message, onRetry }) {
 export function Table({ columns, rows, renderRow, empty }) {
   if (!rows.length) return empty ?? <Empty />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[.02]">
+    <TableSurface label="Business data" minWidth={Math.max(640, columns.length * 150)}>
       <table className="w-full text-left text-xs">
         <thead>
           <tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-zinc-500">
@@ -132,7 +133,7 @@ export function Table({ columns, rows, renderRow, empty }) {
         </thead>
         <tbody>{rows.map(renderRow)}</tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
 

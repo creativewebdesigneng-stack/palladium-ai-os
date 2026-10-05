@@ -3,6 +3,7 @@ import { FileText, Loader2, ReceiptText } from 'lucide-react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listBillingEvents } from '@/lib/billing/billing.functions';
 import { StatusBadge } from './shared';
+import TableSurface from '@/components/palladium/TableSurface';
 
 export default function InvoicesTable() {
   const { session, activeOrgId } = useWorkspace();
@@ -34,7 +35,7 @@ export default function InvoicesTable() {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10">
+    <TableSurface label="Billing invoices" minWidth={680}>
       <table className="w-full text-left text-sm">
         <thead className="bg-white/[.03] text-[11px] uppercase tracking-wide text-zinc-500">
           <tr>
@@ -57,6 +58,6 @@ export default function InvoicesTable() {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
