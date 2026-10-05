@@ -4,6 +4,7 @@ import { listPlans } from '@/lib/platform/platform.functions';
 import { useAuth } from '@/lib/AuthContext';
 import { getPlanKey } from '@/lib/permissions';
 import { friendlyMessage } from '@/lib/errors';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const CODE_TO_KEY = { explorer: 'free', builder: 'pro', business: 'business', enterprise: 'enterprise' };
 const FEATURE_ORDER = ['price', 'projects', 'agents', 'aiUsage', 'storage', 'members', 'integrations', 'automation', 'support'];
@@ -41,7 +42,7 @@ export default function PlanComparison() {
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
+    <TableSurface label="Plan comparison" minWidth={760}>
       <table className="w-full min-w-[760px] text-left text-sm">
         <thead className="bg-white/[.03] text-[11px] uppercase tracking-wide text-zinc-500">
           <tr>
@@ -69,6 +70,6 @@ export default function PlanComparison() {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
