@@ -13,6 +13,7 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("adobe");
     expect(ids).toContain("canva");
     expect(ids).toContain("heygen");
+    expect(pageConnectorCatalogue["canva"]?.state).toBe("supported");
   });
 
   it("prioritizes website production connectors on Website Studio", () => {
@@ -33,6 +34,7 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("atlassian");
     expect(matches.find((item) => item.id === "github")?.state).toBe("supported");
     expect(matches.find((item) => item.id === "vercel")?.state).toBe("target");
+    expect(matches.find((item) => item.id === "supabase")?.state).toBe("supported");
   });
 
   it("maps marketing surfaces to governed social providers and current analytics candidates", () => {
@@ -69,10 +71,17 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("box");
     expect(ids).toContain("sharepoint");
     expect(ids).toContain("coda");
+    expect(pageConnectorCatalogue["airtable"]?.state).toBe("supported");
+    expect(pageConnectorCatalogue["dropbox"]?.state).toBe("supported");
+    expect(pageConnectorCatalogue["sharepoint"]?.state).toBe("supported");
   });
 
   it("promotes verified catalogue matches only after they enter the Blackstar capability catalog", () => {
-    for (const id of ["webflow", "heygen", "semrush", "metricool", "airtable", "coda", "dropbox", "sharepoint", "amplitude", "posthog", "vercel", "supabase", "lovable"]) {
+    for (const id of ["webflow", "airtable", "dropbox", "sharepoint", "supabase"]) {
+      expect(pageConnectorCatalogue[id]?.state, id).toBe("supported");
+      expect(pageConnectorCatalogue[id]?.source, id).toBe("blackstar");
+    }
+    for (const id of ["heygen", "semrush", "metricool", "coda", "amplitude", "posthog", "vercel", "lovable"]) {
       expect(pageConnectorCatalogue[id]?.state, id).toBe("target");
       expect(pageConnectorCatalogue[id]?.source, id).toBe("blackstar");
       expect(pageConnectorCatalogue[id]?.reason, id).toMatch(/user-owned connection|explicit provider authorization|provider route/i);
