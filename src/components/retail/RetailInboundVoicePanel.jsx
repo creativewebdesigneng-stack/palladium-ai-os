@@ -6,6 +6,7 @@ import {
   disconnectRetailInboundVoice,
   getRetailInboundVoiceConfig,
 } from '@/lib/retail/retail-inbound-voice.functions';
+import TableSurface from '@/components/palladium/TableSurface';
 
 function shortError(error, fallback) {
   return error instanceof Error ? error.message.replace(/^twilio_api_error:/, '') : fallback;
@@ -135,7 +136,7 @@ export default function RetailInboundVoicePanel({ workspaceId, profiles = [] }) 
         return <div key={endpoint.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[.06] bg-black/25 p-3"><div><div className="text-sm font-medium text-zinc-200">{endpoint.phone_number}</div><div className="mt-0.5 text-[11px] text-zinc-600">{profile?.name || 'Receptionist profile'} · signed webhook {endpoint.webhook_configured ? 'active' : 'inactive'}</div></div><button type="button" onClick={() => disconnect(endpoint.id)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-400/15 bg-rose-400/[.04] px-3 py-2 text-xs text-rose-200 hover:bg-rose-400/[.08] disabled:opacity-40"><PhoneOff className="h-3.5 w-3.5" />Disconnect</button></div>;
       })}</div>}
 
-      {sessions.length > 0 && <div className="mt-4"><div className="mb-2 text-[10px] uppercase tracking-[.18em] text-zinc-600">Recent inbound sessions</div><div className="overflow-x-auto"><table className="min-w-full text-left text-[11px]"><thead className="text-zinc-600"><tr><th className="px-2 py-2 font-medium">Caller</th><th className="px-2 py-2 font-medium">Number</th><th className="px-2 py-2 font-medium">Status</th><th className="px-2 py-2 font-medium">AI turns</th><th className="px-2 py-2 font-medium">Updated</th></tr></thead><tbody>{sessions.slice(0, 20).map((session) => <tr key={session.id} className="border-t border-white/[.05] text-zinc-400"><td className="px-2 py-2">{session.caller_phone || 'Withheld/unknown'}</td><td className="px-2 py-2">{session.called_phone}</td><td className="px-2 py-2">{session.status}</td><td className="px-2 py-2">{session.turn_count}</td><td className="px-2 py-2">{new Date(session.updated_at).toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+      {sessions.length > 0 && <div className="mt-4"><div className="mb-2 text-[10px] uppercase tracking-[.18em] text-zinc-600">Recent inbound sessions</div><TableSurface label="Recent inbound phone sessions" minWidth={720} maxHeight={420} className="rounded-xl"><table className="text-left text-[11px]"><thead className="text-zinc-600"><tr><th className="px-2 py-2 font-medium">Caller</th><th className="px-2 py-2 font-medium">Number</th><th className="px-2 py-2 font-medium">Status</th><th className="px-2 py-2 font-medium">AI turns</th><th className="px-2 py-2 font-medium">Updated</th></tr></thead><tbody>{sessions.slice(0, 20).map((session) => <tr key={session.id} className="border-t border-white/[.05] text-zinc-400"><td className="px-2 py-2">{session.caller_phone || 'Withheld/unknown'}</td><td className="px-2 py-2">{session.called_phone}</td><td className="px-2 py-2">{session.status}</td><td className="px-2 py-2">{session.turn_count}</td><td className="px-2 py-2">{new Date(session.updated_at).toLocaleString()}</td></tr>)}</tbody></table></TableSurface></div>}
     </section>
   );
 }
