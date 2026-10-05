@@ -1,4 +1,5 @@
 import { CheckCircle2, CircleAlert, CircleDashed } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 function State({ ok, active }) {
   if (ok) {
@@ -35,17 +36,28 @@ export default function ProductionCapabilities({ data, loading }) {
   ];
 
   return (
-    <div className="divide-y divide-white/[.06]">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-200">{row.label}</p>
-            <p className="mt-0.5 text-[10px] text-zinc-500">{row.detail}</p>
-          </div>
-          <State ok={row.ok} active={row.active} />
-        </div>
-      ))}
-      <p className="pt-3 text-[10px] text-zinc-600">Checked server-side. Secret values are never returned to this page.</p>
+    <div>
+      <TableSurface label="Production capabilities" minWidth={640} className="rounded-xl">
+        <table className="text-xs">
+          <thead className="text-[10px] uppercase tracking-wide">
+            <tr>
+              <th className="px-3 py-2.5">Capability</th>
+              <th className="px-3 py-2.5">Details</th>
+              <th className="px-3 py-2.5">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <td className="px-3 py-3 font-medium text-zinc-200">{row.label}</td>
+                <td className="px-3 py-3 text-[10px] text-zinc-500">{row.detail}</td>
+                <td className="px-3 py-3"><State ok={row.ok} active={row.active} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableSurface>
+      <p className="mt-2 text-[10px] text-zinc-600">Checked server-side. Secret values are never returned to this page.</p>
     </div>
   );
 }
