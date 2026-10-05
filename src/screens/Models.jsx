@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Link } from 'react-router-dom';
 import { Bot, CheckCircle2, Cpu, KeyRound, Loader2, Search, Server, ShieldCheck, XCircle } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
+import TableSurface from '@/components/palladium/TableSurface';
 import BlackstarAstraActivationPanel from '@/components/models/BlackstarAstraActivationPanel';
 import DeepSeekRuntimePanel from '@/components/models/DeepSeekRuntimePanel';
 import APIManagement from '@/components/models/APIManagement';
@@ -119,8 +120,8 @@ export default function Models() {
         </div>
 
         {filteredAssignments.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
+          <div className="mt-4"><TableSurface label="Agent model assignments" minWidth={720} maxHeight={520} className="rounded-xl">
+            <table className="text-left text-xs">
               <thead className="text-[10px] uppercase tracking-wide text-zinc-600"><tr><th className="pb-2 font-medium">Agent</th><th className="pb-2 font-medium">Provider</th><th className="pb-2 font-medium">Model</th><th className="pb-2 font-medium">Runtime</th><th className="pb-2 font-medium">Status</th></tr></thead>
               <tbody className="divide-y divide-white/5">
                 {filteredAssignments.map((agent) => {
@@ -129,7 +130,7 @@ export default function Models() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableSurface></div>
         ) : <p className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-zinc-500">No agent model assignments match this filter.</p>}
       </section>
 
@@ -137,12 +138,12 @@ export default function Models() {
         <h2 className="text-sm font-semibold text-white">Recent model usage</h2>
         <p className="mt-1 text-[11px] text-zinc-500">Aggregated from up to the 500 most recent persisted agent task rows.</p>
         {usage.length ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-xs">
+          <div className="mt-4"><TableSurface label="Recent model usage" minWidth={820} maxHeight={520} className="rounded-xl">
+            <table className="text-left text-xs">
               <thead className="text-[10px] uppercase tracking-wide text-zinc-600"><tr><th className="pb-2 font-medium">Provider / model</th><th className="pb-2 font-medium">Runs</th><th className="pb-2 font-medium">Succeeded</th><th className="pb-2 font-medium">Failed</th><th className="pb-2 font-medium">Tokens</th><th className="pb-2 font-medium">Cost</th><th className="pb-2 font-medium">Last used</th></tr></thead>
               <tbody className="divide-y divide-white/5">{usage.map((row) => <tr key={`${row.provider}:${row.model}`}><td className="py-2.5 pr-3"><p className="text-zinc-300">{row.provider}</p><code className="text-[11px] text-violet-200">{row.model}</code></td><td className="py-2.5 pr-3 text-zinc-200">{row.runs}</td><td className="py-2.5 pr-3 text-emerald-300">{row.succeeded}</td><td className="py-2.5 pr-3 text-rose-300">{row.failed}</td><td className="py-2.5 pr-3 text-zinc-400">{(row.tokensIn + row.tokensOut).toLocaleString()}</td><td className="py-2.5 pr-3 text-zinc-300">{moneyFromPence(row.costPence)}</td><td className="py-2.5 text-zinc-500">{row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleString('en-GB') : '—'}</td></tr>)}</tbody>
             </table>
-          </div>
+          </TableSurface></div>
         ) : <p className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-zinc-500">No model execution telemetry yet. Run an agent and its real provider/model usage will appear here.</p>}
       </section>
     </>
