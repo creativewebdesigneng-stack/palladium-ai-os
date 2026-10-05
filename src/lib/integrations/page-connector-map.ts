@@ -1,3 +1,5 @@
+import { capabilityProfile } from "./capability-catalog";
+
 export type PageConnectorState = "native" | "supported" | "target" | "candidate";
 
 export type PageConnectorRecommendation = {
@@ -438,6 +440,22 @@ const ROUTE_RULES: RouteConnectorRule[] = [
   },
 ];
 
+function resolvedConnector(item: PageConnectorRecommendation): PageConnectorRecommendation {
+  if (item.state !== "candidate") return item;
+  const profile = capabilityProfile(item.id);
+  if (profile?.status !== "planned") return item;
+  return {
+    ...item,
+    state: "target",
+    source: "blackstar",
+    reason: `Registered Blackstar provider target. ${item.reason} Runtime access still requires a user-owned connection and a deployed provider route.`,
+  };
+}
+
+const RESOLVED_CONNECTORS: Record<string, PageConnectorRecommendation> = Object.fromEntries(
+  Object.entries(CONNECTORS).map(([id, item]) => [id, resolvedConnector(item)]),
+);
+
 function routeMatches(pathname: string, pattern: string) {
   if (pattern.endsWith("*")) {
     const prefix = pattern.slice(0, -1);
@@ -456,10 +474,10 @@ export function pageConnectorRecommendations(pathname: string, limit = 8) {
   }
 
   return ids
-    .map((id) => CONNECTORS[id])
+    .map((id) => RESOLVED_CONNECTORS[id])
     .filter((value): value is PageConnectorRecommendation => Boolean(value))
     .slice(0, Math.max(1, limit));
 }
 
-export const pageConnectorCatalogue = CONNECTORS;
+export const pageConnectorCatalogue = RESOLVED_CONNECTORS;
 export const pageConnectorRules = ROUTE_RULES;
