@@ -54,7 +54,7 @@ The current ChatGPT catalogue also exposed useful matches including Vercel, Supa
 
 These are not Blackstar integrations merely because they exist in ChatGPT.
 
-During this audit, the verified matches Vercel, Supabase, Lovable, Webflow, Semrush, Metricool, Airtable, Coda, Dropbox, SharePoint, Amplitude, PostHog and HeyGen were also registered in Blackstar's canonical capability catalog as **planned provider targets**. A target is metadata and routing intent only: it does not create OAuth credentials, a live connection, deployed actions or execution evidence.
+During this audit, the verified matches Vercel, Supabase, Lovable, Webflow, Semrush, Metricool, Airtable, Coda, Dropbox, SharePoint, Amplitude, PostHog, HeyGen, Datadog and Vanta were also registered in Blackstar's canonical capability catalog as **planned provider targets**. A target is metadata and routing intent only: it does not create OAuth credentials, a live connection, deployed actions or execution evidence.
 
 ## Page families and best-fit connectors
 
@@ -91,7 +91,7 @@ Routes:
 Best fit:
 GitHub and Figma are direct Blackstar matches.
 Hugging Face is useful for model/dev workflows.
-Registered Blackstar targets: Vercel, Supabase and Lovable. Atlassian and Datadog remain catalogue candidates.
+Registered Blackstar targets: Vercel, Supabase, Lovable and Datadog. Atlassian remains a catalogue candidate.
 
 ### Creative, website, Cinema, Game and 3D pages
 
@@ -188,7 +188,7 @@ Routes:
 
 Best fit:
 Google Workspace, Microsoft 365, Notion, Slack and Asana.
-Vanta is a strong current catalogue candidate for compliance controls/evidence.
+Vanta is a registered Blackstar provider target for compliance controls/evidence.
 
 For Legal/Compliance, current source-backed jurisdictional data remains mandatory; a connector does not make coverage universally current.
 
@@ -210,7 +210,7 @@ Routes:
 `/admin/acceptance`, `/admin/platform-analytics`.
 
 Best fit:
-GitHub plus registered targets Vercel, Supabase, Amplitude and PostHog. Datadog and Vanta remain catalogue candidates.
+GitHub plus registered targets Vercel, Supabase, Amplitude, PostHog, Datadog and Vanta.
 
 These are operational data sources only; readiness data is not acceptance certification.
 
