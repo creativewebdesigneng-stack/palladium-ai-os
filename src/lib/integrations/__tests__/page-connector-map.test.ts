@@ -32,7 +32,7 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("supabase");
     expect(ids).toContain("atlassian");
     expect(matches.find((item) => item.id === "github")?.state).toBe("supported");
-    expect(matches.find((item) => item.id === "vercel")?.state).toBe("candidate");
+    expect(matches.find((item) => item.id === "vercel")?.state).toBe("target");
   });
 
   it("maps marketing surfaces to governed social providers and current analytics candidates", () => {
@@ -45,10 +45,10 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("metricool");
   });
 
-  it("prioritizes product analytics providers without claiming Blackstar support", () => {
+  it("promotes registered product analytics providers to bounded Blackstar targets", () => {
     const matches = pageConnectorRecommendations("/product-analytics");
-    expect(matches.find((item) => item.id === "amplitude")?.state).toBe("candidate");
-    expect(matches.find((item) => item.id === "posthog")?.state).toBe("candidate");
+    expect(matches.find((item) => item.id === "amplitude")?.state).toBe("target");
+    expect(matches.find((item) => item.id === "posthog")?.state).toBe("target");
   });
 
   it("maps commerce and billing to the existing Shopify and Stripe paths", () => {
@@ -71,13 +71,24 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("coda");
   });
 
+  it("promotes verified catalogue matches only after they enter the Blackstar capability catalog", () => {
+    for (const id of ["webflow", "heygen", "semrush", "metricool", "airtable", "coda", "dropbox", "sharepoint", "amplitude", "posthog", "vercel", "supabase", "lovable"]) {
+      expect(pageConnectorCatalogue[id]?.state, id).toBe("target");
+      expect(pageConnectorCatalogue[id]?.source, id).toBe("blackstar");
+      expect(pageConnectorCatalogue[id]?.reason, id).toMatch(/user-owned connection|explicit provider authorization|provider route/i);
+    }
+    expect(pageConnectorCatalogue["datadog"]?.state).toBe("candidate");
+    expect(pageConnectorCatalogue["vanta"]?.state).toBe("candidate");
+    expect(pageConnectorCatalogue["ringcentral"]?.state).toBe("candidate");
+  });
+
   it("offers fitness-specific candidates without fabricating Blackstar support", () => {
     const matches = pageConnectorRecommendations("/health-fitness", 12);
     expect(matches.find((item) => item.id === "coros")?.state).toBe("candidate");
     expect(matches.find((item) => item.id === "caliber")?.state).toBe("candidate");
   });
 
-  it("keeps ChatGPT catalogue discoveries explicitly non-executable until Blackstar integrates them", () => {
+  it("keeps unresolved catalogue discoveries explicitly non-executable until Blackstar registers them", () => {
     const candidates = Object.values(pageConnectorCatalogue).filter(
       (item) => item.source === "chatgpt-catalogue",
     );
