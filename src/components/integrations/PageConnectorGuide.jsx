@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
+import { getPageConnectorConnectionState } from "@/lib/integrations/integrations.functions";
 import { pageConnectorRecommendations } from "@/lib/integrations/page-connector-map";
 
 const STATE_LABELS = {
+  connected: "Connected",
   native: "Native",
   supported: "Supported",
   target: "Connector target",
@@ -11,6 +13,7 @@ const STATE_LABELS = {
 };
 
 const STATE_CLASSES = {
+  connected: "border-emerald-300/25 bg-emerald-400/[.09] text-emerald-200",
   native: "border-emerald-400/15 bg-emerald-500/[.055] text-emerald-200",
   supported: "border-cyan-400/15 bg-cyan-500/[.05] text-cyan-200",
   target: "border-violet-400/15 bg-violet-500/[.055] text-violet-200",
@@ -23,6 +26,38 @@ export default function PageConnectorGuide({ pathname }) {
     () => pageConnectorRecommendations(pathname, 7),
     [pathname],
   );
+  const [connectionStates, setConnectionStates] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    if (connectors.length === 0) {
+      setConnectionStates({});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getPageConnectorConnectionState({
+      data: { providers: connectors.map((connector) => connector.id) },
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setConnectionStates(
+          Object.fromEntries((result.states ?? []).map((state) => [state.provider, state])),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setConnectionStates({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectors]);
+
+  const connectedCount = connectors.filter(
+    (connector) => connectionStates[connector.id]?.connected === true,
+  ).length;
 
   if (connectors.length === 0) return null;
 
@@ -41,29 +76,36 @@ export default function PageConnectorGuide({ pathname }) {
               Page connectors
             </p>
             <p className="truncate text-[11px] text-zinc-600">
-              Best-fit provider routes
+              Best-fit provider routes{connectedCount > 0 ? ` · ${connectedCount} connected` : ""}
             </p>
           </div>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {connectors.map((connector) => (
-            <span
-              key={connector.id}
-              title={connector.reason}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-medium ${STATE_CLASSES[connector.state]}`}
-            >
-              {connector.state === "candidate" ? (
-                <Sparkles className="h-3 w-3 opacity-75" />
-              ) : (
-                <ShieldCheck className="h-3 w-3 opacity-75" />
-              )}
-              <span>{connector.name}</span>
-              <span className="hidden opacity-55 sm:inline">
-                · {STATE_LABELS[connector.state]}
+          {connectors.map((connector) => {
+            const connection = connectionStates[connector.id];
+            const displayState = connection?.connected ? "connected" : connector.state;
+            const title = connection?.connected
+              ? `${connector.reason} Connected through ${connection.transport || "a verified provider route"}.`
+              : connector.reason;
+            return (
+              <span
+                key={connector.id}
+                title={title}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-medium ${STATE_CLASSES[displayState]}`}
+              >
+                {displayState === "candidate" ? (
+                  <Sparkles className="h-3 w-3 opacity-75" />
+                ) : (
+                  <ShieldCheck className="h-3 w-3 opacity-75" />
+                )}
+                <span>{connector.name}</span>
+                <span className="hidden opacity-55 sm:inline">
+                  · {STATE_LABELS[displayState]}
+                </span>
               </span>
-            </span>
-          ))}
+            );
+          })}
         </div>
 
         <button
