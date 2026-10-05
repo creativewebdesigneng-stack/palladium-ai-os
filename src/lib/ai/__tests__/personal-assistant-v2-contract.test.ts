@@ -57,6 +57,19 @@ describe('Blackstar personal assistant v2 contract', () => {
     expect(ui).toContain('assistantChat')
   })
 
+  it('adds current-page connector capability context without granting execution authority', () => {
+    expect(context).toContain('loadAssistantPageConnectorContext')
+    expect(context).toContain('pageConnectorRecommendations')
+    expect(context).toContain('listIntegrationCapabilities')
+    expect(context).toContain('CURRENT PAGE CONNECTOR CONTEXT — READ-ONLY CAPABILITY DISCOVERY')
+    expect(context).toContain('does not authorise or execute provider actions')
+    expect(assistant).toContain('parseAssistantPathname')
+    expect(assistant).toContain('pageConnectorContext.prompt')
+    expect(assistant).toContain('pageConnectorCapabilities')
+    expect(ui).toContain('window.location.pathname')
+    expect(ui).toContain('pageConnectorCapabilities')
+  })
+
   it('keeps agent and integration discovery read-only and workspace context bounded', () => {
     expect(context).toContain('discoverAssistantAgents')
     expect(context).toContain('loadAssistantConnectionContext')

@@ -5,6 +5,8 @@ import { INTEGRATION_PROVIDERS } from '@/lib/integrations/providers'
 import { assessIntegrationHealth } from '@/lib/integrations/integration-health'
 import { assistantConnectionContext, summariseAssistantConnections } from './assistant-connection-inspection'
 import { readConnectedService } from '@/lib/integrations/connected-service.server'
+import { pageConnectorRecommendations } from '@/lib/integrations/page-connector-map'
+import { listIntegrationCapabilities } from '@/lib/integrations/agent-integration-runtime.server'
 
 type Sb = { from: (table: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any }
 export type AssistantTurn = { role: 'user' | 'assistant'; content: string }
@@ -326,6 +328,69 @@ export async function loadAssistantExternalWorkspaceContext(args: {
     prompt,
     reads: successful.length,
     providers: [...new Set(successful.map((entry) => entry.provider))],
+  }
+}
+
+export async function loadAssistantPageConnectorContext(args: {
+  userId: string
+  pathname?: string | null
+  enabled: boolean
+}) {
+  const pathname = typeof args.pathname === 'string' ? args.pathname.trim() : ''
+  if (!args.enabled || !pathname) {
+    return {
+      prompt: '',
+      recommendations: 0,
+      capabilityProviders: [] as string[],
+      capabilities: 0,
+      approvalCapabilities: 0,
+    }
+  }
+
+  const recommendations = pageConnectorRecommendations(pathname, 7)
+  if (!recommendations.length) {
+    return {
+      prompt: '',
+      recommendations: 0,
+      capabilityProviders: [] as string[],
+      capabilities: 0,
+      approvalCapabilities: 0,
+    }
+  }
+
+  const resolved = await Promise.allSettled(
+    recommendations.map(async (recommendation) => ({
+      recommendation,
+      capabilities: await listIntegrationCapabilities(args.userId, recommendation.id),
+    })),
+  )
+  const available = resolved
+    .filter((entry): entry is PromiseFulfilledResult<any> => entry.status === 'fulfilled')
+    .map((entry) => entry.value)
+    .filter((entry) => Array.isArray(entry.capabilities) && entry.capabilities.length > 0)
+
+  const capabilities = available
+    .flatMap((entry) => entry.capabilities)
+    .slice(0, 24)
+  const capabilityProviders = [...new Set(capabilities.map((capability) => capability.provider))]
+  const approvalCapabilities = capabilities.filter((capability) => capability.requiresApproval).length
+
+  const prompt = [
+    'CURRENT PAGE CONNECTOR CONTEXT — READ-ONLY CAPABILITY DISCOVERY',
+    `Current Blackstar page: ${pathname}`,
+    `Best-fit providers for this page: ${recommendations.map((item) => `${item.id}:${item.state}`).join(', ')}`,
+    capabilities.length
+      ? `Runtime capabilities currently discoverable for this signed-in user: ${capabilities.map((capability) => `${capability.provider}:${capability.action} [${capability.lane}; ${capability.requiresApproval ? 'approval required' : 'no approval required by current policy'}; ${capability.deployed ? 'deployed' : 'discoverable'}]`).join('; ')}`
+      : 'No executable runtime capabilities were discovered for the recommended providers on this page.',
+    'This context is capability metadata only. It does not authorise or execute provider actions. Never claim an external action happened from this context. Any consequential write must continue through Blackstar\'s existing preparation, approval, audit and execution runtime.',
+  ].join('\n\n').slice(0, 10000)
+
+  return {
+    prompt,
+    recommendations: recommendations.length,
+    capabilityProviders,
+    capabilities: capabilities.length,
+    approvalCapabilities,
   }
 }
 
