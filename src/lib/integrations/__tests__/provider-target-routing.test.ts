@@ -46,8 +46,8 @@ describe("provider target runtime routing", () => {
     const ambiguous = resolveProviderTargetMatch(
       { id: "heygen", name: "HeyGen" },
       [
-        { id: "hey-gen", name: "HeyGen" },
-        { id: "heygen-alt", name: "HeyGen" },
+        { id: "provider-one", name: "HeyGen" },
+        { id: "provider-two", name: "HeyGen" },
       ],
     );
     expect(ambiguous).toBeNull();
