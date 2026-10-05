@@ -88,19 +88,31 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
     const sb = context.supabase as unknown as Sb;
     const direct = await sb
       .from("integrations")
-      .select("provider,status,account_label,integration_type,last_error")
+      .select("provider,status,account_label,integration_type,granted_scopes,expires_at,last_error")
       .eq("user_id", context.userId)
       .in("provider", providerIds);
     if (direct.error) throw new Error(direct.error.message);
 
-    const nangoRows = await import("./nango.server")
-      .then((module) => module.listPersistedNangoConnections(context.userId))
-      .catch(() => []);
+    const [{ supabaseAdmin }, nangoRows] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("./nango.server")
+        .then((module) => module.listPersistedNangoConnections(context.userId))
+        .catch(() => []),
+    ]);
+    const credentials = await supabaseAdmin
+      .from("integration_credentials")
+      .select("provider,refresh_token_ciphertext,expires_at")
+      .eq("user_id", context.userId)
+      .in("provider", providerIds);
+    if (credentials.error) throw new Error(credentials.error.message);
     const directByProvider = new Map(
       (direct.data ?? []).map((row: any) => [String(row.provider).toLowerCase(), row]),
     );
     const nangoByProvider = new Map(
       nangoRows.map((row: any) => [String(row.providerId).toLowerCase(), row]),
+    );
+    const credentialsByProvider = new Map(
+      (credentials.data ?? []).map((row: any) => [String(row.provider).toLowerCase(), row]),
     );
 
     let githubInstallationValid = false;
@@ -115,8 +127,28 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
       states: providerIds.map((provider) => {
         const directRow: any = directByProvider.get(provider);
         const nangoRow: any = nangoByProvider.get(provider);
+        const credential: any = credentialsByProvider.get(provider);
+        const definition = findProvider(provider);
+        const directHealth =
+          provider === "github"
+            ? null
+            : definition && directRow
+              ? assessIntegrationHealth({
+                  providerName: definition.name,
+                  requiredScopes: definition.scopes,
+                  status: directRow.status,
+                  grantedScopes: Array.isArray(directRow.granted_scopes)
+                    ? directRow.granted_scopes
+                    : [],
+                  expiresAt: credential?.expires_at ?? directRow.expires_at ?? null,
+                  hasRefreshToken: Boolean(credential?.refresh_token_ciphertext),
+                  lastError: directRow.last_error ?? null,
+                })
+              : null;
         const directConnected =
-          directRow?.status === "connected" && (provider !== "github" || githubInstallationValid);
+          provider === "github"
+            ? directRow?.status === "connected" && githubInstallationValid
+            : directHealth?.healthy === true;
         const nangoConnected =
           nangoRow?.status === "connected" && Boolean(nangoRow?.config?.connection_id);
 
