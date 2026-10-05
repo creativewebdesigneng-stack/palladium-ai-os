@@ -18,6 +18,8 @@ export type CapabilityFamily =
   | "media_generation"
   | "three_d"
   | "analytics"
+  | "observability"
+  | "security_compliance"
   | "marketing";
 
 export type ExecutionLane =
