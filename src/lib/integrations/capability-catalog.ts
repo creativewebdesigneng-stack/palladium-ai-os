@@ -18,6 +18,8 @@ export type CapabilityFamily =
   | "media_generation"
   | "three_d"
   | "analytics"
+  | "observability"
+  | "security_compliance"
   | "marketing";
 
 export type ExecutionLane =
@@ -84,6 +86,8 @@ export const PROVIDER_CAPABILITY_PROFILES: ProviderCapabilityProfile[] = [
   { id: "sharepoint", name: "SharePoint", families: ["storage", "productivity"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for SharePoint and OneDrive content, permissions, versions and enterprise document workflows." },
   { id: "amplitude", name: "Amplitude", families: ["analytics"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for product metrics, funnels, cohorts, experiments, feature flags and anomaly monitoring." },
   { id: "posthog", name: "PostHog", families: ["analytics", "developer_tools"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for product analytics, experiments, feature flags, error tracking, replay and LLM observability." },
+  { id: "datadog", name: "Datadog", families: ["observability", "analytics", "developer_tools"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for user-owned logs, metrics, traces, incidents and monitors. Observability data never implies Blackstar acceptance certification." },
+  { id: "vanta", name: "Vanta", families: ["security_compliance"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for user-owned compliance controls, evidence, risks, audits and vendors. Connection or evidence visibility never certifies compliance." },
 ];
 
 export function capabilityProfile(provider: string): ProviderCapabilityProfile | undefined {
