@@ -72,13 +72,11 @@ describe("route-aware page connector recommendations", () => {
   });
 
   it("promotes verified catalogue matches only after they enter the Blackstar capability catalog", () => {
-    for (const id of ["webflow", "heygen", "semrush", "metricool", "airtable", "coda", "dropbox", "sharepoint", "amplitude", "posthog", "vercel", "supabase", "lovable"]) {
+    for (const id of ["webflow", "heygen", "semrush", "metricool", "airtable", "coda", "dropbox", "sharepoint", "amplitude", "posthog", "datadog", "vanta", "vercel", "supabase", "lovable"]) {
       expect(pageConnectorCatalogue[id]?.state, id).toBe("target");
       expect(pageConnectorCatalogue[id]?.source, id).toBe("blackstar");
       expect(pageConnectorCatalogue[id]?.reason, id).toMatch(/user-owned connection|explicit provider authorization|provider route/i);
     }
-    expect(pageConnectorCatalogue["datadog"]?.state).toBe("candidate");
-    expect(pageConnectorCatalogue["vanta"]?.state).toBe("candidate");
     expect(pageConnectorCatalogue["ringcentral"]?.state).toBe("candidate");
   });
 
