@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ROOTS = ['src/components', 'src/screens', 'src/routes'];
-const EXTENSIONS = new Set(['.jsx', '.tsx']);
-const EXEMPT = new Set([
+const ROOTS: string[] = ['src/components', 'src/screens', 'src/routes'];
+const EXTENSIONS = new Set<string>(['.jsx', '.tsx']);
+const EXEMPT = new Set<string>([
   path.normalize('src/components/palladium/TableSurface.jsx'),
   path.normalize('src/components/ui/table.tsx'),
 ]);
 
-function collect(dir, files = []) {
+function collect(dir: string, files: string[] = []): string[] {
   if (!fs.existsSync(dir)) return files;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
