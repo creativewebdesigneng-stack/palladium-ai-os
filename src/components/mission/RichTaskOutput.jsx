@@ -2,6 +2,7 @@ import { Download, ExternalLink, FileText, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { getLiveCommuteRoute } from '@/lib/mission/commute-routing.functions';
+import TableSurface from '@/components/palladium/TableSurface';
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -155,7 +156,7 @@ function FileList({ files }) {
 function DataTable({ table }) {
   if (!table || !Array.isArray(table.columns) || !Array.isArray(table.rows) || !table.rows.length) return null;
   return (
-    <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+    <TableSurface label="Task output table" minWidth={520} className="mt-3 rounded-xl">
       <table className="w-full min-w-[520px] text-left text-[10px]">
         <thead className="bg-white/[.04] text-zinc-500">
           <tr>{table.columns.map((column) => <th key={column.key || column.label} className="px-3 py-2 font-medium">{column.label || column.key}</th>)}</tr>
@@ -168,7 +169,7 @@ function DataTable({ table }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableSurface>
   );
 }
 
