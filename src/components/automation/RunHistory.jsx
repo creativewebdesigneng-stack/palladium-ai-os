@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { History, Play, FileText, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { RUN_HISTORY, STATUS_STYLE } from './automationData';
+import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 
 const STATUS_ICON = { success: CheckCircle2, failed: AlertCircle, warning: Clock };
 
@@ -12,7 +13,7 @@ export default function RunHistory() {
         <h2 className="text-sm font-semibold text-white">Run History</h2>
         <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-zinc-400">{RUN_HISTORY.length} runs</span>
       </div>
-      <div className="overflow-x-auto [scrollbar-width:thin]">
+      <TableSurface label="Automation run history" minWidth={980} maxHeight={560} className="rounded-xl">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-zinc-600">
@@ -59,9 +60,10 @@ export default function RunHistory() {
                 </motion.tr>
               );
             })}
+            {RUN_HISTORY.length === 0 && <TableEmptyRow colSpan={9} title="No automation runs yet" description="Run history will appear after an automation executes." />}
           </tbody>
         </table>
-      </div>
+      </TableSurface>
     </div>
   );
 }
