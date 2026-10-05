@@ -33,9 +33,20 @@ describe("page connector live-state contract", () => {
     expect(responseBlock).not.toMatch(/accessToken|refreshTokenCiphertext|clientSecret|privateKey/);
   });
 
+  it("derives runtime action counts from the existing provider-neutral agent integration runtime", () => {
+    expect(integrationSource).toContain('import("./agent-integration-runtime.server")');
+    expect(integrationSource).toContain("listIntegrationCapabilities(");
+    expect(integrationSource).toContain("capabilityCount");
+    expect(integrationSource).toContain("deployedCapabilityCount");
+    expect(integrationSource).toContain("approvalCapabilityCount");
+    expect(integrationSource).toContain('capabilityState: "unavailable"');
+  });
+
   it("renders connected as an overlay state and preserves target/candidate fallback", () => {
     expect(guideSource).toContain('connected: "Connected"');
     expect(guideSource).toContain('connection?.connected ? "connected" : connector.state');
+    expect(guideSource).toContain("runtimeActionCount");
+    expect(guideSource).toContain("runtime action(s) discovered");
     expect(guideSource).toContain("Candidate means the provider is a recommended external integration");
   });
 });
