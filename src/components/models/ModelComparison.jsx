@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { X, GitCompare } from 'lucide-react';
+import TableSurface from '@/components/palladium/TableSurface';
 
 const DIMS = [
   { key: 'speed', label: 'Speed', max: 5 },
@@ -26,8 +27,8 @@ export default function ModelComparison({ models, onClose, onRemove }) {
         <button onClick={onClose} className="text-xs text-zinc-500 hover:text-white">Clear</button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <TableSurface label="Model comparison metrics" minWidth={Math.max(680, models.length * 220 + 140)} className="rounded-xl">
+        <table className="text-sm">
           <thead>
             <tr className="border-b border-white/10">
               <th className="w-32 p-2 text-left text-xs text-zinc-500">Metric</th>
@@ -65,7 +66,7 @@ export default function ModelComparison({ models, onClose, onRemove }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableSurface>
 
       <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-300">
         <span className="font-semibold">Recommendation:</span> {winner.name} ranks highest overall for your workload.
