@@ -194,7 +194,7 @@ const CONNECTORS: Record<string, PageConnectorRecommendation> = {
     name: "Supabase",
     state: "candidate",
     source: "chatgpt-catalogue",
-    reason: "Recommended external integration for database, Auth and backend operations; do not reuse ChatGPT credentials inside Blackstar.",
+    reason: "Recommended external integration for database, Auth and backend operations; Blackstar requires its own provider authorization and credentials.",
   },
   lovable: {
     id: "lovable",
