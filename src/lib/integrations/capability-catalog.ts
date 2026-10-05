@@ -16,7 +16,9 @@ export type CapabilityFamily =
   | "calendar"
   | "creative_design"
   | "media_generation"
-  | "three_d";
+  | "three_d"
+  | "analytics"
+  | "marketing";
 
 export type ExecutionLane =
   | "direct_api"
@@ -69,6 +71,19 @@ export const PROVIDER_CAPABILITY_PROFILES: ProviderCapabilityProfile[] = [
   { id: "adobe", name: "Adobe Creative Cloud", families: ["creative_design", "media_generation"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned", notes: "Target connector for image, document and media production under explicit user authorization." },
   { id: "runway", name: "Runway", families: ["media_generation", "creative_design"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for governed video and image generation when a live account/API route is configured." },
   { id: "higgsfield", name: "Higgsfield", families: ["media_generation", "creative_design"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for image, video and branded-content generation when a live provider route is configured." },
+  { id: "vercel", name: "Vercel", families: ["developer_tools", "website_portal"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for user-owned projects, deployments and runtime operations. Blackstar's own hosting credentials are never reused as a user connection." },
+  { id: "supabase", name: "Supabase", families: ["developer_tools", "storage"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for user-owned database, Auth, storage and backend operations through explicit provider authorization." },
+  { id: "lovable", name: "Lovable", families: ["website_portal", "developer_tools"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned", notes: "Target connector for user-owned app and website build workflows; execution remains provider- and account-gated." },
+  { id: "webflow", name: "Webflow", families: ["website_portal", "creative_design", "developer_tools"], preferredLanes: ["direct_api", "connector_transport", "browser"], status: "planned", notes: "Target connector for site pages, CMS, assets, localization, interactions and publishing with explicit user authorization." },
+  { id: "heygen", name: "HeyGen", families: ["media_generation", "creative_design"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for avatar video, speech, lip-sync, clipping and localization. Generation is not implied until a user-owned provider route executes successfully." },
+  { id: "semrush", name: "Semrush", families: ["analytics", "marketing"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for SEO, keyword, backlink, traffic, audience and competitive intelligence." },
+  { id: "metricool", name: "Metricool", families: ["social_media", "analytics", "marketing"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for social analytics, scheduling and approval-oriented publishing workflows." },
+  { id: "airtable", name: "Airtable", families: ["productivity", "project_management", "storage"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for structured operational data, records, interfaces and automations." },
+  { id: "coda", name: "Coda", families: ["productivity", "project_management"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for operating documents that combine pages, tables, formulas, controls and collaboration." },
+  { id: "dropbox", name: "Dropbox", families: ["storage", "productivity"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for user-owned file search, storage, sharing, revisions and recovery workflows." },
+  { id: "sharepoint", name: "SharePoint", families: ["storage", "productivity"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for SharePoint and OneDrive content, permissions, versions and enterprise document workflows." },
+  { id: "amplitude", name: "Amplitude", families: ["analytics"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for product metrics, funnels, cohorts, experiments, feature flags and anomaly monitoring." },
+  { id: "posthog", name: "PostHog", families: ["analytics", "developer_tools"], preferredLanes: ["direct_api", "connector_transport"], status: "planned", notes: "Target connector for product analytics, experiments, feature flags, error tracking, replay and LLM observability." },
 ];
 
 export function capabilityProfile(provider: string): ProviderCapabilityProfile | undefined {
