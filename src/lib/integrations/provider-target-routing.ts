@@ -57,14 +57,17 @@ export function resolveProviderTargetMatch<T extends ProviderCatalogueEntry>(
 
   const targetIdKey = normalizeProviderIdentity(target.id);
   const targetNameKey = normalizeProviderIdentity(target.name ?? "");
+  const identityKeys = new Set(providerTargetIdentityKeys(target));
   const scored = matches
     .map((candidate) => {
       const idKey = normalizeProviderIdentity(candidate.id);
       const nameKey = normalizeProviderIdentity(candidate.name ?? "");
       const score =
-        (idKey === targetIdKey ? 4 : 0) +
-        (targetNameKey && nameKey === targetNameKey ? 3 : 0) +
-        (targetNameKey && idKey === targetNameKey ? 2 : 0);
+        (idKey === targetIdKey ? 8 : 0) +
+        (targetNameKey && nameKey === targetNameKey ? 6 : 0) +
+        (targetNameKey && idKey === targetNameKey ? 5 : 0) +
+        (identityKeys.has(idKey) ? 4 : 0) +
+        (identityKeys.has(nameKey) ? 2 : 0);
       return { candidate, score };
     })
     .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
