@@ -58,6 +58,10 @@ export default function PageConnectorGuide({ pathname }) {
   const connectedCount = connectors.filter(
     (connector) => connectionStates[connector.id]?.connected === true,
   ).length;
+  const runtimeActionCount = connectors.reduce(
+    (total, connector) => total + Number(connectionStates[connector.id]?.capabilityCount ?? 0),
+    0,
+  );
 
   if (connectors.length === 0) return null;
 
@@ -76,7 +80,9 @@ export default function PageConnectorGuide({ pathname }) {
               Page connectors
             </p>
             <p className="truncate text-[11px] text-zinc-600">
-              Best-fit provider routes{connectedCount > 0 ? ` · ${connectedCount} connected` : ""}
+              Best-fit provider routes
+              {connectedCount > 0 ? ` · ${connectedCount} connected` : ""}
+              {runtimeActionCount > 0 ? ` · ${runtimeActionCount} runtime actions` : ""}
             </p>
           </div>
         </div>
@@ -86,7 +92,9 @@ export default function PageConnectorGuide({ pathname }) {
             const connection = connectionStates[connector.id];
             const displayState = connection?.connected ? "connected" : connector.state;
             const title = connection?.connected
-              ? `${connector.reason} Connected through ${connection.transport || "a verified provider route"}.`
+              ? connection.capabilityState === "ok"
+                ? `${connector.reason} Connected through ${connection.transport || "a verified provider route"}. ${connection.capabilityCount ?? 0} runtime action(s) discovered; ${connection.deployedCapabilityCount ?? 0} deployed; ${connection.approvalCapabilityCount ?? 0} approval-gated.`
+                : `${connector.reason} Connected through ${connection.transport || "a verified provider route"}. Runtime action discovery is currently unavailable.`
               : connector.reason;
             return (
               <span
@@ -102,6 +110,9 @@ export default function PageConnectorGuide({ pathname }) {
                 <span>{connector.name}</span>
                 <span className="hidden opacity-55 sm:inline">
                   · {STATE_LABELS[displayState]}
+                  {connection?.connected && connection.capabilityState === "ok" && connection.capabilityCount > 0
+                    ? ` · ${connection.capabilityCount} actions`
+                    : ""}
                 </span>
               </span>
             );

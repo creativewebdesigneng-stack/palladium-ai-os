@@ -123,59 +123,112 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
         .catch(() => false);
     }
 
-    return {
-      states: providerIds.map((provider) => {
-        const directRow: any = directByProvider.get(provider);
-        const nangoRow: any = nangoByProvider.get(provider);
-        const credential: any = credentialsByProvider.get(provider);
-        const definition = findProvider(provider);
-        const directHealth =
-          provider === "github"
-            ? null
-            : definition && directRow
-              ? assessIntegrationHealth({
-                  providerName: definition.name,
-                  requiredScopes: definition.scopes,
-                  status: directRow.status,
-                  grantedScopes: Array.isArray(directRow.granted_scopes)
-                    ? directRow.granted_scopes
-                    : [],
-                  expiresAt: credential?.expires_at ?? directRow.expires_at ?? null,
-                  hasRefreshToken: Boolean(credential?.refresh_token_ciphertext),
-                  lastError: directRow.last_error ?? null,
-                })
-              : null;
-        const directConnected =
-          provider === "github"
-            ? directRow?.status === "connected" && githubInstallationValid
-            : directHealth?.healthy === true;
-        const nangoConnected =
-          nangoRow?.status === "connected" && Boolean(nangoRow?.config?.connection_id);
+    const connectionStates = providerIds.map((provider) => {
+      const directRow: any = directByProvider.get(provider);
+      const nangoRow: any = nangoByProvider.get(provider);
+      const credential: any = credentialsByProvider.get(provider);
+      const definition = findProvider(provider);
+      const directHealth =
+        provider === "github"
+          ? null
+          : definition && directRow
+            ? assessIntegrationHealth({
+                providerName: definition.name,
+                requiredScopes: definition.scopes,
+                status: directRow.status,
+                grantedScopes: Array.isArray(directRow.granted_scopes)
+                  ? directRow.granted_scopes
+                  : [],
+                expiresAt: credential?.expires_at ?? directRow.expires_at ?? null,
+                hasRefreshToken: Boolean(credential?.refresh_token_ciphertext),
+                lastError: directRow.last_error ?? null,
+              })
+            : null;
+      const directConnected =
+        provider === "github"
+          ? directRow?.status === "connected" && githubInstallationValid
+          : directHealth?.healthy === true;
+      const nangoConnected =
+        nangoRow?.status === "connected" && Boolean(nangoRow?.config?.connection_id);
 
-        if (directConnected) {
+      if (directConnected) {
+        return {
+          provider,
+          connected: true,
+          transport:
+            provider === "github"
+              ? "github_app"
+              : String(directRow.integration_type || "oauth"),
+          accountLabel:
+            typeof directRow.account_label === "string" ? directRow.account_label : null,
+        };
+      }
+      if (nangoConnected) {
+        return {
+          provider,
+          connected: true,
+          transport: "nango",
+          accountLabel:
+            typeof nangoRow.account_label === "string" ? nangoRow.account_label : null,
+        };
+      }
+      return { provider, connected: false, transport: null, accountLabel: null };
+    });
+
+    const runtime = await import("./agent-integration-runtime.server").catch(() => null);
+    const states = await Promise.all(
+      connectionStates.map(async (state) => {
+        if (!state.connected) {
           return {
-            provider,
-            connected: true,
-            transport:
-              provider === "github"
-                ? "github_app"
-                : String(directRow.integration_type || "oauth"),
-            accountLabel:
-              typeof directRow.account_label === "string" ? directRow.account_label : null,
+            ...state,
+            capabilityState: "not_connected" as const,
+            capabilityCount: 0,
+            deployedCapabilityCount: 0,
+            autonomousCapabilityCount: 0,
+            approvalCapabilityCount: 0,
+            lanes: [] as string[],
           };
         }
-        if (nangoConnected) {
+        if (!runtime) {
           return {
-            provider,
-            connected: true,
-            transport: "nango",
-            accountLabel:
-              typeof nangoRow.account_label === "string" ? nangoRow.account_label : null,
+            ...state,
+            capabilityState: "unavailable" as const,
+            capabilityCount: 0,
+            deployedCapabilityCount: 0,
+            autonomousCapabilityCount: 0,
+            approvalCapabilityCount: 0,
+            lanes: [] as string[],
           };
         }
-        return { provider, connected: false, transport: null, accountLabel: null };
+        try {
+          const capabilities = await runtime.listIntegrationCapabilities(
+            context.userId,
+            state.provider,
+          );
+          return {
+            ...state,
+            capabilityState: "ok" as const,
+            capabilityCount: capabilities.length,
+            deployedCapabilityCount: capabilities.filter((item) => item.deployed).length,
+            autonomousCapabilityCount: capabilities.filter((item) => !item.requiresApproval).length,
+            approvalCapabilityCount: capabilities.filter((item) => item.requiresApproval).length,
+            lanes: Array.from(new Set(capabilities.map((item) => item.lane))),
+          };
+        } catch {
+          return {
+            ...state,
+            capabilityState: "unavailable" as const,
+            capabilityCount: 0,
+            deployedCapabilityCount: 0,
+            autonomousCapabilityCount: 0,
+            approvalCapabilityCount: 0,
+            lanes: [] as string[],
+          };
+        }
       }),
-    };
+    );
+
+    return { states };
   });
 
 export const testIntegrationConnection = createServerFn({ method: "POST" })
