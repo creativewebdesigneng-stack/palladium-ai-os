@@ -193,6 +193,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         upcomingItems: Number(message.metadata?.upcomingItems ?? 0),
         communications: Number(message.metadata?.communications ?? 0),
         externalWorkspaceReads: Number(message.metadata?.externalWorkspaceReads ?? 0),
+        pageConnectorCapabilities: Number(message.metadata?.pageConnectorCapabilities ?? 0),
+        pageConnectorProviders: Array.isArray(message.metadata?.pageConnectorProviders) ? message.metadata.pageConnectorProviders : [],
       }));
       setConversationId(id);
       setMessages(restored.length ? restored : [welcomeMessage()]);
@@ -348,6 +350,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         history,
         ...(conversationId ? { conversationId } : {}),
         ...(location ? { location } : {}),
+        ...(typeof window !== 'undefined' ? { pathname: window.location.pathname } : {}),
       } });
       if (res?.conversationId) setConversationId(res.conversationId);
       setMessages((m) => [...m, {
@@ -362,6 +365,8 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
         upcomingItems: Number(res.upcomingItems ?? 0),
         communications: Number(res.communications ?? 0),
         externalWorkspaceReads: Number(res.externalWorkspaceReads ?? 0),
+        pageConnectorCapabilities: Number(res.pageConnectorCapabilities ?? 0),
+        pageConnectorProviders: Array.isArray(res.pageConnectorProviders) ? res.pageConnectorProviders : [],
       }]);
       speak(res.text);
       void refreshConversations();
@@ -747,7 +752,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                       <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user' ? 'bg-violet-500/20 text-white' : m.error ? 'bg-rose-500/10 text-rose-200 ring-1 ring-rose-400/20' : 'bg-white/[.04] text-zinc-200'}`}>
                         {m.notification && <Bell className="mr-1 inline h-3.5 w-3.5 text-cyan-300" />}{m.text}
                         {m.action && <p className="mt-1.5 flex items-center gap-1 text-[11px] text-violet-300"><Sparkles className="h-3 w-3" /> Navigating…</p>}
-                        {m.role === 'assistant' && (m.memoryHits > 0 || m.agentMatches > 0 || m.connectedIntegrations > 0 || m.projects > 0 || m.fileRefs > 0 || m.upcomingItems > 0 || m.communications > 0 || m.externalWorkspaceReads > 0) && (
+                        {m.role === 'assistant' && (m.memoryHits > 0 || m.agentMatches > 0 || m.connectedIntegrations > 0 || m.projects > 0 || m.fileRefs > 0 || m.upcomingItems > 0 || m.communications > 0 || m.externalWorkspaceReads > 0 || m.pageConnectorCapabilities > 0) && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {m.memoryHits > 0 && <span className="rounded-full border border-violet-300/10 bg-violet-400/[.06] px-2 py-0.5 text-[9px] text-violet-200/70">{m.memoryHits} memory hit{m.memoryHits === 1 ? '' : 's'}</span>}
                             {m.agentMatches > 0 && <span className="rounded-full border border-sky-300/10 bg-sky-400/[.06] px-2 py-0.5 text-[9px] text-sky-200/70">{m.agentMatches} relevant agent{m.agentMatches === 1 ? '' : 's'}</span>}
@@ -757,6 +762,7 @@ export default function GlobalAIAssistant({ open, onOpenChange }) {
                             {m.upcomingItems > 0 && <span className="rounded-full border border-cyan-300/10 bg-cyan-400/[.06] px-2 py-0.5 text-[9px] text-cyan-100/70">{m.upcomingItems} upcoming</span>}
                             {m.communications > 0 && <span className="rounded-full border border-fuchsia-300/10 bg-fuchsia-400/[.06] px-2 py-0.5 text-[9px] text-fuchsia-100/70">{m.communications} communication{m.communications === 1 ? '' : 's'}</span>}
                             {m.externalWorkspaceReads > 0 && <span className="rounded-full border border-sky-300/10 bg-sky-400/[.06] px-2 py-0.5 text-[9px] text-sky-100/70">{m.externalWorkspaceReads} connected read{m.externalWorkspaceReads === 1 ? '' : 's'}</span>}
+                            {m.pageConnectorCapabilities > 0 && <span className="rounded-full border border-emerald-300/10 bg-emerald-400/[.06] px-2 py-0.5 text-[9px] text-emerald-100/70">{m.pageConnectorCapabilities} page connector action{m.pageConnectorCapabilities === 1 ? '' : 's'}</span>}
                           </div>
                         )}
                         {Array.isArray(m.sources) && m.sources.length > 0 && (
