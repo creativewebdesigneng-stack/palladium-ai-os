@@ -54,6 +54,8 @@ The current ChatGPT catalogue also exposed useful matches including Vercel, Supa
 
 These are not Blackstar integrations merely because they exist in ChatGPT.
 
+During this audit, the verified matches Vercel, Supabase, Lovable, Webflow, Semrush, Metricool, Airtable, Coda, Dropbox, SharePoint, Amplitude, PostHog and HeyGen were also registered in Blackstar's canonical capability catalog as **planned provider targets**. A target is metadata and routing intent only: it does not create OAuth credentials, a live connection, deployed actions or execution evidence.
+
 ## Page families and best-fit connectors
 
 ### Command, operations and company pages
@@ -66,7 +68,7 @@ Routes:
 
 Best fit:
 Google Workspace, Microsoft 365, Slack, Notion, Asana, Linear and HubSpot.
-Airtable and Coda are strong catalogue candidates for structured operational data and operating documents.
+Airtable and Coda are registered Blackstar provider targets for structured operational data and operating documents.
 
 ### Agents, Workforce and AI pages
 
@@ -89,7 +91,7 @@ Routes:
 Best fit:
 GitHub and Figma are direct Blackstar matches.
 Hugging Face is useful for model/dev workflows.
-Current ChatGPT candidates: Vercel, Supabase, Lovable, Atlassian and Datadog.
+Registered Blackstar targets: Vercel, Supabase and Lovable. Atlassian and Datadog remain catalogue candidates.
 
 ### Creative, website, Cinema, Game and 3D pages
 
@@ -100,8 +102,8 @@ Routes:
 
 Best fit:
 Canva, Figma, Hugging Face, Adobe, Runway, Higgsfield and GitHub.
-Lovable and Webflow are strong catalogue candidates for app/site-building, CMS and publishing workflows.
-HeyGen is a strong candidate for avatar-led video, speech, lip-sync and multilingual localization.
+Lovable and Webflow are registered Blackstar targets for app/site-building, CMS and publishing workflows.
+HeyGen is a registered Blackstar target for avatar-led video, speech, lip-sync and multilingual localization.
 
 Execution boundary:
 creative model discovery or a configured endpoint is not evidence that media or 3D output was generated.
@@ -117,7 +119,7 @@ Best fit:
 Meta, YouTube, LinkedIn, Pinterest, TikTok, X, Threads and Canva.
 
 Strong current ChatGPT candidates:
-Semrush, Ahrefs, Supermetrics, Metricool, Amplitude, PostHog, HeyGen, Klaviyo and vidIQ.
+Registered targets: Semrush, Metricool, Amplitude, PostHog and HeyGen. Remaining catalogue candidates: Ahrefs, Supermetrics, Klaviyo and vidIQ.
 
 ### CRM, customer support and communications pages
 
@@ -167,7 +169,7 @@ Best fit:
 Google Workspace, Microsoft 365 and Notion.
 
 Strong current ChatGPT candidates:
-Dropbox, Box, SharePoint, Airtable and Coda.
+Registered targets: Dropbox, SharePoint, Airtable and Coda. Box remains a catalogue candidate.
 
 ### Projects and collaboration pages
 
@@ -208,7 +210,7 @@ Routes:
 `/admin/acceptance`, `/admin/platform-analytics`.
 
 Best fit:
-GitHub plus current ChatGPT candidates Vercel, Supabase, Datadog, Amplitude, PostHog and Vanta.
+GitHub plus registered targets Vercel, Supabase, Amplitude and PostHog. Datadog and Vanta remain catalogue candidates.
 
 These are operational data sources only; readiness data is not acceptance certification.
 
