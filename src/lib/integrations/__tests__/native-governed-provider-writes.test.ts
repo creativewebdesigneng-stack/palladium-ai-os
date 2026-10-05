@@ -74,15 +74,21 @@ describe("native governed provider writes", () => {
   });
 
   it("keeps post-dispatch write failures non-failoverable", () => {
-    const source = readFileSync(
+    const adapterSource = readFileSync(
       new URL("../integration-adapters.server.ts", import.meta.url),
       "utf8",
     );
-    const start = source.indexOf("if (isDirectConnectedServiceWriteAction(input.provider, input.action))");
+    const writeSource = readFileSync(
+      new URL("../direct-connected-service-write.server.ts", import.meta.url),
+      "utf8",
+    );
+    const start = adapterSource.indexOf("if (isDirectConnectedServiceWriteAction(input.provider, input.action))");
     expect(start).toBeGreaterThan(-1);
-    const block = source.slice(start, start + 2600);
-    expect(block).toContain('risk: "medium"');
-    expect(source).toContain("requiresApproval: true");
+    const block = adapterSource.slice(start, start + 3200);
+    expect(writeSource).toContain('risk: "medium" as const');
+    expect(writeSource).toContain("requiresApproval: true");
+    expect(adapterSource).toContain('risk: "medium"');
+    expect(adapterSource).toContain("requiresApproval: true");
     expect(block).toContain('failurePhase: "ambiguous"');
     expect(block).toContain("safeToFailover: false");
   });
