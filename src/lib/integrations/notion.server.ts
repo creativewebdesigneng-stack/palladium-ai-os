@@ -265,3 +265,54 @@ export async function readNotionPage(args: {
     truncated: state.blocks >= MAX_BLOCKS || state.chars >= MAX_TEXT_CHARS,
   };
 }
+
+
+export async function createNotionChildPage(args: {
+  userId: string;
+  parentPageId: string;
+  title: string;
+  content?: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const parentPageId = validateNotionId(args.parentPageId);
+  const title = String(args.title ?? "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!title) throw new NotionIntegrationError("A Notion page title is required.");
+  const content = String(args.content ?? "").trim().slice(0, 5000);
+  const response = await notionFetch(
+    args.userId,
+    "/pages",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        parent: { type: "page_id", page_id: parentPageId },
+        properties: {
+          title: {
+            type: "title",
+            title: [{ type: "text", text: { content: title } }],
+          },
+        },
+        ...(content
+          ? {
+              children: [{
+                object: "block",
+                type: "paragraph",
+                paragraph: {
+                  rich_text: [{ type: "text", text: { content } }],
+                },
+              }],
+            }
+          : {}),
+      }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    },
+    args.fetchImpl ?? fetch,
+  );
+  const page = await response.json() as any;
+  return {
+    id: String(page?.id ?? "").slice(0, 100),
+    url: typeof page?.url === "string" ? page.url.slice(0, 2000) : null,
+    createdTime: typeof page?.created_time === "string" ? page.created_time : null,
+    title,
+  };
+}
