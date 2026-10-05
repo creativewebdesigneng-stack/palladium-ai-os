@@ -12,6 +12,15 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("higgsfield");
     expect(ids).toContain("adobe");
     expect(ids).toContain("canva");
+    expect(ids).toContain("heygen");
+  });
+
+  it("prioritizes website production connectors on Website Studio", () => {
+    const ids = pageConnectorRecommendations("/website-studio").map((item) => item.id);
+    expect(ids).toContain("webflow");
+    expect(ids).toContain("lovable");
+    expect(ids).toContain("figma");
+    expect(ids).toContain("semrush");
   });
 
   it("maps developer surfaces to Blackstar providers plus clearly bounded candidates", () => {
@@ -36,6 +45,12 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("metricool");
   });
 
+  it("prioritizes product analytics providers without claiming Blackstar support", () => {
+    const matches = pageConnectorRecommendations("/product-analytics");
+    expect(matches.find((item) => item.id === "amplitude")?.state).toBe("candidate");
+    expect(matches.find((item) => item.id === "posthog")?.state).toBe("candidate");
+  });
+
   it("maps commerce and billing to the existing Shopify and Stripe paths", () => {
     const commerce = pageConnectorRecommendations("/commerce-studio", 12);
     expect(commerce.find((item) => item.id === "shopify")?.state).toBe("supported");
@@ -53,6 +68,7 @@ describe("route-aware page connector recommendations", () => {
     expect(ids).toContain("dropbox");
     expect(ids).toContain("box");
     expect(ids).toContain("sharepoint");
+    expect(ids).toContain("coda");
   });
 
   it("offers fitness-specific candidates without fabricating Blackstar support", () => {
