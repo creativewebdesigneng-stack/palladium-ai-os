@@ -19,6 +19,7 @@ import {
   checkPhoneVerification,
   communicationsPublicUrl,
   communicationsRuntimeCapabilities,
+  isAmbiguousTwilioDispatchError,
   sendTwilioSms,
   startPhoneVerification,
   startTwilioAiCall,
@@ -195,18 +196,34 @@ export const sendCommunicationSms = createServerFn({ method: 'POST' })
     const event = inserted.data;
 
     try {
-      const statusCallbackUrl = communicationsPublicUrl('/api/public/communications/twilio/message-status');
+      const statusCallbackUrl = communicationsPublicUrl('/api/public/communications/twilio/message-status', { event: event.id });
       const provider = await sendTwilioSms({ to: recipient.phone_e164, body: data.body, statusCallbackUrl });
       const acceptedAt = new Date().toISOString();
       await admin.from('communication_events').update({
         status: 'sent', provider_id: provider.sid, sent_at: acceptedAt, updated_at: acceptedAt,
-        metadata: { initiated_by: 'authenticated_user', provider_status: provider.status },
+        metadata: { initiated_by: 'authenticated_user', provider_status: provider.status, provider_outcome: 'confirmed', automatic_retry_blocked: false },
       }).eq('id', event.id).eq('status', 'sending');
       await writeAudit({ userId: context.userId, action: 'communications.sms_sent', targetType: 'communication_event', targetId: event.id, status: 'success', metadata: { purpose: data.purpose, provider: 'twilio' } });
       return { event_id: event.id, status: 'sent', provider_status: provider.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'SMS delivery failed.';
       const failedAt = new Date().toISOString();
+      if (isAmbiguousTwilioDispatchError(error)) {
+        await admin.from('communication_events').update({
+          status: 'sending',
+          error: message.slice(0, 1000),
+          updated_at: failedAt,
+          metadata: {
+            initiated_by: 'authenticated_user',
+            provider_outcome: 'unknown',
+            automatic_retry_blocked: true,
+            reconciliation_pending: true,
+            ambiguous_at: failedAt,
+          },
+        }).eq('id', event.id).eq('status', 'sending');
+        await writeAudit({ userId: context.userId, action: 'communications.sms_dispatch_ambiguous', targetType: 'communication_event', targetId: event.id, status: 'failed', metadata: { purpose: data.purpose, automaticRetryBlocked: true } });
+        return { event_id: event.id, status: 'sending', provider_status: 'unknown', delivery_unknown: true };
+      }
       await admin.from('communication_events').update({ status: 'failed', error: message.slice(0, 1000), updated_at: failedAt }).eq('id', event.id).eq('status', 'sending');
       await writeAudit({ userId: context.userId, action: 'communications.sms_sent', targetType: 'communication_event', targetId: event.id, status: 'failed', metadata: { purpose: data.purpose, error: message.slice(0, 500) } });
       throw error;
@@ -266,17 +283,39 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
       const provider = await startTwilioAiCall({ to: recipient.phone_e164, sessionId: session.id });
       const now = new Date().toISOString();
       await Promise.all([
-        admin.from('communication_call_sessions').update({ provider_call_sid: provider.sid, status: 'queued', updated_at: now }).eq('id', session.id).is('provider_call_sid', null),
-        admin.from('communication_events').update({ provider_id: provider.sid, status: 'queued', updated_at: now, metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true, provider_status: provider.status, selected_project_id: selectedContext.projectId, selected_company_workspace_id: selectedContext.companyWorkspaceId } }).eq('id', event.id),
+        admin.from('communication_call_sessions').update({ provider_call_sid: provider.sid, status: 'queued', updated_at: now }).eq('id', session.id).eq('status', 'queued').is('provider_call_sid', null),
+        admin.from('communication_events').update({ provider_id: provider.sid, status: 'queued', updated_at: now, metadata: { initiated_by: 'authenticated_user', ai_disclosure_required: true, provider_status: provider.status, provider_outcome: 'confirmed', automatic_retry_blocked: false, selected_project_id: selectedContext.projectId, selected_company_workspace_id: selectedContext.companyWorkspaceId } }).eq('id', event.id).eq('status', 'queued'),
       ]);
       await writeAudit({ userId: context.userId, action: 'communications.ai_call_started', targetType: 'communication_event', targetId: event.id, status: 'success', metadata: { purpose: data.purpose, provider: 'twilio' } });
       return { event_id: event.id, session_id: session.id, status: provider.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI call could not be started.';
       const now = new Date().toISOString();
+      if (isAmbiguousTwilioDispatchError(error)) {
+        await Promise.all([
+          admin.from('communication_call_sessions').update({ status: 'queued', updated_at: now }).eq('id', session.id).eq('status', 'queued'),
+          admin.from('communication_events').update({
+            status: 'queued',
+            error: message.slice(0, 1000),
+            updated_at: now,
+            metadata: {
+              initiated_by: 'authenticated_user',
+              ai_disclosure_required: true,
+              provider_outcome: 'unknown',
+              automatic_retry_blocked: true,
+              reconciliation_pending: true,
+              ambiguous_at: now,
+              selected_project_id: selectedContext.projectId,
+              selected_company_workspace_id: selectedContext.companyWorkspaceId,
+            },
+          }).eq('id', event.id).eq('status', 'queued'),
+        ]);
+        await writeAudit({ userId: context.userId, action: 'communications.ai_call_dispatch_ambiguous', targetType: 'communication_event', targetId: event.id, status: 'failed', metadata: { purpose: data.purpose, automaticRetryBlocked: true } });
+        return { event_id: event.id, session_id: session.id, status: 'queued', provider_status: 'unknown', delivery_unknown: true };
+      }
       await Promise.all([
-        admin.from('communication_call_sessions').update({ status: 'failed', ended_at: now, updated_at: now, history: [] }).eq('id', session.id),
-        admin.from('communication_events').update({ status: 'failed', error: message.slice(0, 1000), completed_at: now, updated_at: now }).eq('id', event.id),
+        admin.from('communication_call_sessions').update({ status: 'failed', ended_at: now, updated_at: now, history: [] }).eq('id', session.id).eq('status', 'queued'),
+        admin.from('communication_events').update({ status: 'failed', error: message.slice(0, 1000), completed_at: now, updated_at: now }).eq('id', event.id).eq('status', 'queued'),
       ]);
       await writeAudit({ userId: context.userId, action: 'communications.ai_call_started', targetType: 'communication_event', targetId: event.id, status: 'failed', metadata: { purpose: data.purpose, error: message.slice(0, 500) } });
       throw error;
@@ -300,16 +339,18 @@ export const sendCommunicationPhonePush = createServerFn({ method: 'POST' })
     if (!endpoints.data?.length) throw new Error('No enabled phone push endpoint is connected.');
     const base = (process.env['NTFY_BASE_URL']?.trim() || 'https://ntfy.sh').replace(/\/+$/, '');
     const token = process.env['NTFY_TOKEN']?.trim();
-    let sent = 0;
-    for (const endpoint of endpoints.data) {
-      const response = await fetch(`${base}/${encodeURIComponent(endpoint.topic)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain; charset=utf-8', Title: data.title, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: data.body,
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (response.ok) sent += 1;
-    }
+    const deliveries = await Promise.allSettled(
+      endpoints.data.map(async (endpoint: any) => {
+        const response = await fetch(`${base}/${encodeURIComponent(endpoint.topic)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', Title: data.title, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: data.body,
+          signal: AbortSignal.timeout(6_000),
+        });
+        return response.ok;
+      }),
+    );
+    const sent = deliveries.filter((result) => result.status === 'fulfilled' && result.value === true).length;
     if (!sent) throw new Error('Phone push provider rejected the notification.');
     const event = await admin.from('communication_events').insert({
       user_id: context.userId, channel: 'push', purpose: data.purpose, title: data.title, body: data.body,

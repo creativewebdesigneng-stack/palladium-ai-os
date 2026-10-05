@@ -40,7 +40,7 @@ function useActionMutation({ mutationFn, successTitle, onRefresh, onFailure }) {
   return useMutation({
     mutationFn,
     onSuccess: (result) => {
-      toast({ title: successTitle });
+      toast({ title: typeof successTitle === 'function' ? successTitle(result) : successTitle });
       onRefresh();
       return result;
     },
@@ -88,12 +88,12 @@ export default function PhoneCommunications() {
   const beginVerify = useActionMutation({ mutationFn: () => beginVerifyFn({ data: { recipient_id: selectedId } }), successTitle: 'Verification code sent', onRefresh: refresh, onFailure: fail });
   const confirmVerify = useActionMutation({ mutationFn: () => confirmVerifyFn({ data: { recipient_id: selectedId, code: verifyCode } }), successTitle: 'Mobile number verified', onRefresh: refresh, onFailure: fail });
   const sendPush = useActionMutation({ mutationFn: () => pushFn({ data: { title: pushTitle, body: pushBody, purpose } }), successTitle: 'Phone notification sent', onRefresh: refresh, onFailure: fail });
-  const sendSms = useActionMutation({ mutationFn: () => smsFn({ data: { recipient_id: selectedId, purpose, body: smsBody } }), successTitle: 'SMS accepted by provider', onRefresh: refresh, onFailure: fail });
+  const sendSms = useActionMutation({ mutationFn: () => smsFn({ data: { recipient_id: selectedId, purpose, body: smsBody } }), successTitle: (result) => result?.delivery_unknown ? 'SMS awaiting provider confirmation' : 'SMS accepted by provider', onRefresh: refresh, onFailure: fail });
   const startCall = useActionMutation({ mutationFn: () => callFn({ data: {
     recipient_id: selectedId, purpose, objective: callObjective,
     project_id: callProjectId || undefined,
     company_workspace_id: callCompanyId || undefined,
-  } }), successTitle: 'Blackstar AI call started', onRefresh: refresh, onFailure: fail });
+  } }), successTitle: (result) => result?.delivery_unknown ? 'Call awaiting provider confirmation' : 'Blackstar AI call started', onRefresh: refresh, onFailure: fail });
 
   const selected = useMemo(() => data?.recipients?.find((r) => r.id === selectedId), [data?.recipients, selectedId]);
   const caps = data?.capabilities ?? {};

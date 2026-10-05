@@ -12,6 +12,7 @@ import { phoneAutomationPolicy } from "./automation-policy";
 import {
   communicationsPublicUrl,
   communicationsRuntimeCapabilities,
+  isAmbiguousTwilioDispatchError,
   sendTwilioSms,
   startTwilioAiCall,
 } from "./twilio-provider.server";
@@ -41,7 +42,7 @@ type JobRow = {
   attempts: number;
 };
 
-type ChannelOutcome = "sent" | "suppressed" | "unavailable" | "failed";
+type ChannelOutcome = "sent" | "pending" | "suppressed" | "unavailable" | "failed";
 
 type DispatchResult = {
   purpose: CommunicationPurpose;
@@ -122,11 +123,10 @@ async function sendPush(notification: NotificationRow, purpose: CommunicationPur
 
   const base = (process.env["NTFY_BASE_URL"]?.trim() || "https://ntfy.sh").replace(/\/+$/, "");
   const token = process.env["NTFY_TOKEN"]?.trim();
-  let delivered = 0;
-  for (const endpoint of endpoints.data) {
-    const topic = typeof endpoint.topic === "string" ? endpoint.topic.trim() : "";
-    if (!topic) continue;
-    try {
+  const deliveries = await Promise.allSettled(
+    endpoints.data.map(async (endpoint: any) => {
+      const topic = typeof endpoint.topic === "string" ? endpoint.topic.trim() : "";
+      if (!topic) return false;
       const response = await fetch(`${base}/${encodeURIComponent(topic)}`, {
         method: "POST",
         headers: {
@@ -135,13 +135,12 @@ async function sendPush(notification: NotificationRow, purpose: CommunicationPur
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: notification.body?.slice(0, 1000) || notification.title.slice(0, 1000),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(6_000),
       });
-      if (response.ok) delivered += 1;
-    } catch {
-      // Continue to the user's other registered phone endpoints.
-    }
-  }
+      return response.ok;
+    }),
+  );
+  const delivered = deliveries.filter((result) => result.status === "fulfilled" && result.value === true).length;
   if (!delivered) return "failed";
 
   const now = new Date().toISOString();
@@ -193,7 +192,7 @@ async function sendSms(
     const provider = await sendTwilioSms({
       to: recipient.phone_e164,
       body: notificationBody(notification),
-      statusCallbackUrl: communicationsPublicUrl("/api/public/communications/twilio/message-status"),
+      statusCallbackUrl: communicationsPublicUrl("/api/public/communications/twilio/message-status", { event: event.data.id }),
     });
     const now = new Date().toISOString();
     await db.from("communication_events").update({
@@ -206,7 +205,7 @@ async function sendSms(
         notification_kind: notification.kind,
         provider_status: provider.status,
       },
-    }).eq("id", event.data.id);
+    }).eq("id", event.data.id).eq("status", "sending");
     await writeAudit({
       userId: notification.user_id,
       action: "communications.automated_sms_sent",
@@ -218,11 +217,28 @@ async function sendSms(
     return "sent";
   } catch (error) {
     const message = error instanceof Error ? error.message : "Automated SMS failed.";
+    const now = new Date().toISOString();
+    if (isAmbiguousTwilioDispatchError(error)) {
+      await db.from("communication_events").update({
+        status: "sending",
+        error: message.slice(0, 1000),
+        updated_at: now,
+        metadata: {
+          initiated_by: "blackstar_automation",
+          notification_kind: notification.kind,
+          provider_outcome: "unknown",
+          automatic_retry_blocked: true,
+          reconciliation_pending: true,
+          ambiguous_at: now,
+        },
+      }).eq("id", event.data.id).eq("status", "sending");
+      return "pending";
+    }
     await db.from("communication_events").update({
       status: "failed",
       error: message.slice(0, 1000),
-      updated_at: new Date().toISOString(),
-    }).eq("id", event.data.id);
+      updated_at: now,
+    }).eq("id", event.data.id).eq("status", "sending");
     return "failed";
   }
 }
@@ -280,7 +296,7 @@ async function startVoiceCall(
         provider_call_sid: provider.sid,
         status: "queued",
         updated_at: now,
-      }).eq("id", session.data.id),
+      }).eq("id", session.data.id).eq("status", "queued"),
       db.from("communication_events").update({
         provider_id: provider.sid,
         status: "queued",
@@ -291,7 +307,7 @@ async function startVoiceCall(
           ai_disclosure_required: true,
           provider_status: provider.status,
         },
-      }).eq("id", event.data.id),
+      }).eq("id", event.data.id).eq("status", "queued"),
     ]);
     await writeAudit({
       userId: notification.user_id,
@@ -305,9 +321,29 @@ async function startVoiceCall(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Automated AI call failed.";
     const now = new Date().toISOString();
+    if (isAmbiguousTwilioDispatchError(error)) {
+      await Promise.all([
+        db.from("communication_call_sessions").update({ status: "queued", updated_at: now }).eq("id", session.data.id).eq("status", "queued"),
+        db.from("communication_events").update({
+          status: "queued",
+          error: message.slice(0, 1000),
+          updated_at: now,
+          metadata: {
+            initiated_by: "blackstar_automation",
+            notification_kind: notification.kind,
+            ai_disclosure_required: true,
+            provider_outcome: "unknown",
+            automatic_retry_blocked: true,
+            reconciliation_pending: true,
+            ambiguous_at: now,
+          },
+        }).eq("id", event.data.id).eq("status", "queued"),
+      ]);
+      return "pending";
+    }
     await Promise.all([
-      db.from("communication_call_sessions").update({ status: "failed", ended_at: now, updated_at: now, history: [] }).eq("id", session.data.id),
-      db.from("communication_events").update({ status: "failed", error: message.slice(0, 1000), completed_at: now, updated_at: now }).eq("id", event.data.id),
+      db.from("communication_call_sessions").update({ status: "failed", ended_at: now, updated_at: now, history: [] }).eq("id", session.data.id).eq("status", "queued"),
+      db.from("communication_events").update({ status: "failed", error: message.slice(0, 1000), completed_at: now, updated_at: now }).eq("id", event.data.id).eq("status", "queued"),
     ]);
     return "failed";
   }

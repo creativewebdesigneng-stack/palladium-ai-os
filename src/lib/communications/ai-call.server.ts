@@ -233,26 +233,40 @@ export async function processAiCallStatus(params: URLSearchParams, sessionId: st
   return { ok: true, status };
 }
 
-export async function processSmsStatus(params: URLSearchParams) {
+export async function processSmsStatus(params: URLSearchParams, eventId?: string | null) {
   const sid = param(params, 'MessageSid', 80);
   if (!/^SM[0-9a-fA-F]{32}$/.test(sid)) throw statusError('Invalid Twilio message identifier.', 400);
   const providerStatus = param(params, 'MessageStatus', 80).toLowerCase();
   const delivered = ['delivered', 'read'].includes(providerStatus);
   const failed = ['failed', 'undelivered'].includes(providerStatus);
   const now = new Date().toISOString();
-  const { data: event, error } = await db.from('communication_events').select('id,metadata').eq('provider', 'twilio').eq('provider_id', sid).maybeSingle();
+
+  let query = db.from('communication_events')
+    .select('id,provider_id,metadata')
+    .eq('provider', 'twilio')
+    .eq('channel', 'sms');
+  query = eventId ? query.eq('id', eventId) : query.eq('provider_id', sid);
+  const { data: event, error } = await query.maybeSingle();
   if (error) throw new Error(error.message);
   if (!event) return { ok: true, matched: false };
+  if (event.provider_id && event.provider_id !== sid) throw statusError('SMS provider identity mismatch.', 401);
+
   const status = failed ? 'failed' : delivered ? 'delivered' : 'sent';
   const errorCode = param(params, 'ErrorCode', 80);
   const patch = {
     status,
+    provider_id: sid,
     updated_at: now,
     ...(delivered ? { delivered_at: now } : {}),
-    ...(failed ? { error: errorCode ? `Twilio ${errorCode}` : 'Twilio delivery failed.' } : {}),
+    ...(failed
+      ? { error: errorCode ? `Twilio ${errorCode}` : 'Twilio delivery failed.' }
+      : { error: null }),
     metadata: {
       ...(event.metadata && typeof event.metadata === 'object' ? event.metadata : {}),
       provider_status: providerStatus,
+      provider_outcome: 'confirmed',
+      automatic_retry_blocked: false,
+      reconciliation_pending: false,
       status_callback_received_at: now,
     },
   };
