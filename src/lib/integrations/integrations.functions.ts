@@ -10,6 +10,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { INTEGRATION_PROVIDERS, findProvider } from "./providers";
+import { capabilityProfile } from "./capability-catalog";
+import { resolveProviderTargetMatch } from "./provider-target-routing";
 import { assessIntegrationHealth } from "./integration-health";
 
 type Sb = { from: (t: string) => any };
@@ -108,9 +110,11 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
     const directByProvider = new Map(
       (direct.data ?? []).map((row: any) => [String(row.provider).toLowerCase(), row]),
     );
-    const nangoByProvider = new Map(
-      nangoRows.map((row: any) => [String(row.providerId).toLowerCase(), row]),
-    );
+    const nangoCandidates = nangoRows.map((row: any) => ({
+      id: String(row.providerId).toLowerCase(),
+      name: String(row.providerId),
+      row,
+    }));
     const credentialsByProvider = new Map(
       (credentials.data ?? []).map((row: any) => [String(row.provider).toLowerCase(), row]),
     );
@@ -125,7 +129,12 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
 
     const connectionStates = providerIds.map((provider) => {
       const directRow: any = directByProvider.get(provider);
-      const nangoRow: any = nangoByProvider.get(provider);
+      const profile = capabilityProfile(provider);
+      const nangoMatch = resolveProviderTargetMatch(
+        { id: provider, name: profile?.name ?? findProvider(provider)?.name ?? provider },
+        nangoCandidates,
+      );
+      const nangoRow: any = nangoMatch?.row ?? null;
       const credential: any = credentialsByProvider.get(provider);
       const definition = findProvider(provider);
       const directHealth =
@@ -161,6 +170,7 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
               : String(directRow.integration_type || "oauth"),
           accountLabel:
             typeof directRow.account_label === "string" ? directRow.account_label : null,
+          runtimeProvider: provider,
         };
       }
       if (nangoConnected) {
@@ -170,9 +180,10 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
           transport: "nango",
           accountLabel:
             typeof nangoRow.account_label === "string" ? nangoRow.account_label : null,
+          runtimeProvider: String(nangoRow.providerId || provider),
         };
       }
-      return { provider, connected: false, transport: null, accountLabel: null };
+      return { provider, connected: false, transport: null, accountLabel: null, runtimeProvider: null };
     });
 
     const runtime = await import("./agent-integration-runtime.server").catch(() => null);
@@ -203,7 +214,7 @@ export const getPageConnectorConnectionState = createServerFn({ method: "POST" }
         try {
           const capabilities = await runtime.listIntegrationCapabilities(
             context.userId,
-            state.provider,
+            state.runtimeProvider || state.provider,
           );
           return {
             ...state,

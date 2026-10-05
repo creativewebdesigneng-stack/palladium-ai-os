@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/palladium/PageHeader";
 import { PROVIDER_CAPABILITY_PROFILES } from "@/lib/integrations/capability-catalog";
+import { resolveProviderTargetMatch } from "@/lib/integrations/provider-target-routing";
 import {
   disconnectIntegration,
   listIntegrations,
@@ -89,7 +90,7 @@ export default function Integrations() {
     () =>
       plannedTargets.map((provider) => ({
         ...provider,
-        nango: nangoConnections.find((item) => item.id === provider.id) ?? null,
+        nango: resolveProviderTargetMatch(provider, nangoConnections),
       })),
     [plannedTargets, nangoConnections],
   );
@@ -477,8 +478,8 @@ export default function Integrations() {
                       onClick={() =>
                         connect({
                           id: targetCardId,
-                          providerId: provider.id,
-                          name: `${provider.name} via Nango`,
+                          providerId: provider.nango.id,
+                          name: `${provider.nango.name || provider.name} via Nango`,
                           nangoProvider: true,
                         })
                       }
@@ -489,7 +490,7 @@ export default function Integrations() {
                   ) : nangoConnected ? (
                     <button
                       type="button"
-                      onClick={() => setQuery(provider.name)}
+                      onClick={() => setQuery(provider.nango?.name || provider.name)}
                       className="rounded-lg border border-emerald-300/15 bg-emerald-400/[.05] px-2.5 py-1.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-400/[.09]"
                     >
                       View live provider

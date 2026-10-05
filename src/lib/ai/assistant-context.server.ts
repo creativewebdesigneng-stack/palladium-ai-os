@@ -6,6 +6,8 @@ import { assessIntegrationHealth } from '@/lib/integrations/integration-health'
 import { assistantConnectionContext, summariseAssistantConnections } from './assistant-connection-inspection'
 import { readConnectedService } from '@/lib/integrations/connected-service.server'
 import { pageConnectorRecommendations } from '@/lib/integrations/page-connector-map'
+import { capabilityProfile } from '@/lib/integrations/capability-catalog'
+import { resolveProviderTargetMatch } from '@/lib/integrations/provider-target-routing'
 import { listIntegrationCapabilities } from '@/lib/integrations/agent-integration-runtime.server'
 
 type Sb = { from: (table: string) => any; rpc?: (fn: string, args?: Record<string, unknown>) => any }
@@ -358,11 +360,39 @@ export async function loadAssistantPageConnectorContext(args: {
     }
   }
 
+  const persistedNango = await import('@/lib/integrations/nango.server')
+    .then((module) => module.listPersistedNangoConnections(args.userId))
+    .catch(() => [])
+  const connectedNango = persistedNango
+    .filter((connection: any) => connection.status === 'connected' && connection.config?.connection_id)
+    .map((connection: any) => ({
+      id: String(connection.providerId),
+      name: String(connection.providerId),
+    }))
+
   const resolved = await Promise.allSettled(
-    recommendations.map(async (recommendation) => ({
-      recommendation,
-      capabilities: await listIntegrationCapabilities(args.userId, recommendation.id),
-    })),
+    recommendations.map(async (recommendation) => {
+      const profile = capabilityProfile(recommendation.id)
+      const nangoMatch = resolveProviderTargetMatch(
+        { id: recommendation.id, name: profile?.name ?? recommendation.name },
+        connectedNango,
+      )
+      const runtimeProviders = [...new Set([
+        recommendation.id,
+        ...(nangoMatch && nangoMatch.id !== recommendation.id ? [nangoMatch.id] : []),
+      ])]
+      const discovered = await Promise.all(
+        runtimeProviders.map((provider) =>
+          listIntegrationCapabilities(args.userId, provider).catch(() => []),
+        ),
+      )
+      const capabilities = [...new Map(
+        discovered
+          .flat()
+          .map((capability) => [`${capability.provider}:${capability.action}:${capability.lane}`, capability]),
+      ).values()]
+      return { recommendation, capabilities }
+    }),
   )
   const available = resolved
     .filter((entry): entry is PromiseFulfilledResult<any> => entry.status === 'fulfilled')
