@@ -114,6 +114,12 @@
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
     "undici": "7.29.1",
-    "undici8": "npm:undici@8.10.2"
+    "undici8": "npm:undici@8.10.2",
+    "source-map-js": "1.2.2",
+    "shell-quote": "1.12.0",
+    "proxy-addr": "2.0.8",
+    "seroval": "1.6.9",
+    "seroval-plugins": "1.6.9",
+    "@modelcontextprotocol/sdk": "1.29.0"
   }
 }
