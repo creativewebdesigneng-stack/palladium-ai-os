@@ -219,43 +219,43 @@ export function validateDirectConnectedServiceWriteInput(
   if (provider === "hubspot" && action === "contact_update") {
     allowedKeys(row, ["contact_id", "properties"], "HubSpot contact update");
     return {
-      contact_id: id(row.contact_id, GID, "HubSpot contact ID"),
-      properties: scalarProperties(row.properties, CONTACT_FIELDS),
+      contact_id: id(row["contact_id"], GID, "HubSpot contact ID"),
+      properties: scalarProperties(row["properties"], CONTACT_FIELDS),
     };
   }
   if (provider === "hubspot" && action === "deal_update") {
     allowedKeys(row, ["deal_id", "properties"], "HubSpot deal update");
     return {
-      deal_id: id(row.deal_id, GID, "HubSpot deal ID"),
-      properties: scalarProperties(row.properties, DEAL_FIELDS),
+      deal_id: id(row["deal_id"], GID, "HubSpot deal ID"),
+      properties: scalarProperties(row["properties"], DEAL_FIELDS),
     };
   }
   if (provider === "notion" && action === "child_page_create") {
     allowedKeys(row, ["parent_page_id", "title", "content"], "Notion child page");
     return {
-      parent_page_id: id(row.parent_page_id, UUIDISH, "Notion parent page ID"),
-      title: text(row.title, 500, "Notion title", true)!,
-      ...(row.content !== undefined ? { content: text(row.content, 5000, "Notion content") ?? "" } : {}),
+      parent_page_id: id(row["parent_page_id"], UUIDISH, "Notion parent page ID"),
+      title: text(row["title"], 500, "Notion title", true)!,
+      ...(row["content"] !== undefined ? { content: text(row["content"], 5000, "Notion content") ?? "" } : {}),
     };
   }
   if (provider === "asana" && action === "task_create") {
     allowedKeys(row, ["workspace_id", "project_id", "name", "notes", "due_on"], "Asana task create");
     return {
-      workspace_id: id(row.workspace_id, GID, "Asana workspace GID"),
-      name: text(row.name, 500, "Asana task name", true)!,
-      ...(row.project_id !== undefined ? { project_id: id(row.project_id, GID, "Asana project GID") } : {}),
-      ...(row.notes !== undefined ? { notes: text(row.notes, 5000, "Asana task notes") ?? "" } : {}),
-      ...(row.due_on !== undefined ? { due_on: dueOn(row.due_on) } : {}),
+      workspace_id: id(row["workspace_id"], GID, "Asana workspace GID"),
+      name: text(row["name"], 500, "Asana task name", true)!,
+      ...(row["project_id"] !== undefined ? { project_id: id(row["project_id"], GID, "Asana project GID") } : {}),
+      ...(row["notes"] !== undefined ? { notes: text(row["notes"], 5000, "Asana task notes") ?? "" } : {}),
+      ...(row["due_on"] !== undefined ? { due_on: dueOn(row["due_on"]) } : {}),
     };
   }
   if (provider === "asana" && action === "task_update") {
     allowedKeys(row, ["task_id", "name", "notes", "completed", "due_on"], "Asana task update");
     const result: Record<string, unknown> = {
-      task_id: id(row.task_id, GID, "Asana task GID"),
-      ...(row.name !== undefined ? { name: text(row.name, 500, "Asana task name") ?? "" } : {}),
-      ...(row.notes !== undefined ? { notes: text(row.notes, 5000, "Asana task notes") ?? "" } : {}),
-      ...(typeof row.completed === "boolean" ? { completed: row.completed } : {}),
-      ...(row.due_on !== undefined ? { due_on: dueOn(row.due_on) } : {}),
+      task_id: id(row["task_id"], GID, "Asana task GID"),
+      ...(row["name"] !== undefined ? { name: text(row["name"], 500, "Asana task name") ?? "" } : {}),
+      ...(row["notes"] !== undefined ? { notes: text(row["notes"], 5000, "Asana task notes") ?? "" } : {}),
+      ...(typeof row["completed"] === "boolean" ? { completed: row["completed"] } : {}),
+      ...(row["due_on"] !== undefined ? { due_on: dueOn(row["due_on"]) } : {}),
     };
     if (Object.keys(result).length === 1) throw new Error("At least one Asana task field is required.");
     return result;
@@ -263,17 +263,17 @@ export function validateDirectConnectedServiceWriteInput(
   if (provider === "linear" && action === "issue_create") {
     allowedKeys(row, ["team_id", "title", "description"], "Linear issue create");
     return {
-      team_id: id(row.team_id, UUIDISH, "Linear team ID"),
-      title: text(row.title, 500, "Linear issue title", true)!,
-      ...(row.description !== undefined ? { description: text(row.description, 10000, "Linear issue description") ?? "" } : {}),
+      team_id: id(row["team_id"], UUIDISH, "Linear team ID"),
+      title: text(row["title"], 500, "Linear issue title", true)!,
+      ...(row["description"] !== undefined ? { description: text(row["description"], 10000, "Linear issue description") ?? "" } : {}),
     };
   }
   if (provider === "linear" && action === "issue_update") {
     allowedKeys(row, ["issue_id", "title", "description"], "Linear issue update");
     const result: Record<string, unknown> = {
-      issue_id: id(row.issue_id, UUIDISH, "Linear issue ID"),
-      ...(row.title !== undefined ? { title: text(row.title, 500, "Linear issue title") ?? "" } : {}),
-      ...(row.description !== undefined ? { description: text(row.description, 10000, "Linear issue description") ?? "" } : {}),
+      issue_id: id(row["issue_id"], UUIDISH, "Linear issue ID"),
+      ...(row["title"] !== undefined ? { title: text(row["title"], 500, "Linear issue title") ?? "" } : {}),
+      ...(row["description"] !== undefined ? { description: text(row["description"], 10000, "Linear issue description") ?? "" } : {}),
     };
     if (Object.keys(result).length === 1) throw new Error("At least one Linear issue field is required.");
     return result;
@@ -318,8 +318,8 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { updateHubSpotContact } = await import("./hubspot.server");
     return updateHubSpotContact({
       userId: input.userId,
-      contactId: String(data.contact_id),
-      properties: data.properties as Record<string, unknown>,
+      contactId: String(data["contact_id"]),
+      properties: data["properties"] as Record<string, unknown>,
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -327,8 +327,8 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { updateHubSpotDeal } = await import("./hubspot.server");
     return updateHubSpotDeal({
       userId: input.userId,
-      dealId: String(data.deal_id),
-      properties: data.properties as Record<string, unknown>,
+      dealId: String(data["deal_id"]),
+      properties: data["properties"] as Record<string, unknown>,
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -336,9 +336,9 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { createNotionChildPage } = await import("./notion.server");
     return createNotionChildPage({
       userId: input.userId,
-      parentPageId: String(data.parent_page_id),
-      title: String(data.title),
-      ...(typeof data.content === "string" ? { content: data.content } : {}),
+      parentPageId: String(data["parent_page_id"]),
+      title: String(data["title"]),
+      ...(typeof data["content"] === "string" ? { content: data["content"] } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -346,11 +346,11 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { createAsanaTask } = await import("./asana.server");
     return createAsanaTask({
       userId: input.userId,
-      workspaceId: String(data.workspace_id),
-      name: String(data.name),
-      ...(typeof data.project_id === "string" ? { projectId: data.project_id } : {}),
-      ...(typeof data.notes === "string" ? { notes: data.notes } : {}),
-      ...(typeof data.due_on === "string" ? { dueOn: data.due_on } : {}),
+      workspaceId: String(data["workspace_id"]),
+      name: String(data["name"]),
+      ...(typeof data["project_id"] === "string" ? { projectId: data["project_id"] } : {}),
+      ...(typeof data["notes"] === "string" ? { notes: data["notes"] } : {}),
+      ...(typeof data["due_on"] === "string" ? { dueOn: data["due_on"] } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -358,11 +358,11 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { updateAsanaTask } = await import("./asana.server");
     return updateAsanaTask({
       userId: input.userId,
-      taskId: String(data.task_id),
-      ...(typeof data.name === "string" ? { name: data.name } : {}),
-      ...(typeof data.notes === "string" ? { notes: data.notes } : {}),
-      ...(typeof data.completed === "boolean" ? { completed: data.completed } : {}),
-      ...(typeof data.due_on === "string" ? { dueOn: data.due_on } : {}),
+      taskId: String(data["task_id"]),
+      ...(typeof data["name"] === "string" ? { name: data["name"] } : {}),
+      ...(typeof data["notes"] === "string" ? { notes: data["notes"] } : {}),
+      ...(typeof data["completed"] === "boolean" ? { completed: data["completed"] } : {}),
+      ...(typeof data["due_on"] === "string" ? { dueOn: data["due_on"] } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -370,9 +370,9 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { createLinearIssue } = await import("./linear.server");
     return createLinearIssue({
       userId: input.userId,
-      teamId: String(data.team_id),
-      title: String(data.title),
-      ...(typeof data.description === "string" ? { description: data.description } : {}),
+      teamId: String(data["team_id"]),
+      title: String(data["title"]),
+      ...(typeof data["description"] === "string" ? { description: data["description"] } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -380,9 +380,9 @@ export async function executeDirectConnectedServiceWrite(input: {
     const { updateLinearIssue } = await import("./linear.server");
     return updateLinearIssue({
       userId: input.userId,
-      issueId: String(data.issue_id),
-      ...(typeof data.title === "string" ? { title: data.title } : {}),
-      ...(typeof data.description === "string" ? { description: data.description } : {}),
+      issueId: String(data["issue_id"]),
+      ...(typeof data["title"] === "string" ? { title: data["title"] } : {}),
+      ...(typeof data["description"] === "string" ? { description: data["description"] } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
