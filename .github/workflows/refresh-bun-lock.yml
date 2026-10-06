@@ -1,4 +1,4 @@
-name: Refresh Bun Lock
+name: Refresh Bun Lock 
 on:
   push:
     branches:
