@@ -1,7 +1,9 @@
 import {
   findNangoProvider,
+  findNangoProviderByExternalId,
   isSafeNangoProviderId,
   NANGO_PROVIDERS,
+  nangoExternalProviderId,
   nangoStorageProvider,
   type NangoProviderId,
 } from "./nango-providers";
@@ -124,7 +126,8 @@ function normalizeActionFunction(value: unknown): NangoActionFunction | null {
 
 export async function listNangoProviderActionTemplates(providerId: NangoProviderId) {
   if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
-  const result = await nangoFetch(`/providers/${encodeURIComponent(providerId)}/templates`);
+  const externalProviderId = nangoExternalProviderId(providerId);
+  const result = await nangoFetch(`/providers/${encodeURIComponent(externalProviderId)}/templates`);
   const rows = Array.isArray(result?.data) ? result.data : [];
   return rows
     .map(normalizeActionFunction)
@@ -214,6 +217,7 @@ type NangoIntegration = {
 
 export type NangoCatalogueProvider = {
   id: string;
+  nangoProviderId: string;
   name: string;
   categories: string[];
   category: string;
@@ -224,18 +228,19 @@ export type NangoCatalogueProvider = {
 };
 
 function normalizeCatalogueProvider(row: any): NangoCatalogueProvider | null {
-  const id = typeof row?.name === "string" ? row.name.trim() : "";
-  if (!isSafeNangoProviderId(id)) return null;
+  const externalId = typeof row?.name === "string" ? row.name.trim() : "";
+  if (!isSafeNangoProviderId(externalId)) return null;
   const categories = Array.isArray(row.categories)
     ? row.categories.filter((value: unknown): value is string => typeof value === "string")
     : [];
-  const curated = findNangoProvider(id);
+  const curated = findNangoProviderByExternalId(externalId) ?? findNangoProvider(externalId);
   return {
-    id,
+    id: curated?.id || externalId,
+    nangoProviderId: externalId,
     name:
       typeof row.display_name === "string" && row.display_name.trim()
         ? row.display_name.trim()
-        : curated?.name || id,
+        : curated?.name || externalId,
     categories,
     category: curated?.category || categories[0] || "other",
     authMode: typeof row.auth_mode === "string" ? row.auth_mode : "UNKNOWN",
@@ -258,7 +263,8 @@ export async function listNangoProviderCatalogue(): Promise<NangoCatalogueProvid
 
 async function getNangoCatalogueProvider(providerId: string) {
   if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
-  const result = await nangoFetch(`/providers/${encodeURIComponent(providerId)}`);
+  const externalProviderId = nangoExternalProviderId(providerId);
+  const result = await nangoFetch(`/providers/${encodeURIComponent(externalProviderId)}`);
   const provider = normalizeCatalogueProvider(result?.data ?? result);
   if (!provider || provider.id !== providerId) throw new Error("Unsupported Nango provider.");
   return provider;
@@ -282,6 +288,7 @@ export async function ensureNangoIntegration(providerId: NangoProviderId) {
   if (!isSafeNangoProviderId(providerId)) throw new Error("Unsupported Nango provider.");
   const curated = findNangoProvider(providerId);
   const definition = curated ? { name: curated.name } : await getNangoCatalogueProvider(providerId);
+  const externalProviderId = nangoExternalProviderId(providerId);
   const integrationId = configuredIntegrationId(providerId)!;
   let existing: any = null;
   try {
@@ -292,7 +299,7 @@ export async function ensureNangoIntegration(providerId: NangoProviderId) {
   }
 
   if (existing) {
-    if (existing.provider !== providerId) {
+    if (existing.provider !== externalProviderId) {
       throw new Error(`Integration ID is already assigned to ${existing.provider}.`);
     }
     return { integrationId, created: false };
@@ -303,8 +310,8 @@ export async function ensureNangoIntegration(providerId: NangoProviderId) {
       method: "POST",
       body: JSON.stringify({
         unique_key: integrationId,
-        provider: providerId,
-        display_name: `PalladiumAI ${definition.name}`,
+        provider: externalProviderId,
+        display_name: `Blackstar ${definition.name}`,
         forward_webhooks: true,
       }),
     });
@@ -313,7 +320,7 @@ export async function ensureNangoIntegration(providerId: NangoProviderId) {
     if (!(error instanceof NangoHttpError) || error.status !== 409) throw error;
     const result = await nangoFetch(`/integrations/${encodeURIComponent(integrationId)}`);
     const current = result?.data ?? result;
-    if (current?.provider !== providerId) {
+    if (current?.provider !== externalProviderId) {
       throw new Error(
         `Integration ID is already assigned to ${current?.provider || "another provider"}.`,
       );
@@ -329,9 +336,10 @@ export async function provisionNangoIntegrations() {
   return Promise.all(
     NANGO_PROVIDERS.map(async (definition) => {
       const integrationId = configuredIntegrationId(definition.id)!;
+      const externalProviderId = definition.nangoProviderId;
       const current = byKey.get(integrationId);
       if (current) {
-        return current.provider === definition.id
+        return current.provider === externalProviderId
           ? { id: definition.id, integrationId, status: "existing" as const }
           : {
               id: definition.id,
@@ -346,8 +354,8 @@ export async function provisionNangoIntegrations() {
           method: "POST",
           body: JSON.stringify({
             unique_key: integrationId,
-            provider: definition.id,
-            display_name: `PalladiumAI ${definition.name}`,
+            provider: externalProviderId,
+            display_name: `Blackstar ${definition.name}`,
             forward_webhooks: true,
           }),
         });

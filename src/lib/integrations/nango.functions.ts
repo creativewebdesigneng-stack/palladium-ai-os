@@ -17,6 +17,7 @@ export const listNangoConnections = createServerFn({ method: "POST" })
     } catch {
       providers = NANGO_PROVIDERS.map((provider) => ({
         id: provider.id,
+        nangoProviderId: provider.nangoProviderId,
         name: provider.name,
         categories: [provider.category],
         category: provider.category,
