@@ -1,5 +1,8 @@
 name: Refresh Bun Lock
 on:
+  push:
+    branches:
+      - blackstar/native-writes-forwardport-20261006
   workflow_dispatch:
 permissions:
   contents: write
