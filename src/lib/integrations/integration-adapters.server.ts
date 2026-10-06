@@ -10,6 +10,12 @@ import {
   type ConnectedServiceInput,
 } from "./connected-service.server";
 import {
+  directConnectedServiceWriteCapabilities,
+  executeDirectConnectedServiceWrite,
+  isDirectConnectedServiceWriteAction,
+  prepareDirectConnectedServiceWrite,
+} from "./direct-connected-service-write.server";
+import {
   executeGitHubConnectedService,
   getUserGitHubInstallationId,
   GITHUB_CONNECTED_SERVICE_ACTIONS,
@@ -268,6 +274,17 @@ const directOAuthAdapter: IntegrationAdapter = {
           inputSchema: DIRECT_INPUT_SCHEMA,
         });
       }
+      for (const capability of directConnectedServiceWriteCapabilities(providerId)) {
+        rows.push({
+          provider: providerId,
+          action: capability.action,
+          description: capability.description,
+          risk: "medium",
+          requiresApproval: true,
+          deployed: true,
+          inputSchema: capability.inputSchema,
+        });
+      }
     }
     return rows;
   },
@@ -286,7 +303,10 @@ const directOAuthAdapter: IntegrationAdapter = {
     }
     return (
       isDirectConnectedServiceProvider(provider) &&
-      directConnectedServiceActions(provider).includes(action) &&
+      (
+        directConnectedServiceActions(provider).includes(action) ||
+        isDirectConnectedServiceWriteAction(provider, action)
+      ) &&
       (await hasDirectConnectedService(userId, provider))
     );
   },
@@ -297,6 +317,9 @@ const directOAuthAdapter: IntegrationAdapter = {
     if (input.provider === "x") return prepareXSocialAction(input);
     if (!isDirectConnectedServiceProvider(input.provider)) {
       throw new Error(`No direct OAuth adapter is registered for ${input.provider}.`);
+    }
+    if (isDirectConnectedServiceWriteAction(input.provider, input.action)) {
+      return prepareDirectConnectedServiceWrite(input);
     }
     buildConnectedServiceRequest(asDirectInput(input.provider, input.action, input.actionInput));
     if (!(await hasDirectConnectedService(input.userId, input.provider))) {
@@ -449,6 +472,46 @@ const directOAuthAdapter: IntegrationAdapter = {
         return {
           ok: false,
           error: error instanceof Error ? error.message : "Native X publishing failed.",
+          failurePhase: "ambiguous",
+          safeToFailover: false,
+        };
+      }
+    }
+
+    if (isDirectConnectedServiceWriteAction(input.provider, input.action)) {
+      let prepared;
+      try {
+        prepared = await prepareDirectConnectedServiceWrite(input);
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Direct write preparation failed.",
+          failurePhase: "pre_dispatch",
+          safeToFailover: true,
+        };
+      }
+      try {
+        const result = await executeDirectConnectedServiceWrite({
+          userId: input.userId,
+          provider: input.provider,
+          action: input.action,
+          actionInput: prepared.input,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          ok: true,
+          result: {
+            provider: input.provider,
+            action: input.action,
+            read_only: false,
+            transport: "direct_oauth",
+            data: result,
+          },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Direct provider write failed.",
           failurePhase: "ambiguous",
           safeToFailover: false,
         };
