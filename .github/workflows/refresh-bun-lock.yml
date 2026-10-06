@@ -1,25 +1,27 @@
 name: Refresh Bun Lock
 on:
-  push:
-    branches:
-      - blackstar/native-writes-forwardport-20261006
+  workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   refresh:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: blackstar/native-writes-forwardport-20261006
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
       - run: bun install --lockfile-only
       - name: Commit refreshed lock
         run: |
-          if git diff --quiet -- bun.lock; then exit 0; fi
+          if git diff --quiet -- bun.lock; then
+            echo "bun.lock already current"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add bun.lock
           git commit -m "Refresh Bun lock for MCP security upgrade"
-          git push
+          git push origin HEAD:blackstar/native-writes-forwardport-20261006
