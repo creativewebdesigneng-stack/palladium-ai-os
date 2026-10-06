@@ -1,10 +1,11 @@
-name: Refresh Bun Lock 
+name: Refresh Bun Lock
 on:
   push:
     branches:
       - blackstar/native-writes-forwardport-20261006
 jobs:
   refresh:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,14 +17,9 @@ jobs:
       - run: bun install --lockfile-only
       - name: Commit refreshed lock
         run: |
+          if git diff --quiet -- bun.lock; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add bun.lock
-          git diff --cached --quiet || git commit -m "Refresh Bun lock for MCP SDK security upgrade"
-          git push origin HEAD:blackstar/native-writes-forwardport-20261006
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: refreshed-bun-lock
-          path: bun.lock
-          if-no-files-found: error
+          git commit -m "Refresh Bun lock for MCP security upgrade"
+          git push
