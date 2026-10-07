@@ -61,8 +61,8 @@ function certificate(overrides: Record<string, unknown> = {}) {
     benchmark_hash: HASH,
     evaluator_hash: 'b'.repeat(64),
     model_config_hash: 'c'.repeat(64),
-    completed_at: '2026-09-06T10:00:00.000Z',
-    verified_at: '2026-09-06T10:05:00.000Z',
+    completed_at: new Date(Date.now() - 60_000).toISOString(),
+    verified_at: new Date(Date.now() - 30_000).toISOString(),
     ...overrides,
   }
 }
