@@ -202,3 +202,91 @@ export async function searchHubSpotDeals(args: {
     nextAfter: payload?.paging?.next?.after ? String(payload.paging.next.after).slice(0, 500) : null,
   };
 }
+
+
+function hubspotObjectId(value: string, label: string): string {
+  const id = String(value ?? "").trim();
+  if (!/^\d{1,30}$/.test(id)) throw new HubSpotIntegrationError(`A valid HubSpot ${label} ID is required.`);
+  return id;
+}
+
+function boundedHubSpotProperties(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HubSpotIntegrationError("HubSpot properties must be an object.");
+  }
+  const allow = new Set(allowed);
+  const result: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value).slice(0, 20)) {
+    if (!allow.has(key)) throw new HubSpotIntegrationError(`HubSpot property "${key}" is not allowed for this action.`);
+    if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
+      throw new HubSpotIntegrationError(`HubSpot property "${key}" must be a scalar value.`);
+    }
+    result[key] = String(raw).slice(0, key === "description" ? 5000 : 1000);
+  }
+  if (!Object.keys(result).length) throw new HubSpotIntegrationError("At least one HubSpot property is required.");
+  return result;
+}
+
+const HUBSPOT_CONTACT_WRITE_FIELDS = [
+  "firstname", "lastname", "email", "phone", "company", "jobtitle", "lifecyclestage",
+] as const;
+const HUBSPOT_DEAL_WRITE_FIELDS = [
+  "dealname", "amount", "dealstage", "pipeline", "closedate", "dealtype", "description",
+] as const;
+
+export async function updateHubSpotContact(args: {
+  userId: string;
+  contactId: string;
+  properties: Record<string, unknown>;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const contactId = hubspotObjectId(args.contactId, "contact");
+  const properties = boundedHubSpotProperties(args.properties, HUBSPOT_CONTACT_WRITE_FIELDS);
+  const response = await hubspotFetch(
+    args.userId,
+    `/crm/v3/objects/contacts/${encodeURIComponent(contactId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ properties }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    },
+    args.fetchImpl ?? fetch,
+  );
+  const payload = await response.json() as any;
+  return {
+    id: String(payload?.id ?? contactId).slice(0, 80),
+    updatedAt: payload?.updatedAt ? String(payload.updatedAt).slice(0, 100) : null,
+    properties: payload?.properties && typeof payload.properties === "object" ? payload.properties : properties,
+  };
+}
+
+export async function updateHubSpotDeal(args: {
+  userId: string;
+  dealId: string;
+  properties: Record<string, unknown>;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const dealId = hubspotObjectId(args.dealId, "deal");
+  const properties = boundedHubSpotProperties(args.properties, HUBSPOT_DEAL_WRITE_FIELDS);
+  const response = await hubspotFetch(
+    args.userId,
+    `/crm/v3/objects/deals/${encodeURIComponent(dealId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ properties }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    },
+    args.fetchImpl ?? fetch,
+  );
+  const payload = await response.json() as any;
+  return {
+    id: String(payload?.id ?? dealId).slice(0, 80),
+    updatedAt: payload?.updatedAt ? String(payload.updatedAt).slice(0, 100) : null,
+    properties: payload?.properties && typeof payload.properties === "object" ? payload.properties : properties,
+  };
+}

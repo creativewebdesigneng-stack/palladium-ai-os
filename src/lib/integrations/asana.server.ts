@@ -37,6 +37,7 @@ async function asanaFetch(
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...(init.headers ?? {}),
     },
     signal: init.signal ?? AbortSignal.timeout(20_000),
@@ -236,4 +237,104 @@ export async function searchAsanaProjectTasks(args: {
         : true,
     )
     .slice(0, limit);
+}
+
+
+function dueDate(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const date = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    throw new AsanaIntegrationError("Asana due_on must use YYYY-MM-DD.");
+  }
+  return date;
+}
+
+function boundedTaskText(value: unknown, label: string, max: number, required = false): string | undefined {
+  if (value === undefined || value === null) {
+    if (required) throw new AsanaIntegrationError(`Asana ${label} is required.`);
+    return undefined;
+  }
+  const text = String(value).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  if (required && !text) throw new AsanaIntegrationError(`Asana ${label} is required.`);
+  return text;
+}
+
+export async function createAsanaTask(args: {
+  userId: string;
+  workspaceId: string;
+  name: string;
+  projectId?: string;
+  notes?: string;
+  dueOn?: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const workspace = gid(args.workspaceId, "workspace");
+  const project = args.projectId ? gid(args.projectId, "project") : undefined;
+  const name = boundedTaskText(args.name, "task name", 500, true)!;
+  const notes = boundedTaskText(args.notes, "task notes", 5000);
+  const dueOn = dueDate(args.dueOn);
+  const data = {
+    workspace,
+    name,
+    ...(project ? { projects: [project] } : {}),
+    ...(notes !== undefined ? { notes } : {}),
+    ...(dueOn ? { due_on: dueOn } : {}),
+  };
+  const response = await asanaFetch(
+    args.userId,
+    "/tasks",
+    {
+      method: "POST",
+      body: JSON.stringify({ data }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    },
+    args.fetchImpl ?? fetch,
+  );
+  const payload = await response.json() as any;
+  return {
+    gid: String(payload?.data?.gid ?? "").slice(0, 50),
+    name: String(payload?.data?.name ?? name).slice(0, 500),
+    permalinkUrl: payload?.data?.permalink_url ? String(payload.data.permalink_url).slice(0, 2000) : null,
+  };
+}
+
+export async function updateAsanaTask(args: {
+  userId: string;
+  taskId: string;
+  name?: string;
+  notes?: string;
+  completed?: boolean;
+  dueOn?: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const taskId = gid(args.taskId, "task");
+  const name = boundedTaskText(args.name, "task name", 500);
+  const notes = boundedTaskText(args.notes, "task notes", 5000);
+  const dueOn = dueDate(args.dueOn);
+  const data: Record<string, unknown> = {
+    ...(name !== undefined ? { name } : {}),
+    ...(notes !== undefined ? { notes } : {}),
+    ...(typeof args.completed === "boolean" ? { completed: args.completed } : {}),
+    ...(dueOn ? { due_on: dueOn } : {}),
+  };
+  if (!Object.keys(data).length) throw new AsanaIntegrationError("At least one Asana task field is required.");
+  const response = await asanaFetch(
+    args.userId,
+    `/tasks/${encodeURIComponent(taskId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    },
+    args.fetchImpl ?? fetch,
+  );
+  const payload = await response.json() as any;
+  return {
+    gid: String(payload?.data?.gid ?? taskId).slice(0, 50),
+    name: payload?.data?.name ? String(payload.data.name).slice(0, 500) : name ?? null,
+    completed: typeof payload?.data?.completed === "boolean" ? payload.data.completed : args.completed ?? null,
+    permalinkUrl: payload?.data?.permalink_url ? String(payload.data.permalink_url).slice(0, 2000) : null,
+  };
 }

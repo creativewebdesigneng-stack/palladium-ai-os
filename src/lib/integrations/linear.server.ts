@@ -159,3 +159,107 @@ export async function searchLinearIssues(args: {
     archivedAt: row?.archivedAt ? String(row.archivedAt).slice(0, 100) : null,
   }));
 }
+
+
+function linearId(value: unknown, label: string): string {
+  const id = String(value ?? "").trim();
+  if (!/^[0-9a-fA-F-]{32,36}$/.test(id)) throw new LinearIntegrationError(`A valid Linear ${label} ID is required.`);
+  return id;
+}
+
+function boundedIssueText(value: unknown, label: string, max: number, required = false): string | undefined {
+  if (value === undefined || value === null) {
+    if (required) throw new LinearIntegrationError(`Linear ${label} is required.`);
+    return undefined;
+  }
+  const text = String(value).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  if (required && !text) throw new LinearIntegrationError(`Linear ${label} is required.`);
+  return text;
+}
+
+const ISSUE_CREATE_MUTATION = `
+  mutation BlackstarIssueCreate($input: IssueCreateInput!) {
+    issueCreate(input: $input) {
+      success
+      issue { id identifier title url }
+    }
+  }
+`;
+
+const ISSUE_UPDATE_MUTATION = `
+  mutation BlackstarIssueUpdate($id: String!, $input: IssueUpdateInput!) {
+    issueUpdate(id: $id, input: $input) {
+      success
+      issue { id identifier title url }
+    }
+  }
+`;
+
+export async function createLinearIssue(args: {
+  userId: string;
+  teamId: string;
+  title: string;
+  description?: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const teamId = linearId(args.teamId, "team");
+  const title = boundedIssueText(args.title, "issue title", 500, true)!;
+  const description = boundedIssueText(args.description, "issue description", 10_000);
+  const data = await linearQuery<any>({
+    userId: args.userId,
+    query: ISSUE_CREATE_MUTATION,
+    variables: {
+      input: {
+        teamId,
+        title,
+        ...(description !== undefined ? { description } : {}),
+      },
+    },
+    ...(args.signal ? { signal: args.signal } : {}),
+    ...(args.fetchImpl ? { fetchImpl: args.fetchImpl } : {}),
+  });
+  if (data?.issueCreate?.success !== true || !data?.issueCreate?.issue?.id) {
+    throw new LinearIntegrationError("Linear did not confirm issue creation.");
+  }
+  return {
+    id: String(data.issueCreate.issue.id).slice(0, 100),
+    identifier: data.issueCreate.issue.identifier ? String(data.issueCreate.issue.identifier).slice(0, 100) : null,
+    title: String(data.issueCreate.issue.title ?? title).slice(0, 500),
+    url: data.issueCreate.issue.url ? String(data.issueCreate.issue.url).slice(0, 2000) : null,
+  };
+}
+
+export async function updateLinearIssue(args: {
+  userId: string;
+  issueId: string;
+  title?: string;
+  description?: string;
+  signal?: AbortSignal;
+  fetchImpl?: FetchLike;
+}) {
+  const issueId = linearId(args.issueId, "issue");
+  const title = boundedIssueText(args.title, "issue title", 500);
+  const description = boundedIssueText(args.description, "issue description", 10_000);
+  const input = {
+    ...(title !== undefined ? { title } : {}),
+    ...(description !== undefined ? { description } : {}),
+  };
+  if (!Object.keys(input).length) throw new LinearIntegrationError("At least one Linear issue field is required.");
+  const data = await linearQuery<any>({
+    userId: args.userId,
+    query: ISSUE_UPDATE_MUTATION,
+    variables: { id: issueId, input },
+    ...(args.signal ? { signal: args.signal } : {}),
+    ...(args.fetchImpl ? { fetchImpl: args.fetchImpl } : {}),
+  });
+  if (data?.issueUpdate?.success !== true || !data?.issueUpdate?.issue?.id) {
+    throw new LinearIntegrationError("Linear did not confirm issue update.");
+  }
+  return {
+    id: String(data.issueUpdate.issue.id).slice(0, 100),
+    identifier: data.issueUpdate.issue.identifier ? String(data.issueUpdate.issue.identifier).slice(0, 100) : null,
+    title: String(data.issueUpdate.issue.title ?? title ?? "").slice(0, 500),
+    url: data.issueUpdate.issue.url ? String(data.issueUpdate.issue.url).slice(0, 2000) : null,
+  };
+}
