@@ -4,6 +4,12 @@ import { resolve } from 'node:path'
 const source=readFileSync(resolve(process.cwd(),'src/lib/game-foundry/game-foundry.functions.ts'),'utf8')
 const screen=readFileSync(resolve(process.cwd(),'src/screens/GameFoundry.jsx'),'utf8')
 describe('GTA V asset assessment endpoint',()=>{
+  it('persists validated worker inspection evidence under the owning asset',()=>{
+    expect(source).toContain('export const inspectGameFoundryGtaVehicleAsset')
+    expect(source).toContain('requestGtaVehicleInspection({assetId:data.assetId')
+    expect(source).toContain('gtaVehicleInspection:inspection.report')
+    expect(source).toContain('if(!gtaVehicleInspectorConfigured())')
+  })
   it('enforces ownership and actual completed asset status',()=>{
     expect(source).toContain('export const assessGameFoundryGtaVehicleAsset')
     expect(source).toContain('.eq("id",data.assetId).eq("user_id",context.userId)')

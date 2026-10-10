@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { assessGtaVehicleHandoff } from "./gta-vehicle-handoff";
 import { assessGtaVehicleInspection } from "./gta-vehicle-inspection";
+import { gtaVehicleInspectorConfigured, requestGtaVehicleInspection } from "./gta-vehicle-inspector.server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
@@ -979,4 +980,35 @@ export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" }
       ready:false as const,
       nativeGtaFilesGenerated:false as const,
     };
+  });
+
+/**
+ * Explicit user-triggered GTA V geometry inspection.
+ * Does not authorize native GTA V conversion or export.
+ */
+export const inspectGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({assetId:z.string().uuid(),category:z.enum(["car","motorcycle","truck","prop"])}).parse(input))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const result=await sb.from("three_d_jobs")
+      .select("id,status,output_url,target_engine,requested_format")
+      .eq("id",data.assetId).eq("user_id",context.userId).maybeSingle();
+    if(result.error) throw new Error(result.error.message);
+    if(!result.data) throw new Error("Game Foundry asset not found.");
+    const asset=result.data;
+    if(asset.target_engine!=="zmodeler"||!["obj","fbx"].includes(String(asset.requested_format).toLowerCase())) throw new Error("GTA inspection requires a ZModeler-targeted OBJ or FBX asset.");
+    if(asset.status!=="completed"||!asset.output_url) throw new Error("GTA inspection requires a completed model.");
+    if(!gtaVehicleInspectorConfigured()) throw new Error("GTA inspector worker is not configured.");
+    const inspection=await requestGtaVehicleInspection({assetId:data.assetId,outputUrl:String(asset.output_url),category:data.category});
+    // Persist only validated evidence, keeping any existing processor report.
+    const current=await sb.from("three_d_jobs").select("validation_report").eq("id",data.assetId).eq("user_id",context.userId).maybeSingle();
+    if(current.error) throw new Error(current.error.message);
+    const report=current.data?.validation_report&&typeof current.data.validation_report==="object"?current.data.validation_report:{};
+    const updated=await sb.from("three_d_jobs").update({
+      validation_report:{...report,gtaVehicleInspection:inspection.report},
+      updated_at:new Date().toISOString(),
+    }).eq("id",data.assetId).eq("user_id",context.userId);
+    if(updated.error) throw new Error(updated.error.message);
+    return {assetId:data.assetId,inspectionVerified:true,nativeGtaFilesGenerated:false};
   });
