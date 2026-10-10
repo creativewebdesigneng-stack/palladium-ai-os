@@ -946,5 +946,20 @@ export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" }
     const candidate=asset.metadata?.response?.gtaVehicleHandoff;
     if(!candidate || typeof candidate!=="object") return {assetId:data.assetId,ready:false,metadataComplete:false,requiresWorkerVerification:true,errors:["Worker has not supplied a GTA V vehicle handoff manifest. Mesh, collision, LOD and rigging must be inspected."],nativeGtaFilesGenerated:false};
     const assessment=assessGtaVehicleHandoff(candidate);
+    // A worker manifest must describe this completed asset, not an unrelated model.
+    const manifestMatchesAsset=Boolean(
+      assessment.handoff &&
+      assessment.handoff.sourceFormat===String(asset.requested_format).toLowerCase() &&
+      assessment.handoff.sourceUrl===asset.output_url &&
+      (!asset.project_id || assessment.handoff.projectId===asset.project_id)
+    );
+    if(!manifestMatchesAsset) return {
+      assetId:data.assetId,
+      ready:false,
+      metadataComplete:false,
+      requiresWorkerVerification:true,
+      errors:["Worker handoff manifest does not match this completed asset's format, output URL or project."],
+      nativeGtaFilesGenerated:false,
+    };
     return {assetId:data.assetId,...assessment};
   });
