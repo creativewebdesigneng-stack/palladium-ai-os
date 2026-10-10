@@ -18,7 +18,9 @@ const valid = {
 describe('GTA V vehicle handoff readiness', () => {
   it('accepts a complete interchange manifest without claiming native export', () => {
     const result = assessGtaVehicleHandoff(valid)
-    expect(result.ready).toBe(true)
+    expect(result.ready).toBe(false)
+    expect(result.metadataComplete).toBe(true)
+    expect(result.requiresWorkerVerification).toBe(true)
     expect(result.exportStatus).toBe('interchange_only')
     expect(result.nativeGtaFilesGenerated).toBe(false)
   })
@@ -26,6 +28,11 @@ describe('GTA V vehicle handoff readiness', () => {
     const result = assessGtaVehicleHandoff({ ...valid, collisionMesh: false, rigged: false })
     expect(result.ready).toBe(false)
     expect(result.errors).toHaveLength(2)
+  })
+  it('rejects insecure texture URLs', () => {
+    const result = assessGtaVehicleHandoff({ ...valid, textureUrls: ['http://assets.example.com/paint.png'] })
+    expect(result.ready).toBe(false)
+    expect(result.errors.length).toBeGreaterThan(0)
   })
   it('rejects non-HTTPS sources and unsafe model names', () => {
     expect(assessGtaVehicleHandoff({ ...valid, sourceUrl: 'http://example.com/a.fbx' }).ready).toBe(false)
