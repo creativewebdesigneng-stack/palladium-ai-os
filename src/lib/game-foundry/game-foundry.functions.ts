@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { assessGtaVehicleHandoff } from "./gta-vehicle-handoff";
+import { assessGtaVehicleInspection } from "./gta-vehicle-inspection";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
@@ -961,5 +962,21 @@ export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" }
       errors:["Worker handoff manifest does not match this completed asset's format, output URL or project."],
       nativeGtaFilesGenerated:false,
     };
-    return {assetId:data.assetId,...assessment};
+    const evidence=asset.validation_report?.gtaVehicleInspection;
+    if(!evidence) return {assetId:data.assetId,...assessment,inspectionVerified:false,errors:[...assessment.errors,"No independent vehicle inspection report is attached to this asset."]};
+    const inspection=assessGtaVehicleInspection(evidence,{
+      assetId:data.assetId,
+      outputUrl:String(asset.output_url),
+      category:assessment.handoff!.category,
+    });
+    return {
+      assetId:data.assetId,
+      ...assessment,
+      inspectionVerified:inspection.verified,
+      inspectionErrors:inspection.errors,
+      errors:[...assessment.errors,...inspection.errors],
+      // Even a passing geometry inspection is not a licensed native export certification.
+      ready:false as const,
+      nativeGtaFilesGenerated:false as const,
+    };
   });
