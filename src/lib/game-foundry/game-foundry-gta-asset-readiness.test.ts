@@ -14,6 +14,11 @@ describe('GTA V asset assessment endpoint',()=>{
     expect(screen).toContain('Check GTA V readiness')
     expect(screen).toContain('Native GTA V export: not verified')
   })
+  it('rejects a worker manifest describing a different model or project',()=>{
+    expect(source).toContain('assessment.handoff.sourceUrl===asset.output_url')
+    expect(source).toContain('assessment.handoff.sourceFormat===String(asset.requested_format).toLowerCase()')
+    expect(source).toContain('assessment.handoff.projectId===asset.project_id')
+  })
   it('fails closed when worker supplies no vehicle manifest',()=>{
     expect(source).toContain('Worker has not supplied a GTA V vehicle handoff manifest')
     expect(source).toContain('assessGtaVehicleHandoff(candidate)')
