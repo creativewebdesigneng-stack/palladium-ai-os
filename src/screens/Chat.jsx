@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Bot } from 'lucide-react';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatTopbar from '@/components/chat/ChatTopbar';
 import ChatMessages from '@/components/chat/ChatMessages';
@@ -9,6 +9,8 @@ import ChatEmptyState from '@/components/chat/ChatEmptyState';
 import { assistantChat } from '@/lib/ai/assistant.functions';
 import { listAssistantConversations, getAssistantConversation, renameAssistantConversation } from '@/lib/ai/assistant-conversations.functions';
 import { friendlyMessage } from '@/lib/errors';
+import { listAgents } from '@/lib/agents/agents.functions';
+import { runAgentTask } from '@/lib/runtime/runtime.functions';
 
 function createConversation() {
   return {
@@ -34,6 +36,31 @@ export default function Chat() {
   const getConversationFn = useServerFn(getAssistantConversation);
   const renameConversationFn = useServerFn(renameAssistantConversation);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const listAgentsFn = useServerFn(listAgents);
+  const runAgentTaskFn = useServerFn(runAgentTask);
+  const [agents, setAgents] = useState([]);
+  const [delegationAgent, setDelegationAgent] = useState('');
+  const [delegationInput, setDelegationInput] = useState('');
+  const [delegationOpen, setDelegationOpen] = useState(false);
+  const [delegationPending, setDelegationPending] = useState(false);
+  const [delegationResult, setDelegationResult] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    listAgentsFn({ data: { limit: 100, withTasks: false } }).then((result) => {
+      if (!cancelled) setAgents((result.agents || []).filter((agent) => agent.status === 'active'));
+    }).catch((err) => console.warn('[Chat] agents unavailable', err));
+    return () => { cancelled = true; };
+  }, [listAgentsFn]);
+  const delegateTask = async () => {
+    if (!delegationAgent || !delegationInput.trim() || delegationPending) return;
+    setDelegationPending(true); setError(null); setDelegationResult(null);
+    try {
+      const task = await runAgentTaskFn({ data: { agent_id: delegationAgent, input: delegationInput.trim() } });
+      setDelegationResult(task);
+      setDelegationInput('');
+    } catch (err) { setError(friendlyMessage(err)); }
+    finally { setDelegationPending(false); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +247,17 @@ export default function Chat() {
           </div>
         )}
 
+        <div className="border-b border-white/10 px-4 py-2 sm:px-6">
+          <button type="button" onClick={() => setDelegationOpen((open) => !open)} aria-expanded={delegationOpen} className="flex items-center gap-2 text-xs text-violet-200 hover:text-white"><Bot className="h-4 w-4" /> Delegate a task to an agent</button>
+          {delegationOpen && <div className="mt-3 space-y-2 rounded-xl border border-violet-400/20 bg-violet-400/[.04] p-3">
+            <p className="text-xs text-zinc-400">Choose an active agent and explicitly approve a task run. Execution uses the existing governed agent runtime and records its actual status.</p>
+            <select aria-label="Agent for task" value={delegationAgent} onChange={(e) => setDelegationAgent(e.target.value)} className="w-full rounded-lg border border-white/15 bg-[#15161f] p-2 text-sm text-white"><option value="">Select an active agent</option>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select>
+            <textarea aria-label="Agent task instructions" value={delegationInput} onChange={(e) => setDelegationInput(e.target.value.slice(0, 4000))} rows={2} placeholder="Describe the task the agent should perform…" className="w-full rounded-lg border border-white/15 bg-[#15161f] p-2 text-sm text-white" />
+            <button type="button" disabled={!delegationAgent || !delegationInput.trim() || delegationPending} onClick={delegateTask} className="rounded-lg bg-violet-600 px-3 py-2 text-xs text-white disabled:opacity-40">{delegationPending ? 'Running task…' : 'Confirm and run agent task'}</button>
+            {!agents.length && <p className="text-xs text-amber-200">No active agents available. Create and activate an agent in Agents first.</p>}
+            {delegationResult && <p role="status" className="text-xs text-zinc-300">Task {delegationResult.id || delegationResult.task?.id || 'submitted'} · Status: {delegationResult.status || delegationResult.task?.status || 'unknown'}. See Agent Operations for full execution details.</p>}
+          </div>}
+        </div>
         {loadingHistory && <p className="px-5 py-2 text-xs text-zinc-500">Checking saved conversations…</p>}
         {messages.length === 0 ? <ChatEmptyState onPrompt={send} /> : <ChatMessages messages={messages} />}
         <ChatPromptBox onSend={send} pending={pending} />
