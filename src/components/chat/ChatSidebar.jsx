@@ -17,12 +17,12 @@ export default function ChatSidebar({ conversations, activeId, onSelect, onNew }
         </button>
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5">
           <Search className="h-3.5 w-3.5 text-zinc-600" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search this session" className="w-full bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-600" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search conversations" className="w-full bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-600" />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3">
-        <p className="px-2 py-2 text-[10px] font-medium uppercase tracking-widest text-zinc-600">This session</p>
+        <p className="px-2 py-2 text-[10px] font-medium uppercase tracking-widest text-zinc-600">Conversations</p>
         <div className="space-y-1">
           {filtered.map((conversation) => (
             <button
@@ -34,12 +34,12 @@ export default function ChatSidebar({ conversations, activeId, onSelect, onNew }
               <span className="truncate">{conversation.name}</span>
             </button>
           ))}
-          {filtered.length === 0 && <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-[11px] text-zinc-600">No conversations in this browser session.</p>}
+          {filtered.length === 0 && <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-[11px] text-zinc-600">No conversations found.</p>}
         </div>
       </div>
 
       <div className="border-t border-white/10 p-3 text-[10px] leading-4 text-zinc-600">
-        Chat history is session-local for now. Nothing here is presented as persisted conversation history.
+        Saved conversations are loaded from your account. New unsent chats stay in this browser session.
       </div>
     </aside>
   );

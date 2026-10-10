@@ -9,7 +9,8 @@ describe('workspace chat live-only contract', () => {
     const source = read('screens/Chat.jsx');
     expect(source).toContain("assistantChat");
     expect(source).toContain("assistantFn({ data: { message, history, conversationId: active.serverConversationId } })");
-    expect(source).toContain("conversationId: active.serverConversationId");
+    expect(source).toContain("listAssistantConversations");
+    expect(source).toContain("getAssistantConversation");
     expect(source).not.toContain('SEED_MESSAGES');
     expect(source).not.toContain('CONVERSATIONS');
     expect(source).not.toContain("Here's how I'd approach that");
@@ -23,7 +24,7 @@ describe('workspace chat live-only contract', () => {
     for (const source of [sidebar, emptyState, promptBox]) {
       expect(source).not.toContain("from './chatData'");
     }
-    expect(sidebar).toContain('session-local');
+    expect(sidebar).toContain('Saved conversations are loaded from your account');
     expect(emptyState).toContain('instead of a simulated answer');
   });
 
