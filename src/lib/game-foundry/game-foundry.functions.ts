@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { assessGtaVehicleHandoff } from "./gta-vehicle-handoff";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
@@ -923,4 +924,27 @@ export const certifyGameFoundryProject = createServerFn({ method:"POST" })
         ?"Game Foundry project has persisted runtime-ready evidence and all required external connectors are healthy."
         :"Game Foundry code is complete, but this project is not fully operationally certified until every reported blocker is cleared.",
     };
+  });
+
+/**
+ * Owner-scoped, read-only GTA V readiness assessment of a real completed asset.
+ * Worker metadata is not accepted as proof of native conversion.
+ */
+export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({assetId:z.string().uuid()}).parse(input))
+  .handler(async({data,context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const result=await sb.from("three_d_jobs")
+      .select("id,project_id,status,output_url,requested_format,target_engine,metadata,validation_report")
+      .eq("id",data.assetId).eq("user_id",context.userId).maybeSingle();
+    if(result.error) throw new Error(result.error.message);
+    if(!result.data) throw new Error("Game Foundry asset not found.");
+    const asset=result.data;
+    if(asset.target_engine!=="zmodeler") throw new Error("GTA V vehicle assessment requires a ZModeler-targeted asset.");
+    if(asset.status!=="completed"||!asset.output_url) return {assetId:data.assetId,ready:false,metadataComplete:false,requiresWorkerVerification:true,errors:["Asset generation has not completed with a downloadable model."],nativeGtaFilesGenerated:false};
+    const candidate=asset.metadata?.response?.gtaVehicleHandoff;
+    if(!candidate || typeof candidate!=="object") return {assetId:data.assetId,ready:false,metadataComplete:false,requiresWorkerVerification:true,errors:["Worker has not supplied a GTA V vehicle handoff manifest. Mesh, collision, LOD and rigging must be inspected."],nativeGtaFilesGenerated:false};
+    const assessment=assessGtaVehicleHandoff(candidate);
+    return {assetId:data.assetId,...assessment};
   });
