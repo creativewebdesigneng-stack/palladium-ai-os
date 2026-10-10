@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import ChatSidebar from '@/components/chat/ChatSidebar';
@@ -7,6 +7,7 @@ import ChatMessages from '@/components/chat/ChatMessages';
 import ChatPromptBox from '@/components/chat/ChatPromptBox';
 import ChatEmptyState from '@/components/chat/ChatEmptyState';
 import { assistantChat } from '@/lib/ai/assistant.functions';
+import { listAssistantConversations, getAssistantConversation } from '@/lib/ai/assistant-conversations.functions';
 import { friendlyMessage } from '@/lib/errors';
 
 function createConversation() {
@@ -29,6 +30,43 @@ export default function Chat() {
   const [error, setError] = useState(null);
   const [retryMessage, setRetryMessage] = useState(null);
   const assistantFn = useServerFn(assistantChat);
+  const listConversationsFn = useServerFn(listAssistantConversations);
+  const getConversationFn = useServerFn(getAssistantConversation);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    listConversationsFn({ data: { limit: 30 } }).then(({ conversations: stored }) => {
+      if (cancelled || !stored?.length) return;
+      setConversations((current) => {
+        const local = current.filter((c) => c.messages.length > 0 || c.serverConversationId);
+        const remote = stored.filter((row) => !local.some((c) => c.serverConversationId === row.id)).map((row) => ({
+          id: row.id, name: row.title || 'Conversation', messages: [], provider: null, model: null,
+          serverConversationId: row.id, loaded: false,
+        }));
+        return [...local, ...remote];
+      });
+    }).catch((err) => console.warn('[Chat] conversation history unavailable', err)).finally(() => {
+      if (!cancelled) setLoadingHistory(false);
+    });
+    return () => { cancelled = true; };
+  }, [listConversationsFn]);
+
+  const selectConversation = async (id) => {
+    setActiveId(id);
+    setError(null);
+    setRetryMessage(null);
+    const selected = conversations.find((c) => c.id === id);
+    if (!selected?.serverConversationId || selected.loaded !== false) return;
+    try {
+      const result = await getConversationFn({ data: { conversationId: selected.serverConversationId } });
+      updateConversation(id, (c) => ({ ...c, loaded: true, name: result.conversation?.title || c.name,
+        messages: (result.messages || []).filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({
+          id: m.id, role: m.role === 'assistant' ? 'ai' : 'user', text: m.content,
+        })),
+      }));
+    } catch (err) { setError(friendlyMessage(err)); }
+  };
 
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
   const messages = active?.messages ?? [];
@@ -133,7 +171,7 @@ export default function Chat() {
   return (
     <div className="flex h-[calc(100vh-120px)] min-h-[600px] gap-3">
       <div className="hidden lg:block">
-        <ChatSidebar conversations={conversations} activeId={activeId} onSelect={(id) => { setActiveId(id); setError(null); setRetryMessage(null); }} onNew={newChat} />
+        <ChatSidebar conversations={conversations} activeId={activeId} onSelect={selectConversation} onNew={newChat} />
       </div>
 
       {showLeft && (
@@ -143,7 +181,7 @@ export default function Chat() {
             <ChatSidebar
               conversations={conversations}
               activeId={activeId}
-              onSelect={(id) => { setActiveId(id); setShowLeft(false); setError(null); setRetryMessage(null); }}
+              onSelect={(id) => { selectConversation(id); setShowLeft(false); }}
               onNew={() => { newChat(); setShowLeft(false); }}
             />
           </div>
@@ -170,6 +208,7 @@ export default function Chat() {
           </div>
         )}
 
+        {loadingHistory && <p className="px-5 py-2 text-xs text-zinc-500">Checking saved conversations…</p>}
         {messages.length === 0 ? <ChatEmptyState onPrompt={send} /> : <ChatMessages messages={messages} />}
         <ChatPromptBox onSend={send} pending={pending} />
       </section>
