@@ -24,7 +24,7 @@ describe('workspace chat live-only contract', () => {
     for (const source of [sidebar, emptyState, promptBox]) {
       expect(source).not.toContain("from './chatData'");
     }
-    expect(sidebar).toContain('session-local');
+    expect(sidebar).toContain('Saved conversations are loaded from your account');
     expect(emptyState).toContain('instead of a simulated answer');
   });
 
