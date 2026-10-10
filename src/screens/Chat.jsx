@@ -16,6 +16,7 @@ function createConversation() {
     messages: [],
     provider: null,
     model: null,
+    serverConversationId: null,
   };
 }
 
@@ -65,7 +66,7 @@ export default function Chat() {
     setRetryMessage(null);
 
     try {
-      const result = await assistantFn({ data: { message, history } });
+      const result = await assistantFn({ data: { message, history, conversationId: active.serverConversationId } });
       const assistantMessage = {
         id: `msg-${Date.now()}-assistant`,
         role: 'ai',
@@ -78,6 +79,7 @@ export default function Chat() {
         messages: [...conversation.messages, assistantMessage],
         provider: result.provider,
         model: result.model,
+        serverConversationId: result.conversationId ?? conversation.serverConversationId,
       }));
     } catch (requestError) {
       console.error('[Chat] live assistant request failed', requestError);
@@ -100,7 +102,7 @@ export default function Chat() {
     setPending(true);
     setError(null);
     try {
-      const result = await assistantFn({ data: { message: failedMessage, history } });
+      const result = await assistantFn({ data: { message: failedMessage, history, conversationId: active.serverConversationId } });
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
         messages: [...conversation.messages, {
@@ -112,6 +114,7 @@ export default function Chat() {
         }],
         provider: result.provider,
         model: result.model,
+        serverConversationId: result.conversationId ?? conversation.serverConversationId,
       }));
       setRetryMessage(null);
     } catch (requestError) {
