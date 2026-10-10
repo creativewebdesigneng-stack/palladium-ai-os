@@ -88,13 +88,13 @@ class Handler(BaseHTTPRequestHandler):
             url = approved_source(body["output_url"])
             if body["category"] not in ("car", "motorcycle", "truck", "prop"):
                 raise ValueError("Invalid category")
-            opener = urllib.request.build_opener(urllib.request.HTTPHandler(), urllib.request.HTTPSHandler())
+            opener = urllib.request.build_opener(urllib.request.HTTPSHandler())
             # Disable redirects: never follow a source to an unapproved host.
             class NoRedirect(urllib.request.HTTPRedirectHandler):
                 def redirect_request(self, req, fp, code, msg, headers, newurl):
                     raise ValueError("Redirects are not permitted")
             opener.add_handler(NoRedirect())
-            with opener.open(urllib.request.Request(url, headers={"Accept": "text/plain"}), timeout=15) as stream:
+            # Host allowlisting is necessary but not sufficient against DNS rebinding.\n            # Deploy with an egress firewall that denies private/reserved networks.\n            with opener.open(urllib.request.Request(url, headers={"Accept": "text/plain"}), timeout=15) as stream:
                 raw = stream.read(MAX_BYTES + 1)
             if len(raw) > MAX_BYTES:
                 raise ValueError("OBJ exceeds 25 MB inspection limit")
