@@ -1,24 +1,30 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, BrainCircuit, Orbit, Users } from 'lucide-react';
+import { ArrowRight, Bot, BrainCircuit, Orbit, Users, Clapperboard, Blocks, Mic, Workflow, Database, LayoutDashboard } from 'lucide-react';
 import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 const steps = [
   { number: '01', title: 'Connect intelligence', description: 'Configure the production models your Blackstar agents can use.', to: '/models', icon: BrainCircuit, action: 'Open runtime models' },
   { number: '02', title: 'Establish your organisation', description: 'Invite teammates and define the workspace that governs shared intelligence.', to: '/team', icon: Users, action: 'Open organisation' },
   { number: '03', title: 'Deploy an agent', description: 'Bring your first executable intelligence node online.', to: '/agents/new', icon: Bot, action: 'Deploy agent' },
+  { number: '04', title: 'Mission Control', description: 'Manage personal assistance, tasks, approvals, notifications and agent activity in one command centre.', to: '/mission-control', icon: LayoutDashboard, action: 'Open Mission Control' },
+  { number: '05', title: 'Remember context', description: 'Review and manage your saved memory. Memory scope and retrieval depend on configured access and providers.', to: '/memory', icon: Database, action: 'Open memory' },
+  { number: '06', title: 'Build applications', description: 'Use the existing website and project-building tools to create and manage your work.', to: '/website-studio', icon: Blocks, action: 'Open website studio' },
+  { number: '07', title: 'Create videos', description: 'Plan and render films through Cinema Studio when its generation workers are connected.', to: '/cinema-studio', icon: Clapperboard, action: 'Open Cinema Studio' },
+  { number: '08', title: 'Automate work', description: 'Set up governed workflows and review approval requirements for external actions.', to: '/workflows', icon: Workflow, action: 'Open workflows' },
+  { number: '09', title: 'Use voice tools', description: 'Explore voice capabilities; availability depends on connected speech providers.', to: '/voice-studio', icon: Mic, action: 'Open voice studio' },
 ];
 
 export default function Onboarding() {
   return (
     <div className="blackstar-public-page blackstar-public-onboarding blackstar-style-mission-control relative isolate grid min-h-screen place-items-center overflow-hidden bg-[#010103] p-4 text-white">
       <PublicExperienceBackdrop room="astra-room-mission" visualStyle="blackstar-style-mission-control" />
-      <div className="relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-violet-300/10 bg-black/55 p-6 shadow-[0_36px_120px_rgba(0,0,0,.48)] backdrop-blur-2xl sm:p-8">
+      <div className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-violet-300/10 bg-black/55 p-6 shadow-[0_36px_120px_rgba(0,0,0,.48)] backdrop-blur-2xl sm:p-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/30 to-transparent" />
         <div className="text-center">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-violet-300/15 bg-violet-400/[.08] shadow-[0_0_36px_rgba(139,92,246,.1)]"><Orbit className="h-7 w-7 text-violet-300" /></span>
           <p className="mt-6 text-[10px] font-semibold uppercase tracking-[.3em] text-violet-300/70">BLACKSTAR · INITIALISATION</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] sm:text-4xl">Bring your intelligence infrastructure online.</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-500">Complete these real platform actions in any order. Every step configures an authoritative part of your Blackstar workspace rather than a simulated onboarding state.</p>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-500">Start with the core setup, then explore the existing AI workspace. External providers, permissions and generation workers must be configured before their dependent features can run.</p>
         </div>
         <div className="mt-8 grid gap-3 md:grid-cols-3">
           {steps.map(({ number, title, description, to, icon: Icon, action }) => (
