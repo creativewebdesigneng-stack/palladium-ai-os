@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Check, Copy, ExternalLink, Globe2, Sparkles } from 'lucide-react';
+import { Check, Copy, ExternalLink, Globe2, Sparkles, Volume2, Square } from 'lucide-react';
 import TableSurface from '@/components/palladium/TableSurface';
 
 function CodeBlock({ children, lang }) {
@@ -40,6 +40,22 @@ function CodeBlock({ children, lang }) {
 export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [speechError, setSpeechError] = useState('');
+  useEffect(() => () => { if (typeof window !== 'undefined') window.speechSynthesis?.cancel(); }, []);
+  const speak = () => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      setSpeechError('Speech playback is not available in this browser.'); return;
+    }
+    window.speechSynthesis.cancel();
+    if (speaking) { setSpeaking(false); return; }
+    const utterance = new window.SpeechSynthesisUtterance(message.text || '');
+    utterance.lang = navigator.language || 'en-GB';
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => { setSpeaking(false); setSpeechError('Speech playback failed.'); };
+    setSpeechError(''); setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
   const sources = Array.isArray(message.sources) ? message.sources.filter((source) => source?.url) : [];
   const copy = () => {
     navigator.clipboard?.writeText(message.text);
@@ -103,6 +119,8 @@ export default function MessageBubble({ message }) {
           </div>
         )}
 
+        {!isUser && speechError && <p role="alert" className="mt-2 text-xs text-amber-300">{speechError}</p>}
+        {!isUser && <button type="button" onClick={speak} aria-label={speaking ? 'Stop speaking' : 'Read response aloud'} className="mt-2 flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-xs text-zinc-400 hover:text-violet-200">{speaking ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}{speaking ? 'Stop' : 'Listen'}</button>}
         {!isUser && (
           <button onClick={copy} className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-zinc-600 opacity-0 transition hover:bg-white/5 hover:text-white group-hover:opacity-100" aria-label="Copy response">
             {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}{copied ? 'Copied' : 'Copy'}
