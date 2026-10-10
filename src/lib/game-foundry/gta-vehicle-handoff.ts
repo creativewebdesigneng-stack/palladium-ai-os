@@ -12,7 +12,7 @@ export const gtaVehicleHandoffSchema = z.object({
   modelName: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
   meshParts: z.array(z.string().min(1).max(100)).min(1).max(300),
   materials: z.array(z.string().min(1).max(100)).max(200),
-  textureUrls: z.array(z.string().url()).max(200),
+  textureUrls: z.array(z.string().url().refine((url) => new URL(url).protocol === 'https:', 'HTTPS texture URL required')).max(200),
   lodCount: z.number().int().min(0).max(8),
   collisionMesh: z.boolean(),
   rigged: z.boolean(),
@@ -31,8 +31,12 @@ export function assessGtaVehicleHandoff(input: unknown) {
   if (item.lodCount < 2) warnings.push('At least two LODs are recommended for game performance.')
   if (!item.materials.length) warnings.push('No GTA-compatible materials have been mapped.')
   if (!item.textureUrls.length) warnings.push('No textures are supplied.')
+  // Metadata assertions cannot prove that the underlying meshes, rigs, materials or collisions are valid.
+  // Native-export readiness requires independent worker-side inspection and certification.
   return {
-    ready: errors.length === 0,
+    ready: false as const,
+    metadataComplete: errors.length === 0,
+    requiresWorkerVerification: true as const,
     errors,
     warnings,
     handoff: item,
