@@ -7,7 +7,7 @@ import ChatMessages from '@/components/chat/ChatMessages';
 import ChatPromptBox from '@/components/chat/ChatPromptBox';
 import ChatEmptyState from '@/components/chat/ChatEmptyState';
 import { assistantChat } from '@/lib/ai/assistant.functions';
-import { listAssistantConversations, getAssistantConversation } from '@/lib/ai/assistant-conversations.functions';
+import { listAssistantConversations, getAssistantConversation, renameAssistantConversation } from '@/lib/ai/assistant-conversations.functions';
 import { friendlyMessage } from '@/lib/errors';
 
 function createConversation() {
@@ -32,6 +32,7 @@ export default function Chat() {
   const assistantFn = useServerFn(assistantChat);
   const listConversationsFn = useServerFn(listAssistantConversations);
   const getConversationFn = useServerFn(getAssistantConversation);
+  const renameConversationFn = useServerFn(renameAssistantConversation);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
@@ -163,9 +164,20 @@ export default function Chat() {
     }
   };
 
-  const renameChat = (name) => {
+  const renameChat = async (name) => {
     if (!active) return;
-    updateConversation(active.id, (conversation) => ({ ...conversation, name }));
+    const title = String(name || '').trim().slice(0, 160);
+    if (!title) return;
+    const id = active.id;
+    const previous = active.name;
+    updateConversation(id, (conversation) => ({ ...conversation, name: title }));
+    if (!active.serverConversationId) return;
+    try {
+      await renameConversationFn({ data: { conversationId: active.serverConversationId, title } });
+    } catch (err) {
+      updateConversation(id, (conversation) => ({ ...conversation, name: previous }));
+      setError(friendlyMessage(err));
+    }
   };
 
   return (
