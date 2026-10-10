@@ -64,7 +64,7 @@ function LiveTicker({ notifications = [], activities = [] }) {
     const events = activities.slice(0, 4).map((item) => item.message || item.title || item.action || 'Mission activity updated');
     return [...signals, ...events].filter(Boolean).slice(0, 8);
   }, [notifications, activities]);
-  const text = items.length ? items.join('   •   ') : 'Blackstar realtime mesh connected   •   Mission telemetry active   •   Awaiting new operational events';
+  const text = items.length ? items.join('   •   ') : 'No recent mission events to display   •   Connection and provider health are not inferred from this feed';
   return (
     <div className="relative overflow-hidden border-y border-cyan-300/10 bg-cyan-300/[.025] py-2">
       <motion.div
