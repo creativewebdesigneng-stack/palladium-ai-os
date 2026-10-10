@@ -10,6 +10,7 @@ import { Failed, Empty } from '@/components/business/live';
 import { useToast } from '@/components/ui/use-toast';
 import { uploadGameFoundrySource } from '@/lib/game-foundry/uploadGameFoundrySource';
 import GameFoundryModelViewer from '@/components/game-foundry/GameFoundryModelViewer';
+import { prepareGtaVehicleGeneration } from '@/lib/game-foundry/gta-vehicle-generation';
 import GameFoundryWebPreview from '@/components/game-foundry/GameFoundryWebPreview';
 import GameFoundryWorld from '@/components/game-foundry/GameFoundryWorld';
 import {
@@ -64,6 +65,8 @@ export default function GameFoundry() {
   const [projectType,setProjectType] = useState('game');
   const [quality,setQuality] = useState('game_ready');
 
+  const [gtaVehicleMode,setGtaVehicleMode] = useState(false);
+  const [gtaVehicleType,setGtaVehicleType] = useState('car');
   const [assetName,setAssetName] = useState('');
   const [sourceKind,setSourceKind] = useState('prompt');
   const [assetPrompt,setAssetPrompt] = useState('');
@@ -166,11 +169,12 @@ export default function GameFoundry() {
         const uploaded = await uploadGameFoundrySource(sourceFile);
         storagePath = uploaded.storagePath;
       }
+      const gtaSpec = gtaVehicleMode && sourceKind === 'prompt' ? prepareGtaVehicleGeneration({ prompt:assetPrompt, sourceKind:'prompt', vehicleType:gtaVehicleType, modelName:assetName.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_').replace(/^[^a-z]+/,'bs_').slice(0,40) }) : null;
       return createAssetFn({data:{
-        projectId:assetProjectId||null,inputName:assetName,sourceKind,prompt:sourceKind==='prompt'?assetPrompt:null,
+        projectId:assetProjectId||null,inputName:assetName,sourceKind,prompt:sourceKind==='prompt'?(gtaSpec?.generationPrompt ?? assetPrompt):null,
         sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl,
         storagePath,
-        outputFormat:format,qualityProfile:assetQuality,targetEngine:assetEngine,
+        outputFormat:gtaVehicleMode?'obj':format,qualityProfile:assetQuality,targetEngine:gtaVehicleMode?'zmodeler':assetEngine,
       }});
     },
     onSuccess:async()=>{ setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
@@ -224,6 +228,10 @@ export default function GameFoundry() {
         <div className="flex items-start gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-cyan-500/10 text-cyan-300"><Box className="h-5 w-5" /></span>
           <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-cyan-300/60">3D Foundry</p><h2 className="text-lg font-semibold text-white">Generate game-ready 3D assets</h2><p className="mt-1 text-xs text-zinc-500">Prompt-to-3D, image-to-3D or enhancement of an existing model with explicit engine/export targets.</p></div>
+        </div>
+        <div className="mt-4 rounded-xl border border-violet-400/20 bg-violet-500/[.06] p-3">
+          <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={gtaVehicleMode} onChange={(e)=>{setGtaVehicleMode(e.target.checked);if(e.target.checked){setAssetEngine('zmodeler');setFormat('obj');setAssetQuality('game_ready')}}} /> GTA V vehicle preparation (experimental)</label>
+          {gtaVehicleMode && <div className="mt-2 space-y-2"><label className="block text-xs text-zinc-300">Vehicle type <select className={control+' mt-1'} value={gtaVehicleType} onChange={(e)=>setGtaVehicleType(e.target.value)}><option value="car">Car</option><option value="motorcycle">Motorcycle</option><option value="truck">Truck</option><option value="prop">Static prop</option></select></label><p className="text-xs text-amber-200">Creates OBJ interchange geometry for ZModeler preparation, not an installable GTA V mod. Native .yft/.ytd conversion, rigging and in-game testing are not automated yet. Prompt mode includes GTA-specific geometry guidance; image mode uses your reference image.</p></div>}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Asset name"><input value={assetName} onChange={(e)=>setAssetName(e.target.value)} className={control} placeholder="Alien rifle" /></Field>
