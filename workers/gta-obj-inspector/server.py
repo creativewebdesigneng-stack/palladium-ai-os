@@ -30,7 +30,7 @@ COLLISION = re.compile(r"(?:collision|collider|chassis_col|bounds|_col(?:$|[_ .-
 def approved_source(url):
     parsed = urllib.parse.urlsplit(url)
     allowed = {x.strip().lower() for x in os.environ.get("GTA_INSPECTOR_ALLOWED_HOSTS", "").split(",") if x.strip()}
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
         raise ValueError("HTTPS source without embedded credentials required")
     if parsed.hostname.lower() not in allowed:
         raise ValueError("Source hostname not on inspection allowlist")
@@ -81,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
         if not expected or not secrets.compare_digest(token, expected):
             return self.send_error(401)
         try:
+            if self.headers.get("Transfer-Encoding"):
+                raise ValueError("Transfer-Encoding not supported")
             length = int(self.headers.get("Content-Length", "0"))
             if length < 1 or length > MAX_REQUEST:
                 raise ValueError("Invalid request size")
@@ -104,6 +106,8 @@ class Handler(BaseHTTPRequestHandler):
                 response = connection.getresponse()
                 if response.status != 200:
                     raise ValueError(f"Source HTTP status {response.status}; redirects not followed")
+                if response.getheader("Content-Encoding", "identity").lower() not in ("identity", ""):
+                    raise ValueError("Compressed OBJ responses are not supported")
                 raw = response.read(MAX_BYTES + 1)
             finally:
                 connection.close()

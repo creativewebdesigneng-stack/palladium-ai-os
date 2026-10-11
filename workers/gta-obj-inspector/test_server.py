@@ -22,6 +22,11 @@ class InspectorTests(unittest.TestCase):
             approved_source("https://assets.example.com/car.obj")
 
     @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
+    def test_rejects_custom_port(self):
+        with self.assertRaises(ValueError):
+            approved_source("https://assets.example.com:8443/car.obj")
+
+    @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
     def test_rejects_unlisted_host(self):
         with self.assertRaises(ValueError):
             approved_source("https://untrusted.example.com/car.obj")
