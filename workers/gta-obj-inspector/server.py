@@ -81,7 +81,9 @@ class Handler(BaseHTTPRequestHandler):
         if not expected or not secrets.compare_digest(token, expected):
             return self.send_error(401)
         try:
-            if self.headers.get("Transfer-Encoding"):\n                raise ValueError("Transfer-Encoding not supported")\n            length = int(self.headers.get("Content-Length", "0"))
+            if self.headers.get("Transfer-Encoding"):
+                raise ValueError("Transfer-Encoding not supported")
+            length = int(self.headers.get("Content-Length", "0"))
             if length < 1 or length > MAX_REQUEST:
                 raise ValueError("Invalid request size")
             body = json.loads(self.rfile.read(length))
@@ -104,7 +106,9 @@ class Handler(BaseHTTPRequestHandler):
                 response = connection.getresponse()
                 if response.status != 200:
                     raise ValueError(f"Source HTTP status {response.status}; redirects not followed")
-                if response.getheader("Content-Encoding", "identity").lower() not in ("identity", ""):\n                    raise ValueError("Compressed OBJ responses are not supported")\n                raw = response.read(MAX_BYTES + 1)
+                if response.getheader("Content-Encoding", "identity").lower() not in ("identity", ""):
+                    raise ValueError("Compressed OBJ responses are not supported")
+                raw = response.read(MAX_BYTES + 1)
             finally:
                 connection.close()
             if len(raw) > MAX_BYTES:
