@@ -4,6 +4,8 @@ Runs as a separate Python service; no third-party packages required.
 OBJ names provide *hints*, not proof of functional GTA V rigs/collisions.
 """
 import datetime
+import http.client
+import ssl
 import ipaddress
 import json
 import os
@@ -11,7 +13,6 @@ import re
 import secrets
 import socket
 import urllib.parse
-import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -88,16 +89,24 @@ class Handler(BaseHTTPRequestHandler):
             url = approved_source(body["output_url"])
             if body["category"] not in ("car", "motorcycle", "truck", "prop"):
                 raise ValueError("Invalid category")
-            opener = urllib.request.build_opener(urllib.request.HTTPSHandler())
-            # Disable redirects: never follow a source to an unapproved host.
-            class NoRedirect(urllib.request.HTTPRedirectHandler):
-                def redirect_request(self, req, fp, code, msg, headers, newurl):
-                    raise ValueError("Redirects are not permitted")
-            opener.add_handler(NoRedirect())
-            # Host allowlisting is necessary but not sufficient against DNS rebinding.
-            # Deploy with an egress firewall that denies private/reserved networks.
-            with opener.open(urllib.request.Request(url, headers={"Accept": "text/plain"}), timeout=15) as stream:
-                raw = stream.read(MAX_BYTES + 1)
+            parsed = urllib.parse.urlsplit(url)
+            addresses = [entry[4][0] for entry in socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)]
+            if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+                raise ValueError("Non-public source address refused")
+            class PinnedHTTPSConnection(http.client.HTTPSConnection):
+                def connect(self):
+                    sock = socket.create_connection((addresses[0], 443), timeout=15)
+                    self.sock = self._context.wrap_socket(sock, server_hostname=parsed.hostname)
+            connection = PinnedHTTPSConnection(parsed.hostname, timeout=15, context=ssl.create_default_context())
+            try:
+                path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+                connection.request("GET", path, headers={"Accept": "text/plain", "Host": parsed.hostname})
+                response = connection.getresponse()
+                if response.status != 200:
+                    raise ValueError(f"Source HTTP status {response.status}; redirects not followed")
+                raw = response.read(MAX_BYTES + 1)
+            finally:
+                connection.close()
             if len(raw) > MAX_BYTES:
                 raise ValueError("OBJ exceeds 25 MB inspection limit")
             observed = parse_obj(raw)
