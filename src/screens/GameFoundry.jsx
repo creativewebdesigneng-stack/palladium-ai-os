@@ -84,7 +84,7 @@ export default function GameFoundry() {
   const [processingRigging,setProcessingRigging] = useState('none');
   const [processingAnimation,setProcessingAnimation] = useState('none');
 
-  const overview = useQuery({ queryKey:['game-foundry'], queryFn:()=>overviewFn(), enabled:session==='yes', retry:false });
+  const overview = useQuery({ queryKey:['game-foundry'], queryFn:()=>overviewFn(), enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>['queued','running'].includes(job.status) || ['queued','running'].includes(job.processing_status)) ? 10000 : false; } });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
 
   const checkConnections = useMutation({
@@ -209,6 +209,7 @@ export default function GameFoundry() {
   const specialistProcessing = caps?.gameReadyProcessing?.specialistConfigured === true;
   const completedAssets = assets.filter((asset)=>asset.status==='completed' && Boolean(asset.processed_output_url || asset.output_url));
   const pendingAssets = assets.filter((asset)=>['queued','running'].includes(asset.status));
+  const processingAssets = assets.filter((asset)=>['queued','running'].includes(asset.processing_status));
   const availableFormats = assetEngine === 'zmodeler'
     ? formats.filter((item)=>['fbx','obj'].includes(String(item).toLowerCase()))
     : formats;
@@ -230,7 +231,7 @@ export default function GameFoundry() {
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Gamepad2 className="h-5 w-5" /></span>
           <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300/60">Game generation</p><h2 className="text-lg font-semibold text-white">Create a game project</h2><p className="mt-1 text-xs text-zinc-500">Describe the game, world, gameplay and art direction. Choose an engine target and quality profile.</p></div>
         </div>
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs text-zinc-300"><p className="font-semibold text-white">Creation workflow: 1. Choose input → 2. Generate → 3. Prepare / inspect → 4. Export</p><p className="mt-1 text-zinc-400">{pendingAssets.length} generating or queued · {completedAssets.length} completed assets with output files. A real worker and its output URL are required; no placeholder downloads are provided.</p></div>
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs text-zinc-300"><p className="font-semibold text-white">Creation workflow: 1. Choose input → 2. Generate → 3. Prepare / inspect → 4. Export</p><p className="mt-1 text-zinc-400">{pendingAssets.length} generating or queued · {processingAssets.length} preparing · {completedAssets.length} completed assets with output files. Active jobs refresh automatically every 10 seconds. A real worker and its output URL are required; no placeholder downloads are provided.</p></div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Project name"><input value={name} onChange={(e)=>setName(e.target.value)} className={control} placeholder="Blackstar Arena" /></Field>
           <Field label="Project type"><select value={projectType} onChange={(e)=>setProjectType(e.target.value)} className={control}>{projectTypes.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
