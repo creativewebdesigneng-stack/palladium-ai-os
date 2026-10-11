@@ -94,7 +94,9 @@ class Handler(BaseHTTPRequestHandler):
                 def redirect_request(self, req, fp, code, msg, headers, newurl):
                     raise ValueError("Redirects are not permitted")
             opener.add_handler(NoRedirect())
-            # Host allowlisting is necessary but not sufficient against DNS rebinding.\n            # Deploy with an egress firewall that denies private/reserved networks.\n            with opener.open(urllib.request.Request(url, headers={"Accept": "text/plain"}), timeout=15) as stream:
+            # Host allowlisting is necessary but not sufficient against DNS rebinding.
+            # Deploy with an egress firewall that denies private/reserved networks.
+            with opener.open(urllib.request.Request(url, headers={"Accept": "text/plain"}), timeout=15) as stream:
                 raw = stream.read(MAX_BYTES + 1)
             if len(raw) > MAX_BYTES:
                 raise ValueError("OBJ exceeds 25 MB inspection limit")
