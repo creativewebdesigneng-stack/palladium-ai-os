@@ -319,6 +319,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     outputFormat,
     qualityProfile:assetQuality,
     targetEngine:engine,
+    autoPrepareProfile:gameReadyProfile.nullable().optional(),
   }).superRefine((value,ctx)=>{
     if (value.sourceKind === "prompt" && !value.prompt?.trim()) ctx.addIssue({code:"custom",path:["prompt"],message:"Prompt-to-3D requires a prompt."});
     if (value.sourceKind !== "prompt" && !value.sourceUrl && !value.storagePath) ctx.addIssue({code:"custom",path:["sourceUrl"],message:"Image/model workflows require an uploaded source or public source URL."});
@@ -355,6 +356,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
       quality_profile:data.qualityProfile,
       target_engine:data.targetEngine,
       status:"queued",
+      processing_profile:data.autoPrepareProfile ?? null,
     }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     try {
