@@ -29,7 +29,7 @@ COLLISION = re.compile(r"(?:collision|collider|chassis_col|bounds|_col(?:$|[_ .-
 def approved_source(url):
     parsed = urllib.parse.urlsplit(url)
     allowed = {x.strip().lower() for x in os.environ.get("GTA_INSPECTOR_ALLOWED_HOSTS", "").split(",") if x.strip()}
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
         raise ValueError("HTTPS source without embedded credentials required")
     if parsed.hostname.lower() not in allowed:
         raise ValueError("Source hostname not on inspection allowlist")
@@ -51,7 +51,7 @@ def parse_obj(raw):
     faces = FACE.findall(source)
     if not vertex_count or not faces:
         raise ValueError("OBJ has no usable vertices or faces")
-    # Check indices are valid without loading large geometry into memory.
+    # Positive OBJ indices must be within the final vertex count. Negative\n    # indices are relative to the vertex list at each face declaration.
     for face in faces:
         parts = face.split()
         if len(parts) < 3:

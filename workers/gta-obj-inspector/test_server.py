@@ -15,6 +15,19 @@ class InspectorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_obj(b"o body\nv 0 0 0\nf 1 2 3\n")
 
+    def test_rejects_out_of_range_negative_index(self):
+        with self.assertRaises(ValueError):
+            parse_obj(b"o body\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nf -4 -2 -1\\n")
+
+    def test_accepts_valid_negative_index(self):
+        result=parse_obj(b"o body\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nf -3 -2 -1\\n")
+        self.assertEqual(result["meshNames"],["body"])
+
+    @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
+    def test_rejects_nonstandard_port(self):
+        with self.assertRaises(ValueError):
+            approved_source("https://assets.example.com:8443/car.obj")
+
     @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
     @patch("server.socket.getaddrinfo", return_value=[(None,None,None,None,("127.0.0.1",443))])
     def test_blocks_private_network(self,_):
