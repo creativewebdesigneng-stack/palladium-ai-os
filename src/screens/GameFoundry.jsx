@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Box, Download, FileUp, Gamepad2, Image as ImageIcon, Loader2, Network, PackageCheck, Play, RefreshCw, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
@@ -84,6 +84,8 @@ export default function GameFoundry() {
   const [processingRigging,setProcessingRigging] = useState('none');
   const [processingAnimation,setProcessingAnimation] = useState('none');
 
+  const [autoPrepare,setAutoPrepare] = useState(false);
+  const autoPrepareJobs = useRef(new Map());
   const workerPollOffset = useRef(0);
   const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)); if(active.length){ const start=workerPollOffset.current%active.length; const batch=Array.from({length:Math.min(5,active.length)},(_,index)=>active[(start+index)%active.length]); workerPollOffset.current=(start+batch.length)%active.length; await Promise.allSettled(batch.map((job)=>refreshAssetFn({data:{id:job.id}}))); } else { workerPollOffset.current=0; } return overviewFn(); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>['queued','running'].includes(job.status) || ['queued','running'].includes(job.processing_status)) ? 10000 : false; } });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
@@ -183,7 +185,7 @@ export default function GameFoundry() {
         outputFormat:gtaVehicleMode?'obj':format,qualityProfile:assetQuality,targetEngine:gtaVehicleMode?'zmodeler':assetEngine,
       }});
     },
-    onSuccess:async()=>{ setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
+    onSuccess:async(result)=>{ if(autoPrepare && result?.id) autoPrepareJobs.current.set(result.id,{rigging:processingRigging,animation:processingAnimation}); setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
     onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'3D asset generation could not start',description:friendlyMessage(error)}); },
   });
 
@@ -211,6 +213,20 @@ export default function GameFoundry() {
   const completedAssets = assets.filter((asset)=>asset.status==='completed' && Boolean(asset.processed_output_url || asset.output_url));
   const pendingAssets = assets.filter((asset)=>['queued','running'].includes(asset.status));
   const processingAssets = assets.filter((asset)=>['queued','running'].includes(asset.processing_status));
+  useEffect(()=>{
+    if(!caps?.gameReadyProcessing?.configured) return;
+    for(const asset of assets){
+      const profile=autoPrepareJobs.current.get(asset.id);
+      if(!profile) continue;
+      if(['failed','cancelled'].includes(asset.status)){ autoPrepareJobs.current.delete(asset.id); continue; }
+      if(asset.status!=='completed'||!asset.output_url) continue;
+      autoPrepareJobs.current.delete(asset.id);
+      if(!['not_started','failed'].includes(asset.processing_status||'not_started')) continue;
+      processAssetFn({data:{id:asset.id,profile:{generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,rigging:profile.rigging,animation:profile.animation,textureResolution:2048,targetPolycount:null}}})
+        .then(()=>{ refresh(); toast({title:'Automatic model preparation submitted'}); })
+        .catch((error)=>{ refresh(); toast({variant:'destructive',title:'Automatic preparation failed',description:friendlyMessage(error)}); });
+    }
+  },[assets,caps?.gameReadyProcessing?.configured,processAssetFn]);
   const availableFormats = assetEngine === 'zmodeler'
     ? formats.filter((item)=>['fbx','obj'].includes(String(item).toLowerCase()))
     : formats;
@@ -264,6 +280,7 @@ export default function GameFoundry() {
           <Field label="Game project"><select value={assetProjectId} onChange={(e)=>setAssetProjectId(e.target.value)} className={control}><option value="">Standalone asset</option>{projects.map((project)=><option key={project.id} value={project.id}>{project.name}</option>)}</select></Field>
         </div>
         {sourceKind === 'prompt' ? <Field label="3D prompt"><textarea rows={5} value={assetPrompt} onChange={(e)=>setAssetPrompt(e.target.value)} className={control+' mt-3'} placeholder="A weathered sci-fi rifle, hard-surface PBR, clean topology, game-ready proportions…" /></Field> : <div className="mt-3 grid gap-3"><Field label={sourceKind==='image'?'Upload reference image':'Upload existing 3D model'}><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-cyan-300/20 bg-cyan-400/[.03] px-3 py-3 text-xs text-zinc-300"><FileUp className="h-4 w-4 text-cyan-300"/><span className="min-w-0 flex-1 truncate">{sourceFile?.name || (sourceKind==='image'?'Choose PNG/JPG/WEBP/AVIF up to 100 MB':'Choose GLB/glTF/FBX/OBJ/USD/PLY/STL/VOX up to 100 MB')}</span><input type="file" className="hidden" accept={sourceKind==='image'?'.png,.jpg,.jpeg,.webp,.avif':'.glb,.gltf,.fbx,.obj,.usd,.usdz,.ply,.stl,.vox'} onChange={(e)=>setSourceFile(e.target.files?.[0] ?? null)} /></label></Field><div className="text-center text-[10px] uppercase tracking-[.2em] text-zinc-700">or</div><Field label={sourceKind==='image'?'Public reference image URL':'Public model URL'}><input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className={control} placeholder="https://…" /></Field></div>}
+        <label className="mt-3 flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={autoPrepare} disabled={!caps?.gameReadyProcessing?.configured} onChange={(e)=>setAutoPrepare(e.target.checked)} /> Automatically prepare this model for export after generation (uses processing worker credits; works while this page remains open)</label>
         <button disabled={!canCreateAsset || !assetName.trim() || createAsset.isPending || !hasAssetSource} onClick={()=>createAsset.mutate()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{createAsset.isPending?<Loader2 className="h-4 w-4 animate-spin"/>:sourceKind==='image'?<ImageIcon className="h-4 w-4"/>:<UploadCloud className="h-4 w-4"/>}Generate asset</button>
         {!canCreateAsset && <p className="mt-2 text-xs text-amber-300">{sourceKind==='prompt'?'Prompt-to-3D requires GAME_FOUNDRY_3D_API_URL.':sourceKind==='model'?'Model enhancement requires GAME_FOUNDRY_3D_API_URL.':'No real image-to-3D worker is configured.'}</p>}
       </section>
