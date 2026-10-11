@@ -47,19 +47,30 @@ def parse_obj(raw):
     source = raw.decode("utf-8-sig", errors="replace")
     names = list(dict.fromkeys(x.strip()[:100] for x in NAME.findall(source) if x.strip()))[:300]
     materials = set(MATERIAL.findall(source))
-    vertex_count = len(VERTEX.findall(source))
-    faces = FACE.findall(source)
-    if not vertex_count or not faces:
+    # OBJ indices are relative to the number of vertices *at the face line*.
+    # Validate sequentially rather than against the final vertex count.
+    vertex_count = 0
+    face_count = 0
+    for line in source.splitlines():
+        line = line.strip()
+        if line.startswith("v "):
+            if not VERTEX.fullmatch(line):
+                raise ValueError("OBJ contains a malformed vertex")
+            vertex_count += 1
+        elif line.startswith("f "):
+            parts = line.split()[1:]
+            if len(parts) < 3:
+                raise ValueError("OBJ contains an invalid face")
+            for part in parts:
+                try:
+                    index = int(part.split("/")[0])
+                except ValueError as exc:
+                    raise ValueError("OBJ face has an invalid vertex index") from exc
+                if index == 0 or (index > 0 and index > vertex_count) or (index < 0 and -index > vertex_count):
+                    raise ValueError("OBJ face references invalid vertex")
+            face_count += 1
+    if not vertex_count or not face_count:
         raise ValueError("OBJ has no usable vertices or faces")
-    # Check indices are valid without loading large geometry into memory.
-    for face in faces:
-        parts = face.split()
-        if len(parts) < 3:
-            raise ValueError("OBJ contains an invalid face")
-        for part in parts:
-            index = int(part.split("/")[0])
-            if index == 0 or abs(index) > vertex_count:
-                raise ValueError("OBJ face references invalid vertex")
     lods = {int(n) for name in names for n in LOD.findall(name)}
     return {
         "meshNames": names or ["unnamed_mesh"],
