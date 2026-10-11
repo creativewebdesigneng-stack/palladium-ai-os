@@ -21,6 +21,10 @@ class InspectorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             approved_source("https://assets.example.com/car.obj")
 
+    def test_rejects_empty_faces(self):
+        with self.assertRaises(ValueError):
+            parse_obj(b"v 0 0 0\\nv 1 0 0\\nv 0 1 0\\n")
+
     @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
     def test_rejects_unlisted_host(self):
         with self.assertRaises(ValueError):
