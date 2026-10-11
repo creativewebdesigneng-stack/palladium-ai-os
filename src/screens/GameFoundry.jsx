@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Box, Download, FileUp, Gamepad2, Image as ImageIcon, Loader2, Network, PackageCheck, Play, RefreshCw, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
@@ -84,7 +84,8 @@ export default function GameFoundry() {
   const [processingRigging,setProcessingRigging] = useState('none');
   const [processingAnimation,setProcessingAnimation] = useState('none');
 
-  const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)).slice(0,5); if(active.length){ await Promise.allSettled(active.map((job)=>refreshAssetFn({data:{id:job.id}}))); } return overviewFn(); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>['queued','running'].includes(job.status) || ['queued','running'].includes(job.processing_status)) ? 10000 : false; } });
+  const workerPollOffset = useRef(0);
+  const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)); if(active.length){ const start=workerPollOffset.current%active.length; const batch=Array.from({length:Math.min(5,active.length)},(_,index)=>active[(start+index)%active.length]); workerPollOffset.current=(start+batch.length)%active.length; await Promise.allSettled(batch.map((job)=>refreshAssetFn({data:{id:job.id}}))); } else { workerPollOffset.current=0; } return overviewFn(); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>['queued','running'].includes(job.status) || ['queued','running'].includes(job.processing_status)) ? 10000 : false; } });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
 
   const checkConnections = useMutation({
