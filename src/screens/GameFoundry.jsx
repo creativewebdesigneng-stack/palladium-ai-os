@@ -199,6 +199,7 @@ export default function GameFoundry() {
         sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl,
         storagePath,
         outputFormat:gtaVehicleMode?'obj':format,qualityProfile:assetQuality,targetEngine:gtaVehicleMode?'zmodeler':assetEngine,
+        autoPrepareProfile:autoPrepare?{generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,rigging:processingRigging,animation:processingAnimation,textureResolution:2048,targetPolycount:null}:null,
       }});
     },
     onSuccess:async(result)=>{ if(autoPrepare && result?.id) { autoPrepareJobs.current.set(result.id,{rigging:processingRigging,animation:processingAnimation}); persistAutoPrepareJobs(); } setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
