@@ -17,15 +17,15 @@ class InspectorTests(unittest.TestCase):
 
     def test_rejects_forward_negative_indices(self):
         with self.assertRaises(ValueError):
-            parse_obj(b"v 0 0 0\\nf -1 -2 -3\\nv 1 0 0\\nv 0 1 0\\n")
+            parse_obj(b"v 0 0 0\nf -1 -2 -3\nv 1 0 0\nv 0 1 0\n")
 
     def test_accepts_positive_forward_indices(self):
-        result = parse_obj(b"v 0 0 0\\nf 1 2 3\\nv 1 0 0\\nv 0 1 0\\n")
+        result = parse_obj(b"v 0 0 0\nf 1 2 3\nv 1 0 0\nv 0 1 0\n")
         self.assertEqual(result["textureCount"], 0)
 
     def test_rejects_nonfinite_vertex(self):
         with self.assertRaises(ValueError):
-            parse_obj(b"v nan 0 0\\nv 1 0 0\\nv 0 1 0\\nf 1 2 3\\n")
+            parse_obj(b"v nan 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
 
     @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
     @patch("server.socket.getaddrinfo", return_value=[(None,None,None,None,("127.0.0.1",443))])
