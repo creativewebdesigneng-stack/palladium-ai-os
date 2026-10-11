@@ -93,7 +93,7 @@ export default function GameFoundry() {
       if(saved){
         const entries=JSON.parse(saved);
         if(Array.isArray(entries)) for(const entry of entries){
-          if(Array.isArray(entry)&&typeof entry[0]==='string'&&entry[1]&&['none','basic','humanoid','quadruped'].includes(entry[1].rigging)&&typeof entry[1].animation==='string') autoPrepareJobs.current.set(entry[0],entry[1]);
+          if(Array.isArray(entry)&&typeof entry[0]==='string'&&entry[1]&&['none','auto'].includes(entry[1].rigging)&&['none','idle','basic'].includes(entry[1].animation)) autoPrepareJobs.current.set(entry[0],entry[1]);
         }
       }
     } catch { /* Storage may be unavailable; in-memory automation still works. */ }
