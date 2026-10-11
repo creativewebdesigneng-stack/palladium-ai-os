@@ -24,3 +24,29 @@ jobs:
       - name: Run geometry and SSRF tests
         working-directory: workers/gta-obj-inspector
         run: python -m unittest discover -v
+      - name: Build production inspector container
+        run: docker build -f workers/gta-obj-inspector/Dockerfile -t blackstar-gta-inspector:ci .
+      - name: Verify container runs without root privileges
+        run: |
+          test "$(docker run --rm --entrypoint id blackstar-gta-inspector:ci -u)" != "0"
+      - name: Verify container requires bearer authentication
+        run: |
+          docker run -d --name gta-inspector-ci -p 127.0.0.1:18080:8080 -e GTA_INSPECTOR_TOKEN=ci-test-token -e GTA_INSPECTOR_ALLOWED_HOSTS=assets.example.com blackstar-gta-inspector:ci
+          trap 'docker rm -f gta-inspector-ci >/dev/null 2>&1 || true' EXIT
+          python - <<'PY'
+          import time, urllib.error, urllib.request
+          url = 'http://127.0.0.1:18080/v1/gta/inspect'
+          for attempt in range(30):
+              try:
+                  urllib.request.urlopen(urllib.request.Request(url, data=b'{}', method='POST'), timeout=2)
+              except urllib.error.HTTPError as error:
+                  if error.code == 401:
+                      break
+                  raise
+              except (OSError, TimeoutError):
+                  if attempt == 29:
+                      raise
+                  time.sleep(0.2)
+          else:
+              raise AssertionError('Unauthenticated request was not rejected')
+          PY
