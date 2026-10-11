@@ -48,19 +48,42 @@ def parse_obj(raw):
     source = raw.decode("utf-8-sig", errors="replace")
     names = list(dict.fromkeys(x.strip()[:100] for x in NAME.findall(source) if x.strip()))[:300]
     materials = set(MATERIAL.findall(source))
-    vertex_count = len(VERTEX.findall(source))
-    faces = FACE.findall(source)
-    if not vertex_count or not faces:
+    vertex_count = 0
+    face_count = 0
+    # OBJ positive indices may reference the final vertex table; negative indices
+    # are relative to the vertex table at the face's position in the file.
+    face_indices = []
+    for line in source.splitlines():
+        fields = line.strip().split()
+        if not fields or fields[0].startswith("#"):
+            continue
+        if fields[0] == "v":
+            if len(fields) < 4:
+                raise ValueError("OBJ contains a malformed vertex")
+            import math
+            try:
+                if not all(math.isfinite(float(value)) for value in fields[1:4]):
+                    raise ValueError("OBJ vertex coordinates must be finite")
+            except ValueError as exc:
+                raise ValueError("OBJ contains invalid vertex coordinates") from exc
+            vertex_count += 1
+        elif fields[0] == "f":
+            face_count += 1
+            if len(fields) < 4:
+                raise ValueError("OBJ contains an invalid face")
+            for part in fields[1:]:
+                try:
+                    index = int(part.split("/")[0])
+                except ValueError as exc:
+                    raise ValueError("OBJ contains an invalid face index") from exc
+                if index == 0 or (index < 0 and -index > vertex_count):
+                    raise ValueError("OBJ face references invalid vertex")
+                if index > 0:
+                    face_indices.append(index)
+    if not vertex_count or not face_count:
         raise ValueError("OBJ has no usable vertices or faces")
-    # Check indices are valid without loading large geometry into memory.
-    for face in faces:
-        parts = face.split()
-        if len(parts) < 3:
-            raise ValueError("OBJ contains an invalid face")
-        for part in parts:
-            index = int(part.split("/")[0])
-            if index == 0 or abs(index) > vertex_count:
-                raise ValueError("OBJ face references invalid vertex")
+    if any(index > vertex_count for index in face_indices):
+        raise ValueError("OBJ face references invalid vertex")
     lods = {int(n) for name in names for n in LOD.findall(name)}
     return {
         "meshNames": names or ["unnamed_mesh"],
