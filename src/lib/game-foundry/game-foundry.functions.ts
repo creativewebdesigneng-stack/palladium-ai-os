@@ -1000,7 +1000,7 @@ export const inspectGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" 
     if(result.error) throw new Error(result.error.message);
     if(!result.data) throw new Error("Game Foundry asset not found.");
     const asset=result.data;
-    if(asset.target_engine!=="zmodeler"||!["obj","fbx"].includes(String(asset.requested_format).toLowerCase())) throw new Error("GTA inspection requires a ZModeler-targeted OBJ or FBX asset.");
+    if(asset.target_engine!=="zmodeler"||String(asset.requested_format).toLowerCase()!=="obj") throw new Error("The configured GTA inspector supports only ZModeler-targeted OBJ assets. FBX inspection is not implemented.");
     if(asset.status!=="completed"||!asset.output_url) throw new Error("GTA inspection requires a completed model.");
     if(!gtaVehicleInspectorConfigured()) throw new Error("GTA inspector worker is not configured.");
     const inspection=await requestGtaVehicleInspection({assetId:data.assetId,outputUrl:String(asset.output_url),category:data.category});
