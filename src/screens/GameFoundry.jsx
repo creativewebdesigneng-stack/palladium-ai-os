@@ -89,7 +89,7 @@ export default function GameFoundry() {
   const [autoPrepareRestored,setAutoPrepareRestored] = useState(false);
   useEffect(()=>{
     try {
-      const saved=window.sessionStorage.getItem('blackstar.gameFoundry.autoPrepareJobs');
+      const saved=window.localStorage.getItem('blackstar.gameFoundry.autoPrepareJobs');
       if(saved){
         const entries=JSON.parse(saved);
         if(Array.isArray(entries)) for(const entry of entries){
@@ -100,7 +100,7 @@ export default function GameFoundry() {
     setAutoPrepareRestored(true);
   },[]);
   const persistAutoPrepareJobs = ()=>{
-    try { window.sessionStorage.setItem('blackstar.gameFoundry.autoPrepareJobs',JSON.stringify([...autoPrepareJobs.current])); } catch { /* Storage is optional. */ }
+    try { window.localStorage.setItem('blackstar.gameFoundry.autoPrepareJobs',JSON.stringify([...autoPrepareJobs.current])); } catch { /* Storage is optional. */ }
   };
   const workerPollOffset = useRef(0);
   const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)); if(active.length){ const start=workerPollOffset.current%active.length; const batch=Array.from({length:Math.min(5,active.length)},(_,index)=>active[(start+index)%active.length]); workerPollOffset.current=(start+batch.length)%active.length; const results=await Promise.allSettled(batch.map((job)=>refreshAssetFn({data:{id:job.id}}))); const failures=results.filter((result)=>result.status==='rejected'); if(failures.length) throw new Error(`Could not refresh ${failures.length} of ${batch.length} active Game Foundry worker jobs.`); } else { workerPollOffset.current=0; } return overviewFn(); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>(['queued','running'].includes(job.status)&&Boolean(job.worker_job_id)) || (['queued','running'].includes(job.processing_status)&&Boolean(job.processing_worker_job_id))) ? 10000 : false; } });
