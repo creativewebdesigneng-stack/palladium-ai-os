@@ -493,7 +493,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const asset = await sb.from("three_d_jobs")
-      .select("id,user_id,status,output_url,preview_url,requested_format,target_engine,processing_status")
+      .select("id,user_id,status,output_url,preview_url,requested_format,target_engine,processing_status,metadata")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if (asset.error) throw new Error(asset.error.message);
     if (!asset.data) throw new Error("Game Foundry asset not found.");
@@ -525,7 +525,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         preview_url:worker.previewUrl ?? asset.data.preview_url,
         error_message:worker.errorMessage,
         validation_report:worker.validationReport,
-        metadata:{ provider:worker.provider, response:worker.metadata },
+        metadata:{...(asset.data.metadata && typeof asset.data.metadata==='object' ? asset.data.metadata : {}),processing:{provider:worker.provider,response:worker.metadata}},
         updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId);
       if (update.error) throw new Error(update.error.message);
