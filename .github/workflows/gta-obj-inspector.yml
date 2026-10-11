@@ -1,0 +1,26 @@
+name: GTA OBJ inspector tests
+on:
+  pull_request:
+    paths:
+      - 'workers/gta-obj-inspector/**'
+      - '.github/workflows/gta-obj-inspector.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/gta-obj-inspector/**'
+      - '.github/workflows/gta-obj-inspector.yml'
+jobs:
+  inspector:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python source
+        run: python -m compileall -q workers/gta-obj-inspector
+      - name: Run geometry and SSRF tests
+        working-directory: workers/gta-obj-inspector
+        run: python -m unittest discover -v
