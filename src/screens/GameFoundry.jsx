@@ -86,15 +86,18 @@ export default function GameFoundry() {
 
   const [autoPrepare,setAutoPrepare] = useState(false);
   const autoPrepareJobs = useRef(new Map());
+  const [autoPrepareRestored,setAutoPrepareRestored] = useState(false);
   useEffect(()=>{
     try {
       const saved=window.sessionStorage.getItem('blackstar.gameFoundry.autoPrepareJobs');
-      if(!saved) return;
-      const entries=JSON.parse(saved);
-      if(Array.isArray(entries)) for(const entry of entries){
-        if(Array.isArray(entry)&&typeof entry[0]==='string'&&entry[1]&&['none','basic','humanoid','quadruped'].includes(entry[1].rigging)&&typeof entry[1].animation==='string') autoPrepareJobs.current.set(entry[0],entry[1]);
+      if(saved){
+        const entries=JSON.parse(saved);
+        if(Array.isArray(entries)) for(const entry of entries){
+          if(Array.isArray(entry)&&typeof entry[0]==='string'&&entry[1]&&['none','basic','humanoid','quadruped'].includes(entry[1].rigging)&&typeof entry[1].animation==='string') autoPrepareJobs.current.set(entry[0],entry[1]);
+        }
       }
     } catch { /* Storage may be unavailable; in-memory automation still works. */ }
+    setAutoPrepareRestored(true);
   },[]);
   const persistAutoPrepareJobs = ()=>{
     try { window.sessionStorage.setItem('blackstar.gameFoundry.autoPrepareJobs',JSON.stringify([...autoPrepareJobs.current])); } catch { /* Storage is optional. */ }
@@ -227,7 +230,7 @@ export default function GameFoundry() {
   const pendingAssets = assets.filter((asset)=>['queued','running'].includes(asset.status));
   const processingAssets = assets.filter((asset)=>['queued','running'].includes(asset.processing_status));
   useEffect(()=>{
-    if(!caps?.gameReadyProcessing?.configured) return;
+    if(!autoPrepareRestored || !caps?.gameReadyProcessing?.configured) return;
     for(const asset of assets){
       const profile=autoPrepareJobs.current.get(asset.id);
       if(!profile) continue;
@@ -240,7 +243,7 @@ export default function GameFoundry() {
         .then(()=>{ refresh(); toast({title:'Automatic model preparation submitted'}); })
         .catch((error)=>{ refresh(); toast({variant:'destructive',title:'Automatic preparation failed',description:friendlyMessage(error)}); });
     }
-  },[assets,caps?.gameReadyProcessing?.configured,processAssetFn]);
+  },[assets,autoPrepareRestored,caps?.gameReadyProcessing?.configured,processAssetFn]);
   const availableFormats = assetEngine === 'zmodeler'
     ? formats.filter((item)=>['fbx','obj'].includes(String(item).toLowerCase()))
     : formats;
