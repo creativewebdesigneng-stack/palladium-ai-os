@@ -791,7 +791,7 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
         preview_url:processing.previewUrl ?? asset.data.preview_url,
         error_message:processing.errorMessage,
         validation_report:processing.validationReport,
-        metadata:{provider:processing.provider,response:processing.metadata},
+        metadata:{...(asset.data.metadata && typeof asset.data.metadata==='object' ? asset.data.metadata : {}),processing:{provider:processing.provider,response:processing.metadata}},
         updated_at:new Date().toISOString(),
       }).eq("id",data.id).eq("user_id",context.userId).in("processing_status",["queued","running"]).eq("processing_worker_job_id",asset.data.processing_worker_job_id);
       if(update.error) throw new Error(update.error.message);
