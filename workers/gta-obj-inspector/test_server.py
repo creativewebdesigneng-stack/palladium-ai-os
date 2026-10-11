@@ -15,6 +15,20 @@ class InspectorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_obj(b"o body\nv 0 0 0\nf 1 2 3\n")
 
+    def test_valid_negative_relative_indices(self):
+        obj=b"o body\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nf -3 -2 -1\\n"
+        self.assertEqual(parse_obj(obj)["meshNames"], ["body"])
+
+    def test_rejects_forward_references(self):
+        obj=b"o body\\nv 0 0 0\\nf 1 2 3\\nv 1 0 0\\nv 0 1 0\\n"
+        with self.assertRaises(ValueError):
+            parse_obj(obj)
+
+    def test_rejects_invalid_negative_relative_indices(self):
+        obj=b"o body\\nv 0 0 0\\nv 1 0 0\\nv 0 1 0\\nf -4 -2 -1\\n"
+        with self.assertRaises(ValueError):
+            parse_obj(obj)
+
     @patch.dict("os.environ", {"GTA_INSPECTOR_ALLOWED_HOSTS":"assets.example.com"})
     @patch("server.socket.getaddrinfo", return_value=[(None,None,None,None,("127.0.0.1",443))])
     def test_blocks_private_network(self,_):
