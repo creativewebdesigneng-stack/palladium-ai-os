@@ -527,7 +527,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         validation_report:worker.validationReport,
         metadata:{...(asset.data.metadata && typeof asset.data.metadata==='object' ? asset.data.metadata : {}),processing:{provider:worker.provider,response:worker.metadata}},
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).eq("processing_status","queued").is("processing_worker_job_id",null);
       if (update.error) throw new Error(update.error.message);
       await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.asset_processed", targetType:"three_d_job", targetId:data.id, status:"success", metadata:{ targetEngine:asset.data.target_engine, format:asset.data.requested_format } });
       return { id:data.id, ...worker };
@@ -537,7 +537,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         processing_status:"failed",
         error_message:message.slice(0,1000),
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).eq("processing_status","queued").is("processing_worker_job_id",null);
       throw error;
     }
   });
