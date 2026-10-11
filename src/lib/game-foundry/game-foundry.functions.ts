@@ -778,7 +778,7 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
         metadata:{provider:generation.provider,response:generation.metadata},
         completed_at:terminal?new Date().toISOString():null,
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).in("status",["queued","running"]).eq("worker_job_id",asset.data.worker_job_id);
       if(update.error) throw new Error(update.error.message);
     }
 
@@ -793,7 +793,7 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
         validation_report:processing.validationReport,
         metadata:{provider:processing.provider,response:processing.metadata},
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId);
+      }).eq("id",data.id).eq("user_id",context.userId).in("processing_status",["queued","running"]).eq("processing_worker_job_id",asset.data.processing_worker_job_id);
       if(update.error) throw new Error(update.error.message);
     }
     if(!generation&&!processing) throw new Error("This Game Foundry asset has no active worker job to refresh.");
