@@ -14,3 +14,19 @@ PORT=8080 GTA_INSPECTOR_TOKEN=<secret> GTA_INSPECTOR_ALLOWED_HOSTS=assets.exampl
 Place behind an HTTPS reverse proxy. Configure the Blackstar server's `GAME_FOUNDRY_GTA_INSPECTOR_URL` and `GAME_FOUNDRY_GTA_INSPECTOR_TOKEN` to match. **Do not expose this unauthenticated.**
 
 **Limitations:** OBJ only, max 25 MB, hostname allowlist, redirects refused. Names matching wheel/collision conventions are only *heuristics*, not verified GTA rigging or collision physics. The report cannot prove GTA V compatibility or generate `.yft`/`.ytd`. FBX requires a separate licensed parser. No service is deployed by this PR. Do not configure production until the service's network isolation and URL fetching are security reviewed.
+
+## Container image
+
+From the repository root:
+
+```sh
+docker build -f workers/gta-obj-inspector/Dockerfile -t blackstar-gta-obj-inspector .
+docker run --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  --memory=256m --cpus=1 --pids-limit=64 \
+  -e GTA_INSPECTOR_TOKEN -e GTA_INSPECTOR_ALLOWED_HOSTS \
+  -p 127.0.0.1:8080:8080 blackstar-gta-obj-inspector
+```
+
+Set `GTA_INSPECTOR_TOKEN` and `GTA_INSPECTOR_ALLOWED_HOSTS` in the container environment before starting. Publish only through an HTTPS reverse proxy with authentication and rate limiting. Restrict egress to HTTPS and deny private, link-local, and metadata ranges at the network layer. The service intentionally has no public health endpoint.
+
+The worker remains **undeployed** until a trusted container host, HTTPS endpoint, secrets and storage allowlist are configured. Vercel's web deployment does not automatically run this long-lived Python HTTP server.
