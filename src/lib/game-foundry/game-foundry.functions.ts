@@ -527,8 +527,9 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
         validation_report:worker.validationReport,
         metadata:{...(asset.data.metadata && typeof asset.data.metadata==='object' ? asset.data.metadata : {}),processing:{provider:worker.provider,response:worker.metadata}},
         updated_at:new Date().toISOString(),
-      }).eq("id",data.id).eq("user_id",context.userId).eq("processing_status","queued").is("processing_worker_job_id",null);
+      }).eq("id",data.id).eq("user_id",context.userId).eq("processing_status","queued").is("processing_worker_job_id",null).select("id").maybeSingle();
       if (update.error) throw new Error(update.error.message);
+      if (!update.data) throw new Error("The processing job changed before the worker submission could be recorded; reconcile the worker before retrying.");
       await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.asset_processed", targetType:"three_d_job", targetId:data.id, status:"success", metadata:{ targetEngine:asset.data.target_engine, format:asset.data.requested_format } });
       return { id:data.id, ...worker };
     } catch (error) {
