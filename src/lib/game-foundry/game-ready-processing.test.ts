@@ -74,7 +74,7 @@ describe('Game Foundry game-ready processing', () => {
       },
     })
     expect(result.status).toBe('completed')
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${BLACKSTAR_HOSTED_3D_WORKER}/v1/assets/process`)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${BLACKSTAR_HOSTED_3D_WORKER}/api/v1/assets/process`)
     const body=JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
     expect(body.output_format).toBe('glb')
     expect(result.validationReport).toMatchObject({valid:true,output:{format:'glb'}})
