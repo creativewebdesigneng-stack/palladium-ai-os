@@ -28,11 +28,46 @@ function assetUrl(value: unknown): string | null {
   }
 }
 
-function failMessage(status: number): string {
-  if (status === 401 || status === 403) return "The FAL 3D generation provider rejected the server credentials. Check the production FAL_API_KEY.";
-  if (status === 402) return "The FAL 3D provider cannot start this job because its account has insufficient credits.";
+// Classify upstream errors without disclosing raw provider responses, account identifiers or secrets.
+function providerErrorDetail(raw: string): string {
+  const bounded = raw.slice(0, 4096);
+  try {
+    const parsed: unknown = JSON.parse(bounded);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const error = parsed as Record<string, unknown>;
+      const value = error["detail"] ?? error["message"] ?? error["error"];
+      if (typeof value === "string") return value.slice(0, 1000);
+      if (Array.isArray(value)) return value.map((part) => {
+        if (!part || typeof part !== "object") return "";
+        const message = (part as Record<string, unknown>)["msg"];
+        return typeof message === "string" ? message : "";
+      }).join(" ").slice(0, 1000);
+    }
+  } catch { /* Upstream may return HTML or plain text. */ }
+  return bounded;
+}
+
+export function falFailureMessage(status: number, rawResponse = ""): string {
+  const detail = providerErrorDetail(rawResponse);
+  if (/cloudfront|distribution is not configured|request method.*not allowed/i.test(detail)) {
+    return "The FAL request was rejected by an upstream gateway. Check the provider endpoint and request method.";
+  }
+  if (/exhausted balance|insufficient (balance|credits?|funds)|balance (is )?(exhausted|depleted|insufficient)|top[ -]?up|billing (disabled|issue)|payment required/i.test(detail) || status === 402) {
+    return "FAL has blocked 3D generation because the account needs billing attention. Check the FAL billing dashboard and account balance.";
+  }
+  if (/user is locked|account (is )?(locked|suspended|disabled)|account restriction/i.test(detail)) {
+    return "The FAL account is locked or restricted. Check account status in FAL or contact FAL support.";
+  }
+  if (status === 401 || /invalid (api )?key|no user found for key|invalid credentials|unauthenticated|unauthorized (api )?key|authentication failed/i.test(detail)) {
+    return "FAL did not authenticate the server API key. Generate a valid FAL API key and update FAL_API_KEY in Vercel production.";
+  }
+  if (status === 403) {
+    return "FAL denied this 3D request (HTTP 403). Check the FAL account's billing status, API key permissions, and Hunyuan3D model access.";
+  }
   if (status === 429) return "The FAL 3D provider is temporarily rate-limited. Try again later.";
-  return `The FAL 3D provider returned HTTP ${status}. Check the provider request and availability.`;
+  if (status === 422 || status === 400) return "FAL rejected the 3D request parameters. Review the selected model input and format.";
+  if (status === 404) return "The configured FAL 3D model endpoint could not be found.";
+  return `The FAL 3D provider returned HTTP ${status}. Check provider service availability.`;
 }
 
 async function falJson(path: string, method: "GET" | "POST", payload?: object): Promise<Record<string, any>> {
@@ -48,7 +83,11 @@ async function falJson(path: string, method: "GET" | "POST", payload?: object): 
     redirect: "manual",
     signal: AbortSignal.timeout(30000),
   });
-  if (!response.ok) throw new Error(failMessage(response.status));
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "");
+    // Do not log raw upstream responses: they may include account data or other sensitive details.
+    throw new Error(falFailureMessage(response.status, errorBody));
+  }
   const body: unknown = await response.json();
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("The FAL 3D provider returned an invalid JSON response.");
   return body as Record<string, any>;
