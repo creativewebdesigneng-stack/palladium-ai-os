@@ -28,7 +28,7 @@ describe('Blackstar hosted prompt-to-3D fallback', () => {
     })
     expect(result.workerJobId).toBe('job-1')
     expect(result.provider).toBe('game-foundry-3d')
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai/v1/assets/generate')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai/api/v1/assets/generate')
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ redirect:'manual' })
   })
 })
