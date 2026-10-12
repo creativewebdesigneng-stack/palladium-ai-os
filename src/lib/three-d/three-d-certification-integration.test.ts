@@ -8,7 +8,7 @@ const screen=readFileSync('src/screens/ThreeDStudio.jsx','utf8')
 describe('3D Studio operational certification',()=>{
   it('uses a live worker health probe rather than configuration alone',()=>{
     expect(runtime).toContain('probeThreeDWorker')
-    expect(runtime).toContain('${base}/health')
+    expect(runtime).toContain('hostedWorkerPath(base, "/health")')
     expect(runtime).toContain('readySignal')
     expect(functions).toContain('certifyThreeDStudio')
     expect(screen).toContain('Certify live worker')
