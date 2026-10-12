@@ -78,7 +78,7 @@ export async function submitFalThreeDAsset(input: {
   if (provider === "fal-3d-text" && !(input.prompt || "").trim()) throw new Error("A 3D generation prompt is required.");
   if (provider === "fal-3d-image" && !input.sourceUrl) throw new Error("An image URL is required for image-to-3D.");
   const json = await falJson(model, "POST", inputData);
-  const workerJobId = String(json.request_id ?? "").trim();
+  const workerJobId = String(json['request_id'] ?? "").trim();
   if (!/^[a-zA-Z0-9_-]{1,180}$/.test(workerJobId)) throw new Error("The FAL 3D provider did not return a valid queue request ID.");
   return {
     workerJobId, status: "queued", outputUrl: null, previewUrl: null, errorMessage: null,
@@ -93,7 +93,7 @@ export async function getFalThreeDAssetJob(
   const model = FAL_MODELS[provider];
   const path = `${model}/requests/${encodeURIComponent(workerJobId)}`;
   const queued = await falJson(`${path}/status`, "GET");
-  const state = String(queued.status ?? "");
+  const state = String(queued['status'] ?? "");
   const metadata = { model, requestedFormat: outputFormat };
   if (state === "IN_QUEUE") return { workerJobId, provider, status: "queued", outputUrl: null, previewUrl: null, errorMessage: null, metadata };
   if (state === "IN_PROGRESS") return { workerJobId, provider, status: "running", outputUrl: null, previewUrl: null, errorMessage: null, metadata };
@@ -103,8 +103,8 @@ export async function getFalThreeDAssetJob(
   if (state !== "COMPLETED") throw new Error("The FAL 3D provider returned an unknown queue status.");
   const response = await falJson(path, "GET");
   const format = outputFormat.toLowerCase();
-  const output = assetUrl(response.model_urls?.[format]?.url ?? (format === "glb" ? response.model_glb?.url : null));
-  const preview = assetUrl(response.thumbnail?.url);
+  const output = assetUrl(response['model_urls']?.[format]?.url ?? (format === "glb" ? response['model_glb']?.url : null));
+  const preview = assetUrl(response['thumbnail']?.url);
   return {
     workerJobId, provider, status: output ? "completed" : "failed",
     outputUrl: output, previewUrl: preview,
