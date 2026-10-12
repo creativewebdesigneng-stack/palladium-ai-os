@@ -1,3 +1,5 @@
+import { getFalThreeDAssetJob, isFal3dReady, submitFalThreeDAsset, type FalThreeDProvider } from './game-foundry-fal-3d.server';
+
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export type GameFoundryEngine = "generic" | "unity" | "unreal" | "godot" | "web" | "blender" | "zmodeler";
@@ -41,16 +43,16 @@ export function preferredGameFoundryAssetFormat(targetEngine:GameFoundryEngine) 
 
 export function getGameFoundryCapabilities() {
   const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  const assetWorker = promptWorkerBase();
+  const falReady = isFal3dReady();
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
   const modly = cleanBase(process.env["MODLY_API_URL"]) || BLACKSTAR_HOSTED_3D_WORKER;
   return {
     assetGeneration: {
-      promptTo3d: true,
-      imageTo3d: Boolean(assetWorker || modly),
+      promptTo3d: Boolean(configuredAssetWorker || falReady),
+      imageTo3d: Boolean(configuredAssetWorker || falReady),
       modelEnhancement: Boolean(configuredAssetWorker),
-      configuredProvider: configuredAssetWorker ? "game-foundry-3d" : "blackstar-hosted-3d",
-      formats: configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : ["glb","gltf","obj","ply","stl","vox"],
+      configuredProvider: configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
+      formats: configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : falReady ? ["glb","obj","fbx"] : [],
     },
     gameGeneration: {
       configured: true,
@@ -67,7 +69,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Prompt-to-3D and game-ready geometry processing use Blackstar-hosted execution by default. Blackstar's native game compiler produces bounded engine source and portable project packages without an external game worker; GAME_FOUNDRY_GAME_API_URL remains an optional external build lane. ZModeler3 uses FBX/OBJ interchange and an optional configured bridge; Blackstar does not claim native .z3d generation. Engine entries describe compatible export/plugin paths, not guaranteed remote control.",
+    note: "Prompt/image-to-3D uses the existing FAL credential and Hunyuan3D queue by default, or a configured specialist worker. The AppDeploy frontend hostname cannot receive external POST requests and is not used for generation. Game-ready post-processing still requires an independently reachable worker. The native game compiler produces bounded source/packages. ZModeler3 uses OBJ/FBX interchange; no native .z3d or GTA V .yft/.ytd generation is claimed.",
   };
 }
 
@@ -124,14 +126,17 @@ export async function submitGameFoundryAsset(input: {
   targetEngine: GameFoundryEngine;
 }) {
   const configuredAssetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  const assetBase = input.sourceKind === "prompt" ? promptWorkerBase() : configuredAssetBase;
-  const token = configuredAssetBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined;
-  if (input.sourceKind === "image" && !assetBase) {
-    const { submitThreeDJob } = await import("./../three-d/three-d-runtime.server");
-    if (!input.sourceUrl) throw new Error("A public image URL is required.");
-    const fallback = await submitThreeDJob({ sourceUrl: input.sourceUrl, outputFormat: input.outputFormat });
-    return { ...fallback, provider:"modly-compatible" as const };
+  if (!configuredAssetBase && (input.sourceKind === "prompt" || input.sourceKind === "image")) {
+    return submitFalThreeDAsset({
+      sourceKind: input.sourceKind,
+      prompt: input.prompt,
+      sourceUrl: input.sourceUrl ? publicHttpUrl(input.sourceUrl) : null,
+      outputFormat: input.outputFormat,
+      qualityProfile: input.qualityProfile,
+    });
   }
+  const assetBase = configuredAssetBase;
+  const token = configuredAssetBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined;
   if (!assetBase) throw new Error("Model enhancement requires GAME_FOUNDRY_3D_API_URL.");
   const body = {
     source_kind: input.sourceKind,
@@ -157,9 +162,10 @@ export async function submitGameFoundryAsset(input: {
   };
 }
 
-export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly-compatible"|"game-foundry-3d") {
+export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly-compatible"|"game-foundry-3d"|FalThreeDProvider, outputFormat = "glb") {
   const id=workerJobId.trim();
   if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry asset worker id.");
+  if(provider==="fal-3d-text" || provider==="fal-3d-image") return getFalThreeDAssetJob(id, provider, outputFormat);
   if(provider==="modly-compatible"){
     const { getThreeDJob } = await import("./../three-d/three-d-runtime.server");
     const result=await getThreeDJob(id);
