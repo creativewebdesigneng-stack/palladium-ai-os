@@ -108,7 +108,8 @@ async function request(base: string, token: string | undefined, path: string, in
   const headers = new Headers(init.headers);
   headers.set("Content-Type","application/json");
   if (token?.trim()) headers.set("Authorization",`Bearer ${token.trim()}`);
-  const response = await fetch(`${base}${path}`, { ...init, headers, redirect:"manual", signal:AbortSignal.timeout(120_000) });
+  const gatewayPath = base === BLACKSTAR_HOSTED_3D_WORKER ? `/api${path}` : path;
+  const response = await fetch(`${base}${gatewayPath}`, { ...init, headers, redirect:"manual", signal:AbortSignal.timeout(120_000) });
   const text = await response.text();
   if (!response.ok) throw new Error(`Game Foundry worker error (${response.status}): ${text.slice(0,300)}`);
   try { return JSON.parse(text); } catch { throw new Error("Game Foundry worker returned invalid JSON."); }
