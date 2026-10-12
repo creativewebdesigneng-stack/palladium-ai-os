@@ -45,7 +45,6 @@ export function getGameFoundryCapabilities() {
   const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const falReady = isFal3dReady();
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
-  const modly = cleanBase(process.env["MODLY_API_URL"]) || BLACKSTAR_HOSTED_3D_WORKER;
   return {
     assetGeneration: {
       promptTo3d: Boolean(configuredAssetWorker || falReady),
