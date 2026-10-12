@@ -68,7 +68,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Prompt/image-to-3D uses the existing FAL credential and Hunyuan3D queue by default, or a configured specialist worker. The AppDeploy frontend hostname cannot receive external POST requests and is not used for generation. Game-ready post-processing still requires an independently reachable worker. The native game compiler produces bounded source/packages. ZModeler3 uses OBJ/FBX interchange; no native .z3d or GTA V .yft/.ytd generation is claimed.",
+    note: "Prompt/image-to-3D uses the existing FAL credential and Hunyuan3D queue by default, or a configured specialist worker. The AppDeploy frontend hostname cannot receive external POST requests and is not used for generation. Game-ready post-processing still requires an independently reachable worker. The native game compiler produces bounded source/packages. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation or GTA V .yft/.ytd export.",
   };
 }
 
