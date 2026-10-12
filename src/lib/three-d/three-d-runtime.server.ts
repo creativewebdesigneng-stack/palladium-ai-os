@@ -52,7 +52,7 @@ export async function probeThreeDWorker() {
     let payload: any = null;
     try { payload = text ? JSON.parse(text) : null; } catch {}
     const readySignal = payload && typeof payload === "object" && "ready" in payload ? payload.ready === true : null;
-    const healthy = response.ok && readySignal !== false;
+    const healthy = response.ok && readySignal === true;
     return {
       provider: typeof payload?.provider === "string" ? payload.provider : "modly-compatible",
       configured: true,
@@ -68,7 +68,9 @@ export async function probeThreeDWorker() {
         ? null
         : readySignal === false
           ? "3D worker health endpoint reported ready=false."
-          : `3D worker health endpoint returned HTTP ${response.status}.`,
+          : response.ok
+            ? "3D worker health endpoint did not return explicit ready=true JSON."
+            : `3D worker health endpoint returned HTTP ${response.status}.`,
     };
   } catch (error) {
     return {
