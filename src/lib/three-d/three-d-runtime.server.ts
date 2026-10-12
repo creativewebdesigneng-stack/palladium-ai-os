@@ -13,6 +13,10 @@ export type ThreeDWorkerResult = {
 const ALLOWED_FORMATS = new Set(["glb", "gltf", "obj", "ply", "stl", "vox"]);
 const DEFAULT_MODLY_API_URL = "https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai";
 
+function hostedWorkerPath(base: string, path: string) {
+  return base === DEFAULT_MODLY_API_URL ? `/api${path}` : path;
+}
+
 function workerConfig() {
   const base = (process.env["MODLY_API_URL"] || DEFAULT_MODLY_API_URL).trim().replace(/\/+$/, "");
   const token = (process.env["MODLY_API_TOKEN"] || "").trim();
@@ -38,7 +42,7 @@ export async function probeThreeDWorker() {
     };
   }
   try {
-    const response = await fetch(`${base}/health`, {
+    const response = await fetch(`${base}${hostedWorkerPath(base, "/health")}`, {
       method: "GET",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       redirect: "manual",
@@ -145,7 +149,7 @@ async function request(path: string, init?: RequestInit): Promise<any> {
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, {
+  const response = await fetch(`${base}${hostedWorkerPath(base, path)}`, {
     ...init,
     redirect: "error",
     signal: AbortSignal.timeout(120_000),
