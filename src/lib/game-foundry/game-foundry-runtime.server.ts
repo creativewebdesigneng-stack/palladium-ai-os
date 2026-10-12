@@ -128,7 +128,7 @@ export async function submitGameFoundryAsset(input: {
   if (!configuredAssetBase && (input.sourceKind === "prompt" || input.sourceKind === "image")) {
     return submitFalThreeDAsset({
       sourceKind: input.sourceKind,
-      prompt: input.prompt,
+      prompt: input.prompt ?? null,
       sourceUrl: input.sourceUrl ? publicHttpUrl(input.sourceUrl) : null,
       outputFormat: input.outputFormat,
       qualityProfile: input.qualityProfile,
