@@ -39,6 +39,14 @@ describe('3D Studio runtime', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/health');
   });
 
+  it('uses the AppDeploy API gateway for hosted image-to-mesh jobs', async () => {
+    delete process.env['MODLY_API_URL'];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'image-job-1', status: 'queued' }), { status: 200 }));
+    const result = await submitThreeDJob({ sourceUrl: 'https://assets.example.com/reference.png', outputFormat: 'obj' });
+    expect(result.workerJobId).toBe('image-job-1');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai/api/workflow-runs/from-image');
+  });
+
   it('blocks local/private image sources before contacting a worker', async () => {
     process.env['MODLY_API_URL'] = 'https://modly-worker.example';
     await expect(submitThreeDJob({ sourceUrl: 'http://127.0.0.1/private.png', outputFormat: 'glb' }))
