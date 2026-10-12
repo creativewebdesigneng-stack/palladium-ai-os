@@ -24,7 +24,7 @@ describe('Game Foundry connector health',()=>{
     const worker=health.results.find((item)=>item.id==='3d-worker')
     expect(worker?.configured).toBe(true)
     expect(worker?.healthy).toBe(true)
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('blackstar-3d-worker-v7iyno.v2.appdeploy.ai/health')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('blackstar-3d-worker-v7iyno.v2.appdeploy.ai/api/worker-health')
   })
 
   it('distinguishes reachability from health',async()=>{
