@@ -75,7 +75,7 @@ export async function submitFalThreeDAsset(input: {
   const inputData = provider === "fal-3d-text"
     ? { prompt: (input.prompt || "").trim().slice(0, 1024), generate_type: generateType, face_count: 40000 }
     : { input_image_url: input.sourceUrl, generate_type: generateType, face_count: 40000 };
-  if (provider === "fal-3d-text" && !inputData.prompt) throw new Error("A 3D generation prompt is required.");
+  if (provider === "fal-3d-text" && !(input.prompt || "").trim()) throw new Error("A 3D generation prompt is required.");
   if (provider === "fal-3d-image" && !input.sourceUrl) throw new Error("An image URL is required for image-to-3D.");
   const json = await falJson(model, "POST", inputData);
   const workerJobId = String(json.request_id ?? "").trim();
