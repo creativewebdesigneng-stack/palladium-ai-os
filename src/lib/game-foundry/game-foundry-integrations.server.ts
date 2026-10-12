@@ -73,7 +73,8 @@ export async function probeGameFoundryConnections(){
     const token=configuredBase&&target.tokenEnv?process.env[target.tokenEnv]?.trim():"";
     const started=Date.now();
     try{
-      const response=await fetch(`${base}/health`,{
+      const path=!configuredBase&&base===BLACKSTAR_HOSTED_3D_WORKER?"/api/worker-health":"/health";
+      const response=await fetch(`${base}${path}`,{
         method:"GET",
         headers:token?{Authorization:`Bearer ${token}`}:{},
         redirect:"manual",

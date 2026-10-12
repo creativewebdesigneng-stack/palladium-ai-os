@@ -763,15 +763,16 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     const asset=await sb.from("three_d_jobs")
-      .select("id,status,worker_job_id,output_url,preview_url,error_message,metadata,processing_status,processing_worker_job_id,processed_output_url,validation_report")
+      .select("id,status,worker_job_id,requested_format,output_url,preview_url,error_message,metadata,processing_status,processing_worker_job_id,processed_output_url,validation_report")
       .eq("id",data.id).eq("user_id",context.userId).maybeSingle();
     if(asset.error) throw new Error(asset.error.message);
     if(!asset.data) throw new Error("Game Foundry asset not found.");
 
     let generation=null;
     if(["queued","running"].includes(String(asset.data.status))&&asset.data.worker_job_id){
-      const provider=asset.data.metadata?.provider==="game-foundry-3d"?"game-foundry-3d":"modly-compatible";
-      generation=await getGameFoundryAssetJob(String(asset.data.worker_job_id),provider);
+      const storedProvider=String(asset.data.metadata?.provider ?? "modly-compatible");
+      const provider=storedProvider==="fal-3d-text"||storedProvider==="fal-3d-image"||storedProvider==="game-foundry-3d"?storedProvider:"modly-compatible";
+      generation=await getGameFoundryAssetJob(String(asset.data.worker_job_id),provider,String(asset.data.requested_format ?? "glb"));
       const terminal=["completed","failed","cancelled"].includes(generation.status);
       const update=await sb.from("three_d_jobs").update({
         status:generation.status,

@@ -7,6 +7,7 @@ import {
 
 const originalAsset = process.env['GAME_FOUNDRY_3D_API_URL']
 const originalGame = process.env['GAME_FOUNDRY_GAME_API_URL']
+const originalFal = process.env['FAL_API_KEY']
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -14,6 +15,8 @@ afterEach(() => {
   else process.env['GAME_FOUNDRY_3D_API_URL'] = originalAsset
   if (originalGame === undefined) delete process.env['GAME_FOUNDRY_GAME_API_URL']
   else process.env['GAME_FOUNDRY_GAME_API_URL'] = originalGame
+  if (originalFal === undefined) delete process.env['FAL_API_KEY']
+  else process.env['FAL_API_KEY'] = originalFal
 })
 
 describe('Blackstar Game Foundry runtime', () => {
@@ -29,12 +32,11 @@ describe('Blackstar Game Foundry runtime', () => {
     expect(caps.engines.find((engine) => engine.id === 'unity')?.exports).toContain('fbx')
   })
 
-  it('uses the official Blackstar hosted worker for prompt-to-3D when no override exists', async () => {
+  it('uses a FAL provider queue when no specialist 3D worker is configured', async () => {
     delete process.env['GAME_FOUNDRY_3D_API_URL']
+    process.env['FAL_API_KEY'] = 'test-only-key'
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      id: 'job-1',
-      status: 'completed',
-      output_url: 'https://cdn.example.com/crate.glb',
+      request_id: '123e4567-e89b-12d3-a456-426614174000',
     }), { status: 200, headers: { 'content-type': 'application/json' } }))
     const result = await submitGameFoundryAsset({
       sourceKind: 'prompt',
@@ -44,8 +46,8 @@ describe('Blackstar Game Foundry runtime', () => {
       qualityProfile: 'game_ready',
       targetEngine: 'unreal',
     })
-    expect(result.workerJobId).toBe('job-1')
-    expect(result.provider).toBe('game-foundry-3d')
+    expect(result.workerJobId).toBe('123e4567-e89b-12d3-a456-426614174000')
+    expect(result.provider).toBe('fal-3d-text')
   })
 
   it('keeps the direct external game-worker call fail-closed when no external worker exists', async () => {
