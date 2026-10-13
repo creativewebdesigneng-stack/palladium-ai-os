@@ -42,7 +42,7 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
         .eq('user_id',context.userId).ilike('name',prepared.name).limit(2);
       if(lookup.error) throw new Error('Could not check your current agent skills.');
       const current=(lookup.data??[]) as Array<Record<string,unknown>>;
-      if(current.length>1 || (current.length===1 && current[0]?.source_ref!==prepared.sourceRef)){
+      if(current.length>1 || (current.length===1 && current[0]?.['source_ref']!==prepared.sourceRef)){
         skipped.push({id:item.id,reason:'An existing skill uses this name; no user skill was overwritten.'});
         continue;
       }
@@ -51,8 +51,8 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
         // if the verified replacement source is marked dangerous.
         const prev=current[0]!;
         const update=await sb.from('agent_skills')
-          .update({...prepared.row,enabled:prev.enabled===true && prepared.scanVerdict!=='dangerous',updated_at:new Date().toISOString()})
-          .eq('user_id',context.userId).eq('id',prev.id).eq('source_ref',prepared.sourceRef)
+          .update({...prepared.row,enabled:prev['enabled']===true && prepared.scanVerdict!=='dangerous',updated_at:new Date().toISOString()})
+          .eq('user_id',context.userId).eq('id',prev['id']).eq('source_ref',prepared.sourceRef)
           .select('id').maybeSingle();
         if(update.error||!update.data) throw new Error('Could not safely update a verified scientific skill.');
         existing++;
