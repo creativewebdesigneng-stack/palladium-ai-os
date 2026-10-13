@@ -3,6 +3,7 @@ import { assessGtaVehicleHandoff } from "./gta-vehicle-handoff";
 import { assessGtaVehicleInspection } from "./gta-vehicle-inspection";
 import { gtaVehicleInspectorConfigured, requestGtaVehicleInspection } from "./gta-vehicle-inspector.server";
 import { z } from "zod";
+import { open3dHealth } from "./game-foundry-open3d.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
@@ -150,6 +151,7 @@ const assetQuality = z.enum(["draft","game_ready","cinematic"]);
 const projectType = z.enum(["game","environment","character","prop","vehicle","asset_pack"]);
 const sourceKind = z.enum(["prompt","image","model"]);
 const outputFormat = z.enum(["glb","gltf","fbx","obj","usd","ply","stl","vox"]);
+const generationModel = z.enum(["auto","shap-e","triposr","trellis","fal"]).default("auto");
 
 export const getGameFoundryOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -169,7 +171,8 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
     ]);
     if (projects.error) throw new Error(projects.error.message);
     if (assets.error) throw new Error(assets.error.message);
-    return { capabilities:{ ...getGameFoundryCapabilities(), gameReadyProcessing:getGameReadyProcessingCapabilities(), integrations:getGameFoundryIntegrations() }, projects:projects.data ?? [], assets:assets.data ?? [] };
+    const freeWorker = await open3dHealth();
+    return { capabilities:{ ...getGameFoundryCapabilities(), freeWorker, gameReadyProcessing:getGameReadyProcessingCapabilities(), integrations:getGameFoundryIntegrations() }, projects:projects.data ?? [], assets:assets.data ?? [] };
   });
 
 export const createGameFoundryProject = createServerFn({ method:"POST" })
@@ -319,6 +322,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     outputFormat,
     qualityProfile:assetQuality,
     targetEngine:engine,
+    generationModel,
     autoPrepareProfile:gameReadyProfile.nullable().optional(),
   }).superRefine((value,ctx)=>{
     if (value.sourceKind === "prompt" && !value.prompt?.trim()) ctx.addIssue({code:"custom",path:["prompt"],message:"Prompt-to-3D requires a prompt."});
@@ -367,6 +371,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
         outputFormat: data.outputFormat,
         qualityProfile: data.qualityProfile,
         targetEngine: data.targetEngine,
+        generationModel: data.generationModel,
       });
       const terminal = ["completed","failed","cancelled"].includes(worker.status);
       const updated = await sb.from("three_d_jobs").update({
@@ -771,7 +776,9 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
     let generation=null;
     if(["queued","running"].includes(String(asset.data.status))&&asset.data.worker_job_id){
       const storedProvider=String(asset.data.metadata?.provider ?? "modly-compatible");
-      const provider=storedProvider==="fal-3d-text"||storedProvider==="fal-3d-image"||storedProvider==="game-foundry-3d"?storedProvider:"modly-compatible";
+      const provider=storedProvider==="fal-3d-text"||storedProvider==="fal-3d-image"||storedProvider==="game-foundry-3d"
+        ||storedProvider==="open3d-shap-e"||storedProvider==="open3d-triposr"||storedProvider==="open3d-trellis"
+        ?storedProvider:"modly-compatible";
       generation=await getGameFoundryAssetJob(String(asset.data.worker_job_id),provider,String(asset.data.requested_format ?? "glb"));
       const terminal=["completed","failed","cancelled"].includes(generation.status);
       const update=await sb.from("three_d_jobs").update({

@@ -1,4 +1,6 @@
 import { getFalThreeDAssetJob, isFal3dReady, submitFalThreeDAsset, type FalThreeDProvider } from './game-foundry-fal-3d.server';
+import { getOpen3dAssetJob, isOpen3dConfigured, open3dHealth, submitOpen3dAsset, modelSupportsSource,
+  type Open3dModel, type Open3dProvider, type AssetModelChoice } from './game-foundry-open3d.server';
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -44,14 +46,17 @@ export function preferredGameFoundryAssetFormat(targetEngine:GameFoundryEngine) 
 export function getGameFoundryCapabilities() {
   const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const falReady = isFal3dReady();
+  const freeConfigured = isOpen3dConfigured();
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
   return {
     assetGeneration: {
-      promptTo3d: Boolean(configuredAssetWorker || falReady),
-      imageTo3d: Boolean(configuredAssetWorker || falReady),
+      promptTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady),
+      imageTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady),
       modelEnhancement: Boolean(configuredAssetWorker),
-      configuredProvider: configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
-      formats: configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : falReady ? ["glb","obj","fbx"] : [],
+      freeWorkerConfigured: freeConfigured,
+      falConfigured: falReady,
+      configuredProvider: freeConfigured ? "blackstar-open3d" : configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
+      formats: freeConfigured ? ["glb","obj"] : configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : falReady ? ["glb","obj","fbx"] : [],
     },
     gameGeneration: {
       configured: true,
@@ -68,7 +73,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Prompt/image-to-3D uses the existing FAL credential and Hunyuan3D queue by default, or a configured specialist worker. The AppDeploy frontend hostname cannot receive external POST requests and is not used for generation. Game-ready post-processing still requires an independently reachable worker. The native game compiler produces bounded source/packages. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation or GTA V .yft/.ytd export.",
+    note: "Auto generation uses only a verified self-hosted Shap-E, TripoSR or TRELLIS worker; FAL is opt-in and may incur charges. Only OBJ/GLB exports are supported by the free engines. A GPU/CPU host and worker URL must be supplied; the AppDeploy frontend is not a usable POST worker. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation. Game-ready processing and GTA .yft/.ytd still require separate specialist tools.",
   };
 }
 
@@ -123,17 +128,36 @@ export async function submitGameFoundryAsset(input: {
   outputFormat: string;
   qualityProfile: "draft" | "game_ready" | "cinematic";
   targetEngine: GameFoundryEngine;
+  generationModel?: AssetModelChoice;
 }) {
-  const configuredAssetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
-  if (!configuredAssetBase && (input.sourceKind === "prompt" || input.sourceKind === "image")) {
-    return submitFalThreeDAsset({
-      sourceKind: input.sourceKind,
-      prompt: input.prompt ?? null,
+  const choice = input.generationModel ?? "auto";
+  if (input.sourceKind === "prompt" || input.sourceKind === "image") {
+    if (choice === "fal") return submitFalThreeDAsset({
+      sourceKind: input.sourceKind, prompt: input.prompt ?? null,
       sourceUrl: input.sourceUrl ? publicHttpUrl(input.sourceUrl) : null,
-      outputFormat: input.outputFormat,
-      qualityProfile: input.qualityProfile,
+      outputFormat: input.outputFormat, qualityProfile: input.qualityProfile,
+    });
+    let model: Open3dModel;
+    if (choice === "auto") {
+      const health = await open3dHealth();
+      // Fast generators are preferred; TRELLIS is reserved for quality and explicit selection.
+      const preference: Open3dModel[] = input.sourceKind === "prompt"
+        ? input.qualityProfile === "cinematic" ? ["trellis","shap-e"] : ["shap-e","trellis"]
+        : input.qualityProfile === "cinematic" ? ["trellis","triposr"] : ["triposr","trellis"];
+      const available = preference.find(candidate => health.models.includes(candidate));
+      if (!available) throw new Error("No free 3D generation engine is online. Connect a self-hosted Shap-E, TripoSR, or TRELLIS worker. FAL will not be charged automatically.");
+      model = available;
+    } else if (choice === "shap-e" || choice === "triposr" || choice === "trellis") model = choice;
+    else throw new Error("Unknown 3D generation engine.");
+    if (!modelSupportsSource(model,input.sourceKind)) throw new Error("TripoSR only accepts image input. Select image mode or a different model.");
+    return submitOpen3dAsset({
+      model, sourceKind: input.sourceKind, prompt: input.prompt ?? null,
+      sourceUrl: input.sourceUrl ? publicHttpUrl(input.sourceUrl) : null,
+      outputFormat: input.outputFormat, qualityProfile: input.qualityProfile, targetEngine: input.targetEngine,
     });
   }
+  if (choice !== "auto") throw new Error("Model enhancement uses the configured specialist processing worker rather than prompt/image engines.");
+  const configuredAssetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const assetBase = configuredAssetBase;
   const token = configuredAssetBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined;
   if (!assetBase) throw new Error("Model enhancement requires GAME_FOUNDRY_3D_API_URL.");
@@ -145,8 +169,7 @@ export async function submitGameFoundryAsset(input: {
     quality_profile: input.qualityProfile,
     target_engine: input.targetEngine,
   };
-  if (input.sourceKind === "prompt" && !body.prompt) throw new Error("A prompt is required for prompt-to-3D.");
-  if (input.sourceKind !== "prompt" && !body.source_url) throw new Error("A public source URL is required.");
+  if (!body.source_url) throw new Error("A public model source URL is required.");
   const json = await request(assetBase, token, "/v1/assets/generate", { method:"POST", body:JSON.stringify(body) });
   const workerJobId = String(json.id ?? json.job_id ?? json.run_id ?? "").trim();
   if (!workerJobId) throw new Error("Game Foundry 3D worker did not return a job id.");
@@ -161,10 +184,11 @@ export async function submitGameFoundryAsset(input: {
   };
 }
 
-export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly-compatible"|"game-foundry-3d"|FalThreeDProvider, outputFormat = "glb") {
+export async function getGameFoundryAssetJob(workerJobId:string, provider:"modly-compatible"|"game-foundry-3d"|FalThreeDProvider|Open3dProvider, outputFormat = "glb") {
   const id=workerJobId.trim();
   if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error("Invalid Game Foundry asset worker id.");
   if(provider==="fal-3d-text" || provider==="fal-3d-image") return getFalThreeDAssetJob(id, provider, outputFormat);
+  if(provider==="open3d-shap-e" || provider==="open3d-triposr" || provider==="open3d-trellis") return getOpen3dAssetJob(id,provider,outputFormat);
   if(provider==="modly-compatible"){
     const { getThreeDJob } = await import("./../three-d/three-d-runtime.server");
     const result=await getThreeDJob(id);
