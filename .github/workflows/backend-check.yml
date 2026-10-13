@@ -104,6 +104,20 @@ jobs:
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
           python3 -m unittest discover -s workers/open3d-free -p 'test_*.py'
 
+      - name: Windows browser worker PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in Get-ChildItem browser-worker/windows/*.ps1) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "Invalid PowerShell syntax: $($file.Name)"
+            }
+          }
+
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
         run: |
