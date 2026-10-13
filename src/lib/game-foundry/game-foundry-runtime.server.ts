@@ -151,12 +151,13 @@ export async function submitGameFoundryAsset(input: {
     else throw new Error("Unknown 3D generation engine.");
     if (!modelSupportsSource(model,input.sourceKind)) throw new Error("TripoSR only accepts image input. Select image mode or a different model.");
     return submitOpen3dAsset({
-      model, sourceKind: input.sourceKind, prompt: input.prompt,
+      model, sourceKind: input.sourceKind, prompt: input.prompt ?? null,
       sourceUrl: input.sourceUrl ? publicHttpUrl(input.sourceUrl) : null,
       outputFormat: input.outputFormat, qualityProfile: input.qualityProfile, targetEngine: input.targetEngine,
     });
   }
   if (choice !== "auto") throw new Error("Model enhancement uses the configured specialist processing worker rather than prompt/image engines.");
+  const configuredAssetBase = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const assetBase = configuredAssetBase;
   const token = configuredAssetBase ? process.env["GAME_FOUNDRY_3D_API_TOKEN"] : undefined;
   if (!assetBase) throw new Error("Model enhancement requires GAME_FOUNDRY_3D_API_URL.");
@@ -168,8 +169,7 @@ export async function submitGameFoundryAsset(input: {
     quality_profile: input.qualityProfile,
     target_engine: input.targetEngine,
   };
-  if (input.sourceKind === "prompt" && !body.prompt) throw new Error("A prompt is required for prompt-to-3D.");
-  if (input.sourceKind !== "prompt" && !body.source_url) throw new Error("A public source URL is required.");
+  if (!body.source_url) throw new Error("A public model source URL is required.");
   const json = await request(assetBase, token, "/v1/assets/generate", { method:"POST", body:JSON.stringify(body) });
   const workerJobId = String(json.id ?? json.job_id ?? json.run_id ?? "").trim();
   if (!workerJobId) throw new Error("Game Foundry 3D worker did not return a job id.");
