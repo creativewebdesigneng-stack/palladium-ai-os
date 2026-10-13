@@ -2,11 +2,10 @@
  * Client helper for streaming agent runs.
  *
  * Talks to the same-origin `/api/agents/run` endpoint with the operator's
- * session token so the runtime can authenticate the caller. Falls back to the
- * non-streaming server function when streaming is unavailable.
+ * session token so the runtime can authenticate the caller. Server-side
+ * failures are surfaced without silently retrying a side-effecting run.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { runAgentTask } from "./runtime.functions";
 
 async function accessToken() {
   const { data } = await supabase.auth.getSession();
@@ -36,15 +35,9 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
     } catch {
       /* keep the default message */
     }
-    // Streaming unavailable — try the buffered path before giving up.
-    if (res.status >= 500) {
-      const result = await runAgentTask({ data: { agent_id: agentId, input } });
-      if (!result?.task || !String(result.output ?? result.task.output_text ?? result.task.output?.text ?? "").trim()) {
-        throw new Error("Agent execution returned no final deliverable. Check the model provider and runtime configuration.");
-      }
-      onEvent?.({ type: "complete", task: result.task });
-      return result.task;
-    }
+    // An HTTP failure does not prove that a run was never started. Retrying
+    // against a second execution path can repeat writes, purchases or messages.
+    // Leave the user's task untouched and surface the original server error.
     throw new Error(message);
   }
 
