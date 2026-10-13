@@ -39,7 +39,7 @@ describe('Blackstar FAL 3D generation fallback', () => {
     ))
     const result = await submitGameFoundryAsset({
       sourceKind: 'prompt', prompt: 'A racing car for a game', sourceUrl: null,
-      outputFormat: 'obj', qualityProfile: 'game_ready', targetEngine: 'zmodeler',
+      outputFormat: 'obj', qualityProfile: 'game_ready', generationModel: 'fal', targetEngine: 'zmodeler',
     })
     expect(result.status).toBe('queued')
     expect(result.provider).toBe('fal-3d-text')
@@ -73,7 +73,7 @@ describe('Blackstar FAL 3D generation fallback', () => {
     ))
     const result = await submitGameFoundryAsset({
       sourceKind: 'image', prompt: null, sourceUrl: 'https://public.example.com/photo.png',
-      outputFormat: 'glb', qualityProfile: 'draft', targetEngine: 'unreal',
+      outputFormat: 'glb', qualityProfile: 'draft', generationModel: 'fal', targetEngine: 'unreal',
     })
     expect(result.provider).toBe('fal-3d-image')
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/fal-ai/hunyuan3d-v3/image-to-3d')
