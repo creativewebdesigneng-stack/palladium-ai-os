@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { SCIENTIFIC_SKILL_SOURCES, SCIENTIFIC_SKILLS_COMMIT } from './scientific-skill-sources';
 import { fetchPinnedScientificSkill } from './scientific-skills-import.server';
+import { scientificSkillSource } from './scientific-skill-sources';
 
 type Sb = { from: (table: string) => any };
 const BATCH = 4;
@@ -74,5 +75,21 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
       total:SCIENTIFIC_SKILL_SOURCES.length,
       nextCursor:end<SCIENTIFIC_SKILL_SOURCES.length?end:null,
       status:'reference-only; user-review required before agents can read imported skill',
+    };
+  });
+
+/** Preview one verified source without modifying the user's skills or executing scripts. */
+export const previewScientificSkill = createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input:unknown)=>z.object({id:z.string().min(1).max(100)}).parse(input))
+  .handler(async ({data})=>{
+    if(!scientificSkillSource(data.id)) throw new Error('Unknown scientific skill.');
+    const prepared=await fetchPinnedScientificSkill(data.id);
+    return {
+      id:prepared.id,name:prepared.name,description:prepared.description,
+      scanVerdict:prepared.scanVerdict,sourceUrl:prepared.sourceUrl,
+      sourceRef:prepared.sourceRef,
+      preview:String(prepared.row['body']).slice(0,2500),
+      note:'Reference playbook only. Additional tools or scientific software are not installed.',
     };
   });
