@@ -144,7 +144,7 @@ def run_job(jid, payload):
         generator = payload["generator"]
         output_format = payload["output_format"]
         try:
-            if generator in ("triposr", "trellis") and payload["source_kind"] == "image":
+            if payload["source_kind"] == "image":
                 image = folder / "source.png"
                 download_image(payload["source_url"], image)
             else:
