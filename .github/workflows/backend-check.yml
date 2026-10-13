@@ -99,6 +99,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+      - name: Free Open3D worker Python syntax and safety tests
+        run: |
+          python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
+          python3 -m unittest discover -s workers/open3d-free -p 'test_*.py'
+
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
         run: |
