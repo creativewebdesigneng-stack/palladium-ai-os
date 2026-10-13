@@ -47,6 +47,13 @@ describe("agent harness", () => {
     expect(evaluateHarnessPolicy({ tool: "web_fetch", requestedDomains: ["evil.test"], allowedDomains: ["example.com"] }).code).toBe("domain_outside_allowlist");
   });
 
+  it("rejects a requested web domain when the allowlist is absent or empty", () => {
+    const request = { tool: "web_fetch", requestedDomains: ["example.com"] };
+    expect(evaluateHarnessPolicy(request).code).toBe("domain_outside_allowlist");
+    expect(evaluateHarnessPolicy({ ...request, allowedDomains: [] }).decision).toBe("deny");
+    expect(evaluateHarnessPolicy({ ...request, allowedDomains: ["example.com"] }).decision).toBe("allow");
+  });
+
   it("prevents sub-agents escalating tools or nesting indefinitely", () => {
     expect(evaluateSubagentSpawn({ depth: 0, parentTools: ["web_search", "memory_search"], requestedTools: ["web_search"] }).decision).toBe("allow");
     expect(evaluateSubagentSpawn({ depth: 0, parentTools: ["web_search"], requestedTools: ["github_write"] }).code).toBe("subagent_permission_escalation");
