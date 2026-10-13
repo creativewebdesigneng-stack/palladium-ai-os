@@ -15,7 +15,7 @@ if (-not $target) {
   Write-Host "The recorded worker is no longer running; stale process record cleared."
   exit 0
 }
-$recordedStart = ([datetime]$record.startedUtc).ToUniversalTime()
+$recordedStart = ([DateTimeOffset]::Parse([string]$record.startedUtc)).UtcDateTime
 $currentStart = $target.StartTime.ToUniversalTime()
 if ([math]::Abs(($currentStart - $recordedStart).TotalSeconds) -ge 2) {
   throw "PID has been reused; refusing to stop an unrelated process. Remove the stale worker-process.json manually after checking."
