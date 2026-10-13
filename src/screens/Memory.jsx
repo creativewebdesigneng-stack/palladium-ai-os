@@ -5,6 +5,7 @@ import MemoryCard from '@/components/memory/MemoryCard';
 import MemorySettings from '@/components/memory/MemorySettings';
 import AgentRecallPreview from '@/components/memory/AgentRecallPreview';
 import MemoryGraph from '@/components/memory/MemoryGraph';
+import MemoryArchiveExplorer from '@/components/memory/MemoryArchiveExplorer';
 import MemoryBrain from '@/components/memory/MemoryBrain';
 import VectorPanel from '@/components/memory/VectorPanel';
 import AddMemoryModal from '@/components/memory/AddMemoryModal';
@@ -349,6 +350,7 @@ export default function Memory() {
         />
 
         <MemoryToolbar type={type} onType={setType} scope={scope} onScope={setScope} query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} counts={counts} />
+        <MemoryArchiveExplorer enabled={session === 'yes'} revision={brainPulse + entries.length + documents.length} />
 
         {semantic && (
           <div className="mb-3 text-[11px] text-zinc-400">
