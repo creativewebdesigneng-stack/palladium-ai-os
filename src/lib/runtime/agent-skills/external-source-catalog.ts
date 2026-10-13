@@ -54,14 +54,14 @@ export const EXTERNAL_ARCHIVE_SOURCES: readonly ExternalArchiveSource[] = [
   },
   {
     id: 'harness-extended', name: 'Awesome Harness Engineering (extended)', license: 'CC0-1.0',
-    url: 'https://github.com/',
+    url: 'https://github.com/ai-boost/awesome-harness-engineering',
     integratesWith: ['Agent Orchestrator', 'Workforce', 'Evaluations', 'Approvals'],
     summary: 'Educational collection of agent loop, context, MCP, safe autonomy, CI, sandbox, tracing and operational design references, not a runtime.',
     status: 'reference',
   },
   {
     id: 'harness-compact', name: 'Awesome Harness Engineering (compact)', license: 'CC0-1.0',
-    url: 'https://github.com/',
+    url: '',
     integratesWith: ['General Intelligence Kernel', 'Observability', 'Certification'],
     summary: 'A second harness architecture reference collection: specifications, tool boundaries, memory, evaluations and reliable agent operations. Not an executable tool.',
     status: 'reference',
