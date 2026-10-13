@@ -1,3 +1,5 @@
+import { normaliseInteractiveItems } from "./dom-snapshot.mjs";
+
 const MAX_ERRORS = 25;
 const MAX_ERROR_CHARS = 1200;
 
@@ -83,4 +85,10 @@ export async function inspectPageReadOnly(page, navigate, params = {}) {
     page.off("requestfailed", onRequestFailed);
     page.off("response", onResponse);
   }
+}
+
+/** Attach only value-free, bounded DOM evidence to a read-only QA result. */
+export function attachQaDomEvidence(inspection, rawItems) {
+  const interactiveItems = normaliseInteractiveItems(rawItems);
+  return { ...inspection, interactiveItems, interactiveCount: interactiveItems.length };
 }
