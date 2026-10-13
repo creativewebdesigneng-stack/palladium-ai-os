@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { X, Loader2, Plug, ShieldAlert, Wand2, Palette } from 'lucide-react';
 import {
   PERSONAL_CATEGORIES, AUTONOMY_LEVELS, PERSONALITIES, TOOL_CATALOG,
@@ -55,7 +56,11 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
     });
   }, [open, initial, connectedIntegrations]);
 
-  if (!open) return null;
+  // PageTransition and Mission Theatre use CSS transforms. A fixed dialog
+  // nested inside them is trapped in their stacking/containing block, which
+  // can make the form impossible to focus or interact with. Portal it above
+  // the entire shell instead.
+  if (!open || typeof document === 'undefined') return null;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const setIdentity = (key, value) => setForm((f) => ({ ...f, identity: { ...f.identity, [key]: value, disclosure: 'AI agent' } }));
@@ -110,8 +115,8 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
   const field = 'w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-400/40 focus:outline-none';
   const label = 'mb-1 block text-[11px] font-medium text-zinc-400';
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-labelledby="personal-agent-builder-title" className="pointer-events-auto fixed inset-0 z-[2147483647] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -119,7 +124,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
       >
         <div className="mb-5 flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-violet-400" />
-          <h2 className="text-sm font-semibold text-white">{initial?.id ? 'Configure agent' : 'Create a personal agent'}</h2>
+          <h2 id="personal-agent-builder-title" className="text-sm font-semibold text-white">{initial?.id ? 'Configure agent' : 'Create a personal agent'}</h2>
           <button onClick={onClose} aria-label="Close" className="ml-auto rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
@@ -127,7 +132,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="ag-name">Name</label>
-              <input id="ag-name" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Shopping Assistant" className={field} />
+              <input id="ag-name" autoFocus required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Shopping Assistant" className={field} />
             </div>
             <div>
               <label className={label} htmlFor="ag-cat">Category</label>
@@ -296,6 +301,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
           </div>
         </form>
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }
