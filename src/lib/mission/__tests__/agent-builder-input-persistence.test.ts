@@ -25,16 +25,16 @@ describe('Mission Control agent editor input persistence', () => {
     expect(builder).toContain('onSave?.({');
   });
 
-  it('renders above transformed Mission Control shells so pointer and keyboard focus reach inputs', () => {
-    const transition = readFileSync(new URL('../../../components/visual/PageTransition.jsx', import.meta.url), 'utf8');
-    const theatreCss = readFileSync(new URL('../../../components/blackstar/blackstar-astra.css', import.meta.url), 'utf8');
-    expect(transition).toContain('<motion.div');
-    expect(theatreCss).toContain('transform-style: preserve-3d;');
-    expect(builder).toContain("import { createPortal } from 'react-dom';");
-    expect(builder).toContain('return createPortal(');
-    expect(builder).toContain('document.body,');
-    expect(builder).toContain('role="dialog" aria-modal="true"');
+  it('embeds the Personal AI editor directly in the page and never opens a second overlay', () => {
+    expect(builder).toContain("inline = false");
+    expect(builder).toContain("role={inline ? 'region' : 'dialog'}");
+    expect(builder).toContain("return inline ? editor : createPortal(editor, document.body);");
     expect(builder).toContain('autoFocus required value={form.name}');
-    expect(builder).toContain('pointer-events-auto fixed inset-0');
+    expect(builder).toContain("inline ? 'relative w-full pointer-events-auto'");
+    expect(missionControl).toContain("tab === 'personal' && builder.open && <AgentBuilder inline open");
+    expect(missionControl).toContain("tab === 'personal' && !builder.open && <PersonalAISection");
+    // The overview may continue to use the legacy modal, but the personal
+    // tab must not mount it at the same time as the inline form.
+    expect((missionControl.match(/<AgentBuilder open={builder.open}/g) ?? []).length).toBe(1);
   });
 });
