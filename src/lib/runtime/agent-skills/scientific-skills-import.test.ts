@@ -47,9 +47,9 @@ describe('pinned scientific archive catalogue and owner-governed imports',()=>{
     }));
     await expect(fetchPinnedScientificSkill('aeon',mock)).rejects.toThrow(/do not match/);
     expect(mock).toHaveBeenCalledOnce();
-    expect(String(mock.mock.calls[0][0])).toContain(SCIENTIFIC_SKILLS_COMMIT);
-    expect(String(mock.mock.calls[0][0])).toContain('/skills/aeon/SKILL.md');
-    expect(mock.mock.calls[0][1].redirect).toBe('error');
+    expect(String(mock.mock.calls[0]![0])).toContain(SCIENTIFIC_SKILLS_COMMIT);
+    expect(String(mock.mock.calls[0]![0])).toContain('/skills/aeon/SKILL.md');
+    expect(mock.mock.calls[0]![1].redirect).toBe('error');
   });
   it('rejects oversized source downloads',async()=>{
     const mock=vi.fn().mockResolvedValue(new Response('file too large',{
