@@ -219,7 +219,14 @@ async function performAction(session, action, params = {}) {
   switch (action) {
     case "navigate": return navigate(session, params);
     case "read": case "extract": return extract(session, params);
-    case "inspect_qa": return inspectPageReadOnly(session.page, (safeParams) => navigate(session, safeParams), params);
+    case "inspect_qa": {
+      // Browser Use-informed QA attaches bounded, value-free DOM control evidence
+      // to the already-existing Visual Operator inspection endpoint. No model
+      // credentials, form values or browser storage are included.
+      const evidence = await inspectPageReadOnly(session.page, (safeParams) => navigate(session, safeParams), params);
+      const interactiveItems = await extract(session, {}).then((snapshot) => snapshot.items ?? []).catch(() => []);
+      return { ...evidence, interactiveItems, interactiveCount: interactiveItems.length };
+    }
     case "click": await session.page.locator(safeSelector(params.selector)).first().click({ timeout: 10_000 }); return { url: session.page.url() };
     case "type": await session.page.locator(safeSelector(params.selector)).first().fill(safeText(params.text)); return { ok: true };
     case "scroll": { const amount = Math.max(1, Math.min(10, Number(params.amount || 1))); const dy = (params.direction === "up" ? -1 : 1) * 700 * amount; await session.page.evaluate((y) => window.scrollBy(0, y), dy); return { ok: true }; }
