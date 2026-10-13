@@ -8,6 +8,10 @@ import {
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES, DEFAULT_AGENT_IDENTITY, normaliseAgentIdentity } from '@/lib/agents/agent-identity';
 
+// Stable default prevents the form initialization effect from erasing
+// controlled inputs after each keystroke.
+const NO_CONNECTED_INTEGRATIONS = [];
+
 const EMPTY = {
   name: '',
   category: 'shopping',
@@ -27,7 +31,7 @@ const EMPTY = {
   identity: DEFAULT_AGENT_IDENTITY,
 };
 
-export default function AgentBuilder({ open, initial, connectedIntegrations = [], saving, onClose, onSave }) {
+export default function AgentBuilder({ open, initial, connectedIntegrations = NO_CONNECTED_INTEGRATIONS, saving, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
