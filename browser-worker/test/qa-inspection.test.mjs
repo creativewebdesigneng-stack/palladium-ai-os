@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
-import { inspectPageReadOnly } from "../qa-inspection.mjs";
+import { inspectPageReadOnly, redactQaSecrets } from "../qa-inspection.mjs";
 
 class FakePage extends EventEmitter {
   url() { return "https://blackstar.example/ai-hub?session=secret#token"; }
@@ -35,4 +35,14 @@ test("collects bounded read-only QA evidence, redacts URL parameters and removes
   assert.equal(page.listenerCount("pageerror"), 0);
   assert.equal(page.listenerCount("requestfailed"), 0);
   assert.equal(page.listenerCount("response"), 0);
+});
+
+test("Browser Use QA diagnostics redact URL tokens and credential-bearing error text", () => {
+  const dirty = "GET https://shop.example.com/orders?access_token=private123#token Bearer abcdef0123456789 api_key=supersecret password: hiddenvalue";
+  const result = redactQaSecrets(dirty);
+  assert.match(result, /https:\/\/shop\.example\.com\/orders/);
+  for (const secret of ["private123","abcdef0123456789","supersecret","hiddenvalue"]) {
+    assert.equal(result.includes(secret), false);
+  }
+  assert.match(result, /Bearer \[redacted\]/);
 });
