@@ -6,11 +6,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import { listAgentSkills } from '@/lib/runtime/agent-skills/agent-skills.functions';
 import { installScientificSkillBatch, previewScientificSkill } from '@/lib/runtime/agent-skills/scientific-skills.functions';
+import { installDiagramDesignGuide } from '@/lib/runtime/agent-skills/diagram-design-guide.functions';
 import { SCIENTIFIC_SKILL_SOURCES, SCIENTIFIC_SKILLS_COMMIT } from '@/lib/runtime/agent-skills/scientific-skill-sources';
 
 const SOURCE_GROUPS = [
   ['Scientific Agent Skills', '177 individually pinned research playbooks; can be installed into your own existing Skills Registry after integrity checks.', 'Catalogued · opt-in import'],
-  ['Diagram Design', '44 diagram types with visual/style guidance; renderer and exporter must be connected through Design Studio.', 'Integration pending'],
+  ['Diagram Design', '44 diagram types with visual/style guidance; renderer and exporter must be connected through Design Studio.', 'Verified guidance import available'],
   ['AgentMemory', 'Session recall, episode consolidation and MCP memory tools; must respect Blackstar Memory Fabric ownership.', 'External memory adapter pending'],
   ['OpenViking', 'Virtual-directory knowledge storage and retrieval; AGPL-3.0 compliance and tenant isolation require review.', 'Licensing review'],
   ['Browser Use', 'Browser interaction/automation; must run inside Blackstar browser-worker policies, never with unrestricted browsing or purchases.', 'Isolated worker adapter pending'],
@@ -29,6 +30,7 @@ export default function ArchiveScientificSkillsPanel({enabled}) {
   const listFn=useServerFn(listAgentSkills);
   const installFn=useServerFn(installScientificSkillBatch);
   const previewFn=useServerFn(previewScientificSkill);
+  const diagramFn=useServerFn(installDiagramDesignGuide);
   const skills=useQuery({
     queryKey:['agent-skills'],
     queryFn:()=>listFn({data:{}}),enabled,retry:false,
@@ -61,6 +63,12 @@ export default function ArchiveScientificSkillsPanel({enabled}) {
     onError:error=>toast({variant:'destructive',title:'Scientific skill import interrupted',
       description:`${friendlyMessage(error)} Restarting the importer is safe; previously imported records are reused.`}),
   });
+  const installDiagram=useMutation({
+    mutationFn:()=>diagramFn({data:{}}),
+    onSuccess:async()=>{await qc.invalidateQueries({queryKey:['agent-skills']});
+      toast({title:'Diagram Design guidance imported',description:'Reference playbook added. No third-party renderer or scripts were installed.'});},
+    onError:error=>toast({variant:'destructive',title:'Diagram Design source verification failed',description:friendlyMessage(error)}),
+  });
   const inspect=useMutation({
     mutationFn:id=>previewFn({data:{id}}),
     onError:error=>toast({variant:'destructive',title:'Could not verify source',
@@ -82,6 +90,13 @@ export default function ArchiveScientificSkillsPanel({enabled}) {
           <p className="mt-1 text-[11px] leading-4 text-zinc-400">{description}</p>
           <p className="mt-2 text-[10px] uppercase tracking-wide text-violet-200/80">{status}</p>
         </div>)}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 p-3">
+        <span className="flex-1 text-xs text-zinc-400">Diagram Design: verified reference guidance for 44 diagrams; rendering remains inside approved Blackstar tools.</span>
+        <button type="button" disabled={installDiagram.isPending || !enabled} onClick={()=>installDiagram.mutate()}
+          className="rounded-lg border border-violet-400/30 px-3 py-2 text-xs font-medium text-violet-200 disabled:opacity-40">
+          {installDiagram.isPending?'Importing Diagram Design…':'Import Diagram Design guidance'}
+        </button>
       </div>
       <div className="rounded-xl border border-white/10 bg-black/25 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
