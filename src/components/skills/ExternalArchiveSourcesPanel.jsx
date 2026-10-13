@@ -82,7 +82,12 @@ export default function ExternalArchiveSourcesPanel({ enabled = false }) {
               <p className="mt-2 text-xs leading-relaxed text-zinc-400">{source.summary}</p>
               <p className="mt-2 text-[11px] text-zinc-500">Reuses: {source.integratesWith.join(' · ')}</p>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-amber-200">{source.status === 'external-worker' ? 'Needs separate worker' : source.status === 'review-required' ? 'Licence & security review' : 'Reference catalogue only'}</span>
+                <span className="text-[10px] text-amber-200">{
+                  (source.id==='agentmemory'||source.id==='openviking') && installed.data?.mcpLinks?.some(link=>link.sourceId===source.id)
+                    ? (installed.data.mcpLinks.find(link=>link.sourceId===source.id)?.enabled ? 'MCP configured · health not verified' : 'MCP saved · disabled')
+                    : source.status === 'external-worker' ? 'Needs separate worker'
+                    : source.status === 'review-required' ? 'Licence & security review' : 'Reference catalogue only'
+                }</span>
                 {source.url && <a href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200">Source <ExternalLink className="h-3 w-3"/></a>}
               </div>
             </article>
@@ -134,6 +139,7 @@ export default function ExternalArchiveSourcesPanel({ enabled = false }) {
             <button type="button" disabled={page>=pageCount-1} onClick={()=>setPage(Math.min(page+1,pageCount-1))} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs disabled:opacity-40">Next</button>
           </div>}
         </div>
+        <p className="text-xs text-zinc-400">Memory services that offer a compatible MCP endpoint can be added using Blackstar's existing <a href="/mcp-hub" className="text-violet-300 underline">MCP Hub</a>. The source card only reports an owner-scoped saved connection; it does not imply the service is reachable or that permissions have been granted. Browser Use must use the existing <a href="/browser-preview" className="text-violet-300 underline">Browser</a> policy path.</p>
         <p className="flex items-start gap-2 text-xs text-zinc-400"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet-300"/>
           This library does not install upstream binaries, grant browser authority, replace Memory Fabric, contact clinical services or bypass the Approval Centre. Imported playbooks remain disabled until explicitly reviewed and verified.
         </p>
