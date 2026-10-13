@@ -1,8 +1,26 @@
 const MAX_ERRORS = 25;
 const MAX_ERROR_CHARS = 1200;
 
+/** Read-only QA errors may include bearer tokens, signed URLs or credentials.
+ * Never send those raw values back to an agent or the Visual Operator.
+ */
+export function redactQaSecrets(value) {
+  return String(value || "")
+    .replace(/https?:\/\/[^\s"'<>]+/gi, (candidate) => {
+      try {
+        const url = new URL(candidate);
+        if (url.username || url.password) return "[redacted-url]";
+        url.search = "";
+        url.hash = "";
+        if (/\/(?:oauth|auth\/callback|reset-password|magic-link|invite|verify-email)(?:\/|$)/i.test(url.pathname)) return url.origin;
+        return url.toString();
+      } catch { return "[redacted-url]"; }
+    })
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{6,}/gi, "Bearer [redacted]")
+    .replace(/\b(api[_-]?key|access[_-]?token|refresh[_-]?token|session[_-]?token|password|client[_-]?secret|authorization)\s*[:=]\s*["']?[^\s,"'};]+/gi, "$1=[redacted]");
+}
 function clean(value) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, MAX_ERROR_CHARS);
+  return redactQaSecrets(value).replace(/\s+/g, " ").trim().slice(0, MAX_ERROR_CHARS);
 }
 
 function safeUrl(value) {
