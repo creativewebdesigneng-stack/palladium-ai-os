@@ -73,7 +73,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Auto generation uses only a verified self-hosted Shap-E, TripoSR or TRELLIS worker; FAL is opt-in and may incur charges. Only OBJ/GLB exports are supported by the free engines. A GPU/CPU host and worker URL must be supplied; the AppDeploy frontend is not a usable POST worker. Game-ready processing and GTA .yft/.ytd still require separate specialist tools.",
+    note: "Auto generation uses only a verified self-hosted Shap-E, TripoSR or TRELLIS worker; FAL is opt-in and may incur charges. Only OBJ/GLB exports are supported by the free engines. A GPU/CPU host and worker URL must be supplied; the AppDeploy frontend is not a usable POST worker. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation. Game-ready processing and GTA .yft/.ytd still require separate specialist tools.",
   };
 }
 
