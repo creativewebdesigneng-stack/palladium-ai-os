@@ -19,7 +19,7 @@ export function gameFoundryAssetErrorMessage(error, stage) {
   }
 }
 
-export function validateGameFoundryAssetInput({ inputName, sourceKind, prompt, sourceUrl, sourceFile }) {
+export function validateGameFoundryAssetInput({ inputName, sourceKind, prompt = null, sourceUrl = null, sourceFile = null }) {
   const name = String(inputName ?? '').trim();
   if (!name) throw new Error('Enter a name for the 3D asset.');
   if (name.length > 240) throw new Error('3D asset names must be 240 characters or fewer.');
