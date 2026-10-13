@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const streamClient = readFileSync(new URL('../run-client.js', import.meta.url), 'utf8');
 const commandCenter = readFileSync(new URL('../../../components/runtime/CommandCenter.jsx', import.meta.url), 'utf8');
+const route = readFileSync(new URL('../../../routes/api/agents/run.ts', import.meta.url), 'utf8');
 
 describe('Agent run result visibility', () => {
   it('does not accept an incomplete SSE stream as a successful run', () => {
@@ -14,7 +15,15 @@ describe('Agent run result visibility', () => {
   it('refuses a success state for tool-only output without an agent deliverable', () => {
     expect(streamClient).toContain('if (!String(task.output_text ?? task.output?.text ?? "").trim()) {');
     expect(streamClient).toContain('Tool activity alone is not a finished result.');
-    expect(streamClient).toContain('Agent execution returned no final deliverable.');
+    expect(streamClient).toContain('The agent completed without a final response.');
+  });
+
+  it('never retries a potentially side-effecting failed request through another execution path', () => {
+    expect(streamClient).not.toContain('runAgentTask({ data:');
+    expect(streamClient).toContain('Retrying');
+    expect(route).toContain('const hasServerCredential = Boolean(');
+    expect(route).toContain('if (!hasServerCredential) {');
+    expect(route).toContain('missing its Supabase server credential');
   });
 
   it('preserves the user request when the agent fails', () => {
