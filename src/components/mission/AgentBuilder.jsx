@@ -32,7 +32,7 @@ const EMPTY = {
   identity: DEFAULT_AGENT_IDENTITY,
 };
 
-export default function AgentBuilder({ open, initial, connectedIntegrations = NO_CONNECTED_INTEGRATIONS, saving, onClose, onSave }) {
+export default function AgentBuilder({ open, inline = false, initial, connectedIntegrations = NO_CONNECTED_INTEGRATIONS, saving, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
 
   // This modal must escape PageTransition and CommandTheatre transform stacks
   // so clicks and keyboard focus reach the form inputs.
-  if (!open || typeof document === 'undefined') return null;
+  if (!open || (!inline && typeof document === 'undefined')) return null;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const setIdentity = (key, value) => setForm((f) => ({ ...f, identity: { ...f.identity, [key]: value, disclosure: 'AI agent' } }));
@@ -113,12 +113,12 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
   const field = 'w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-400/40 focus:outline-none';
   const label = 'mb-1 block text-[11px] font-medium text-zinc-400';
 
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="personal-agent-builder-title" className="pointer-events-auto fixed inset-0 z-[2147483647] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+  const editor = (
+    <div role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby="personal-agent-builder-title" className={inline ? 'relative w-full pointer-events-auto' : 'pointer-events-auto fixed inset-0 z-[2147483647] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm'}>
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="my-8 w-full max-w-3xl rounded-3xl border border-white/10 bg-[#0b0c13] p-6 shadow-2xl"
+        initial={inline ? false : { opacity: 0, y: 20, scale: 0.98 }}
+        animate={inline ? undefined : { opacity: 1, y: 0, scale: 1 }}
+        className={`${inline ? 'mx-auto my-0 max-w-4xl' : 'my-8 max-w-3xl'} w-full rounded-3xl border border-white/10 bg-[#0b0c13] p-6 shadow-2xl`}
       >
         <div className="mb-5 flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-violet-400" />
@@ -299,7 +299,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
           </div>
         </form>
       </motion.div>
-    </div>,
-    document.body,
+    </div>
   );
+  return inline ? editor : createPortal(editor, document.body);
 }
