@@ -82,6 +82,7 @@ export default function GameFoundry() {
   const [assetSubmissionError,setAssetSubmissionError] = useState(null);
   const [format,setFormat] = useState('glb');
   const [assetQuality,setAssetQuality] = useState('game_ready');
+  const [generationModel,setGenerationModel] = useState('auto');
   const [assetEngine,setAssetEngine] = useState('unreal');
   const [assetProjectId,setAssetProjectId] = useState('');
   const [processingRigging,setProcessingRigging] = useState('none');
@@ -209,6 +210,7 @@ export default function GameFoundry() {
         sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl.trim(),
         storagePath,
         outputFormat:gtaVehicleMode?'obj':format,qualityProfile:assetQuality,targetEngine:gtaVehicleMode?'zmodeler':assetEngine,
+        generationModel:sourceKind==='model'?'auto':generationModel,
         autoPrepareProfile:autoPrepare?{generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,rigging:processingRigging,animation:processingAnimation,textureResolution:2048,targetPolycount:null}:null,
       }});
     },
@@ -241,11 +243,20 @@ export default function GameFoundry() {
   const caps = overview.data?.capabilities;
   const projects = overview.data?.projects ?? [];
   const assets = overview.data?.assets ?? [];
-  const canCreateAsset = sourceKind === 'image' ? caps?.assetGeneration?.imageTo3d : sourceKind === 'prompt' ? caps?.assetGeneration?.promptTo3d : caps?.assetGeneration?.modelEnhancement;
+  const freeModels = caps?.freeWorker?.models ?? [];
+  const supportsSource = (model)=>sourceKind==='prompt' ? model!=='triposr' : sourceKind==='image';
+  const freeReady = freeModels.some(supportsSource);
+  const canCreateAsset = sourceKind==='model'
+    ? caps?.assetGeneration?.modelEnhancement
+    : generationModel==='fal'
+      ? caps?.assetGeneration?.configuredProvider==='fal-3d' || caps?.assetGeneration?.configuredProvider==='game-foundry-3d' || caps?.assetGeneration?.configuredProvider==='blackstar-open3d'
+      : generationModel==='auto' ? freeReady : freeModels.includes(generationModel) && supportsSource(generationModel);
   const hasAssetSource = sourceKind === 'prompt' ? Boolean(assetPrompt.trim()) : Boolean(sourceFile || sourceUrl.trim());
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
   const integrations = useMemo(()=>caps?.integrations ?? [],[caps]);
-  const formats = caps?.assetGeneration?.formats ?? ['glb','gltf','obj','ply','stl','vox'];
+  const formats = sourceKind!=='model' && generationModel!=='fal'
+    ? ['glb','obj']
+    : generationModel==='fal' ? ['glb','obj','fbx'] : caps?.assetGeneration?.formats ?? ['glb','obj'];
   const specialistProcessing = caps?.gameReadyProcessing?.specialistConfigured === true;
   const completedAssets = assets.filter((asset)=>asset.status==='completed' && Boolean(asset.processed_output_url || asset.output_url));
   const pendingAssets = assets.filter((asset)=>['queued','running'].includes(asset.status));
@@ -312,6 +323,13 @@ export default function GameFoundry() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Asset name"><input value={assetName} onChange={(e)=>setAssetName(e.target.value)} className={control} placeholder="Alien rifle" /></Field>
           <Field label="Start with"><select value={sourceKind} onChange={(e)=>{setSourceKind(e.target.value);setSourceFile(null);setSourceUrl('');setAssetSubmissionError(null)}} className={control}><option value="prompt">Prompt</option><option value="image">Upload picture / image URL</option><option value="model">Import model / model URL</option></select></Field>
+          <Field label="3D generation model"><select value={generationModel} onChange={(e)=>{setGenerationModel(e.target.value);setFormat('obj');setAssetSubmissionError(null)}} className={control}>
+            <option value="auto">Automatic · free models only</option>
+            <option value="shap-e">Shap-E · free · text to 3D {freeModels.includes('shap-e')?'(ready)':'(offline)'}</option>
+            <option value="triposr">TripoSR · free · image to 3D {freeModels.includes('triposr')?'(ready)':'(offline)'}</option>
+            <option value="trellis">TRELLIS · free · high-quality {freeModels.includes('trellis')?'(ready)':'(offline)'}</option>
+            <option value="fal">FAL · paid credits · explicit opt-in</option>
+          </select></Field>
           <Field label="Engine"><select value={assetEngine} onChange={(e)=>{const next=e.target.value;setAssetEngine(next);if(next==='zmodeler'&&!['fbx','obj'].includes(String(format).toLowerCase()))setFormat(formats.includes('fbx')?'fbx':'obj')}} className={control}>{engines.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
           <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{availableFormats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
           <Field label="Quality"><select value={assetQuality} onChange={(e)=>setAssetQuality(e.target.value)} className={control}><option value="draft">Draft</option><option value="game_ready">Game ready</option><option value="cinematic">Cinematic</option></select></Field>
@@ -321,7 +339,8 @@ export default function GameFoundry() {
         <label className="mt-3 flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={autoPrepare} disabled={!caps?.gameReadyProcessing?.configured} onChange={(e)=>setAutoPrepare(e.target.checked)} /> Automatically prepare this model for export after generation (uses processing worker credits; continues after a reload in this tab; processing starts when Game Foundry is open)</label>
         <button disabled={!canCreateAsset || !assetName.trim() || createAsset.isPending || !hasAssetSource} onClick={()=>createAsset.mutate()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{createAsset.isPending?<Loader2 className="h-4 w-4 animate-spin"/>:sourceKind==='image'?<ImageIcon className="h-4 w-4"/>:<UploadCloud className="h-4 w-4"/>}Generate asset</button>
         {assetSubmissionError && <p role="alert" className="mt-2 rounded-lg border border-rose-300/20 bg-rose-400/[.05] px-3 py-2 text-xs text-rose-200">{assetSubmissionError}</p>}
-        {!canCreateAsset && <p className="mt-2 text-xs text-amber-300">{sourceKind==='prompt'?'Prompt-to-3D requires GAME_FOUNDRY_3D_API_URL.':sourceKind==='model'?'Model enhancement requires GAME_FOUNDRY_3D_API_URL.':'No real image-to-3D worker is configured.'}</p>}
+        {sourceKind!=='model' && <p className="mt-2 text-xs text-zinc-400">Free worker: {caps?.freeWorker?.connected ? `connected · ${freeModels.length} engines ready` : 'not connected'} · Shap-E (text), TripoSR (images), TRELLIS (GPU quality). Automatic mode never submits to billable FAL. Free models require your own compute.</p>}
+        {!canCreateAsset && <p className="mt-2 text-xs text-amber-300">{sourceKind==='model'?'Model enhancement requires a specialist worker.':generationModel==='fal'?'FAL is not configured or is blocked by billing. Select a free model.':'No compatible free 3D worker is online yet. The owner must run the open-source worker and configure its URL and token.'}</p>}
       </section>
     </div>
 
