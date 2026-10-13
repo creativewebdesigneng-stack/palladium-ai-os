@@ -37,7 +37,7 @@ if (Test-Path $processFile) {
   try {
     $previous = Get-Content -Raw -Path $processFile | ConvertFrom-Json
     $existing = Get-Process -Id ([int]$previous.pid) -ErrorAction SilentlyContinue
-    if ($existing -and [math]::Abs(($existing.StartTime.ToUniversalTime() - [datetime]$previous.startedUtc).TotalSeconds) -lt 2) {
+    if ($existing -and [math]::Abs(($existing.StartTime.ToUniversalTime() - ([DateTimeOffset]::Parse([string]$previous.startedUtc)).UtcDateTime).TotalSeconds) -lt 2) {
       throw "Blackstar browser worker already running (PID $($previous.pid)). Stop it before restarting."
     }
   } catch {
