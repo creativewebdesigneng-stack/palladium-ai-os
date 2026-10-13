@@ -17,19 +17,32 @@ export function domainAllowed(host, allowedDomains) {
 }
 
 export function isPrivateIp(ip) {
-  if (!net.isIP(ip)) return true;
-  if (ip === "::1" || ip === "0:0:0:0:0:0:0:1") return true;
-  if (ip.startsWith("fe80:") || ip.startsWith("fc") || ip.startsWith("fd")) return true;
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split(".").map(Number);
-    return (
-      a === 0 || a === 10 || a === 127 ||
+  const address = String(ip || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (!net.isIP(address)) return true;
+  if (net.isIPv4(address)) {
+    const [a, b, c] = address.split(".").map(Number);
+    // Deny local, shared/CGNAT, benchmarking, documentation, multicast and
+    // special-purpose ranges, not only RFC1918. A browser must not be able
+    // to visit those networks via a public-looking, rebinding hostname.
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      a >= 224
-    );
+      (a === 192 && (b === 168 || (b === 0 && c === 0) || (b === 0 && c === 2) || (b === 88 && c === 99))) ||
+      (a === 198 && ((b === 18 || b === 19) || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224;
   }
+  // IPv4-mapped and NAT64 addresses can represent restricted IPv4 hosts.
+  // Reject the family rather than trying to guess whether a mapped host is safe.
+  if (address.includes("::ffff:") || address.startsWith("64:ff9b:")) return true;
+  const segments = address.split(":");
+  const first = Number.parseInt(segments[0] || "0", 16);
+  if (address === "::" || address === "::1" || first === 0 ||
+      (first >= 0xfc00 && first <= 0xfdff) ||
+      (first >= 0xfe80 && first <= 0xfebf) ||
+      (first >= 0xff00 && first <= 0xffff) ||
+      address.startsWith("2001:db8:")) return true;
   return false;
 }
 

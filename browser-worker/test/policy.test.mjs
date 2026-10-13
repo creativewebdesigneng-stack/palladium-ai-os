@@ -31,6 +31,13 @@ test("detects private IPv4 and IPv6 ranges", () => {
   }
   assert.equal(isPrivateIp("8.8.8.8"), false);
   assert.equal(isPrivateIp("1.1.1.1"), false);
+  for (const ip of [
+    "100.64.0.1", "100.127.255.254", "198.18.0.1",
+    "192.0.2.4", "198.51.100.9", "203.0.113.1",
+    "::ffff:127.0.0.1", "::ffff:10.1.2.3", "64:ff9b::a00:1",
+    "fe90::1234", "2001:db8::2",
+  ]) assert.equal(isPrivateIp(ip), true, `browser SSRF must block ${ip}`);
+  assert.equal(isPrivateIp("2001:4860:4860::8888"), false);
 });
 
 test("requires an exact bearer worker token", () => {

@@ -77,7 +77,10 @@ export function evaluateHarnessPolicy(input: HarnessPolicyInput): HarnessPolicyR
 
   const requested = normalizeHarnessDomains(input.requestedDomains ?? []);
   const allowed = normalizeHarnessDomains(input.allowedDomains ?? []);
-  if (requested.length && allowed.length && requested.some((host) => !domainAllowed(host, allowed))) {
+  // Missing network grants must fail closed, even before an approval step.
+  // Harness reliability checks from both uploaded collections should validate
+  // security invariants at runtime, not rely on model reasoning.
+  if (requested.length && requested.some((host) => !domainAllowed(host, allowed))) {
     return { decision: "deny", risk: "high", code: "domain_outside_allowlist", reason: "The requested network target is outside the agent's allow-list." };
   }
 
