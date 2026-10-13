@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
-import { inspectPageReadOnly, redactQaSecrets } from "../qa-inspection.mjs";
+import { inspectPageReadOnly, redactQaSecrets, attachQaDomEvidence } from "../qa-inspection.mjs";
 
 class FakePage extends EventEmitter {
   url() { return "https://blackstar.example/ai-hub?session=secret#token"; }
@@ -45,4 +45,16 @@ test("Browser Use QA diagnostics redact URL tokens and credential-bearing error 
     assert.equal(result.includes(secret), false);
   }
   assert.match(result, /Bearer \[redacted\]/);
+});
+
+test("read-only QA enrichment returns no browser form values or signed links", () => {
+  const result = attachQaDomEvidence({ readOnly:true,url:"https://blackstar.example" },[
+    { selector:"#email",tag:"input",type:"email",value:"private@blackstar.example" },
+    { selector:"#visit",tag:"a",href:"https://blackstar.example/mission?secret=token123" },
+  ]);
+  assert.equal(result.readOnly,true);
+  assert.equal(result.interactiveCount,2);
+  assert.equal(result.interactiveItems[1].href,"https://blackstar.example/mission");
+  assert.equal(JSON.stringify(result).includes("private@blackstar.example"),false);
+  assert.equal(JSON.stringify(result).includes("token123"),false);
 });
