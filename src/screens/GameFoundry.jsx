@@ -249,7 +249,7 @@ export default function GameFoundry() {
   const canCreateAsset = sourceKind==='model'
     ? caps?.assetGeneration?.modelEnhancement
     : generationModel==='fal'
-      ? caps?.assetGeneration?.configuredProvider==='fal-3d' || caps?.assetGeneration?.configuredProvider==='game-foundry-3d' || caps?.assetGeneration?.configuredProvider==='blackstar-open3d'
+      ? caps?.assetGeneration?.falConfigured === true
       : generationModel==='auto' ? freeReady : freeModels.includes(generationModel) && supportsSource(generationModel);
   const hasAssetSource = sourceKind === 'prompt' ? Boolean(assetPrompt.trim()) : Boolean(sourceFile || sourceUrl.trim());
   const engineCards = useMemo(()=>caps?.engines ?? [],[caps]);
