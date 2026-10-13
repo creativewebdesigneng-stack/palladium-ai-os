@@ -86,7 +86,7 @@ export const listImportedArchiveSkillDrafts = createServerFn({method:'POST'})
       .limit(500);
     if (error) throw new Error('Could not inspect imported skill candidates.');
     return { imported: (data??[]).filter((row:Record<string,unknown>) =>
-      typeof row.source_ref==='string' && row.source_ref.startsWith('https://github.com/')) };
+      typeof row.source_ref==='string' && row.source_ref.startsWith('https://raw.githubusercontent.com/')) };
   });
 
 export const importExternalArchiveSkillDraft = createServerFn({method:'POST'})
