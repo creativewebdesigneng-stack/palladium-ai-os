@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const builder = readFileSync(new URL('../../components/mission/AgentBuilder.jsx', import.meta.url), 'utf8');
-const missionControl = readFileSync(new URL('../../screens/MissionControl.jsx', import.meta.url), 'utf8');
+const builder = readFileSync(new URL('../../../components/mission/AgentBuilder.jsx', import.meta.url), 'utf8');
+const missionControl = readFileSync(new URL('../../../screens/MissionControl.jsx', import.meta.url), 'utf8');
 
 describe('Mission Control agent editor input persistence', () => {
   it('uses a stable default integration list so changing form fields does not reset them', () => {
