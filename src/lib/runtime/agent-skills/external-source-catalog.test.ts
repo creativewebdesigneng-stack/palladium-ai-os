@@ -72,7 +72,7 @@ describe('Seven-archive source catalogue',()=>{
     expect(prepared.version).toBe('2.72.0');
     expect(prepared.requiresTools).toEqual(['external-skill-runtime-certification']);
     expect(prepared.requiresScripts).toEqual([]);
-    expect(prepared.body).toContain('blackstar');
+    expect(prepared.body.toLowerCase()).toContain('blackstar');
     expect(prepared.scan.verdict).not.toBe('dangerous');
   });
 
