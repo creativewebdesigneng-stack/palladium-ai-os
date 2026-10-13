@@ -20,6 +20,7 @@ const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "windows");
 test("Windows local deployment keeps secrets DPAPI-protected and avoids enabling external services", () => {
   const setup = readFileSync(join(folder,"start-local.ps1"),"utf8");
   const stop = readFileSync(join(folder,"stop-local.ps1"),"utf8");
+  const copy = readFileSync(join(folder,"copy-worker-token.ps1"),"utf8");
   assert.match(setup, /Export-Clixml/);
   assert.match(setup, /SecureStringToBSTR/);
   assert.match(setup, /ZeroFreeBSTR/);
@@ -30,4 +31,7 @@ test("Windows local deployment keeps secrets DPAPI-protected and avoids enabling
   assert.match(stop, /recordedStart/);
   assert.match(stop, /Stop-Process/);
   assert.doesNotMatch(stop, /\btailscale funnel reset\b|netsh advfirewall/i);
+  assert.match(copy, /Set-Clipboard/);
+  assert.match(copy, /ZeroFreeBSTR/);
+  assert.doesNotMatch(copy, /Write-Host\s+\$token|Write-Output\s+\$token/i);
 });
