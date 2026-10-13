@@ -23,6 +23,70 @@ BROWSER_WORKER_TOKEN=your-long-private-random-value npm start
 
 The worker listens on port `8787` by default.
 
+## Windows 10 local worker — no new cloud subscription
+
+This runs the EXISTING Playwright worker on the user's Windows PC. It is separate from the 3D/AI model workers. No GTX 1080 Ti GPU is required. Install Node.js LTS 20+ first, then from a clone of the current Blackstar repository run:
+
+~~~powershell
+powershell -NoProfile -File .\browser-worker\windows\start-local.ps1
+~~~
+
+The script installs Playwright and its matching Chromium binary, starts a browser service only on 127.0.0.1:8787, generates a long random bearer token encrypted using Windows DPAPI, and verifies a real Chromium health check. It does **not** modify Vercel, firewall rules, scheduled tasks, existing Tailscale services or tunnel exposure.
+
+Stop that specific worker, without touching other applications, with:
+
+~~~powershell
+powershell -NoProfile -File .\browser-worker\windows\stop-local.ps1
+~~~
+
+### Optional public HTTPS access for development evaluation only
+
+The deployed Vercel server cannot reach your computer's 127.0.0.1 directly. If you explicitly choose to make a **development/test worker** accessible from the Internet, consider a HTTPS reverse tunnel. A Tailscale Funnel on external HTTPS port 8443 avoids overwriting the existing model bridge on port 443. Current Tailscale documentation: https://tailscale.com/docs/reference/tailscale-cli/funnel.
+
+**Tailscale Personal is for non-commercial use.** Its free plan is not an appropriate assumption for a commercial Blackstar production SaaS. Check your chosen provider's current business terms and hosting costs before connecting paying users. Public Funnel traffic is reachable by anyone, so strong bearer authentication, tenant isolation, logs, abuse limits and network-layer filtering are still required.
+
+If Tailscale is already installed, online, and port 8443 is not in use by an unrelated app, you can **manually** opt into a separate development Funnel:
+
+~~~powershell
+tailscale status
+tailscale funnel status
+tailscale funnel --bg --yes --https=8443 http://127.0.0.1:8787
+~~~
+
+Use the actual device hostname returned by Tailscale and append port 8443 to form your HTTPS origin; never guess the hostname. To stop **only** the browser Funnel without disrupting any existing model bridge:
+
+~~~powershell
+tailscale funnel --https=8443 off
+~~~
+
+Do not run a global Funnel reset. These commands are not executed by the local worker startup script.
+
+To securely transfer the worker token into Vercel's protected Production environment, run this **only when you have decided to connect the worker**:
+
+~~~powershell
+powershell -NoProfile -File .\browser-worker\windows\copy-worker-token.ps1
+~~~
+
+The token is copied to the Windows clipboard but not printed. Paste it only into the protected Production secret field for PLAYWRIGHT_BROWSER_TOKEN, and clear the clipboard. Also set BROWSER_AGENT_PROVIDER to playwright, PLAYWRIGHT_BROWSER_ENDPOINT to the **actual** bare HTTPS origin (including :8443 when applicable), and BROWSER_AGENT_ALLOW_SIMULATION to false. Redeploy Vercel after these changes.
+
+To run the existing real browser acceptance test locally (requires HTTPS tunnel), in a terminal:
+
+~~~powershell
+$env:PLAYWRIGHT_BROWSER_ENDPOINT = "https://your-actual-tailnet-host.ts.net:8443"
+$secure = Import-Clixml "$env:LOCALAPPDATA\Blackstar\browser-worker\worker-token.clixml"
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try { $env:PLAYWRIGHT_BROWSER_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+node .\browser-worker\smoke.mjs
+Remove-Item Env:PLAYWRIGHT_BROWSER_TOKEN -ErrorAction SilentlyContinue
+~~~
+
+The smoke test checks a real authenticated Chromium session, private-network refusal, navigation and text extraction. It never makes payments or reports simulated results as real. Production readiness still requires running a real user-authorised agent task inside Blackstar after the worker host is connected.
+
+### Operational limits
+
+This local proof-of-concept is not a durable multi-user browser service: PC uptime, sleep, GPU/CPU contention, residential network stability and tunnel policy affect reliability. For a commercial paid product, migrate the **same worker**, not a new orchestrator, to an approved commercial-compatible host. Its single-process session map needs sticky sessions or a coordinator before scaling replicas, and an outbound network firewall is required to defend against DNS rebinding after hostname validation.
+
 ## Docker
 
 ```bash
