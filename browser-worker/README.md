@@ -127,13 +127,21 @@ Do not expose `BROWSER_WORKER_TOKEN` or `PLAYWRIGHT_BROWSER_TOKEN` to browser/cl
 
 ## Genuine acceptance test
 
-After hosting the worker, set `PLAYWRIGHT_BROWSER_ENDPOINT` and `PLAYWRIGHT_BROWSER_TOKEN` locally (as private process environment variables; never in version control) and run from the repository root:
+For the existing Windows localhost-only worker, you can run a real navigation/extraction acceptance test **without exposing any tunnel or copying a secret**:
+
+```powershell
+powershell -NoProfile -File .\browser-worker\windows\test-local.ps1
+```
+
+The script reads the existing Windows DPAPI token, checks the saved process identity, tests Chromium on 127.0.0.1 and clears child-process secrets. It visits the publicly available HTTP client test service at `https://httpbingo.org/html`. This endpoint is for development tests; don't run aggressive load tests against shared public services.
+
+For a separately hosted authenticated **HTTPS** worker, set `PLAYWRIGHT_BROWSER_ENDPOINT` and `PLAYWRIGHT_BROWSER_TOKEN` locally (as private process environment variables; never in version control) and run from the repository root:
 
 ```bash
 node browser-worker/smoke.mjs
 ```
 
-The smoke script checks bearer-authenticated Chromium readiness, creates a real isolated session, verifies local/private addresses are blocked, navigates to `https://example.com/`, extracts its real page text, closes the session and reports `BROWSER_WORKER_ACCEPTANCE=PASS` only if every assertion holds. It performs no purchases and does not use simulated responses.
+The smoke script checks bearer-authenticated Chromium readiness, creates a real isolated session, verifies local/private addresses are blocked, navigates to `https://httpbingo.org/html` (an HTTP test service), verifies HTTP 200 and a substantive extracted page body **without requiring an English page phrase**, closes the session and reports `BROWSER_WORKER_ACCEPTANCE=PASS` only if every assertion holds. It performs no purchases and does not use simulated responses.
 
 The health endpoint alone does not establish that arbitrary authenticated customer sites or long-running workflows operate correctly. Conduct separate owner-authorised browser tasks through Blackstar before claiming broader certification.
 

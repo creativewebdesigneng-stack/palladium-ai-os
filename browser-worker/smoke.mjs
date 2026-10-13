@@ -4,6 +4,13 @@
  * browser worker. Never prints the worker token or browser storage.
  * No Vercel secrets or mock/simulated evidence are accepted.
  */
+import { SMOKE_TARGET, verifySmokeEvidence } from "./smoke-evidence.mjs";
+
+const localOnly = process.argv.slice(2).includes("--local");
+if (process.argv.slice(2).some((arg) => arg !== "--local")) {
+  console.error("Unknown argument. Only --local is supported for a loopback-only HTTP check.");
+  process.exit(2);
+}
 const endpoint = process.env.PLAYWRIGHT_BROWSER_ENDPOINT;
 const token = process.env.PLAYWRIGHT_BROWSER_TOKEN;
 if (!endpoint || !token) {
@@ -13,16 +20,22 @@ if (!endpoint || !token) {
 let origin;
 try {
   const url = new URL(endpoint);
-  if (url.protocol !== "https:" || url.username || url.password ||
-      url.pathname !== "/" || url.search || url.hash) throw new Error("unsafe");
+  const loopback = url.protocol === "http:" && url.hostname === "127.0.0.1" &&
+    /^[1-9][0-9]{0,4}$/.test(url.port) && Number(url.port) <= 65535;
+  if ((localOnly ? !loopback : url.protocol !== "https:") ||
+      url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("unsafe endpoint");
+  }
   origin = url.origin;
 } catch {
-  console.error("The browser-worker endpoint must be a bare HTTPS origin without embedded credentials.");
+  console.error(localOnly
+    ? "Local smoke check requires http://127.0.0.1:<port> and --local. Remote HTTP is never accepted."
+    : "The browser-worker endpoint must be a bare HTTPS origin without embedded credentials.");
   process.exit(2);
 }
 async function api(path, payload = {}) {
   const response = await fetch(origin + path, {
-    method: "POST", redirect: "manual", signal: AbortSignal.timeout(20_000),
+    method: "POST", redirect: "manual", signal: AbortSignal.timeout(path === "/action" ? 35_000 : 30_000),
     headers: { "authorization": "Bearer " + token, "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
@@ -39,7 +52,7 @@ try {
       health.body.browserReady !== true)
     throw new Error("Worker failed authenticated Chromium readiness.");
   console.log("PASS: authenticated Chromium readiness");
-  const session = await api("/session", {allowedDomains: ["example.com"]});
+  const session = await api("/session", {allowedDomains: [new URL(SMOKE_TARGET).hostname]});
   if (session.httpStatus !== 200 ||
       !/^[0-9a-f-]{36}$/i.test(String(session.body.sessionId??"")))
     throw new Error("Worker did not return a real isolated session.");
@@ -52,18 +65,14 @@ try {
     throw new Error("Worker attempted a private-network navigation.");
   console.log("PASS: blocked private-network access");
   const nav = await api("/action",{
-    sessionId, action:"navigate", params:{url:"https://example.com/"}
+    sessionId, action:"navigate", params:{url:SMOKE_TARGET}
   });
-  if (nav.httpStatus !== 200 || nav.body.ok !== true ||
-      !String(nav.body.data?.url??"").startsWith("https://example.com"))
-    throw new Error("Real browser navigation did not complete.");
   const read = await api("/action",{
     sessionId, action:"extract", params:{selector:"body"}
   });
-  if(read.httpStatus!==200 || read.body.ok!==true ||
-     !String(read.body.data?.text??"").toLowerCase().includes("example domain"))
-    throw new Error("Worker did not extract a real page.");
-  console.log("PASS: real HTML navigation and extraction (example.com)");
+  const evidence = verifySmokeEvidence(nav, read);
+  console.log("PASS: real HTML navigation/extraction", evidence.url,
+    "HTTP", evidence.pageStatus, "characters:", evidence.characters);
   console.log("BROWSER_WORKER_ACCEPTANCE=PASS");
 } catch(error) {
   console.error("BROWSER_WORKER_ACCEPTANCE=FAIL:", error instanceof Error?error.message:"Unknown error");

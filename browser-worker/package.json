@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check policy.mjs && node --check dom-snapshot.mjs && node --check qa-inspection.mjs && node --check storage-state.mjs && node --check session-governance.mjs && node --check host-policy.mjs && node --check smoke.mjs",
+    "check": "node --check server.mjs && node --check policy.mjs && node --check dom-snapshot.mjs && node --check qa-inspection.mjs && node --check storage-state.mjs && node --check session-governance.mjs && node --check host-policy.mjs && node --check smoke-evidence.mjs && node --check smoke.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
