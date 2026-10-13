@@ -90,15 +90,15 @@ export const listImportedArchiveSkillDrafts = createServerFn({method:'POST'})
     // Report only that an owner-scoped external connector is configured,
     // never infer it is healthy or has authority to read Blackstar memories.
     const mcpLinks = (mcp.data ?? []).filter((item:Record<string,unknown>) => {
-      const slug = String(item.slug??'').toLowerCase();
+      const slug = String(item['slug']??'').toLowerCase();
       return slug === 'openviking' || slug === 'agentmemory' || slug === 'agent-memory';
     }).map((item:Record<string,unknown>)=>({
-      sourceId: String(item.slug).toLowerCase()==='openviking'?'openviking':'agentmemory',
-      configured:true,enabled:item.enabled===true,requiresApproval:item.requires_approval!==false,
+      sourceId: String(item['slug']).toLowerCase()==='openviking'?'openviking':'agentmemory',
+      configured:true,enabled:item['enabled']===true,requiresApproval:item['requires_approval']!==false,
     }));
     return {
       imported: (skills.data??[]).filter((row:Record<string,unknown>) =>
-        typeof row.source_ref==='string' && row.source_ref.startsWith('https://raw.githubusercontent.com/')),
+        typeof row['source_ref']==='string' && row['source_ref'].startsWith('https://raw.githubusercontent.com/')),
       mcpLinks,
     };
   });
