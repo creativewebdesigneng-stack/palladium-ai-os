@@ -13,6 +13,7 @@ import { extractVerifiedProductPage } from "./product-page.mjs";
 import { filterStorageState } from "./storage-state.mjs";
 import { inspectPageReadOnly, attachQaDomEvidence } from "./qa-inspection.mjs";
 import { createBrowserSessionGate, BrowserSessionBusyError, BrowserSessionCapacityError } from "./session-governance.mjs";
+import { browserWorkerBindAddress } from "./host-policy.mjs";
 
 const PORT = Number(process.env.PORT || process.env.BROWSER_WORKER_PORT || 8787);
 const TOKEN = process.env.BROWSER_WORKER_TOKEN || "";
@@ -300,6 +301,7 @@ const server = http.createServer(async (req, res) => {
     return json(res, status, { ok: false, error: message.slice(0, 500) });
   }
 });
-server.listen(PORT, "0.0.0.0", () => console.log(`Palladium Playwright worker listening on :${PORT}`));
+const BIND = browserWorkerBindAddress(process.platform, process.env.BROWSER_WORKER_BIND);
+server.listen(PORT, BIND, () => console.log(`Blackstar Playwright worker listening on ${BIND}:${PORT}`));
 async function shutdown() { server.close(); for (const id of [...sessions.keys()]) await closeSession(id); try { if (browserPromise) await (await browserPromise).close(); } catch {} process.exit(0); }
 process.on("SIGTERM", shutdown); process.on("SIGINT", shutdown);
