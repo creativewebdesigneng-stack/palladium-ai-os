@@ -9,6 +9,7 @@ import { friendlyMessage } from '@/lib/errors';
 import { Failed, Empty } from '@/components/business/live';
 import { useToast } from '@/components/ui/use-toast';
 import { uploadGameFoundrySource } from '@/lib/game-foundry/uploadGameFoundrySource';
+import { gameFoundryAssetErrorMessage, validateGameFoundryAssetInput } from '@/lib/game-foundry/game-foundry-asset-errors';
 import GameFoundryModelViewer from '@/components/game-foundry/GameFoundryModelViewer';
 import { prepareGtaVehicleGeneration } from '@/lib/game-foundry/gta-vehicle-generation';
 import GameFoundryWebPreview from '@/components/game-foundry/GameFoundryWebPreview';
@@ -77,6 +78,8 @@ export default function GameFoundry() {
   const [assetPrompt,setAssetPrompt] = useState('');
   const [sourceUrl,setSourceUrl] = useState('');
   const [sourceFile,setSourceFile] = useState(null);
+  const assetSubmissionStage = useRef('prepare');
+  const [assetSubmissionError,setAssetSubmissionError] = useState(null);
   const [format,setFormat] = useState('glb');
   const [assetQuality,setAssetQuality] = useState('game_ready');
   const [assetEngine,setAssetEngine] = useState('unreal');
@@ -188,22 +191,39 @@ export default function GameFoundry() {
 
   const createAsset = useMutation({
     mutationFn:async()=>{
+      assetSubmissionStage.current = 'prepare';
+      setAssetSubmissionError(null);
+      validateGameFoundryAssetInput({inputName:assetName,sourceKind,prompt:assetPrompt,sourceUrl,sourceFile});
+      const gtaSpec = gtaVehicleMode && sourceKind === 'prompt' ? prepareGtaVehicleGeneration({ prompt:assetPrompt, sourceKind:'prompt', vehicleType:gtaVehicleType, modelName:assetName.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_').replace(/^[^a-z]+/,'bs_').slice(0,40) }) : null;
+      const effectivePrompt = sourceKind==='prompt' ? (gtaSpec?.generationPrompt ?? assetPrompt) : null;
+      if (effectivePrompt) validateGameFoundryAssetInput({inputName:assetName,sourceKind,prompt:effectivePrompt});
       let storagePath = null;
       if (sourceKind !== 'prompt' && sourceFile) {
+        assetSubmissionStage.current = 'upload';
         const uploaded = await uploadGameFoundrySource(sourceFile);
         storagePath = uploaded.storagePath;
       }
-      const gtaSpec = gtaVehicleMode && sourceKind === 'prompt' ? prepareGtaVehicleGeneration({ prompt:assetPrompt, sourceKind:'prompt', vehicleType:gtaVehicleType, modelName:assetName.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_').replace(/^[^a-z]+/,'bs_').slice(0,40) }) : null;
+      assetSubmissionStage.current = 'submit';
       return createAssetFn({data:{
-        projectId:assetProjectId||null,inputName:assetName,sourceKind,prompt:sourceKind==='prompt'?(gtaSpec?.generationPrompt ?? assetPrompt):null,
-        sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl,
+        projectId:assetProjectId||null,inputName:assetName,sourceKind,prompt:effectivePrompt,
+        sourceUrl:sourceKind==='prompt'||storagePath?null:sourceUrl.trim(),
         storagePath,
         outputFormat:gtaVehicleMode?'obj':format,qualityProfile:assetQuality,targetEngine:gtaVehicleMode?'zmodeler':assetEngine,
         autoPrepareProfile:autoPrepare?{generatePbrMaterials:true,unwrapUvs:true,generateLods:true,generateCollision:true,optimizeTopology:true,rigging:processingRigging,animation:processingAnimation,textureResolution:2048,targetPolycount:null}:null,
       }});
     },
-    onSuccess:async(result)=>{ if(autoPrepare && result?.id) { autoPrepareJobs.current.set(result.id,{rigging:processingRigging,animation:processingAnimation}); persistAutoPrepareJobs(); } setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); await refresh(); toast({title:'3D asset generation submitted'}); },
-    onError:async(error)=>{ await refresh(); toast({variant:'destructive',title:'3D asset generation could not start',description:friendlyMessage(error)}); },
+    onSuccess:(result)=>{
+      if(autoPrepare && result?.id) { autoPrepareJobs.current.set(result.id,{rigging:processingRigging,animation:processingAnimation}); persistAutoPrepareJobs(); }
+      setAssetName(''); setAssetPrompt(''); setSourceUrl(''); setSourceFile(null); setAssetSubmissionError(null);
+      toast({title:'3D asset generation submitted'});
+      void refresh().catch(()=>{ /* A subsequent list refresh must not convert an accepted job into an error. */ });
+    },
+    onError:(error)=>{
+      const message=gameFoundryAssetErrorMessage(error,assetSubmissionStage.current);
+      setAssetSubmissionError(message);
+      toast({variant:'destructive',title:'3D asset generation could not start',description:message});
+      void refresh().catch(()=>{ /* Preserve the original submission error when list refresh also fails. */ });
+    },
   });
 
   const assessGtaAsset = useMutation({
@@ -291,7 +311,7 @@ export default function GameFoundry() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Asset name"><input value={assetName} onChange={(e)=>setAssetName(e.target.value)} className={control} placeholder="Alien rifle" /></Field>
-          <Field label="Start with"><select value={sourceKind} onChange={(e)=>setSourceKind(e.target.value)} className={control}><option value="prompt">Prompt</option><option value="image">Upload picture / image URL</option><option value="model">Import model / model URL</option></select></Field>
+          <Field label="Start with"><select value={sourceKind} onChange={(e)=>{setSourceKind(e.target.value);setSourceFile(null);setSourceUrl('');setAssetSubmissionError(null)}} className={control}><option value="prompt">Prompt</option><option value="image">Upload picture / image URL</option><option value="model">Import model / model URL</option></select></Field>
           <Field label="Engine"><select value={assetEngine} onChange={(e)=>{const next=e.target.value;setAssetEngine(next);if(next==='zmodeler'&&!['fbx','obj'].includes(String(format).toLowerCase()))setFormat(formats.includes('fbx')?'fbx':'obj')}} className={control}>{engines.map((x)=><option key={x} value={x}>{labelize(x)}</option>)}</select></Field>
           <Field label="Format"><select value={format} onChange={(e)=>setFormat(e.target.value)} className={control}>{availableFormats.map((x)=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select></Field>
           <Field label="Quality"><select value={assetQuality} onChange={(e)=>setAssetQuality(e.target.value)} className={control}><option value="draft">Draft</option><option value="game_ready">Game ready</option><option value="cinematic">Cinematic</option></select></Field>
@@ -300,6 +320,7 @@ export default function GameFoundry() {
         {sourceKind === 'prompt' ? <Field label="3D prompt"><textarea rows={5} value={assetPrompt} onChange={(e)=>setAssetPrompt(e.target.value)} className={control+' mt-3'} placeholder="A weathered sci-fi rifle, hard-surface PBR, clean topology, game-ready proportions…" /></Field> : <div className="mt-3 grid gap-3"><Field label={sourceKind==='image'?'Upload reference image':'Upload existing 3D model'}><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-cyan-300/20 bg-cyan-400/[.03] px-3 py-3 text-xs text-zinc-300"><FileUp className="h-4 w-4 text-cyan-300"/><span className="min-w-0 flex-1 truncate">{sourceFile?.name || (sourceKind==='image'?'Choose PNG/JPG/WEBP/AVIF up to 100 MB':'Choose GLB/glTF/FBX/OBJ/USD/PLY/STL/VOX up to 100 MB')}</span><input type="file" className="hidden" accept={sourceKind==='image'?'.png,.jpg,.jpeg,.webp,.avif':'.glb,.gltf,.fbx,.obj,.usd,.usdz,.ply,.stl,.vox'} onChange={(e)=>setSourceFile(e.target.files?.[0] ?? null)} /></label></Field><div className="text-center text-[10px] uppercase tracking-[.2em] text-zinc-700">or</div><Field label={sourceKind==='image'?'Public reference image URL':'Public model URL'}><input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className={control} placeholder="https://…" /></Field></div>}
         <label className="mt-3 flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={autoPrepare} disabled={!caps?.gameReadyProcessing?.configured} onChange={(e)=>setAutoPrepare(e.target.checked)} /> Automatically prepare this model for export after generation (uses processing worker credits; continues after a reload in this tab; processing starts when Game Foundry is open)</label>
         <button disabled={!canCreateAsset || !assetName.trim() || createAsset.isPending || !hasAssetSource} onClick={()=>createAsset.mutate()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40">{createAsset.isPending?<Loader2 className="h-4 w-4 animate-spin"/>:sourceKind==='image'?<ImageIcon className="h-4 w-4"/>:<UploadCloud className="h-4 w-4"/>}Generate asset</button>
+        {assetSubmissionError && <p role="alert" className="mt-2 rounded-lg border border-rose-300/20 bg-rose-400/[.05] px-3 py-2 text-xs text-rose-200">{assetSubmissionError}</p>}
         {!canCreateAsset && <p className="mt-2 text-xs text-amber-300">{sourceKind==='prompt'?'Prompt-to-3D requires GAME_FOUNDRY_3D_API_URL.':sourceKind==='model'?'Model enhancement requires GAME_FOUNDRY_3D_API_URL.':'No real image-to-3D worker is configured.'}</p>}
       </section>
     </div>
