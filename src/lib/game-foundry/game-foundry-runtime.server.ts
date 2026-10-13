@@ -54,6 +54,7 @@ export function getGameFoundryCapabilities() {
       imageTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady),
       modelEnhancement: Boolean(configuredAssetWorker),
       freeWorkerConfigured: freeConfigured,
+      falConfigured: falReady,
       configuredProvider: freeConfigured ? "blackstar-open3d" : configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
       formats: freeConfigured ? ["glb","obj"] : configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : falReady ? ["glb","obj","fbx"] : [],
     },
