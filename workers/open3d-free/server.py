@@ -70,30 +70,58 @@ def update_job(jid, **values):
 
 
 def gpu_memory_gb():
+    # nvidia-smi reports GPU memory even when the HTTP worker uses a different
+    # Python environment from the model venvs.
     try:
-        import torch
-        if torch.cuda.is_available():
-            prop = torch.cuda.get_device_properties(0)
-            return prop.total_memory / (1024**3)
-    except Exception:
-        pass
-    return 0.0
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=4, check=True,
+        )
+        return max(int(line.strip()) for line in result.stdout.splitlines() if line.strip()) / 1024
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+_MODEL_CACHE = (0.0, [])
+
+
+def modules_available(python, modules, extra_path=None):
+    if not Path(python).is_file():
+        return False
+    # Probe installed packages without importing multi-GB weights or loading models.
+    script = "import importlib.util,sys;sys.exit(0 if all(importlib.util.find_spec(x) for x in sys.argv[1:]) else 1)"
+    env = os.environ.copy()
+    if extra_path:
+        env["PYTHONPATH"] = str(extra_path) + os.pathsep + env.get("PYTHONPATH", "")
+    try:
+        return subprocess.run([python, "-c", script, *modules], env=env, timeout=10,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def installed_models():
+    global _MODEL_CACHE
+    if time.monotonic() - _MODEL_CACHE[0] < 60:
+        return _MODEL_CACHE[1]
     cuda_memory = gpu_memory_gb()
     shap_python = os.environ.get("OPEN3D_SHAPE_PYTHON", sys.executable)
     triposr_python = os.environ.get("OPEN3D_TRIPOSR_PYTHON", sys.executable)
     trellis_python = os.environ.get("OPEN3D_TRELLIS_PYTHON", sys.executable)
-    # Explicit flags signal the worker administrator installed each model in the indicated venv.
-    # TRELLIS must have a compatible NVIDIA CUDA runtime and >=16 GB GPU memory.
-    return [
-        {"id": "shap-e", "ready": os.environ.get("OPEN3D_ENABLE_SHAPE_E") == "1" and Path(shap_python).is_file()},
+    tripo_repo = Path(os.environ.get("OPEN3D_TRIPOSR_REPO", "/nonexistent"))
+    trellis_repo = Path(os.environ.get("OPEN3D_TRELLIS_REPO", "/nonexistent"))
+    models = [
+        {"id": "shap-e", "ready": os.environ.get("OPEN3D_ENABLE_SHAPE_E") == "1"
+         and modules_available(shap_python, ["torch", "shap_e", "trimesh"])},
         {"id": "triposr", "ready": os.environ.get("OPEN3D_ENABLE_TRIPOSR") == "1"
-         and Path(triposr_python).is_file() and (Path(os.environ.get("OPEN3D_TRIPOSR_REPO", "")) / "run.py").is_file()},
+         and (tripo_repo / "run.py").is_file()
+         and modules_available(triposr_python, ["torch", "tsr", "PIL", "rembg"], tripo_repo)},
         {"id": "trellis", "ready": os.environ.get("OPEN3D_ENABLE_TRELLIS") == "1"
-         and Path(trellis_python).is_file() and cuda_memory >= 16.0},
+         and cuda_memory >= 16.0
+         and modules_available(trellis_python, ["torch", "trellis", "trimesh"], trellis_repo)},
     ]
+    _MODEL_CACHE = (time.monotonic(), models)
+    return models
 
 
 def safe_source(url):
