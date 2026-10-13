@@ -39,6 +39,9 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
     // Streaming unavailable — try the buffered path before giving up.
     if (res.status >= 500) {
       const result = await runAgentTask({ data: { agent_id: agentId, input } });
+      if (!result?.task || !String(result.output ?? result.task.output_text ?? result.task.output?.text ?? "").trim()) {
+        throw new Error("Agent execution returned no final deliverable. Check the model provider and runtime configuration.");
+      }
       onEvent?.({ type: "complete", task: result.task });
       return result.task;
     }
@@ -49,6 +52,7 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
   const decoder = new TextDecoder();
   let buffer = "";
   let task = null;
+  let terminalError = null;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -66,9 +70,17 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
         continue;
       }
       if (event.type === "complete") task = event.task;
+      if (event.type === "error") terminalError = event.message || "The agent run failed.";
       onEvent?.(event);
     }
   }
 
+  if (terminalError) throw new Error(terminalError);
+  if (!task) {
+    throw new Error("The agent connection ended before a completion result arrived. Check the model provider and preview runtime logs.");
+  }
+  if (!String(task.output_text ?? task.output?.text ?? "").trim()) {
+    throw new Error("The agent completed without a final response. Tool activity alone is not a finished result.");
+  }
   return task;
 }
