@@ -8,6 +8,7 @@ import SkillsToolbar from '@/components/skills/SkillsToolbar';
 import ToolCard from '@/components/skills/ToolCard';
 import ToolDetailDrawer from '@/components/skills/ToolDetailDrawer';
 import AgentPlaybooksPanel from '@/components/skills/AgentPlaybooksPanel';
+import ExternalArchiveSourcesPanel from '@/components/skills/ExternalArchiveSourcesPanel';
 import { CATEGORIES } from '@/components/skills/skillsData';
 import { getToolFramework, saveToolPermission } from '@/lib/tools/tools.functions';
 import { friendlyMessage } from '@/lib/errors';
@@ -116,6 +117,7 @@ export default function Skills() {
 
       {session === 'no' && <Failed message="Sign in to manage your skills and tool registry." />}
       {session === 'yes' && <AgentPlaybooksPanel enabled />}
+      {session === 'yes' && <ExternalArchiveSourcesPanel enabled />}
       {session === 'yes' && framework.isLoading && <Loading label="Loading your tool registry…" />}
       {framework.isError && (
         <Failed message={friendlyMessage(framework.error)} onRetry={() => framework.refetch()} />
