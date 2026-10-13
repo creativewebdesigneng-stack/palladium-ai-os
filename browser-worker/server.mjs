@@ -12,11 +12,13 @@ import {
 import { extractVerifiedProductPage } from "./product-page.mjs";
 import { filterStorageState } from "./storage-state.mjs";
 import { inspectPageReadOnly, attachQaDomEvidence } from "./qa-inspection.mjs";
+import { createBrowserSessionGate, BrowserSessionBusyError, BrowserSessionCapacityError } from "./session-governance.mjs";
 
 const PORT = Number(process.env.PORT || process.env.BROWSER_WORKER_PORT || 8787);
 const TOKEN = process.env.BROWSER_WORKER_TOKEN || "";
 const HEADLESS = process.env.BROWSER_WORKER_HEADLESS !== "false";
 const sessions = new Map();
+const gate = createBrowserSessionGate(MAX_SESSIONS);
 let browserPromise;
 
 function json(res, status, body) {
@@ -49,34 +51,42 @@ async function sessionFor(id) {
   const session = sessions.get(String(id || ""));
   if (!session) throw new Error("Unknown or expired browser session");
   if (session.expiresAt <= Date.now()) { await closeSession(session.id); throw new Error("Unknown or expired browser session"); }
-  touch(session); return session;
+  return session;
 }
 
 async function createSession(allowedDomains, storageState) {
-  if (sessions.size >= MAX_SESSIONS) throw new Error("Browser worker is at session capacity");
-  const domains = cleanAllowedDomains(allowedDomains);
-  if (!domains.length) throw new Error("At least one allowed domain is required");
-  const initialState = storageState == null ? undefined : filterStorageState(storageState, domains);
-  const browser = await getBrowser();
-  const context = await browser.newContext({
-    ignoreHTTPSErrors: false,
-    acceptDownloads: false,
-    javaScriptEnabled: true,
-    locale: "en-GB",
-    ...(initialState ? { storageState: initialState } : {}),
-  });
-  const page = await context.newPage();
-  const id = crypto.randomUUID();
-  const session = { id, context, page, allowedDomains: domains, expiresAt: Date.now() + SESSION_TTL_MS };
-  await context.route("**/*", async (route) => {
-    const request = route.request();
-    try {
-      const requireAllowedDomain = request.isNavigationRequest() && request.resourceType() === "document";
-      await assertPublicHttpUrl(request.url(), domains, { requireAllowedDomain });
-      await route.continue();
-    } catch { await route.abort("blockedbyclient"); }
-  });
-  sessions.set(id, session); return session;
+  const releaseSlot = gate.reserveCreate(sessions.size);
+  let context;
+  try {
+    const domains = cleanAllowedDomains(allowedDomains);
+    if (!domains.length) throw new Error("At least one allowed domain is required");
+    const initialState = storageState == null ? undefined : filterStorageState(storageState, domains);
+    const browser = await getBrowser();
+    context = await browser.newContext({
+      ignoreHTTPSErrors: false,
+      acceptDownloads: false,
+      javaScriptEnabled: true,
+      locale: "en-GB",
+      ...(initialState ? { storageState: initialState } : {}),
+    });
+    const page = await context.newPage();
+    const id = crypto.randomUUID();
+    const session = { id, context, page, allowedDomains: domains, expiresAt: Date.now() + SESSION_TTL_MS };
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      try {
+        const requireAllowedDomain = request.isNavigationRequest() && request.resourceType() === "document";
+        await assertPublicHttpUrl(request.url(), domains, { requireAllowedDomain });
+        await route.continue();
+      } catch { await route.abort("blockedbyclient"); }
+    });
+    sessions.set(id, session);
+    context = null; // Ownership has transferred to the durable session map.
+    return session;
+  } finally {
+    releaseSlot();
+    if (context) { try { await context.close(); } catch {} }
+  }
 }
 
 async function navigate(session, params) {
@@ -247,7 +257,13 @@ async function performAction(session, action, params = {}) {
   }
 }
 
-const cleanupTimer = setInterval(() => { const now = Date.now(); for (const [id, session] of sessions) if (session.expiresAt <= now) void closeSession(id); }, 60_000); cleanupTimer.unref();
+const cleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of sessions) {
+    // Do not tear down Chromium while an authorised browser action is active.
+    if (session.expiresAt <= now && !gate.isActive(id)) void closeSession(id);
+  }
+}, 60_000); cleanupTimer.unref();
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "POST required" });
@@ -261,13 +277,28 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {
         ok: true, service: "palladium-playwright-worker",
         browserReady: true, sessions: sessions.size,
+        ...gate.status(sessions.size),
       });
     }
     const body = await readBody(req);
     if (path === "/session") { const session = await createSession(body.allowedDomains, body.storageState); return json(res, 200, { sessionId: session.id }); }
-    if (path === "/action") { const session = await sessionFor(body.sessionId); const data = await performAction(session, String(body.action || ""), body.params || {}); return json(res, 200, { ok: true, data }); }
+    if (path === "/action") {
+      const id = String(body.sessionId || "");
+      const releaseAction = gate.acquire(id);
+      try {
+        const session = await sessionFor(id);
+        const data = await performAction(session, String(body.action || ""), body.params || {});
+        if (sessions.has(id)) touch(session); // Expiry extends after action completion.
+        return json(res, 200, { ok: true, data });
+      } finally { releaseAction(); }
+    }
     return json(res, 404, { ok: false, error: "Not found" });
-  } catch (error) { const message = error instanceof Error ? error.message : "Browser worker error"; return json(res, 400, { ok: false, error: message.slice(0, 500) }); }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Browser worker error";
+    const status = error instanceof BrowserSessionCapacityError ? 429
+      : error instanceof BrowserSessionBusyError ? 409 : 400;
+    return json(res, status, { ok: false, error: message.slice(0, 500) });
+  }
 });
 server.listen(PORT, "0.0.0.0", () => console.log(`Palladium Playwright worker listening on :${PORT}`));
 async function shutdown() { server.close(); for (const id of [...sessions.keys()]) await closeSession(id); try { if (browserPromise) await (await browserPromise).close(); } catch {} process.exit(0); }

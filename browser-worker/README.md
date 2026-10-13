@@ -10,7 +10,7 @@ All endpoints require `Authorization: Bearer <BROWSER_WORKER_TOKEN>`.
 - `POST /session` with `{ "allowedDomains": ["example.com"] }`
 - `POST /action` with `{ "sessionId": "...", "action": "navigate", "params": { ... } }`
 
-Sessions are short-lived, capped, isolated Playwright browser contexts. Top-level navigation must stay inside the session allow-list. Local/private network targets are blocked, including DNS results that resolve to private IP space.
+Sessions are short-lived, capped, isolated Playwright browser contexts. Concurrent session requests reserve capacity before launching Chromium, and each session permits one active action at a time (409 when busy). Capacity failures return HTTP 429. The worker does not close a session in the middle of an active action; expired idle sessions are reclaimed automatically. This is single-process admission; use sticky sessions or a separate coordinator before running multiple replicas. Top-level navigation must stay inside the session allow-list. Local/private network targets are blocked, including DNS results that resolve to private IP space.
 
 ## Run locally
 

@@ -524,6 +524,8 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
         method: "POST",
         headers: cfg.headers,
         body: JSON.stringify({ allowedDomains: config.allowedDomains }),
+        redirect: "manual",
+        signal: AbortSignal.timeout(30_000),
       });
       if (!created.ok) throw new Error(`Browser provider could not open a session (${created.status})`);
       const body = (await created.json()) as { sessionId?: string };
@@ -534,6 +536,10 @@ function createRemoteBrowserTool(cfg: RemoteConfig, config: BrowserAgentConfig):
       method: "POST",
       headers: cfg.headers,
       body: JSON.stringify({ sessionId, action, params }),
+      redirect: "manual",
+      // Do not retry mutating actions automatically: server-side effects may
+      // have occurred before a timeout/connection loss.
+      signal: AbortSignal.timeout(action === "search" ? 120_000 : 60_000),
     });
     if (!res.ok) throw new Error(`Browser action "${action}" failed (${res.status})`);
     const body = (await res.json()) as { ok?: boolean; data?: unknown; error?: string };
