@@ -19,6 +19,7 @@ export function gameFoundryAssetErrorMessage(error, stage) {
   }
 }
 
+/** @param {{ inputName: string, sourceKind: string, prompt?: string | null, sourceUrl?: string | null, sourceFile?: { name: string, size: number } | null }} input */
 export function validateGameFoundryAssetInput({ inputName, sourceKind, prompt = null, sourceUrl = null, sourceFile = null }) {
   const name = String(inputName ?? '').trim();
   if (!name) throw new Error('Enter a name for the 3D asset.');
