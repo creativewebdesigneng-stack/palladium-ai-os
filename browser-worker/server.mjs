@@ -33,7 +33,10 @@ async function readBody(req) {
 }
 
 async function getBrowser() {
-  if (!browserPromise) browserPromise = chromium.launch({ headless: HEADLESS, args: ["--disable-dev-shm-usage"] });
+  if (!browserPromise) {
+    browserPromise = chromium.launch({ headless: HEADLESS, args: ["--disable-dev-shm-usage"] })
+      .catch((error) => { browserPromise = null; throw error; });
+  }
   return browserPromise;
 }
 
@@ -250,7 +253,16 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "POST required" });
     if (!bearerAuthorised(req.headers, TOKEN)) return json(res, 401, { ok: false, error: "Unauthorised" });
     const path = new URL(req.url || "/", "http://worker.local").pathname;
-    if (path === "/health") return json(res, 200, { ok: true, service: "palladium-playwright-worker", sessions: sessions.size });
+    if (path === "/health") {
+      // Do not claim readiness merely because Node is listening. Prove that
+      // Playwright can start Chromium in this exact deployed environment.
+      const browser = await getBrowser();
+      if (!browser.isConnected()) throw new Error("Chromium is not connected");
+      return json(res, 200, {
+        ok: true, service: "palladium-playwright-worker",
+        browserReady: true, sessions: sessions.size,
+      });
+    }
     const body = await readBody(req);
     if (path === "/session") { const session = await createSession(body.allowedDomains, body.storageState); return json(res, 200, { sessionId: session.id }); }
     if (path === "/action") { const session = await sessionFor(body.sessionId); const data = await performAction(session, String(body.action || ""), body.params || {}); return json(res, 200, { ok: true, data }); }

@@ -6,7 +6,7 @@ This service implements the production browser contract used by `src/lib/mission
 
 All endpoints require `Authorization: Bearer <BROWSER_WORKER_TOKEN>`.
 
-- `POST /health`
+- `POST /health` — starts and verifies actual Chromium (`browserReady:true`), not just a Node heartbeat
 - `POST /session` with `{ "allowedDomains": ["example.com"] }`
 - `POST /action` with `{ "sessionId": "...", "action": "navigate", "params": { ... } }`
 
@@ -18,7 +18,7 @@ Sessions are short-lived, capped, isolated Playwright browser contexts. Top-leve
 cd browser-worker
 npm install
 npx playwright install chromium
-BROWSER_WORKER_TOKEN=replace-me npm start
+BROWSER_WORKER_TOKEN=your-long-private-random-value npm start
 ```
 
 The worker listens on port `8787` by default.
@@ -27,8 +27,14 @@ The worker listens on port `8787` by default.
 
 ```bash
 docker build -t palladium-browser-worker browser-worker
-docker run --rm -p 8787:8787 -e BROWSER_WORKER_TOKEN=replace-me palladium-browser-worker
+docker run --rm -p 127.0.0.1:8787:8787 -e BROWSER_WORKER_TOKEN=your-long-private-random-value palladium-browser-worker
 ```
+
+## Hosting choice and cost
+
+The committed Render Blueprint uses the **starter** plan, which can be a paid service. Do not create a new Render/Railway service if you need zero hosting charges or have not approved hosting cost. You can run this Docker worker on a computer you already own and publish a narrowly restricted **HTTPS** endpoint through an authenticated tunnel/reverse proxy; this still consumes your computer's electricity and requires reliable connectivity. Keep the private worker bearer token in the host's and Vercel's protected environment variables.
+
+**The built Docker image now includes every runtime import** (`dom-snapshot.mjs`, `qa-inspection.mjs` and `storage-state.mjs`). CI checks the dependency closure so a future import cannot silently break startup.
 
 ## Deploy on Render
 
@@ -49,11 +55,23 @@ Configure the main PalladiumAI deployment with:
 ```text
 BROWSER_AGENT_PROVIDER=playwright
 PLAYWRIGHT_BROWSER_ENDPOINT=https://your-worker.example.com
-PLAYWRIGHT_BROWSER_TOKEN=<same value as BROWSER_WORKER_TOKEN>
+PLAYWRIGHT_BROWSER_TOKEN=<same long private token as BROWSER_WORKER_TOKEN>
 BROWSER_AGENT_ALLOW_SIMULATION=false
 ```
 
-Do not expose `BROWSER_WORKER_TOKEN` or `PLAYWRIGHT_BROWSER_TOKEN` to browser/client code.
+Do not expose `BROWSER_WORKER_TOKEN` or `PLAYWRIGHT_BROWSER_TOKEN` to browser/client code. The provider is not considered configured without *both* an HTTPS endpoint and a token, and is not considered live until the authenticated health check proves Chromium is ready.
+
+## Genuine acceptance test
+
+After hosting the worker, set `PLAYWRIGHT_BROWSER_ENDPOINT` and `PLAYWRIGHT_BROWSER_TOKEN` locally (as private process environment variables; never in version control) and run from the repository root:
+
+```bash
+node browser-worker/smoke.mjs
+```
+
+The smoke script checks bearer-authenticated Chromium readiness, creates a real isolated session, verifies local/private addresses are blocked, navigates to `https://example.com/`, extracts its real page text, closes the session and reports `BROWSER_WORKER_ACCEPTANCE=PASS` only if every assertion holds. It performs no purchases and does not use simulated responses.
+
+The health endpoint alone does not establish that arbitrary authenticated customer sites or long-running workflows operate correctly. Conduct separate owner-authorised browser tasks through Blackstar before claiming broader certification.
 
 ## Safety boundaries
 

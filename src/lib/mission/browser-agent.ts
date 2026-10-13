@@ -440,15 +440,22 @@ type RemoteConfig = {
 function remoteConfig(id: string): RemoteConfig | null {
   if (id === "playwright") {
     const endpoint = process.env["PLAYWRIGHT_BROWSER_ENDPOINT"];
-    if (!endpoint) return null;
-    const token = process.env["PLAYWRIGHT_BROWSER_TOKEN"];
+    const token = process.env["PLAYWRIGHT_BROWSER_TOKEN"]?.trim();
+    // The built-in Playwright worker always requires a private bearer token.
+    // HTTPS origin only: never transmit it to an HTTP host or URL with embedded
+    // credentials, a query, a fragment or an unexpected path.
+    if (!endpoint || !token) return null;
+    let url: URL;
+    try { url = new URL(endpoint); } catch { return null; }
+    if (url.protocol !== "https:" || url.username || url.password ||
+        url.pathname !== "/" || url.search || url.hash) return null;
     return {
       id,
       label: "Playwright worker",
-      endpoint: endpoint.replace(/\/$/, ""),
+      endpoint: url.origin,
       headers: {
         "content-type": "application/json",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        authorization: `Bearer ${token}`,
       },
     };
   }
@@ -475,11 +482,25 @@ export async function probeBrowserProvider(id: string): Promise<{ ok: boolean; e
   const cfg = remoteConfig(id);
   if (!cfg) return { ok: false, error: "Provider credentials are not configured" };
   try {
-    const res = await fetch(`${cfg.endpoint}/health`, { method: "POST", headers: cfg.headers });
+    const res = await fetch(`${cfg.endpoint}/health`, {
+      method: "POST", headers: cfg.headers, redirect: "manual",
+      signal: AbortSignal.timeout(8_000),
+    });
     if (!res.ok) return { ok: false, error: `Health check returned ${res.status}` };
+    if (id === "playwright") {
+      // A generic 200 HTML page (or a Node server lacking Chromium) is not a
+      // connected, capable browser worker. Fail closed on invalid provenance.
+      const body: unknown = await res.json();
+      if (!body || typeof body !== "object" || Array.isArray(body) ||
+          (body as Record<string, unknown>)["ok"] !== true ||
+          (body as Record<string, unknown>)["service"] !== "palladium-playwright-worker" ||
+          (body as Record<string, unknown>)["browserReady"] !== true) {
+        return { ok: false, error: "Browser worker did not verify Chromium readiness" };
+      }
+    }
     return { ok: true };
-  } catch (error) {
-    return { ok: false, error: (error as Error).message };
+  } catch {
+    return { ok: false, error: "Browser worker could not be reached or verified" };
   }
 }
 
@@ -666,7 +687,7 @@ registerBrowserProvider({
   label: "Playwright worker",
   kind: "production",
   requires: ["PLAYWRIGHT_BROWSER_ENDPOINT"],
-  note: "Set PLAYWRIGHT_BROWSER_ENDPOINT (and optionally PLAYWRIGHT_BROWSER_TOKEN) to a worker exposing the /session, /action and /health contract.",
+  note: "Set an HTTPS PLAYWRIGHT_BROWSER_ENDPOINT and matching private PLAYWRIGHT_BROWSER_TOKEN; the worker must verify Chromium via /health.",
   factory: productionFactory("playwright", "Connect a Playwright worker endpoint to enable it."),
 });
 
