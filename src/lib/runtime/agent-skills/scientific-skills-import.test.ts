@@ -41,6 +41,17 @@ describe('pinned scientific archive catalogue and owner-governed imports',()=>{
   it('does not misidentify another skill as the pinned requested source',()=>{
     expect(()=>prepareScientificSkillImport('aeon',markdown.replace('name: aeon','name: astropy'))).toThrow(/does not match/);
   });
+  it('keeps a quoted description within the canonical parser limit without altering source guidance',()=>{
+    const description = 'Power analysis for "research designs" and sample sizes. '.repeat(8);
+    const source = markdown.replace(/^description:.*$/m, `description: ${description}`);
+    const result = prepareScientificSkillImport('aeon', source);
+    expect(result.description.length).toBeLessThanOrEqual(240);
+    expect(result.row['description']).toBe(result.description);
+    expect(result.row['body']).toContain(source);
+    expect(result.row['enabled']).toBe(false);
+    expect(result.row['requires_tools']).toEqual([]);
+    expect(result.row['requires_scripts']).toEqual([]);
+  });
   it('rejects upstream substitutions when exact Git blob content does not match',async()=>{
     const mock=vi.fn().mockResolvedValue(new Response(markdown,{
       status:200,headers:{'content-type':'text/plain'},

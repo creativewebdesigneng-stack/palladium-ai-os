@@ -46,7 +46,12 @@ export function prepareScientificSkillImport(id: string, source: string): Scient
   if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) throw new Error('Scientific skill file exceeds the maximum size.');
   const frontName = frontmatterField(source, 'name');
   if (frontName !== id) throw new Error('Scientific skill name does not match the pinned catalogue.');
-  const description = (frontmatterField(source, 'description') || `Scientific research guidance from the pinned ${id} publisher skill.`).slice(0, 240);
+  let description = (frontmatterField(source, 'description') || `Scientific research guidance from the pinned ${id} publisher skill.`).slice(0, 240);
+  // The canonical manifest reader strips quotes without decoding JSON escapes.
+  // Bound the serialized scalar too; the complete upstream text stays in body.
+  while (JSON.stringify(description).slice(1, -1).length > 240) {
+    description = description.slice(0, -1);
+  }
   const name = safeScientificSkillName(id);
   const originalLicence = frontmatterField(source, 'license') || 'See upstream repository and individual dependencies';
   // No external script, model, API key, provider or binary is implied to be installed.
