@@ -35,6 +35,7 @@ function monthStart(): string {
 }
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
+const currencyCode = (value: unknown): string | null => typeof value === 'string' && /^[a-z]{3}$/i.test(value.trim()) ? value.trim().toUpperCase() : null;
 
 export async function resolveSpendLimits(
   sb: Sb,
@@ -50,7 +51,7 @@ export async function resolveSpendLimits(
           .eq("id", agentId)
           .eq("user_id", userId)
           .maybeSingle()
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
     sb
       .from("purchase_requests")
       .select("total, currency, status, created_at, approval_request_id")
@@ -58,12 +59,22 @@ export async function resolveSpendLimits(
       .gte("created_at", monthStart()),
   ]);
 
+  if (limitRows.error || agentRow.error || spend.error) {
+    throw new Error("Spending limits and purchase history could not be verified.");
+  }
+  if (agentId && !agentRow.data) throw new Error("The owned shopping agent could not be verified.");
   const rows: any[] = limitRows.data ?? [];
   const userRow = rows.find((r) => !r.agent_id) ?? null;
   const agentLimitRow = agentId ? (rows.find((r) => r.agent_id === agentId) ?? null) : null;
   const agent = agentRow?.data ?? null;
 
-  const currency = userRow?.currency ?? agent?.currency ?? "GBP";
+  const currency = currencyCode(userRow?.currency ?? agent?.currency ?? "GBP");
+  if (!currency) throw new Error("The spending-control currency could not be verified.");
+  for (const row of [userRow, agentLimitRow, agent?.budget_limit != null ? agent : null]) {
+    if (row?.currency != null && currencyCode(row.currency) !== currency) {
+      throw new Error("Spending controls use different currencies; verified conversion is required.");
+    }
+  }
 
   // The tightest configured per-transaction ceiling wins.
   const perTxCandidates = [
@@ -72,6 +83,9 @@ export async function resolveSpendLimits(
   ].filter((v): v is number => v != null);
 
   const committed = (spend.data ?? []).filter((p: any) => COMMITTED.includes(p.status));
+  if (committed.some((p: any) => currencyCode(p.currency ?? currency) !== currency)) {
+    throw new Error("Committed purchases use different currencies; verified conversion is required.");
+  }
   const userMonthSpend =
     Math.round(committed.reduce((sum: number, p: any) => sum + Number(p.total ?? 0), 0) * 100) /
     100;
@@ -85,6 +99,7 @@ export async function resolveSpendLimits(
       .eq("user_id", userId)
       .eq("agent_id", agentId)
       .gte("created_at", monthStart());
+    if (approvals.error) throw new Error("Agent purchase approvals could not be verified.");
     const ids = new Set(((approvals.data ?? []) as any[]).map((a) => a.id));
     agentMonthSpend =
       Math.round(
@@ -109,8 +124,16 @@ export async function resolveSpendLimits(
 const money = (currency: string, value: number) => `${currency} ${value.toFixed(2)}`;
 
 /** Pure check so it can be unit-tested without a database. */
-export function checkAgainstLimits(total: number, limits: SpendLimits): LimitVerdict {
+export function checkAgainstLimits(total: number, limits: SpendLimits, currency: string = limits.currency): LimitVerdict {
   const amount = Math.round(total * 100) / 100;
+  const values = [amount, limits.userMonthSpend, limits.agentMonthSpend,
+    limits.perTransaction, limits.userMonthlyCap, limits.agentMonthlyCap];
+  if (total < 0 || values.some(value => value !== null && (!Number.isFinite(value) || value < 0))) {
+    return { ok: false, limits, reason: "Purchase amounts and spending controls must be finite non-negative values." };
+  }
+  if (!currencyCode(currency) || currencyCode(currency) !== currencyCode(limits.currency)) {
+    return { ok: false, limits, reason: "Purchase currency must match the spending controls; no unverified conversion is allowed." };
+  }
 
   // Read-only discovery never calls this gate. A monetary action must have at
   // least one explicit user/agent ceiling before PalladiumAI will prepare it.
@@ -164,9 +187,10 @@ export async function assertWithinLimits(
   userId: string,
   agentId: string | null | undefined,
   total: number,
+  currency?: string,
 ): Promise<SpendLimits> {
   const limits = await resolveSpendLimits(sb, userId, agentId ?? null);
-  const verdict = checkAgainstLimits(total, limits);
+  const verdict = checkAgainstLimits(total, limits, currency);
   if (!verdict.ok) throw new Error(verdict.reason);
   return limits;
 }
