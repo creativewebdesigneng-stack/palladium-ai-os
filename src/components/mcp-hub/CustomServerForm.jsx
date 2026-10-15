@@ -1,52 +1,46 @@
 import { useState } from 'react';
-import { X, Wrench, Plus } from 'lucide-react';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 export default function CustomServerForm({ onSave, onClose }) {
-  const [form, setForm] = useState({ name: '', url: '', auth: 'none', desc: '', tools: '' });
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const submit = (e) => {
-    e.preventDefault();
-    onSave({
-      name: form.name || 'My MCP Server',
-      url: form.url,
-      auth: form.auth,
-      desc: form.desc,
-      tools: form.tools.split(',').map(t => t.trim()).filter(Boolean),
-    });
+  const [form, setForm] = useState({ name: '', slug: '', endpointUrl: '', authHeaderName: '', authHeaderValue: '', tools: '' });
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const set = (key, value) => setForm(previous => ({ ...previous, [key]: value }));
+  const submit = async event => {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    try {
+      await onSave({ name: form.name, slug: form.slug, endpointUrl: form.endpointUrl,
+        authHeaderName: form.authHeaderName || null, authHeaderValue: form.authHeaderValue || null,
+        allowedToolNames: form.tools.split(',').map(value => value.trim()).filter(Boolean),
+        enabled: false, requiresApproval: true });
+      setForm(previous => ({ ...previous, authHeaderValue: '' }));
+      onClose();
+    } catch {
+      setError('Configuration could not be certified and saved. Check your fields and the required audit service before retrying. Refresh the registry to check whether a disabled configuration was stored.');
+    } finally { setPending(false); }
   };
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <button className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <form onSubmit={submit} className="relative flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[#0c0d13]">
-        <div className="flex items-center gap-2 border-b border-white/10 p-4">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500"><Wrench className="h-4 w-4 text-white" /></span>
-          <p className="text-sm font-semibold text-white">Add custom MCP server</p>
-          <button type="button" onClick={onClose} className="ml-auto text-zinc-500 hover:text-white"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          <Field label="Name"><input value={form.name} onChange={e => set('name', e.target.value)} placeholder="My MCP Server" className="input" /></Field>
-          <Field label="Server URL"><input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://mcp.example.com/sse" className="input" /></Field>
-          <Field label="Authentication">
-            <select value={form.auth} onChange={e => set('auth', e.target.value)} className="input">
-              <option value="none" className="bg-[#10121a]">None</option>
-              <option value="bearer" className="bg-[#10121a]">Bearer token</option>
-              <option value="basic" className="bg-[#10121a]">Basic auth</option>
-              <option value="oauth" className="bg-[#10121a]">OAuth</option>
-            </select>
-          </Field>
-          <Field label="Description"><textarea value={form.desc} onChange={e => set('desc', e.target.value)} rows={3} placeholder="What this server exposes…" className="input" /></Field>
-          <Field label="Tools (comma separated)"><input value={form.tools} onChange={e => set('tools', e.target.value)} placeholder="run_query, search_docs" className="input" /></Field>
-        </div>
-        <div className="border-t border-white/10 p-3">
-          <button type="submit" className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-500 py-2.5 text-sm font-medium text-white hover:bg-violet-600"><Plus className="h-4 w-4" />Save custom server</button>
-        </div>
-      </form>
-    </div>
-  );
+  return <Sheet open onOpenChange={open=>{if(!open&&!pending)onClose();}}>
+    <SheetContent aria-describedby="external-server-description" className="w-full max-w-md bg-[#0c0d13] p-0 sm:max-w-md" onEscapeKeyDown={event=>{if(pending)event.preventDefault();}} onPointerDownOutside={event=>{if(pending)event.preventDefault();}}>
+    <form onSubmit={submit} className="flex h-full flex-col">
+      <div className="border-b border-white/10 p-4 pr-10">
+        <SheetTitle className="text-sm font-semibold text-white">Register disabled MCP server</SheetTitle>
+        <SheetDescription id="external-server-description" className="mt-2 text-xs text-zinc-400">Prepare a disabled configuration for review.</SheetDescription>
+      </div>
+      <fieldset disabled={pending} className="flex-1 space-y-3 overflow-y-auto p-4">
+        <p className="text-xs leading-5 text-zinc-400">Use a reviewed Streamable HTTP endpoint. Saving keeps tools disabled and approval required. It does not contact the provider or certify security review.</p>
+        <Field label="Name"><input required maxLength={120} value={form.name} onChange={e=>set('name',e.target.value)} className="input"/></Field>
+        <Field label="Slug"><input required maxLength={63} pattern="[a-z0-9][a-z0-9_-]*" value={form.slug} onChange={e=>set('slug',e.target.value)} placeholder="reviewed-memory" className="input"/></Field>
+        <Field label="HTTPS MCP endpoint"><input required type="url" maxLength={2048} value={form.endpointUrl} onChange={e=>set('endpointUrl',e.target.value)} placeholder="https://your-service.example/mcp" className="input"/></Field>
+        <Field label="Authentication header name (optional)"><input maxLength={64} value={form.authHeaderName} onChange={e=>set('authHeaderName',e.target.value)} placeholder="Authorization" className="input"/></Field>
+        <Field label="Authentication header value (optional)"><input type="password" autoComplete="new-password" maxLength={8192} value={form.authHeaderValue} onChange={e=>set('authHeaderValue',e.target.value)} placeholder="Bearer …" className="input"/></Field>
+        <Field label="Allowed tool names (comma separated)"><textarea required rows={3} value={form.tools} onChange={e=>set('tools',e.target.value)} placeholder="search, read" className="input"/></Field>
+        <p className="text-[11px] leading-5 text-zinc-500">Provide 1–200 exact names from reviewed provider documentation. Credentials are encrypted server-side. Licensing, tenant isolation and security scanning remain required before activation.</p>
+        {error&&<p role="alert" className="text-xs text-rose-300">{error}</p>}
+      </fieldset>
+      <div className="border-t border-white/10 p-3"><button disabled={pending} type="submit" className="w-full rounded-xl bg-violet-500 py-2.5 text-sm text-white disabled:opacity-40">{pending?'Saving configuration…':'Save disabled configuration'}</button></div>
+    </form>
+  </SheetContent></Sheet>;
 }
-
-function Field({ label, children }) {
-  return <label className="block"><span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500">{label}</span>{children}</label>;
-}
+function Field({label,children}) { return <label className="block"><span className="mb-1 block text-xs text-zinc-400">{label}</span>{children}</label>; }
