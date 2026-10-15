@@ -21,3 +21,13 @@ Eight new handler tests cover required audit failure before writes, payload excl
 Both production audit credentials are sensitive Vercel variables managed by integration `icfg_7JyiX7jdTiYPofli24hgwd8W`. The connected Vercel API cannot access that integration configuration, and the Supabase connector exposes publishable keys only. No secret was fabricated, retrieved through database internals, printed, or substituted with a publishable key. Required-audit failures must remain blocking until a valid server credential is securely configured. The final scientific import and live configuration mutations cannot be certified until then.
 
 OpenViking and AgentMemory still require their reviewed authenticated services and tenant-isolation evidence. The external Browser Use Python provider remains unconnected. This recovery makes existing Trust Fabric schema usable; it does not certify those external providers.
+
+## Production recovery evidence
+
+PR #953 merged as `b7522f31dfe7179f95545f11c3bcd7e5f4e67803`; its exact production deployment `dpl_3ZS1zg4VnjHsKvVEGFGD7U2e2rJJ` reached READY before the migration ran. Supabase recorded the recovery as version `20261015100404`; the repository filename is aligned with that recorded version, preserving identical reviewed SQL and preventing a later CLI push from treating it as a second pending migration.
+
+Live checks found four RLS-enabled tables and 15 policies, no anonymous SELECT/INSERT or authenticated TRUNCATE, no UPDATE policy missing USING/WITH CHECK, and no anonymous resolver execution. The owner has three identities and three empty-scope passports, zero delegation grants and zero message envelopes. Advisor findings were unchanged (three before/three after, none new).
+
+Authenticated production Control Plane verification showed all collections available, with three identities, three passports, zero delegations and zero A2A messages. The existing three agents and waiting-for-approval run remained visible. Identity counts describe registered canonical metadata, not independent trust certification.
+
+The authorized secure scientific importer was retried through the signed-in Skills page after recovery. It stopped at its required audit preflight with: “Required audit entry could not be persisted. The operation cannot be certified.” The remaining reference was not imported through SQL or another bypass. The production credential update is still required.
