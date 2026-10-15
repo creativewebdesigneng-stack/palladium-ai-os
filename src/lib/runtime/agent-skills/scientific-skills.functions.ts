@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
-import { writeAudit } from '@/lib/platform/audit.server';
+import { writeAuditRequired } from '@/lib/platform/audit.server';
 import { SCIENTIFIC_SKILL_SOURCES, SCIENTIFIC_SKILLS_COMMIT } from './scientific-skill-sources';
 import { fetchPinnedScientificSkill } from './scientific-skills-import.server';
 import { scientificSkillSource } from './scientific-skill-sources';
@@ -25,6 +25,11 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
   .handler(async ({data,context})=>{
     const sb=context.supabase as unknown as Sb;
     const slice=SCIENTIFIC_SKILL_SOURCES.slice(data.cursor,data.cursor+BATCH);
+    await writeAuditRequired({
+      userId:context.userId,action:'agent_skill_scientific_archive_batch_started',
+      targetType:'agent_skill_pack',status:'success',
+      metadata:{commit:SCIENTIFIC_SKILLS_COMMIT,cursor:data.cursor,requested:slice.length},
+    });
     let inserted=0,existing=0;
     const skipped:Array<{id:string;reason:string}>=[];
     const downloads=await Promise.allSettled(slice.map(async item=>fetchPinnedScientificSkill(item.id)));
@@ -63,7 +68,7 @@ export const installScientificSkillBatch = createServerFn({method:'POST'})
         inserted++;
       }
     }
-    await writeAudit({
+    await writeAuditRequired({
       userId:context.userId,action:'agent_skill_scientific_archive_batch',
       targetType:'agent_skill_pack',targetId:null,status:'success',
       metadata:{publisher:'K-Dense-AI',commit:SCIENTIFIC_SKILLS_COMMIT,

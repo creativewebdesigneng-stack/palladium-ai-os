@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
-import { writeAudit } from '@/lib/platform/audit.server';
+import { writeAuditRequired } from '@/lib/platform/audit.server';
 
 const DIAGRAM_COMMIT = '0a8ea20ae69b33a5edce6018eedd3a9d26e90c1c';
 const DIAGRAM_BLOB = '45dc9eaf42f7b8eaed4a5789c274c425fb30678d';
@@ -54,6 +54,10 @@ export const installDiagramDesignGuide = createServerFn({method:'POST'})
     if(rows.length>1 || (rows.length===1 && rows[0]?.['source_ref']!==DIAGRAM_REF)){
       throw new Error('A different diagram-design skill already exists. Nothing was overwritten.');
     }
+    await writeAuditRequired({
+      userId:context.userId,action:'agent_skill_external_diagram_import_started',
+      targetType:'agent_skill',status:'success',metadata:{commit:DIAGRAM_COMMIT},
+    });
     const values={
       name:guide.name,description:guide.description,version:guide.version,body:guide.body,
       requires_tools:guide.requiresTools,requires_scripts:guide.requiresScripts,
@@ -69,7 +73,7 @@ export const installDiagramDesignGuide = createServerFn({method:'POST'})
       :await sb.from('agent_skills').insert({...values,user_id:context.userId,org_id:null})
         .select('id').maybeSingle();
     if(result.error || !result.data)throw new Error('Could not save verified Diagram Design guidance.');
-    await writeAudit({
+    await writeAuditRequired({
       userId:context.userId,action:'agent_skill_external_diagram_import',
       targetType:'agent_skill',targetId:result.data.id,status:'success',
       metadata:{source:'cathrynlavery/diagram-design',commit:DIAGRAM_COMMIT,disabled:!values.enabled},
