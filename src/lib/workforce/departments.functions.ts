@@ -20,7 +20,7 @@ export const listDepartments = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!data.orgId) return { departments: [] };
     const sb = context.supabase as unknown as Sb;
-    const [{ data: teams, error }, { data: agents }] = await Promise.all([
+    const [{ data: teams, error }, { data: agents, error: agentsError }] = await Promise.all([
       sb
         .from("teams")
         .select("id,name,description,goal,lead_agent_id,permissions,status,created_at")
@@ -29,6 +29,7 @@ export const listDepartments = createServerFn({ method: "POST" })
       sb.from("personal_agents").select("id,team_id"),
     ]);
     if (error) throw new Error(error.message);
+    if (agentsError) throw new Error(agentsError.message);
     return {
       departments: (teams ?? []).map((t: any) => ({
         ...t,
@@ -56,6 +57,12 @@ export const saveDepartment = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    const agentIds = [...new Set(data.agents)];
+    if (agentIds.length) {
+      const { data: agents, error: agentsError } = await sb.from("personal_agents").select("id").eq("org_id", data.orgId).in("id", agentIds);
+      if (agentsError) throw new Error(agentsError.message);
+      if ((agents ?? []).length !== agentIds.length) throw new Error("Every department agent must be accessible in this organisation.");
+    }
     const payload = {
       org_id: data.orgId,
       name: data.name,
@@ -70,16 +77,20 @@ export const saveDepartment = createServerFn({ method: "POST" })
       : sb.from("teams").insert(payload);
     const { data: team, error } = await q.select("id").maybeSingle();
     if (error) throw new Error(error.message);
-    const teamId = team?.id ?? data.id;
+    const teamId = team?.id;
     if (!teamId) throw new Error("You do not have permission to manage departments here.");
 
-    await sb.from("personal_agents").update({ team_id: null }).eq("team_id", teamId);
-    if (data.agents.length) {
-      const { error: assignError } = await sb
+    const { error: clearError } = await sb.from("personal_agents").update({ team_id: null }).eq("team_id", teamId).eq("org_id", data.orgId);
+    if (clearError) throw new Error(clearError.message);
+    if (agentIds.length) {
+      const { data: assigned, error: assignError } = await sb
         .from("personal_agents")
         .update({ team_id: teamId })
-        .in("id", data.agents);
+        .eq("org_id", data.orgId)
+        .in("id", agentIds)
+        .select("id");
       if (assignError) throw new Error(assignError.message);
+      if ((assigned ?? []).length !== agentIds.length) throw new Error("Some department assignments could not be verified. Reload the department before retrying.");
     }
     return { id: teamId };
   });

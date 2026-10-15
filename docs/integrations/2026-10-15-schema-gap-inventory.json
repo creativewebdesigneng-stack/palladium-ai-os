@@ -26,10 +26,6 @@
     "marketplace_agents",
     "marketplace_purchases",
     "media_edit_jobs",
-    "project_cycles",
-    "project_modules",
-    "project_work_items",
-    "teams",
     "trusted_media_assets"
   ],
   "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
@@ -49,8 +45,7 @@
     "whatsapp_broadcast_recipients"
   ],
   "unreviewed_absent_dependency_names": [
-    "agent_economy_accounts",
-    "team_members"
+    "agent_economy_accounts"
   ],
   "recovered_personal_workspace": [
     "shopping_tasks",
@@ -99,5 +94,15 @@
     "web_crawl_jobs",
     "voice_clone_jobs",
     "user_documents"
+  ],
+  "recovered_project_team_contracts": [
+    "project_cycles",
+    "project_modules",
+    "project_work_items",
+    "teams",
+    "team_members"
+  ],
+  "recovered_missing_columns": [
+    "personal_agents.team_id"
   ]
 }
