@@ -15,10 +15,12 @@ function Stat({ label, value, Icon }) {
         <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">{label}</p>
         <Icon className="h-4 w-4 text-violet-300" />
       </div>
-      <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-3 text-2xl font-semibold text-white">{value == null ? <span className="text-base text-amber-200">Unavailable</span> : value}</p>
     </div>
   );
 }
+
+const SOURCE_LABELS = { agents: 'Agents', tasks: 'Agent runs', approvals: 'Approvals', tools: 'Tool catalogue', permissions: 'Tool overrides', executions: 'Tool executions', identities: 'Identities', passports: 'Passports', delegations: 'Delegations', a2a: 'A2A messages' };
 
 const SURFACES = [
   ['Skills & Tools', '/skills', 'Manage reusable agent capabilities and tool grants.'],
@@ -46,7 +48,7 @@ export default function AgentRuntime() {
       <PageHeader
         eyebrow="Blackstar infrastructure"
         title="Control Plane"
-        description="One live control plane for Blackstar runtime activity, Trust Fabric identity, passports, A2A traffic, approvals, tools, sandbox guardrails and delegated execution."
+        description="Inspect recorded Blackstar runtime activity, Trust Fabric records, approvals and execution guardrails. Each collection reports whether it could be verified."
       />
 
       {session === 'no' && <Failed message="Sign in to inspect the Blackstar control plane." />}
@@ -55,6 +57,12 @@ export default function AgentRuntime() {
 
       {overview.isSuccess && (
         <div className="space-y-5">
+          <section aria-label="Snapshot verification" className="rounded-2xl border border-white/10 bg-white/[.025] p-4 text-xs leading-5 text-zinc-400">
+            <p>Owner-scoped snapshot. Counts describe the bounded records loaded here, rather than account-wide totals or proof of provider health.</p>
+            <p className="mt-1">Observed: {overview.data.observedAt}</p>
+            {Object.entries(overview.data.sources).some(([,source])=>!source.available)&&<p role="status" className="mt-2 text-amber-200">Could not verify: {Object.entries(overview.data.sources).filter(([,source])=>!source.available).map(([key])=>SOURCE_LABELS[key]).join(', ')}. Unavailable data is not counted as zero.</p>}
+            {Object.entries(overview.data.sources).some(([,source])=>source.truncated)&&<p className="mt-2 text-amber-200">Snapshot limits reached: {Object.entries(overview.data.sources).filter(([,source])=>source.truncated).map(([key,source])=>`${SOURCE_LABELS[key]} (${source.limit})`).join(', ')}. Counts may be lower than the full account totals.</p>}
+          </section>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat label="Agents" value={overview.data.stats.agents} Icon={Bot} />
             <Stat label="Live runs" value={overview.data.stats.liveRuns} Icon={Activity} />
@@ -63,7 +71,7 @@ export default function AgentRuntime() {
             <Stat label="Live A2A" value={overview.data.stats.liveA2aMessages} Icon={Network} />
             <Stat label="Delegations" value={overview.data.stats.activeDelegations} Icon={GitBranch} />
             <Stat label="Pending approvals" value={overview.data.stats.pendingApprovals} Icon={ShieldCheck} />
-            <Stat label="Enabled tool grants" value={overview.data.stats.enabledToolGrants} Icon={CheckCircle2} />
+            <Stat label="Enabled tool overrides" value={overview.data.stats.enabledToolGrants} Icon={CheckCircle2} />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[1.4fr_.9fr]">
@@ -117,19 +125,19 @@ export default function AgentRuntime() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-white/10 bg-white/[.025] p-4">
                 <p className="text-xs uppercase tracking-[0.15em] text-zinc-500">Identity fabric</p>
-                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.trustedIdentities} active canonical identities are visible through your authenticated scope.</p>
+                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.trustedIdentities == null ? 'Identity records could not be verified.' : `${overview.data.stats.trustedIdentities} active canonical identities are in this owner snapshot.`}</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[.025] p-4">
                 <p className="text-xs uppercase tracking-[0.15em] text-zinc-500">Agent passports</p>
-                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.passports} governed passports describe capability, autonomy and risk boundaries.</p>
+                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.passports == null ? 'Passport records could not be verified.' : `${overview.data.stats.passports} registered passports are in this owner snapshot. This is not proof of current validity.`}</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[.025] p-4">
                 <p className="text-xs uppercase tracking-[0.15em] text-zinc-500">Delegation fabric</p>
-                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.activeDelegations} active scoped grants. External actions remain approval-governed by policy.</p>
+                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.activeDelegations == null ? 'Delegation records could not be verified.' : `${overview.data.stats.activeDelegations} active, unexpired scoped grants are in this snapshot. External actions remain approval-governed.`}</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[.025] p-4">
                 <p className="text-xs uppercase tracking-[0.15em] text-zinc-500">A2A transport</p>
-                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.liveA2aMessages} queued, approval-pending or delivered message envelopes are in the current owner scope.</p>
+                <p className="mt-2 text-sm text-zinc-300">{overview.data.stats.liveA2aMessages == null ? 'A2A message records could not be verified.' : `${overview.data.stats.liveA2aMessages} queued, approval-pending or delivered, unexpired envelopes are in this owner snapshot.`}</p>
               </div>
             </div>
           </section>
@@ -144,7 +152,7 @@ export default function AgentRuntime() {
                     <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-400">{task.status}</span>
                   </div>
                 ))}
-                {overview.data.tasks.length === 0 && <p className="text-sm text-zinc-500">No agent runs yet.</p>}
+                {!overview.data.sources.tasks.available ? <p className="text-sm text-amber-200">Agent runs could not be verified.</p> : overview.data.tasks.length === 0 && <p className="text-sm text-zinc-500">No agent runs in this snapshot.</p>}
               </div>
             </section>
 
