@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HARNESS_CAPABILITIES,
+  assertHarnessToolInput,
   evaluateHarnessPolicy,
   evaluateSubagentSpawn,
   normalizeHarnessDomains,
@@ -75,5 +76,41 @@ describe("agent harness", () => {
   it('normalizes URL hostnames consistently while retaining exact subdomain boundaries',()=>{
     expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:['https://docs.example.com:443/page'],allowedDomains:['https://WWW.Example.com/path']}).decision).toBe('allow');
     expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:['example.com.evil.test'],allowedDomains:['example.com']}).decision).toBe('deny');
+  });
+});
+
+
+describe("harness negative-path archive review", () => {
+  it("rejects credentials beyond the inspection depth rather than allowing uninspected input", () => {
+    let nested: Record<string, unknown> = { api_key: "hidden" };
+    for (let i=0;i<10;i++) nested = { child: nested };
+    expect(evaluateHarnessPolicy({tool:"integration_action",input:nested})).toMatchObject({decision:"deny",code:"input_inspection_limit"});
+  });
+  it("rejects oversized input without returning any secret data", () => {
+    const result=evaluateHarnessPolicy({tool:"memory_search",input:{items:Array(10_001).fill("private-value")}});
+    expect(result).toMatchObject({decision:"deny",code:"input_inspection_limit"});
+    expect(JSON.stringify(result)).not.toContain("private-value");
+  });
+  it("rejects cyclic input without stack overflow",()=>{
+    const input:Record<string,unknown>={};input['self']=input;
+    expect(evaluateHarnessPolicy({tool:"test",input}).code).toBe("input_inspection_limit");
+  });
+  it.each(["https://user:secret@example.com/path","https://","https:bad host"])("keeps invalid or credential-bearing URL %s in the policy boundary",url=>{
+    expect(assertHarnessToolInput("web_fetch",{url},["example.com"])).toMatchObject({decision:"deny",code:"invalid_domain_scope"});
+  });
+  it("preserves ordinary allowed web requests",()=>{
+    expect(assertHarnessToolInput("web_fetch",{url:"https://docs.example.com/page?q=public"},["example.com"]).decision).toBe("allow");
+  });
+  it.each([-1,0.5,NaN,Infinity])("rejects invalid subagent depth %s",depth=>{
+    expect(evaluateSubagentSpawn({depth,parentTools:[],requestedTools:[]}).code).toBe("invalid_subagent_scope");
+  });
+  it.each([-1,0.5,NaN,Infinity])("rejects invalid subagent maxDepth %s",maxDepth=>{
+    expect(evaluateSubagentSpawn({depth:0,maxDepth,parentTools:[],requestedTools:[]}).code).toBe("invalid_subagent_scope");
+  });
+  it("rejects malformed and oversized delegation tool scopes",()=>{
+    for(const tools of [[""],["a".repeat(161)],Array(201).fill("read"),null]){
+      expect(evaluateSubagentSpawn({depth:0,parentTools:tools,requestedTools:[]} as any).decision).toBe("deny");
+      expect(evaluateSubagentSpawn({depth:0,parentTools:[],requestedTools:tools} as any).decision).toBe("deny");
+    }
   });
 });

@@ -45,15 +45,25 @@ export const HARNESS_CAPABILITIES = [
 
 const SENSITIVE_KEY = /^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|auth(?:orization)?|password|passwd|secret|private[_-]?key|cookie|session[_-]?token)$/i;
 
-function hasCredentialInput(value: unknown, depth = 0): boolean {
-  if (depth > 8 || value == null) return false;
-  if (Array.isArray(value)) return value.some((item) => hasCredentialInput(item, depth + 1));
-  if (typeof value !== "object") return false;
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (SENSITIVE_KEY.test(key) && child !== undefined && child !== null && String(child).trim() !== "") return true;
-    if (hasCredentialInput(child, depth + 1)) return true;
+/** Bound inspection work, but never interpret uninspected input as safe. */
+function inspectCredentialInput(value: unknown): "credential" | "limit" | null {
+  const pending = [{ value, depth: 0 }];
+  const seen = new WeakSet<object>();
+  let inspected = 0;
+  while (pending.length) {
+    const item = pending.pop()!;
+    if (++inspected > 10_000 || item.depth > 8) return "limit";
+    if (item.value == null || typeof item.value !== "object") continue;
+    if (seen.has(item.value)) return "limit";
+    seen.add(item.value);
+    const entries = Object.entries(item.value);
+    if (entries.length + pending.length + inspected > 10_000) return "limit";
+    for (const [key, child] of entries) {
+      if (SENSITIVE_KEY.test(key) && child !== undefined && child !== null && String(child).trim() !== "") return "credential";
+      pending.push({ value: child, depth: item.depth + 1 });
+    }
   }
-  return false;
+  return null;
 }
 
 function normalizeHarnessDomain(value: unknown): string | null {
@@ -80,7 +90,11 @@ function domainAllowed(host: string, allowed: string[]) {
 
 export function evaluateHarnessPolicy(input: HarnessPolicyInput): HarnessPolicyResult {
   const risk = input.risk ?? "low";
-  if (hasCredentialInput(input.input ?? {})) {
+  const credentialInspection = inspectCredentialInput(input.input ?? {});
+  if (credentialInspection === "limit") {
+    return { decision: "deny", risk: "high", code: "input_inspection_limit", reason: "Tool input exceeds the bounded safety inspection. Reduce its nesting or size before retrying." };
+  }
+  if (credentialInspection === "credential") {
     return { decision: "deny", risk: "critical", code: "credential_input_blocked", reason: "Credentials and secrets must be injected by trusted server integrations, never supplied in agent tool input." };
   }
 
@@ -123,7 +137,13 @@ export type SubagentSpawnInput = {
 };
 
 export function evaluateSubagentSpawn(input: SubagentSpawnInput): HarnessPolicyResult {
-  const maxDepth = Math.min(Math.max(input.maxDepth ?? 2, 0), 4);
+  const validTools = (tools: unknown): tools is string[] => Array.isArray(tools) && tools.length <= 200 && tools.every(tool => typeof tool === "string" && tool.trim().length > 0 && tool.length <= 160);
+  if (!Number.isSafeInteger(input.depth) || input.depth < 0 ||
+      (input.maxDepth !== undefined && (!Number.isSafeInteger(input.maxDepth) || input.maxDepth < 0)) ||
+      !validTools(input.parentTools) || !validTools(input.requestedTools)) {
+    return { decision: "deny", risk: "high", code: "invalid_subagent_scope", reason: "Delegation requires non-negative integer depths and bounded explicit tool names." };
+  }
+  const maxDepth = Math.min(input.maxDepth ?? 2, 4);
   if (input.depth >= maxDepth) {
     return { decision: "deny", risk: "high", code: "subagent_depth_exceeded", reason: `Sub-agent depth is capped at ${maxDepth}.` };
   }
@@ -137,8 +157,8 @@ export function evaluateSubagentSpawn(input: SubagentSpawnInput): HarnessPolicyR
 export function assertHarnessToolInput(tool: string, input: Record<string, unknown>, allowedDomains: string[] = []): HarnessPolicyResult {
   const requestedUrl = typeof input["url"] === "string" ? input["url"] : "";
   let requestedDomains: string[] = [];
-  if (/^https?:\/\//i.test(requestedUrl)) {
-    try { requestedDomains = [new URL(requestedUrl).hostname]; } catch { requestedDomains = []; }
-  }
+  // Validate the original URL: extracting only the hostname would hide embedded
+  // credentials, and swallowing parse failures would remove the network request.
+  if (/^https?:/i.test(requestedUrl.trim())) requestedDomains = [requestedUrl];
   return evaluateHarnessPolicy({ tool, input, requestedDomains, allowedDomains });
 }
