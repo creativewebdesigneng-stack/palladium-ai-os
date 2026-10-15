@@ -4,7 +4,7 @@ vi.mock('@tanstack/react-start',()=>({createServerFn:()=>{
   return chain;
 }}));
 vi.mock('@/integrations/supabase/auth-middleware',()=>({requireSupabaseAuth:()=>null}));
-vi.mock('@/lib/platform/audit.server',()=>({writeAudit:vi.fn()}));
+vi.mock('@/lib/platform/audit.server',()=>({writeAudit:vi.fn(),writeAuditRequired:vi.fn()}));
 vi.mock('@/lib/integrations/oauth.server',()=>({encryptToken:vi.fn()}));
 vi.mock('../external-mcp.server',()=>({listExternalMcpTools:vi.fn(),validateExternalMcpEndpoint:vi.fn()}));
 import {getExternalMcpRegistryOverview} from '../mcp.functions';

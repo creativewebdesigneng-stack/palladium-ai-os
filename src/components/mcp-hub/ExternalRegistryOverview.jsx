@@ -1,9 +1,13 @@
+import { useState } from 'react';
+import CustomServerForm from './CustomServerForm';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { RefreshCcw, Server, ShieldCheck } from 'lucide-react';
-import { getExternalMcpRegistryOverview } from '@/lib/mcp/mcp.functions';
+import { getExternalMcpRegistryOverview, saveExternalMcpServer } from '@/lib/mcp/mcp.functions';
 
 export default function ExternalRegistryOverview(){
+  const [adding,setAdding]=useState(false);
+  const save=useServerFn(saveExternalMcpServer);
   const load=useServerFn(getExternalMcpRegistryOverview);
   const query=useQuery({queryKey:['external-mcp-registry-overview'],queryFn:()=>load({data:{}}),retry:false});
   const servers=query.data?.servers??[];
@@ -15,6 +19,8 @@ export default function ExternalRegistryOverview(){
         <RefreshCcw className="h-3.5 w-3.5"/>Refresh external registry
       </button>
     </div>
+    <button type="button" onClick={()=>setAdding(true)} className="mt-3 rounded-lg border border-violet-400/30 px-3 py-2 text-xs text-violet-200">Register disabled server</button>
+    {adding&&<CustomServerForm onClose={()=>setAdding(false)} onSave={async data=>{await save({data});await query.refetch();}}/>}
     <p className="mt-2 text-xs leading-5 text-zinc-400">Your saved server configurations and last discovery state. A saved or enabled server is not proof of current reachability, authentication or tenant isolation.</p>
     {query.isPending&&<p className="mt-3 text-xs text-zinc-400">Checking your authorised server registry…</p>}
     {query.error&&<p role="alert" className="mt-3 text-xs text-rose-300">{query.error instanceof Error?query.error.message:'Could not verify your server registry.'}</p>}

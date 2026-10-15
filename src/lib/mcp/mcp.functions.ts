@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { writeAudit } from "@/lib/platform/audit.server";
+import { z } from "zod";
+import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
 import { encryptToken } from "@/lib/integrations/oauth.server";
 import { listExternalMcpTools, validateExternalMcpEndpoint } from "./external-mcp.server";
 
@@ -22,9 +23,19 @@ function normaliseHeaderName(value?: string | null): string | null {
   return header;
 }
 
-function normaliseAllowedTools(value?: string[]): string[] {
-  return [...new Set((value ?? []).map((item) => item.trim()).filter(Boolean).map((item) => item.slice(0, 160)))].slice(0, 200);
-}
+const externalMcpDraftSchema = z.object({
+  id: z.string().uuid().nullable().optional(),
+  orgId: z.null().optional(),
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(63),
+  endpointUrl: z.string().trim().min(1).max(2048),
+  authHeaderName: z.string().trim().max(64).nullable().optional(),
+  authHeaderValue: z.string().trim().max(8192).refine(value => !/[\r\n]/.test(value), "Auth headers cannot contain line breaks.").nullable().optional(),
+  clearAuth: z.boolean().optional(),
+  enabled: z.literal(false).optional(),
+  requiresApproval: z.literal(true).optional(),
+  allowedToolNames: z.array(z.string().trim().min(1).max(160)).min(1).max(200),
+}).strict();
 
 export const listExternalMcpServers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -63,19 +74,7 @@ export const getExternalMcpRegistryOverview = createServerFn({method:'POST'})
 
 export const saveExternalMcpServer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    id?: string | null;
-    orgId?: string | null;
-    name: string;
-    slug: string;
-    endpointUrl: string;
-    authHeaderName?: string | null;
-    authHeaderValue?: string | null;
-    clearAuth?: boolean;
-    enabled?: boolean;
-    requiresApproval?: boolean;
-    allowedToolNames?: string[];
-  }) => input)
+  .inputValidator((input: z.input<typeof externalMcpDraftSchema>) => externalMcpDraftSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -94,14 +93,18 @@ export const saveExternalMcpServer = createServerFn({ method: "POST" })
       slug: normaliseSlug(data.slug),
       endpoint_url: endpoint,
       auth_header_name: authHeaderName,
-      enabled: data.enabled ?? true,
-      requires_approval: data.requiresApproval ?? true,
-      allowed_tool_names: normaliseAllowedTools(data.allowedToolNames),
+      enabled: false,
+      requires_approval: true,
+      allowed_tool_names: [...new Set(data.allowedToolNames)],
       updated_at: new Date().toISOString(),
     };
     if (data.clearAuth) row["auth_header_ciphertext"] = null;
     else if (authValue) row["auth_header_ciphertext"] = encryptToken(authValue);
 
+    await writeAuditRequired({
+      userId, action: "external_mcp_server_save_started", targetType: "external_mcp_server",
+      targetId: data.id ?? null, metadata: { enabled: false, requires_approval: true },
+    });
     let result;
     if (data.id) {
       result = await sb
@@ -120,7 +123,7 @@ export const saveExternalMcpServer = createServerFn({ method: "POST" })
     }
     if (result.error || !result.data) throw new Error("Could not save the external MCP server.");
 
-    await writeAudit({
+    await writeAuditRequired({
       userId: userId,
       action: data.id ? "external_mcp_server_updated" : "external_mcp_server_created",
       targetType: "external_mcp_server",
