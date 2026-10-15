@@ -36,7 +36,8 @@ export const startFocusSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => startInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { data: existing } = await sb.from("task_focus_sessions").select("id").eq("user_id", context.userId).is("ended_at", null).limit(1).maybeSingle();
+    const { data: existing, error: readError } = await sb.from("task_focus_sessions").select("id").eq("user_id", context.userId).is("ended_at", null).limit(1).maybeSingle();
+    if (readError) throw new Error(readError.message);
     if (existing) throw new Error("Finish your active focus session before starting another one.");
     const { data: row, error } = await sb.from("task_focus_sessions").insert({
       user_id: context.userId,

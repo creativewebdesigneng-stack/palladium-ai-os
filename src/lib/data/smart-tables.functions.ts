@@ -56,13 +56,15 @@ export const getSmartTable = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [{ data: table, error }, { data: records }, { data: views }] = await Promise.all([
+    const [{ data: table, error }, { data: records, error: recordsError }, { data: views, error: viewsError }] = await Promise.all([
       sb.from('smart_tables').select('id,name,description,fields,default_view,created_at,updated_at').eq('id', data.id).eq('user_id', context.userId).maybeSingle(),
       sb.from('smart_table_records').select('id,values,created_at,updated_at').eq('table_id', data.id).eq('user_id', context.userId).order('created_at', { ascending: true }).limit(500),
       sb.from('smart_table_views').select('id,name,kind,config,created_at').eq('table_id', data.id).eq('user_id', context.userId).order('created_at', { ascending: true }),
     ]);
     if (error) throw new Error(error.message);
     if (!table) throw new Error('Smart table not found or access denied.');
+    if (recordsError) throw new Error(recordsError.message);
+    if (viewsError) throw new Error(viewsError.message);
     return { table, records: records ?? [], views: views ?? [] };
   });
 
@@ -84,7 +86,8 @@ export const createSmartTable = createServerFn({ method: 'POST' })
       fields: data.fields,
     }).select('id,name,description,fields,default_view,created_at,updated_at').single();
     if (error) throw new Error(error.message);
-    await sb.from('smart_table_views').insert({ user_id: context.userId, table_id: table.id, name: 'Grid', kind: 'grid', config: {} });
+    const { error: viewError } = await sb.from('smart_table_views').insert({ user_id: context.userId, table_id: table.id, name: 'Grid', kind: 'grid', config: {} });
+    if (viewError) throw new Error(viewError.message);
     await writeAudit({ userId: context.userId, orgId: null, action: 'smart_table.created', targetType: 'smart_table', targetId: table.id, status: 'success', metadata: { fields: data.fields.length } });
     return table;
   });

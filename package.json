@@ -18,7 +18,8 @@
     "test:connector-recovery": "node scripts/verification/connector-recovery.mjs",
     "test:browser-recovery": "node scripts/verification/browser-schema-recovery.mjs",
     "test:customer-recovery": "node scripts/verification/customer-operations-recovery.mjs",
-    "test:personal-recovery": "node scripts/verification/personal-workspace-recovery.mjs"
+    "test:personal-recovery": "node scripts/verification/personal-workspace-recovery.mjs",
+    "test:content-recovery": "node scripts/verification/content-workspace-recovery.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

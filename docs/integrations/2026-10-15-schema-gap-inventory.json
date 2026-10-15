@@ -29,7 +29,6 @@
     "creator_profiles",
     "deployment_targets",
     "enterprise_autonomy_policies",
-    "html_studio_documents",
     "marketplace_agents",
     "marketplace_purchases",
     "media_edit_jobs",
@@ -41,23 +40,13 @@
     "project_cycles",
     "project_modules",
     "project_work_items",
-    "saved_prompt_runs",
-    "saved_prompt_versions",
-    "saved_prompts",
-    "seo_projects",
-    "seo_snapshots",
-    "smart_table_records",
-    "smart_table_views",
-    "smart_tables",
     "social_post_targets",
     "social_posts",
-    "task_focus_sessions",
     "teams",
     "trusted_media_assets",
     "user_documents",
     "voice_clone_jobs",
-    "web_crawl_jobs",
-    "zen_notes"
+    "web_crawl_jobs"
   ],
   "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
   "recovered_customer_operations": [
@@ -92,5 +81,18 @@
     "fitness_weight_entries",
     "finance_transactions",
     "marketing_campaigns"
+  ],
+  "recovered_content_workspace": [
+    "saved_prompts",
+    "saved_prompt_versions",
+    "saved_prompt_runs",
+    "smart_tables",
+    "smart_table_records",
+    "smart_table_views",
+    "zen_notes",
+    "html_studio_documents",
+    "seo_projects",
+    "seo_snapshots",
+    "task_focus_sessions"
   ]
 }
