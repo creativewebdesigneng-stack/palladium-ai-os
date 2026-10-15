@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { persistRegulationVersion } from "./version-store.ts";
 
 const MAX_SOURCES_PER_RUN = 12;
 const MAX_RESPONSE_BYTES = 2_000_000;
@@ -196,9 +197,7 @@ async function syncOne(supabase: any, source: any) {
 
     const regulation = await ensureSourceMonitorRegulation(supabase, source);
     const oldVersionId = regulation.current_version_id || null;
-    const { data: version, error: versionError } = await supabase
-      .from("compliance_regulation_versions")
-      .insert({
+    const version = await persistRegulationVersion(supabase, {
         regulation_id: regulation.id,
         version_label: checkedAt,
         source_url: (fetched as any).url,
@@ -208,10 +207,7 @@ async function syncOne(supabase: any, source: any) {
         diff_summary: oldVersionId ? "Authoritative source content changed. Applicability and legal effect require review." : "Initial authoritative source snapshot captured.",
         provenance: { adapter: source.adapter, http_status: fetched.status, content_type: (fetched as any).contentType, etag: fetched.etag, last_modified: fetched.lastModified },
         captured_at: checkedAt,
-      })
-      .select("id")
-      .single();
-    if (versionError) throw new Error(`version_create_failed:${versionError.message}`);
+      });
 
     const changeType = oldVersionId ? "updated" : "new";
     const { error: changeError } = await supabase.from("compliance_regulatory_changes").insert({
@@ -247,7 +243,7 @@ async function syncOne(supabase: any, source: any) {
       finished_at: checkedAt,
       http_status: fetched.status,
       items_seen: 1,
-      versions_created: 1,
+      versions_created: version.created ? 1 : 0,
       changes_created: 1,
       diagnostics: { unchanged: false, fetched_url: (fetched as any).url, content_hash: (fetched as any).hash },
     }).eq("id", run.id);
