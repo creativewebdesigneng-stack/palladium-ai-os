@@ -40,6 +40,9 @@ export const getBrowserControl = createServerFn({ method: "POST" })
         .limit(25),
     ]);
 
+    if (sessions.error || executions.error) {
+      throw new Error("Could not verify your browser session and execution history.");
+    }
     const rows: any[] = sessions.data ?? [];
     const sessionVerdicts = rows.map((session) => {
       const plan = buildRecordedSessionComputerUsePlan(

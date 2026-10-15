@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
-import dns from "node:dns/promises";
-import net from "node:net";
+import { assertPublicNetworkEndpoint } from "@/lib/security/public-network.server";
 import type { BrowserTool } from "@/lib/mission/browser-agent";
 import { isDomainAllowed } from "@/lib/mission/browser-agent";
 import { asBrowserDatabase } from "./browser-database.types";
@@ -17,28 +16,15 @@ function safeName(value: string) {
   );
 }
 
-function privateIp(ip: string) {
-  if (!net.isIP(ip)) return true;
-  if (ip === "::1" || ip.startsWith("fe80:") || ip.startsWith("fc") || ip.startsWith("fd")) return true;
-  if (net.isIPv4(ip)) {
-    const [a = 0, b = 0] = ip.split(".").map(Number);
-    return a === 0 || a === 10 || a === 127 || a >= 224 ||
-      (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-  }
-  return false;
-}
-
 async function assertDownloadUrl(raw: string, allowedDomains: string[]) {
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error("Download link is not a valid URL."); }
   if (!/^https?:$/.test(url.protocol)) throw new Error("Only http(s) downloads are supported.");
+  if (url.username || url.password) throw new Error("Download links cannot contain embedded credentials.");
   if (!isDomainAllowed(url.toString(), allowedDomains)) {
     throw new Error("Download link is outside this agent's domain allow-list.");
   }
-  const addresses = await dns.lookup(url.hostname, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some(({ address }) => privateIp(address))) {
-    throw new Error("Download link resolves to a private or unsafe network address.");
-  }
+  await assertPublicNetworkEndpoint(url);
   return url;
 }
 
@@ -66,15 +52,40 @@ export async function captureBrowserDownloadFromPage(args: {
   const url = await assertDownloadUrl(href, args.allowedDomains);
 
   const response = await fetch(url, {
-    redirect: "follow",
-    signal: args.signal ?? AbortSignal.timeout(30_000),
+    redirect: "manual",
+    signal: args.signal ? AbortSignal.any([args.signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
     headers: { "User-Agent": "PalladiumAI-BrowserArtifact/1.0" },
   });
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
+    throw new Error("Browser download redirects require a separately verified link.");
+  }
   if (!response.ok) throw new Error(`Download failed (${response.status}).`);
   const declared = Number(response.headers.get("content-length") || 0);
-  if (declared > MAX_DOWNLOAD_BYTES) throw new Error("Browser download exceeds the 25 MB artifact limit.");
-  const data = new Uint8Array(await response.arrayBuffer());
-  if (data.byteLength > MAX_DOWNLOAD_BYTES) throw new Error("Browser download exceeds the 25 MB artifact limit.");
+  if (declared > MAX_DOWNLOAD_BYTES) {
+    await response.body?.cancel();
+    throw new Error("Browser download exceeds the 25 MB artifact limit.");
+  }
+  const chunks: Uint8Array[] = [];
+  let sizeBytes = 0;
+  if (response.body) {
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sizeBytes += value.byteLength;
+        if (sizeBytes > MAX_DOWNLOAD_BYTES) {
+          await reader.cancel();
+          throw new Error("Browser download exceeds the 25 MB artifact limit.");
+        }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+  }
+  const data = new Uint8Array(sizeBytes);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
 
   return {
     filename: filenameFromResponse(url, response.headers.get("content-disposition"), args.filenameHint),
