@@ -64,6 +64,7 @@ describe('AI Hub inventory of the bundled PalladiumAI MCP surface', () => {
       slug: 'acme',
       name: 'Acme MCP',
       enabled: true,
+      allowed_tool_names: ['search'],
       cached_tools: [{ name: 'search', description: 'Search Acme.' }],
     })
     const counts = countAiHubResources([...resources, ...external])

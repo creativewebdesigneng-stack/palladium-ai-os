@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { toAiHubExternalMcpResources } from '../resources'
 
 describe('AI Hub external MCP resource mapping', () => {
+  it.each([null, [], [''], [42], 'orders.list', [' orders.list'], Array(201).fill('orders.list')])(
+    'does not advertise cached tools for invalid scope %j', (allowed_tool_names) => {
+      const resources = toAiHubExternalMcpResources({ id: 'server-1', enabled: true,
+        allowed_tool_names, cached_tools: [{ name: 'orders.list' }] });
+      expect(resources).toHaveLength(1);
+      expect(resources[0]?.capabilities).toEqual([]);
+    },
+  );
+
+  it('requires an explicit enabled state before advertising tools as available', () => {
+    const resources = toAiHubExternalMcpResources({ id: 'server-1', allowed_tool_names: ['orders.list'],
+      cached_tools: [{ name: 'orders.list' }] });
+    expect(resources.map(row => row.status)).toEqual(['disabled', 'disabled']);
+  });
+
   it('projects only allowed tools without exposing credentials or endpoints', () => {
     const resources = toAiHubExternalMcpResources({
       id: 'server-1',

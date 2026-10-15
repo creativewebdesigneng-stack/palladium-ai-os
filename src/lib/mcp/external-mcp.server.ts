@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { decryptToken } from "@/lib/integrations/oauth.server";
+import { isExplicitExternalToolScope } from "./external-tool-scope";
 
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -142,6 +143,9 @@ async function loadServer(sb: Db, userId: string, serverId: string): Promise<Ext
     .maybeSingle();
   if (error || !data) throw new Error("External MCP server is not available.");
   if (!data.enabled) throw new Error("External MCP server is disabled.");
+  if (!isExplicitExternalToolScope(data.allowed_tool_names)) {
+    throw new Error("External MCP server requires an explicit, bounded tool allow-list before discovery or execution.");
+  }
   return data as ExternalMcpServer;
 }
 
@@ -307,8 +311,8 @@ export async function listExternalMcpTools(args: {
   const discovered = Array.isArray(result?.["tools"])
     ? (result!["tools"] as unknown[]).map(normaliseTool).filter((tool): tool is ExternalMcpTool => Boolean(tool)).slice(0, MAX_TOOL_COUNT)
     : [];
-  const allow = new Set((server.allowed_tool_names ?? []).filter(Boolean));
-  const tools = allow.size ? discovered.filter((tool) => allow.has(tool.name)) : discovered;
+  const allow = new Set(server.allowed_tool_names);
+  const tools = discovered.filter((tool) => allow.has(tool.name));
   await args.sb
     .from("external_mcp_servers")
     .update({
@@ -338,12 +342,12 @@ export async function callExternalMcpTool(args: {
     throw new Error("This external MCP server requires explicit operator approval before tool execution.");
   }
   const allowed = server.allowed_tool_names ?? [];
-  if (allowed.length && !allowed.includes(args.toolName)) throw new Error("That MCP tool is not allowed for this server.");
+  if (!allowed.includes(args.toolName)) throw new Error("That MCP tool is not allowed for this server.");
   const sessionId = await initialise(server, args.options);
   const response = await postRpc({
     server,
     method: "tools/call",
-    params: { name: args.toolName.slice(0, 160), arguments: args.input },
+    params: { name: args.toolName, arguments: args.input },
     sessionId,
     requestId: 2,
     ...(args.options ? { options: args.options } : {}),
