@@ -31,7 +31,7 @@ insert into private.members values('${a}','${org}'),('${b}','${org}');
 const file = readdirSync('supabase/migrations').find(n => n.endsWith('_restore_browser_runtime_schema.sql'));
 const migration = readFileSync('supabase/migrations/' + file, 'utf8');
 await db.exec(migration);
-await denied(migration);
+await assert.rejects(() => db.exec(migration), /requires all four tables to be absent/); passed++;
 const tables = ['browser_credentials','browser_profiles','browser_sessions','browser_artifacts'];
 for (const t of tables) {
   check((await rows(`select relrowsecurity from pg_class where oid='${t}'::regclass`))[0].relrowsecurity, 'RLS enabled');
