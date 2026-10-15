@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAuditRequired } from "@/lib/platform/audit.server";
 import { canonicalBlackstarAgentId } from "./agent-trust";
 
 type Sb = { from: (table: string) => any };
@@ -58,6 +59,7 @@ export const upsertAgentPassport = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const agent = await ownedAgent(sb, context.userId, data.agent_id);
     const orgId = agent.org_id_fk ?? agent.org_id ?? null;
+    await writeAuditRequired({userId:context.userId,action:"agent_passport_save_started",targetType:"personal_agent",targetId:agent.id});
 
     const { data: identity, error: identityError } = await sb
       .from("agent_identities")
@@ -94,6 +96,7 @@ export const upsertAgentPassport = createServerFn({ method: "POST" })
       .select("*")
       .maybeSingle();
     if (passportError || !passport) throw new Error(passportError?.message ?? "Could not update agent passport.");
+    await writeAuditRequired({userId:context.userId,action:"agent_passport_saved",targetType:"agent_passport",targetId:passport.id});
     return { identity, passport };
   });
 
@@ -122,6 +125,7 @@ export const createAgentDelegationGrant = createServerFn({ method: "POST" })
     const granteeOrg = grantee.org_id_fk ?? grantee.org_id ?? null;
     if (grantorOrg !== granteeOrg) throw new Error("Delegation requires agents in the same owner and organisation scope.");
 
+    await writeAuditRequired({userId:context.userId,action:"agent_delegation_create_started",targetType:"personal_agent",targetId:grantor.id});
     const { data: grant, error } = await sb
       .from("agent_delegation_grants")
       .insert({
@@ -140,6 +144,14 @@ export const createAgentDelegationGrant = createServerFn({ method: "POST" })
       .select("*")
       .maybeSingle();
     if (error || !grant) throw new Error(error?.message ?? "Could not create delegation grant.");
+    try {
+      await writeAuditRequired({userId:context.userId,action:"agent_delegation_created",targetType:"agent_delegation_grant",targetId:grant.id});
+    } catch (error) {
+      // Do not leave a newly created routing grant active after certification fails.
+      const suspended = await sb.from("agent_delegation_grants").update({status:"suspended"}).eq("id",grant.id).eq("user_id",context.userId).select("id").maybeSingle();
+      if (suspended.error || !suspended.data) throw new Error("Delegation audit failed and suspension could not be verified. Inspect this grant before retrying.");
+      throw error;
+    }
     return grant;
   });
 
@@ -148,6 +160,7 @@ export const revokeAgentDelegationGrant = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    await writeAuditRequired({userId:context.userId,action:"agent_delegation_revoke_started",targetType:"agent_delegation_grant",targetId:data.id});
     const { data: grant, error } = await sb
       .from("agent_delegation_grants")
       .update({ status: "revoked" })
@@ -156,5 +169,6 @@ export const revokeAgentDelegationGrant = createServerFn({ method: "POST" })
       .select("id,status")
       .maybeSingle();
     if (error || !grant) throw new Error(error?.message ?? "Delegation grant not found.");
+    await writeAuditRequired({userId:context.userId,action:"agent_delegation_revoked",targetType:"agent_delegation_grant",targetId:grant.id});
     return grant;
   });

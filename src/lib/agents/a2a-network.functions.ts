@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAuditRequired } from "@/lib/platform/audit.server";
 import { resolveAgentNetworkRoute, type AgentNetworkPassport } from "./a2a-network";
 import type { AgentDelegationGrant } from "./agent-trust";
 
@@ -115,6 +116,7 @@ export const queueAgentNetworkMessage = createServerFn({ method: "POST" })
     const recipientOrg = recipient.org_id_fk ?? recipient.org_id ?? null;
     if (senderOrg !== recipientOrg) throw new Error("A2A routing cannot cross organisation boundaries.");
 
+    await writeAuditRequired({userId:context.userId,action:"agent_a2a_queue_started",targetType:"personal_agent",targetId:sender.id});
     const { data: message, error } = await sb
       .from("agent_a2a_messages")
       .insert({
@@ -135,5 +137,12 @@ export const queueAgentNetworkMessage = createServerFn({ method: "POST" })
       .select("*")
       .maybeSingle();
     if (error || !message) throw new Error(error?.message ?? "Could not queue A2A message.");
+    try {
+      await writeAuditRequired({userId:context.userId,action:"agent_a2a_queued",targetType:"agent_a2a_message",targetId:message.id});
+    } catch (error) {
+      const rejected = await sb.from("agent_a2a_messages").update({status:"rejected"}).eq("id",message.id).eq("user_id",context.userId).select("id").maybeSingle();
+      if (rejected.error || !rejected.data) throw new Error("A2A audit failed and rejection could not be verified. Inspect this envelope before retrying.");
+      throw error;
+    }
     return { route, message };
   });
