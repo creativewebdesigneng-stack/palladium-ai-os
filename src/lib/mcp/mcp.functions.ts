@@ -33,9 +33,32 @@ export const listExternalMcpServers = createServerFn({ method: "POST" })
     const { data, error } = await sb
       .from("external_mcp_servers")
       .select("id,org_id,name,slug,endpoint_url,auth_header_name,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,created_at,updated_at")
+      .eq("user_id", context.userId)
       .order("name", { ascending: true });
     if (error) throw new Error("Could not load external MCP servers.");
     return data ?? [];
+  });
+
+/** Read-only bounded projection of the existing registry, with no endpoint or secret fields. */
+export const getExternalMcpRegistryOverview = createServerFn({method:'POST'})
+  .middleware([requireSupabaseAuth])
+  .handler(async ({context})=>{
+    const sb=context.supabase as unknown as Sb;
+    const {data,error}=await sb.from('external_mcp_servers')
+      .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at')
+      .eq('user_id',context.userId).order('name',{ascending:true}).limit(101);
+    if(error)throw new Error('Could not verify your external MCP registry.');
+    const rows=(data??[]) as Array<Record<string,unknown>>;
+    return {
+      servers:rows.slice(0,100).map(row=>({
+        id:String(row['id']),name:String(row['name']).slice(0,120),slug:String(row['slug']).slice(0,63),
+        enabled:row['enabled']===true,requiresApproval:row['requires_approval']!==false,
+        allowedToolCount:Array.isArray(row['allowed_tool_names'])?row['allowed_tool_names'].length:0,
+        cachedToolCount:Array.isArray(row['cached_tools'])?Math.min(row['cached_tools'].length,200):0,
+        lastDiscoveredAt:typeof row['last_discovered_at']==='string'?row['last_discovered_at']:null,
+      })),
+      truncated:rows.length>100,
+    };
   });
 
 export const saveExternalMcpServer = createServerFn({ method: "POST" })

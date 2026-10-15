@@ -1,6 +1,7 @@
 import { Copy, KeyRound, LockKeyhole, Server, ShieldCheck, Wrench } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog';
+import ExternalRegistryOverview from '@/components/mcp-hub/ExternalRegistryOverview';
 
 const ACCESS = {
   read: { label: 'Read only', cls: 'border-emerald-400/20 bg-emerald-400/[.08] text-emerald-300' },
@@ -23,7 +24,7 @@ export default function McpHub() {
       <PageHeader
         eyebrow="MCP"
         title="MCP Hub"
-        description="The live Model Context Protocol surface bundled with Blackstar. This page shows the server and tools that actually ship with the application."
+        description="Blackstar's bundled Model Context Protocol tools and your private external server registry. Saved configuration is shown separately from live connectivity."
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
@@ -72,6 +73,8 @@ export default function McpHub() {
           ))}
         </div>
       </div>
+
+      <ExternalRegistryOverview />
 
       <div className="space-y-5">
         {GROUPS.map((group) => {
