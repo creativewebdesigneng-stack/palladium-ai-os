@@ -20,7 +20,8 @@
     "test:customer-recovery": "node scripts/verification/customer-operations-recovery.mjs",
     "test:personal-recovery": "node scripts/verification/personal-workspace-recovery.mjs",
     "test:content-recovery": "node scripts/verification/content-workspace-recovery.mjs",
-    "test:studio-recovery": "node scripts/verification/studio-and-analytics-recovery.mjs"
+    "test:studio-recovery": "node scripts/verification/studio-and-analytics-recovery.mjs",
+    "test:private-recovery": "node scripts/verification/private-operations-recovery.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
