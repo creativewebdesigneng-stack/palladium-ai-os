@@ -1,4 +1,5 @@
 import type { AiHubCapabilityKind } from './contracts'
+import { isExplicitExternalToolScope } from '@/lib/mcp/external-tool-scope'
 
 export interface AiHubLiveResource {
   id: string
@@ -199,10 +200,10 @@ export function toAiHubExternalMcpResources(row: AiHubResourceRecord): AiHubLive
   const id = String(row['id'] ?? '')
   const slug = String(row['slug'] ?? id)
   const tools = normaliseExternalMcpTools(row['cached_tools'])
-  const allowedNames = Array.isArray(row['allowed_tool_names']) ? row['allowed_tool_names'].map(String).filter(Boolean) : []
+  const allowedNames = isExplicitExternalToolScope(row['allowed_tool_names']) ? row['allowed_tool_names'] : []
   const allow = new Set(allowedNames)
-  const visibleTools = allow.size > 0 ? tools.filter((tool) => allow.has(tool.name)) : tools
-  const enabled = row['enabled'] !== false
+  const visibleTools = tools.filter((tool) => allow.has(tool.name))
+  const enabled = row['enabled'] === true
   const requiresApproval = row['requires_approval'] !== false
   const providerId = `external-mcp:${id}`
   const server: AiHubLiveResource = {

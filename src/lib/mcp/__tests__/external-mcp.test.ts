@@ -20,7 +20,7 @@ function fakeSb(overrides: Record<string, unknown> = {}) {
     auth_header_ciphertext: null,
     enabled: true,
     requires_approval: true,
-    allowed_tool_names: [],
+    allowed_tool_names: ["search"],
     ...overrides,
   };
   const updates: Record<string, unknown>[] = [];
@@ -89,6 +89,42 @@ describe("external MCP endpoint security", () => {
 });
 
 describe("external MCP protocol boundary", () => {
+  it.each([null, [], [''], [' search'], ['search '], [123], 'search', Array(201).fill('search'), ['x'.repeat(161)]])(
+    'rejects invalid persisted tool scope %j before DNS, discovery, execution or cache writes', async (scope) => {
+      const { sb, updates } = fakeSb({ allowed_tool_names: scope });
+      const fetchImpl = vi.fn();
+      const lookupImpl = vi.fn(publicLookup);
+      const args = { sb: sb as never, userId: 'user-1', serverId: 'server-1', options: { fetchImpl: fetchImpl as never, lookupImpl } };
+      await expect(listExternalMcpTools(args)).rejects.toThrow(/explicit.*allow-list/);
+      await expect(callExternalMcpTool({ ...args, approved: true, toolName: 'search', input: {} })).rejects.toThrow(/explicit.*allow-list/);
+      expect(lookupImpl).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(updates).toEqual([]);
+    },
+  );
+
+  it('does not let approval authorize an unlisted tool or a truncated name', async () => {
+    const { sb } = fakeSb();
+    const fetchImpl = vi.fn();
+    for (const toolName of ['write', 'search-extra', 'search ', 'x'.repeat(161)]) {
+      await expect(callExternalMcpTool({ sb: sb as never, userId: 'user-1', serverId: 'server-1',
+        toolName, input: {}, approved: true, options: { fetchImpl: fetchImpl as never, lookupImpl: publicLookup } }))
+        .rejects.toThrow(/not allowed/);
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('executes an exactly allowed tool after explicit approval', async () => {
+    const { sb } = fakeSb();
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 1, result: {} }))
+      .mockResolvedValueOnce(jsonResponse({ jsonrpc: '2.0', id: 2, result: { content: [] } }));
+    await expect(callExternalMcpTool({ sb: sb as never, userId: 'user-1', serverId: 'server-1',
+      toolName: 'search', input: { query: 'reference' }, approved: true,
+      options: { fetchImpl: fetchImpl as never, lookupImpl: publicLookup } })).resolves.toEqual({ content: [] });
+    expect(JSON.parse(fetchImpl.mock.calls[1]![1].body)).toMatchObject({ method: 'tools/call', params: { name: 'search', arguments: { query: 'reference' } } });
+  });
+
   it("initialises, discovers bounded tools, applies the allow-list and updates the cache", async () => {
     const { sb, updates } = fakeSb({ allowed_tool_names: ["search"] });
     const fetchImpl = vi
