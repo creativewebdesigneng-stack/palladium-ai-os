@@ -117,6 +117,7 @@ export const promoteZenNoteToKnowledge = createServerFn({ method: "POST" })
         scope: "private",
       },
     });
-    await sb.from("zen_notes").update({ knowledge_document_id: indexed.document.id, updated_at: new Date().toISOString() }).eq("id", note.id).eq("user_id", context.userId);
+    const { error: linkError } = await sb.from("zen_notes").update({ knowledge_document_id: indexed.document.id, updated_at: new Date().toISOString() }).eq("id", note.id).eq("user_id", context.userId);
+    if (linkError) throw new Error(linkError.message);
     return { ok: true, documentId: String(indexed.document.id), chunks: Number(indexed.chunks ?? 0) };
   });
