@@ -15,10 +15,10 @@ export type AuditEntry = {
   metadata?: Record<string, unknown>;
 };
 
-export async function writeAudit(entry: AuditEntry) {
-  try {
+/** Required audit boundary for operations that must not proceed unrecorded. */
+export async function writeAuditRequired(entry: AuditEntry) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("mission_audit_logs").insert({
+    const result = await supabaseAdmin.from("mission_audit_logs").insert({
       user_id: entry.userId,
       org_id: entry.orgId ?? null,
       action: entry.action,
@@ -28,7 +28,16 @@ export async function writeAudit(entry: AuditEntry) {
       agent_id: entry.agentId ?? null,
       ip_address: entry.ipAddress ?? null,
       metadata: entry.metadata ?? {},
-    } as never);
+    } as never).select("id").single();
+    if (result.error || !result.data?.id) {
+      throw new Error("Required audit entry could not be persisted. The operation cannot be certified.");
+    }
+    return result.data.id;
+}
+
+export async function writeAudit(entry: AuditEntry) {
+  try {
+    await writeAuditRequired(entry);
   } catch (error) {
     // Audit logging must never take down the request it is describing.
     console.error("[audit] failed to record entry", entry.action, error);
