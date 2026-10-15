@@ -40,7 +40,7 @@ create table agent_identities(org_id uuid);
 create table agent_delegation_grants(created_by uuid,org_id uuid,user_id uuid);
 `);
 await db.exec(recovery);
-await denied(recovery);
+await assert.rejects(() => db.exec(recovery), /requires all four tables to be absent/); passed++;
 await db.exec(migration('_tune_connector_and_trust_indexes.sql'));
 for (const table of ['integrations','integration_credentials','dashboard_widgets','platform_settings']) {
   check((await rows(`select relrowsecurity from pg_class where oid='${table}'::regclass`))[0].relrowsecurity, `${table} RLS`);

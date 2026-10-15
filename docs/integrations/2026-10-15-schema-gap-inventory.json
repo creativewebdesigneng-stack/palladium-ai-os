@@ -27,10 +27,6 @@
     "builder_deployments",
     "builder_jobs",
     "creator_profiles",
-    "crm_activities",
-    "crm_contacts",
-    "crm_field_definitions",
-    "crm_saved_views",
     "deployment_targets",
     "enterprise_autonomy_policies",
     "finance_transactions",
@@ -68,22 +64,31 @@
     "social_post_targets",
     "social_posts",
     "spend_limits",
-    "support_canned_responses",
-    "support_help_articles",
-    "support_inboxes",
-    "support_messages",
-    "support_tickets",
     "task_focus_sessions",
     "teams",
     "trusted_media_assets",
     "user_documents",
     "voice_clone_jobs",
     "web_crawl_jobs",
-    "whatsapp_broadcast_recipients",
-    "whatsapp_broadcasts",
-    "whatsapp_conversations",
-    "whatsapp_messages",
     "zen_notes"
   ],
-  "caution": "Each remaining name needs table-versus-storage and migration/handler review before recovery. This is not a claim that all 72 names should become new tables."
+  "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
+  "recovered_customer_operations": [
+    "crm_contacts",
+    "crm_activities",
+    "crm_field_definitions",
+    "crm_saved_views",
+    "support_inboxes",
+    "support_tickets",
+    "support_messages",
+    "support_canned_responses",
+    "support_help_articles",
+    "whatsapp_conversations",
+    "whatsapp_messages",
+    "whatsapp_broadcasts",
+    "whatsapp_broadcast_recipients"
+  ],
+  "unreviewed_absent_dependency_names": [
+    "agent_economy_accounts"
+  ]
 }
