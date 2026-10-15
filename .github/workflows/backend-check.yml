@@ -105,6 +105,9 @@ jobs:
       - name: Connector recovery isolated Postgres access-control tests
         run: bun run test:connector-recovery
 
+      - name: Browser recovery isolated Postgres access-control tests
+        run: bun run test:browser-recovery
+
       - name: Free Open3D worker Python syntax and safety tests
         run: |
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
