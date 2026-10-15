@@ -1,5 +1,5 @@
 import { describe,expect,it } from 'vitest'
-import { archivePath, buildMemoryArchiveOverview } from './memory-archive'
+import { archivePath, buildMemoryArchiveOverview, filterMemoryArchiveEntries } from './memory-archive'
 
 const UUIDS=['00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000003']
 const now=Date.parse('2026-10-13T12:00:00.000Z')
@@ -57,5 +57,34 @@ describe('Blackstar governed memory archive',()=>{
     expect(result.counts.long_term).toBe(1)
     expect(result.total).toBe(2)
     expect(result.truncated).toBe(false)
+  })
+  it('never proposes duplicate consolidation across different record owners',()=>{
+    const result=buildMemoryArchiveOverview({memories:[{...base,id:UUIDS[0]!,user_id:'owner-A'},{...base,id:UUIDS[1]!,user_id:'owner-B'}],now})
+    expect(result.reviews).toEqual([])
+  })
+  it('counts only valid projected records while reporting every inspected input',()=>{
+    const result=buildMemoryArchiveOverview({memories:[{...base,id:UUIDS[0]!},{...base,id:'invalid'}],documents:[{id:'invalid'}],now})
+    expect(result.total).toBe(1)
+    expect(result.scanned).toBe(3)
+  })
+  it('drills into an exact folder boundary and searches metadata without body access',()=>{
+    const overview=buildMemoryArchiveOverview({memories:[
+      {...base,id:UUIDS[0]!,scope:'agent',agent_id:'alpha',title:'Launch checklist'},
+      {...base,id:UUIDS[1]!,scope:'agent',agent_id:'alpha-other',title:'Other checklist'},
+      {...base,id:UUIDS[2]!,content:'private-body-only-search-term',title:'Unrelated'},
+    ],now})
+    const folder=overview.folders.find(row=>row.path.includes('/agent/alpha/'))!.path
+    expect(filterMemoryArchiveEntries(overview.entries,{folderPath:folder,query:'LAUNCH'}).map(row=>row.id)).toEqual([UUIDS[0]])
+    expect(filterMemoryArchiveEntries(overview.entries,{query:'private-body-only-search-term'})).toEqual([])
+  })
+  it('filters lifecycle suggestions without changing canonical records or review data',()=>{
+    const overview=buildMemoryArchiveOverview({memories:[
+      {...base,id:UUIDS[0]!,expires_at:'2026-10-01T00:00:00Z'},
+      {...base,id:UUIDS[1]!,memory_type:'short_term'},
+    ],now})
+    const before=JSON.stringify(overview)
+    expect(filterMemoryArchiveEntries(overview.entries,{reviews:overview.reviews,reviewKind:'expired'}).map(row=>row.id)).toEqual([UUIDS[0]])
+    expect(filterMemoryArchiveEntries(overview.entries,{reviews:overview.reviews,reviewKind:'short_term_stale'}).map(row=>row.id)).toEqual([UUIDS[1]])
+    expect(JSON.stringify(overview)).toBe(before)
   })
 })
