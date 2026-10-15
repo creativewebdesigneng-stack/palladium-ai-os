@@ -77,6 +77,28 @@ describe("executeTool harness enforcement", () => {
     expect(db.tables.tool_executions).toHaveLength(1);
   });
 
+  it("blocks input beyond inspection bounds before provider preparation or approval", async () => {
+    let nested: Record<string,unknown> = { api_key: "deep-secret" };
+    for(let i=0;i<10;i++) nested={child:nested};
+    const db=sb();
+    const result=await executeTool("integration_action",{provider:"shopify",input:nested},ctx(db),grants(["integration_action",{}]));
+    expect(result.output).toMatchObject({policy_code:"input_inspection_limit"});
+    expect(integrationMocks.prepareIntegrationAction).not.toHaveBeenCalled();
+    expect(integrationMocks.executeIntegrationAction).not.toHaveBeenCalled();
+    expect(db.tables.approval_requests).toHaveLength(0);
+    expect(JSON.stringify(db.tables.tool_executions)).not.toContain("deep-secret");
+  });
+
+  it.each(["web_fetch", "html_studio"])("blocks credential-bearing URLs without persisting them in %s execution logs",async tool=>{
+    const db=sb();
+    const result=await executeTool(tool,{url:"https://user:private-secret@example.com/path"},ctx(db),grants([tool,{allowedDomains:["example.com"]}]));
+    expect(result.output).toMatchObject({policy_code:"invalid_domain_scope"});
+    expect(db.tables.approval_requests).toHaveLength(0);
+    expect(db.tables.tool_executions).toHaveLength(1);
+    expect(db.tables.tool_executions[0].input).toEqual({redacted:true});
+    expect(JSON.stringify(db.tables.tool_executions)).not.toContain("private-secret");
+  });
+
   it("leaves ordinary safe reads unchanged", async () => {
     const db = sb();
     const result = await executeTool(

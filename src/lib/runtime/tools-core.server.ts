@@ -1522,7 +1522,7 @@ export async function executeTool(
 
   const harnessInputPolicy = assertHarnessToolInput(name, input, grant.allowedDomains);
   if (harnessInputPolicy.decision === "deny") {
-    await log("failed", { error: harnessInputPolicy.reason, policy_code: harnessInputPolicy.code });
+    await log("failed", { error: harnessInputPolicy.reason, policy_code: harnessInputPolicy.code, input: { redacted: true } });
     return {
       ok: false,
       output: {
