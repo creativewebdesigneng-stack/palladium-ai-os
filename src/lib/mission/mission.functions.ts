@@ -605,7 +605,7 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         });
 
         try {
-          await assertWithinLimits(sb, userId, agent?.id ?? null, Number(draft.total));
+          await assertWithinLimits(sb, userId, agent?.id ?? null, Number(draft.total), String(draft.currency ?? ''));
         } catch (error) {
           const reason = (error as Error).message;
           await sb
@@ -861,7 +861,7 @@ export const decideApproval = createServerFn({ method: "POST" })
 
     if (data.decision === "approve" && approval.estimated_cost != null) {
       try {
-        await assertWithinLimits(sb, userId, approval.agent_id, Number(approval.estimated_cost));
+        await assertWithinLimits(sb, userId, approval.agent_id, Number(approval.estimated_cost), String(approval.currency ?? ''));
       } catch (error) {
         await log(sb, userId, "purchase_blocked_by_limit", {
           agent_id: approval.agent_id,
@@ -1119,7 +1119,7 @@ export const confirmPurchase = createServerFn({ method: "POST" })
     if (!approval.data || approval.data.status !== "approved")
       throw new Error("Approval is required before checkout");
 
-    await assertWithinLimits(sb, userId, approval.data.agent_id, Number(purchase.total));
+    await assertWithinLimits(sb, userId, approval.data.agent_id, Number(purchase.total), String(purchase.currency ?? ''));
 
     await sb
       .from("purchase_requests")

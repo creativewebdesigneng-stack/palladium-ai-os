@@ -111,6 +111,9 @@ jobs:
       - name: Customer operations isolated Postgres access-control tests
         run: bun run test:customer-recovery
 
+      - name: Personal workspace isolated Postgres access-control tests
+        run: bun run test:personal-recovery
+
       - name: Free Open3D worker Python syntax and safety tests
         run: |
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py

@@ -354,7 +354,7 @@ export const preparePurchase = createServerFn({ method: "POST" })
 
     let limits;
     try {
-      limits = await assertWithinLimits(sb, userId, agentId, total);
+      limits = await assertWithinLimits(sb, userId, agentId, total, draft.currency);
     } catch (error) {
       await audit(sb, userId, "purchase_blocked_by_limit", {
         agent_id: agentId,
@@ -455,12 +455,12 @@ export const preparePurchase = createServerFn({ method: "POST" })
 
 /** Read-only affordability preview shown before a purchase is prepared. */
 export const previewPurchaseLimits = createServerFn({ method: "POST" })
-  .inputValidator((input: { total: number; agentId?: string | null }) => input)
+  .inputValidator((input: { total: number; agentId?: string | null; currency?: string }) => input)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const limits = await resolveSpendLimits(sb, context.userId, data.agentId ?? null);
-    return checkAgainstLimits(Number(data.total ?? 0), limits);
+    return checkAgainstLimits(Number(data.total ?? 0), limits, data.currency);
   });
 
 /* ------------------------------------------------------------------- limits */
