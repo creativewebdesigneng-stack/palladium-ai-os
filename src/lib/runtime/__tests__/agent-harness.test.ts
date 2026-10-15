@@ -59,4 +59,21 @@ describe("agent harness", () => {
     expect(evaluateSubagentSpawn({ depth: 0, parentTools: ["web_search"], requestedTools: ["github_write"] }).code).toBe("subagent_permission_escalation");
     expect(evaluateSubagentSpawn({ depth: 2, maxDepth: 2, parentTools: ["web_search"], requestedTools: ["web_search"] }).code).toBe("subagent_depth_exceeded");
   });
+
+  it('does not discard a disallowed target beyond the network scope limit',()=>{
+    const requested=[...Array(50).fill('example.com'),'evil.test'];
+    expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:requested,allowedDomains:['example.com']}).code).toBe('invalid_domain_scope');
+  });
+
+  it('rejects malformed or credential-bearing scopes instead of silently normalizing them',()=>{
+    for(const target of ['https://user:secret@example.com','file://example.com','*.example.com','http://','bad host']){
+      expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:[target],allowedDomains:['example.com']}).decision).toBe('deny');
+    }
+    expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:['example.com'],allowedDomains:['https://user:secret@example.com']}).code).toBe('invalid_domain_scope');
+  });
+
+  it('normalizes URL hostnames consistently while retaining exact subdomain boundaries',()=>{
+    expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:['https://docs.example.com:443/page'],allowedDomains:['https://WWW.Example.com/path']}).decision).toBe('allow');
+    expect(evaluateHarnessPolicy({tool:'web_fetch',requestedDomains:['example.com.evil.test'],allowedDomains:['example.com']}).decision).toBe('deny');
+  });
 });

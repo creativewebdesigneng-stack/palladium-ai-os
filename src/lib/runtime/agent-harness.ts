@@ -56,9 +56,22 @@ function hasCredentialInput(value: unknown, depth = 0): boolean {
   return false;
 }
 
+function normalizeHarnessDomain(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim() || value.trim().length > 2048) return null;
+  try {
+    const raw = value.trim();
+    if (/\s/.test(raw)) return null;
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    const host = url.hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+    if (!host || host.includes('*') || host.startsWith('.') || host.includes('..')) return null;
+    return host;
+  } catch { return null; }
+}
+
 export function normalizeHarnessDomains(domains: unknown): string[] {
   if (!Array.isArray(domains)) return [];
-  return [...new Set(domains.map((domain) => String(domain ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")).filter(Boolean))].slice(0, 50);
+  return [...new Set(domains.map(normalizeHarnessDomain).filter((host):host is string=>host!==null))].slice(0, 50);
 }
 
 function domainAllowed(host: string, allowed: string[]) {
@@ -75,6 +88,13 @@ export function evaluateHarnessPolicy(input: HarnessPolicyInput): HarnessPolicyR
     return { decision: "deny", risk: "critical", code: "privileged_sandbox_blocked", reason: "Privileged execution is disabled in the general agent runtime." };
   }
 
+  // Do not truncate requested targets before enforcement: a disallowed 51st
+  // target must never disappear from the policy decision.
+  for (const domains of [input.requestedDomains ?? [], input.allowedDomains ?? []]) {
+    if (!Array.isArray(domains) || domains.length > 50 || domains.some(value=>normalizeHarnessDomain(value)===null)) {
+      return { decision:'deny',risk:'high',code:'invalid_domain_scope',reason:'Network scope must contain at most 50 valid HTTP(S) host targets without credentials or wildcards.' };
+    }
+  }
   const requested = normalizeHarnessDomains(input.requestedDomains ?? []);
   const allowed = normalizeHarnessDomains(input.allowedDomains ?? []);
   // Missing network grants must fail closed, even before an approval step.

@@ -33,6 +33,22 @@ export type ArchiveOverview = {
   scanned:number; truncated:boolean
 }
 
+/** Metadata-only local navigation over an already authorised, bounded overview. */
+export function filterMemoryArchiveEntries(entries:ArchiveEntry[], options:{
+  query?:string; folderPath?:string; reviewKind?:ArchiveReviewKind|'all'; reviews?:ArchiveReview[];
+} = {}):ArchiveEntry[] {
+  const query=(options.query??'').trim().toLowerCase().slice(0,200)
+  const folder=options.folderPath?.replace(/\/+$/,'')
+  const reviewIds=options.reviewKind && options.reviewKind!=='all'
+    ?new Set((options.reviews??[]).filter(row=>row.kind===options.reviewKind).map(row=>row.id)):null
+  return entries.filter(row=>{
+    if(folder && !row.path.startsWith(`${folder}/`))return false
+    if(reviewIds && !reviewIds.has(row.id))return false
+    return !query || [row.title,row.path,row.category,row.layer,row.scope,row.kind]
+      .some(value=>String(value??'').toLowerCase().includes(query))
+  })
+}
+
 const LAYERS:MemoryArchiveLayer[]=['short_term','long_term','knowledge','organisation']
 const SCOPES:MemoryArchiveScope[]=['private','user','agent','shared','organisation']
 const safeSegment=(value:string)=>value.toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50)
@@ -88,7 +104,7 @@ export function buildMemoryArchiveOverview(input:{
     }
     const normalized=row.content.trim().toLowerCase().replace(/\s+/g,' ')
     // Compare only within the same exact access boundary, never across agents or organisations.
-    const boundary=`${archiveScope(row.scope)}:${row.org_id??''}:${row.agent_id??''}:${layer}`
+    const boundary=JSON.stringify([row.user_id??null,archiveScope(row.scope),row.org_id??null,row.agent_id??null,layer])
     if(!expired && normalized.length>=24){
       const key=`${boundary}:${normalized}`
       if(seen.has(key)){
@@ -115,6 +131,6 @@ export function buildMemoryArchiveOverview(input:{
     entries:entries.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||String(b.recordedAt??'').localeCompare(String(a.recordedAt??''))),
     folders:[...folders.values()].sort((a,b)=>a.path.localeCompare(b.path)),
     reviews:reviews.filter(review=>lens==='all' || entries.some(row=>row.id===review.id)).slice(0,50),
-    counts,total:rows.length+docs.length,scanned:rows.length+docs.length,truncated:input.truncated===true,
+    counts,total:Object.values(counts).reduce((a,b)=>a+b,0),scanned:input.memories.length+docs.length,truncated:input.truncated===true,
   }
 }
