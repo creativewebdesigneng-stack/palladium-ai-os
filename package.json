@@ -14,7 +14,8 @@
     "test": "vitest run",
     "backend:check": "tsc --noEmit && vitest run",
     "smoke:production": "node scripts/production-smoke.mjs",
-    "test:trust-fabric": "node scripts/verification/trust-fabric-recovery.mjs"
+    "test:trust-fabric": "node scripts/verification/trust-fabric-recovery.mjs",
+    "test:connector-recovery": "node scripts/verification/connector-recovery.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
