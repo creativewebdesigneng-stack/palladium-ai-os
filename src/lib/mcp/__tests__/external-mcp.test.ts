@@ -6,7 +6,7 @@ import {
   validateExternalMcpEndpoint,
 } from "../external-mcp.server";
 
-const publicLookup = async () => [{ address: "203.0.113.10", family: 4 }];
+const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 
 function fakeSb(overrides: Record<string, unknown> = {}) {
   const server = {
@@ -68,11 +68,23 @@ describe("external MCP endpoint security", () => {
     const endpoint = validateExternalMcpEndpoint("https://mcp.example.com/rpc");
     await expect(
       assertPublicMcpEndpoint(endpoint, async () => [
-        { address: "203.0.113.10", family: 4 },
+        { address: "93.184.216.34", family: 4 },
         { address: "10.0.0.7", family: 4 },
       ]),
     ).rejects.toThrow(/private/);
     await expect(assertPublicMcpEndpoint(endpoint, publicLookup)).resolves.toBeUndefined();
+  });
+
+  it('rejects special-purpose and alternate private-address encodings before external requests',async()=>{
+    const endpoint=validateExternalMcpEndpoint('https://mcp.example.com/rpc');
+    for(const address of ['198.18.0.1','198.51.100.2','203.0.113.3','192.0.0.8',
+      '::ffff:a00:1','64:ff9b::a00:1','fec0::1','ff02::1','2001:db8::1','2002:a00:1::1','not-an-ip']){
+      await expect(assertPublicMcpEndpoint(endpoint,async()=>[{address,family:address.includes(':')?6:4}]),address).rejects.toThrow(/private/);
+    }
+    for(const address of ['198.18.0.1','[::ffff:a00:1]','[64:ff9b::a00:1]','[fec0::1]']){
+      expect(()=>validateExternalMcpEndpoint(`https://${address}/mcp`)).toThrow(/public/);
+    }
+    await expect(assertPublicMcpEndpoint(endpoint,async()=>[{address:'2606:4700:4700::1111',family:6}])).resolves.toBeUndefined();
   });
 });
 
