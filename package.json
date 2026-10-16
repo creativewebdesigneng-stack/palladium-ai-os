@@ -100,11 +100,11 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "2.25.1",
+    "@lovable.dev/vite-tanstack-config": "2.26.7",
     "@types/node": "^22.16.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
@@ -112,11 +112,11 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^15.15.0",
     "nitro": "3.0.260603-beta",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.1",
-    "vitest": "^5.0.2"
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
   },
   "overrides": {
     "axios": "1.20.0",
