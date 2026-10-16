@@ -22,7 +22,8 @@
     "test:content-recovery": "node scripts/verification/content-workspace-recovery.mjs",
     "test:studio-recovery": "node scripts/verification/studio-and-analytics-recovery.mjs",
     "test:private-recovery": "node scripts/verification/private-operations-recovery.mjs",
-    "test:project-team-recovery": "node scripts/verification/project-team-recovery.mjs"
+    "test:project-team-recovery": "node scripts/verification/project-team-recovery.mjs",
+    "test:agent-economy-recovery": "node scripts/verification/agent-economy-recovery.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
