@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Copy, FileVideo2, Loader2, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { TRUSTED_MEDIA_MAX_BYTES, TRUSTED_MEDIA_MAX_MB } from "@/lib/media/trusted-media-policy";
 import PageHeader from "@/components/palladium/PageHeader";
 import {
   beginTrustedMediaUpload,
@@ -50,7 +51,7 @@ export default function TrustedSocialVideo() {
     event.preventDefault();
     if (!file) return setError("Choose an MP4 video first.");
     if (file.type !== "video/mp4" && !file.name.toLowerCase().endsWith(".mp4")) return setError("Trusted social video currently accepts MP4 files only.");
-    if (file.size > 512 * 1024 * 1024) return setError("The governed upload limit is 512 MB.");
+    if (file.size > TRUSTED_MEDIA_MAX_BYTES) return setError(`The governed upload limit is ${TRUSTED_MEDIA_MAX_MB} MB.`);
     setBusy(true);
     setError("");
     setNotice("");
@@ -103,7 +104,7 @@ export default function TrustedSocialVideo() {
           <p className="mb-4 text-xs leading-5 text-zinc-500">Files remain in Blackstar's private trusted-media bucket. The browser never supplies a remote source URL to TikTok or YouTube.</p>
           <form onSubmit={upload} className="space-y-4">
             <label className="block rounded-xl border border-dashed border-white/15 bg-black/20 p-4">
-              <span className="mb-2 block text-xs font-medium text-zinc-300">MP4 video · maximum 512 MB</span>
+              <span className="mb-2 block text-xs font-medium text-zinc-300">MP4 video · maximum {TRUSTED_MEDIA_MAX_MB} MB</span>
               <input id="trusted-video-file" type="file" accept="video/mp4,.mp4" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="block w-full text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-black" />
               {file && <span className="mt-2 block text-xs text-zinc-500">{file.name} · {bytes(file.size)}</span>}
             </label>

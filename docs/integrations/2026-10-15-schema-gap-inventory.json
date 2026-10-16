@@ -3,7 +3,8 @@
   "project": "piwhiuangitqvwvwwcga",
   "scope": "Literal .from(string) references in non-test src and supabase/functions files; dynamic references and columns not covered.",
   "verified_storage_buckets": [
-    "knowledge"
+    "knowledge",
+    "trusted-media"
   ],
   "recovered_this_checkpoint": [
     "browser_artifacts",
@@ -20,8 +21,7 @@
     "deployment_targets",
     "marketplace_agents",
     "marketplace_purchases",
-    "media_edit_jobs",
-    "trusted_media_assets"
+    "media_edit_jobs"
   ],
   "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
   "recovered_customer_operations": [
@@ -105,5 +105,8 @@
     "agent_collective_deliberations",
     "agent_evolution_proposals",
     "enterprise_autonomy_policies"
+  ],
+  "recovered_trusted_media": [
+    "trusted_media_assets"
   ]
 }

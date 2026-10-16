@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { TRUSTED_MEDIA_MAX_BYTES } from "./trusted-media-policy";
 
 const BUCKET = "trusted-media";
 const READ_TTL_SECONDS = 15 * 60;
@@ -32,14 +33,14 @@ export async function getTrustedVideoAsset(userId: string, id: unknown): Promise
   // one new-table access dynamically typed while retaining explicit row checks.
   const db = supabaseAdmin as any;
   const { data, error } = await db.from("trusted_media_assets")
-    .select("id,user_id,bucket,object_path,filename,mime_type,size_bytes,duration_seconds,status")
+    .select("id,user_id,bucket,object_path,filename,mime_type,size_bytes,duration_seconds,status,verified_at")
     .eq("id", trustedId).eq("user_id", userId).eq("status", "ready").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Trusted media asset is not ready or does not belong to this user.");
   if (data.bucket !== BUCKET || data.mime_type !== "video/mp4") throw new Error("Trusted media asset is not an approved MP4 video.");
   const sizeBytes = Number(data.size_bytes);
   const durationSeconds = Number(data.duration_seconds);
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+  if (!data.verified_at || !Number.isFinite(Date.parse(String(data.verified_at))) || !Number.isSafeInteger(sizeBytes) || sizeBytes < 24 || sizeBytes>TRUSTED_MEDIA_MAX_BYTES || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds>43200) {
     throw new Error("Trusted media asset verification metadata is incomplete.");
   }
   const objectPath = clean(data.object_path, 1000);
