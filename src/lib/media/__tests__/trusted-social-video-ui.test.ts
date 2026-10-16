@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { TRUSTED_MEDIA_MAX_BYTES } from "../trusted-media-policy";
 
 const screen = readFileSync("src/screens/TrustedSocialVideo.jsx", "utf8");
 const route = readFileSync("src/routes/_shell/_app/trusted-social-video.tsx", "utf8");
@@ -12,7 +13,8 @@ describe("Trusted Social Video browser contract", () => {
     expect(screen).toContain("listTrustedMediaAssets");
     expect(screen).toContain('method: "PUT"');
     expect(screen).toContain('"Content-Type": "video/mp4"');
-    expect(screen).toContain("512 * 1024 * 1024");
+    expect(screen).toContain("file.size > TRUSTED_MEDIA_MAX_BYTES");
+    expect(TRUSTED_MEDIA_MAX_BYTES).toBe(50 * 1024 * 1024);
   });
 
   it("does not accept arbitrary remote provider source URLs or credentials", () => {

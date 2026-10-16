@@ -129,6 +129,9 @@ jobs:
       - name: Agent governance isolated Postgres access-control tests
         run: bun run test:governance-recovery
 
+      - name: Trusted media isolated Postgres access-control tests
+        run: bun run test:trusted-media-recovery
+
       - name: Free Open3D worker Python syntax and safety tests
         run: |
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
