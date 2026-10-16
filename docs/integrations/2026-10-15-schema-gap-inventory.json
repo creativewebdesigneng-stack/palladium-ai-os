@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-15",
+  "as_of": "2026-10-16",
   "project": "piwhiuangitqvwvwwcga",
   "scope": "Literal .from(string) references in non-test src and supabase/functions files; dynamic references and columns not covered.",
   "verified_storage_buckets": [
@@ -12,17 +12,12 @@
     "browser_sessions"
   ],
   "unreviewed_absent_reference_names": [
-    "agent_collective_deliberations",
-    "agent_economy_entries",
-    "agent_evolution_proposals",
-    "agent_simulation_runs",
     "api_keys",
     "api_request_logs",
     "builder_deployments",
     "builder_jobs",
     "creator_profiles",
     "deployment_targets",
-    "enterprise_autonomy_policies",
     "marketplace_agents",
     "marketplace_purchases",
     "media_edit_jobs",
@@ -44,9 +39,7 @@
     "whatsapp_broadcasts",
     "whatsapp_broadcast_recipients"
   ],
-  "unreviewed_absent_dependency_names": [
-    "agent_economy_accounts"
-  ],
+  "unreviewed_absent_dependency_names": [],
   "recovered_personal_workspace": [
     "shopping_tasks",
     "shopping_results",
@@ -104,5 +97,13 @@
   ],
   "recovered_missing_columns": [
     "personal_agents.team_id"
+  ],
+  "recovered_agent_governance": [
+    "agent_economy_accounts",
+    "agent_economy_entries",
+    "agent_simulation_runs",
+    "agent_collective_deliberations",
+    "agent_evolution_proposals",
+    "enterprise_autonomy_policies"
   ]
 }
