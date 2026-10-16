@@ -16,10 +16,8 @@
     "builder_deployments",
     "builder_jobs",
     "creator_profiles",
-    "deployment_targets",
     "marketplace_agents",
-    "marketplace_purchases",
-    "media_edit_jobs"
+    "marketplace_purchases"
   ],
   "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
   "recovered_customer_operations": [
@@ -110,5 +108,9 @@
   "recovered_developer_api": [
     "api_keys",
     "api_request_logs"
+  ],
+  "recovered_provider_jobs": [
+    "media_edit_jobs",
+    "deployment_targets"
   ]
 }
