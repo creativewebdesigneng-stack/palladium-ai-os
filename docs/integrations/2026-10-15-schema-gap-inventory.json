@@ -13,8 +13,6 @@
     "browser_sessions"
   ],
   "unreviewed_absent_reference_names": [
-    "api_keys",
-    "api_request_logs",
     "builder_deployments",
     "builder_jobs",
     "creator_profiles",
@@ -108,5 +106,9 @@
   ],
   "recovered_trusted_media": [
     "trusted_media_assets"
+  ],
+  "recovered_developer_api": [
+    "api_keys",
+    "api_request_logs"
   ]
 }

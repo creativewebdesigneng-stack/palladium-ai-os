@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 
-const { authenticateApiRequest, ApiError } = await import("../api-auth.server");
+const { authenticateApiRequest, ApiError, withApiAuth } = await import("../api-auth.server");
 
 const KEY = "pk_test_live_abcdef123456";
 
@@ -47,6 +47,42 @@ function request(key = KEY) {
 }
 
 describe("api key authentication", () => {
+  it.each([[], null, "agents:read", ["tasks:read"]])("never grants access for missing or malformed scopes %j", async scopes => {
+    await seed({scopes});
+    await expect(authenticateApiRequest(request(), {scope:"agents:read"})).rejects.toMatchObject({status:403,code:"insufficient_scope"});
+  });
+  it("rejects malformed expiry evidence",async()=>{
+    await seed({expires_at:"invalid"});
+    await expect(authenticateApiRequest(request(),{scope:"agents:read"})).rejects.toMatchObject({code:"expired_api_key"});
+  });
+  it.each(["api_keys","subscriptions","api_request_logs"])("fails closed when %s is unavailable",async table=>{
+    await seed();const from=state.db.from;
+    state.db.from=(name:string)=>{
+      if(name!==table)return from(name);
+      const q:any=new Proxy({}, {get:(_,key)=>key==="then"?(resolve:any)=>Promise.resolve({data:null,count:null,error:{message:"Invalid API key"}}).then(resolve):()=>q});return q;
+    };
+    await expect(authenticateApiRequest(request(),{scope:"agents:read"})).rejects.toMatchObject({status:503,code:"api_backend_unavailable"});
+  });
+  it("does not execute a handler when quota reservation fails",async()=>{
+    await seed();state.db.rpc=vi.fn(async()=>({error:{message:"unavailable"}}));
+    const handler=vi.fn();const response=await withApiAuth({scope:"agents:read",path:"/agents"},handler)({request:request()});
+    expect(response.status).toBe(503);expect(handler).not.toHaveBeenCalled();expect(state.db.tables.api_request_logs).toHaveLength(0);
+  });
+  it("honours the atomic quota decision after initial checks pass",async()=>{
+    await seed();state.db.rpc=vi.fn(async()=>({data:{error:"rate_limit_exceeded"},error:null}));
+    const handler=vi.fn();const response=await withApiAuth({scope:"agents:read",path:"/agents"},handler)({request:request()});
+    expect(response.status).toBe(429);expect(handler).not.toHaveBeenCalled();
+  });
+  it("keeps a completed POST successful when completion telemetry fails",async()=>{
+    await seed();state.db.rpc=vi.fn(async()=>({data:{id:"log-reserved"},error:null}));
+    const from=state.db.from;state.db.from=(name:string)=>{
+      const q=from(name);if(name==="api_request_logs")q.update=()=>{const failed:any={eq:()=>failed,then:(resolve:any)=>Promise.resolve({error:{message:"offline"}}).then(resolve)};return failed;};return q;
+    };
+    const handler=vi.fn(async()=>({done:true}));const post=new Request("https://app.test/api/public/v1/agents",{method:"POST",headers:{authorization:`Bearer ${KEY}`}});
+    const response=await withApiAuth({scope:"agents:read",path:"/agents"},handler)({request:post});
+    expect(response.status).toBe(201);expect(handler).toHaveBeenCalledTimes(1);
+    expect(state.db.rpc.mock.calls[0][1]).toMatchObject({p_user_id:"user-1",p_key_id:"key-1",p_scope:"agents:read",p_execution:false});
+  });
   it("accepts a valid key and resolves the free plan by default", async () => {
     await seed();
     const ctx = await authenticateApiRequest(request(), { scope: "agents:read" });
