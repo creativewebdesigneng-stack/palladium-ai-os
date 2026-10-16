@@ -17,12 +17,15 @@ const SCOPES = new Set<string>(API_SCOPES as unknown as string[]);
 const EVENTS = new Set<string>(WEBHOOK_EVENT_TYPES as unknown as string[]);
 
 async function resolvePlan(sb: Sb, userId: string) {
-  const { data } = await sb
+  const { data, error } = await sb
     .from("subscriptions")
     .select("plan_code,status,org_id")
+    .eq("user_id", userId)
+    .is("org_id", null)
     .in("status", ["trialing", "active", "past_due"])
     .order("updated_at", { ascending: false })
     .limit(1);
+  if (error) throw new Error("Could not verify your API plan. Try again later.");
   return (data?.[0]?.plan_code as string) ?? "explorer";
 }
 
@@ -53,11 +56,12 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const planCode = await resolvePlan(sb, context.userId);
     const limits = apiLimitsFor(planCode);
-    const { data } = await sb
+    const { data, error } = await sb
       .from("api_keys")
       .select(KEY_COLUMNS)
-
+      .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
+    if (error) throw new Error("Could not load API keys. Try again later.");
     return {
       keys: (data ?? []).map(shapeKey),
       plan: { code: planCode, ...limits },
@@ -95,34 +99,21 @@ export const createApiKeyFn = createServerFn({ method: "POST" })
     const planCode = await resolvePlan(sb, context.userId);
     const limits = apiLimitsFor(planCode);
 
-    const { count } = await sb
-      .from("api_keys")
-      .select("id", { count: "exact", head: true })
-      .is("revoked_at", null);
-    if ((count ?? 0) >= limits.maxKeys) {
-      throw new Error(
-        `The ${limits.label} plan allows ${limits.maxKeys} active API key(s). Revoke one or upgrade.`,
-      );
-    }
-
     const generated = await generateApiKey(data.environment);
-    const { data: row, error } = await sb
-      .from("api_keys")
-      .insert({
-        user_id: context.userId,
-        name: data.name,
-        environment: data.environment,
-        key_prefix: generated.prefix,
-        last_four: generated.lastFour,
-        key_hash: generated.hash,
-        scopes: data.scopes.length ? data.scopes : ["agents:read", "tasks:read"],
-        expires_at: data.expiresInDays
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await (supabaseAdmin as any).rpc("create_developer_api_key", {
+        p_user_id: context.userId, p_max_keys: limits.maxKeys,
+        p_name: data.name, p_environment: data.environment,
+        p_prefix: generated.prefix, p_last_four: generated.lastFour,
+        p_hash: generated.hash,
+        p_scopes: data.scopes.length ? data.scopes : ["agents:read", "tasks:read"],
+        p_expires_at: data.expiresInDays
           ? new Date(Date.now() + data.expiresInDays * 86_400_000).toISOString()
           : null,
-      })
-      .select(KEY_COLUMNS)
-      .single();
-    if (error) throw new Error(error.message);
+      });
+    if (error || !row) throw new Error("Could not securely create the API key. Try again later.");
+    if (row.error === "key_quota_exceeded") throw new Error(`The ${limits.label} plan allows ${limits.maxKeys} active API key(s). Revoke one or upgrade.`);
+    if (!row.id) throw new Error("API key creation was not confirmed.");
     // The only time the raw key exists outside the caller's own machine.
     return { key: generated.raw, record: shapeKey(row) };
   });
@@ -133,30 +124,34 @@ export const rotateApiKeyFn = createServerFn({ method: "POST" })
   .inputValidator((input: { key_id: string }) => ({ key_id: String(input?.key_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
-    const { data: existing } = await sb
+    const { data: existing, error: lookupError } = await sb
       .from("api_keys")
-      .select("id,name,environment,scopes")
+      .select("id,name,environment,scopes,revoked_at,expires_at")
       .eq("id", data.key_id)
+      .eq("user_id", context.userId)
       .maybeSingle();
+    if (lookupError) throw new Error("Could not verify this API key. Try again later.");
     if (!existing) throw new Error("That API key no longer exists.");
+    if (existing.revoked_at || (existing.expires_at && Date.parse(existing.expires_at) <= Date.now())) throw new Error("Revoked or expired API keys cannot be rotated. Create a new key.");
 
     const generated = await generateApiKey(
       (existing.environment === "test" ? "test" : "live") as "live" | "test",
     );
-    const { data: row, error } = await sb
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("api_keys")
       .update({
         key_hash: generated.hash,
         key_prefix: generated.prefix,
         last_four: generated.lastFour,
-        request_count: 0,
-        last_used_at: null,
-        revoked_at: null,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", data.key_id)
+      .eq("user_id", context.userId)
+      .is("revoked_at", null)
       .select(KEY_COLUMNS)
       .single();
-    if (error) throw new Error(error.message);
+    if (error || !row) throw new Error("API key rotation was not confirmed. Refresh and try again.");
     return { key: generated.raw, record: shapeKey(row) };
   });
 
@@ -165,12 +160,14 @@ export const revokeApiKeyFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { key_id: string }) => ({ key_id: String(input?.key_id ?? "") }))
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as Sb;
-    const { error } = await sb
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("api_keys")
       .update({ revoked_at: new Date().toISOString() })
-      .eq("id", data.key_id);
-    if (error) throw new Error(error.message);
+      .eq("id", data.key_id)
+      .eq("user_id", context.userId)
+      .select("id").maybeSingle();
+    if (error || !row) throw new Error("API key revocation was not confirmed.");
     return { revoked: true };
   });
 
@@ -329,15 +326,18 @@ export const getApiUsageFn = createServerFn({ method: "POST" })
     const limits = apiLimitsFor(planCode);
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 
-    const [{ data: logs }, { data: keys }] = await Promise.all([
+    const [logsResult, keysResult] = await Promise.all([
       sb
         .from("api_request_logs")
         .select("id,method,path,status_code,duration_ms,ip,created_at,api_key_id,error")
+        .eq("user_id", context.userId)
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(500),
-      sb.from("api_keys").select("id,name"),
+      sb.from("api_keys").select("id,name").eq("user_id", context.userId),
     ]);
+    if (logsResult.error || keysResult.error) throw new Error("Could not load API usage. Try again later.");
+    const logs = logsResult.data; const keys = keysResult.data;
 
     const keyNames = new Map<string, string>((keys ?? []).map((k: any) => [k.id, k.name]));
     const rows = logs ?? [];

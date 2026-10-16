@@ -18,6 +18,8 @@ export type ApiCallerContext = {
   planCode: string;
   limits: ApiPlanLimits;
   admin: any;
+  keyHash: string;
+  requestLogId?: string;
 };
 
 export class ApiError extends Error {
@@ -62,10 +64,15 @@ async function resolvePlan(admin: any, userId: string, orgId: string | null): Pr
     .in("status", ["trialing", "active", "past_due"])
     .order("updated_at", { ascending: false })
     .limit(1);
-  const { data } = orgId
+  const { data, error } = orgId
     ? await query.eq("org_id", orgId)
     : await query.is("org_id", null).eq("user_id", userId);
+  if (error) throw backendUnavailable();
   return (data?.[0]?.plan_code as string) ?? "explorer";
+}
+
+function backendUnavailable() {
+  return new ApiError(503, "api_backend_unavailable", "API authorization storage is unavailable. Try again later.");
 }
 
 /** Verifies the bearer key and enforces scope + plan quotas. Throws ApiError. */
@@ -86,20 +93,21 @@ export async function authenticateApiRequest(
   const admin: any = supabaseAdmin;
 
   const hash = await sha256Hex(presented);
-  const { data: key } = await admin
+  const { data: key, error: keyError } = await admin
     .from("api_keys")
     .select("id,user_id,org_id,name,scopes,revoked_at,expires_at,environment")
     .eq("key_hash", hash)
     .maybeSingle();
+  if (keyError) throw backendUnavailable();
 
   if (!key) throw new ApiError(401, "invalid_api_key", "This API key is not recognised.");
   if (key.revoked_at) throw new ApiError(401, "revoked_api_key", "This API key has been revoked.");
-  if (key.expires_at && new Date(key.expires_at).getTime() < Date.now()) {
+  if (key.expires_at && (!Number.isFinite(Date.parse(key.expires_at)) || Date.parse(key.expires_at) <= Date.now())) {
     throw new ApiError(401, "expired_api_key", "This API key has expired.");
   }
 
   const scopes: string[] = Array.isArray(key.scopes) ? key.scopes : [];
-  if (scopes.length && !scopes.includes(options.scope)) {
+  if (!scopes.includes(options.scope)) {
     throw new ApiError(
       403,
       "insufficient_scope",
@@ -127,7 +135,7 @@ export async function authenticateApiRequest(
   const minuteAgo = new Date(Date.now() - 60_000).toISOString();
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
 
-  const [{ count: minuteCount }, { count: dayCount }] = await Promise.all([
+  const [minuteResult, dayResult] = await Promise.all([
     admin
       .from("api_request_logs")
       .select("id", { count: "exact", head: true })
@@ -139,6 +147,9 @@ export async function authenticateApiRequest(
       .eq("user_id", key.user_id)
       .gte("created_at", dayAgo),
   ]);
+  if (minuteResult.error || dayResult.error || !Number.isSafeInteger(minuteResult.count) || !Number.isSafeInteger(dayResult.count)) throw backendUnavailable();
+  const minuteCount = minuteResult.count;
+  const dayCount = dayResult.count;
 
   if ((minuteCount ?? 0) >= limits.requestsPerMinute) {
     throw new ApiError(
@@ -166,12 +177,13 @@ export async function authenticateApiRequest(
   }
 
   if (options.execution) {
-    const { count: execCount } = await admin
+    const { count: execCount, error: execError } = await admin
       .from("api_request_logs")
       .select("id", { count: "exact", head: true })
       .eq("user_id", key.user_id)
-      .ilike("path", "%/run%")
+      .eq("is_execution", true)
       .gte("created_at", dayAgo);
+    if (execError || !Number.isSafeInteger(execCount)) throw backendUnavailable();
     if ((execCount ?? 0) >= limits.executionsPerDay) {
       throw new ApiError(
         429,
@@ -194,6 +206,7 @@ export async function authenticateApiRequest(
     planCode,
     limits,
     admin,
+    keyHash: hash,
   };
 }
 
@@ -209,23 +222,14 @@ async function logRequest(args: {
   const { admin, request, ctx } = args;
   if (!ctx) return;
   try {
-    await admin.from("api_request_logs").insert({
-      user_id: ctx.userId,
-      org_id: ctx.orgId,
-      api_key_id: ctx.keyId,
-      method: request.method,
-      path: args.path,
+    const { error } = await admin.from("api_request_logs").update({
       status_code: args.status,
       duration_ms: Date.now() - args.startedAt,
       ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for"),
       user_agent: request.headers.get("user-agent"),
       error: args.error ?? null,
-      plan_code: ctx.planCode,
-    });
-    await admin
-      .from("api_keys")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", ctx.keyId);
+    }).eq("id", ctx.requestLogId).eq("user_id", ctx.userId);
+    if (error) console.error("[devapi] request completion telemetry unavailable");
   } catch (error) {
     console.error("[devapi] failed to log request", error);
   }
@@ -244,6 +248,22 @@ export function withApiAuth(
     let ctx: ApiCallerContext | null = null;
     try {
       ctx = await authenticateApiRequest(request, options);
+      // Reserve quota before effects. A failed completion update leaves status=0,
+      // still counted; never report a completed POST as retryable because logging failed.
+      const { data: receipt, error: reservationError } = await ctx.admin.rpc("reserve_developer_api_request", {
+        p_user_id: ctx.userId, p_key_id: ctx.keyId, p_hash: ctx.keyHash,
+        p_scope: options.scope, p_method: request.method, p_path: options.path,
+        p_plan: ctx.planCode, p_minute: ctx.limits.requestsPerMinute,
+        p_day: ctx.limits.requestsPerDay, p_execution_limit: ctx.limits.executionsPerDay,
+        p_execution: Boolean(options.execution),
+      });
+      if (reservationError || !receipt || (!receipt.id && !receipt.error)) throw backendUnavailable();
+      if (receipt.error) {
+        if (receipt.error === "invalid_api_key") throw new ApiError(401, "invalid_api_key", "This API key is no longer active.");
+        if (!["rate_limit_exceeded", "daily_quota_exceeded", "execution_quota_exceeded"].includes(receipt.error)) throw backendUnavailable();
+        throw new ApiError(429, receipt.error, "The API request quota was exceeded.");
+      }
+      ctx.requestLogId = receipt.id;
       const result = await handler(ctx, request, params ?? {});
       const status = request.method === "POST" ? 201 : 200;
       const headers = {
@@ -258,7 +278,7 @@ export function withApiAuth(
       const code = isApiError ? error.code : "internal_error";
       const message = isApiError ? error.message : "The request could not be completed.";
       if (!isApiError) console.error("[devapi]", options.path, error);
-      if (ctx) {
+      if (ctx?.requestLogId) {
         await logRequest({
           admin: ctx.admin,
           request,

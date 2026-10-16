@@ -1,0 +1,66 @@
+// Real isolated Postgres grants/RLS/constraints and serialized reservation checks; no production keys.
+import {readFileSync,readdirSync} from 'node:fs';
+import assert from 'node:assert/strict';import {PGlite} from '@electric-sql/pglite';
+const db=new PGlite();let passed=0;const check=(v,m)=>{assert.ok(v,m);passed++;};
+const rows=async q=>(await db.query(q)).rows;const denied=async q=>{await assert.rejects(()=>db.query(q));passed++;};
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,a=id(1),b=id(2),org=id(3),hash='a'.repeat(64),hashB='b'.repeat(64);
+await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
+create table auth.users(id uuid primary key);create table public.organisations(id uuid primary key);
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+grant usage on schema auth,public to anon,authenticated,service_role;
+insert into auth.users values('${a}'),('${b}');insert into organisations values('${org}');`);
+const file=readdirSync('supabase/migrations').find(n=>n.endsWith('_restore_developer_api_authority.sql'));
+const sql=readFileSync('supabase/migrations/'+file,'utf8');await db.exec(sql);
+await assert.rejects(()=>db.exec(sql),/requires both tables absent/);passed++;
+for(const table of ['api_keys','api_request_logs']){
+ check((await rows(`select relrowsecurity from pg_class where oid='${table}'::regclass`))[0].relrowsecurity,'RLS enabled');
+ check((await rows(`select count(*) n from ${table}`))[0].n===0,'no backfill');
+ for(const role of ['anon','authenticated'])for(const priv of ['INSERT','UPDATE','DELETE','TRUNCATE'])check(!(await rows(`select has_table_privilege('${role}','${table}','${priv}') ok`))[0].ok,`${role} cannot ${priv} ${table}`);
+}
+check(!(await rows("select has_column_privilege('authenticated','api_keys','key_hash','SELECT') ok"))[0].ok,'hash never client-readable');
+check(!(await rows("select has_table_privilege('anon','api_request_logs','SELECT') ok"))[0].ok,'anonymous logs denied');
+const make=(user,h,max=1)=>`select public.create_developer_api_key('${user}',${max},'Fixture','test','pk_test_fixture','1234','${h}',array['agents:read','agents:run'],null) result`;
+await db.exec('set role service_role');const keyA=(await rows(make(a,hash)))[0].result;
+check(keyA.id&&!keyA.key_hash,'safe creation receipt');
+check((await rows(make(a,'c'.repeat(64))))[0].result.error==='key_quota_exceeded','second active key blocked');
+const keyB=(await rows(make(b,hashB)))[0].result;
+await denied(make(a,'not-a-hash',2));await denied(make(a,'d'.repeat(64),101));
+await denied(`update api_keys set scopes=array['admin:all'] where id='${keyA.id}'`);
+await denied(`update api_keys set scopes=array[null]::text[] where id='${keyA.id}'`);
+await denied(`insert into api_request_logs(user_id,api_key_id,method,path,status_code) values('${b}','${keyA.id}','GET','/fixture',200)`);
+await db.exec(`reset role;set role authenticated;set request.jwt.claim.sub='${a}'`);
+const owned=await rows('select id,name from api_keys');check(owned.length===1&&owned[0].id===keyA.id,'other owner key hidden');
+await denied('select key_hash from api_keys');await denied('select * from api_keys');
+await denied(`update api_keys set scopes=array['agents:run']`);await denied('delete from api_keys');
+await denied(make(a,'d'.repeat(64),2));
+const reserve=(user,key,h,{minute=20,day=500,execLimit=1,execution=false,scope='agents:read'}={})=>`select public.reserve_developer_api_request('${user}','${key}','${h}','${scope}','POST','/fixture/run','builder',${minute},${day},${execLimit},${execution}) result`;
+await denied(reserve(a,keyA.id,hash));
+await db.exec('reset role;set role anon');await denied(make(a,hash));await denied(reserve(a,keyA.id,hash));
+await db.exec('reset role;set role service_role');
+check((await rows(reserve(a,keyB.id,hashB)))[0].result.error==='invalid_api_key','cross-owner reservation denied');
+check((await rows(reserve(a,keyA.id,hashB)))[0].result.error==='invalid_api_key','rotated hash rejected');
+check((await rows(reserve(a,keyA.id,hash,{scope:'tasks:write'})))[0].result.error==='invalid_api_key','scope rechecked at reservation');
+const r1=(await rows(reserve(a,keyA.id,hash,{execution:true})))[0].result;
+check(Boolean(r1.id),'request reserved before execution');
+check((await rows(`select status_code,is_execution from api_request_logs where id='${r1.id}'`))[0].status_code===0,'incomplete reservation remains visible');
+check((await rows(reserve(a,keyA.id,hash,{execution:true})))[0].result.error==='execution_quota_exceeded','pending request consumes execution quota');
+check((await rows(reserve(a,keyA.id,hash,{minute:1})))[0].result.error==='rate_limit_exceeded','pending request consumes minute quota');
+check((await rows(reserve(a,keyA.id,hash,{day:1})))[0].result.error==='daily_quota_exceeded','pending request consumes day quota');
+check(Boolean((await rows(reserve(b,keyB.id,hashB,{minute:1})))[0].result.id),'other owner has independent quota');
+await db.exec(`update api_keys set revoked_at=now() where id='${keyA.id}'`);
+check((await rows(reserve(a,keyA.id,hash)))[0].result.error==='invalid_api_key','revocation rechecked');
+check(Boolean((await rows(make(a,'e'.repeat(64))))[0].result.id),'revoked key releases active key slot');
+await db.exec(`update api_keys set revoked_at=null,expires_at=now()-interval '1 second' where id='${keyA.id}'`);
+check((await rows(reserve(a,keyA.id,hash)))[0].result.error==='invalid_api_key','expiry rechecked');
+await db.exec(`reset role;set role authenticated;set request.jwt.claim.sub='${a}'`);
+check((await rows('select * from api_request_logs')).length===1,'other owner logs hidden');await denied('update api_request_logs set status_code=200');
+await db.exec(`reset role;set role service_role;delete from api_keys where id='${keyA.id}'`);
+check((await rows(`select api_key_id from api_request_logs where id='${r1.id}'`))[0].api_key_id===null,'key deletion retains user quota history');
+await db.exec(`reset role;delete from auth.users where id='${a}'`);
+check((await rows(`select * from api_request_logs where user_id='${a}'`)).length===0,'owner deletion clears private logs');
+for(const f of ['create_developer_api_key','reserve_developer_api_request']){
+ const fn=(await rows(`select p.prosecdef,p.proacl::text acl,pg_get_functiondef(p.oid) definition from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname='${f}'`))[0];
+ check(!fn.prosecdef,'no definer authority');check(fn.definition.includes('pg_advisory_xact_lock'),'quota transaction lock present');
+ check(!fn.acl.includes('authenticated=')&&!fn.acl.includes('anon=')&&!fn.acl.includes(',=X'),'no public function execute');
+}
+await db.close();console.log(`Developer API recovery: ${passed} isolated Postgres authorization checks passed.`);
