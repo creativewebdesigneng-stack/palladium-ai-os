@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
-import { writeAudit } from '@/lib/platform/audit.server';
+import { writeAudit, writeAuditRequired } from '@/lib/platform/audit.server';
 import { getAutoEditorJob, getMediaRuntimeCapabilities, submitAutoEditorJob } from '@/lib/media/media-runtime.server';
 
 type Sb = { from: (table: string) => any };
@@ -32,7 +32,8 @@ export const createMediaEditJob = createServerFn({ method: 'POST' })
     outputFormat,
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as Sb;
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const sb = supabaseAdmin as unknown as Sb;
     const { data: job, error: insertError } = await sb.from('media_edit_jobs').insert({
       user_id: context.userId,
       input_name: data.inputName,
@@ -44,17 +45,18 @@ export const createMediaEditJob = createServerFn({ method: 'POST' })
       output_format: data.outputFormat,
       status: 'queued',
     }).select('id').single();
-    if (insertError) throw new Error(insertError.message);
+    if (insertError || !job?.id) throw new Error('Media job creation could not be confirmed.');
     try {
+      await writeAuditRequired({userId:context.userId,action:'media_edit.submission_requested',targetType:'media_edit_job',targetId:job.id,metadata:{mode:data.mode,outputFormat:data.outputFormat}});
       const result = await submitAutoEditorJob(data);
       const completedAt = result.status === 'completed' || result.status === 'failed' ? new Date().toISOString() : null;
-      const { error } = await sb.from('media_edit_jobs').update({ worker_job_id: result.workerJobId, status: result.status, output_url: result.outputUrl, completed_at: completedAt, updated_at: new Date().toISOString() }).eq('id', job.id);
-      if (error) throw new Error(error.message);
+      const { data: receipt, error } = await sb.from('media_edit_jobs').update({ worker_job_id: result.workerJobId, status: result.status, output_url: result.outputUrl, completed_at: completedAt, updated_at: new Date().toISOString() }).eq('id', job.id).eq('user_id',context.userId).select('id').maybeSingle();
+      if (error || !receipt) throw new Error('Media worker receipt could not be persisted. Do not resubmit automatically.');
       await writeAudit({ userId: context.userId, orgId: null, action: 'media_edit.submitted', targetType: 'media_edit_job', targetId: job.id, status: 'success', metadata: { mode: data.mode, outputFormat: data.outputFormat } });
       return { id: job.id, ...result };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Media edit submission failed';
-      await sb.from('media_edit_jobs').update({ status: 'failed', error_message: message, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', job.id);
+      await sb.from('media_edit_jobs').update({ status: 'failed', error_message: message, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', job.id).eq('user_id',context.userId);
       throw error;
     }
   });
@@ -69,8 +71,10 @@ export const refreshMediaEditJob = createServerFn({ method: 'POST' })
     if (!job) throw new Error('Media job not found or access denied.');
     if (!job.worker_job_id) throw new Error('This media job was not accepted by the worker.');
     const result = await getAutoEditorJob(job.worker_job_id);
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const admin = supabaseAdmin as unknown as Sb;
     const completedAt = result.status === 'completed' || result.status === 'failed' ? new Date().toISOString() : null;
-    const { error: updateError } = await sb.from('media_edit_jobs').update({ status: result.status, output_url: result.outputUrl, error_message: result.errorMessage, metadata: result.metadata, completed_at: completedAt, updated_at: new Date().toISOString() }).eq('id', data.id).eq('user_id', context.userId);
-    if (updateError) throw new Error(updateError.message);
+    const { data: receipt,error: updateError } = await admin.from('media_edit_jobs').update({ status: result.status, output_url: result.outputUrl, error_message: result.errorMessage, metadata: result.metadata, completed_at: completedAt, updated_at: new Date().toISOString() }).eq('id', data.id).eq('user_id', context.userId).eq('worker_job_id',job.worker_job_id).select('id').maybeSingle();
+    if (updateError || !receipt) throw new Error('Media status update could not be confirmed.');
     return { id: data.id, ...result };
   });

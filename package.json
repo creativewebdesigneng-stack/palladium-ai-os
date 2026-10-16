@@ -25,7 +25,8 @@
     "test:project-team-recovery": "node scripts/verification/project-team-recovery.mjs",
     "test:governance-recovery": "node scripts/verification/agent-governance-recovery.mjs",
     "test:trusted-media-recovery": "node scripts/verification/trusted-media-recovery.mjs",
-    "test:developer-api-recovery": "node scripts/verification/developer-api-recovery.mjs"
+    "test:developer-api-recovery": "node scripts/verification/developer-api-recovery.mjs",
+    "test:provider-job-recovery": "node scripts/verification/provider-job-recovery.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
