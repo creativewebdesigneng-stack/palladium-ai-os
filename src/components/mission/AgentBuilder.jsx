@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { X, Loader2, Plug, ShieldAlert, Wand2, Palette } from 'lucide-react';
 import {
   PERSONAL_CATEGORIES, AUTONOMY_LEVELS, PERSONALITIES, TOOL_CATALOG,
@@ -8,8 +9,8 @@ import {
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES, DEFAULT_AGENT_IDENTITY, normaliseAgentIdentity } from '@/lib/agents/agent-identity';
 
-// Keep the default stable across renders: a fresh [] would retrigger the
-// form-initialisation effect after every keystroke and erase user input.
+// Stable default prevents the form initialization effect from erasing
+// controlled inputs after each keystroke.
 const NO_CONNECTED_INTEGRATIONS = [];
 
 const EMPTY = {
@@ -31,7 +32,7 @@ const EMPTY = {
   identity: DEFAULT_AGENT_IDENTITY,
 };
 
-export default function AgentBuilder({ open, initial, connectedIntegrations = NO_CONNECTED_INTEGRATIONS, saving, onClose, onSave }) {
+export default function AgentBuilder({ open, inline = false, initial, connectedIntegrations = NO_CONNECTED_INTEGRATIONS, saving, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
@@ -55,7 +56,9 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
     });
   }, [open, initial, connectedIntegrations]);
 
-  if (!open) return null;
+  // This modal must escape PageTransition and CommandTheatre transform stacks
+  // so clicks and keyboard focus reach the form inputs.
+  if (!open || (!inline && typeof document === 'undefined')) return null;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const setIdentity = (key, value) => setForm((f) => ({ ...f, identity: { ...f.identity, [key]: value, disclosure: 'AI agent' } }));
@@ -110,16 +113,16 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
   const field = 'w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-400/40 focus:outline-none';
   const label = 'mb-1 block text-[11px] font-medium text-zinc-400';
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+  const editor = (
+    <div role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby="personal-agent-builder-title" className={inline ? 'relative w-full pointer-events-auto' : 'pointer-events-auto fixed inset-0 z-[2147483647] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm'}>
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="my-8 w-full max-w-3xl rounded-3xl border border-white/10 bg-[#0b0c13] p-6 shadow-2xl"
+        initial={inline ? false : { opacity: 0, y: 20, scale: 0.98 }}
+        animate={inline ? undefined : { opacity: 1, y: 0, scale: 1 }}
+        className={`${inline ? 'mx-auto my-0 max-w-4xl' : 'my-8 max-w-3xl'} w-full rounded-3xl border border-white/10 bg-[#0b0c13] p-6 shadow-2xl`}
       >
         <div className="mb-5 flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-violet-400" />
-          <h2 className="text-sm font-semibold text-white">{initial?.id ? 'Configure agent' : 'Create a personal agent'}</h2>
+          <h2 id="personal-agent-builder-title" className="text-sm font-semibold text-white">{initial?.id ? 'Configure agent' : 'Create a personal agent'}</h2>
           <button onClick={onClose} aria-label="Close" className="ml-auto rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
@@ -127,7 +130,7 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="ag-name">Name</label>
-              <input id="ag-name" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Shopping Assistant" className={field} />
+              <input id="ag-name" autoFocus required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Shopping Assistant" className={field} />
             </div>
             <div>
               <label className={label} htmlFor="ag-cat">Category</label>
@@ -298,4 +301,5 @@ export default function AgentBuilder({ open, initial, connectedIntegrations = NO
       </motion.div>
     </div>
   );
+  return inline ? editor : createPortal(editor, document.body);
 }
