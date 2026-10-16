@@ -15,6 +15,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 create function private.is_org_member(_org uuid) returns boolean language sql stable security definer set search_path='' as $$ select exists(select 1 from public.organisation_members where user_id=auth.uid() and org_id=_org) $$;
 create function private.is_org_admin(_org uuid) returns boolean language sql stable security definer set search_path='' as $$ select exists(select 1 from public.organisation_members where user_id=auth.uid() and org_id=_org and role in ('owner','admin')) $$;
 grant usage on schema auth,private,public to anon,authenticated,service_role;grant select on personal_agents to authenticated;
+grant all on personal_agents to service_role;
 insert into auth.users values('${a}'),('${b}');insert into organisations values('${org}'),('${otherOrg}');
 insert into organisation_members values('${org}','${a}','owner'),('${org}','${b}','member'),('${otherOrg}','${b}','owner');
 insert into personal_agents values('${id(21)}','${a}','${org}','${org}'),('${id(22)}','${a}','${org}','${org}'),('${id(23)}','${b}','${otherOrg}','${otherOrg}'),('${id(24)}','${b}','${otherOrg}','${otherOrg}');`);
@@ -22,6 +23,8 @@ const file=readdirSync('supabase/migrations').find(n=>n.endsWith('_restore_agent
 const migration=readFileSync('supabase/migrations/'+file,'utf8');await db.exec(migration);
 const indexFile=readdirSync('supabase/migrations').find(n=>n.endsWith('_cover_agent_economy_account_identity.sql'));
 await db.exec(readFileSync('supabase/migrations/'+indexFile,'utf8'));
+const identityFile=readdirSync('supabase/migrations').find(n=>n.endsWith('_enforce_agent_economy_owner_identity.sql'));
+await db.exec(readFileSync('supabase/migrations/'+identityFile,'utf8'));
 check((await rows("select pg_get_indexdef('public.agent_economy_entries_account_identity_idx'::regclass) as definition"))[0].definition.includes('(account_id, user_id, agent_id, currency)'),'composite ledger FK index covers every identity column');
 await assert.rejects(()=>db.exec(migration),/requires all six tables absent/);passed++;
 const templates={
@@ -61,7 +64,14 @@ check((await rows('select * from enterprise_autonomy_policies')).length===2,'mem
 check((await rows(`update enterprise_autonomy_policies set max_concurrent_runs=5 where org_id='${org}' returning id`)).length===0,'member cannot change org policy');
 await denied(`insert into enterprise_autonomy_policies(user_id,org_id) values('${b}','${org}') on conflict(org_id) do update set user_id=excluded.user_id`);
 await db.exec(`reset role;set role service_role;`);
+await denied(`insert into agent_economy_accounts(user_id,org_id,agent_id) values('${a}','${org}','${id(23)}')`);
+await denied(`insert into agent_economy_accounts(user_id,org_id,agent_id) values('${a}','${otherOrg}','${id(22)}')`);
+await denied(`update agent_economy_accounts set agent_id='${id(24)}' where id='${id(101)}'`);
+await denied(`update agent_economy_entries set org_id='${otherOrg}' where id='${id(102)}'`);
 for(const [column,value] of [['user_id',b],['agent_id',id(23)],['currency','USD']])await denied(`update agent_economy_entries set ${column}='${value}' where id='${id(102)}'`);
 await denied(`delete from agent_economy_accounts where id='${id(101)}'`);
 for(const t of tables)check((await rows(`select * from ${t}`)).length===2,'trusted server access retained');
+await db.exec(`delete from personal_agents where id='${id(21)}';update agent_economy_accounts set status='frozen' where id='${id(101)}';`);
+check((await rows(`select status from agent_economy_accounts where id='${id(101)}'`))[0].status==='frozen','retired agent account remains manageable');
+check((await rows(`select * from agent_economy_entries where account_id='${id(101)}'`)).length===1,'retirement preserves immutable financial history');
 await db.close();console.log(`Agent governance: ${passed} isolated Postgres authorization checks passed.`);
