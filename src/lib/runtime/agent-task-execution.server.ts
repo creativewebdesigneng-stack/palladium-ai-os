@@ -177,7 +177,7 @@ export async function executeAgentTask(args: {
     if (run) {
       const rescued = await rescueRuntimeConnectedServiceRead({ sb: args.sb, userId: args.userId, run, error })
       if (rescued) return { task: rescued.task, output: rescued.result.text }
-      await failRun({ userId: args.userId, run, error })
+      await failRun({ sb: args.sb, userId: args.userId, run, error })
       if (error instanceof RuntimeError && error.code === 'VERIFICATION_FAILED') {
         await captureVerifiedAgentSkillFailure({ sb: args.sb as never, userId: args.userId, taskId: run.taskId })
       }

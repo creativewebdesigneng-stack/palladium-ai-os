@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AGENT_MODEL_CHOICES } from '@/lib/agents/agent-model-selection';
 import { createAgent as createAgentFn } from '@/lib/agents/agents.functions';
 import { describeError, persistedAgentId, singleFlight } from '@/lib/agents/agent-create-submit';
 import { useUpgrade } from '@/lib/upgradeContext';
@@ -92,7 +93,9 @@ export default function AgentWizard() {
     submitRef.current = true;
     setCreating(true);
     try {
-      const modelName = WIZARD_MODELS.find(m => m.id === d.model)?.name || 'gpt-4o-mini';
+      const selectedModel = AGENT_MODEL_CHOICES[d.model];
+      if (!selectedModel) throw new Error('Select a supported AI model.');
+      const modelName = selectedModel.model;
       const skills = splitList(d.skills);
       const connectors = splitList(d.connectors);
       const certifications = splitList(d.certifications).map(name => ({ name, status: 'declared' }));
@@ -120,6 +123,7 @@ export default function AgentWizard() {
         description: d.desc,
         category: d.dept,
         model: modelName,
+        model_provider: selectedModel.provider,
         instructions: d.rules || d.behaviour || '',
         allowed_tools: d.tools,
         status: 'draft',

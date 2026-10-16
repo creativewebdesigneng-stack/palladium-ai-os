@@ -45,7 +45,7 @@ vi.mock("@/lib/memory/memory.server", () => ({
   storeMemory: vi.fn(async () => ({})),
   searchMemory: vi.fn(async () => []),
 }));
-vi.mock("@/lib/platform/audit.server", () => ({ writeAudit: vi.fn(async () => {}) }));
+vi.mock("@/lib/platform/audit.server", () => ({ writeAudit: vi.fn(async () => {}), writeAuditRequired: vi.fn(async () => "audit-id") }));
 vi.mock("@/lib/devapi/webhooks.server", () => ({ dispatchWebhookEvent: vi.fn(async () => {}) }));
 
 let adminDb: any;

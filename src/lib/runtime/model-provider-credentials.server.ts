@@ -1,4 +1,5 @@
 import { decryptToken, encryptToken } from '@/lib/integrations/oauth.server'
+import { ProviderError } from './model-gateway.base'
 import type { Provider, ProviderAccess } from './model-gateway.base'
 
 export type UserConnectableModelProvider = Extract<Provider, 'openai' | 'anthropic'>
@@ -136,12 +137,18 @@ export async function resolveUserModelProviderAccess(args: {
 
   if (error) {
     if (String(error.code ?? '') === '42P01') return null
-    throw new Error('Could not resolve the personal model provider connection.')
+    // Availability already authorises this same deployment provider. An optional
+    // personal-store outage must not disable it; never switch vendors or users.
+    if (deploymentProviderConfigured(args.provider)) {
+      console.warn('[model-provider] personal lookup unavailable; using configured deployment provider', { provider: args.provider });
+      return null
+    }
+    throw new ProviderError('Personal model credentials could not be read. Check the deployed Supabase server credential and retry.', 503, true)
   }
   if (!data?.api_key_ciphertext) return null
   return {
     provider: args.provider,
-    apiKey: decryptToken(String(data.api_key_ciphertext)),
+    apiKey: decryptPersonalKey(String(data.api_key_ciphertext)),
   }
 }
 
@@ -181,4 +188,14 @@ export function deploymentProviderConfigured(provider: Provider): boolean {
   if (provider === 'openai') return Boolean(process.env['OPENAI_API_KEY'])
   if (provider === 'anthropic') return Boolean(process.env['ANTHROPIC_API_KEY'])
   return Boolean(process.env['OPENAI_COMPATIBLE_BASE_URL'])
+}
+
+function decryptPersonalKey(ciphertext: string) {
+  try {
+    const key = decryptToken(ciphertext).trim()
+    if (!key) throw new Error("Empty personal credential")
+    return key
+  } catch {
+    throw new ProviderError('The personal model connection cannot be decrypted. Reconnect it or repair server encryption configuration.', 503, false)
+  }
 }

@@ -9,7 +9,8 @@
  * Runs are never left stuck: stale runs are reaped, every model call is
  * time-boxed and retried, and every failure path closes the task row.
  */
-import { writeAudit } from "@/lib/platform/audit.server";
+import { normaliseAgentModelSelection } from "@/lib/agents/agent-model-selection";
+import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
 import { agentIdentityFromPreferences, identityPromptInstruction } from "@/lib/agents/agent-identity";
 import { captureCompletedAgentRunMemory } from "./agent-run-memory.server";
 import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
@@ -270,14 +271,22 @@ export async function prepareRun(args: {
   assertWithinLimit(ent, "tasks_per_month");
 
   const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
-  const provider = normaliseProvider(agent.model_provider);
-  const model = resolveModel(provider, agent.model);
+  let selection;
+  try { selection = normaliseAgentModelSelection(agent.model_provider || normaliseProvider(agent.model_provider), agent.model); }
+  catch { throw new RuntimeError("The saved provider/model selection is invalid. Edit this agent and select a matching provider and model.", "INVALID_MODEL_SELECTION", 400); }
+  const provider = normaliseProvider(selection.provider);
+  const model = resolveModel(provider, selection.model);
   if (!(await isProviderAvailableForUser({ userId: args.userId, provider }))) {
     throw new RuntimeError(
       `The '${provider}' model provider is not configured for this workspace or connected by this user.`,
       "PROVIDER_NOT_CONFIGURED",
       503,
     );
+  }
+  try {
+    await writeAuditRequired({userId: args.userId, orgId, action: "agent.run_requested", targetType: "personal_agent", targetId: agent.id, agentId: agent.id, metadata: {provider, model}});
+  } catch {
+    throw new RuntimeError("Required run audit could not be saved. Repair the deployed Supabase server credential before retrying.", "AUDIT_UNAVAILABLE", 503);
   }
   const messages = await buildContext(args.sb, agent, input);
 
@@ -419,11 +428,14 @@ export async function completeRun(args: {
   const duration = Date.now() - run.startedAt;
   const db = await admin();
 
+  await writeAuditRequired({userId: args.userId, orgId: run.orgId, action: "agent.run_result", targetType: "agent_task", targetId: run.taskId, agentId: run.agent.id, metadata: {provider: result.provider, model: result.model, duration_ms: duration}});
   const output = { text: result.text, tool_calls: args.toolCallCount };
-  await db
+  const completionReceipt = await db
     .from("agent_tasks")
     .update({
       status: "succeeded",
+      provider: result.provider,
+      model: result.model,
       output,
       output_text: result.text,
       tokens_in: result.usage.input,
@@ -433,7 +445,8 @@ export async function completeRun(args: {
       heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
-    .eq("id", run.taskId);
+    .eq("id", run.taskId).eq("user_id", args.userId).select("id").maybeSingle();
+  if (completionReceipt.error || !completionReceipt.data) throw new RuntimeError("Model response received, but the run result could not be saved. Check Supabase server access.", "RUN_PERSISTENCE_FAILED", 503);
 
   await db
     .from("personal_agents")
@@ -537,6 +550,7 @@ export async function completeRun(args: {
 }
 
 export async function failRun(args: {
+  sb?: Sb;
   userId: string;
   run: Pick<PreparedRun, "taskId" | "agent" | "orgId" | "startedAt">;
   error: unknown;
@@ -552,8 +566,8 @@ export async function failRun(args: {
       : args.error instanceof ProviderError || args.error instanceof RuntimeError
         ? args.error.message
         : "The run failed unexpectedly. Please try again.";
-  const db = await admin();
-  await db
+  const db = args.sb ?? await admin();
+  const failureReceipt = await db
     .from("agent_tasks")
     .update({
       status: cancelled ? "cancelled" : "failed",
@@ -562,7 +576,11 @@ export async function failRun(args: {
       heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
-    .eq("id", args.run.taskId);
+    .eq("id", args.run.taskId).eq("user_id", args.userId).select("id").maybeSingle();
+  if (failureReceipt.error || !failureReceipt.data) {
+    console.error("[runtime] failure state was not persisted", {taskId: args.run.taskId});
+    return `${message} Run status could not be saved; check Supabase access before retrying.`;
+  }
 
   await db.from("agent_activities").insert({
     user_id: args.userId,
@@ -604,7 +622,7 @@ export async function failRun(args: {
     });
   }
 
-  console.error("[runtime] run failed", args.run.taskId, args.error);
+  console.error("[runtime] run failed", {taskId: args.run.taskId, code: args.error instanceof RuntimeError ? args.error.code : args.error instanceof ProviderError ? "MODEL_PROVIDER_ERROR" : "RUN_FAILED"});
   return message;
 }
 
@@ -749,10 +767,10 @@ export async function executeRun(args: {
   const usage = { input: 0, output: 0 };
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
-  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
 
   try {
+    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (externalFailure) throw externalFailure;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
@@ -777,6 +795,7 @@ export async function executeRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
+          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","compatible"].includes(p))],
         });
       } catch (error) {
         if (externalFailure) throw externalFailure;
@@ -841,12 +860,12 @@ export async function* streamRun(args: {
   let toolCallCount = 0;
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
-  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
 
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
   try {
+    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
@@ -871,6 +890,7 @@ export async function* streamRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
+          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","compatible"].includes(p))],
         })) {
           if (event.type === "text") yield { type: "delta", text: event.delta };
           if (event.type === "done") final = event.result;
@@ -937,7 +957,7 @@ export async function* streamRun(args: {
       yield { type: "complete", task: rescued.task };
       return;
     }
-    const message = await failRun({ userId: args.userId, run: args.run, error });
+    const message = await failRun({ sb: args.sb, userId: args.userId, run: args.run, error });
     yield { type: "error", message };
   } finally {
     clearTimeout(budget);

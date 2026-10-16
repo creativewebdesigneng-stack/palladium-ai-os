@@ -128,6 +128,7 @@ async function buildPlan(run: PreparedRun, providerAccess: ProviderAccess | null
       temperature: 0.1,
       maxTokens: Math.min(Math.max(run.agent.max_tokens ?? 1200, 500), 1800),
       providerAccess,
+      allowedProviders: [run.provider],
     });
     const parsed = extractJsonObject(result.text);
     if (!parsed) return fallback;
@@ -216,6 +217,7 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
       maxTokens: 1400,
       signal,
       providerAccess,
+      allowedProviders: [run.provider],
     });
     const parsed = extractJsonObject(result.text);
     return normaliseVerificationDecision(parsed ?? { passed: false, score: 0, issues: ["Verifier returned invalid structured output"], next_action: "replan" });
@@ -424,28 +426,28 @@ export async function executePlannedRun(args: {
     controller.abort();
   }, Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS));
 
-  const astraPolicy = resolveBlackstarAstraPlannerPolicy(args.reasoningControl);
-  const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-  if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
-  const resumed = args.resumeCheckpoint ?? null;
-  let plan = resumed ? resumed.plan : await buildPlan(args.run, providerAccess);
-  await persistPlan(args.sb, args.run.taskId, plan);
-  const messages: ChatMessage[] = resumed
-    ? resumed.messages.map((message) => ({ ...message }))
-    : [
-        args.run.messages[0] ?? { role: "system", content: "" },
-        { role: "system", content: renderPlannerPrompt(plan) },
-        ...args.run.messages.slice(1),
-      ];
-  const usage = resumed
-    ? { input: resumed.usage.input, output: resumed.usage.output }
-    : { input: 0, output: 0 };
-  let toolCallCount = resumed?.tool_call_count ?? 0;
-  let toolRounds = resumed?.tool_rounds ?? 0;
-  const guard = new RunLoopGuard();
-  const steeringCursor = createSteeringCursor();
-
   try {
+    const astraPolicy = resolveBlackstarAstraPlannerPolicy(args.reasoningControl);
+    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
+    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
+    const resumed = args.resumeCheckpoint ?? null;
+    let plan = resumed ? resumed.plan : await buildPlan(args.run, providerAccess);
+    await persistPlan(args.sb, args.run.taskId, plan);
+    const messages: ChatMessage[] = resumed
+      ? resumed.messages.map((message) => ({ ...message }))
+      : [
+          args.run.messages[0] ?? { role: "system", content: "" },
+          { role: "system", content: renderPlannerPrompt(plan) },
+          ...args.run.messages.slice(1),
+        ];
+    const usage = resumed
+      ? { input: resumed.usage.input, output: resumed.usage.output }
+      : { input: 0, output: 0 };
+    let toolCallCount = resumed?.tool_call_count ?? 0;
+    let toolRounds = resumed?.tool_rounds ?? 0;
+    const guard = new RunLoopGuard();
+    const steeringCursor = createSteeringCursor();
+
     for (let round = 0; round < astraPolicy.model_round_budget; round += 1) {
       if (ownerAbort) throw ownerAbort;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
@@ -479,6 +481,7 @@ export async function executePlannedRun(args: {
         maxTokens: args.run.agent.max_tokens,
         signal: controller.signal,
         providerAccess,
+        allowedProviders: [args.run.provider],
       });
       usage.input += result.usage.input;
       usage.output += result.usage.output;

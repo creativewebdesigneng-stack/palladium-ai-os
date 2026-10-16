@@ -40,6 +40,14 @@ describe("model gateway provider failover", () => {
     process.env = { ...originalEnv };
   });
 
+  it("does not use a configured vendor outside an agent's explicit provider consent", async () => {
+    baseGateway.runChat.mockRejectedValue(new ProviderError("Provider unavailable", 503, true));
+    webAccess.searchPublicWeb.mockResolvedValue({results:[]});
+    await expect(runChat({...makeArgs([{role:"user",content:"Reply QA AGENT ONLINE"}]),allowedProviders:["groq"]})).rejects.toBeInstanceOf(ProviderError);
+    expect(baseGateway.runChat).toHaveBeenCalled();
+    expect(baseGateway.runChat.mock.calls.every(([args])=>args.provider === "groq")).toBe(true);
+  });
+
   it("fails over from Groq to OpenAI using the OpenAI default model", async () => {
     baseGateway.runChat
       .mockRejectedValueOnce(new ProviderError("rate limited", 429, true))

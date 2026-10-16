@@ -323,6 +323,8 @@ export type RunArgs = {
   maxAttempts?: number;
   signal?: AbortSignal;
   providerAccess?: ProviderAccess | null;
+  /** Explicit provider consent for agent calls; undefined retains other callers existing policy. */
+  allowedProviders?: Provider[];
 };
 
 const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
