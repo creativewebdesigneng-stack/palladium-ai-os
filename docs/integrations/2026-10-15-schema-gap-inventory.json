@@ -13,8 +13,6 @@
     "browser_sessions"
   ],
   "unreviewed_absent_reference_names": [
-    "builder_deployments",
-    "builder_jobs",
     "creator_profiles",
     "marketplace_agents",
     "marketplace_purchases"
@@ -112,5 +110,9 @@
   "recovered_provider_jobs": [
     "media_edit_jobs",
     "deployment_targets"
+  ],
+  "recovered_builder_execution": [
+    "builder_jobs",
+    "builder_deployments"
   ]
 }

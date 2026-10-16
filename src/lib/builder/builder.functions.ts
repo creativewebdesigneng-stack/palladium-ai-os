@@ -76,26 +76,30 @@ export const listBuilderGitHubRepositories = createServerFn({ method: "POST" }).
 
 export const createBuilderJob = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => createInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
-  const { data: row, error } = await sb.from("builder_jobs").insert({ user_id: context.userId, title: data.title.trim(), prompt: data.prompt.trim(), status: "requested" }).select(jobColumns).single();
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
+  const { data: row, error } = await admin.from("builder_jobs").insert({ user_id: context.userId, title: data.title.trim(), prompt: data.prompt.trim(), status: "requested" }).select(jobColumns).single();
   if (error) throw new Error(error.message);
   return mapJob(row);
 });
 
 export const generateBuilderJobPlan = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
-  const { data: claimed, error: claimError } = await sb.from("builder_jobs").update({ status: "planning", last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("status", ["requested", "failed"]).select(jobColumns).maybeSingle();
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
+  const { data: claimed, error: claimError } = await admin.from("builder_jobs").update({ status: "planning", last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("status", ["requested", "failed"]).select(jobColumns).maybeSingle();
   if (claimError) throw new Error(claimError.message);
   if (!claimed) throw new Error("This build request is no longer ready for planning.");
   const { provider, model } = await resolveBuilderPreference(sb, context.userId);
   try {
     const plan = await generateBuilderPlan({ title: String(claimed.title), prompt: String(claimed.prompt), provider, model });
-    const { data: planned, error: persistError } = await sb.from("builder_jobs").update({ plan, status: "planned", last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planning").select(jobColumns).maybeSingle();
+    const { data: planned, error: persistError } = await admin.from("builder_jobs").update({ plan, status: "planned", last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planning").select(jobColumns).maybeSingle();
     if (persistError) throw new Error(persistError.message);
     if (!planned) throw new Error("Planning was cancelled before the generated plan could be saved.");
     return mapJob(planned);
   } catch (error) {
     const safeMessage = error instanceof ProviderError && error.status === 503 ? "AI provider is not configured." : error instanceof Error && error.message.startsWith("The AI planner returned") ? error.message : "AI planning failed. Try again.";
-    const { error: failureError } = await sb.from("builder_jobs").update({ status: "failed", last_error: safeMessage, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planning");
+    const { error: failureError } = await admin.from("builder_jobs").update({ status: "failed", last_error: safeMessage, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planning");
     if (failureError) console.error("[builder] could not persist planning failure", failureError.message);
     throw new Error(safeMessage);
   }
@@ -103,19 +107,21 @@ export const generateBuilderJobPlan = createServerFn({ method: "POST" }).middlew
 
 export const generateBuilderJobSource = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
-  const { data: claimed, error: claimError } = await sb.from("builder_jobs").update({ source_status: "generating", source_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planned").in("source_status", ["not_started", "failed"]).select(jobColumns).maybeSingle();
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
+  const { data: claimed, error: claimError } = await admin.from("builder_jobs").update({ source_status: "generating", source_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planned").in("source_status", ["not_started", "failed"]).select(jobColumns).maybeSingle();
   if (claimError) throw new Error(claimError.message);
   if (!claimed || !claimed.plan) throw new Error("This build request is not ready for source generation.");
   const { provider, model } = await resolveBuilderPreference(sb, context.userId);
   try {
     const sourceManifest = await generateBuilderSourceManifest({ title: String(claimed.title), prompt: String(claimed.prompt), plan: claimed.plan, provider, model });
-    const { data: generated, error: persistError } = await sb.from("builder_jobs").update({ source_manifest: sourceManifest, source_status: "generated", source_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planned").eq("source_status", "generating").select(jobColumns).maybeSingle();
+    const { data: generated, error: persistError } = await admin.from("builder_jobs").update({ source_manifest: sourceManifest, source_status: "generated", source_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("status", "planned").eq("source_status", "generating").select(jobColumns).maybeSingle();
     if (persistError) throw new Error(persistError.message);
     if (!generated) throw new Error("Source generation was interrupted before the manifest could be saved.");
     return mapJob(generated);
   } catch (error) {
     const safeMessage = error instanceof ProviderError && error.status === 503 ? "AI provider is not configured." : error instanceof Error && error.message.startsWith("The AI source generator returned") ? error.message : "AI source generation failed. Try again.";
-    const { error: failureError } = await sb.from("builder_jobs").update({ source_status: "failed", source_last_error: safeMessage, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("source_status", "generating");
+    const { error: failureError } = await admin.from("builder_jobs").update({ source_status: "failed", source_last_error: safeMessage, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("source_status", "generating");
     if (failureError) console.error("[builder] could not persist source generation failure", failureError.message);
     throw new Error(safeMessage);
   }
@@ -123,6 +129,8 @@ export const generateBuilderJobSource = createServerFn({ method: "POST" }).middl
 
 export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => targetRepoInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
   const { data: job, error } = await sb.from("builder_jobs").select(jobColumns).eq("id", data.id).eq("user_id", context.userId).eq("source_status", "generated").maybeSingle();
   if (error) throw new Error(error.message);
   if (!job || !job.source_manifest) throw new Error("Generate and review source before choosing a repository.");
@@ -138,7 +146,7 @@ export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).mid
   const queued = await queueGitHubWriteApproval({ sb, userId: context.userId }, { action: "github_branch_create", repository: target.fullName, branch, base_sha: base.sha });
   if (!queued.approval_request_id) throw new Error("GitHub branch approval could not be queued.");
 
-  const { data: updated, error: updateError } = await sb.from("builder_jobs").update({ repository_full_name: target.fullName, branch_name: branch, branch_approval_id: queued.approval_request_id, repository_status: "branch_approval_pending", repository_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("repository_status", "not_started").select(jobColumns).maybeSingle();
+  const { data: updated, error: updateError } = await admin.from("builder_jobs").update({ repository_full_name: target.fullName, branch_name: branch, branch_approval_id: queued.approval_request_id, repository_status: "branch_approval_pending", repository_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("repository_status", "not_started").select(jobColumns).maybeSingle();
   if (updateError) throw new Error(updateError.message);
   if (!updated) throw new Error("Repository handoff changed before it could be saved.");
   return mapJob(updated);
@@ -146,6 +154,8 @@ export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).mid
 
 export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
   const { data: job, error } = await sb.from("builder_jobs").select(jobColumns).eq("id", data.id).eq("user_id", context.userId).eq("source_status", "generated").maybeSingle();
   if (error) throw new Error(error.message);
   if (!job?.repository_full_name || !job.branch_name || !job.branch_approval_id || !job.source_manifest) throw new Error("Queue and approve the Builder branch before file approvals.");
@@ -199,7 +209,7 @@ export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).midd
   }
 
   if (!approvalRows.length) {
-    const { data: applied, error: appliedError } = await sb.from("builder_jobs").update({ repository_status: "files_applied", repository_last_error: null, file_approval_ids: [], updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("repository_status", ["branch_approval_pending", "branch_ready"]).select(jobColumns).maybeSingle();
+    const { data: applied, error: appliedError } = await admin.from("builder_jobs").update({ repository_status: "files_applied", repository_last_error: null, file_approval_ids: [], updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("repository_status", ["branch_approval_pending", "branch_ready"]).select(jobColumns).maybeSingle();
     if (appliedError) throw new Error(appliedError.message);
     if (!applied) throw new Error("Repository handoff changed before it could be completed.");
     return { ...mapJob(applied), unchangedFiles: unchanged };
@@ -209,7 +219,7 @@ export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).midd
   if (insertError) throw new Error("Could not queue Builder file approvals.");
   const fileApprovalIds = (approvals ?? []).map((row: any) => ({ id: String(row.id), action: String(row.action_type), path: String(row.details?.builder_file_path ?? ""), status: String(row.status) }));
 
-  const { data: updated, error: updateError } = await sb.from("builder_jobs").update({ repository_status: "files_approval_pending", repository_last_error: null, file_approval_ids: fileApprovalIds, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("repository_status", ["branch_approval_pending", "branch_ready"]).select(jobColumns).maybeSingle();
+  const { data: updated, error: updateError } = await admin.from("builder_jobs").update({ repository_status: "files_approval_pending", repository_last_error: null, file_approval_ids: fileApprovalIds, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("repository_status", ["branch_approval_pending", "branch_ready"]).select(jobColumns).maybeSingle();
   if (updateError) throw new Error(updateError.message);
   if (!updated) throw new Error("File approvals were queued but the Builder handoff state changed. Refresh before retrying.");
   return { ...mapJob(updated), unchangedFiles: unchanged };
@@ -217,6 +227,8 @@ export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).midd
 
 export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
   const { data: job, error } = await sb.from("builder_jobs").select(jobColumns).eq("id", data.id).eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!job?.branch_approval_id || !job.repository_full_name || !job.branch_name) throw new Error("Repository handoff has not started.");
@@ -227,12 +239,12 @@ export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" })
     if (approvalsError) throw new Error(approvalsError.message);
     const statuses: string[] = (approvals ?? []).map((row: any) => String(row.status));
     if (statuses.some((status: string) => status === "rejected")) {
-      const { data: failed, error: failedError } = await sb.from("builder_jobs").update({ repository_status: "failed", repository_last_error: "One or more GitHub file approvals were rejected.", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
+      const { data: failed, error: failedError } = await admin.from("builder_jobs").update({ repository_status: "failed", repository_last_error: "One or more GitHub file approvals were rejected.", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
       if (failedError) throw new Error(failedError.message);
       return mapJob(failed ?? job);
     }
     if (statuses.length === approvalIds.length && statuses.every((status: string) => status === "approved")) {
-      const { data: applied, error: appliedError } = await sb.from("builder_jobs").update({ repository_status: "files_applied", repository_last_error: null, file_approval_ids: (job.file_approval_ids ?? []).map((entry: any) => ({ ...entry, status: "approved" })), updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
+      const { data: applied, error: appliedError } = await admin.from("builder_jobs").update({ repository_status: "files_applied", repository_last_error: null, file_approval_ids: (job.file_approval_ids ?? []).map((entry: any) => ({ ...entry, status: "approved" })), updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
       if (appliedError) throw new Error(appliedError.message);
       return mapJob(applied ?? job);
     }
@@ -242,7 +254,7 @@ export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" })
   const { data: branchApproval, error: branchError } = await sb.from("approval_requests").select("status").eq("id", job.branch_approval_id).eq("user_id", context.userId).maybeSingle();
   if (branchError) throw new Error(branchError.message);
   if (branchApproval?.status === "rejected") {
-    const { data: failed, error: failedError } = await sb.from("builder_jobs").update({ repository_status: "failed", repository_last_error: "GitHub branch creation was rejected.", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
+    const { data: failed, error: failedError } = await admin.from("builder_jobs").update({ repository_status: "failed", repository_last_error: "GitHub branch creation was rejected.", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select(jobColumns).maybeSingle();
     if (failedError) throw new Error(failedError.message);
     return mapJob(failed ?? job);
   }
@@ -252,14 +264,16 @@ export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" })
   const { owner, repo } = splitGitHubRepository(target.fullName);
   const branches = await listGitHubBranches({ installationId, owner, repo, perPage: 100 });
   if (!branches.some((branch) => branch.name === job.branch_name)) return mapJob(job);
-  const { data: ready, error: readyError } = await sb.from("builder_jobs").update({ repository_status: "branch_ready", repository_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("repository_status", "branch_approval_pending").select(jobColumns).maybeSingle();
+  const { data: ready, error: readyError } = await admin.from("builder_jobs").update({ repository_status: "branch_ready", repository_last_error: null, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).eq("repository_status", "branch_approval_pending").select(jobColumns).maybeSingle();
   if (readyError) throw new Error(readyError.message);
   return mapJob(ready ?? job);
 });
 
 export const cancelBuilderJob = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
-  const { data: row, error } = await sb.from("builder_jobs").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("status", ["requested", "planning"]).select(jobColumns).maybeSingle();
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
+  const { data: row, error } = await admin.from("builder_jobs").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).in("status", ["requested", "planning"]).select(jobColumns).maybeSingle();
   if (error) throw new Error(error.message);
   if (!row) throw new Error("Build request could not be cancelled because it is no longer pending.");
   return mapJob(row);
