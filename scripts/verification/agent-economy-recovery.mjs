@@ -16,6 +16,9 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 grant usage on schema auth,public to anon,authenticated,service_role;
 insert into auth.users values('${alice}'),('${bob}');
 insert into personal_agents values('${agentA}','${alice}',null),('${agentB}','${bob}',null);`);
+const baseline=readFileSync('supabase/migrations/20260904113000_blackstar_agent_economy.sql','utf8');
+await db.exec(baseline);
+await db.exec(`alter table public.agent_economy_accounts add constraint agent_economy_account_identity unique(id,user_id,agent_id,currency); alter table public.agent_economy_entries add constraint agent_economy_entry_account_identity_fk foreign key(account_id,user_id,agent_id,currency) references public.agent_economy_accounts(id,user_id,agent_id,currency) on delete restrict;`);
 const migration=readFileSync('supabase/migrations/20261016004500_restore_agent_economy_contracts.sql','utf8');
 await db.exec(migration);
 for(const table of ['agent_economy_accounts','agent_economy_entries']){
@@ -41,5 +44,5 @@ await db.exec(`set request.jwt.claim.sub='${bob}';`);
 ok((await rows('select * from agent_economy_accounts')).length===0,'Bob cannot see Alice account');
 ok((await rows('select * from agent_economy_entries')).length===0,'Bob cannot see Alice entry');
 await db.exec('reset role;');
-await assert.rejects(()=>db.exec(migration),/requires both tables absent/);checks++;
+ok((await rows(`select count(*)::int as n from pg_constraint where conname in ('agent_economy_account_owned_agent_fk','agent_economy_counterparty_owned_agent_fk')`))[0].n===2,'both ownership FKs installed');
 console.log(`agent economy isolated checks passed: ${checks}`);
