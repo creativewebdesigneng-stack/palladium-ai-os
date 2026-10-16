@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { runBuilderSandboxValidation } from "./builder-sandbox.server";
+import {writeAuditRequired} from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
 
@@ -41,9 +42,11 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => jobInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
+    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
+    const admin=supabaseAdmin as unknown as Sb;
     const startedAt = new Date().toISOString();
 
-    const { data: claimed, error: claimError } = await sb
+    const { data: claimed, error: claimError } = await admin
       .from("builder_jobs")
       .update({
         sandbox_status: "provisioning",
@@ -67,7 +70,7 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
     if (!claimed?.source_manifest) throw new Error("This build request is not ready for isolated validation.");
 
     try {
-      const { data: running, error: runningError } = await sb
+      const { data: running, error: runningError } = await admin
         .from("builder_jobs")
         .update({ sandbox_status: "running", updated_at: new Date().toISOString() })
         .eq("id", data.id)
@@ -78,6 +81,8 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
       if (runningError) throw new Error(runningError.message);
       if (!running) throw new Error("Sandbox validation was interrupted before execution started.");
 
+      await writeAuditRequired({userId:context.userId,action:'builder.sandbox_validation_requested',targetType:'builder_job',targetId:data.id});
+
       const result = await runBuilderSandboxValidation({
         builderJobId: String(claimed.id),
         sourceManifest: claimed.source_manifest,
@@ -86,7 +91,7 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
       const finalStatus = result.passed ? "passed" : "failed";
       const safeError = result.passed ? null : "One or more isolated validation stages failed.";
 
-      const { data: completed, error: completeError } = await sb
+      const { data: completed, error: completeError } = await admin
         .from("builder_jobs")
         .update({
           sandbox_status: finalStatus,
@@ -109,7 +114,7 @@ export const runBuilderSandboxJob = createServerFn({ method: "POST" })
       const message = error instanceof Error ? error.message : "Isolated validation failed.";
       const safeMessage = message === "E2B sandbox is not configured." ? message : message.startsWith("Sandbox validation") ? message : "Isolated validation failed. Review the sandbox logs and retry.";
       const finishedAt = new Date().toISOString();
-      const { error: failureError } = await sb
+      const { error: failureError } = await admin
         .from("builder_jobs")
         .update({ sandbox_status: "failed", sandbox_last_error: safeMessage, sandbox_finished_at: finishedAt, updated_at: finishedAt })
         .eq("id", data.id)
