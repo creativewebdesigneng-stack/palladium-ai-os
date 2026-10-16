@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AGENT_MODEL_CHOICES } from '@/lib/agents/agent-model-selection';
+import { agentWizardSettings } from '@/lib/agents/agent-wizard-settings';
+import { listAgentToolChoices } from '@/lib/tools/tools.functions';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { createAgent as createAgentFn } from '@/lib/agents/agents.functions';
 import { describeError, persistedAgentId, singleFlight } from '@/lib/agents/agent-create-submit';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Check, ArrowRight, ArrowLeft, Bot, Sparkles, Wrench, Shield, User, MessageSquare, MemoryStick, BadgeCheck } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { WIZARD_MODELS, WIZARD_TOOLS, DEPARTMENTS } from '@/components/agents/agentsData';
+import { WIZARD_MODELS, DEPARTMENTS } from '@/components/agents/agentsData';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { AGENT_AVATAR_STYLES, AGENT_PRESENTATION_STYLES, AGENT_SKINS, AGENT_VOICE_STYLES } from '@/lib/agents/agent-identity';
 
@@ -29,7 +32,7 @@ const areaCls = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-s
 
 function Toggle({ label, desc, on, onToggle }) {
   return (
-    <button onClick={onToggle} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition ${on ? 'border-violet-400/40 bg-violet-500/10' : 'border-white/10 bg-white/[.02] hover:bg-white/5'}`}>
+    <button type="button" aria-pressed={on} onClick={onToggle} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition ${on ? 'border-violet-400/40 bg-violet-500/10' : 'border-white/10 bg-white/[.02] hover:bg-white/5'}`}>
       <div><p className="text-sm text-zinc-200">{label}</p><p className="text-[11px] text-zinc-500">{desc}</p></div>
       <span className={`relative h-6 w-10 shrink-0 rounded-full transition ${on ? 'bg-violet-600' : 'bg-white/10'}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${on ? 'left-[18px]' : 'left-0.5'}`} /></span>
     </button>
@@ -56,11 +59,14 @@ export default function AgentWizard() {
     model: 'gpt',
     role: '', goals: '', rules: '', behaviour: '', personality: '',
     mem: { long: true, short: true, history: false, kb: true },
-    tools: ['web', 'files'],
+    tools: [],
     skills: '', connectors: '', certifications: '', experience: '', learnable: '',
     perms: { internet: true, files: true, automation: false, apis: false },
   });
 
+  const toolsFn = useServerFn(listAgentToolChoices);
+  const toolChoices = useQuery({queryKey:["agent-tool-choices"],queryFn:()=>toolsFn(),retry:false});
+  const availableTools = toolChoices.data ?? [];
   const navigate = useNavigate();
   const { gate } = useUpgrade();
   const { toast } = useToast();
@@ -93,9 +99,8 @@ export default function AgentWizard() {
     submitRef.current = true;
     setCreating(true);
     try {
-      const selectedModel = AGENT_MODEL_CHOICES[d.model];
-      if (!selectedModel) throw new Error('Select a supported AI model.');
-      const modelName = selectedModel.model;
+      const settings = agentWizardSettings(d, availableTools);
+      const modelName = settings.model;
       const skills = splitList(d.skills);
       const connectors = splitList(d.connectors);
       const certifications = splitList(d.certifications).map(name => ({ name, status: 'declared' }));
@@ -123,9 +128,10 @@ export default function AgentWizard() {
         description: d.desc,
         category: d.dept,
         model: modelName,
-        model_provider: selectedModel.provider,
+        ...settings,
+        personality: d.personality,
         instructions: d.rules || d.behaviour || '',
-        allowed_tools: d.tools,
+        allowed_tools: settings.allowed_tools,
         status: 'draft',
         operating_profile: {
           role: d.role || d.dept,
@@ -251,13 +257,16 @@ export default function AgentWizard() {
 
           {step === 4 && (
             <div>
-              <p className="mb-3 text-xs text-zinc-400">Select the tools this agent can use</p>
+              <p className="mb-3 text-xs text-zinc-400">Select up to 30 tools to request for this agent</p>
+              <p className="mb-3 text-xs text-zinc-500">Selection requests a tool; plan limits, tool permissions, connected accounts and approvals still apply.</p>
+              {toolChoices.isPending && <p className="text-xs text-zinc-400">Loading executable tools…</p>}
+              {toolChoices.error && <p role="alert" className="text-xs text-rose-300">Could not load tools. <button type="button" onClick={()=>toolChoices.refetch()}>Retry catalogue</button></p>}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {WIZARD_TOOLS.map(t => {
-                  const Icon = t.icon;
-                  const on = d.tools.includes(t.id);
+                {availableTools.map(t => {
+                  const Icon = Wrench;
+                  const on = d.tools.includes(t.slug);
                   return (
-                    <button key={t.id} onClick={() => toggleTool(t.id)} className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition ${on ? 'border-violet-400/40 bg-violet-500/10 text-white' : 'border-white/10 text-zinc-400 hover:bg-white/5'}`}>
+                    <button type="button" aria-pressed={on} disabled={!on && d.tools.length >= 30} title={t.description} key={t.slug} onClick={() => toggleTool(t.slug)} className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition ${on ? 'border-violet-400/40 bg-violet-500/10 text-white' : 'border-white/10 text-zinc-400 hover:bg-white/5'}`}>
                       <span className={`grid h-9 w-9 place-items-center rounded-lg ${on ? 'bg-violet-600/30 text-violet-200' : 'bg-white/5 text-zinc-500'}`}><Icon className="h-4 w-4" /></span>
                       <span className="text-xs font-medium">{t.name}</span>
                       {on && <Check className="ml-auto h-3.5 w-3.5 text-violet-400" />}
@@ -291,7 +300,7 @@ export default function AgentWizard() {
                 <p className="mb-2 text-xs font-medium text-zinc-300">Review</p>
                 <div className="space-y-1.5 text-xs text-zinc-400">
                   <p><span className="text-zinc-600">Name:</span> {d.name || '—'} · <span className="text-zinc-600">Dept:</span> {d.dept} · <span className="text-zinc-600">Model:</span> {WIZARD_MODELS.find(m => m.id === d.model)?.name}</p>
-                  <p><span className="text-zinc-600">Tools:</span> {d.tools.map(t => WIZARD_TOOLS.find(x => x.id === t)?.name).join(', ') || '—'}</p>
+                  <p><span className="text-zinc-600">Tools:</span> {d.tools.map(t => availableTools.find(x => x.slug === t)?.name).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Skills:</span> {splitList(d.skills).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Connectors:</span> {splitList(d.connectors).join(', ') || '—'}</p>
                   <p><span className="text-zinc-600">Memory:</span> {Object.entries(d.mem).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}</p>

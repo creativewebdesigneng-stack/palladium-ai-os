@@ -1,0 +1,13 @@
+# Agent wizard settings recovery
+
+The existing wizard offered ten hardcoded display aliases, including `web`, `files`, `terminal` and `api`, which do not name executable runtime tools. Turning every memory option off only changed preference metadata; the canonical `memory_enabled` flag still defaulted to true. Personality was also present only in preferences rather than the runtime field.
+
+The wizard now reads active tools from the existing authenticated tool catalogue and intersects them with the existing executable manifest. The read helper lives in the existing tools server-functions module, uses the caller's Supabase client and reports query failures. No duplicate registry, execution engine or permission writer is added. New agents start with no tools selected; tools are configured explicitly with canonical slugs and the existing 30-tool writer limit. No existing agent permissions are rewritten.
+
+The setup payload preserves canonical provider/model IDs and derives `memory_enabled=false` when all four memory options are off. It also saves personality in the runtime field. Individual memory-retention semantics remain owned by the existing memory subsystem; this change does not claim to redesign granular retention. Accessible pressed states expose selection and toggle state for testing and assistive technology.
+
+Selecting a tool requests configuration only. Runtime plan checks, active/disabled tool-permission rows, owner/tenant checks, connected accounts, domains and approvals still govern execution. Catalogue presence is not provider health or successful tool certification. No reference skill is enabled automatically.
+
+Regression coverage checks memory-off, explicit memory opt-in, canonical model selection, executable slugs, duplicate selections, retired/placeholders/unknown tool rejection, the 30-tool limit, missing catalogue behavior, caller-scoped catalogue reads and query errors. Exact build, TypeScript, full suite and deployment results are recorded in the release PR.
+
+Live model acceptance remains blocked by the deployed Supabase server-key rejection confirmed through connected Supabase logs: audit POST 401, UNAUTHORIZED_INVALID_API_KEY, bad_checksum. The connected database confirms the audit table exists, service_role can insert and bypasses RLS, authenticated cannot insert, and no public base table lacks RLS. These expected permissions are preserved. The connector exposes no server-secret rotation/retrieval action, and no SQL or anonymous-key workaround is used. Latest archive verification retains 176 scientific references plus Diagram Design, all disabled with zero executable dependencies. Both authenticated secure importers stopped at mandatory audit preflight.

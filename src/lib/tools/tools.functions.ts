@@ -17,6 +17,17 @@ type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, un
 
 /* ------------------------------------------------------------------ catalogue */
 
+/** Read only the existing executable catalogue; selecting a tool grants nothing. */
+export const listAgentToolChoices = createServerFn({method: "POST"})
+  .middleware([requireSupabaseAuth])
+  .handler(async ({context}) => {
+    const sb=context.supabase as unknown as Sb;
+    const {data,error}=await sb.from("tools").select("slug,name,description,is_active,min_plan,category").eq("is_active",true).order("name",{ascending:true});
+    if(error) throw new Error("Could not load the executable tool catalogue.");
+    const executable=new Set(TOOL_MANIFEST.map(t=>t.slug));
+    return (data??[]).filter((t:any)=>executable.has(t.slug)).map((t:any)=>({...t,executable:true}));
+  });
+
 export const getToolFramework = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

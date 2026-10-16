@@ -1,5 +1,4 @@
 // Mock data for the PalladiumAI Agents experience. Placeholder only.
-import { Globe, FileText, Mail, Calendar, Terminal, Eye, ImagePlus, Search, Webhook, Workflow, Cpu } from 'lucide-react';
 
 export const CATEGORIES = ['All', 'Research', 'Support', 'Engineering', 'Marketing', 'Finance', 'Operations', 'Design', 'HR'];
 
@@ -13,18 +12,7 @@ export const WIZARD_MODELS = [
   { id: 'llama', name: 'Llama', letter: 'L', grad: 'from-purple-400 to-fuchsia-500', desc: 'Open-source, self-hostable', context: '128K' },
 ];
 
-export const WIZARD_TOOLS = [
-  { id: 'browser', name: 'Browser', icon: Globe },
-  { id: 'files', name: 'File Analysis', icon: FileText },
-  { id: 'email', name: 'Email', icon: Mail },
-  { id: 'calendar', name: 'Calendar', icon: Calendar },
-  { id: 'terminal', name: 'Terminal', icon: Terminal },
-  { id: 'vision', name: 'Vision', icon: Eye },
-  { id: 'image', name: 'Image Generation', icon: ImagePlus },
-  { id: 'web', name: 'Web Search', icon: Search },
-  { id: 'api', name: 'API Calls', icon: Webhook },
-  { id: 'workflow', name: 'Workflow Builder', icon: Workflow },
-];
+
 
 export const AVATAR_COLORS = [
   'from-violet-500 to-indigo-600', 'from-cyan-500 to-blue-600', 'from-emerald-500 to-teal-600',
