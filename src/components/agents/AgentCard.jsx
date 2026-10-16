@@ -45,7 +45,7 @@ export default function AgentCard({ agent, onEdit, onDuplicate, onDelete, onRun 
       <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-violet-300/[.08] bg-black/20 p-2.5 text-[10px] text-zinc-500">
         <span className="flex min-w-0 items-center gap-1" title="Memory"><Brain className={`h-3.5 w-3.5 shrink-0 ${agent.memory ? 'text-violet-300' : 'text-zinc-700'}`} /><span className="truncate">{agent.memory ? 'Memory' : 'No memory'}</span></span>
         <span className="flex min-w-0 items-center gap-1" title="Last run"><Clock className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{agent.lastRun}</span></span>
-        <span className="flex min-w-0 items-center gap-1" title="Performance"><Cpu className="h-3.5 w-3.5 shrink-0 text-violet-300/70" /><span className="truncate">{agent.score}%</span></span>
+        <span className="flex min-w-0 items-center gap-1" title="Performance"><Cpu className="h-3.5 w-3.5 shrink-0 text-violet-300/70" /><span className="truncate">{agent.score == null ? '—' : `${agent.score}%`}</span></span>
       </div>
 
       <div className="mt-4 flex items-center gap-1 border-t border-violet-300/[.08] pt-3">
