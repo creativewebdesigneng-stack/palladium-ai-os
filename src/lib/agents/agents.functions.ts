@@ -4,6 +4,7 @@
  * Every call runs behind `requireSupabaseAuth`, so the caller identity comes
  * from the verified bearer token and RLS scopes every row to its owner.
  */
+import { normaliseAgentModelSelection } from "./agent-model-selection";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normaliseAutonomyLevel } from "./agent-autonomy";
@@ -18,13 +19,15 @@ import {
 type Sb = { from: (t: string) => any };
 
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
-const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "groq", "compatible"];
+const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "gemini", "deepseek", "groq", "compatible"];
 const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   lovable: "google/gemini-3-flash-preview",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
   compatible: "local-model",
+  gemini: "gemini-2.5-flash",
+  deepseek: "deepseek-chat",
 };
 
 type AgentWriteInput = {
@@ -52,7 +55,8 @@ export function normaliseAgentWrite(input: AgentWriteInput) {
   const name = String(input?.name ?? "").trim();
   if (!name) throw new Error("Agent name is required");
   const status = AGENT_STATUSES.includes(input.status ?? "") ? input.status! : "draft";
-  const modelProvider = String(input.model_provider ?? "openai").trim().toLowerCase();
+  const selection = normaliseAgentModelSelection(input.model_provider, input.model);
+  const modelProvider = selection.provider;
   if (!MODEL_PROVIDERS.includes(modelProvider)) throw new Error("Unknown AI model provider");
 
   const temperature = Number.isFinite(Number(input.temperature))
@@ -61,7 +65,7 @@ export function normaliseAgentWrite(input: AgentWriteInput) {
   const maxTokens = Number.isFinite(Number(input.max_tokens))
     ? Math.min(Math.max(Math.round(Number(input.max_tokens)), 64), 32_768)
     : 4096;
-  const model = String(input.model ?? "").trim() || DEFAULT_MODEL_BY_PROVIDER[modelProvider] || "gpt-5-mini";
+  const model = selection.model || DEFAULT_MODEL_BY_PROVIDER[modelProvider] || "gpt-5-mini";
   const operatingProfile = input.operating_profile === undefined
     ? undefined
     : normaliseOperatingProfile(input.operating_profile);

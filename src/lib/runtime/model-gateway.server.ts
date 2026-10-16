@@ -184,7 +184,7 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
     },
   ];
 
-  for (const provider of fallbackOrder(primaryProvider)) {
+  for (const provider of fallbackOrder(primaryProvider).filter(p => !args.allowedProviders || args.allowedProviders.includes(p))) {
     const model = provider === primaryProvider ? primaryModel : resolveModel(provider, null);
     try {
       const result = await tryProviderModels({ ...args, messages, tools: [] }, provider, model);
@@ -228,12 +228,13 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
   );
-  const remembered = activeProviderByConversation.get(args.messages);
+  const cached = activeProviderByConversation.get(args.messages);
+  const remembered = cached && (!args.allowedProviders || args.allowedProviders.includes(cached.provider)) ? cached : undefined;
   const primaryProvider = remembered?.provider ?? args.provider;
   const primaryModel = remembered?.model ?? resolveModel(primaryProvider, args.model);
   let lastError: unknown;
 
-  for (const provider of fallbackOrder(primaryProvider)) {
+  for (const provider of fallbackOrder(primaryProvider).filter(p => !args.allowedProviders || args.allowedProviders.includes(p))) {
     const model = provider === primaryProvider ? primaryModel : resolveModel(provider, null);
     try {
       const result = await tryProviderModels(args, provider, model);

@@ -44,7 +44,7 @@ vi.mock("@/lib/memory/memory.server", () => ({
   searchMemory: vi.fn(async () => []),
 }));
 
-vi.mock("@/lib/platform/audit.server", () => ({ writeAudit: vi.fn(async () => {}) }));
+vi.mock("@/lib/platform/audit.server", () => ({ writeAudit: vi.fn(async () => {}), writeAuditRequired: vi.fn(async () => "audit-id") }));
 vi.mock("@/lib/devapi/webhooks.server", () => ({ dispatchWebhookEvent: vi.fn(async () => {}) }));
 
 let adminDb: ReturnType<typeof createFakeSupabase>;
@@ -54,6 +54,8 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 
+import * as credentials from "../model-provider-credentials.server";
+import * as audit from "@/lib/platform/audit.server";
 import { ProviderError } from "../model-gateway.server";
 import {
   ACTIVE_TASK_STATES,
@@ -62,6 +64,8 @@ import {
   isSuccessState,
   isTerminalState,
   prepareRun,
+  streamRun,
+  completeRun,
   runtimeConnectedServiceReadSpec,
   RuntimeError,
 } from "../runtime.server";
@@ -786,3 +790,40 @@ describe("workflow approval gates", () => {
   });
 });
 
+
+
+describe("model recovery boundaries", () => {
+  it("maps the observed legacy Gemini label before queueing and invoking", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-only");
+    const sb = db([{...AGENT, model: "Gemini"}]);
+    try {
+      const run = await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"Reply QA AGENT ONLINE"});
+      expect(run).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
+      expect(sb.tables.agent_tasks[0]).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
+    } finally {vi.unstubAllEnvs();}
+  });
+  it("queues nothing and invokes no model when required audit fails", async () => {
+    const sb=db();vi.mocked(audit.writeAuditRequired).mockRejectedValueOnce(Error("private upstream detail"));
+    await expect(prepareRun({sb,userId:USER,agentId:AGENT.id,input:"go"})).rejects.toMatchObject({code:"AUDIT_UNAVAILABLE",status:503});
+    expect(sb.tables.agent_tasks).toHaveLength(0);expect(gateway.runChat).not.toHaveBeenCalled();
+  });
+  it("closes a streamed credential lookup failure through the authenticated owner client", async () => {
+    const sb=db();const run=await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"go"});
+    adminDb=createFakeSupabase();
+    vi.spyOn(credentials,"resolveUserModelProviderAccess").mockRejectedValueOnce(new ProviderError("Personal credentials unavailable. Check server configuration.",503,true));
+    const events=[];for await(const event of streamRun({sb,userId:USER,run}))events.push(event);
+    expect(events.at(-1)).toMatchObject({type:"error",message:expect.stringContaining("Personal credentials unavailable")});
+    expect(sb.tables.agent_tasks[0]).toMatchObject({status:"failed",completed_at:expect.any(String)});
+    expect(gateway.streamChat).not.toHaveBeenCalled();
+  });
+  it("does not report completion without a persisted owner-bound receipt", async () => {
+    const sb=db();const run=await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"go"});adminDb=createFakeSupabase();
+    await expect(completeRun({sb,userId:USER,run,result:textResult(),toolCallCount:0})).rejects.toMatchObject({code:"RUN_PERSISTENCE_FAILED"});
+    expect(sb.tables.agent_tasks[0].status).not.toBe("succeeded");
+  });
+  it("reports failure persistence problems instead of claiming the task was closed", async () => {
+    const sb=db();const run=await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"go"});
+    const message=await failRun({sb:createFakeSupabase(),userId:USER,run,error:new ProviderError("Provider unavailable.",503,true)});
+    expect(message).toContain("Run status could not be saved");
+  });
+});

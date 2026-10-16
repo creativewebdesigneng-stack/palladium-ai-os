@@ -17,7 +17,7 @@ describe('agent provider configuration preflight', () => {
     expect(prepareRunEnd).toBeGreaterThan(prepareRunStart)
 
     const providerResolution = prepareRunSource.indexOf(
-      'const provider = normaliseProvider(agent.model_provider)',
+      'const provider = normaliseProvider(selection.provider)',
     )
     const providerGuard = prepareRunSource.indexOf('if (!(await isProviderAvailableForUser({ userId: args.userId, provider })))')
     const taskWrite = prepareRunSource.indexOf('.from("agent_tasks")', providerGuard)

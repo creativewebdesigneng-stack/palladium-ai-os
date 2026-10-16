@@ -36,7 +36,8 @@ describe('Blackstar external AI connection contract', () => {
     expect(credentialsFunctions).toContain("await import('./model-provider-credentials.server')")
     expect(credentialsFunctions).not.toMatch(/^import \{[^\n]*decryptToken/m)
     expect(credentialsServer).toContain('encryptToken(key)')
-    expect(credentialsServer).toContain('decryptToken(String(data.api_key_ciphertext))')
+    expect(credentialsServer).toContain('decryptPersonalKey(String(data.api_key_ciphertext))')
+    expect(credentialsServer).toContain('decryptToken(ciphertext)')
     expect(credentialsServer).toContain("from('model_provider_credentials')")
   })
 

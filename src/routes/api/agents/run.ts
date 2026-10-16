@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { failRun, prepareRun, streamRun } from "@/lib/runtime/runtime.server";
+import { failRun, prepareRun, streamRun, RuntimeError } from "@/lib/runtime/runtime.server";
 
 /**
  * Streaming agent run (SSE). Same-origin endpoint used by the command centre so
@@ -46,8 +46,8 @@ export const Route = createFileRoute("/api/agents/run")({
           });
         } catch (error) {
           return json(
-            { error: error instanceof Error ? error.message : "Could not start the run." },
-            400,
+            { error: error instanceof RuntimeError ? error.message : "Could not start the run. Check model configuration and backend access.", code: error instanceof RuntimeError ? error.code : "RUN_PREPARATION_FAILED" },
+            error instanceof RuntimeError ? error.status : 503,
           );
         }
 
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/agents/run")({
             try {
               for await (const event of streamRun({ sb, userId, run })) send(event);
             } catch (error) {
-              const message = await failRun({ userId, run, error });
+              const message = await failRun({ sb, userId, run, error });
               send({ type: "error", message });
             } finally {
               controller.close();

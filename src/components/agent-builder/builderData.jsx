@@ -30,6 +30,8 @@ export const TOOLS = [
 // These IDs and model values intentionally mirror src/lib/runtime/model-gateway.server.ts.
 // Store canonical API model IDs, never display-only names, so saved agents execute unchanged.
 export const PROVIDERS = [
+  { id: 'gemini', label: 'Google Gemini', models: ['gemini-2.5-flash'] },
+  { id: 'deepseek', label: 'DeepSeek', models: ['deepseek-chat'] },
   {
     id: 'openai',
     label: 'OpenAI',
