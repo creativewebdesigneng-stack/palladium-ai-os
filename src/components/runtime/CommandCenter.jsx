@@ -57,8 +57,9 @@ export default function CommandCenter({ agent, onFinished }) {
           }
         },
       });
+      if (!finished) throw new Error('The agent run did not return a completed task.');
       setInput('');
-      if (finished) onFinished?.(finished);
+      onFinished?.(finished);
     } catch (e) {
       if (controller.signal.aborted) return;
       setStatus('failed');
@@ -141,7 +142,7 @@ export default function CommandCenter({ agent, onFinished }) {
             <p className="mt-3 text-sm text-rose-400">{error}</p>
           ) : (
             <div className="mt-3 text-sm leading-relaxed text-zinc-300">
-              {text ? <ReactMarkdown>{text}</ReactMarkdown> : <p className="text-zinc-500">Thinking through the task, memory and enabled tools…</p>}
+              {text ? <ReactMarkdown>{text}</ReactMarkdown> : <p className="text-zinc-500">{running ? 'Waiting for the agent to return a final answer…' : 'No final response was produced. Check your selected model provider and the agent run error.'}</p>}
             </div>
           )}
         </div>

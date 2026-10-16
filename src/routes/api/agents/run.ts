@@ -14,6 +14,17 @@ export const Route = createFileRoute("/api/agents/run")({
         const url = process.env["SUPABASE_URL"];
         const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
         if (!url || !key) return json({ error: "Backend not configured." }, 500);
+        // The existing run finaliser and failure recorder use the trusted
+        // Supabase admin client. Reject an unconfigured preview *before* a
+        // chargeable model/tool call or task mutation starts.
+        const hasServerCredential = Boolean(
+          process.env["SUPABASE_SECRET_KEY"] ||
+          process.env["SUPABASE_SECRET_KEYS"] ||
+          process.env["SUPABASE_SERVICE_ROLE_KEY"]
+        );
+        if (!hasServerCredential) {
+          return json({ error: "Agent execution is unavailable: this preview is missing its Supabase server credential. Configure an isolated, protected preview backend before running agents." }, 503);
+        }
 
         const authHeader = request.headers.get("authorization") ?? "";
         const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";

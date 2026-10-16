@@ -2,11 +2,10 @@
  * Client helper for streaming agent runs.
  *
  * Talks to the same-origin `/api/agents/run` endpoint with the operator's
- * session token so the runtime can authenticate the caller. Falls back to the
- * non-streaming server function when streaming is unavailable.
+ * session token so the runtime can authenticate the caller. Server-side
+ * failures are surfaced without silently retrying a side-effecting run.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { runAgentTask } from "./runtime.functions";
 
 async function accessToken() {
   const { data } = await supabase.auth.getSession();
@@ -36,12 +35,9 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
     } catch {
       /* keep the default message */
     }
-    // Streaming unavailable — try the buffered path before giving up.
-    if (res.status >= 500) {
-      const result = await runAgentTask({ data: { agent_id: agentId, input } });
-      onEvent?.({ type: "complete", task: result.task });
-      return result.task;
-    }
+    // An HTTP failure does not prove that a run was never started. Retrying
+    // against a second execution path can repeat writes, purchases or messages.
+    // Leave the user's task untouched and surface the original server error.
     throw new Error(message);
   }
 
@@ -49,6 +45,7 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
   const decoder = new TextDecoder();
   let buffer = "";
   let task = null;
+  let terminalError = null;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -66,9 +63,17 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
         continue;
       }
       if (event.type === "complete") task = event.task;
+      if (event.type === "error") terminalError = event.message || "The agent run failed.";
       onEvent?.(event);
     }
   }
 
+  if (terminalError) throw new Error(terminalError);
+  if (!task) {
+    throw new Error("The agent connection ended before a completion result arrived. Check the model provider and preview runtime logs.");
+  }
+  if (!String(task.output_text ?? task.output?.text ?? "").trim()) {
+    throw new Error("The agent completed without a final response. Tool activity alone is not a finished result.");
+  }
   return task;
 }
