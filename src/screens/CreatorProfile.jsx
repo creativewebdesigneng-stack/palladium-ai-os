@@ -58,7 +58,7 @@ export default function CreatorProfile() {
           <p className="mt-2 text-sm text-zinc-300">{creator.bio || 'No bio yet.'}</p>
           <div className="mt-3 flex gap-4 text-xs text-zinc-400">
             <span className="flex items-center gap-1"><Bot className="h-3.5 w-3.5" />{stats?.agent_count ?? 0} agents</span>
-            <span className="flex items-center gap-1"><Download className="h-3.5 w-3.5" />{stats?.total_downloads ?? 0} downloads</span>
+            <span className="flex items-center gap-1"><Download className="h-3.5 w-3.5" />{stats?.total_downloads==null?'Download metrics unavailable':`${stats.total_downloads} downloads`}</span>
           </div>
         </div>
       </div>

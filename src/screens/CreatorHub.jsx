@@ -36,7 +36,7 @@ export default function CreatorHub() {
   useEffect(() => { load(); }, [load]);
 
   const submit = async (id) => {
-    try { await submitMarketplaceAgent({ item_id: id }); toast({ title: 'Submitted for review' }); load(); }
+    try { const result=await submitMarketplaceAgent({ item_id: id }); toast({ title: result.publication_next==='listing_fee_payment_required'?'Listing fee required':'Submitted for review',description: result.publication_next==='listing_fee_payment_required'?'Complete the existing listing-fee checkout in Creator Marketplace.':undefined }); load(); }
     catch (e) { toast({ title: 'Submit failed', description: e.message, variant: 'destructive' }); }
   };
   const remove = async (id) => {
@@ -61,6 +61,7 @@ export default function CreatorHub() {
           </button>
         }
       />
+      <p className="mb-5 text-sm text-zinc-400">Manage listing fees and purchased items in the <a href="/creator-marketplace" className="text-violet-300 underline">Creator Marketplace</a>.</p>
       <div className="mb-5 flex gap-1.5">
         {TABS.map(([id, label, Icon]) => (
           <button key={id} onClick={() => setTab(id)} className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm ${tab === id ? 'bg-white text-black' : 'border border-white/10 text-zinc-300 hover:bg-white/5'}`}><Icon className="h-4 w-4" />{label}</button>

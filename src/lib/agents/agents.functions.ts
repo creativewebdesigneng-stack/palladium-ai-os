@@ -48,7 +48,7 @@ type AgentWriteInput = {
   operating_profile?: AgentOperatingProfile | Record<string, unknown> | null;
 };
 
-function normaliseAgentWrite(input: AgentWriteInput) {
+export function normaliseAgentWrite(input: AgentWriteInput) {
   const name = String(input?.name ?? "").trim();
   if (!name) throw new Error("Agent name is required");
   const status = AGENT_STATUSES.includes(input.status ?? "") ? input.status! : "draft";

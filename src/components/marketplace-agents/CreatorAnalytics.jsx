@@ -5,7 +5,7 @@ import { getCreatorStats } from './api';
 
 // Creator analytics dashboard: aggregate cards (published agents, downloads,
 // earnings, avg rating) + a per-agent performance table. Reads from the
-// getCreatorStats backend function (cross-org aggregation via service role).
+// getCreatorStats backend function using owned canonical orders.
 export default function CreatorAnalytics() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -15,13 +15,14 @@ export default function CreatorAnalytics() {
 
   if (!stats) return <div className="text-sm text-zinc-500">Loading analytics…</div>;
 
-  const avgRating = stats.agents.length
-    ? (stats.agents.reduce((s, a) => s + a.rating, 0) / stats.agents.length).toFixed(1)
+  const ratings=stats.agents.filter(a=>Number.isFinite(a.rating));
+  const avgRating = ratings.length
+    ? (ratings.reduce((s, a) => s + a.rating, 0) / ratings.length).toFixed(1)
     : '—';
   const cards = [
     ['Published agents', stats.agent_count, Bot],
-    ['Total downloads', stats.total_downloads.toLocaleString(), Download],
-    ['Total earnings', `£${stats.total_earnings.toLocaleString()}`, Coins],
+    ['Total downloads', stats.total_downloads==null?'Unavailable':stats.total_downloads.toLocaleString(), Download],
+    ['Total earnings', stats.total_earnings==null?'Private':`£${stats.total_earnings.toLocaleString()}`, Coins],
     ['Avg rating', avgRating, Star],
   ];
 
@@ -43,8 +44,8 @@ export default function CreatorAnalytics() {
             <div key={a.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 p-3">
               <span className="min-w-0 flex-1 truncate text-xs text-zinc-200">{a.title}</span>
               <span className="flex items-center gap-3 text-[11px] text-zinc-500">
-                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{a.downloads}</span>
-                <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" />{a.rating.toFixed(1)}</span>
+                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{a.downloads??'—'}</span>
+                <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" />{a.rating==null?'—':a.rating.toFixed(1)}</span>
                 <span>£{a.earnings}</span>
               </span>
             </div>

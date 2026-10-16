@@ -12,12 +12,8 @@
     "browser_profiles",
     "browser_sessions"
   ],
-  "unreviewed_absent_reference_names": [
-    "creator_profiles",
-    "marketplace_agents",
-    "marketplace_purchases"
-  ],
-  "caution": "Remaining reference names have CREATE TABLE definitions in the repository but still require handler, dependency and authorization review. Dynamic references and missing columns are not fully inventoried.",
+  "unreviewed_absent_reference_names": [],
+  "caution": "The original absent-reference names have been restored or mapped to existing canonical records. Dynamic references, missing columns, authenticated journeys and live provider behavior are not fully certified.",
   "recovered_customer_operations": [
     "crm_contacts",
     "crm_activities",
@@ -114,5 +110,10 @@
   "recovered_builder_execution": [
     "builder_jobs",
     "builder_deployments"
-  ]
+  ],
+  "retired_legacy_reference_mappings": {
+    "marketplace_agents": "marketplace_listings (item_type=agent)",
+    "creator_profiles": "marketplace_seller_profiles",
+    "marketplace_purchases": "marketplace_orders (buyer-owned)"
+  }
 }

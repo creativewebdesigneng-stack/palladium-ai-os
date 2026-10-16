@@ -60,9 +60,8 @@ export default function AgentMarketplace() {
       toast({ title: 'Install failed', description: e.message, variant: 'destructive' });
       return;
     }
-    setAgents((list) => list.map((a) => a.id === agent.id ? { ...a, usage: { ...a.usage, installs: (a.usage?.installs || 0) + 1 } } : a));
     setActive(null);
-    toast({ title: `${agent.name} installed`, description: 'Added to your agent library.' });
+    toast({ title: `${agent.name} added for review`, description: 'Added paused with no tool permissions. Review it in your agent library.' });
   };
 
   // Creator marketplace: publish a draft agent listing for review.

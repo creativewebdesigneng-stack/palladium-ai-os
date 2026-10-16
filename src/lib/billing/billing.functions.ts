@@ -53,8 +53,8 @@ export const listBillingEvents = createServerFn({ method: "POST" })
       .from("subscriptions")
       .select("plan_code,status,created_at,updated_at,cancel_at_period_end,environment");
     const purchasesQuery = sb
-      .from("marketplace_purchases")
-      .select("id,amount_pence,currency,status,created_at")
+      .from("marketplace_orders")
+      .select("id,sale_price_pence,currency,status,created_at")
       .order("created_at", { ascending: false })
       .limit(50);
     const requestsQuery = sb
@@ -63,13 +63,15 @@ export const listBillingEvents = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const [{ data: subs }, { data: purchases }, { data: requests }] = await Promise.all([
+    const results = await Promise.all([
       orgId ? subQuery.eq("org_id", orgId) : subQuery.eq("user_id", userId).is("org_id", null),
-      orgId ? purchasesQuery.eq("org_id", orgId) : purchasesQuery.eq("user_id", userId),
+      purchasesQuery.eq("buyer_id", userId),
       // purchase_requests has no org_id column — only ever the caller's own.
       requestsQuery.eq("user_id", userId),
     ]);
 
+    if(results.some(r=>r.error))throw new Error("Could not load billing events. Try again later.");
+    const [{data:subs},{data:purchases},{data:requests}]=results;
     const events: Array<{
       id: string;
       kind: "subscription" | "purchase" | "purchase_request";
@@ -97,7 +99,7 @@ export const listBillingEvents = createServerFn({ method: "POST" })
         kind: "purchase",
         title: "Marketplace purchase",
         status: p.status,
-        amount: (p.amount_pence ?? 0) / 100,
+        amount: Number(p.sale_price_pence) / 100,
         currency: p.currency ?? "GBP",
         date: p.created_at,
       });

@@ -20,7 +20,7 @@ export default function TemplateCard({ t, onPreview, onUse, onFav, favs }) {
         <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">{t.desc}</p>
         <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
           <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>
-          <span>·</span><span>{t.uses.toLocaleString()} uses</span>
+          <span>·</span><span>{t.uses==null?'Usage unavailable':`${t.uses.toLocaleString()} uses`}</span>
           <span>·</span><span className="truncate">{t.creator}</span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/5 pt-3">

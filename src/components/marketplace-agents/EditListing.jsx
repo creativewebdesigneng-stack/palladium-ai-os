@@ -28,7 +28,6 @@ export default function EditListing({ item, onClose, onSaved }) {
     price: Number(item.price) || 0,
     required_plan: item.required_plan || 'free',
     usage_requirements: item.usage_requirements || '',
-    revenue_share: Number(item.revenue_share) || 30,
     provider: ac.provider || 'openai',
     model: ac.model || '',
     tools: ac.tools || [],
@@ -57,7 +56,6 @@ export default function EditListing({ item, onClose, onSaved }) {
         price: form.price,
         required_plan: form.required_plan,
         usage_requirements: form.usage_requirements,
-        revenue_share: form.revenue_share,
         metadata: {
           grad: form.grad,
           initials: form.title.slice(0, 2).toUpperCase(),
@@ -106,9 +104,9 @@ export default function EditListing({ item, onClose, onSaved }) {
             <TagInput values={form.features} onAdd={addCap} input={capInput} setInput={setCapInput} onRemove={(c) => set('features', form.features.filter((x) => x !== c))} placeholder="Add a capability and press Enter" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Price (£/mo)"><input type="number" min="0" value={form.price} onChange={(e) => set('price', Number(e.target.value))} className={inp} /></Field>
+            <Field label="Price (£, one-time)"><input type="number" min="0" value={form.price} onChange={(e) => set('price', Number(e.target.value))} className={inp} /></Field>
             <Field label="Required plan"><select value={form.required_plan} onChange={(e) => set('required_plan', e.target.value)} className={inp}>{PLANS.map((p) => <option key={p.id} value={p.id} className="bg-[#101119]">{p.label}</option>)}</select></Field>
-            <Field label="Revenue share %"><input type="number" min="0" max="100" value={form.revenue_share} onChange={(e) => set('revenue_share', Number(e.target.value))} className={inp} /></Field>
+            <p className="text-xs text-zinc-400">Marketplace fees: £3 per listing; 2% on sales below £10,000 and 8% on sales of £10,000 or more.</p>
           </div>
           <Field label="Usage requirements"><textarea value={form.usage_requirements} onChange={(e) => set('usage_requirements', e.target.value)} rows={2} placeholder="e.g. Requires Pro plan + GitHub integration" className={`${inp} resize-none`} /></Field>
 

@@ -35,7 +35,7 @@ export default function AgentCard({ agent, onOpen, onInstall }) {
       <div className="mt-auto flex items-center justify-between pt-4">
         <div className="flex items-center gap-3">
           <RatingStars rating={agent.rating} count={agent.reviewsCount} />
-          <span className="text-[10px] text-zinc-600">{agent.runs} runs</span>
+          <span className="text-[10px] text-zinc-600">{agent.runs==null?'Run metrics unavailable':`${agent.runs} runs`}</span>
         </div>
         <PriceBadge price={agent.price} />
       </div>
