@@ -25,7 +25,7 @@ export default function TemplatePreview({ t, onClose, onUse, onFav, favs }) {
           </div>
           <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-400">
             <span className="flex items-center gap-0.5 text-amber-300"><Star className="h-3 w-3 fill-amber-300" />{t.rating}</span>
-            <span>{t.uses.toLocaleString()} uses</span>
+            <span>{t.uses==null?'Usage unavailable':`${t.uses.toLocaleString()} uses`}</span>
           </div>
           <p className="mt-3 text-[13px] leading-relaxed text-zinc-300">{t.desc}</p>
 

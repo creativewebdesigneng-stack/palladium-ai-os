@@ -37,7 +37,7 @@ function toTemplate(listing, index) {
     creator: listing.creator?.display_name || listing.creator_name || 'Unknown publisher',
     price: Number(listing.price) > 0 ? `£${Number(listing.price).toFixed(2)}` : 'Free',
     rating: listing.rating ? Number(listing.rating).toFixed(1) : '—',
-    uses: Number(listing.install_count ?? 0),
+    uses: null,
     grad: GRADS[index % GRADS.length],
     createdAt: listing.created_at ?? null,
     preview: { hero: listing.title ?? 'Template', sections: features },
@@ -78,7 +78,7 @@ export default function Templates() {
   const install = useMutation({
     mutationFn: (t) => installFn({ data: { item_id: t.id } }),
     onSuccess: (_r, t) => {
-      toast({ title: 'Template installed', description: `${t.name} was added to your workspace.` });
+      toast({ title: 'Reference added for review', description: `${t.name} was added paused with no tool permissions.` });
       qc.invalidateQueries({ queryKey: ['marketplace-templates'] });
       qc.invalidateQueries({ queryKey: ['agents'] });
     },

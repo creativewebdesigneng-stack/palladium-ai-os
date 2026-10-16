@@ -23,7 +23,7 @@ export default function AgentDetailDrawer({ agent, onClose, onInstall }) {
                 {agent.creatorId ? <Link to={`/creators/${agent.creatorId}`} className="text-[11px] text-zinc-500 hover:text-violet-300">by {agent.creator.name}</Link> : <p className="text-[11px] text-zinc-500">by {agent.creator.name}</p>}
                 <div className="mt-1.5 flex items-center gap-2">
                   <RatingStars rating={agent.rating} count={agent.reviewsCount} />
-                  <span className="text-[10px] text-zinc-600">{agent.runs} runs</span>
+                  <span className="text-[10px] text-zinc-600">{agent.runs==null?'Run metrics unavailable':`${agent.runs} runs`}</span>
                   <PriceBadge price={agent.price} />
                 </div>
               </div>
@@ -61,7 +61,7 @@ export default function AgentDetailDrawer({ agent, onClose, onInstall }) {
 
               <Panel title="Usage" icon={BarChart3}>
                 <div className="grid grid-cols-3 gap-3">
-                  {[['Installs', agent.usage.installs.toLocaleString()], ['Success rate', `${agent.usage.successRate}%`], ['Avg run time', agent.usage.avgRunTime]].map(([l, v]) => (
+                  {[['Installs', agent.usage.installs==null?'Unavailable':agent.usage.installs.toLocaleString()], ['Success rate', agent.usage.successRate==null?'Unavailable':`${agent.usage.successRate}%`], ['Avg run time', agent.usage.avgRunTime]].map(([l, v]) => (
                     <div key={l} className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-lg font-semibold text-white">{v}</p><p className="text-[10px] text-zinc-500">{l}</p></div>
                   ))}
                 </div>

@@ -27,9 +27,9 @@ export default function ListingsManager({ items, onEdit, onSubmit, onRemove }) {
               </div>
               <p className="mt-0.5 truncate text-xs text-zinc-500">v{it.version || '1.0.0'} · {it.category}</p>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
-                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{Number(it.downloads) || 0}</span>
+                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{it.downloads==null?'—':Number(it.downloads)}</span>
                 <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-400" />{Number(it.rating || 0).toFixed(1)} ({Number(it.reviews_count) || 0})</span>
-                <span>{Number(it.price) === 0 ? 'Free' : `£${it.price}/mo`}</span>
+                <span>{Number(it.price) === 0 ? 'Free' : `£${it.price}`}</span>
                 {it.required_plan && <span className="rounded bg-white/5 px-1.5 py-0.5 capitalize">{it.required_plan}</span>}
               </div>
             </div>
@@ -37,11 +37,11 @@ export default function ListingsManager({ items, onEdit, onSubmit, onRemove }) {
               {it.status === 'published' && (
                 <a href="/agent-marketplace" className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/5"><ExternalLink className="h-3 w-3" />View</a>
               )}
-              <button onClick={() => onEdit(it)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/5"><Pencil className="h-3 w-3" />Edit</button>
+              <button disabled={!['draft','rejected','removed'].includes(it.status)} onClick={() => onEdit(it)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/5"><Pencil className="h-3 w-3" />Edit</button>
               {(it.status === 'draft' || it.status === 'rejected') && (
                 <button onClick={() => onSubmit(it.id)} className="flex items-center gap-1 rounded-lg border border-violet-400/30 bg-violet-500/10 px-2.5 py-1.5 text-[11px] text-violet-200 hover:bg-violet-500/20"><Send className="h-3 w-3" />Submit</button>
               )}
-              {it.status !== 'removed' && (
+              {it.status === 'published' && (
                 <button onClick={() => onRemove(it.id)} className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-rose-300 hover:bg-rose-500/10"><Trash2 className="h-3 w-3" />Remove</button>
               )}
             </div>

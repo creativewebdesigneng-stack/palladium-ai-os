@@ -104,10 +104,10 @@ export const listAiHubResources = createServerFn({ method: 'POST' })
       untypedClient.from('external_mcp_servers')
         .select('id,name,slug,enabled,requires_approval,allowed_tool_names,cached_tools,last_discovered_at,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
-      untypedClient.from('marketplace_agents')
+      untypedClient.from('marketplace_listings')
         .select('id,title,summary,description,category,tags,price_pence,currency,version,required_plan,install_count,rating_avg,rating_count,published_at,updated_at')
         .eq('status', 'published')
-        .order('install_count', { ascending: false }).limit(limit),
+        .eq('item_type','agent').order('published_at', { ascending: false }).limit(limit),
       untypedClient.from('builder_jobs')
         .select('id,title,status,source_status,repository_status,sandbox_status,created_at,updated_at')
         .order('updated_at', { ascending: false }).limit(limit),
