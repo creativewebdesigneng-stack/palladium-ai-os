@@ -6,40 +6,9 @@ import type {
   BrowserTool,
   CheckoutDraft,
 } from "@/lib/mission/browser-agent";
-import { isDomainAllowed, resolveBrowserProvider } from "@/lib/mission/browser-agent";
+import { isDomainAllowed, resolveBrowserProvider, resolveRemoteBrowserConfig } from "@/lib/mission/browser-agent";
 import type { BrowserStorageState } from "./browser-storage-state";
-
-function remoteConfig(provider: string) {
-  if (provider === "playwright") {
-    const endpoint = process.env["PLAYWRIGHT_BROWSER_ENDPOINT"];
-    if (!endpoint) return null;
-    const token = process.env["PLAYWRIGHT_BROWSER_TOKEN"];
-    return {
-      id: provider,
-      endpoint: endpoint.replace(/\/$/, ""),
-      headers: {
-        "content-type": "application/json",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-    };
-  }
-  if (provider === "browserbase") {
-    const endpoint = process.env["BROWSERBASE_RUNNER_ENDPOINT"];
-    const key = process.env["BROWSERBASE_API_KEY"];
-    const project = process.env["BROWSERBASE_PROJECT_ID"];
-    if (!endpoint || !key || !project) return null;
-    return {
-      id: provider,
-      endpoint: endpoint.replace(/\/$/, ""),
-      headers: {
-        "content-type": "application/json",
-        "x-bb-api-key": key,
-        "x-bb-project-id": project,
-      },
-    };
-  }
-  return null;
-}
+import { sanitizeBrowserStorageState } from "./browser-storage-state";
 
 function assertAllowed(url: string, allowedDomains: string[]) {
   if (!isDomainAllowed(url, allowedDomains)) {
@@ -56,12 +25,13 @@ export function createStatefulBrowserTool(args: {
   initialState?: BrowserStorageState | null;
 }): StatefulBrowserTool {
   const provider = resolveBrowserProvider();
-  const cfg = remoteConfig(provider);
+  const cfg = resolveRemoteBrowserConfig(provider);
   if (!cfg) {
     throw new Error("Persistent browser sessions require a configured production browser provider.");
   }
   const steps: BrowserStep[] = [];
   let sessionId: string | null = null;
+  const initialState = args.initialState ? sanitizeBrowserStorageState(args.initialState, args.config.allowedDomains) : null;
 
   const record = (kind: BrowserStep["kind"], target: string, detail?: string) => {
     steps.push({ kind, target, at: new Date().toISOString(), simulated: false, ...(detail ? { detail } : {}) });
@@ -74,12 +44,14 @@ export function createStatefulBrowserTool(args: {
       headers: cfg.headers,
       body: JSON.stringify({
         allowedDomains: args.config.allowedDomains,
-        ...(args.initialState ? { storageState: args.initialState } : {}),
+        ...(initialState ? { storageState: initialState } : {}),
       }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(30_000),
     });
     if (!created.ok) throw new Error(`Browser provider could not open a persistent session (${created.status}).`);
-    const body = await created.json() as { sessionId?: string };
-    if (!body.sessionId) throw new Error("Browser provider did not return a session.");
+    const body = await created.json() as { sessionId?: unknown };
+    if (typeof body?.sessionId !== "string" || !body.sessionId.trim() || body.sessionId.length > 200 || /[\x00-\x1f]/.test(body.sessionId)) throw new Error("Browser provider did not return a valid session.");
     sessionId = body.sessionId;
   };
 
@@ -89,9 +61,17 @@ export function createStatefulBrowserTool(args: {
       method: "POST",
       headers: cfg.headers,
       body: JSON.stringify({ sessionId, action, params }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
     });
-    const body = await response.json().catch(() => ({})) as { ok?: boolean; data?: unknown; error?: string };
-    if (!response.ok || body.ok === false) throw new Error(body.error || `Browser action "${action}" failed (${response.status}).`);
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`Browser action "${action}" failed (${response.status}).`);
+    }
+    const body = await response.json().catch(() => null) as { ok?: boolean; data?: unknown } | null;
+    if (!body || body.ok !== true || !body.data || typeof body.data !== "object" || Array.isArray(body.data)) {
+      throw new Error(`Browser action "${action}" did not return a verified result.`);
+    }
     return body.data;
   };
 
@@ -103,7 +83,8 @@ export function createStatefulBrowserTool(args: {
       assertAllowed(url, args.config.allowedDomains);
       record("navigate", url);
       const data = await call("navigate", { url }) as { url?: string } | undefined;
-      const resolved = data?.url ?? url;
+      const resolved = data?.url;
+      if (typeof resolved !== "string" || !resolved) throw new Error("Browser navigation did not return a verified URL.");
       assertAllowed(resolved, args.config.allowedDomains);
       return { ok: true, url: resolved, simulated: false };
     },
@@ -127,7 +108,8 @@ export function createStatefulBrowserTool(args: {
       assertAllowed(url, args.config.allowedDomains);
       record("extract", url, selector);
       const data = await call("extract", { url, selector }) as { text?: string; items?: unknown[] } | undefined;
-      return { url, text: data?.text ?? "", items: data?.items ?? [], simulated: false };
+      if (typeof data?.text !== "string") throw new Error("Browser extraction did not return verified text.");
+      return { url, text: data.text, items: data.items ?? [], simulated: false };
     },
     async screenshot() {
       record("screenshot", "current page");
@@ -189,7 +171,7 @@ export function createStatefulBrowserTool(args: {
     async exportStorageState() {
       const data = await call("storage_state") as BrowserStorageState | undefined;
       if (!data) return { cookies: [], origins: [] };
-      return data;
+      return sanitizeBrowserStorageState(data, args.config.allowedDomains);
     },
   };
   return tool;

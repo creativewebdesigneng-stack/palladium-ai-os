@@ -485,6 +485,9 @@ function remoteConfig(id: string): RemoteConfig | null {
   return null;
 }
 
+/** Server-side configuration shared by ordinary and persistent browser sessions. */
+export { remoteConfig as resolveRemoteBrowserConfig };
+
 export async function probeBrowserProvider(id: string): Promise<{ ok: boolean; error?: string }> {
   const cfg = remoteConfig(id);
   if (!cfg) return { ok: false, error: "Provider credentials are not configured" };

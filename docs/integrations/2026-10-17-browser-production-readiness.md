@@ -35,6 +35,21 @@ Browserbase rejection without network traffic, HTTPS base-path handling and
 whitespace-only credentials. Full CI and live release receipts are recorded in
 the corresponding pull request and issue #982.
 
+## Persistent-session transport correction
+
+The persistent `browser_task` path now shares the ordinary adapter's validated
+provider configuration instead of reconstructing credentials independently.
+Both session creation (which can carry saved cookies) and subsequent actions
+refuse redirects and use bounded 30/60-second request signals. Ambiguous mutating
+failures are not retried. Initial and exported profile state is filtered through
+the existing domain-scoped storage sanitizer. Invalid session receipts, missing
+navigation/extraction evidence and invalid action envelopes fail explicitly;
+provider error bodies are not returned as user-visible errors.
+
+Regression tests cover redirects, timeout non-replay, state filtering, malformed
+receipts and both provider authentication formats. These tests do not establish
+a live production worker connection or install Browser Use/OpenHands.
+
 ## Requirements before production execution can be certified
 
 1. An approved production host running the existing `browser-worker` Docker
