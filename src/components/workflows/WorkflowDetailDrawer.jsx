@@ -14,6 +14,11 @@ export default function WorkflowDetailDrawer({ workflow, onClose, onChanged }) {
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [runInput, setRunInput] = useState('');
+
+  useEffect(() => {
+    setRunInput(workflow?.description || workflow?.name || '');
+  }, [workflow?.id, workflow?.description, workflow?.name]);
 
   const loadRuns = useCallback(async () => {
     if (!workflow) return;
@@ -37,7 +42,7 @@ export default function WorkflowDetailDrawer({ workflow, onClose, onChanged }) {
   const handleRun = async () => {
     setBusy(true);
     try {
-      await runWorkflow({ data: { workflow_id: workflow.id, input: '' } });
+      await runWorkflow({ data: { workflow_id: workflow.id, input: runInput.trim() } });
       toast({ title: 'Workflow run started', description: workflow.name });
       await loadRuns();
       onChanged?.();
@@ -82,10 +87,16 @@ export default function WorkflowDetailDrawer({ workflow, onClose, onChanged }) {
             <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-zinc-400">{workflow.nodes.length} nodes</span>
             <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-zinc-400">{workflow.runs} runs</span>
           </div>
+          <div className="mt-3">
+            <label htmlFor="workflow-run-objective" className="block text-xs font-medium text-zinc-300">Run objective</label>
+            <textarea id="workflow-run-objective" value={runInput} onChange={(event) => setRunInput(event.target.value)} disabled={busy}
+              placeholder="What should this workflow do on this run?" rows={3}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-zinc-500 disabled:opacity-50" />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button disabled={busy} onClick={handleRun} className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1.5 text-[11px] font-medium text-white disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}Run</button>
+            <button disabled={busy || !runInput.trim()} onClick={handleRun} className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1.5 text-[11px] font-medium text-white disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}Run</button>
             <button disabled={busy} onClick={() => handleStatus(workflow.status === 'Paused' ? 'active' : 'paused')} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"><Pause className="h-3.5 w-3.5" />{workflow.status === 'Paused' ? 'Resume' : 'Pause'}</button>
-            <button disabled={busy} onClick={handleRun} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Retry</button>
+            <button disabled={busy || !runInput.trim()} onClick={handleRun} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 hover:bg-white/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Retry</button>
           </div>
         </div>
 
