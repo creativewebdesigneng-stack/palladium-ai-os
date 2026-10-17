@@ -165,7 +165,7 @@ describe("Gemini signed tool continuation", () => {
     expect(first?.geminiContinuation).toEqual({ model: args.model, parts });
     await runGeminiNative({ ...args, messages: [
       ...args.messages,
-      { role: "assistant", content: first!.text, tool_calls: first!.toolCalls, geminiContinuation: first!.geminiContinuation },
+      { role: "assistant", content: first!.text, tool_calls: first!.toolCalls, geminiContinuation: first!.geminiContinuation! },
       { role: "tool", tool_call_id: first!.toolCalls[0]!.id, content: JSON.stringify({ requires_approval: true }) },
       { role: "tool", tool_call_id: first!.toolCalls[1]!.id, content: JSON.stringify({ requires_approval: true }) },
     ] });

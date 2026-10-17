@@ -202,7 +202,7 @@ export async function runGeminiNative(args: RunArgs): Promise<ChatResult> {
   const parts = json.candidates?.[0]?.content?.parts ?? [];
   // Do not expose or persist provider thought text. Only public content and
   // opaque signatures needed by the native protocol are retained.
-  const continuationParts: GeminiContinuation["parts"] = parts.flatMap((part) => {
+  const continuationParts: GeminiContinuation["parts"] = parts.flatMap<GeminiContinuation["parts"][number]>((part) => {
     if (part.thought === true) return [];
     const signature = typeof part.thoughtSignature === "string"
       ? { thoughtSignature: part.thoughtSignature } : {};
