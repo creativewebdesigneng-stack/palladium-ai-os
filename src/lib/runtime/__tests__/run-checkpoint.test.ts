@@ -212,3 +212,14 @@ describe("durable run checkpoints", () => {
     expect(typeof update?.["heartbeat_at"]).toBe("string");
   });
 });
+
+
+it("preserves opaque native continuation through checkpoint serialization without granting authority", () => {
+  const geminiContinuation = { model: "gemini-3.6-flash", parts: [{ functionCall: { name: "calculator", args: { expression: "1+1" } }, thoughtSignature: "opaque-signature" }] };
+  const checkpoint = createDurableRunCheckpoint({ phase: "tool_boundary", plan: createInitialPlan({ objective: "Synthetic QA" }),
+    messages: [{ role: "assistant", content: "", tool_calls: [{ id: "a", name: "calculator", arguments: { expression: "1+1" } }], geminiContinuation }],
+    toolRounds: 1, toolCallCount: 1, usage: { input: 1, output: 1 } });
+  const restored = parseDurableRunCheckpoint(JSON.parse(JSON.stringify(checkpoint)));
+  expect(restored?.messages[0]?.geminiContinuation).toEqual(geminiContinuation);
+  expect(restored).not.toHaveProperty("grants");
+});

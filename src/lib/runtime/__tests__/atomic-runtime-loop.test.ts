@@ -105,6 +105,7 @@ function toolResult(calls: Array<{ id: string; name: string; arguments: any }>) 
   return {
     text: "",
     toolCalls: calls,
+    geminiContinuation: { model: "gemini-3.6-flash", parts: [{ text: "public", thoughtSignature: "opaque-fixture" }] },
     usage: { input: 5, output: 5 },
     provider: "openai" as const,
     model: "gpt-5-mini",
@@ -169,6 +170,8 @@ describe("conservative parallel batching in the non-streaming loop", () => {
     const secondCall = gateway.runChat.mock.calls[1];
     expect(secondCall).toBeDefined();
     const messages = secondCall![0].messages;
+    expect(messages.find((m: any) => m.role === "assistant").geminiContinuation)
+      .toMatchObject({ model: "gemini-3.6-flash", parts: [{ thoughtSignature: "opaque-fixture" }] });
     const toolMsgs = messages.filter((m: any) => m.role === "tool");
     expect(toolMsgs.map((m: any) => m.tool_call_id)).toEqual(["a", "b"]);
     expect(toolMsgs.map((m: any) => m.name)).toEqual(["web_search", "current_time"]);
@@ -293,6 +296,8 @@ describe("streaming loop parity", () => {
 
     expect(events.some((e) => e.type === "complete")).toBe(true);
     expect(peak()).toBe(2);
+    const nextMessages = gateway.streamChat.mock.calls[1]![0].messages;
+    expect(nextMessages.find((m: any) => m.role === "assistant").geminiContinuation.parts[0].thoughtSignature).toBe("opaque-fixture");
     const toolEvents = events.filter((e) => e.type === "tool");
     expect(toolEvents.map((e) => e.name)).toEqual(["web_search", "current_time"]);
   });

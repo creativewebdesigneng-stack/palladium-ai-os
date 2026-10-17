@@ -687,7 +687,7 @@ function awaitsApproval(output: unknown): boolean {
 }
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
-  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
+  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls, ...(result.geminiContinuation ? { geminiContinuation: result.geminiContinuation } : {}) });
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   try {

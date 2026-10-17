@@ -23,12 +23,23 @@ export type ProviderAccess = {
   apiKey: string;
 };
 
+/** Opaque Gemini continuation data; never execution authority or UI output. */
+export type GeminiContinuation = {
+  model: string;
+  parts: Array<{
+    text?: string;
+    functionCall?: { name: string; args: Record<string, unknown>; id?: string };
+    thoughtSignature?: string;
+  }>;
+};
+
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   tool_call_id?: string;
   name?: string;
   tool_calls?: ToolCall[];
+  geminiContinuation?: GeminiContinuation;
 };
 
 export type ToolCall = { id: string; name: string; arguments: Record<string, unknown> };
@@ -40,6 +51,7 @@ export type ToolDef = {
 };
 
 export type ChatResult = {
+  geminiContinuation?: GeminiContinuation;
   text: string;
   toolCalls: ToolCall[];
   usage: { input: number; output: number };
