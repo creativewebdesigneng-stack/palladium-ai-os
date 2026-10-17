@@ -168,7 +168,8 @@ export function describeBrowserProviders(): Array<Omit<BrowserProviderDescriptor
 }> {
   return [...registry.values()].map(({ factory: _factory, ...d }) => ({
     ...d,
-    configured: d.requires.every((key) => Boolean(process.env[key])),
+    configured: d.requires.every((key) => Boolean(process.env[key]?.trim())) &&
+      (d.id === 'playwright' || d.id === 'browserbase' ? remoteConfig(d.id) !== null : true),
   }));
 }
 
@@ -437,22 +438,28 @@ type RemoteConfig = {
   headers: Record<string, string>;
 };
 
+function secureRunnerEndpoint(value: string | undefined, originOnly: boolean): string | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.username || url.password || url.href.includes('?') || url.href.includes('#') ||
+        (originOnly && url.pathname !== '/')) return null;
+    return originOnly ? url.origin : url.href.replace(/\/+$/, '');
+  } catch { return null; }
+}
+
 function remoteConfig(id: string): RemoteConfig | null {
   if (id === "playwright") {
-    const endpoint = process.env["PLAYWRIGHT_BROWSER_ENDPOINT"];
+    const endpoint = secureRunnerEndpoint(process.env["PLAYWRIGHT_BROWSER_ENDPOINT"], true);
     const token = process.env["PLAYWRIGHT_BROWSER_TOKEN"]?.trim();
     // The built-in Playwright worker always requires a private bearer token.
     // HTTPS origin only: never transmit it to an HTTP host or URL with embedded
     // credentials, a query, a fragment or an unexpected path.
     if (!endpoint || !token) return null;
-    let url: URL;
-    try { url = new URL(endpoint); } catch { return null; }
-    if (url.protocol !== "https:" || url.username || url.password ||
-        url.pathname !== "/" || url.search || url.hash) return null;
     return {
       id,
       label: "Playwright worker",
-      endpoint: url.origin,
+      endpoint,
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
@@ -460,14 +467,14 @@ function remoteConfig(id: string): RemoteConfig | null {
     };
   }
   if (id === "browserbase") {
-    const key = process.env["BROWSERBASE_API_KEY"];
-    const project = process.env["BROWSERBASE_PROJECT_ID"];
-    const endpoint = process.env["BROWSERBASE_RUNNER_ENDPOINT"];
+    const key = process.env["BROWSERBASE_API_KEY"]?.trim();
+    const project = process.env["BROWSERBASE_PROJECT_ID"]?.trim();
+    const endpoint = secureRunnerEndpoint(process.env["BROWSERBASE_RUNNER_ENDPOINT"], false);
     if (!key || !project || !endpoint) return null;
     return {
       id,
       label: "Browserbase",
-      endpoint: endpoint.replace(/\/$/, ""),
+      endpoint,
       headers: {
         "content-type": "application/json",
         "x-bb-api-key": key,
@@ -692,7 +699,7 @@ registerBrowserProvider({
   id: "playwright",
   label: "Playwright worker",
   kind: "production",
-  requires: ["PLAYWRIGHT_BROWSER_ENDPOINT"],
+  requires: ["PLAYWRIGHT_BROWSER_ENDPOINT", "PLAYWRIGHT_BROWSER_TOKEN"],
   note: "Set an HTTPS PLAYWRIGHT_BROWSER_ENDPOINT and matching private PLAYWRIGHT_BROWSER_TOKEN; the worker must verify Chromium via /health.",
   factory: productionFactory("playwright", "Connect a Playwright worker endpoint to enable it."),
 });

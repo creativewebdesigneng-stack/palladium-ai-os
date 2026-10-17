@@ -1,5 +1,17 @@
 # Agent feature verification — 17 October 2026
 
+## Current checkpoint through PR #996
+
+The sections below retain earlier acceptance history and include superseded
+blockers. Audited recovery, active cancellation, Groq 120B/20B execution,
+existing-agent model switching, memory-form interaction and accurate recall
+status have since passed live verification. Current release/task receipts are
+maintained in issue #982. Embedding quota/billing and external service acceptance
+remain open. See [browser production readiness](2026-10-17-browser-production-readiness.md)
+for the fresh production worker audit and deployment prerequisites.
+
+## Earlier acceptance history
+
 ## Live finding and repair
 
 The authenticated Agent Builder created QA Feature Verification 2026-10-17
