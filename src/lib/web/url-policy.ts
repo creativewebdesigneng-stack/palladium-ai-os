@@ -1,12 +1,16 @@
-const PRIVATE_HOST = /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/i;
+import { isIP } from 'node:net';
+import { isUnsafeNetworkAddress } from '@/lib/security/public-network.server';
 
 export function isPublicHttpUrl(value: unknown) {
   if (typeof value !== 'string' || value.length > 2048) return false;
   try {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol)) return false;
-    const host = url.hostname.toLowerCase();
-    if (!host || PRIVATE_HOST.test(host) || host.endsWith('.local') || host.endsWith('.internal')) return false;
+    if (url.username || url.password) return false;
+    const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return false;
+    const address = host.replace(/^\[|\]$/g, '');
+    if (isIP(address) && isUnsafeNetworkAddress(address)) return false;
     return true;
   } catch {
     return false;
