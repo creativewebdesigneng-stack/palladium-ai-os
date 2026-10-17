@@ -463,8 +463,8 @@ export async function completeRun(args: {
     taskId: run.taskId,
     request: String(run.messages[run.messages.length - 1]?.content ?? ""),
     outcome: result.text,
-    provider: run.provider,
-    model: run.model,
+    provider: result.provider,
+    model: result.model,
   }).catch((error: unknown) => console.error("[runtime] authorised run memory capture unavailable", error));
 
   await Promise.all([
@@ -476,8 +476,8 @@ export async function completeRun(args: {
       agentId: run.agent.id,
       metadata: {
         task_id: run.taskId,
-        provider: run.provider,
-        model: run.model,
+        provider: result.provider,
+        model: result.model,
         tokens_in: result.usage.input,
         tokens_out: result.usage.output,
         tool_calls: args.toolCallCount,
@@ -491,7 +491,7 @@ export async function completeRun(args: {
       quantity: result.usage.input + result.usage.output,
       unit: "token",
       agentId: run.agent.id,
-      metadata: { task_id: run.taskId, provider: run.provider, model: run.model },
+      metadata: { task_id: run.taskId, provider: result.provider, model: result.model },
     }),
     args.sb.from("agent_activities").insert({
       user_id: args.userId,
@@ -508,7 +508,7 @@ export async function completeRun(args: {
       targetType: "agent_task",
       targetId: run.taskId,
       agentId: run.agent.id,
-      metadata: { provider: run.provider, model: run.model, duration_ms: duration },
+      metadata: { provider: result.provider, model: result.model, duration_ms: duration },
     }),
   ]);
 

@@ -4,7 +4,7 @@ import type { Provider } from '@/lib/runtime/model-gateway.base';
 export const AGENT_MODEL_CHOICES: Record<string, { provider: Provider; model: string }> = {
   gpt: { provider: 'openai', model: 'gpt-5-mini' },
   claude: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-  gemini: { provider: 'gemini', model: 'gemini-2.5-flash' },
+  gemini: { provider: 'gemini', model: 'gemini-3.6-flash' },
   deepseek: { provider: 'deepseek', model: 'deepseek-chat' },
   llama: { provider: 'groq', model: 'llama-3.3-70b-versatile' },
 };

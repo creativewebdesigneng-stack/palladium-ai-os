@@ -793,13 +793,25 @@ describe("workflow approval gates", () => {
 
 
 describe("model recovery boundaries", () => {
+  it("uses the actual completed model for receipts, usage and audit provenance", async () => {
+    const sb = db();
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    const result = { ...textResult(), model: "gpt-4.1-mini" };
+    await completeRun({ sb, userId: USER, run, result, toolCallCount: 0 });
+    expect(sb.tables.agent_tasks[0]).toMatchObject({ status: "succeeded", model: result.model, provider: result.provider });
+    const usage = entitlements.recordUsage.mock.calls.map(call => (call as unknown[])[0]) as any[];
+    expect(usage).toHaveLength(2);
+    for (const row of usage) expect(row.metadata).toMatchObject({ provider: result.provider, model: result.model });
+    expect(audit.writeAuditRequired).toHaveBeenCalledWith(expect.objectContaining({ action: "agent.run_result", metadata: expect.objectContaining({ model: result.model }) }));
+    expect(audit.writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agent.run", metadata: expect.objectContaining({ model: result.model }) }));
+  });
   it("maps the observed legacy Gemini label before queueing and invoking", async () => {
     vi.stubEnv("GEMINI_API_KEY", "test-only");
     const sb = db([{...AGENT, model: "Gemini"}]);
     try {
       const run = await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"Reply QA AGENT ONLINE"});
-      expect(run).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
-      expect(sb.tables.agent_tasks[0]).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
+      expect(run).toMatchObject({provider:"gemini",model:"gemini-3.6-flash"});
+      expect(sb.tables.agent_tasks[0]).toMatchObject({provider:"gemini",model:"gemini-3.6-flash"});
     } finally {vi.unstubAllEnvs();}
   });
   it("queues nothing and invokes no model when required audit fails", async () => {

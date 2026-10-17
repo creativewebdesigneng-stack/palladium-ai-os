@@ -1,5 +1,6 @@
 // Static option catalogues for the Agent Builder (labels, not user data).
 // Agent test runs execute on the real runtime; no seeded transcripts exist here.
+import { AGENT_MODEL_CHOICES } from '@/lib/agents/agent-model-selection';
 
 // IMPORTANT: these IDs are the executable runtime slugs from tools.server.ts.
 // Never store display-only aliases here, otherwise the runtime will correctly
@@ -30,7 +31,7 @@ export const TOOLS = [
 // These IDs and model values intentionally mirror src/lib/runtime/model-gateway.server.ts.
 // Store canonical API model IDs, never display-only names, so saved agents execute unchanged.
 export const PROVIDERS = [
-  { id: 'gemini', label: 'Google Gemini', models: ['gemini-2.5-flash'] },
+  { id: 'gemini', label: 'Google Gemini', models: [AGENT_MODEL_CHOICES['gemini'].model] },
   { id: 'deepseek', label: 'DeepSeek', models: ['deepseek-chat'] },
   {
     id: 'openai',

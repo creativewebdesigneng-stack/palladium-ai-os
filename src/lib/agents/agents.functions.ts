@@ -4,7 +4,7 @@
  * Every call runs behind `requireSupabaseAuth`, so the caller identity comes
  * from the verified bearer token and RLS scopes every row to its owner.
  */
-import { normaliseAgentModelSelection } from "./agent-model-selection";
+import { AGENT_MODEL_CHOICES, normaliseAgentModelSelection } from "./agent-model-selection";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normaliseAutonomyLevel } from "./agent-autonomy";
@@ -26,7 +26,7 @@ const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
   compatible: "local-model",
-  gemini: "gemini-2.5-flash",
+  gemini: AGENT_MODEL_CHOICES['gemini']!.model,
   deepseek: "deepseek-chat",
 };
 
