@@ -49,6 +49,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
 import {
   reasoningControlForResumedAstraRun,
   resumeOneStaleAgentRun,
+  processResumableAgentRuns,
 } from "../run-resume-worker.server";
 
 const checkpoint = {
@@ -114,6 +115,27 @@ beforeEach(() => {
 });
 
 describe("durable run resume worker", () => {
+  it('uses bounded audited closure before attempting checkpoint resume', async () => {
+    const sb = db();
+    sb.rpc = vi.fn().mockResolvedValue({ data: 2, error: null });
+    resume.claim.mockResolvedValue(null);
+    await expect(processResumableAgentRuns(999, sb)).resolves.toEqual({
+      resumed: 0, retryable_failed: 0, failed: 0, unrecoverable_closed: 2,
+    });
+    expect(sb.rpc).toHaveBeenCalledWith('close_unrecoverable_agent_tasks', { _limit: 4 });
+    expect(resume.claim).toHaveBeenCalledWith(expect.objectContaining({ sb }));
+    expect(planner.execute).not.toHaveBeenCalled();
+  });
+  it.each([null, -1, 5, 1.5])('rejects an invalid recovery receipt %s', async data => {
+    const sb = db(); sb.rpc = vi.fn().mockResolvedValue({ data, error: null });
+    await expect(processResumableAgentRuns(2, sb)).rejects.toMatchObject({ code: 'STALE_RUN_RECOVERY_FAILED' });
+    expect(resume.claim).not.toHaveBeenCalled();
+  });
+  it('does not resume when required recovery auditing fails', async () => {
+    const sb = db(); sb.rpc = vi.fn().mockResolvedValue({ data: null, error: Error('audit unavailable') });
+    await expect(processResumableAgentRuns(2, sb)).rejects.toMatchObject({ code: 'STALE_RUN_RECOVERY_FAILED' });
+    expect(resume.claim).not.toHaveBeenCalled();
+  });
   it("resumes the same task from its checkpoint and releases the lease", async () => {
     const sb = db();
     resume.claim.mockResolvedValue(claim());
