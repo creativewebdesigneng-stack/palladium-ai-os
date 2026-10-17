@@ -266,7 +266,22 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
     blackstarAstraContextCompactionOptions(args.provider, args.model),
   );
   if (args.provider === "gemini") {
-    yield* streamGeminiNative({ ...args, model: resolveModel("gemini", args.model) });
+    const candidates = modelCandidates("gemini", args.model);
+    for (const [index, model] of candidates.entries()) {
+      let emitted = false;
+      try {
+        for await (const event of streamGeminiNative({ ...args, model })) {
+          emitted = true;
+          yield event;
+        }
+        return;
+      } catch (error) {
+        // Recover an unavailable model only before any output or tool call.
+        // Never retry auth, quota, cancellation or a partially emitted run here.
+        if (emitted || args.signal?.aborted || !(error instanceof base.ProviderError) || error.status !== 404
+          || index === candidates.length - 1) throw error;
+      }
+    }
     return;
   }
   if (isAstraGroqBootstrapRequest(args.provider, args.model)) {

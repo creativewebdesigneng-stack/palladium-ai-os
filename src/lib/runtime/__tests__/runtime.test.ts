@@ -798,8 +798,8 @@ describe("model recovery boundaries", () => {
     const sb = db([{...AGENT, model: "Gemini"}]);
     try {
       const run = await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"Reply QA AGENT ONLINE"});
-      expect(run).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
-      expect(sb.tables.agent_tasks[0]).toMatchObject({provider:"gemini",model:"gemini-2.5-flash"});
+      expect(run).toMatchObject({provider:"gemini",model:"gemini-3.6-flash"});
+      expect(sb.tables.agent_tasks[0]).toMatchObject({provider:"gemini",model:"gemini-3.6-flash"});
     } finally {vi.unstubAllEnvs();}
   });
   it("queues nothing and invokes no model when required audit fails", async () => {
