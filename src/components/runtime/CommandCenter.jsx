@@ -66,6 +66,8 @@ export default function CommandCenter({ agent, onFinished }) {
       if (controller.signal.aborted) return;
       setStatus('failed');
       setError(e?.message || 'Run failed.');
+      // Reconcile history after an uncertain transport result; never replay it.
+      onFinished?.();
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
     }

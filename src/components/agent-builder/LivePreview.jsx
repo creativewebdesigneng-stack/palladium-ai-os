@@ -66,14 +66,14 @@ export default function LivePreview({ config, agentId }) {
         agentId,
         input: text,
         onEvent: (event) => {
-          if (event.type === 'delta' && event.delta) appendDelta(event.delta);
+          if (event.type === 'delta' && event.text) appendDelta(event.text);
           else if (event.type === 'tool') {
-            addStep({ type: 'tool', name: event.tool || 'Tool', detail: event.detail || event.status || 'executed' });
-            log(`Tool used: ${event.tool || 'tool'}`, 'tool');
+            addStep({ type: 'tool', name: event.name || 'Tool', detail: event.ok ? 'completed' : 'blocked or failed' });
+            log(`Tool ${event.ok ? 'completed' : 'blocked or failed'}: ${event.name || 'tool'}`, 'tool');
           } else if (event.type === 'status' && event.status) {
             log(`Status: ${event.status}`, 'perm');
-          } else if (event.type === 'error' && event.error) {
-            setLast({ error: true, text: event.error });
+          } else if (event.type === 'error' && event.message) {
+            setLast({ error: true, text: event.message });
           }
         },
       });
