@@ -6,6 +6,7 @@ const directory = new URL('../../../supabase/migrations/', import.meta.url);
 const filename = readdirSync(directory).find(name => name.endsWith('_close_unrecoverable_agent_tasks.sql'));
 if (!filename) throw new Error('Recorded recovery migration is missing.');
 const migration = readFileSync(new URL(filename, directory), 'utf8');
+const correction = readFileSync(new URL('20261017182912_fix_unrecoverable_agent_task_status_type.sql', directory), 'utf8');
 const db = new PGlite();
 const uid = '00000000-0000-4000-8000-000000000001';
 const aid = '00000000-0000-4000-8000-000000000002';
@@ -24,7 +25,8 @@ beforeAll(async () => {
     grant usage on schema auth to service_role,authenticated,anon;
     create table personal_agents(id uuid primary key,user_id uuid);
     insert into personal_agents values('${aid}','${uid}');
-    create table agent_tasks(id uuid primary key,user_id uuid,agent_id uuid,org_id uuid,status text,
+    create type exec_status as enum ('pending','queued','running','succeeded','failed','cancelled','waiting_for_tool','waiting_for_approval','completed');
+    create table agent_tasks(id uuid primary key,user_id uuid,agent_id uuid,org_id uuid,status exec_status,
       heartbeat_at timestamptz,started_at timestamptz,created_at timestamptz default now(),
       checkpoint_state jsonb,resume_count int default 0,cancel_requested boolean default false,
       resume_lease_token uuid,resume_lease_expires_at timestamptz,error text,completed_at timestamptz,resume_last_error text);
@@ -37,6 +39,7 @@ beforeAll(async () => {
     grant select,update on agent_tasks to service_role;
     grant insert,select on mission_audit_logs to service_role;`);
   await db.exec(migration);
+  await db.exec(correction);
 }, 20000);
 beforeEach(async () => { await db.exec('reset role; truncate agent_tasks,mission_audit_logs;'); });
 afterAll(async () => { await db.close(); });
