@@ -4,7 +4,9 @@ const embeddings = vi.hoisted(() => ({ embedOne: vi.fn() }));
 vi.mock("../embeddings.server", () => ({
   embedOne: embeddings.embedOne,
   embedTexts: vi.fn(),
-  EmbeddingError: class EmbeddingError extends Error {},
+  EmbeddingError: class EmbeddingError extends Error {
+    constructor(message: string, readonly retryable = false, readonly code?: string) { super(message); }
+  },
 }));
 
 vi.mock("../vector-store.server", () => ({
@@ -13,6 +15,7 @@ vi.mock("../vector-store.server", () => ({
 }));
 
 import { searchMemory } from "../memory.server";
+import { EmbeddingError } from '../embeddings.server';
 
 type SearchRow = {
   user_id?: string;
@@ -32,6 +35,7 @@ function sb(args: {
   keywordError?: string;
   documentKeywords?: Array<{ id: string; document_id: string; content: string; user_id: string }>;
   documentKeywordError?: string;
+  chunkError?: string;
 }) {
   const keywordResponse = args.keywordError
     ? { data: null, error: { message: args.keywordError } }
@@ -80,7 +84,7 @@ function sb(args: {
 
   const rpc = vi.fn(async (name: string) => {
     if (name === "search_agent_memories") return { data: args.semantic ?? [], error: null };
-    if (name === "search_memory_chunks") return { data: args.chunks ?? [], error: null };
+    if (name === "search_memory_chunks") return { data: args.chunks ?? [], error: args.chunkError ? { message: args.chunkError } : null };
     throw new Error(`unexpected rpc ${name}`);
   });
 
@@ -93,6 +97,36 @@ beforeEach(() => {
 });
 
 describe("searchMemory hybrid retrieval", () => {
+  it('distinguishes a complete empty search from an unavailable one', async () => {
+    const diagnostics = vi.fn();
+    expect(await searchMemory({ sb: sb({}), userId: 'user-1', query: 'synthetic', onDiagnostics: diagnostics })).toEqual([]);
+    expect(diagnostics).toHaveBeenCalledWith({ semantic: 'available', keyword: 'available', reason: null });
+  });
+  it('reports quota-limited keyword fallback without exposing provider messages', async () => {
+    const diagnostics = vi.fn();
+    embeddings.embedOne.mockRejectedValueOnce(new EmbeddingError('private provider detail', false, 'quota'));
+    const rows = await searchMemory({ sb: sb({ keyword: [{ id: 'owned', content: 'synthetic notes' }] }), userId: 'user-1', query: 'synthetic', onDiagnostics: diagnostics });
+    expect(rows.map(row => row.id)).toEqual(['owned']);
+    expect(diagnostics).toHaveBeenCalledWith({ semantic: 'unavailable', keyword: 'available', reason: 'quota' });
+  });
+  it('reports incomplete keyword sources while retaining surviving hits', async () => {
+    const diagnostics = vi.fn();
+    embeddings.embedOne.mockRejectedValueOnce(new Error('unavailable'));
+    await searchMemory({ sb: sb({ keywordError: 'unavailable' }), userId: 'user-1', query: 'synthetic', onDiagnostics: diagnostics });
+    expect(diagnostics).toHaveBeenCalledWith({ semantic: 'unavailable', keyword: 'partial', reason: 'provider' });
+  });
+  it('does not report a successful empty search when all retrieval sources failed', async () => {
+    const diagnostics = vi.fn();
+    embeddings.embedOne.mockRejectedValueOnce(new Error('unavailable'));
+    await searchMemory({ sb: sb({ keywordError: 'unavailable', documentKeywordError: 'unavailable' }), userId: 'user-1', query: 'synthetic', onDiagnostics: diagnostics });
+    expect(diagnostics).toHaveBeenCalledWith({ semantic: 'unavailable', keyword: 'unavailable', reason: 'provider' });
+  });
+  it('reports partial semantic recall if only document vector retrieval fails', async () => {
+    const diagnostics = vi.fn();
+    const rows = await searchMemory({ sb: sb({ semantic: [{ id: 'memory', content: 'synthetic', similarity: 0.8 }], chunkError: 'unavailable' }), userId: 'user-1', query: 'synthetic', onDiagnostics: diagnostics });
+    expect(rows.map(row => row.id)).toContain('memory');
+    expect(diagnostics).toHaveBeenCalledWith({ semantic: 'partial', keyword: 'available', reason: 'provider' });
+  });
   it("keeps exact keyword recall when semantic retrieval also returns results", async () => {
     const database = sb({
       semantic: [{ id: "semantic", content: "inventory notes", similarity: 0.45 }],

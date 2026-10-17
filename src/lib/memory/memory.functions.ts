@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { retrieveGovernedAgentMemory } from "./agent-memory-context.server";
 import { promoteReviewedShortTermMemory } from "./reviewed-memory.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { MemorySearchStatus } from './recall-status';
 import {
   deleteDocument,
   deleteMemory,
@@ -173,6 +174,7 @@ export const searchMemories = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     try {
+      let retrieval: MemorySearchStatus | null = null;
       const results = await searchMemory({
         sb: context.supabase as unknown as Sb,
         userId: context.userId,
@@ -180,8 +182,9 @@ export const searchMemories = createServerFn({ method: "POST" })
         limit: data.limit,
         agentId: data.agent_id,
         types: data.types,
+        onDiagnostics: status => { retrieval = status; },
       });
-      return { results };
+      return { results, retrieval };
     } catch (error) {
       surface(error);
     }
