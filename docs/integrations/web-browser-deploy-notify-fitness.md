@@ -18,9 +18,8 @@ This batch audits Firecrawl, Crawlee, browser-use, OpenHands, Coolify, ntfy and 
 - optional `FIRECRAWL_API_URL`
 - `CRAWLEE_WORKER_URL`
 - `CRAWLEE_WORKER_TOKEN` (required authenticated worker connection)
-- `BROWSER_USE_API_KEY`
-- optional `BROWSER_USE_API_URL`
-- `OPENHANDS_SERVER_URL`
+- `BROWSER_USE_API_KEY` and `BROWSER_USE_API_URL` (future adapter connection metadata only)
+- `OPENHANDS_SERVER_URL` (external connection metadata only)
 - `COOLIFY_API_URL`
 - `COOLIFY_API_TOKEN`
 - optional `NTFY_BASE_URL` (defaults to `https://ntfy.sh`)
@@ -52,3 +51,25 @@ These application checks do not pin a DNS answer through connection establishmen
 Worker-side egress filtering and validation of every crawl/navigation redirect
 remain necessary to prevent rebinding or remote-provider access to private networks.
 This change does not deploy a Crawlee/Browser Use worker or certify a live crawl.
+
+### 17 October 2026 external adapter availability
+
+Browser Use and OpenHands currently have connection metadata and native tracking
+surfaces, but no executable adapter wired to those environment settings. Both
+authenticated provider status and Web Intelligence now reuse one status source:
+`configured: false`, `state: adapter_required`. A separate
+`connectionConfigured` boolean reports only syntactically valid HTTPS settings;
+it never implies a deployed adapter or successful health check. No endpoint or
+secret value is returned, and these status reads make no provider request.
+
+Browser Preview, Developer Workspace and Web Intelligence display **Adapter
+required** for these providers. Missing/failed status reads display **Status
+unavailable**, loading displays **Checking…**, and usable API configuration is
+labelled **Settings present** without claiming a live health check. Browser Use
+and OpenHands execution remains unavailable even if all metadata variables exist.
+Saved OpenHands remote-session references remain offline tracking records.
+
+Connecting either runtime still requires its authenticated execution adapter,
+deployment and governed live acceptance through the existing browser or developer
+runtime. No alternate runtime, provider authority or environment-based feature
+override is introduced by this status correction.
