@@ -9,7 +9,7 @@ The wizard and Agent Builder had introduced a separate 2.5 Flash default while t
 - New wizard, legacy display-label recovery, writer defaults and Agent Builder selections now use the existing 3.6 Flash choice. Explicitly saved model IDs are preserved.
 - Gemini streaming uses the gateway's existing candidate list only after a provider 404 and before any output. Available explicit models are not changed. There is no new cross-provider fallback, credential store or model registry.
 - Authentication, quota, cancellation, other transport errors and partial text/tool emissions do not trigger this new streaming fallback. Native transport retries remain as before.
-- The final stream event reports the actual provider/model, which the existing completion writer persists. Exact-model evaluation uses the existing pinned path without fallback.
+- The final stream event reports the actual provider/model, which the existing completion writer persists. Usage, audit and permitted memory provenance use the actual completed model too. Exact-model evaluation uses the existing pinned path without fallback.
 
 Regression tests cover the observed 404 recovery, actual model/usage identity, same-provider/tool preservation, rejected statuses, partial emissions, exhausted candidates, available explicit models and pinned evaluation failures. Full build, TypeScript, application tests and existing access-control/worker CI gates are required before merge. Exact deployment and authenticated runtime results are recorded on the pull request; mocked responses are not live certification.
 
