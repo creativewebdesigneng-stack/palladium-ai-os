@@ -19,7 +19,7 @@ export async function changeOwnedAgentModel(args: {
 
   const configured = isModelProviderConfigured(selected.provider);
   const personal = configured ? [] : await listUserModelProviderCredentials(args.userId);
-  if (!configured && !personal.some(row => row.enabled && row.provider === selected.provider)) {
+  if (!configured && !personal.some((row: { enabled: boolean; provider: string }) => row.enabled && row.provider === selected.provider)) {
     throw new Error('That model provider is not connected. Review Runtime Models first.');
   }
   // This receipt records an intent, not a completed change, including if CAS fails.
