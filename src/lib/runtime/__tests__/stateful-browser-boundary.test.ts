@@ -66,6 +66,12 @@ describe('persistent browser transport and profile boundary', () => {
     return expect(createStatefulBrowserTool({ config }).navigate('https://example.com')).rejects.toThrow('valid session');
   });
 
+  it('redacts malformed session-response bodies', async () => {
+    fetchMock.mockResolvedValue(new Response('synthetic-private-session-token'));
+    await expect(createStatefulBrowserTool({ config }).navigate('https://example.com')).rejects.toThrow('valid session');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not replay an ambiguous mutating timeout', async () => {
     fetchMock.mockResolvedValueOnce(json({ sessionId: 'session-1' })).mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
     await expect(createStatefulBrowserTool({ config }).click('#save')).rejects.toThrow('Timed out');

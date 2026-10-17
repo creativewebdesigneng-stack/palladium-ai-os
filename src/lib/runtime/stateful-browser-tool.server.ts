@@ -50,7 +50,7 @@ export function createStatefulBrowserTool(args: {
       signal: AbortSignal.timeout(30_000),
     });
     if (!created.ok) throw new Error(`Browser provider could not open a persistent session (${created.status}).`);
-    const body = await created.json() as { sessionId?: unknown };
+    const body = await created.json().catch(() => null) as { sessionId?: unknown } | null;
     if (typeof body?.sessionId !== "string" || !body.sessionId.trim() || body.sessionId.length > 200 || /[\x00-\x1f]/.test(body.sessionId)) throw new Error("Browser provider did not return a valid session.");
     sessionId = body.sessionId;
   };
