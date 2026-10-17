@@ -7,6 +7,8 @@ export const AGENT_MODEL_CHOICES: Record<string, { provider: Provider; model: st
   gemini: { provider: 'gemini', model: 'gemini-3.6-flash' },
   deepseek: { provider: 'deepseek', model: 'deepseek-chat' },
   llama: { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+  'groq-oss-120b': { provider: 'groq', model: 'openai/gpt-oss-120b' },
+  'groq-oss-20b': { provider: 'groq', model: 'openai/gpt-oss-20b' },
 };
 
 export function normaliseAgentModelSelection(provider?: string | null, model?: string | null) {

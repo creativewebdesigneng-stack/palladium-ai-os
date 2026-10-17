@@ -3,6 +3,7 @@ import {agentWizardSettings} from '../agent-wizard-settings';
 const tools=[{slug:'web_search',name:'Search',is_active:true,executable:true},{slug:'file_analysis',name:'Files',is_active:true,executable:true},{slug:'retired',name:'Retired',is_active:false,executable:true},{slug:'placeholder',name:'Placeholder',is_active:true,executable:false}];
 const input={model:'gemini',mem:{long:false,short:false,history:false,kb:false},tools:[] as string[]};
 describe('wizard settings sent to the existing agent writer',()=>{
+  it.each([['groq-oss-120b','openai/gpt-oss-120b'],['groq-oss-20b','openai/gpt-oss-20b']])('keeps %s on the Groq route', (model,id)=>expect(agentWizardSettings({...input,model},tools)).toMatchObject({model:id,model_provider:'groq'}));
   it('preserves a no-tools, memory-off Gemini configuration',()=>expect(agentWizardSettings(input,tools)).toEqual({model:'gemini-3.6-flash',model_provider:'gemini',memory_enabled:false,allowed_tools:[]}));
   it('enables memory only for an explicitly selected memory option',()=>expect(agentWizardSettings({...input,mem:{long:true}},tools).memory_enabled).toBe(true));
   it('persists executable slugs and removes duplicate selections',()=>expect(agentWizardSettings({...input,tools:['file_analysis','web_search','web_search']},tools).allowed_tools).toEqual(['file_analysis','web_search']));
