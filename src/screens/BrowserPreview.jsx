@@ -16,6 +16,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import { getBrowserControl } from '@/lib/browser/browser.functions';
 import { getAutomationProviderStatus } from '@/lib/integrations/automation-providers.functions';
 import { friendlyMessage } from '@/lib/errors';
+import AutomationProviderStatusBadge from '@/components/integrations/AutomationProviderStatusBadge';
 
 function stateClasses(state) {
   if (state === 'production_connected') return 'border-emerald-400/20 bg-emerald-500/[.07] text-emerald-200';
@@ -62,7 +63,7 @@ export default function BrowserPreview() {
       <PageHeader
         eyebrow="Workspace"
         title="Browser Preview"
-        description="Live browser-provider health, recorded sessions and browser tool activity. Browser Use is an optional provider behind Blackstar's existing browser safety and audit layer."
+        description="Live browser-provider health, recorded sessions and browser tool activity. Browser Use requires an execution adapter behind Blackstar's existing browser safety and audit layer."
       />
 
       {control.isLoading ? (
@@ -99,7 +100,7 @@ export default function BrowserPreview() {
                 <p className="text-xs font-semibold text-white">Browser Use provider</p>
                 <p className="mt-1 text-[11px] leading-5 text-zinc-500">{browserUse?.detail ?? 'Optional browser-agent provider status is unavailable.'}</p>
               </div>
-              <span className={`rounded-full border px-2 py-1 text-[10px] ${browserUse?.configured ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300'}`}>{browserUse?.configured ? 'Configured' : 'Needs env'}</span>
+              <AutomationProviderStatusBadge provider={browserUse} loading={providers.isLoading} error={Boolean(providers.error)} />
             </div>
             <p className="mt-3 text-[10px] text-zinc-600">Browser Use does not bypass Blackstar: sessions, domain restrictions, tool permissions and audit telemetry remain authoritative here.</p>
           </section>

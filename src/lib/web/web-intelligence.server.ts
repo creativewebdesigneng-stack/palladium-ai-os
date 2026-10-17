@@ -1,6 +1,7 @@
 import { assertPublicHttpUrl } from './url-policy';
 import { assertPublicNetworkEndpoint } from '@/lib/security/public-network.server';
 import { providerEndpoint, requestProviderJson } from '@/lib/security/provider-http.server';
+import { getExternalAutomationStatus } from '@/lib/integrations/external-automation-status.server';
 
 type WebOperation = 'search' | 'scrape' | 'crawl';
 type WebProvider = 'firecrawl' | 'crawlee';
@@ -37,14 +38,7 @@ export function getWebAutomationCapabilities() {
       label: 'Crawlee worker',
       operations: ['scrape', 'crawl'] as WebOperation[],
     },
-    browserUse: {
-      configured: Boolean(env('BROWSER_USE_API_URL') && env('BROWSER_USE_API_KEY')),
-      label: 'Browser Use',
-    },
-    openHands: {
-      configured: Boolean(env('OPENHANDS_SERVER_URL')),
-      label: 'OpenHands',
-    },
+    ...getExternalAutomationStatus(),
   };
 }
 

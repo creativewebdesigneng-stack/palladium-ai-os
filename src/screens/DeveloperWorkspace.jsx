@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Code2, KeyRound, Loader2, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { Bot, Code2, KeyRound, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import RemoteDeveloperSessionsPanel from '@/components/developer/RemoteDeveloperSessionsPanel';
 import { getAutomationProviderStatus } from '@/lib/integrations/automation-providers.functions';
+import AutomationProviderStatusBadge from '@/components/integrations/AutomationProviderStatusBadge';
 
 const AREAS = [
   { icon: KeyRound, title: 'Developer Portal', text: 'Create and manage real API keys, webhooks, usage and platform access.', to: '/developer-portal' },
@@ -32,7 +33,7 @@ export default function DeveloperWorkspace() {
       <RemoteDeveloperSessionsPanel />
 
       <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
-        <div className="flex flex-wrap items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10"><Bot className="h-5 w-5 text-violet-300" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold text-white">OpenHands coding-agent provider</h2>{providers.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" /> : <span className={`rounded-full border px-2 py-0.5 text-[10px] ${openHands?.configured ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300'}`}>{openHands?.configured ? 'Configured' : 'Needs env'}</span>}</div><p className="mt-2 text-xs leading-5 text-zinc-500">{openHands?.detail ?? 'Configure OPENHANDS_SERVER_URL to expose an external coding-agent server through Blackstar.'}</p><p className="mt-2 text-[10px] text-zinc-600">This integration intentionally does not import OpenHands Agent Canvas or create a parallel agent runtime.</p></div></div>
+        <div className="flex flex-wrap items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10"><Bot className="h-5 w-5 text-violet-300" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold text-white">OpenHands coding-agent provider</h2><AutomationProviderStatusBadge provider={openHands} loading={providers.isLoading} error={Boolean(providers.error)} /></div><p className="mt-2 text-xs leading-5 text-zinc-500">{openHands?.detail ?? 'OpenHands execution status is unavailable.'}</p><p className="mt-2 text-[10px] text-zinc-600">This integration intentionally does not import OpenHands Agent Canvas or create a parallel agent runtime.</p></div></div>
       </section>
     </div>
   </>;

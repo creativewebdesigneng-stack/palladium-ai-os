@@ -5,10 +5,12 @@ import WebSnapshotPanel from '@/components/web/WebSnapshotPanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { createWebIntelligenceJob, getWebIntelligenceOverview } from '@/lib/web/web-intelligence.functions';
 import { friendlyMessage } from '@/lib/errors';
+import AutomationProviderStatusBadge from '@/components/integrations/AutomationProviderStatusBadge';
 
 export default function WebIntelligence() {
   const { session } = useWorkspace();
   const [overview, setOverview] = useState(null);
+  const [overviewState, setOverviewState] = useState('loading');
   const [provider, setProvider] = useState('firecrawl');
   const [operation, setOperation] = useState('scrape');
   const [source, setSource] = useState('');
@@ -17,8 +19,9 @@ export default function WebIntelligence() {
 
   const load = async () => {
     if (session !== 'yes') return;
-    try { setOverview(await getWebIntelligenceOverview({ data: undefined })); }
-    catch (e) { setError(e); }
+    setOverviewState('loading');
+    try { setOverview(await getWebIntelligenceOverview({ data: undefined })); setOverviewState('ready'); }
+    catch (e) { setError(e); setOverviewState('error'); }
   };
   useEffect(() => { load(); }, [session]);
 
@@ -51,7 +54,13 @@ export default function WebIntelligence() {
         </section>
         <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-sm font-semibold text-white">Recent web jobs</h2><div className="mt-3 space-y-2">{jobs.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-zinc-500">No web automation jobs yet.</p> : jobs.map((job) => <div key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-white">{job.operation} · {job.provider}</span><span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400">{job.status}</span><span className="ml-auto text-[10px] text-zinc-600">{new Date(job.created_at).toLocaleString()}</span></div><p className="mt-2 truncate text-[11px] text-zinc-500">{job.source}</p>{job.error && <p className="mt-1 text-[10px] text-rose-300">{job.error}</p>}</div>)}</div></section>
       </div>
-      <aside className="space-y-4"><Capability label="Firecrawl" configured={caps?.firecrawl?.configured} detail="Search, scrape and crawl with LLM-ready output." /><Capability label="Crawlee worker" configured={caps?.crawlee?.configured} detail="Reliable HTTP/browser crawling via your own worker." /><Capability label="Browser Use" configured={caps?.browserUse?.configured} detail="Agent-driven browser automation remains connected to the existing Browser Runtime." /><Capability label="OpenHands" configured={caps?.openHands?.configured} detail="Coding-agent server support is reused by Blackstar's developer and agent runtime layers." /><div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.05] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300"/>Private/local network targets are blocked before jobs and snapshots are submitted, reducing SSRF risk.</div></aside>
+      <aside className="space-y-4">
+        <Capability label="Firecrawl" provider={caps?.firecrawl} state={overviewState} detail="Search, scrape and crawl with LLM-ready output." />
+        <Capability label="Crawlee worker" provider={caps?.crawlee} state={overviewState} detail="Reliable HTTP/browser crawling via your own worker." />
+        <Capability label="Browser Use" provider={caps?.browserUse} state={overviewState} detail={caps?.browserUse?.detail ?? 'Browser Use execution status is unavailable.'} />
+        <Capability label="OpenHands" provider={caps?.openHands} state={overviewState} detail={caps?.openHands?.detail ?? 'OpenHands execution status is unavailable.'} />
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[.05] p-4 text-[11px] leading-5 text-emerald-100/75"><ShieldCheck className="mb-2 h-4 w-4 text-emerald-300"/>Private/local network targets are blocked before jobs and snapshots are submitted, reducing SSRF risk.</div>
+      </aside>
     </div>
     <WebSnapshotPanel jobs={jobs} />
     <style>{`.field{width:100%;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.22);border-radius:.75rem;padding:.65rem .75rem;font-size:.75rem;color:white;outline:none}.field:focus{border-color:rgba(167,139,250,.45)}.field option{background:#11131a}`}</style>
@@ -59,4 +68,4 @@ export default function WebIntelligence() {
 }
 
 function Field({ label, children }) { return <label className="block"><span className="mb-1 block text-[11px] font-medium text-zinc-400">{label}</span>{children}</label>; }
-function Capability({ label, configured, detail }) { return <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-white">{label}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] ${configured ? 'border-emerald-400/20 text-emerald-300' : 'border-amber-400/20 text-amber-300'}`}>{configured ? 'Configured' : 'Needs env'}</span></div><p className="mt-2 text-[11px] leading-5 text-zinc-500">{detail}</p></div>; }
+function Capability({ label, provider, state, detail }) { return <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-white">{label}</p><AutomationProviderStatusBadge provider={provider} loading={state === 'loading'} error={state === 'error'} /></div><p className="mt-2 text-[11px] leading-5 text-zinc-500">{detail}</p></div>; }
