@@ -5,11 +5,12 @@ export const CATEGORIES = ['All', 'Research', 'Support', 'Engineering', 'Marketi
 export const DEPARTMENTS = ['Research', 'Support', 'Engineering', 'Marketing', 'Finance', 'Operations', 'Design', 'HR', 'Product'];
 
 export const WIZARD_MODELS = [
-  { id: 'gpt', name: 'GPT-5', letter: 'G', grad: 'from-emerald-400 to-teal-500', desc: 'Balanced reasoning, coding & chat', context: '128K' },
-  { id: 'claude', name: 'Claude', letter: 'C', grad: 'from-orange-400 to-amber-500', desc: 'Long context, nuanced writing', context: '200K' },
-  { id: 'gemini', name: 'Gemini', letter: 'G', grad: 'from-blue-400 to-indigo-500', desc: 'Fast, multimodal, huge context', context: '1M' },
-  { id: 'deepseek', name: 'DeepSeek', letter: 'D', grad: 'from-cyan-400 to-blue-500', desc: 'Cost-efficient deep reasoning', context: '64K' },
-  { id: 'llama', name: 'Llama', letter: 'L', grad: 'from-purple-400 to-fuchsia-500', desc: 'Open-source, self-hostable', context: '128K' },
+  { id: 'gpt', name: 'GPT-5 mini', provider: 'openai', letter: 'G', grad: 'from-emerald-400 to-teal-500', desc: 'OpenAI · gpt-5-mini' },
+  { id: 'claude', provider: 'anthropic', name: 'Claude Sonnet 4.5', letter: 'C', grad: 'from-orange-400 to-amber-500', desc: 'Anthropic · claude-sonnet-4-5-20250929' },
+  { id: 'gemini', provider: 'gemini', name: 'Gemini 3.6 Flash', letter: 'G', grad: 'from-blue-400 to-indigo-500', desc: 'Google · gemini-3.6-flash' },
+  { id: 'deepseek', provider: 'deepseek', name: 'DeepSeek Chat', letter: 'D', grad: 'from-cyan-400 to-blue-500', desc: 'DeepSeek · deepseek-chat' },
+  { id: 'groq-oss-120b', provider: 'groq', name: 'GPT-OSS 120B', letter: 'G', grad: 'from-purple-400 to-fuchsia-500', desc: 'Groq · openai/gpt-oss-120b' },
+  { id: 'groq-oss-20b', provider: 'groq', name: 'GPT-OSS 20B', letter: 'G', grad: 'from-purple-400 to-indigo-500', desc: 'Groq · openai/gpt-oss-20b' },
 ];
 
 

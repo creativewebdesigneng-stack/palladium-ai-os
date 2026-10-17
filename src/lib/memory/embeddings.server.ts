@@ -25,7 +25,7 @@ const DEFAULT_MODEL: Record<EmbeddingProvider, string> = {
   compatible: "text-embedding-3-small",
 };
 
-export type EmbeddingErrorCode = "configuration" | "input" | "provider";
+export type EmbeddingErrorCode = "configuration" | "input" | "provider" | "quota" | "rate_limit" | "authentication";
 
 export class EmbeddingError extends Error {
   constructor(
@@ -36,6 +36,42 @@ export class EmbeddingError extends Error {
     super(message);
     this.name = "EmbeddingError";
   }
+}
+
+async function responseError(res: Response): Promise<EmbeddingError> {
+  // Use structured classifications only. Provider messages can echo private input.
+  const payload = await res.json().catch(() => null);
+  const codes = [payload?.error?.code, payload?.error?.type];
+  if (res.status === 402 || codes.some(code => [
+    "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
+    "organization_usage_limit_exceeded", "billing_hard_limit_reached",
+  ].includes(code))) {
+    return new EmbeddingError("Embedding quota or billing limit reached. Review the embedding provider account; keyword memory search remains available.", false, "quota");
+  }
+  if (res.status === 401 || res.status === 403) {
+    return new EmbeddingError("The embedding provider rejected access. Review its credentials and permissions.", false, "authentication");
+  }
+  if (res.status === 429) return new EmbeddingError("Embedding rate limit reached — please retry later. Keyword memory search remains available.", true, "rate_limit");
+  return new EmbeddingError(`Embedding provider returned HTTP ${res.status}.`, res.status >= 500, "provider");
+}
+
+function retryDelay(res: Response | undefined, attempt: number): number {
+  const header = res?.headers.get("retry-after");
+  if (header) {
+    const seconds = Number(header);
+    const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - Date.now();
+    if (Number.isFinite(delay)) return Math.max(0, delay);
+  }
+  return 400 * 2 ** attempt;
+}
+
+function waitForRetry(delay: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, delay);
+    signal.addEventListener("abort", abort, { once: true });
+  });
 }
 
 function providerConfigured(provider: EmbeddingProvider): boolean {
@@ -132,45 +168,49 @@ export async function embedTexts(
   const provider = resolveEmbeddingProvider(options.provider);
   const model = options.model ?? process.env["EMBEDDING_MODEL"] ?? DEFAULT_MODEL[provider];
   const { url, headers } = endpoint(provider);
+  // One budget covers every attempt and backoff, including caller cancellation.
+  const deadline = Date.now() + 30_000;
+  const timeout = AbortSignal.timeout(30_000);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
 
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    signal.throwIfAborted();
+    let response: Response | undefined;
     try {
       const res = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify({ model, input, dimensions: EMBEDDING_DIMENSIONS }),
-        signal: options.signal ?? AbortSignal.timeout(30_000),
+        signal,
       });
-
-      if (res.status === 429 || res.status >= 500) {
-        lastError = new EmbeddingError(
-          res.status === 429
-            ? "Embedding rate limit reached — please retry shortly."
-            : "The embedding provider is unavailable.",
-          true,
-        );
-        await new Promise((r) => setTimeout(r, 400 * 2 ** attempt));
-        continue;
-      }
-      if (res.status === 402)
-        throw new EmbeddingError("AI credits are exhausted. Top up to keep indexing memory.");
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new EmbeddingError(`Embedding failed (${res.status}). ${detail.slice(0, 200)}`);
-      }
+      response = res;
+      if (!res.ok) throw await responseError(res);
 
       const payload = (await res.json()) as {
         data?: Array<{ embedding: number[]; index?: number }>;
       };
-      const rows = [...(payload.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-      const vectors = rows.map((r) => r.embedding).filter((v) => Array.isArray(v) && v.length > 0);
-      if (!vectors.length) throw new EmbeddingError("The embedding provider returned no vectors.");
+      if (!Array.isArray(payload.data) || payload.data.some(row => !row || typeof row !== 'object')) {
+        throw new EmbeddingError("The embedding provider returned invalid vectors. Memory was not indexed.", false, "provider");
+      }
+      const rows = [...payload.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+      const vectors = rows.map((r) => r.embedding);
+      if (rows.length !== input.length || rows.some((row, index) =>
+        (row.index !== undefined && row.index !== index) || !Array.isArray(row.embedding)
+        || row.embedding.length !== EMBEDDING_DIMENSIONS || row.embedding.some(value => typeof value !== "number" || !Number.isFinite(value)))) {
+        throw new EmbeddingError("The embedding provider returned invalid vectors. Memory was not indexed.", false, "provider");
+      }
       return { vectors, model, provider };
     } catch (error) {
+      signal.throwIfAborted();
       if (error instanceof EmbeddingError && !error.retryable) throw error;
-      lastError = error;
+      lastError = error instanceof EmbeddingError ? error : new EmbeddingError("The embedding provider could not be reached.", true, "provider");
     }
+    if (attempt === 2) break;
+    const delay = retryDelay(response, attempt);
+    // Never retry before Retry-After or wait past the request budget.
+    if (delay >= deadline - Date.now()) break;
+    await waitForRetry(delay, signal);
   }
   throw lastError instanceof Error ? lastError : new EmbeddingError("Embedding failed.");
 }
