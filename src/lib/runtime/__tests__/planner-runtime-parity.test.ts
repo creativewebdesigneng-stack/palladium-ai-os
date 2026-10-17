@@ -77,6 +77,7 @@ function toolResult(calls: Array<{ id: string; name: string; arguments: Record<s
   return {
     text: "",
     toolCalls: calls,
+    geminiContinuation: { model: "gemini-3.6-flash", parts: [{ text: "public", thoughtSignature: "opaque-fixture" }] },
     usage: { input: 2, output: 2 },
     provider: "openai" as const,
     model: "gpt-5-mini",
@@ -176,6 +177,7 @@ describe("planned runtime parity", () => {
 
     expect(peak).toBe(2);
     const completion = runtime.completeRun.mock.calls[0]?.[0];
+    expect(completion.run.messages.find((m: any) => m.role === "assistant").geminiContinuation.parts[0].thoughtSignature).toBe("opaque-fixture");
     const toolMessages = completion.run.messages.filter((message: any) => message.role === "tool");
     expect(toolMessages.map((message: any) => message.tool_call_id)).toEqual(["a", "b"]);
   });

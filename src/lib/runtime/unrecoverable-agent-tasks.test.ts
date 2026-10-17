@@ -4,8 +4,8 @@ import { PGlite } from '@electric-sql/pglite';
 
 const directory = new URL('../../../supabase/migrations/', import.meta.url);
 const filename = readdirSync(directory).find(name => name.endsWith('_close_unrecoverable_agent_tasks.sql'));
-const migration = readFileSync(filename ? new URL(filename, directory)
-  : new URL('../../../docs/integrations/pending-close-unrecoverable-agent-tasks.sql', import.meta.url), 'utf8');
+if (!filename) throw new Error('Recorded recovery migration is missing.');
+const migration = readFileSync(new URL(filename, directory), 'utf8');
 const db = new PGlite();
 const uid = '00000000-0000-4000-8000-000000000001';
 const aid = '00000000-0000-4000-8000-000000000002';

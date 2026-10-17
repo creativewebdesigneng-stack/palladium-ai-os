@@ -302,6 +302,7 @@ export async function prepareRun(args: {
       provider,
       model,
       status: "queued",
+      cancel_requested: false,
       started_at: now,
       heartbeat_at: now,
     })
@@ -445,8 +446,15 @@ export async function completeRun(args: {
       heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
-    .eq("id", run.taskId).eq("user_id", args.userId).select("id").maybeSingle();
-  if (completionReceipt.error || !completionReceipt.data) throw new RuntimeError("Model response received, but the run result could not be saved. Check Supabase server access.", "RUN_PERSISTENCE_FAILED", 503);
+    .eq("id", run.taskId).eq("user_id", args.userId)
+    .in("status", [...ACTIVE_TASK_STATES, "waiting_for_approval"])
+    .eq("cancel_requested", false).select("id").maybeSingle();
+  if (completionReceipt.error || !completionReceipt.data) {
+    if (!completionReceipt.error && await isCancelled(args.sb, run.taskId)) {
+      throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
+    }
+    throw new RuntimeError("Model response received, but the run result could not be saved. Check Supabase server access.", "RUN_PERSISTENCE_FAILED", 503);
+  }
 
   await db
     .from("personal_agents")
@@ -687,7 +695,7 @@ function awaitsApproval(output: unknown): boolean {
 }
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
-  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
+  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls, ...(result.geminiContinuation ? { geminiContinuation: result.geminiContinuation } : {}) });
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   try {

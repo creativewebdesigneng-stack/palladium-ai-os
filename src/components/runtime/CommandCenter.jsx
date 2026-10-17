@@ -17,11 +17,12 @@ export default function CommandCenter({ agent, onFinished }) {
   const [toolTrace, setToolTrace] = useState([]);
   const [error, setError] = useState('');
   const [task, setTask] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const abortRef = useRef(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const running = status === 'pending' || status === 'running';
+  const running = status === 'pending' || status === 'running' || cancelling;
 
   const run = async () => {
     if (!input.trim() || running) return;
@@ -40,6 +41,7 @@ export default function CommandCenter({ agent, onFinished }) {
         input,
         signal: controller.signal,
         onEvent: (event) => {
+          if (controller.signal.aborted) return;
           if (event.type === 'status') {
             setStatus('running');
             setTask((t) => t ?? { id: event.task_id });
@@ -52,6 +54,7 @@ export default function CommandCenter({ agent, onFinished }) {
             setError(event.message);
           } else if (event.type === 'complete') {
             setStatus('completed');
+            setError('');
             setTask(event.task);
             if (event.task?.output_text) setText(event.task.output_text);
           }
@@ -63,20 +66,35 @@ export default function CommandCenter({ agent, onFinished }) {
       if (controller.signal.aborted) return;
       setStatus('failed');
       setError(e?.message || 'Run failed.');
+      // Reconcile history after an uncertain transport result; never replay it.
+      onFinished?.();
     } finally {
-      abortRef.current = null;
+      if (abortRef.current === controller) abortRef.current = null;
     }
   };
 
   const cancel = async () => {
     const id = task?.id;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStatus('failed');
-    setError('Run cancelled.');
-    if (id) {
-      try { await cancelAgentTask({ data: { task_id: id } }); } catch { /* already closed */ }
-      onFinished?.({ id });
+    if (!id || cancelling) return;
+    const controller = abortRef.current;
+    setCancelling(true);
+    try {
+      const result = await cancelAgentTask({ data: { task_id: id } });
+      const receipt = result?.task;
+      if (!receipt || !['cancelled', 'succeeded', 'failed'].includes(receipt.status)) {
+        throw new Error('Cancellation was not confirmed. The run may still be active.');
+      }
+      controller?.abort();
+      if (abortRef.current === controller) abortRef.current = null;
+      setTask(receipt);
+      setStatus(receipt.status === 'succeeded' ? 'completed' : receipt.status);
+      setError(receipt.status === 'cancelled' ? 'Run cancelled.' : receipt.status === 'failed' ? receipt.error || 'Run failed.' : '');
+      if (receipt.output_text) setText(receipt.output_text);
+      onFinished?.(receipt);
+    } catch (e) {
+      setError(e?.message || 'Cancellation could not be confirmed. The run may still be active.');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -101,8 +119,8 @@ export default function CommandCenter({ agent, onFinished }) {
           </p>
           <div className="flex items-center gap-2">
             {running && (
-              <button onClick={cancel} className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5">
-                <Square className="h-3.5 w-3.5" /> Cancel
+              <button onClick={cancel} disabled={cancelling || !task?.id} className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50">
+                <Square className="h-3.5 w-3.5" /> {cancelling ? 'Cancelling…' : 'Cancel'}
               </button>
             )}
             <button

@@ -1,16 +1,16 @@
-# Pending audited recovery repair
+# Audited recovery repair
 
-This change is intentionally a draft and must not merge or deploy yet.
-The connected Supabase apply_migration request for
-close_unrecoverable_agent_tasks returned Invalid or expired requestState twice
-on 17 October 2026. A subsequent read-only to_regprocedure check confirmed that
-the function was absent. No direct SQL mutation or alternate credential was
-used to bypass that failure.
+After the owner selected the Supabase connector again, normal authenticated
+apply_migration succeeded on 17 October 2026. The recorded database version is
+20261017132131_close_unrecoverable_agent_tasks. Read-only verification confirms
+SECURITY INVOKER, no anon/authenticated EXECUTE, and service_role EXECUTE only.
+Earlier requests had failed with expired requestState; no alternate credentials
+or direct task-state updates were used to bypass those failures.
 
-The SQL candidate is stored outside migrations until normal authenticated
-migration application succeeds. Then move it to the actual recorded migration
-version, run the tests, check advisors, deploy through normal reviewed CI,
-and verify the existing scheduled worker receipts and audit rows. Never invoke
+The exact applied SQL is now stored under its actual recorded migration version.
+Security advisors match the previous baseline and do not flag the new function.
+The worker still requires passing CI and normal deployment, followed by
+scheduled worker receipts and audit verification. Never invoke
 the closure from an operator SQL session to manufacture a successful receipt.
 
 The service-role-only SECURITY INVOKER function locks a bounded batch, preserves
