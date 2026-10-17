@@ -7,6 +7,7 @@
 import { AGENT_MODEL_CHOICES, normaliseAgentModelSelection } from "./agent-model-selection";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from 'zod';
 import { normaliseAutonomyLevel } from "./agent-autonomy";
 import { normaliseAgentIdentity } from "./agent-identity";
 import {
@@ -292,6 +293,18 @@ export const updateAgent = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Agent not found");
     return row;
+  });
+
+/** Changes the model for future runs without rewriting other configuration. */
+export const updateAgentModel = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(), choice: z.string().min(1).max(80),
+    expectedUpdatedAt: z.string().min(1).max(80),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentModel } = await import('./agent-model-update.server');
+    return changeOwnedAgentModel({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
   });
 
 /** Permanently deletes one of the caller's agents. */
