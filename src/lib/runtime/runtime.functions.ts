@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { executeAgentTask } from "./agent-task-execution.server";
 import { resolveAgentRuntimeSnapshot } from "./runtime-snapshot";
 import { TOOL_SLUGS } from "./tools.server";
+import { cancelOwnedAgentTask } from "./agent-cancellation.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -39,22 +40,7 @@ export const cancelAgentTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { task_id: string }) => ({ task_id: String(input?.task_id ?? "") }))
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as Sb;
-    const { data: task, error: cancellationError } = await sb
-      .from("agent_tasks")
-      .update({
-        status: "cancelled",
-        cancel_requested: true,
-        completed_at: new Date().toISOString(),
-        error: "Cancelled by the operator.",
-      })
-      .eq("id", data.task_id)
-      .eq("user_id", context.userId)
-      .in("status", ["pending", "queued", "running", "waiting_for_tool", "waiting_for_approval"])
-      .select("*")
-      .maybeSingle();
-    if (cancellationError) throw new Error("Could not cancel the agent task.");
-    return { task: task ?? null };
+    return cancelOwnedAgentTask(context.supabase as unknown as Sb, context.userId, data.task_id);
   });
 
 /** Agent + recent runs + the tools this workspace can grant. */

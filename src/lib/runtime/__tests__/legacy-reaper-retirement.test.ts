@@ -16,6 +16,6 @@ describe("agent crash recovery", () => {
     expect(publicRuntimeApi).not.toContain("processResumableAgentRuns(");
     expect(publicRuntimeApi).toContain("Manual stale-run reaping has been retired");
     expect(publicRuntimeApi).toContain('eq("user_id", context.userId)');
-    expect(publicRuntimeApi).toContain("if (cancellationError)");
+    expect(publicRuntimeApi).toContain("cancelOwnedAgentTask(context.supabase as unknown as Sb, context.userId, data.task_id)");
   });
 });
