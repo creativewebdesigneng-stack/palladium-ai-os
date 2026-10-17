@@ -110,6 +110,10 @@ function toast({ ...rawProps }) {
     },
   });
 
+  // The current Toast is a native element, so no primitive schedules expiry.
+  // Reuse the existing bounded removal queue instead of retaining every alert.
+  addToRemoveQueue(id);
+
   return { id, dismiss, update };
 }
 

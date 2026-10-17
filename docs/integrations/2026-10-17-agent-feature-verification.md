@@ -48,30 +48,42 @@ Cancellation QA exposed an optimistic UI claim: task
 The cancellation repair returns the actual owner-bound terminal receipt if
 completion wins, waits for confirmation before aborting the UI stream, and
 prevents a late provider response from overwriting a saved cancellation.
-Automated race tests cover both streaming and buffered execution. Release and
-live cancellation retest remain required before claiming this resolved.
+PR #990 passed all CI gates (2,870 app tests, 1,576 PostgreSQL checks, worker
+safety and security audit). Merge `e005387ed3f6b48858ac0e185cfa38dc6f5d96ab`
+is READY in production `dpl_BwCkEg4NBt5A2GxbJH8FPYKYQTdY`. Automated race tests
+cover streaming and buffered execution. Live retest task
+`d3815e69-652e-4ff7-9642-7cfe510e6898` failed with Gemini quota exhaustion
+before cancellation could win. The UI displayed that saved failure accurately,
+not a false cancellation. Live active cancellation remains quota-blocked.
 
 Production semantic-memory logs reported embedding-provider rate limits.
 Keyword fallback remains available; semantic recall is not certified healthy.
-Approval request `531d3d09-4b04-44d0-8654-25af193b3864` is still pending;
-live rejection is under investigation and no action has been approved.
+Approval request `531d3d09-4b04-44d0-8654-25af193b3864` was rejected through
+the repaired authenticated UI at 12:58:26.353 UTC. Supabase saved rejected and
+the Approval Centre displayed zero pending actions and the recent rejection.
+No action was approved or executed.
 
 Browser hit testing found that the animated preserve-3d mission frame sometimes
 intercepts clicks intended for Reject and memory buttons. The control repair
 keeps the shell flat and retains its ambient pulse. It does not alter approval
-handlers, database policies or user permissions. Live post-deployment rejection
-and memory-form checks are required to verify this interaction repair.
+handlers, database policies or user permissions. Live rejection passed.
+Further browser inspection found a separate obstruction: native notification
+cards never scheduled expiry, close buttons had no dismissal callback, and the
+empty fixed notification containers intercepted clicks. The existing hook now
+schedules its removal queue; the renderer hides dismissed cards immediately,
+wires the labelled close button, and lets empty notification containers pass
+pointer events. No new notification system or permission is introduced.
 
 | Feature | Evidence / current status |
 | --- | --- |
 | Authentication and agent creation | Live authenticated wizard creation and owner-bound Supabase record verified. |
 | Model inference / fallback | Earlier no-tool QA tasks `5aa78c33-9cdb-4e8b-8244-56c970ce6e9d` and `66f191b2-0680-49f4-9d08-e90d1a00b45b` succeeded on actual Gemini 3.6 Flash; task, audit and usage agree. |
-| Tool permission enforcement | Live calculator denied because approval is required. Follow-up failure reproduced and repaired here; post-deployment retest required. |
-| Approval request / decision | Automated runtime, harness and workflow tests cover boundaries. Live full request/decision test pending continuation repair deployment. |
-| Memory | Automated consent, provenance, context isolation, capture and search tests pass in the full suite. Synthetic live round trip pending; no privacy preference override. |
-| Planning / verification / steering / cancellation | Automated execution and negative-boundary coverage; no live capability certification inferred from those tests. |
-| Workflows / scheduler | Recent authenticated scheduled worker receipts HTTP 200, not degraded, no processor failures. Live synthetic workflow still pending. |
-| Durable recovery | Three legacy QA runs have no checkpoint and cannot be replayed safely. Bounded audited terminal-closure repair prepared separately; migration connector returned Invalid or expired requestState twice, and function absence was verified. Not deployed. Approval-paused tasks remain protected. |
+| Tool permission enforcement | Live calculator denial and Gemini follow-up both verified; no calculator execution claimed. |
+| Approval request / decision | Synthetic request created and rejected through authenticated UI; rejected status and decision time verified in Supabase. No external action executed. |
+| Memory | Automated consent, provenance, isolation, capture and search tests pass. Semantic lookup reported embedding-provider limits; live memory-form check awaits notification repair. No privacy override. |
+| Planning / verification / steering / cancellation | Automated boundaries and late-provider cancellation races pass. UI now renders the saved terminal receipt; live active cancellation is blocked by Gemini quota. |
+| Workflows / scheduler | Delay-only live run succeeded and Run History displayed Completed. Recent worker receipts: HTTP 200, no degradation or processor failures. |
+| Durable recovery | Three legacy QA runs have no checkpoint and cannot safely replay. Audited bounded repair remains draft #988; normal migration retries return expired requestState and the function is confirmed absent. No direct state edits. Approval pauses protected. |
 | Browser Use / connected services | Browser worker policy tests pass. Real execution requires the existing authenticated healthy worker/provider and assigned capability. No external writes or credential substitution used for certification. |
 | OpenViking / AgentMemory | Archive audit remains subject to authenticated deployment, licensing and tenant-isolation requirements documented in the existing archive integration reports. No replacement memory system deployed. |
 | Scientific / Diagram guides | Existing secure importers completed all 177 scientific skills plus Diagram Design. All 178 remain disabled; scientific verdicts 121 OK, 7 warning, 49 dangerous; Diagram OK. |
@@ -83,6 +95,11 @@ and memory-form checks are required to verify this interaction repair.
 Focused native transport, atomic/streaming/planned continuation and checkpoint
 regressions: 30 tests passed. Production build and TypeScript check passed.
 Full regression and release receipts are recorded in the PR after execution.
+
+Notification lifecycle regressions verify expiry and immediate dismissal with
+fake timers and the rendered existing Toaster. Full app suite: 2,872 tests in
+649 files passed locally. Notification release still requires CI and live
+acceptance before declaring the obstruction resolved.
 
 The independently prepared recovery branch passed 2,868 application tests in
 648 files, 1,576 isolated PostgreSQL authorization checks across 15 suites,
