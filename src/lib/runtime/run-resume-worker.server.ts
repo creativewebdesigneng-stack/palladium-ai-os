@@ -197,11 +197,16 @@ export async function resumeOneStaleAgentRun(args: {
   }
 }
 
-export async function processResumableAgentRuns(limit = 2) {
-  const bounded = Math.max(1, Math.min(4, Math.floor(limit)));
-  const stats = { resumed: 0, retryable_failed: 0, failed: 0 };
+export async function processResumableAgentRuns(limit = 2, sb: Sb = supabaseAdmin as unknown as Sb) {
+  const bounded = Number.isFinite(limit) ? Math.max(1, Math.min(4, Math.floor(limit))) : 2;
+  if (!sb.rpc) throw new RuntimeError('Recovery RPC is unavailable.', 'STALE_RUN_RECOVERY_FAILED', 503);
+  const { data: closed, error } = await sb.rpc('close_unrecoverable_agent_tasks', { _limit: bounded });
+  if (error || !Number.isInteger(closed) || Number(closed) < 0 || Number(closed) > bounded) {
+    throw new RuntimeError('Could not audit interrupted agent run recovery.', 'STALE_RUN_RECOVERY_FAILED', 503);
+  }
+  const stats = { resumed: 0, retryable_failed: 0, failed: 0, unrecoverable_closed: Number(closed) };
   for (let index = 0; index < bounded; index += 1) {
-    const result = await resumeOneStaleAgentRun();
+    const result = await resumeOneStaleAgentRun({ sb });
     if (result === "none") break;
     if (result === "resumed") stats.resumed += 1;
     else if (result === "retryable_failure") stats.retryable_failed += 1;
