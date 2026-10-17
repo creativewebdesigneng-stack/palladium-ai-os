@@ -6,6 +6,8 @@ const MAP = {
   completed: { label: 'Completed', cls: 'bg-emerald-500/15 text-emerald-300', Icon: CheckCircle2 },
   failed: { label: 'Failed', cls: 'bg-rose-500/15 text-rose-300', Icon: XCircle },
   cancelled: { label: 'Cancelled', cls: 'bg-zinc-500/15 text-zinc-300', Icon: XCircle },
+  waiting_for_approval: { label: 'Awaiting approval', cls: 'bg-amber-500/15 text-amber-300', Icon: Clock },
+  waiting_for_tool: { label: 'Awaiting tool', cls: 'bg-violet-500/15 text-violet-300', Icon: Clock },
 };
 
 export default function TaskStatusBadge({ status }) {

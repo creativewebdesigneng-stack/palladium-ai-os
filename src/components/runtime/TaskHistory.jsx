@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import TaskStatusBadge from './TaskStatusBadge';
 
-const STATUS_UI = { succeeded: 'completed', queued: 'pending', cancelled: 'failed' };
+const STATUS_UI = { succeeded: 'completed', queued: 'pending' };
 const outputOf = (t) => t.output_text || (typeof t.output === 'string' ? t.output : t.output?.text) || '';
 
 // Collapsible list of past runs for this agent. Each row expands to show the
@@ -30,7 +30,7 @@ export default function TaskHistory({ tasks }) {
                 <div className="border-t border-white/10 p-3 text-xs">
                   {t.input && <p className="mb-2 text-zinc-400"><span className="text-zinc-600">Input:</span> {t.input}</p>}
                   {t.error ? (
-                    <p className="text-rose-400">{t.error}</p>
+                    <p className={t.status === 'cancelled' ? 'text-zinc-400' : 'text-rose-400'}>{t.error}</p>
                   ) : (
                     <div className="text-sm leading-relaxed text-zinc-300">
                       <ReactMarkdown>{outputOf(t) || 'No output'}</ReactMarkdown>

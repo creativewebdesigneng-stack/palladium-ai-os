@@ -21,6 +21,7 @@ import {
 } from "./preferences.server";
 import { getVectorStore, resolveVectorProvider, type VectorFilter } from "./vector-store.server";
 import { rankHybridMemoryHits } from "./hybrid-memory-ranking";
+import type { MemorySearchStatus } from './recall-status';
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -336,10 +337,15 @@ export async function searchMemory(args: {
   agentId?: string | null;
   types?: MemoryType[] | null;
   includeDocuments?: boolean;
+  onDiagnostics?: (status: MemorySearchStatus) => void;
 }): Promise<MemorySearchHit[]> {
   const query = clean(args.query, 2000);
   if (!query) return [];
   const limit = Math.min(Math.max(args.limit ?? 8, 1), 25);
+  let keywordFailures = 0;
+  const keywordSources = args.includeDocuments === false ? 1 : 2;
+  let semantic: MemorySearchStatus['semantic'] = 'unavailable';
+  let reason: MemorySearchStatus['reason'] = null;
 
   const keywordPromise = keywordSearch(
     args.sb,
@@ -349,6 +355,7 @@ export async function searchMemory(args: {
     args.agentId ?? null,
     args.types ?? null,
   ).catch((error) => {
+    keywordFailures += 1;
     console.error("[memory] keyword search unavailable", error);
     return [] as MemorySearchHit[];
   });
@@ -359,6 +366,7 @@ export async function searchMemory(args: {
     ? Promise.resolve([] as MemorySearchHit[])
     : keywordDocumentSearch(args.sb, args.userId, query, limit)
       .catch((error) => {
+        keywordFailures += 1;
         console.error("[memory] document keyword search unavailable", error);
         return [] as MemorySearchHit[];
       });
@@ -373,6 +381,7 @@ export async function searchMemory(args: {
       _types: args.types ?? null,
     });
     if (error) throw new Error(error.message);
+    semantic = args.includeDocuments === false ? 'available' : 'partial';
     for (const row of rows ?? []) {
       semanticHits.push({
         id: row.id,
@@ -402,8 +411,10 @@ export async function searchMemory(args: {
           document_id: chunk.document_id,
         });
       }
+      semantic = 'available';
     }
   } catch (error) {
+    reason = error instanceof EmbeddingError ? error.code ?? 'provider' : 'provider';
     if (error instanceof EmbeddingError && error.code === "configuration") {
       console.warn("[memory] semantic search using keyword fallback", error.message);
     } else {
@@ -412,6 +423,9 @@ export async function searchMemory(args: {
   }
 
   const [keywordHits, documentKeywordHits] = await Promise.all([keywordPromise, documentKeywordPromise]);
+  args.onDiagnostics?.({ semantic, reason,
+    keyword: keywordFailures === 0 ? 'available' : keywordFailures === keywordSources ? 'unavailable' : 'partial',
+  });
   return rankHybridMemoryHits({
     semantic: semanticHits,
     keyword: [...keywordHits, ...documentKeywordHits],

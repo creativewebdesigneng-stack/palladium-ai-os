@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useSession, useActiveOrg } from '@/hooks/use-workspace';
 import { uploadKnowledgeDocument } from '@/lib/memory/uploadKnowledge';
+import { describeMemoryRecall } from '@/lib/memory/recall-status';
 import {
   createMemory,
   getMemoryPreferences,
@@ -53,6 +54,9 @@ export default function Memory() {
   const [scope, setScope] = useState('all');
   const [query, setQuery] = useState('');
   const [semantic, setSemantic] = useState(null);
+  const [recallStatus, setRecallStatus] = useState(null);
+  const [recallPending, setRecallPending] = useState(false);
+  const [recallError, setRecallError] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -98,17 +102,23 @@ export default function Memory() {
   }, [session, reload]);
 
   useEffect(() => {
+    setSemantic(null);
+    setRecallStatus(null);
+    setRecallError(false);
     if (session !== 'yes' || query.trim().length < 3) {
-      setSemantic(null);
+      setRecallPending(false);
       return;
     }
+    setRecallPending(true);
     let alive = true;
     const t = setTimeout(async () => {
       try {
         const res = await searchMemories({ data: { query: query.trim(), limit: 24 } });
-        if (alive) setSemantic(res?.results || []);
+        if (alive) { setSemantic(res?.results || []); setRecallStatus(res?.retrieval || null); }
       } catch {
-        if (alive) setSemantic(null);
+        if (alive) setRecallError(true);
+      } finally {
+        if (alive) setRecallPending(false);
       }
     }, 350);
     return () => {
@@ -352,9 +362,11 @@ export default function Memory() {
         <MemoryToolbar type={type} onType={setType} scope={scope} onScope={setScope} query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} counts={counts} />
         <MemoryArchiveExplorer enabled={session === 'yes'} revision={brainPulse + entries.length + documents.length} />
 
-        {semantic && (
-          <div className="mb-3 text-[11px] text-zinc-400">
-            Semantic recall found {semantic.length} relevant {semantic.length === 1 ? 'entry' : 'entries'} — the neural network is tracing related memories by meaning.
+        {recallPending && <p role="status" className="mb-3 text-[11px] text-zinc-400">Searching memory…</p>}
+        {recallError && <p role="alert" className="mb-3 text-[11px] text-amber-300">Memory recall is unavailable. Showing local text matches only.</p>}
+        {semantic !== null && (
+          <div role="status" className="mb-3 text-[11px] text-zinc-400">
+            {describeMemoryRecall(recallStatus, semantic.length)}
           </div>
         )}
 
