@@ -318,6 +318,30 @@ describe("run lifecycle", () => {
     expect(gateway.runChat).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])("never overwrites an operator cancellation when a provider finishes (stream=%s)", async streaming => {
+    const sb = db();
+    const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });
+    const cancelDuringProvider = () => {
+      Object.assign(sb.tables['agent_tasks']![0]!, { status: "cancelled", cancel_requested: true });
+      return textResult();
+    };
+    gateway.runChat.mockImplementation(async () => cancelDuringProvider());
+    gateway.streamChat.mockImplementation(async function* () {
+      yield { type: "done", result: cancelDuringProvider() };
+    });
+    if (streaming) {
+      const events = [];
+      for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.some(event => event.type === "complete")).toBe(false);
+      expect(events.some(event => event.type === "error")).toBe(true);
+    } else {
+      await expect(executeRun({ sb, userId: USER, run })).rejects.toMatchObject({ code: "CANCELLED" });
+    }
+    expect(sb.tables['agent_tasks']?.[0]?.['status']).toBe("cancelled");
+    expect(sb.tables['agent_tasks']?.[0]?.['output_text']).toBeUndefined();
+    expect(entitlements.recordUsage).not.toHaveBeenCalled();
+  });
+
   it("does not complete a task when a provider resolves after workflow cancellation", async () => {
     const sb = db();
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "go" });

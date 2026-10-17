@@ -5,6 +5,7 @@ const MAP = {
   running: { label: 'Running', cls: 'bg-violet-500/15 text-violet-300', Icon: Loader2 },
   completed: { label: 'Completed', cls: 'bg-emerald-500/15 text-emerald-300', Icon: CheckCircle2 },
   failed: { label: 'Failed', cls: 'bg-rose-500/15 text-rose-300', Icon: XCircle },
+  cancelled: { label: 'Cancelled', cls: 'bg-zinc-500/15 text-zinc-300', Icon: XCircle },
 };
 
 export default function TaskStatusBadge({ status }) {

@@ -26,6 +26,42 @@ Reference: https://ai.google.dev/gemini-api/docs/generate-content/thought-signat
 
 ## Feature verification matrix
 
+### Verified follow-ups
+
+Gemini tool continuation PR #987 passed every CI gate and was normally merged
+as `b916452456ef3365ff5729c504e479648f105156`. Exact-commit production deployment
+`dpl_CgdC613nurdNekdtomPJabGnDQfN` reached READY. Authenticated live task
+`b5af2ff6-908c-495f-a417-f64d1b6e89b2` completed with
+`CALCULATOR BLOCKED BY APPROVAL`; its calculator execution remained denied.
+Task, audit and usage agree on Gemini 3.6 Flash and 2,027 tokens. No approval was
+bypassed and no calculator execution is claimed.
+
+Workflow objective PR #989 passed every CI gate and was normally merged as
+`18e702cef3de283dbf07a48238a0c1cf85a4067b`; exact-commit production deployment
+`dpl_FRyDKaDXVi4KznPeqgD75nax19q2` is READY. After secure session refresh,
+authenticated workflow run `932bb285-3862-4d18-b460-e4f97852fa8a` completed
+successfully. Its only step saved `Delayed for 10 ms.` and the live Run History
+displayed Completed. It used no agent, connector or external action.
+
+Cancellation QA exposed an optimistic UI claim: task
+`78c5f77b-0bbc-4795-9ffb-e6a84d127a3b` completed while the screen said cancelled.
+The cancellation repair returns the actual owner-bound terminal receipt if
+completion wins, waits for confirmation before aborting the UI stream, and
+prevents a late provider response from overwriting a saved cancellation.
+Automated race tests cover both streaming and buffered execution. Release and
+live cancellation retest remain required before claiming this resolved.
+
+Production semantic-memory logs reported embedding-provider rate limits.
+Keyword fallback remains available; semantic recall is not certified healthy.
+Approval request `531d3d09-4b04-44d0-8654-25af193b3864` is still pending;
+live rejection is under investigation and no action has been approved.
+
+Browser hit testing found that the animated preserve-3d mission frame sometimes
+intercepts clicks intended for Reject and memory buttons. The control repair
+keeps the shell flat and retains its ambient pulse. It does not alter approval
+handlers, database policies or user permissions. Live post-deployment rejection
+and memory-form checks are required to verify this interaction repair.
+
 | Feature | Evidence / current status |
 | --- | --- |
 | Authentication and agent creation | Live authenticated wizard creation and owner-bound Supabase record verified. |
