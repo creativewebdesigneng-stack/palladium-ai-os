@@ -300,7 +300,7 @@ async function runToolCalls(args: {
   signal: AbortSignal;
   guard: RunLoopGuard;
 }) {
-  args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls });
+  args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls, ...(args.result.geminiContinuation ? { geminiContinuation: args.result.geminiContinuation } : {}) });
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   let plan = args.plan;

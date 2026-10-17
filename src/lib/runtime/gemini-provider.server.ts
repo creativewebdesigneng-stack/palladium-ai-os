@@ -2,6 +2,7 @@ import {
   ProviderError,
   type ChatMessage,
   type ChatResult,
+  type GeminiContinuation,
   type RunArgs,
   type StreamEvent,
   type ToolCall,
@@ -57,6 +58,11 @@ function geminiBody(args: RunArgs) {
       ];
     }
     if (message.role === "assistant") {
+      // Preserve each signature on its original part and in its original order.
+      // A continuation belongs only to the model that produced it.
+      if (message.geminiContinuation?.model === args.model) {
+        return [{ role: "model", parts: message.geminiContinuation.parts }];
+      }
       const parts: Array<Record<string, unknown>> = [];
       if (message.content) parts.push({ text: message.content });
       for (const call of message.tool_calls ?? []) {
@@ -69,7 +75,16 @@ function geminiBody(args: RunArgs) {
 
   return {
     ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
-    contents,
+    // Parallel tool results form one native user turn, preserving call order.
+    contents: contents.reduce<typeof contents>((grouped, current) => {
+      const previous = grouped.at(-1);
+      if (previous?.role === "user" && current.role === "user" &&
+        previous.parts.every(part => "functionResponse" in part) &&
+        current.parts.every(part => "functionResponse" in part)) {
+        previous.parts.push(...current.parts);
+      } else grouped.push(current);
+      return grouped;
+    }, []),
     ...(args.tools?.length
       ? {
           tools: [
@@ -179,13 +194,31 @@ export async function runGeminiNative(args: RunArgs): Promise<ChatResult> {
   const response = await requestGemini(args);
   const json = (await response.json()) as {
     candidates?: Array<{
-      content?: { parts?: Array<{ text?: unknown; functionCall?: { name?: unknown; args?: unknown } }> };
+      content?: { parts?: Array<{ text?: unknown; thought?: boolean; thoughtSignature?: unknown; functionCall?: { name?: unknown; args?: unknown; id?: unknown } }> };
     }>;
     usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown };
   };
 
   const parts = json.candidates?.[0]?.content?.parts ?? [];
+  // Do not expose or persist provider thought text. Only public content and
+  // opaque signatures needed by the native protocol are retained.
+  const continuationParts: GeminiContinuation["parts"] = parts.flatMap((part) => {
+    if (part.thought === true) return [];
+    const signature = typeof part.thoughtSignature === "string"
+      ? { thoughtSignature: part.thoughtSignature } : {};
+    if (part.functionCall && typeof part.functionCall.name === "string") {
+      const call = part.functionCall;
+      return [{ functionCall: {
+        name: call.name as string,
+        args: call.args && typeof call.args === "object" && !Array.isArray(call.args)
+          ? call.args as Record<string, unknown> : {},
+        ...(typeof call.id === "string" ? { id: call.id } : {}),
+      }, ...signature }];
+    }
+    return typeof part.text === "string" ? [{ text: part.text, ...signature }] : [];
+  });
   const text = parts
+    .filter((part) => part.thought !== true)
     .map((part) => (typeof part.text === "string" ? part.text : ""))
     .filter(Boolean)
     .join("")
@@ -202,6 +235,7 @@ export async function runGeminiNative(args: RunArgs): Promise<ChatResult> {
   const output = typeof json.usageMetadata?.candidatesTokenCount === "number" ? json.usageMetadata.candidatesTokenCount : 0;
 
   return {
+    geminiContinuation: { model: args.model, parts: continuationParts },
     text,
     toolCalls,
     usage: { input, output },
