@@ -10,13 +10,13 @@ describe('existing agent tool selection', () => {
   it('saves executable assignments without rewriting model, preferences or policy', async () => {
     const sb = seed(); const row = await changeOwnedAgentTools(args(sb));
     expect(row.allowed_tools).toEqual(['browser']); expect(row.model).toBe('groq'); expect(row.preferences).toEqual({ keep: true }); expect(row.requires_approval).toBe(true);
-    expect(sb.tables.tool_permissions[0].allowed_domains).toEqual(['httpbingo.org']);
+    expect(sb.tables['tool_permissions']?.[0]?.['allowed_domains']).toEqual(['httpbingo.org']);
   });
   it('rejects another owner and stale configuration', async () => {
     const sb = seed();
     await expect(changeOwnedAgentTools({ ...args(sb), userId: 'other' })).rejects.toThrow('not found');
     await expect(changeOwnedAgentTools({ ...args(sb), expectedUpdatedAt: 'stale' })).rejects.toThrow('changed');
-    expect(sb.tables.personal_agents[0].allowed_tools).toEqual([]);
+    expect(sb.tables['personal_agents']?.[0]?.['allowed_tools']).toEqual([]);
   });
   it('rejects catalogue placeholders', async () => {
     const sb = seed(); await expect(changeOwnedAgentTools({ ...args(sb), tools: ['placeholder'] })).rejects.toThrow('executable');
@@ -24,6 +24,6 @@ describe('existing agent tool selection', () => {
   it('does not mutate assignments if required audit fails', async () => {
     vi.mocked(writeAuditRequired).mockRejectedValueOnce(new Error('audit unavailable'));
     const sb = seed(); await expect(changeOwnedAgentTools(args(sb))).rejects.toThrow('audit unavailable');
-    expect(sb.tables.personal_agents[0].allowed_tools).toEqual([]);
+    expect(sb.tables['personal_agents']?.[0]?.['allowed_tools']).toEqual([]);
   });
 });

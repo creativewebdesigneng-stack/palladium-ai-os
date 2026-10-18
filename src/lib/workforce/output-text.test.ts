@@ -9,6 +9,6 @@ describe('Workforce persisted evidence presentation', () => {
   });
   it('counts runtime succeeded tasks consistently with the overview', () => {
     const row = mapAgentToWf({ id: 'a', name: 'QA', allowed_tools: ['browser'], created_at: '2026-10-01' }, [{ agent_id: 'a', status: 'succeeded' }, { agent_id: 'a', status: 'completed' }, { agent_id: 'a', status: 'failed' }]);
-    expect(row.overview.tasksDone).toBe(2); expect(row.performance).toBe(67); expect(row.tools).toEqual(['browser']); expect(row.tasks[0].status).toBe('Completed');
+    expect(row.overview.tasksDone).toBe(2); expect(row.performance).toBe(67); expect(row.tools).toEqual(['browser']); expect(row.tasks[0]?.status).toBe('Completed');
   });
 });
