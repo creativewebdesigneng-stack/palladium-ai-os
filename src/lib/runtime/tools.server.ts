@@ -4,6 +4,7 @@ import {
   TOOL_SLUGS as CORE_TOOL_SLUGS,
   executeTool as executeCoreTool,
   resolveGrantedTools as resolveCoreGrantedTools,
+  toolResultError,
   type ToolContext,
   type ToolGrant,
 } from "./tools-core.server";
@@ -235,6 +236,11 @@ export async function executeTool(
                         : name === "astra_async_workflow"
                           ? await runBlackstarAstraAsyncWorkflowTool(input, localCtx)
                           : await runBlackstarAstraOrchestrationTool(input, localCtx);
+    const failure = toolResultError(output);
+    if (failure) {
+      await log('failed', { error: failure.slice(0, 500), output: outputMetadata(output) });
+      return { ok: false, output };
+    }
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {

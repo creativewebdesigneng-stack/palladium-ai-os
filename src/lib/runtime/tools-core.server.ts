@@ -169,7 +169,7 @@ const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
       })
       .select("id")
       .maybeSingle();
-    if (error) return { error: "Could not queue the external MCP action for approval." };
+    if (error || !data?.id) return { error: "Could not queue the external MCP action for approval." };
     return {
       queued: true,
       approval_request_id: data?.id,
@@ -210,7 +210,7 @@ const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
       })
       .select("id")
       .maybeSingle();
-    if (error) return { error: "Could not queue the connected-app action for approval." };
+    if (error || !data?.id) return { error: "Could not queue the connected-app action for approval." };
     return {
       queued: true,
       approval_request_id: data?.id,
@@ -252,8 +252,8 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input) => {
-      const expr = str(input["expression"]).replace(/[^0-9+\-*/(). %]/g, "");
-      if (!expr) return { error: "Empty or unsupported expression." };
+      const expr = str(input["expression"]).trim();
+      if (!expr || !/^[0-9+\-*/(). %]+$/.test(expr)) return { error: "Empty or unsupported expression." };
       try {
         const value = Function(`"use strict"; return (${expr});`)();
         return Number.isFinite(value)
@@ -451,7 +451,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not raise an approval request." };
+      if (error || !data?.id) return { error: "Could not raise an approval request." };
       return {
         approval_request_id: data?.id,
         status: "pending",
@@ -748,7 +748,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the connected-service write for approval." };
+      if (error || !data?.id) return { error: "Could not queue the connected-service write for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", provider, action };
     },
   },
@@ -912,7 +912,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not create the calendar proposal." };
+      if (error || !task?.id) return { error: "Could not create the calendar proposal." };
       const { data: approval, error: approvalError } = await ctx.sb
         .from("approval_requests")
         .insert({
@@ -936,7 +936,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (approvalError) {
+      if (approvalError || !approval?.id) {
         if (task?.id) await ctx.sb.from("personal_tasks").update({ status: "failed" }).eq("id", task.id);
         return { error: "Could not queue the calendar proposal for approval." };
       }
@@ -986,7 +986,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the email draft for approval." };
+      if (error || !data?.id) return { error: "Could not queue the email draft for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_draft" };
     },
   },
@@ -1033,7 +1033,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the email for approval." };
+      if (error || !data?.id) return { error: "Could not queue the email for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_send" };
     },
   },
@@ -1074,7 +1074,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the Slack message for approval." };
+      if (error || !data?.id) return { error: "Could not queue the Slack message for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending" };
     },
   },
@@ -1183,8 +1183,8 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not prepare the purchase." };
-      const { data: approval } = await ctx.sb
+      if (error || !pr?.id) return { error: "Could not prepare the purchase." };
+      const { data: approval, error: approvalError } = await ctx.sb
         .from("approval_requests")
         .insert({
           user_id: ctx.userId,
@@ -1210,6 +1210,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
+      if (approvalError || !approval?.id) return { error: "Could not queue the purchase for approval. No payment was authorised." };
       // Link the two so the approval decision drives the purchase status.
       if (pr?.id && approval?.id) {
         await ctx.sb
@@ -1490,6 +1491,17 @@ function outputMetadata(output: unknown): unknown {
   return output;
 }
 
+/** A returned provider/handler failure is not a successful tool execution. */
+export function toolResultError(output: unknown): string | null {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return null;
+  const value = output as Record<string, unknown>;
+  const nested = value['result'] as Record<string, unknown> | null;
+  if (value['error'] || value['ok'] === false || (nested && typeof nested === 'object' && nested['ok'] === false)) {
+    return typeof value['error'] === 'string' ? value['error'] : 'Tool returned an unsuccessful result.';
+  }
+  return null;
+}
+
 /** Executes one tool call. Never throws — failures come back as tool output so
  * the model can recover instead of the whole run dying. Every attempt is logged. */
 export async function executeTool(
@@ -1633,6 +1645,11 @@ export async function executeTool(
       spendCap: grant.spendCap ?? ctx.spendCap ?? null,
       requiresApproval: grant.requiresApproval,
     });
+    const failure = toolResultError(output);
+    if (failure) {
+      await log('failed', { error: failure.slice(0, 500), output: outputMetadata(output) });
+      return { ok: false, output };
+    }
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {
