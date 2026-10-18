@@ -60,8 +60,8 @@ describe('bounded browser approval input and queueing', () => {
         steps: [{ action: 'navigate', url: startingUrl }, { action: 'extract', selector: 'body' }],
       } },
     });
-    expect(row?.details?.input).not.toHaveProperty('url');
-    expect(db.tables['agent_tasks']?.[0]?.waiting_approval_request_id).toBe(result.approval_request_id);
+    expect(row?.['details']?.['input']).not.toHaveProperty('url');
+    expect(db.tables['agent_tasks']?.[0]?.['waiting_approval_request_id']).toBe(result.approval_request_id);
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
