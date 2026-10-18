@@ -1596,7 +1596,9 @@ export async function executeTool(
       return { ok: true, output };
     } catch (error) {
       await log('failed', { error: 'Could not queue bounded browser approval.' });
-      return { ok: false, output: { error: 'Browser approval supports only bounded navigation and extraction under current domain policy.' } };
+      // Preserve the approval boundary on failure: both runtimes must stop rather
+      // than accept a model's "please approve" message as a completed deliverable.
+      return { ok: false, output: { requires_approval: true, error: 'Browser approval could not be queued. Check the bounded input, domain policy and deployed agent approval-resume schema.' } };
     }
   }
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
