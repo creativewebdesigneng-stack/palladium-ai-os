@@ -11,10 +11,28 @@ const step = z.object({
   selector: z.string().max(500).optional(), label: z.string().max(120).optional(),
   fields: z.array(z.object({ name: z.string().max(80), selector: z.string().max(500), required: z.boolean().optional() }).strict()).max(16).optional(),
 }).strict();
-const inputSchema = z.object({ steps: z.array(step).min(2).max(8), max_steps: z.number().int().min(2).max(8).optional(), persist_session: z.literal(false).optional() }).strict().refine(value =>
-  value.steps[0]?.action === 'navigate' && Boolean(value.steps[0]?.url) && value.steps.some(s => s.action === 'read' || s.action === 'extract'),
-  'Approval requires initial navigation and a read or extraction step.');
-export function approvedBrowserInput(input: unknown) { return inputSchema.parse(input); }
+// The executable browser_task contract permits either a top-level starting URL
+// or a URL on the first navigate step. Keep accepting both while narrowing the
+// *approved* operation to read-only, plain HTTPS navigation/extraction.
+const inputSchema = z.object({
+  url: publicUrl.optional(),
+  steps: z.array(step).min(2).max(8),
+  max_steps: z.number().int().min(2).max(8).optional(),
+  persist_session: z.literal(false).optional(),
+}).strict().refine(value => {
+  const first = value.steps[0];
+  return first?.action === 'navigate'
+    && Boolean(first.url ?? value.url)
+    && (!first.url || !value.url || first.url === value.url)
+    && value.steps.some(s => s.action === 'read' || s.action === 'extract');
+}, 'Approval requires initial HTTPS navigation, a read or extraction step, and matching starting URLs.');
+
+export function approvedBrowserInput(input: unknown) {
+  const { url, steps, ...options } = inputSchema.parse(input);
+  // Persist only the canonical approved step payload. Do not carry a second,
+  // possibly different, top-level navigation target into the continuation.
+  return { steps: [{ ...steps[0]!, url: steps[0]!.url ?? url }, ...steps.slice(1)], ...options };
+}
 type Sb = { from: (table: string) => any };
 
 /** Uses the existing immutable approval ledger; no browser runs while queueing. */
