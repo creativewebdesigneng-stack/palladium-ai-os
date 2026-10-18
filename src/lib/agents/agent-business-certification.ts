@@ -258,7 +258,7 @@ export function buildAgentBusinessCertification(
     );
 
     const verifierBacked = tasks.flatMap((task) => {
-      if (task.status !== "completed" || !succeededTaskIds.has(task.id)) return [];
+      if (!(["completed", "succeeded"].includes(task.status ?? "")) || !succeededTaskIds.has(task.id)) return [];
       const decision = verification(task.verification_state);
       if (!decision.passed || decision.score === null) return [];
       return [{ taskId: task.id, score: decision.score }];

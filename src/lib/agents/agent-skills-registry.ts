@@ -169,7 +169,7 @@ export function normaliseAgentSkillsRegistry(value: unknown): AgentSkillsRegistr
   const registry: AgentSkillsRegistry = {
     version: 1,
     skills,
-    tools: uniqueList(row["tools"], 60, 140),
+    tools: uniqueList(row["tools"], 100, 140),
     connectors: uniqueList(row["connectors"], 60, 160),
     permissions: uniqueList(row["permissions"], 60, 160),
     certifications,
@@ -228,7 +228,9 @@ export function effectiveAgentSkillsRegistry(args: {
   const registry: AgentSkillsRegistry = {
     version: 1,
     skills,
-    tools: mergeUnique(explicit?.tools, args.allowedTools),
+    // Saved assignments are authoritative when supplied by the live agent.
+    // Declared registry tools alone must not resurrect a removed binding.
+    tools: args.allowedTools == null ? (explicit?.tools ?? []) : uniqueList(args.allowedTools, 100, 140),
     connectors: explicit?.connectors ?? [],
     permissions: explicit?.permissions ?? [],
     certifications: explicit?.certifications ?? [],

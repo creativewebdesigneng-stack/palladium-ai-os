@@ -378,7 +378,8 @@ export default function MissionControl() {
 
       <div className="mt-4 space-y-4">
         {tab === 'orchestrator' && <OrchestratorConsole onRun={(goal) => orchestrate.mutate(goal)} pending={orchestrate.isPending || !isAuthenticated} result={orchestration} />}
-        {tab === 'personal' && <PersonalAISection agents={data?.personalAgents ?? agents} loading={loading} onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })} onEdit={(agent) => setBuilder({ open: true, initial: { ...agent, allowed_domains: DEFAULT_ALLOWED_DOMAINS } })} onDelete={(agent) => removeAgent.mutate(agent.id)} onRun={(agent) => { setTab('overview'); toast({ title: `${agent.name} selected`, description: 'Type your request in the command console and select this agent.' }); }} onTemplate={openTemplate} />}
+        {tab === 'personal' && !builder.open && <PersonalAISection agents={data?.personalAgents ?? agents} loading={loading} onCreate={(category) => setBuilder({ open: true, initial: category ? { category } : null })} onEdit={(agent) => setBuilder({ open: true, initial: { ...agent } })} onDelete={(agent) => removeAgent.mutate(agent.id)} onRun={(agent) => { setTab('overview'); toast({ title: `${agent.name} selected`, description: 'Type your request in the command console and select this agent.' }); }} onTemplate={openTemplate} />}
+        {tab === 'personal' && builder.open && <AgentBuilder inline open initial={builder.initial} saving={agentMutation.isPending} onClose={() => setBuilder({ open: false, initial: null })} onSave={(value) => agentMutation.mutate(value)} />}
         {tab === 'professional' && <ProfessionalPanel agents={data?.professionalAgents ?? []} workforces={data?.workforces ?? []} runs={data?.workforceRuns ?? []} agentRuns={data?.agentRuns ?? []} loading={loading} />}
         {tab === 'approvals' && <ApprovalCentre approvals={approvals} purchases={data?.purchases ?? []} results={data?.shoppingResults ?? []} loading={loading} busyId={busyId} onDecide={(approval, decisionValue) => { setBusyId(approval.id); decide.mutate({ id: approval.id, decision: decisionValue, approval }); }} onRetry={(approval) => { setBusyId(approval.id); retryExternal.mutate(approval.id); }} onChooseAlternative={(approval, alt) => alternative.mutate({ approvalId: approval.id, resultId: alt.id })} onConfirmPurchase={(purchase) => { setBusyId(purchase.id); checkout.mutate(purchase.id); }} onAskAgent={(approval) => toast({ title: 'Ask the agent', description: `Send a follow-up about “${approval.title}” from the console — the agent keeps this request open.` })} />}
         {tab === 'shopping' && <ShoppingWorkspace agents={(data?.agents ?? []).filter((agent) => agent.category === 'shopping' || agent.scope === 'personal')} />}
@@ -396,7 +397,6 @@ export default function MissionControl() {
         )}
       </div>
 
-      <AgentBuilder open={builder.open} initial={builder.initial} saving={agentMutation.isPending} onClose={() => setBuilder({ open: false, initial: null })} onSave={(value) => agentMutation.mutate(value)} />
     </div>
   );
 }

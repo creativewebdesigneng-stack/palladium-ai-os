@@ -86,3 +86,8 @@ describe("Universal Skills Registry", () => {
     expect(prompt).toContain("never grants");
   });
 });
+
+
+it('does not expose removed tool bindings from declared registry metadata', () => {
+  expect(effectiveAgentSkillsRegistry({ registry: { version: 1, skills: [], tools: ['browser'] } as any, allowedTools: [] })?.tools ?? []).toEqual([]);
+});

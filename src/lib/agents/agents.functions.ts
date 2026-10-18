@@ -97,7 +97,7 @@ export function normaliseAgentWrite(input: AgentWriteInput) {
     requires_approval: input.requires_approval !== false,
     autonomy: normaliseAutonomyLevel(input.autonomy),
     instructions: (input.instructions ?? "").slice(0, 8000),
-    allowed_tools: (input.allowed_tools ?? []).slice(0, 30).map((t) => String(t).slice(0, 40)),
+    allowed_tools: [...new Set((input.allowed_tools ?? []).slice(0, 100).map((t) => String(t).slice(0, 80)))],
     preferences,
     status,
     operating_profile: operatingProfile,
@@ -305,6 +305,18 @@ export const updateAgentModel = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { changeOwnedAgentModel } = await import('./agent-model-update.server');
     return changeOwnedAgentModel({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
+  });
+
+/** Tool assignments only; never replace the rest of a saved agent from the UI. */
+export const updateAgentTools = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(), expectedUpdatedAt: z.string().min(1).max(80),
+    tools: z.array(z.string().min(1).max(80)).max(100),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentTools } = await import('./agent-tools-update.server');
+    return changeOwnedAgentTools({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
   });
 
 /** Permanently deletes one of the caller's agents. */

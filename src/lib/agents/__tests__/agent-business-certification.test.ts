@@ -193,3 +193,13 @@ describe("agent business capability certification", () => {
     expect(result?.failedToolExecutions).toBe(1);
   });
 });
+
+
+it('counts the current succeeded runtime status as verifier-backed browser evidence', () => {
+  const web = buildAgentBusinessCertification({ allowedTools: ['browser_task'],
+    tasks: [{ ...task('run', 0.95), status: 'succeeded' }],
+    toolExecutions: [execution('run', 'browser_task', { simulated: false })],
+  }).find(row => row.id === 'web_research');
+  expect(web?.verifiedTasks).toBe(1);
+  expect(web?.status).toBe('building_evidence');
+});

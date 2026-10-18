@@ -13,7 +13,7 @@ const detail = readFileSync(
 describe('agent business certification UI', () => {
   it('surfaces evidence-backed readiness in the real agent command centre', () => {
     expect(detail).toContain('AgentBusinessCertificationPanel')
-    expect(detail).toContain('<AgentBusinessCertificationPanel agentId={agent.id} />')
+    expect(detail).toContain('<AgentBusinessCertificationPanel agentId={agent.id}')
     expect(panel).toContain('getAgentBusinessCertification')
     expect(panel).toContain('Evidence-backed agent readiness')
   })

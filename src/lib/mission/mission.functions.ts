@@ -1,3 +1,4 @@
+import { personalAgentPermissionWrites } from './agent-permission-writes';
 import { createServerFn } from "@tanstack/react-start";
 import { normaliseAgentIdentity } from "@/lib/agents/agent-identity";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -388,6 +389,13 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
       scope: data.scope === "professional" ? "professional" : "personal",
     };
 
+    const previousPermissions = data.id
+      ? await sb.from('tool_permissions').select('tool,enabled,requires_approval,allowed_domains,spend_cap')
+          .eq('agent_id', data.id).eq('user_id', userId)
+      : { data: [], error: null };
+    if (previousPermissions.error) throw new Error('Could not load saved agent permissions.');
+    const permissionWrites = personalAgentPermissionWrites({ tools, previous: previousPermissions.data ?? [],
+      domains: data.allowed_domains ?? (data.id ? undefined : DEFAULT_DOMAINS), budget: data.budget_limit });
     let saved: any;
     if (data.id) {
       const res = await sb
@@ -406,21 +414,12 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
     }
     if (!saved) throw new Error("Agent could not be saved");
 
-    const domains = data.allowed_domains?.length ? data.allowed_domains : DEFAULT_DOMAINS;
-    if (tools.length) {
-      await sb.from("tool_permissions").upsert(
-        tools.map((tool) => ({
-          user_id: userId,
-          agent_id: saved.id,
-          tool,
-          enabled: true,
-          requires_approval: ["checkout", "booking", "email_draft"].includes(tool),
-          allowed_domains:
-            tool === "browser" || tool === "shopping_search" || tool === "checkout" ? domains : [],
-          spend_cap: tool === "checkout" ? (data.budget_limit ?? null) : null,
-        })),
-        { onConflict: "agent_id,tool" },
+    if (permissionWrites.length) {
+      const permissions = await sb.from('tool_permissions').upsert(
+        permissionWrites.map(policy => ({ ...policy, user_id: userId, agent_id: saved.id })),
+        { onConflict: 'agent_id,tool' },
       );
+      if (permissions.error) throw new Error('Agent details saved, but tool permissions could not be saved. Refresh before retrying.');
     }
 
     await log(sb, userId, data.id ? "agent_updated" : "agent_created", {
@@ -829,7 +828,7 @@ export const decideApproval = createServerFn({ method: "POST" })
     if (!approval) throw new Error("Approval request not found");
     if (approval.status !== "pending") throw new Error("This request has already been decided");
 
-    if (approval.action_type === "personal_task_tool") {
+    if (["personal_task_tool", "agent_runtime_tool"].includes(approval.action_type)) {
       const toolDecision = data.decision === "approve" ? "approved" : "rejected";
       const result = await decidePersonalTaskToolApproval({
         sb,

@@ -1,3 +1,4 @@
+import { pauseAgentBrowserCalls } from './browser-approval.server';
 /**
  * The PalladiumAI agent runtime.
  *
@@ -469,7 +470,7 @@ export async function completeRun(args: {
     agent: run.agent,
     orgId: run.orgId,
     taskId: run.taskId,
-    request: String(run.messages[run.messages.length - 1]?.content ?? ""),
+    request: String([...run.messages].reverse().find(message => message.role === "user")?.content ?? ""),
     outcome: result.text,
     provider: result.provider,
     model: result.model,
@@ -749,6 +750,8 @@ export async function executeRun(args: {
   run: PreparedRun;
   signal?: AbortSignal;
   timeoutMs?: number;
+  resumedUsage?: { input: number; output: number };
+  resumedToolCalls?: number;
 }) {
   const controller = new AbortController();
   let externalFailure: RuntimeError | null = null;
@@ -771,8 +774,8 @@ export async function executeRun(args: {
     Math.min(Math.max(args.timeoutMs ?? RUN_BUDGET_MS, 1_000), RUN_BUDGET_MS),
   );
   const messages = [...args.run.messages];
-  let toolCallCount = 0;
-  const usage = { input: 0, output: 0 };
+  let toolCallCount = args.resumedToolCalls ?? 0;
+  const usage = { ...(args.resumedUsage ?? { input: 0, output: 0 }) };
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
 
@@ -827,6 +830,8 @@ export async function executeRun(args: {
         });
       }
       toolCallCount += result.toolCalls.length;
+      const paused = await pauseAgentBrowserCalls({ ...args, result, messages, usage, toolCalls: toolCallCount });
+      if (paused) return paused;
       await runToolCalls(
         {
           sb: args.sb,
@@ -925,6 +930,12 @@ export async function* streamRun(args: {
       }
 
       toolCallCount += final.toolCalls.length;
+      const paused = await pauseAgentBrowserCalls({ ...args, result: final, messages, usage, toolCalls: toolCallCount });
+      if (paused) {
+        yield { type: 'status', status: 'waiting_for_approval', task_id: args.run.taskId };
+        yield { type: 'complete', task: paused };
+        return;
+      }
       yield { type: "status", status: "waiting_for_tool", task_id: args.run.taskId };
       const { awaitingApproval } = await runToolCalls(
         {

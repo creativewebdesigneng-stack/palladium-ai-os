@@ -5,7 +5,8 @@ type Sb = { from: (table: string) => any };
 type Decision = "approved" | "rejected";
 
 type PersonalTaskApprovalDetails = {
-  personal_task_id: string;
+  personal_task_id: string | null;
+  runtime_agent?: boolean;
   agent_task_id: string;
   tool_call_id: string;
   tool_name: string;
@@ -24,8 +25,8 @@ function detailsOf(value: unknown): PersonalTaskApprovalDetails | null {
   const agent_task_id = asId(row["agent_task_id"]);
   const tool_call_id = asId(row["tool_call_id"]);
   const tool_name = asId(row["tool_name"]);
-  if (!personal_task_id || !agent_task_id || !tool_call_id || !tool_name) return null;
-  return { personal_task_id, agent_task_id, tool_call_id, tool_name };
+  if ((!personal_task_id && row["runtime_agent"] !== true) || !agent_task_id || !tool_call_id || !tool_name) return null;
+  return { personal_task_id, agent_task_id, tool_call_id, tool_name, runtime_agent: row["runtime_agent"] === true };
 }
 
 /**
@@ -52,12 +53,12 @@ export async function decidePersonalTaskToolApproval(args: {
   if (approvalError) throw new Error(approvalError.message);
   if (!approval) throw new Error("Approval request not found.");
   if (approval.user_id !== args.userId) throw new Error("Only the task owner can decide this approval.");
-  if (approval.action_type !== "personal_task_tool")
+  if (!["personal_task_tool", "agent_runtime_tool"].includes(approval.action_type))
     throw new Error("This approval is not a resumable personal-task tool approval.");
   if (approval.status !== "pending") throw new Error("This approval request has already been decided.");
 
   const details = detailsOf(approval.details);
-  if (!details || approval.task_id !== details.personal_task_id)
+  if (!details || (approval.action_type === "agent_runtime_tool") !== Boolean(details.runtime_agent) || approval.task_id !== details.personal_task_id)
     throw new Error("This approval is not linked to a valid personal task run.");
 
   const { data: run, error: runError } = await args.sb
@@ -73,10 +74,10 @@ export async function decidePersonalTaskToolApproval(args: {
   if (run.status !== "waiting_for_approval" || run.waiting_approval_request_id !== approval.id)
     throw new Error("This personal task is no longer waiting for this approval.");
 
-  const resume = run.approval_resume_state;
-  if (!resume || typeof resume !== "object" || Array.isArray(resume))
+  const resumeState = run.approval_resume_state;
+  if (!resumeState || typeof resumeState !== "object" || Array.isArray(resumeState))
     throw new Error("Personal task approval resume state is missing.");
-  const resumeRow = resume as Record<string, unknown>;
+  const resumeRow = resumeState as Record<string, unknown>;
   const pendingCall = resumeRow["pendingCall"];
   if (!pendingCall || typeof pendingCall !== "object" || Array.isArray(pendingCall))
     throw new Error("Personal task approval tool state is missing.");
@@ -102,7 +103,10 @@ export async function decidePersonalTaskToolApproval(args: {
   if (decisionError) throw new Error(decisionError.message);
   if (!decided) throw new Error("This approval request has already been decided.");
 
-  const execution = await resumePersonalTaskApproval({
+  const resume = details.runtime_agent
+    ? (await import("@/lib/runtime/browser-approval.server")).resumeAgentBrowserApproval
+    : resumePersonalTaskApproval;
+  const execution = await resume({
     sb: args.sb,
     userId: args.userId,
     approvalRequestId: approval.id,

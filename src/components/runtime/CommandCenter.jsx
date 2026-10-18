@@ -43,7 +43,7 @@ export default function CommandCenter({ agent, onFinished }) {
         onEvent: (event) => {
           if (controller.signal.aborted) return;
           if (event.type === 'status') {
-            setStatus('running');
+            setStatus(event.status === 'waiting_for_approval' ? 'waiting_for_approval' : 'running');
             setTask((t) => t ?? { id: event.task_id });
           } else if (event.type === 'delta') {
             setText((prev) => prev + event.text);
@@ -53,15 +53,16 @@ export default function CommandCenter({ agent, onFinished }) {
             setStatus('failed');
             setError(event.message);
           } else if (event.type === 'complete') {
-            setStatus('completed');
+            setStatus(event.task?.status === 'waiting_for_approval' ? 'waiting_for_approval' : 'completed');
             setError('');
             setTask(event.task);
             if (event.task?.output_text) setText(event.task.output_text);
           }
         },
       });
+      if (!finished) throw new Error('The agent run did not return a completed task.');
       setInput('');
-      if (finished) onFinished?.(finished);
+      onFinished?.(finished);
     } catch (e) {
       if (controller.signal.aborted) return;
       setStatus('failed');
@@ -159,7 +160,7 @@ export default function CommandCenter({ agent, onFinished }) {
             <p className="mt-3 text-sm text-rose-400">{error}</p>
           ) : (
             <div className="mt-3 text-sm leading-relaxed text-zinc-300">
-              {text ? <ReactMarkdown>{text}</ReactMarkdown> : <p className="text-zinc-500">Thinking through the task, memory and enabled tools…</p>}
+              {status === 'waiting_for_approval' ? <p className="text-amber-300">Browser action paused. Review the exact request in the <a href="/mission-control" className="underline">Approval Centre</a> to continue this run.</p> : text ? <ReactMarkdown>{text}</ReactMarkdown> : <p className="text-zinc-500">{running ? 'Waiting for the agent to return a final answer…' : 'No final response was produced. Check your selected model provider and the agent run error.'}</p>}
             </div>
           )}
         </div>

@@ -33,8 +33,10 @@ function bounded(value: unknown, fallback: string, max: number): string {
 }
 
 function browserApprovalCopy(call: PersonalTaskPendingToolCall, agentName?: string | null) {
-  if (call.name !== "browser_interact") return null;
-  const url = typeof call.arguments["url"] === "string" ? call.arguments["url"] : "";
+  if (!["browser_interact", "browser", "browser_task"].includes(call.name)) return null;
+  const firstNavigation = Array.isArray(call.arguments['steps'])
+    ? call.arguments['steps'].find((step: any) => step?.action === 'navigate') : null;
+  const url = typeof call.arguments["url"] === "string" ? call.arguments["url"] : firstNavigation?.url ?? '';
   let host = "an external site";
   try {
     host = new URL(url).hostname.replace(/^www\./, "") || host;
@@ -74,7 +76,8 @@ export async function pauseForPersonalTaskApproval(args: {
   sb: Sb;
   userId: string;
   orgId: string | null;
-  personalTaskId: string;
+  personalTaskId: string | null;
+  runtimeAgent?: boolean;
   runId: string;
   agentId: string | null;
   agentName?: string | null;
@@ -95,6 +98,7 @@ export async function pauseForPersonalTaskApproval(args: {
 
   const details = {
     personal_task_id: args.personalTaskId,
+    ...(args.runtimeAgent ? { runtime_agent: true } : {}),
     agent_task_id: args.runId,
     tool_call_id: args.call.id,
     tool_name: args.call.name,
@@ -108,7 +112,7 @@ export async function pauseForPersonalTaskApproval(args: {
       org_id: args.orgId,
       agent_id: args.agentId,
       task_id: args.personalTaskId,
-      action_type: "personal_task_tool",
+      action_type: args.runtimeAgent ? "agent_runtime_tool" : "personal_task_tool",
       title,
       summary,
       details,

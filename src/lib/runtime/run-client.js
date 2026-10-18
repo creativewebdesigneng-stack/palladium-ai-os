@@ -51,7 +51,7 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
     let event;
     try { event = JSON.parse(data); } catch { return null; }
     if (!event || typeof event !== "object") return null;
-    if (event.type === "complete" && (!event.task?.id || event.task.status !== "succeeded")) {
+    if (event.type === "complete" && (!event.task?.id || !["succeeded", "waiting_for_approval"].includes(event.task.status))) {
       throw new Error("The runtime did not confirm a successful task. Check run history before trying again.");
     }
     onEvent?.(event);
