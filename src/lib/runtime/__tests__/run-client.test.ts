@@ -65,3 +65,11 @@ describe('agent streaming receipts', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+
+
+it('returns a persisted approval pause without claiming task success or retrying it', async () => {
+  const paused = { id: 'synthetic-task', status: 'waiting_for_approval', output: null };
+  const fetcher = setup([`data: {"type":"complete","task":${JSON.stringify(paused)}}\n\n`]);
+  await expect(run()).resolves.toEqual(paused);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

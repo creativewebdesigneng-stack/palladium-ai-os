@@ -1,3 +1,4 @@
+import { workflowDisplayText } from '@/lib/workforce/workflow-display';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Workflow, Play, Loader2, CheckCircle2, XCircle, MinusCircle, GitBranch, Layers, Users, Clock3 } from 'lucide-react';
@@ -54,8 +55,8 @@ function displaySteps(rows = []) {
       step_id: row.step_id ?? row.id,
       name: row.name ?? 'Workflow step',
       status: row.status === 'cancelled' ? 'skipped' : row.status,
-      output: String(row.output ?? ''),
-      error: row.error ? String(row.error) : null,
+      output: workflowDisplayText(row.output),
+      error: row.error ? workflowDisplayText(row.error) : null,
       attempts: Number(row.attempt ?? 1),
       duration_ms: Number(row.duration_ms ?? 0),
     }));
@@ -121,7 +122,7 @@ export default function WorkforceOrchestrator() {
       if (mounted.current) {
         setRunStatus(run.status);
         setMessages(detail?.messages ?? []);
-        setResult({ run, steps, output: String(run.output ?? '') });
+        setResult({ run, steps, output: workflowDisplayText(run.output) });
       }
       if (TERMINAL.has(run.status)) return { run, steps, messages: detail?.messages ?? [] };
       await sleep(1500);

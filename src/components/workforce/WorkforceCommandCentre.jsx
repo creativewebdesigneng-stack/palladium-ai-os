@@ -11,6 +11,10 @@ const METRICS = [
 
 const USAGE_LABELS = {
   agentExecutions: 'Agent executions',
+  agent_task: 'Completed agent executions',
+  tool_execution: 'Tool executions',
+  ai_tokens: 'AI tokens',
+  workflow_run: 'Workflow runs',
   aiModelUsage: 'AI model usage',
   workflowRuns: 'Workflow runs',
   memory: 'Memory (MB)',
@@ -46,12 +50,14 @@ function MetricCard({ m, value, i }) {
 }
 
 function TaskBreakdown({ overview }) {
-  const { runningTasks, pendingTasks, completedTasks, failedTasks, totalTasks } = overview;
+  const { runningTasks, pendingTasks, completedTasks, failedTasks, totalTasks, waitingForApproval, cancelledTasks } = overview;
   const segments = [
     { label: 'Executing', value: runningTasks, cls: 'bg-cyan-300' },
     { label: 'Queued', value: pendingTasks, cls: 'bg-zinc-500' },
     { label: 'Completed', value: completedTasks, cls: 'bg-violet-400' },
     { label: 'Exceptions', value: failedTasks, cls: 'bg-rose-400' },
+    { label: 'Awaiting approval', value: waitingForApproval, cls: 'bg-amber-300' },
+    { label: 'Cancelled', value: cancelledTasks, cls: 'bg-zinc-700' },
   ];
   const total = Math.max(1, totalTasks);
   return (
@@ -77,11 +83,11 @@ function TaskBreakdown({ overview }) {
 }
 
 function UsagePanel({ usage }) {
-  const entries = Object.entries(usage || {}).filter(([, v]) => v);
+  const entries = Object.entries(usage || {}).filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value > 0);
   return (
     <div className="rounded-2xl border border-white/[.065] bg-black/25 p-4 backdrop-blur-xl">
       <p className="text-xs font-semibold text-white">Infrastructure consumption</p>
-      <p className="mt-1 text-[10px] uppercase tracking-[.14em] text-zinc-600">Current billing cycle</p>
+      <p className="mt-1 text-[10px] uppercase tracking-[.14em] text-zinc-600">Latest recorded usage (up to 500 records)</p>
       {entries.length ? (
         <div className="mt-4 space-y-3">
           {entries.map(([k, v]) => {
@@ -100,7 +106,7 @@ function UsagePanel({ usage }) {
           })}
         </div>
       ) : (
-        <p className="mt-4 text-[11px] text-zinc-600">No infrastructure consumption recorded this period.</p>
+        <p className="mt-4 text-[11px] text-zinc-600">No infrastructure consumption in the loaded usage records.</p>
       )}
     </div>
   );

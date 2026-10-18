@@ -1,3 +1,4 @@
+import AgentToolsEditor from './AgentToolsEditor';
 import { Cpu, Wrench, Brain } from 'lucide-react';
 import AgentSkillsRegistryPanel from '@/components/agents/AgentSkillsRegistryPanel';
 import { useState } from 'react';
@@ -77,6 +78,7 @@ export default function AgentConfigPanel({ agent, onAgentUpdated }) {
             <span key={t} className="rounded-lg bg-white/5 px-2 py-1 text-[11px] text-zinc-300">{t}</span>
           )) : <span className="text-[11px] text-zinc-600">None configured</span>}
         </div>
+        <AgentToolsEditor key={agent.id} agent={agent} onAgentUpdated={onAgentUpdated} />
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Brain className="h-3.5 w-3.5 text-violet-400" />Memory</p>

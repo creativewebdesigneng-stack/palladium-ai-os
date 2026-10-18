@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { writeAudit } from "@/lib/platform/audit.server";
+import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { executeTool, resolveGrantedTools, TOOL_MANIFEST } from "@/lib/runtime/tools.server";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
@@ -41,6 +41,10 @@ export const getToolFramework = createServerFn({ method: "POST" })
       sb.from("personal_agents").select("id,name,allowed_tools,requires_approval,status"),
       getEntitlements(sb as never, userId, null),
     ]);
+
+    if ([catalogue, permissions, executions, agents].some(result => result.error)) {
+      throw new Error("Could not load tool settings. Refresh before changing permissions.");
+    }
 
     const browser = await browserProviderStatus();
 
@@ -107,6 +111,11 @@ export const saveToolPermission = createServerFn({ method: "POST" })
       .filter(Boolean)
       .slice(0, 50);
 
+    if ((data.tool === 'browser' || data.tool === 'browser_task') && data.enabled !== false &&
+      (!domains.length || domains.some(domain => !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)))) {
+      throw new Error('Browser tools require explicit valid domain names.');
+    }
+
     const row = {
       user_id: userId,
       agent_id: data.agentId ?? null,
@@ -117,36 +126,28 @@ export const saveToolPermission = createServerFn({ method: "POST" })
       spend_cap: data.spendCap ?? null,
     };
 
-    const { data: existing } = await sb
-      .from("tool_permissions")
-      .select("id")
-      .eq("tool", data.tool)
-      .is("agent_id", data.agentId ? undefined : null)
-      .limit(1);
+    let lookup = sb.from('tool_permissions').select('id')
+      .eq('user_id', userId).eq('tool', data.tool);
+    lookup = data.agentId ? lookup.eq('agent_id', data.agentId) : lookup.is('agent_id', null);
+    const { data: match, error: lookupError } = await lookup.maybeSingle();
+    if (lookupError) throw new Error('Could not load the existing tool permission.');
 
-    const match = data.agentId
-      ? (
-          await sb
-            .from("tool_permissions")
-            .select("id")
-            .eq("tool", data.tool)
-            .eq("agent_id", data.agentId)
-            .maybeSingle()
-        ).data
-      : existing?.[0];
-
+    const requestAuditId = await writeAuditRequired({ userId, agentId: data.agentId ?? null,
+      action: 'tool_permission_change_requested', targetType: 'tool', status: 'success',
+      metadata: { tool: data.tool, agent_id: data.agentId ?? null, enabled: row.enabled,
+        allowed_domains: domains, requires_approval: row.requires_approval } });
     const result = match
-      ? await sb.from("tool_permissions").update(row).eq("id", match.id).select("*").maybeSingle()
+      ? await sb.from("tool_permissions").update(row).eq("id", match.id).eq("user_id", userId).select("*").maybeSingle()
       : await sb.from("tool_permissions").insert(row).select("*").maybeSingle();
 
-    if (result.error) throw new Error("Could not save that tool permission.");
+    if (result.error || !result.data) throw new Error("Could not save that tool permission.");
 
     await writeAudit({
       userId: userId,
       action: "tool_permission_updated",
       targetType: "tool",
       status: "success",
-      metadata: { tool: data.tool, agent_id: data.agentId ?? null, enabled: row.enabled },
+      metadata: { requestAuditId, tool: data.tool, agent_id: data.agentId ?? null, enabled: row.enabled },
     });
 
     return result.data;

@@ -1,3 +1,4 @@
+import { pauseAgentBrowserCalls } from './browser-approval.server';
 import type { AgentOperatingProfile } from "@/lib/agents/agent-spec";
 import {
   applyReplan,
@@ -492,6 +493,8 @@ export async function executePlannedRun(args: {
         if (toolRounds > MAX_TOOL_ROUNDS) {
           throw new RuntimeError("The agent used too many tool rounds without producing a verifiable answer.", "TOOL_LOOP_EXHAUSTED", 500);
         }
+        const paused = await pauseAgentBrowserCalls({ ...args, result, messages, usage, toolCalls: toolCallCount });
+        if (paused) return paused;
         await invalidateDurableRunCheckpoint({ sb: args.sb, taskId: args.run.taskId });
         const observed = await runToolCalls({
           sb: args.sb,

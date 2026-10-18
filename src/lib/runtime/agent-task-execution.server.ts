@@ -158,6 +158,7 @@ export async function executeAgentTask(args: {
       ],
     }
     let task = await executePlannedRun({ sb: args.sb, userId: args.userId, run, reasoningControl })
+    if (task?.status === 'waiting_for_approval') return { task, output: '' };
     if (!outputText(task)) {
       run = {
         ...run,

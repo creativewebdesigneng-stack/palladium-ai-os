@@ -88,7 +88,7 @@ export default function AgentDetail() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <CommandCenter agent={agent} onFinished={load} />
-          <AgentBusinessCertificationPanel agentId={agent.id} />
+          <AgentBusinessCertificationPanel agentId={agent.id} key={`${agent.id}:${agent.updated_at}:${tasks[0]?.updated_at ?? ""}`} />
           <TaskHistory tasks={tasks} />
         </div>
         <AgentConfigPanel agent={agent} onAgentUpdated={setAgent} />

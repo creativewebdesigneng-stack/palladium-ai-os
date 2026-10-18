@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const execution = vi.hoisted(() => ({ resumePersonalTaskApproval: vi.fn() }));
+const execution = vi.hoisted(() => ({ resumePersonalTaskApproval: vi.fn(), resumeAgentBrowserApproval: vi.fn(async () => ({ status: "succeeded", runId: "run-1" })) }));
 
 vi.mock("../personal-task-execution.server", () => ({
   resumePersonalTaskApproval: execution.resumePersonalTaskApproval,
 }));
+
+vi.mock('@/lib/runtime/browser-approval.server', () => ({ resumeAgentBrowserApproval: execution.resumeAgentBrowserApproval }));
 
 import { decidePersonalTaskToolApproval } from "../personal-task-approval-decision.server";
 
@@ -190,4 +192,15 @@ describe("personal task approval decision", () => {
     ).rejects.toThrow("stale or mismatched");
     expect(execution.resumePersonalTaskApproval).not.toHaveBeenCalled();
   });
+});
+
+it('routes a standalone browser decision through the same association checks and decision lifecycle', async () => {
+  const sb = fakeSb({
+    approval: { ...approval, action_type: 'agent_runtime_tool', task_id: null, details: { ...details, personal_task_id: null, runtime_agent: true, tool_name: 'browser_task' } },
+    run: { ...run, task_id: null, approval_resume_state: { version: 1, pendingCall: { id: 'call-1', name: 'browser_task', arguments: {} } } },
+    decided: { id: 'approval-1', status: 'approved' },
+  });
+  const result = await decidePersonalTaskToolApproval({ sb, userId: 'user-1', approvalRequestId: 'approval-1', decision: 'approved' });
+  expect(result.execution.status).toBe('succeeded');
+  expect(execution.resumeAgentBrowserApproval).toHaveBeenCalledWith(expect.objectContaining({ approvalRequestId: 'approval-1', userId: 'user-1' }));
 });

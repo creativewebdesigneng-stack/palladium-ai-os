@@ -1,3 +1,4 @@
+import { workforceUsageTotals } from '@/lib/workforce/workflow-display';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Plus, UserPlus, ClipboardPlus, Filter, Bot, Building2, Activity, Network } from 'lucide-react';
@@ -31,7 +32,7 @@ import {
 // ledger. Nothing is mocked: every number comes from RLS-scoped rows.
 function buildOverview(agents, tasks, usage) {
   const count = (s) => tasks.filter((t) => t.status === s).length;
-  const running = count('running');
+  const running = count('running') + count('waiting_for_tool');
   const pending = count('pending') + count('queued');
   const completed = count('succeeded') + count('completed');
   const failed = count('failed');
@@ -42,6 +43,8 @@ function buildOverview(agents, tasks, usage) {
     pendingTasks: pending,
     completedTasks: completed,
     failedTasks: failed,
+    waitingForApproval: count('waiting_for_approval'),
+    cancelledTasks: count('cancelled'),
     totalTasks: tasks.length,
     performance: completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0,
     usage: usage || {},
@@ -84,7 +87,7 @@ export default function Workforce() {
     }
     try {
       const summary = await getUsageSummary({ data: { orgId: activeOrgId ?? null } });
-      setUsage(summary?.usage ?? summary ?? null);
+      setUsage(workforceUsageTotals(summary));
     } catch {
       setUsage(null);
     }
