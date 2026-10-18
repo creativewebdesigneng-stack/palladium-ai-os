@@ -177,22 +177,26 @@ export default function ApprovalCentre({
               {decided.map((d) => {
                 const executionFailed = d.status === 'approved' && d.execution_status === 'failed';
                 const executionSucceeded = d.execution_status === 'succeeded';
+                const browserNotExecuted = d.action_type === 'agent_browser_task' && d.status === 'approved' && d.execution_status == null;
                 return (
-                  <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
+                  <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed || browserNotExecuted ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
                     <div className="flex items-center gap-2 text-[11px]">
-                      <span className={`h-1.5 w-1.5 rounded-full ${executionFailed ? 'bg-rose-400' : d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${executionFailed || browserNotExecuted ? 'bg-rose-400' : d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                       <span className="truncate text-zinc-300">{d.title}</span>
                       <span className="ml-auto text-zinc-600">
-                        {executionFailed ? 'approved · action failed' : executionSucceeded ? 'approved · completed' : d.status}
+                        {browserNotExecuted ? 'approved · not executed' : executionFailed ? 'approved · action failed' : executionSucceeded ? 'approved · completed' : d.status}
                       </span>
                     </div>
+                    {browserNotExecuted && (
+                      <p className="mt-2 text-[10px] text-rose-200/80" role="alert">This browser approval was recorded without execution evidence. It cannot be replayed. Open the latest Blackstar Preview, run a new browser task and review its new approval request.</p>
+                    )}
                     {executionFailed && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[10px] text-rose-200/80">
                           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                           <span>{d.execution_error ?? 'The provider action failed. Reconnect the integration if its permissions changed, then retry.'}</span>
                         </p>
-                        {onRetry && (
+                        {onRetry && d.action_type !== 'agent_browser_task' && (
                           <button
                             onClick={() => onRetry(d)}
                             disabled={busyId === d.id}
