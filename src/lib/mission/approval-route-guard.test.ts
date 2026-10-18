@@ -12,3 +12,7 @@ describe('generic approval route guard', () => {
     (type) => expect(() => assertGenericApprovalCanDecide(type)).not.toThrow(),
   );
 });
+
+ it('refuses generic decisions for bounded local tool continuations', () => {
+   expect(() => assertGenericApprovalCanDecide('agent_tool_task')).toThrow('dedicated executable approval handler');
+ });

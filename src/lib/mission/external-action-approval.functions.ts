@@ -21,7 +21,8 @@ type ExternalActionType =
   | "nango_dynamic_action"
   | "external_mcp_action"
   | "agent_skill_script"
-  | "agent_browser_task";
+  | "agent_browser_task"
+  | "agent_tool_task";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
   "github_branch_create",
@@ -43,6 +44,7 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "external_mcp_action",
   "agent_skill_script",
   "agent_browser_task",
+  "agent_tool_task",
   ...GITHUB_EXECUTABLE,
 ]);
 
@@ -65,7 +67,7 @@ async function executeExternalAction(
   details: Record<string, unknown>,
   approval: { id: string; agent_id?: string | null; org_id?: string | null },
 ) {
-  if (type === 'agent_browser_task') {
+  if (['agent_browser_task', 'agent_tool_task'].includes(type)) {
     const { executeApprovedBrowserTask } = await import('@/lib/runtime/browser-approval.server');
     return executeApprovedBrowserTask({ sb, userId, approvalRequestId: approval.id });
   }
@@ -181,7 +183,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
         .maybeSingle();
       if (rejected.error) throw new Error(rejected.error.message);
       if (!rejected.data) throw new Error("This request has already been decided");
-      if (type === 'agent_browser_task') {
+      if (['agent_browser_task', 'agent_tool_task'].includes(type)) {
         const { rejectBrowserApproval } = await import('@/lib/runtime/browser-approval.server');
         await rejectBrowserApproval({ sb: approvalDb, userId, approvalRequestId: approval.id, agentId: approval.agent_id, taskId: safeDetails(approval.details)['agent_task_id'] as string });
       }
@@ -248,7 +250,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
 
     // Fail closed for the exact approved browser continuation, without
     // overwriting task cancellation or a separately completed run.
-    if (type === "agent_browser_task" && !execution.ok) {
+    if (["agent_browser_task", "agent_tool_task"].includes(type) && !execution.ok) {
       const taskId = safeDetails(approval.details)["agent_task_id"];
       if (typeof taskId === "string" && taskId.length > 0) {
         const closed = await approvalDb.from("agent_tasks")
@@ -333,7 +335,7 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       throw new Error("This approved action is not eligible for retry");
     }
     const type = actionType(approval.action_type);
-    if (type === "agent_skill_script" || type === "agent_browser_task") {
+    if (type === "agent_skill_script" || ["agent_browser_task", "agent_tool_task"].includes(type)) {
       throw new Error("This approved action is single-use. Request a new approval instead of retrying it.");
     }
 

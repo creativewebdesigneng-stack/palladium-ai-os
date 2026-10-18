@@ -55,6 +55,7 @@ const TABS = [
 
 const EXTERNAL_ACTION_TYPES = new Set([
   'agent_browser_task',
+  'agent_tool_task',
   'calendar_create',
   'slack_post',
   'hubspot_contact_update',

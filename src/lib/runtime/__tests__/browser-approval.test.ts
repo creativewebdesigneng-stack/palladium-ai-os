@@ -9,7 +9,7 @@ vi.mock('../tools.server', () => ({ executeTool: calls.execute, resolveGrantedTo
 vi.mock('../runtime.server', () => ({ executeRun: calls.complete }));
 vi.mock('../planner-runtime.server', () => ({ executePlannedRun: calls.planned }));
 vi.mock('../run-checkpoint.server', () => ({ createDurableRunCheckpoint: (value: unknown) => value }));
-import { approvedBrowserInput, browserApprovalEvidence, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
+import { approvedLocalToolInput, queueLocalToolApproval, approvedBrowserInput, browserApprovalEvidence, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
 const input = { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] };
 const args = () => ({ sb: db, userId: 'owner', approvalRequestId: 'approval' });
 beforeEach(() => {
@@ -174,4 +174,65 @@ describe('bounded approved browser execution', () => {
     await rejectBrowserApproval({ ...args(), agentId: 'agent', taskId: 'task' });
     expect(db.tables['agent_tasks']?.[0]?.['status']).toBe('cancelled'); expect(calls.execute).not.toHaveBeenCalled();
   });
+});
+
+
+describe('bounded local tool approvals share the existing continuation', () => {
+  it.each([
+    ['calculator', { expression: '12 * 59' }],
+    ['current_time', {}],
+    ['data_analysis', { values: [2, 4, 8], label: 'sample' }],
+  ])('queues exact %s input without executing it', async (name, input) => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const result = await queueLocalToolApproval(name as string, input, {
+      sb: db, userId: 'owner', agentId: 'agent', taskId: 'task', orgId: null,
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2]);
+    expect(result.requires_approval).toBe(true);
+    expect(db.tables['approval_requests']?.at(-1)).toMatchObject({
+      action_type: 'agent_tool_task', details: { tool: name, input, agent_task_id: 'task' },
+    });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['email_send', {}], ['calculator', { expression: '2^3' }],
+    ['calculator', { expression: '1', extra: true }], ['current_time', { url: 'https://example.org' }],
+    ['data_analysis', { values: [] }], ['data_analysis', { values: [Infinity] }],
+    ['data_analysis', { values: Array(1001).fill(1) }],
+  ])('refuses unsupported or unbounded input for %s', (name, input) => {
+    expect(() => approvedLocalToolInput(name as string, input)).toThrow();
+  });
+  it('rechecks the exact current grant, executes once and resumes the same task with original output', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: 'calculator', input: { expression: '12 * 59' } };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'calculator';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['calculator', { requiresApproval: true, allowedDomains: [], spendCap: 0 }],
+      ['current_time', { requiresApproval: true, allowedDomains: [], spendCap: 0 }],
+    ]) });
+    calls.execute.mockResolvedValueOnce({ ok: true, output: { expression: '12 * 59', value: 708 } });
+    const result = await executeApprovedBrowserTask(args());
+    expect(result).toMatchObject({ ok: true, provider: 'local', result: { agent_task_id: 'task', tool_evidence: { truncated: false } } });
+    expect(JSON.parse(result.result!.tool_evidence!.content).value).toBe(708);
+    const call = calls.execute.mock.calls[0]!;
+    expect(call[0]).toBe('calculator');
+    expect(call[1]).toEqual({ expression: '12 * 59' });
+    expect(call[3].get('calculator').requiresApproval).toBe(false);
+    expect(call[3].get('current_time').requiresApproval).toBe(true);
+    expect(calls.complete).toHaveBeenCalledWith(expect.objectContaining({ run: expect.objectContaining({ taskId: 'task', messages: [expect.objectContaining({ content: expect.stringContaining('708') })] }) }));
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+  it('does not treat a browser grant as permission for calculator', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: 'calculator', input: { expression: '1+1' } };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'calculator';
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+});
+
+it('fails closed on a malformed approval expiry', async () => {
+  db.tables['approval_requests']![0]!['expires_at'] = 'invalid';
+  expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+  expect(calls.execute).not.toHaveBeenCalled();
 });

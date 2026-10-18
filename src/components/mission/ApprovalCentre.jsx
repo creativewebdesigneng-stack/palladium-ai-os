@@ -113,6 +113,7 @@ export default function ApprovalCentre({
 
                   <p className="mt-2 text-sm font-semibold text-white">{a.title}</p>
                   {a.summary && <p className="mt-0.5 text-xs text-zinc-400">{a.summary}</p>}
+                  {a.action_type === 'agent_tool_task' && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-zinc-300" aria-label="Exact tool input awaiting approval">{JSON.stringify({ tool: a.details?.tool, input: a.details?.input }, null, 2)}</pre>}
                   {a.action_type === 'agent_browser_task' && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-zinc-300" aria-label="Exact browser steps awaiting approval">{JSON.stringify(a.details?.input?.steps ?? [], null, 2)}</pre>}
 
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
@@ -177,7 +178,7 @@ export default function ApprovalCentre({
               {decided.map((d) => {
                 const executionFailed = d.status === 'approved' && d.execution_status === 'failed';
                 const executionSucceeded = d.execution_status === 'succeeded';
-                const browserNotExecuted = d.action_type === 'agent_browser_task' && d.status === 'approved' && d.execution_status == null;
+                const browserNotExecuted = ['agent_browser_task', 'agent_tool_task'].includes(d.action_type) && d.status === 'approved' && d.execution_status == null;
                 return (
                   <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed || browserNotExecuted ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
                     <div className="flex items-center gap-2 text-[11px]">
@@ -188,7 +189,7 @@ export default function ApprovalCentre({
                       </span>
                     </div>
                     {browserNotExecuted && (
-                      <p className="mt-2 text-[10px] text-rose-200/80" role="alert">This browser approval was recorded without execution evidence. It cannot be replayed. Open the latest Blackstar Preview, run a new browser task and review its new approval request.</p>
+                      <p className="mt-2 text-[10px] text-rose-200/80" role="alert">This tool approval was recorded without execution evidence. It cannot be replayed. Open the latest Blackstar Preview, run a new task and review its new approval request.</p>
                     )}
                     {executionFailed && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -196,7 +197,7 @@ export default function ApprovalCentre({
                           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                           <span>{d.execution_error ?? 'The provider action failed. Reconnect the integration if its permissions changed, then retry.'}</span>
                         </p>
-                        {onRetry && d.action_type !== 'agent_browser_task' && (
+                        {onRetry && !['agent_browser_task', 'agent_tool_task'].includes(d.action_type) && (
                           <button
                             onClick={() => onRetry(d)}
                             disabled={busyId === d.id}

@@ -1626,6 +1626,15 @@ export async function executeTool(
       } };
     }
   }
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis'].includes(name)) {
+    try {
+      const { queueLocalToolApproval } = await import('./browser-approval.server');
+      return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
+    } catch {
+      await log('failed', { error: 'Could not queue bounded tool approval.', policy_code: 'APPROVAL_QUEUE_FAILED' });
+      return { ok: false, output: { requires_approval: true, error: 'Bounded tool approval could not be queued.', policy_code: 'APPROVAL_QUEUE_FAILED' } };
+    }
+  }
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });
     return {

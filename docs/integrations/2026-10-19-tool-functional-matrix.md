@@ -73,3 +73,18 @@ so it is inconclusive for runtime domain enforcement.
 
 No live external messages, calendar writes, purchases, credential changes or
 Production application deployment were performed in this functional audit.
+
+## Bounded local approval continuation follow-up
+
+Calculator, current_time and data_analysis now use the existing immutable approval
+ledger and same-task continuation. The operator sees the exact tool/input before
+approval. Only that call receives a temporary approval waiver; saved policy and
+other grants retain approval requirements. Inputs are strict and bounded, expiry
+is checked, and execution re-resolves the current owner/agent grant before the
+single-use task claim. Original output is retained as bounded tool_evidence.
+
+Automated tests cover exact queue payloads, no execution before approval, invalid
+and unbounded inputs, revoked permissions and same-task continuation. These are
+regression tests, not live agent acceptance. Live status remains pending until a
+signed-in run on the matching checked Preview produces persisted tool/audit rows.
+Other tool names cannot enter this bounded local executor.

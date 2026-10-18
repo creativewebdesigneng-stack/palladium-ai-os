@@ -38,26 +38,43 @@ export function browserApprovalEvidence(output: unknown) {
   const content = JSON.stringify(output) ?? 'null';
   return { format: 'json', characters: content.length, truncated: content.length > 16_000, content: content.slice(0, 16_000) };
 }
+const localInputs = {
+  calculator: z.object({ expression: z.string().trim().min(1).max(500).regex(/^[0-9+\-*/(). %]+$/) }).strict(),
+  current_time: z.object({}).strict(),
+  data_analysis: z.object({ values: z.array(z.number().finite()).min(1).max(1000), label: z.string().max(120).optional() }).strict(),
+};
+export function approvedLocalToolInput(name: string, input: unknown) {
+  if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
+  return localInputs[name as keyof typeof localInputs].parse(input);
+}
+export async function queueLocalToolApproval(name: string, input: unknown, ctx: ToolContext) {
+  const payload = approvedLocalToolInput(name, input);
+  return queueApproval(payload, ctx, name);
+}
 type Sb = { from: (table: string) => any };
 
 /** Uses the existing immutable approval ledger; no browser runs while queueing. */
 export async function queueBrowserApproval(input: unknown, ctx: ToolContext) {
-  const payload = approvedBrowserInput(input);
+  return queueApproval(approvedBrowserInput(input), ctx, 'browser_task');
+}
+async function queueApproval(payload: any, ctx: ToolContext, name: string) {
+  const browser = name === 'browser_task';
+  const kind = browser ? 'agent_browser_task' : 'agent_tool_task';
   if (!ctx.taskId) throw new Error('Browser approval requires an existing agent task.');
   const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
-  if (!ctx.allowedDomains?.length || payload.steps.some(s => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? []))) {
+  if (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) {
     throw new Error('Browser approval is outside the current domain policy.');
   }
   const { data: task, error: taskError } = await ctx.sb.from('agent_tasks').select('id,status,cancel_requested,waiting_approval_request_id')
     .eq('id', ctx.taskId).eq('agent_id', ctx.agentId).eq('user_id', ctx.userId).maybeSingle();
   if (taskError || !task || task.waiting_approval_request_id || task.cancel_requested || !['running', 'waiting_for_tool'].includes(task.status)) throw new Error('The browser task is no longer active.');
   await writeAuditRequired({ userId: ctx.userId, agentId: ctx.agentId, targetType: 'agent_task', targetId: ctx.taskId,
-    action: 'agent.browser_approval_requested', metadata: { actions: payload.steps.map(s => s.action) } });
+    action: browser ? 'agent.browser_approval_requested' : 'agent.tool_approval_requested', metadata: { tool: name, ...(browser ? { actions: payload.steps.map((s: any) => s.action) } : {}) } });
   const { data: approval, error } = await ctx.sb.from('approval_requests').insert({
     user_id: ctx.userId, org_id: ctx.orgId, agent_id: ctx.agentId, task_id: null,
-    action_type: 'agent_browser_task', title: 'Approve bounded browser navigation and extraction',
-    summary: `Read-only browsing on ${new URL(payload.steps[0]!.url!).hostname}. No forms, logins, downloads or persistent browser profile.`,
-    details: { kind: 'agent_browser_task', agent_task_id: ctx.taskId, input: payload },
+    action_type: kind, title: browser ? 'Approve bounded browser navigation and extraction' : `Approve ${name}`,
+    summary: browser ? `Read-only browsing on ${new URL(payload.steps[0]!.url!).hostname}. No forms, logins, downloads or persistent browser profile.` : `Execute exactly one ${name} call and resume the existing agent task.`,
+    details: { kind, agent_task_id: ctx.taskId, ...(browser ? {} : { tool: name }), input: payload },
     risk_level: 'low', status: 'pending', expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
   }).select('id').maybeSingle();
   if (error || !approval?.id) throw new Error('Could not queue browser approval.');
@@ -78,26 +95,32 @@ export async function queueBrowserApproval(input: unknown, ctx: ToolContext) {
 }
 
 /** Called only after the Approval Centre's single-use pending -> executing claim. */
-export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string; approvalRequestId: string }) {
+export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string; approvalRequestId: string }): Promise<{ ok: boolean; provider: string; error?: string; result?: { agent_task_id: string; simulated: boolean; task_status: string; browser_evidence?: ReturnType<typeof browserApprovalEvidence>; tool_evidence?: ReturnType<typeof browserApprovalEvidence> } }> {
   let claimedTask: string | null = null;
+  let executionProvider = 'unknown';
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
   const db = supabaseAdmin as unknown as Sb;
   try {
     const { data: approval, error } = await args.sb.from('approval_requests').select('*')
       .eq('id', args.approvalRequestId).eq('user_id', args.userId).maybeSingle();
-    if (error || !approval || approval.action_type !== 'agent_browser_task' || approval.status !== 'approved' || approval.execution_status !== 'executing') throw new Error('Browser approval is not claimed for execution.');
-    if (!approval.expires_at || new Date(approval.expires_at).getTime() <= Date.now()) throw new Error('Browser approval has expired.');
-    const input = approvedBrowserInput(approval.details?.input);
+    if (error || !approval || !['agent_browser_task', 'agent_tool_task'].includes(approval.action_type) || approval.status !== 'approved' || approval.execution_status !== 'executing') throw new Error('Browser approval is not claimed for execution.');
+    if (!approval.expires_at || !Number.isFinite(new Date(approval.expires_at).getTime()) || new Date(approval.expires_at).getTime() <= Date.now()) throw new Error('Browser approval has expired.');
+    const browser = approval.action_type === 'agent_browser_task';
+    executionProvider = browser ? 'playwright' : 'local';
+    const name = browser ? 'browser_task' : approval.details?.tool;
+    const input: any = browser ? approvedBrowserInput(approval.details?.input) : approvedLocalToolInput(name, approval.details?.input);
     const taskId = approval.details?.agent_task_id;
     const { data: task, error: taskError } = await args.sb.from('agent_tasks').select('*')
       .eq('id', taskId).eq('user_id', args.userId).eq('agent_id', approval.agent_id).maybeSingle();
     if (taskError || !task || task.status !== 'waiting_for_approval' || task.cancel_requested || task.waiting_approval_request_id !== approval.id) throw new Error('The approved browser task is cancelled, stale or mismatched.');
+    // Retain the version-1 snapshot discriminator for existing paused tasks;
+    // approval.action_type and the exact pending tool message bind the operation.
     const snapshot = task.approval_resume_state;
     if (!snapshot || snapshot.version !== 1 || snapshot.kind !== 'agent_browser_task' || !Array.isArray(snapshot.messages) || snapshot.provider !== task.provider || snapshot.model !== task.model) throw new Error('Browser task continuation is missing or mismatched.');
     const { compactToolResultForModel } = await import('./atomic-loop-guard.server');
     const messages = snapshot.messages.map((message: any) => ({ ...message }));
     const pending = messages.findLast((message: any) => {
-      if (message.role !== 'tool' || message.name !== 'browser_task') return false;
+      if (message.role !== 'tool' || message.name !== name) return false;
       try { return JSON.parse(message.content).approval_request_id === approval.id; } catch { return false; }
     });
     if (!pending) throw new Error('Approved browser continuation does not contain this request.');
@@ -109,20 +132,20 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const { resolveGrantedTools, executeTool } = await import('./tools.server');
     const entitlements = await getEntitlements(args.sb as never, args.userId, task.org_id ?? null);
     const tools = await resolveGrantedTools(args.sb, agent, entitlements.planCode);
-    const grant = tools.grants.get('browser_task');
+    const grant = tools.grants.get(name);
     const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
-    if (!grant || !grant.allowedDomains.length || input.steps.some(s => s.url && !isDomainAllowed(s.url, grant.allowedDomains))) throw new Error('Current browser permissions no longer allow the approved task.');
-    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: 'agent.browser_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
+    if (!grant || (browser && (!grant.allowedDomains.length || input.steps.some((s: any) => s.url && !isDomainAllowed(s.url, grant.allowedDomains))))) throw new Error('Current browser permissions no longer allow the approved task.');
+    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
     const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
       .eq('id', taskId).eq('user_id', args.userId).eq('status', 'waiting_for_approval').eq('waiting_approval_request_id', approval.id).eq('cancel_requested', false).select('id').maybeSingle();
     if (claim.error || !claim.data) throw new Error('This browser task has already resumed or was cancelled.');
     claimedTask = taskId;
     // Waive only this exact, immutable approved call; current domain/plan/tool gates still apply.
-    const approvedGrants = new Map(tools.grants); approvedGrants.set('browser_task', { ...grant, requiresApproval: false });
-    const executed = await executeTool('browser_task', input, { sb: args.sb, userId: args.userId, agentId: agent.id, orgId: task.org_id ?? null, taskId, allowedProviders: agent.allowed_providers ?? [] }, approvedGrants);
+    const approvedGrants = new Map(tools.grants); approvedGrants.set(name, { ...grant, requiresApproval: false });
+    const executed = await executeTool(name, input, { sb: args.sb, userId: args.userId, agentId: agent.id, orgId: task.org_id ?? null, taskId, allowedProviders: agent.allowed_providers ?? [] }, approvedGrants);
     const output = executed.output as Record<string, any> | null;
-    if (!executed.ok || !output || output['simulated'] !== false || output['result']?.ok !== true || output['result']?.completed_steps !== input.steps.length || !Array.isArray(output['result']?.outputs) || output['result'].outputs.length !== input.steps.length) throw new Error('Approved browser task did not return verified real-browser success.');
-    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: 'agent.browser_approval_result', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id, provider: output['provider'], simulated: false } });
+    if (!executed.ok || !output || (browser && (output['simulated'] !== false || output['result']?.ok !== true || output['result']?.completed_steps !== input.steps.length || !Array.isArray(output['result']?.outputs) || output['result'].outputs.length !== input.steps.length))) throw new Error('Approved browser task did not return verified real-browser success.');
+    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_result' : 'agent.tool_approval_result', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id, tool: name, provider: browser ? output['provider'] : 'local', simulated: false } });
     pending.content = compactToolResultForModel(output);
     const { executeRun } = await import('./runtime.server');
     const { normaliseProvider } = await import('./model-gateway.server');
@@ -141,10 +164,10 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
         initialUsage: { input: Number(task.tokens_in ?? 0), output: Number(task.tokens_out ?? 0) },
         initialToolCallCount: Number(task.tool_calls ?? 1) });
     }
-    return { ok: true, provider: String(output['provider']), result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, browser_evidence: browserApprovalEvidence(output) } };
+    return { ok: true, provider: browser ? String(output['provider']) : 'local', result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
   } catch (error) {
     if (claimedTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', claimedTask).eq('user_id', args.userId).in('status', ['running', 'waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
-    return { ok: false, provider: 'playwright', error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
+    return { ok: false, provider: executionProvider, error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
   }
 }
 

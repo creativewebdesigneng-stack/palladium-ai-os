@@ -180,14 +180,14 @@ describe("central approval enforcement", () => {
   const ctx = (db: any) =>
     ({ sb: db, userId: "user-1", orgId: null, agentId: "agent-1", taskId: "task-1", spendCap: null }) as any;
 
-  it("does not execute an ordinary tool when its resolved grant requires approval", async () => {
+  it("does not execute an approval-gated clock when the active task cannot be linked", async () => {
     const db = sb();
     const grants = new Map([
       ["current_time", { slug: "current_time", requiresApproval: true, allowedDomains: [], spendCap: null }],
     ]);
     const result = await executeTool("current_time", {}, ctx(db), grants as any);
     expect(result.ok).toBe(false);
-    expect(result.output).toMatchObject({ requires_approval: true, suggested_tool: "request_approval" });
+    expect(result.output).toMatchObject({ requires_approval: true, policy_code: "APPROVAL_QUEUE_FAILED" });
   });
 
   it("allows the dedicated connected-service write tool to queue approval instead of executing the provider write", async () => {

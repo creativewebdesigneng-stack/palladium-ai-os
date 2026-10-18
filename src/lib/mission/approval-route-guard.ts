@@ -4,7 +4,7 @@
  * approval continuation receipt. Fail closed rather than recording success.
  */
 export function assertGenericApprovalCanDecide(actionType: string): void {
-  if (actionType === 'agent_browser_task') {
+  if (['agent_browser_task', 'agent_tool_task'].includes(actionType)) {
     throw new Error(
       'Browser approvals require the dedicated executable approval handler. Open the current Blackstar Preview and submit a new browser task if an earlier approval has no execution evidence.',
     );
