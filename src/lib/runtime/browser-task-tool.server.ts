@@ -15,7 +15,7 @@ import { buildBrowserTaskComputerUsePlan } from "./browser-computer-use-policy.s
 export const BROWSER_TASK_TOOL_DEF: ToolDef = {
   name: "browser_task",
   description:
-    "Run a bounded resilient browser task inside one session. Supports navigation, structured extraction, label-based element recovery, page validation, trusted stored-credential/TOTP login, private downloads, screenshots, trace output and opt-in encrypted cross-run session persistence. Every URL is domain-scoped; secrets, cookies, local storage and download bytes never enter model-visible output.",
+    "Run a bounded resilient browser task inside one session. Supports navigation, structured extraction, label-based element recovery, page validation, trusted stored-credential/TOTP login, private downloads, screenshots, trace output and opt-in encrypted cross-run session persistence. Every URL is domain-scoped; secrets, cookies, local storage and download bytes never enter model-visible output. For approval-gated runs, only plain HTTPS navigate/read/extract steps are permitted (2 to 8 steps); the initial URL may be top-level or on the first navigate step, and max_steps must be 2 to 8. All other actions remain blocked until a separate safe approval flow is implemented.",
   parameters: {
     type: "object",
     properties: {
