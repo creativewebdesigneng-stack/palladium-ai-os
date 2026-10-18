@@ -58,7 +58,17 @@ export async function queueBrowserApproval(input: unknown, ctx: ToolContext) {
   if (error || !approval?.id) throw new Error('Could not queue browser approval.');
   const paused = await ctx.sb.from('agent_tasks').update({ waiting_approval_request_id: approval.id })
     .eq('id', ctx.taskId).eq('user_id', ctx.userId).eq('cancel_requested', false).in('status', ['running', 'waiting_for_tool']).select('id').maybeSingle();
-  if (paused.error || !paused.data) throw new Error('Could not link browser approval to its active task.');
+  if (paused.error || !paused.data) {
+    // A concurrent cancellation can win after the approval INSERT. Never leave
+    // that orphaned request actionable in Mission Control.
+    const closed = await ctx.sb.from('approval_requests').update({ status: 'cancelled' })
+      .eq('id', approval.id).eq('user_id', ctx.userId).eq('agent_id', ctx.agentId)
+      .eq('status', 'pending').select('id').maybeSingle();
+    if (closed.error || !closed.data) {
+      throw new Error('Could not link or safely cancel the unbound browser approval.');
+    }
+    throw new Error('Could not link browser approval to its active task.');
+  }
   return { approval_request_id: approval.id, status: 'awaiting_approval', requires_approval: true };
 }
 
