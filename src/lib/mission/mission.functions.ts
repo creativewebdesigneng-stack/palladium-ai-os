@@ -13,6 +13,7 @@ import {
 import { assertWithinLimits } from "@/lib/shopping/limits.server";
 import { executePersonalTask } from "./personal-task-execution.server";
 import { decidePersonalTaskToolApproval } from "./personal-task-approval-decision.server";
+import { assertGenericApprovalCanDecide } from "./approval-route-guard";
 import { resolveAgentShoppingDomains } from "./shopping-domain-policy.server";
 
 import { notify } from "@/lib/notifications/notify.server";
@@ -828,6 +829,8 @@ export const decideApproval = createServerFn({ method: "POST" })
     const approval = current.data;
     if (!approval) throw new Error("Approval request not found");
     if (approval.status !== "pending") throw new Error("This request has already been decided");
+    // Executable browser approvals require an immutable single-use external-action claim.
+    assertGenericApprovalCanDecide(String(approval.action_type ?? ""));
 
     if (approval.action_type === "personal_task_tool") {
       const toolDecision = data.decision === "approve" ? "approved" : "rejected";
