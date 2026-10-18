@@ -211,25 +211,20 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This request has already been decided");
 
-    // Unexpected provider/runtime exceptions cannot strand a single-use
-    // approval as "approved / executing". Fail closed and persist the outcome.
-    let execution: Awaited<ReturnType<typeof executeExternalAction>>;
-    try {
-      execution = await executeExternalAction(
-        sb,
-        userId,
-        type,
-        safeDetails(claim.data.details),
-        claim.data,
-      );
-    } catch {
-      execution = {
-        ok: false,
-        provider: "blackstar",
-        error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
-        result: undefined,
-      } as Awaited<ReturnType<typeof executeExternalAction>>;
-    }
+    // The human decision is claimed before dispatch. Unexpected runtime
+    // exceptions must not strand an approved action as "executing".
+    const execution = await executeExternalAction(
+      sb,
+      userId,
+      type,
+      safeDetails(claim.data.details),
+      claim.data,
+    ).catch(() => ({
+      ok: false,
+      provider: "blackstar",
+      error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+      result: undefined,
+    } as Awaited<ReturnType<typeof executeExternalAction>>));
 
     const finalised = await approvalDb
       .from("approval_requests")
@@ -356,25 +351,20 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This action is already being retried");
 
-    // Unexpected provider/runtime exceptions cannot strand a single-use
-    // approval as "approved / executing". Fail closed and persist the outcome.
-    let execution: Awaited<ReturnType<typeof executeExternalAction>>;
-    try {
-      execution = await executeExternalAction(
-        sb,
-        userId,
-        type,
-        safeDetails(claim.data.details),
-        claim.data,
-      );
-    } catch {
-      execution = {
-        ok: false,
-        provider: "blackstar",
-        error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
-        result: undefined,
-      } as Awaited<ReturnType<typeof executeExternalAction>>;
-    }
+    // The human decision is claimed before dispatch. Unexpected runtime
+    // exceptions must not strand an approved action as "executing".
+    const execution = await executeExternalAction(
+      sb,
+      userId,
+      type,
+      safeDetails(claim.data.details),
+      claim.data,
+    ).catch(() => ({
+      ok: false,
+      provider: "blackstar",
+      error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+      result: undefined,
+    } as Awaited<ReturnType<typeof executeExternalAction>>));
 
     const finalised = await approvalDb
       .from("approval_requests")
