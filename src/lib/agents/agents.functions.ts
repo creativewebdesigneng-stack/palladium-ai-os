@@ -324,3 +324,15 @@ export const deleteAgent = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** Updates tool selection only; existing permission and approval policy stays authoritative. */
+export const updateAgentTools = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(), tools: z.array(z.string().min(1).max(80)).max(30),
+    expectedUpdatedAt: z.string().min(1).max(80),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentTools } = await import('./agent-tools-update.server');
+    return changeOwnedAgentTools({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
+  });

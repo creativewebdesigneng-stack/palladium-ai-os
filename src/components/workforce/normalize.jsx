@@ -45,12 +45,12 @@ function synthSeries(perf) {
 }
 
 const STATUS_MAP = { draft: 'Idle', active: 'Online', paused: 'Paused', archived: 'Offline' };
-const TASK_STATUS_MAP = { pending: 'Queued', running: 'Running', completed: 'Completed', failed: 'Failed' };
+const TASK_STATUS_MAP = { pending: 'Queued', running: 'Running', succeeded: 'Completed', completed: 'Completed', failed: 'Failed' };
 
 export function mapAgentToWf(a, tasks = []) {
   const myTasks = tasks.filter((t) => t.agent_id === a.id);
   const running = myTasks.find((t) => t.status === 'running');
-  const completed = myTasks.filter((t) => t.status === 'completed').length;
+  const completed = myTasks.filter((t) => ['completed', 'succeeded'].includes(t.status)).length;
   const failed = myTasks.filter((t) => t.status === 'failed').length;
   const perf = completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0;
   const status = running ? 'Working' : STATUS_MAP[a.status] || 'Idle';
@@ -67,16 +67,16 @@ export function mapAgentToWf(a, tasks = []) {
     status,
     currentTask: running ? running.title : a.status === 'active' ? 'Available' : '—',
     model: a.model || '—',
-    tools: Array.isArray(a.tools) ? a.tools : [],
+    tools: Array.isArray(a.allowed_tools) ? a.allowed_tools : Array.isArray(a.tools) ? a.tools : [],
     projects: [],
     performance: perf,
-    lastActive: relTime(a.updated_date || a.created_date),
+    lastActive: relTime(a.updated_at || a.updated_date || a.created_at || a.created_date),
     department: '',
     team: '',
     workflows: 0,
     overview: {
       type: a.role || 'Agent',
-      created: a.created_date ? new Date(a.created_date).toLocaleDateString() : '—',
+      created: (a.created_at || a.created_date) ? new Date(a.created_at || a.created_date).toLocaleDateString() : '—',
       description: a.description || 'No description set.',
       successRate: perf,
       avgDuration: '—',
