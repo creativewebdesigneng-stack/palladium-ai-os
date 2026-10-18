@@ -65,6 +65,32 @@ describe('bounded browser approval input and queueing', () => {
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
+  it('cancels an orphaned approval if task cancellation wins the link race', async () => {
+    db.tables['agent_tasks'] = [{
+      id: 'task', user_id: 'owner', agent_id: 'agent',
+      status: 'waiting_for_tool', cancel_requested: false, waiting_approval_request_id: null,
+    }];
+    let taskAccesses = 0;
+    const racingDb = {
+      ...db,
+      from: (table: string) => {
+        if (table === 'agent_tasks' && ++taskAccesses === 2) {
+          db.tables['agent_tasks']![0]!['status'] = 'cancelled';
+        }
+        return db.from(table);
+      },
+    };
+    await expect(queueBrowserApproval(input, {
+      sb: racingDb, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueBrowserApproval>[1])).rejects.toThrow(
+      'Could not link browser approval to its active task.',
+    );
+    expect(db.tables['approval_requests']?.at(-1)?.['status']).toBe('cancelled');
+    expect(db.tables['agent_tasks']?.[0]?.['waiting_approval_request_id']).toBeNull();
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it('fails closed on conflicting starting URLs, unsafe steps, and unsupported budgets', () => {
     const safeSteps = [{ action: 'navigate' }, { action: 'read' }];
     expect(() => approvedBrowserInput({ url: 'https://httpbingo.org/html', steps: [
