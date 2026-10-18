@@ -54,9 +54,12 @@ export async function streamAgentRun({ agentId, input, onEvent, signal }) {
     if (event.type === "complete" && (!event.task?.id || event.task.status !== "succeeded")) {
       throw new Error("The runtime did not confirm a successful task. Check run history before trying again.");
     }
+    if (event.type === 'paused' && (!event.task?.id || event.task.status !== 'waiting_for_approval' || !event.task.waiting_approval_request_id)) {
+      throw new Error('The runtime did not confirm the paused approval task.');
+    }
     onEvent?.(event);
     if (event.type === "error") throw new Error(event.message || "Run failed.");
-    return event.type === "complete" ? event.task : null;
+    return event.type === "complete" || event.type === "paused" ? event.task : null;
   };
 
   try {

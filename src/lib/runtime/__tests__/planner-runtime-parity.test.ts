@@ -17,10 +17,12 @@ vi.mock("../tools.server", () => ({ executeTool: toolsMod.executeTool }));
 const runtime = vi.hoisted(() => ({
   completeRun: vi.fn(async ({ run }: any) => ({ id: run.taskId, status: "succeeded" })),
   setRunState: vi.fn(async () => {}),
+  pausedRunReceipt: vi.fn(async () => ({ id: 'task-1', status: 'waiting_for_approval', waiting_approval_request_id: 'approval' })),
 }));
 vi.mock("../runtime.server", () => ({
   completeRun: runtime.completeRun,
   setRunState: runtime.setRunState,
+  pausedRunReceipt: runtime.pausedRunReceipt,
   RuntimeError: class RuntimeError extends Error {
     constructor(
       message: string,
@@ -347,5 +349,17 @@ describe("planned runtime parity", () => {
     const completion = runtime.completeRun.mock.calls[0]?.[0];
     expect(completion.result.usage).toEqual({ input: 102, output: 27 });
     expect(completion.toolCallCount).toBe(3);
+  });
+});
+
+
+describe('planned browser approval pause', () => {
+  it('stops execution and verification on a durable approval receipt', async () => {
+    const sb = db();
+    gateway.runChat.mockImplementation(async (args: any) => isPlanningCall(args) ? planningResult : toolResult([{ id: 'browser', name: 'browser_task', arguments: {} }]));
+    toolsMod.executeTool.mockResolvedValueOnce({ ok: true, output: { approval_request_id: 'approval', status: 'awaiting_approval' } });
+    const task = await executePlannedRun({ sb, userId: 'user-1', run: run(sb, new Map([grant('browser_task', true)])) });
+    expect(task.status).toBe('waiting_for_approval'); expect(runtime.pausedRunReceipt).toHaveBeenCalledTimes(1);
+    expect(runtime.completeRun).not.toHaveBeenCalled(); expect(toolsMod.executeTool).toHaveBeenCalledTimes(1);
   });
 });

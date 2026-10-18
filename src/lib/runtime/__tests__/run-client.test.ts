@@ -65,3 +65,16 @@ describe('agent streaming receipts', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+
+
+describe('paused approval receipts', () => {
+  it('returns an authenticated paused receipt without treating it as success', async () => {
+    const paused = { id: 'task', status: 'waiting_for_approval', waiting_approval_request_id: 'approval' };
+    setup([`data: ${JSON.stringify({ type: 'paused', task: paused })}\n\n`]);
+    expect(await run()).toEqual(paused);
+  });
+  it('rejects an unlinked pause receipt', async () => {
+    setup([`data: ${JSON.stringify({ type: 'paused', task: { id: 'task', status: 'waiting_for_approval' } })}\n\n`]);
+    await expect(run()).rejects.toThrow('paused approval task');
+  });
+});

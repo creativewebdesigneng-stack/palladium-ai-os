@@ -1445,7 +1445,10 @@ export async function resolveGrantedTools(
     });
   }
 
-  return { defs: [...grants.keys()].map((slug) => REGISTRY[slug]!.def), grants };
+  // Approval-gated browsing must use the durable bounded task, never a one-off
+  // browser session that cannot resume its navigation/extraction sequence.
+  const visible = [...grants.keys()].filter(slug => !(slug === 'browser' && grants.get(slug)?.requiresApproval && grants.has('browser_task')));
+  return { defs: visible.map((slug) => REGISTRY[slug]!.def), grants };
 }
 
 const SENSITIVE_KEY =
@@ -1586,6 +1589,16 @@ export async function executeTool(
     "nango_action",
     "integration_action",
   ]);
+  if (grant.requiresApproval && name === "browser_task") {
+    try {
+      const { queueBrowserApproval } = await import('./browser-approval.server');
+      const output = await queueBrowserApproval(input, { ...ctx, allowedDomains: grant.allowedDomains });
+      return { ok: true, output };
+    } catch (error) {
+      await log('failed', { error: 'Could not queue bounded browser approval.' });
+      return { ok: false, output: { error: 'Browser approval supports only bounded navigation and extraction under current domain policy.' } };
+    }
+  }
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });
     return {

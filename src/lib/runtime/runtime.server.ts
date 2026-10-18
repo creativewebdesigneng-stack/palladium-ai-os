@@ -649,6 +649,7 @@ type ToolLoopDeps = {
 
 export type RunEvent =
   | { type: "status"; status: string; task_id: string }
+  | { type: "paused"; task: any }
   | { type: "delta"; text: string }
   | { type: "tool"; name: string; ok: boolean }
   | { type: "error"; message: string }
@@ -701,6 +702,7 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls, ...(result.geminiContinuation ? { geminiContinuation: result.geminiContinuation } : {}) });
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
+  let processedCalls = 0;
   try {
     const parallel = canBatchInParallel(result.toolCalls, deps.grants);
     const outcomes: ToolOutcome[] = parallel
@@ -710,6 +712,7 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
     for (let index = 0; index < result.toolCalls.length; index += 1) {
       const call = result.toolCalls[index]!;
       const outcome = parallel ? outcomes[index]! : await invokeGuardedTool(deps, call);
+      processedCalls += 1;
       await deps.onEvent?.({ type: "tool", name: call.name, ok: outcome.ok });
       if (awaitsApproval(outcome.output)) {
         const receipt = outcome.output as Record<string, unknown>;
@@ -728,6 +731,10 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
         name: call.name,
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
+      if (awaitingApproval) {
+        for (const skipped of result.toolCalls.slice(index + 1)) messages.push({ role: 'tool', tool_call_id: skipped.id, name: skipped.name, content: 'Not executed: the run paused for operator approval. Request this action again after reviewing the approved result if it is still needed.' });
+        break;
+      }
     }
   } finally {
     await setRunState(
@@ -737,7 +744,14 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
     );
     if (awaitingApproval) await notifyInputRequired(deps.userId, deps.run);
   }
-  return { awaitingApproval };
+  return { awaitingApproval, processedCalls };
+}
+
+export async function pausedRunReceipt(sb: Sb, userId: string, taskId: string, usage: { input: number; output: number }, toolCalls: number, resume?: { run: PreparedRun; messages: ChatMessage[]; planner?: Record<string, unknown> }) {
+  const { data, error } = await sb.from('agent_tasks').update({ tokens_in: usage.input, tokens_out: usage.output, tool_calls: toolCalls, ...(resume ? { approval_resume_state: { version: 1, kind: 'agent_browser_task', messages: resume.messages, provider: resume.run.provider, model: resume.run.model, startedAt: resume.run.startedAt, usage, toolCalls, ...(resume.planner ? { planner: resume.planner } : {}) } } : {}) })
+    .eq('id', taskId).eq('user_id', userId).eq('status', 'waiting_for_approval').eq('cancel_requested', false).select('*').maybeSingle();
+  if (error || !data) throw new RuntimeError('Could not confirm the paused approval task.', 'APPROVAL_PAUSE_FAILED', 503);
+  return data;
 }
 
 async function notifyInputRequired(
@@ -761,6 +775,8 @@ export async function executeRun(args: {
   run: PreparedRun;
   signal?: AbortSignal;
   timeoutMs?: number;
+  initialUsage?: { input: number; output: number };
+  initialToolCallCount?: number;
 }) {
   const controller = new AbortController();
   let externalFailure: RuntimeError | null = null;
@@ -783,8 +799,8 @@ export async function executeRun(args: {
     Math.min(Math.max(args.timeoutMs ?? RUN_BUDGET_MS, 1_000), RUN_BUDGET_MS),
   );
   const messages = [...args.run.messages];
-  let toolCallCount = 0;
-  const usage = { input: 0, output: 0 };
+  let toolCallCount = args.initialToolCallCount ?? 0;
+  const usage = { ...(args.initialUsage ?? { input: 0, output: 0 }) };
   const guard = new RunLoopGuard();
   const steeringCursor = createSteeringCursor();
 
@@ -839,7 +855,7 @@ export async function executeRun(args: {
         });
       }
       toolCallCount += result.toolCalls.length;
-      await runToolCalls(
+      const { awaitingApproval, processedCalls } = await runToolCalls(
         {
           sb: args.sb,
           userId: args.userId,
@@ -851,6 +867,8 @@ export async function executeRun(args: {
         result,
         messages,
       );
+      toolCallCount -= result.toolCalls.length - processedCalls;
+      if (awaitingApproval) return await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages });
     }
     throw new RuntimeError(
       "The agent used too many tool rounds without answering.",
@@ -938,7 +956,7 @@ export async function* streamRun(args: {
 
       toolCallCount += final.toolCalls.length;
       yield { type: "status", status: "waiting_for_tool", task_id: args.run.taskId };
-      const { awaitingApproval } = await runToolCalls(
+      const { awaitingApproval, processedCalls } = await runToolCalls(
         {
           sb: args.sb,
           userId: args.userId,
@@ -951,12 +969,18 @@ export async function* streamRun(args: {
         final,
         messages,
       );
+      toolCallCount -= final.toolCalls.length - processedCalls;
       while (pending.length) yield pending.shift()!;
       yield {
         type: "status",
         status: awaitingApproval ? "waiting_for_approval" : "running",
         task_id: args.run.taskId,
       };
+      if (awaitingApproval) {
+        const task = await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages });
+        yield { type: 'paused', task };
+        return;
+      }
     }
 
     throw new RuntimeError(

@@ -20,7 +20,8 @@ type ExternalActionType =
   | ApprovedGitHubActionType
   | "nango_dynamic_action"
   | "external_mcp_action"
-  | "agent_skill_script";
+  | "agent_skill_script"
+  | "agent_browser_task";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
   "github_branch_create",
@@ -41,6 +42,7 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "nango_dynamic_action",
   "external_mcp_action",
   "agent_skill_script",
+  "agent_browser_task",
   ...GITHUB_EXECUTABLE,
 ]);
 
@@ -63,6 +65,10 @@ async function executeExternalAction(
   details: Record<string, unknown>,
   approval: { id: string; agent_id?: string | null; org_id?: string | null },
 ) {
+  if (type === 'agent_browser_task') {
+    const { executeApprovedBrowserTask } = await import('@/lib/runtime/browser-approval.server');
+    return executeApprovedBrowserTask({ sb, userId, approvalRequestId: approval.id });
+  }
   if (type === "external_mcp_action") {
     return executeApprovedAgentMcpAction({ sb, userId, details });
   }
@@ -175,6 +181,10 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
         .maybeSingle();
       if (rejected.error) throw new Error(rejected.error.message);
       if (!rejected.data) throw new Error("This request has already been decided");
+      if (type === 'agent_browser_task') {
+        const { rejectBrowserApproval } = await import('@/lib/runtime/browser-approval.server');
+        await rejectBrowserApproval({ sb: approvalDb, userId, approvalRequestId: approval.id, agentId: approval.agent_id, taskId: safeDetails(approval.details)['agent_task_id'] as string });
+      }
       await updateTask(sb, userId, approval.task_id ?? null, "cancelled");
       await audit(sb, userId, approval, "external_action_rejected", "success", {});
       return { status: "rejected" as const, execution: null };
@@ -291,8 +301,8 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       throw new Error("This approved action is not eligible for retry");
     }
     const type = actionType(approval.action_type);
-    if (type === "agent_skill_script") {
-      throw new Error("Approved skill scripts are single-use. Request a new approval instead of retrying a failed recipe.");
+    if (type === "agent_skill_script" || type === "agent_browser_task") {
+      throw new Error("This approved action is single-use. Request a new approval instead of retrying it.");
     }
 
     // Retry claims only the already-approved immutable request payload. The UI

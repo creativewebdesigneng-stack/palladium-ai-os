@@ -13,6 +13,7 @@ import {
 import { notify } from "@/lib/notifications/notify.server";
 import {
   completeRun,
+  pausedRunReceipt,
   RuntimeError,
   setRunState,
   type PreparedRun,
@@ -303,6 +304,7 @@ async function runToolCalls(args: {
   args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls, ...(args.result.geminiContinuation ? { geminiContinuation: args.result.geminiContinuation } : {}) });
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
+  let processedCalls = 0;
   let plan = args.plan;
   let recoveryReason: string | null = null;
   try {
@@ -334,11 +336,13 @@ async function runToolCalls(args: {
             guard: args.guard,
             call,
           });
+      processedCalls += 1;
       const output = outcome.output as Record<string, unknown> | null;
       const approvalWait = Boolean(
         output &&
           (output["approval_request_id"] || output["status"] === "awaiting_approval" || output["requires_approval"] === true),
       );
+      if (approvalWait && !output?.['approval_request_id']) throw new RuntimeError('Tool requires approval but no executable approval request was queued.', 'APPROVAL_NOT_QUEUED', 409);
       awaitingApproval = awaitingApproval || approvalWait;
       const content = compactToolResultForModel(outcome.output);
       args.messages.push({
@@ -348,6 +352,10 @@ async function runToolCalls(args: {
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
 
+      if (approvalWait) {
+        for (const skipped of args.result.toolCalls.slice(index + 1)) args.messages.push({ role: 'tool', tool_call_id: skipped.id, name: skipped.name, content: 'Not executed: paused for operator approval. Request this action again if it is still needed after the approved result.' });
+        break;
+      }
       const recovery: PlannedToolRecovery | null = recoveryReason
         ? null
         : classifyPlannedToolFailure({
@@ -394,7 +402,7 @@ async function runToolCalls(args: {
       metadata: { task_id: args.run.taskId, agent_id: args.run.agent.id },
     });
   }
-  return { plan, awaitingApproval };
+  return { plan, awaitingApproval, processedCalls };
 }
 
 /**
@@ -504,6 +512,8 @@ export async function executePlannedRun(args: {
           guard,
         });
         plan = observed.plan;
+        toolCallCount -= result.toolCalls.length - observed.processedCalls;
+        if (observed.awaitingApproval) return await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages, planner: { plan, toolRounds, reasoningControl: args.reasoningControl ?? null } });
         if (!observed.awaitingApproval) {
           await saveCheckpoint({
             sb: args.sb,

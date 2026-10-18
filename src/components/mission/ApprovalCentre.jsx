@@ -113,6 +113,7 @@ export default function ApprovalCentre({
 
                   <p className="mt-2 text-sm font-semibold text-white">{a.title}</p>
                   {a.summary && <p className="mt-0.5 text-xs text-zinc-400">{a.summary}</p>}
+                  {a.action_type === 'agent_browser_task' && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-zinc-300" aria-label="Exact browser steps awaiting approval">{JSON.stringify(a.details?.input?.steps ?? [], null, 2)}</pre>}
 
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
                     {a.details?.seller && <span className="inline-flex items-center gap-1"><Store className="h-3 w-3" />{a.details.seller}</span>}
