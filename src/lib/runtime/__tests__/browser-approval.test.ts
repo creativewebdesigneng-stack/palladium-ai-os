@@ -9,7 +9,7 @@ vi.mock('../tools.server', () => ({ executeTool: calls.execute, resolveGrantedTo
 vi.mock('../runtime.server', () => ({ executeRun: calls.complete }));
 vi.mock('../planner-runtime.server', () => ({ executePlannedRun: calls.planned }));
 vi.mock('../run-checkpoint.server', () => ({ createDurableRunCheckpoint: (value: unknown) => value }));
-import { approvedBrowserInput, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
+import { approvedBrowserInput, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
 const input = { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] };
 const args = () => ({ sb: db, userId: 'owner', approvalRequestId: 'approval' });
 beforeEach(() => {
@@ -19,6 +19,66 @@ beforeEach(() => {
   calls.resolve.mockResolvedValue({ defs: [], grants: new Map([['browser_task', { slug: 'browser_task', requiresApproval: true, allowedDomains: ['httpbingo.org'], spendCap: 0 }]]) });
   calls.execute.mockResolvedValue({ ok: true, output: { provider: 'playwright', simulated: false, result: { ok: true, completed_steps: 2, outputs: [{ action: 'navigate', result: { ok: true } }, { action: 'extract', result: { text: 'Real extracted content' } }] } } });
 });
+describe('bounded browser approval input and queueing', () => {
+  const startingUrl = 'https://httpbingo.org/html';
+
+  it('normalizes the real model starting-URL shape without broadening approval scope', () => {
+    const modelInput = {
+      url: startingUrl, max_steps: 5,
+      steps: [{ action: 'navigate', url: startingUrl }, { action: 'extract', selector: 'body' }],
+    };
+    expect(approvedBrowserInput(modelInput)).toEqual({
+      max_steps: 5,
+      steps: [{ action: 'navigate', url: startingUrl }, { action: 'extract', selector: 'body' }],
+    });
+    expect(approvedBrowserInput({
+      url: startingUrl, steps: [{ action: 'navigate' }, { action: 'read' }],
+    })).toEqual({
+      steps: [{ action: 'navigate', url: startingUrl }, { action: 'read' }],
+    });
+  });
+
+  it('queues the canonical read-only model payload and links the existing task', async () => {
+    db.tables['agent_tasks'] = [{
+      id: 'task', user_id: 'owner', agent_id: 'agent', status: 'waiting_for_tool',
+      cancel_requested: false, waiting_approval_request_id: null,
+    }];
+    const modelInput = {
+      url: startingUrl, max_steps: 5,
+      steps: [{ action: 'navigate', url: startingUrl }, { action: 'extract', selector: 'body' }],
+    };
+    const result = await queueBrowserApproval(modelInput, {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueBrowserApproval>[1]);
+    expect(result).toMatchObject({ status: 'awaiting_approval', requires_approval: true });
+    const row = db.tables['approval_requests']?.at(-1);
+    expect(row).toMatchObject({
+      id: result.approval_request_id, action_type: 'agent_browser_task', status: 'pending',
+      details: { agent_task_id: 'task', input: {
+        max_steps: 5,
+        steps: [{ action: 'navigate', url: startingUrl }, { action: 'extract', selector: 'body' }],
+      } },
+    });
+    expect(row?.details?.input).not.toHaveProperty('url');
+    expect(db.tables['agent_tasks']?.[0]?.waiting_approval_request_id).toBe(result.approval_request_id);
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on conflicting starting URLs, unsafe steps, and unsupported budgets', () => {
+    const safeSteps = [{ action: 'navigate' }, { action: 'read' }];
+    expect(() => approvedBrowserInput({ url: 'https://httpbingo.org/html', steps: [
+      { action: 'navigate', url: 'https://other.example/html' }, { action: 'read' },
+    ] })).toThrow();
+    expect(() => approvedBrowserInput({ steps: safeSteps })).toThrow();
+    expect(() => approvedBrowserInput({ url: 'https://httpbingo.org/html?token=x', steps: safeSteps })).toThrow();
+    expect(() => approvedBrowserInput({ url: startingUrl, steps: [
+      { action: 'navigate' }, { action: 'click', selector: 'button' },
+    ] })).toThrow();
+    expect(() => approvedBrowserInput({ url: startingUrl, max_steps: 10, steps: safeSteps })).toThrow();
+  });
+});
+
 describe('bounded approved browser execution', () => {
   it.each(['click', 'type', 'login', 'download'])('refuses %s payloads and credential/profile features', action => {
     expect(() => approvedBrowserInput({ steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action }] })).toThrow();
