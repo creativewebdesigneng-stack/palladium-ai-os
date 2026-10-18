@@ -22,8 +22,6 @@ describe("App Studio runtime wiring", () => {
     expect(tools).toContain('tool: name');
   });
 
-  it("preserves per-agent approval policy for App Studio editing", () => {
-    expect(tools).toContain('name === "app_studio" && grant.requiresApproval');
-    expect(tools).toContain("requires_approval: true");
-  });
+  // Approval policy is exercised through actual grant resolution and dispatch
+  // for App Studio and every extension in all-tool-permission-contract.test.ts.
 });

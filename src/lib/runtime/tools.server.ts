@@ -128,11 +128,9 @@ export async function resolveGrantedTools(
 
     grants.set(def.name, {
       slug: def.name,
-      requiresApproval: def.name === "app_studio"
-        ? Boolean(permission?.requires_approval ?? entry?.requires_approval ?? agent.requires_approval ?? false)
-        : false,
-      allowedDomains: [],
-      spendCap: null,
+      requiresApproval: Boolean(permission?.requires_approval) || Boolean(entry?.requires_approval) || Boolean(agent.requires_approval),
+      allowedDomains: (permission?.allowed_domains as string[] | null) ?? [],
+      spendCap: permission?.spend_cap == null ? null : Number(permission.spend_cap),
     });
     defs.push(def);
   }
@@ -192,12 +190,12 @@ export async function executeTool(
     return { ok: false, output: { error: harness.reason, policy_code: harness.code } };
   }
 
-  if (name === "app_studio" && grant.requiresApproval) {
-    await log("failed", { error: "App Studio draft editing requires explicit approval under this agent policy." });
+  if (grant.requiresApproval) {
+    await log("failed", { error: `Tool "${name}" requires explicit approval under this agent policy.` });
     return {
       ok: false,
       output: {
-        error: "App Studio is configured to require explicit operator approval for this agent.",
+        error: `Tool "${name}" is configured to require explicit operator approval for this agent.`,
         requires_approval: true,
         suggested_tool: "request_approval",
       },
@@ -205,7 +203,7 @@ export async function executeTool(
   }
 
   try {
-    const localCtx = { ...ctx, allowedDomains: [], spendCap: null, requiresApproval: false };
+    const localCtx = { ...ctx, allowedDomains: grant.allowedDomains, spendCap: grant.spendCap, requiresApproval: grant.requiresApproval };
     const output = name === "skill_script"
       ? await runSkillScriptTool(input, localCtx)
       : name === "social_ops"

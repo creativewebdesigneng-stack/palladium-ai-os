@@ -158,6 +158,12 @@ describe("task state machine", () => {
 });
 
 describe("agent permissions", () => {
+  it('rejects obsolete tool assignments before creating a misleading no-tool run', async () => {
+    const sb = db([{ ...AGENT, allowed_tools: ['web', 'files', 'api', 'workflow'] }]);
+    await expect(prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'go' })).rejects.toMatchObject({ code: 'INVALID_TOOL_ASSIGNMENTS' });
+    expect(sb.tables.agent_tasks).toHaveLength(0);
+    expect(gateway.runChat).not.toHaveBeenCalled();
+  });
   it("refuses to run an agent the caller cannot read", async () => {
     const sb = db([]); // RLS-equivalent: no visible row
     await expect(

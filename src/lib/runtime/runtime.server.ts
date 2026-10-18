@@ -29,7 +29,7 @@ import {
   type ChatMessage,
   type ChatResult,
 } from "./model-gateway.server";
-import { executeTool, resolveGrantedTools, type ToolGrant } from "./tools.server";
+import { executeTool, resolveGrantedTools, TOOL_SLUGS, type ToolGrant } from "./tools.server";
 import {
   canBatchInParallel,
   compactToolResultForModel,
@@ -265,6 +265,11 @@ export async function prepareRun(args: {
   // Do not invoke the retired reap_stale_agent_tasks RPC on each user request.
 
   const agent = await loadAgent(args.sb, args.agentId);
+  const unsupportedTools = (agent.allowed_tools ?? []).filter((slug: string) => !TOOL_SLUGS.includes(slug));
+  if (unsupportedTools.length) throw new RuntimeError(
+    `This agent has unsupported tool assignments: ${unsupportedTools.join(', ')}. Open Edit tools & permissions and select supported tools before running it.`,
+    'INVALID_TOOL_ASSIGNMENTS', 400,
+  );
   const orgId = agent.org_id_fk ?? agent.org_id ?? null;
 
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
