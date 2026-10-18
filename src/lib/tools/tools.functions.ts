@@ -42,6 +42,10 @@ export const getToolFramework = createServerFn({ method: "POST" })
       getEntitlements(sb as never, userId, null),
     ]);
 
+    if (catalogue.error || permissions.error || agents.error) {
+      throw new Error("Could not load tool configuration and permissions.");
+    }
+
     const browser = await browserProviderStatus();
 
     const executable = new Set(TOOL_MANIFEST.map((t) => t.slug));
@@ -91,6 +95,7 @@ export const saveToolPermission = createServerFn({ method: "POST" })
         .from("personal_agents")
         .select("id")
         .eq("id", data.agentId)
+        .eq("user_id", userId)
         .maybeSingle();
       if (!agent) throw new Error("That agent is not available to you.");
     }
@@ -117,29 +122,17 @@ export const saveToolPermission = createServerFn({ method: "POST" })
       spend_cap: data.spendCap ?? null,
     };
 
-    const { data: existing } = await sb
-      .from("tool_permissions")
-      .select("id")
-      .eq("tool", data.tool)
-      .is("agent_id", data.agentId ? undefined : null)
-      .limit(1);
-
-    const match = data.agentId
-      ? (
-          await sb
-            .from("tool_permissions")
-            .select("id")
-            .eq("tool", data.tool)
-            .eq("agent_id", data.agentId)
-            .maybeSingle()
-        ).data
-      : existing?.[0];
+    let query = sb.from("tool_permissions").select("id")
+      .eq("tool", data.tool).eq("user_id", userId);
+    query = data.agentId ? query.eq("agent_id", data.agentId) : query.is("agent_id", null);
+    const { data: match, error: lookupError } = await query.maybeSingle();
+    if (lookupError) throw new Error("Could not load the existing tool permission.");
 
     const result = match
-      ? await sb.from("tool_permissions").update(row).eq("id", match.id).select("*").maybeSingle()
+      ? await sb.from("tool_permissions").update(row).eq("id", match.id).eq("user_id", userId).select("*").maybeSingle()
       : await sb.from("tool_permissions").insert(row).select("*").maybeSingle();
 
-    if (result.error) throw new Error("Could not save that tool permission.");
+    if (result.error || !result.data) throw new Error("Could not save that tool permission.");
 
     await writeAudit({
       userId: userId,
