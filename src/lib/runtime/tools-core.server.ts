@@ -1595,10 +1595,23 @@ export async function executeTool(
       const output = await queueBrowserApproval(input, { ...ctx, allowedDomains: grant.allowedDomains });
       return { ok: true, output };
     } catch (error) {
-      await log('failed', { error: 'Could not queue bounded browser approval.' });
+      // Record a bounded reason code, not the raw exception: model-supplied
+      // targets, selectors or credentials must never leak into execution logs.
+      const message = error instanceof Error ? error.message : '';
+      const reason = error instanceof Error && error.name === 'ZodError'
+        ? 'APPROVAL_INPUT_INVALID'
+        : message.includes('current domain policy') ? 'APPROVAL_DOMAIN_DENIED'
+        : message.includes('no longer active') ? 'APPROVAL_TASK_INACTIVE'
+        : message.includes('Could not queue browser approval') ? 'APPROVAL_INSERT_FAILED'
+        : message.includes('Could not link browser approval') ? 'APPROVAL_LINK_FAILED'
+        : 'APPROVAL_QUEUE_FAILED';
+      await log('failed', { error: 'Could not queue bounded browser approval.', policy_code: reason });
       // Preserve the approval boundary on failure: both runtimes must stop rather
       // than accept a model's "please approve" message as a completed deliverable.
-      return { ok: false, output: { requires_approval: true, error: 'Browser approval could not be queued. Check the bounded input, domain policy and deployed agent approval-resume schema.' } };
+      return { ok: false, output: {
+        requires_approval: true, policy_code: reason,
+        error: 'Browser approval could not be queued. Check the bounded input, domain policy and deployed agent approval-resume schema.',
+      } };
     }
   }
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
