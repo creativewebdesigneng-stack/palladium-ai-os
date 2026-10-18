@@ -863,3 +863,41 @@ describe("model recovery boundaries", () => {
     expect(message).toContain("Run status could not be saved");
   });
 });
+
+
+describe("honest completion after blocked tools", () => {
+  it("rejects empty completion before persisting success or usage", async () => {
+    const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    await expect(completeRun({ sb, userId: USER, run, result: textResult("  "), toolCallCount: 1 })).rejects.toMatchObject({ code: "EMPTY_RUN_OUTPUT" });
+    expect(sb.tables.agent_tasks[0].status).not.toBe("succeeded");
+    expect(entitlements.recordUsage).not.toHaveBeenCalled();
+    expect(audit.writeAuditRequired).not.toHaveBeenCalledWith(expect.objectContaining({ action: "agent.run_result" }));
+  });
+  it("does not complete a stream when its model returns no deliverable", async () => {
+    const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: textResult("") }; });
+    const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+    expect(events.some(event => event.type === "complete")).toBe(false);
+    expect(sb.tables.agent_tasks[0].status).toBe("failed");
+  });
+  it.each([false, true])("does not label approval-blocked browser work complete (stream=%s)", async (stream) => {
+    const sb = db([{ ...AGENT, allowed_tools: ["browser"], requires_approval: true }]);
+    sb.tables.tools.push({ slug: "browser", is_active: true }, { slug: "browser_task", is_active: true });
+    sb.tables.tool_permissions.push({ tool: "browser", agent_id: AGENT.id, enabled: true, requires_approval: true, allowed_domains: ["httpbingo.org"] });
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "Open https://httpbingo.org/html" });
+    const call = { ...textResult(""), toolCalls: [{ id: "browser-call", name: "browser_task", arguments: { steps: [{ action: "navigate", url: "https://httpbingo.org/html" }] } }] };
+    if (stream) {
+      gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: call }; });
+      const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.some(event => event.type === "complete")).toBe(false);
+      expect(sb.tables.agent_tasks[0].status).toBe("failed");
+      expect(events.at(-1)).toMatchObject({ type: "error", message: expect.stringContaining("no executable approval request") });
+    } else {
+      gateway.runChat.mockResolvedValueOnce(call);
+      await expect(executeRun({ sb, userId: USER, run })).rejects.toMatchObject({ code: "APPROVAL_NOT_QUEUED" });
+      expect(sb.tables.agent_tasks[0].status).not.toBe("succeeded");
+    }
+    expect(sb.tables.tool_executions).toEqual([expect.objectContaining({ tool: "browser_task", status: "failed" })]);
+    expect(sb.tables.approval_requests ?? []).toHaveLength(0);
+  });
+});

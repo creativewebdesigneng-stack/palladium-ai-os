@@ -426,6 +426,9 @@ export async function completeRun(args: {
   toolCallCount: number;
 }) {
   const { run, result } = args;
+  if (!result.text?.trim()) {
+    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502);
+  }
   const duration = Date.now() - run.startedAt;
   const db = await admin();
 
@@ -708,7 +711,16 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
       const call = result.toolCalls[index]!;
       const outcome = parallel ? outcomes[index]! : await invokeGuardedTool(deps, call);
       await deps.onEvent?.({ type: "tool", name: call.name, ok: outcome.ok });
-      if (awaitsApproval(outcome.output)) awaitingApproval = true;
+      if (awaitsApproval(outcome.output)) {
+        const receipt = outcome.output as Record<string, unknown>;
+        if (!receipt["approval_request_id"]) {
+          throw new RuntimeError(
+            `Tool "${call.name}" requires operator approval, but no executable approval request was queued. The action did not run.`,
+            "APPROVAL_NOT_QUEUED", 409,
+          );
+        }
+        awaitingApproval = true;
+      }
       const content = compactToolResultForModel(outcome.output);
       messages.push({
         role: "tool",
