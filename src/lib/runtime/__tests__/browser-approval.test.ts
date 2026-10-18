@@ -9,7 +9,7 @@ vi.mock('../tools.server', () => ({ executeTool: calls.execute, resolveGrantedTo
 vi.mock('../runtime.server', () => ({ executeRun: calls.complete }));
 vi.mock('../planner-runtime.server', () => ({ executePlannedRun: calls.planned }));
 vi.mock('../run-checkpoint.server', () => ({ createDurableRunCheckpoint: (value: unknown) => value }));
-import { approvedBrowserInput, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
+import { approvedBrowserInput, browserApprovalEvidence, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
 const input = { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] };
 const args = () => ({ sb: db, userId: 'owner', approvalRequestId: 'approval' });
 beforeEach(() => {
@@ -106,6 +106,16 @@ describe('bounded browser approval input and queueing', () => {
 });
 
 describe('bounded approved browser execution', () => {
+  it('retains actual navigation and extraction above the generic ledger limit, with a hard evidence bound', async () => {
+    const output = { provider: 'playwright', simulated: false, result: { ok: true, completed_steps: 2, current_url: 'https://httpbingo.org/html', outputs: [{ action: 'navigate', result: { ok: true, status: 200 } }, { action: 'extract', result: { text: 'page text '.repeat(600) } }] } };
+    calls.execute.mockResolvedValueOnce({ ok: true, output });
+    const receipt = await executeApprovedBrowserTask(args());
+    const evidence = receipt.result?.browser_evidence;
+    expect(evidence).toMatchObject({ truncated: false, characters: expect.any(Number) });
+    expect(JSON.parse(evidence!.content)).toEqual(output);
+    expect(browserApprovalEvidence({ text: 'a'.repeat(20_000) })).toMatchObject({ truncated: true, content: expect.any(String) });
+    expect(browserApprovalEvidence({ text: 'a'.repeat(20_000) }).content.length).toBe(16_000);
+  });
   it.each(['click', 'type', 'login', 'download'])('refuses %s payloads and credential/profile features', action => {
     expect(() => approvedBrowserInput({ steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action }] })).toThrow();
     expect(() => approvedBrowserInput({ ...input, persist_session: true })).toThrow();

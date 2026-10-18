@@ -71,3 +71,37 @@ continued same-task result and audited approval execution before certifying.
 The older Preview's environment configuration remains broken; do not use it for
 acceptance. No Production deploy, PR merge or credential disclosure is authorised
 by this work.
+No Production deployment, merge, migration or approval bypass was performed in the initial attempt above.
+
+## Authorised schema repair and live execution follow-up
+
+After the operator authorised the shared-database change, the existing
+`personal_task_approval_resume` migration was applied successfully. Read-only
+inspection verified both nullable columns and the partial index. No other schema
+change or Production application deployment was performed.
+
+The first paused task `d617dd4e-7d4b-4458-8a2a-a7d08cbaa44d` retained its resume
+state. Its approval expired without execution; that record was left intact.
+
+A fresh signed-in Preview run queued approval `18e396a0-07a1-4690-959c-eb8f528ef76c`.
+The Approval Centre displayed the exact httpbingo.org navigation and h1/body
+extraction steps. Approving that bounded request resumed the same task
+`4f0d1a48-5671-481f-a1fa-6cec24e77348` and returned:
+
+- Tool execution `a77836be-b11c-4dc7-962c-c4e1dc0906ed`: browser_task, succeeded.
+- Approval execution: succeeded; provider playwright; simulated false.
+- Agent task: succeeded; heading reported as `Herman Melville - Moby-Dick`.
+- Persisted audit actions: agent.browser_approval_requested,
+  agent.browser_approval_execution, agent.browser_approval_result,
+  agent.run_result and agent.run, all successful.
+- The generic tool log replaced its 4,483-character output with a size marker.
+  The model omitted the body in its final answer. Thus this run proves execution
+  through the real-browser success guard, but does not provide a retained body
+  excerpt for independent review.
+
+The follow-up retains up to 16,000 original result characters in the existing
+approval execution receipt with original length and an explicit truncation flag.
+It is limited to this strict approved read-only path. A new live run is required
+after deployment to verify the retained navigation/extraction evidence. Model-only
+approval prose (including task 64a6689d-e82f-401d-b5fe-2206b9a3f7f9) is not browser
+acceptance evidence or certification.

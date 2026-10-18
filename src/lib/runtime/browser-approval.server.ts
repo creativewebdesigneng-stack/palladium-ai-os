@@ -33,6 +33,11 @@ export function approvedBrowserInput(input: unknown) {
   // possibly different, top-level navigation target into the continuation.
   return { steps: [{ ...steps[0]!, url: steps[0]!.url ?? url }, ...steps.slice(1)], ...options };
 }
+// Retain bounded original evidence only for approved read-only public-page steps.
+export function browserApprovalEvidence(output: unknown) {
+  const content = JSON.stringify(output) ?? 'null';
+  return { format: 'json', characters: content.length, truncated: content.length > 16_000, content: content.slice(0, 16_000) };
+}
 type Sb = { from: (table: string) => any };
 
 /** Uses the existing immutable approval ledger; no browser runs while queueing. */
@@ -136,7 +141,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
         initialUsage: { input: Number(task.tokens_in ?? 0), output: Number(task.tokens_out ?? 0) },
         initialToolCallCount: Number(task.tool_calls ?? 1) });
     }
-    return { ok: true, provider: String(output['provider']), result: { agent_task_id: taskId, simulated: false, task_status: resumed.status } };
+    return { ok: true, provider: String(output['provider']), result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, browser_evidence: browserApprovalEvidence(output) } };
   } catch (error) {
     if (claimedTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', claimedTask).eq('user_id', args.userId).in('status', ['running', 'waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
     return { ok: false, provider: 'playwright', error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
