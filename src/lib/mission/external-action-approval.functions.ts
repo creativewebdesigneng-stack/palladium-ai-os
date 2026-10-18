@@ -211,15 +211,27 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This request has already been decided");
 
-    const execution = await executeExternalAction(
-      sb,
-      userId,
-      type,
-      safeDetails(claim.data.details),
-      claim.data,
-    );
+    // Unexpected provider/runtime exceptions cannot strand a single-use
+    // approval as "approved / executing". Fail closed and persist the outcome.
+    let execution: Awaited<ReturnType<typeof executeExternalAction>>;
+    try {
+      execution = await executeExternalAction(
+        sb,
+        userId,
+        type,
+        safeDetails(claim.data.details),
+        claim.data,
+      );
+    } catch {
+      execution = {
+        ok: false,
+        provider: "blackstar",
+        error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+        result: undefined,
+      } as Awaited<ReturnType<typeof executeExternalAction>>;
+    }
 
-    await approvalDb
+    const finalised = await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",
@@ -232,7 +244,32 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId)
       .eq("status", "approved")
-      .eq("execution_status", "executing");
+      .eq("execution_status", "executing")
+      .select("id")
+      .maybeSingle();
+    if (finalised.error || !finalised.data) {
+      throw new Error("Could not persist the approved action execution outcome.");
+    }
+
+    // Fail closed for the exact approved browser continuation, without
+    // overwriting task cancellation or a separately completed run.
+    if (type === "agent_browser_task" && !execution.ok) {
+      const taskId = safeDetails(approval.details)["agent_task_id"];
+      if (typeof taskId === "string" && taskId.length > 0) {
+        const closed = await approvalDb.from("agent_tasks")
+          .update({
+            status: "failed",
+            error: "Approved browser action failed; start a new authorised task. No browser success was certified.",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", taskId).eq("user_id", userId)
+          .eq("agent_id", approval.agent_id)
+          .eq("waiting_approval_request_id", approval.id)
+          .eq("cancel_requested", false)
+          .in("status", ["running", "waiting_for_approval"]);
+        if (closed.error) throw new Error("Could not close the failed approved browser task.");
+      }
+    }
 
     await updateTask(
       sb,
@@ -319,15 +356,27 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This action is already being retried");
 
-    const execution = await executeExternalAction(
-      sb,
-      userId,
-      type,
-      safeDetails(claim.data.details),
-      claim.data,
-    );
+    // Unexpected provider/runtime exceptions cannot strand a single-use
+    // approval as "approved / executing". Fail closed and persist the outcome.
+    let execution: Awaited<ReturnType<typeof executeExternalAction>>;
+    try {
+      execution = await executeExternalAction(
+        sb,
+        userId,
+        type,
+        safeDetails(claim.data.details),
+        claim.data,
+      );
+    } catch {
+      execution = {
+        ok: false,
+        provider: "blackstar",
+        error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+        result: undefined,
+      } as Awaited<ReturnType<typeof executeExternalAction>>;
+    }
 
-    await approvalDb
+    const finalised = await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",
@@ -340,7 +389,12 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId)
       .eq("status", "approved")
-      .eq("execution_status", "executing");
+      .eq("execution_status", "executing")
+      .select("id")
+      .maybeSingle();
+    if (finalised.error || !finalised.data) {
+      throw new Error("Could not persist the approved action execution outcome.");
+    }
 
     await updateTask(
       sb,
