@@ -39,3 +39,35 @@ database change is authorised, applied and verified. Then rerun the agent, appro
 its exact read-only request, and inspect real worker output, task completion and audits.
 
 No Production deployment, merge, migration or approval bypass was performed in this attempt.
+
+## Follow-up: approval recorded on an outdated Preview (18 October 2026)
+
+Read-only inspection confirms the shared database migration was later applied as
+`20261018175829_personal_task_approval_resume`. Both nullable columns and the
+partial index are present. The next real QA task
+`d617dd4e-7d4b-4458-8a2a-a7d08cbaa44d` successfully queued immutable
+browser approval `784b62f9-28e3-4d24-9bb5-d46272c332fe` and preserved
+the resumable checkpoint, proving the former schema blocker is resolved.
+
+The user approved it at 18:16:35 UTC. But the decision was served by **older**
+Preview `dpl_5XQ1W45jJXUVJjh7jx93YNetP6DG` from branch
+`integration/browser-worker-live-preview-20261013`, not the current repair
+Preview. Vercel runtime logs show its generic `decideApproval` handler logged
+`purchase_approved` and lacked a server-side Supabase credential. The request
+now has `status=approved`, `execution_status=NULL`, no execution result and
+no execution timestamp. The same agent task is still
+`waiting_for_approval`, with zero verified worker output. **This is not live
+browser acceptance.** Never re-label it as completed or replay it via SQL.
+
+The repair branch now fails closed if generic approval routing receives
+`agent_browser_task`, and the Approval Centre visibly distinguishes an
+approved-but-unexecuted browser request and hides replay for single-use browser
+actions. A new QA run and its own fresh human approval are required on the
+correct Preview build:
+`https://palladium-ai-czswlp7z7-creativewebdesigneng-7856s-projects.vercel.app`.
+Inspect the browser tool execution, non-simulated navigation/extraction payload,
+continued same-task result and audited approval execution before certifying.
+
+The older Preview's environment configuration remains broken; do not use it for
+acceptance. No Production deploy, PR merge or credential disclosure is authorised
+by this work.
