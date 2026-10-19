@@ -88,7 +88,7 @@ describe("tool grants", () => {
     "retains catalogue and explicit user approval flags for %s",
     async slug => {
       const db = sb();
-      db.tables["tools"].find((row: Record<string, any>) => row.slug === slug).requires_approval = true;
+      db.tables["tools"].find((row: Record<string, any>) => row["slug"] === slug)["requires_approval"] = true;
       db.tables["tool_permissions"].push({
         tool: slug, agent_id: "a", enabled: true, requires_approval: false,
       });
