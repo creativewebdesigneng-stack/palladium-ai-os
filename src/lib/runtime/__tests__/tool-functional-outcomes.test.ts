@@ -66,6 +66,25 @@ describe('actual tool handler functional outcomes', () => {
   const { result } = await run('web_fetch', { url: 'https://httpbingo.org/html' });
   expect(result).toMatchObject({ ok: true, output: { text: 'Actual parser fixture Visible text' } }); expect(fetcher).toHaveBeenCalledTimes(1);
  });
+ it.each(['web_fetch', 'http_request'])('%s refuses to follow cross-domain redirects', async tool => {
+   const fetcher = vi.fn().mockRejectedValue(new TypeError('redirect blocked'));
+   vi.stubGlobal('fetch', fetcher);
+   const { result, sb } = await run(tool, { url: 'https://httpbingo.org/redirect' });
+   expect(result.ok).toBe(false);
+   expect(sb.tables['tool_executions']![0]!['status']).toBe('failed');
+   expect(fetcher).toHaveBeenCalledWith('https://httpbingo.org/redirect',
+     expect.objectContaining({ redirect: 'error' }));
+ });
+ it.each(['web_fetch', 'http_request'])('%s never sends requests to a literal IPv6 loopback address', async tool => {
+   const fetcher = vi.fn();
+   vi.stubGlobal('fetch', fetcher);
+   const db = fixture();
+   const result = await executeTool(tool, { url: 'https://[::1]/private' }, {
+     sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+   }, new Map([[tool, { slug: tool, requiresApproval: false, allowedDomains: ['[::1]'], spendCap: 0 }]]));
+   expect(result.ok).toBe(false);
+   expect(fetcher).not.toHaveBeenCalled();
+ });
  it('web_fetch and HTTP provider errors are recorded as failed', async () => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('Unavailable', { status: 503 }))));
   for (const tool of ['web_fetch', 'http_request']) { const { result, sb } = await run(tool, { url: 'https://httpbingo.org/html' }); expect(result.ok).toBe(false); expect(sb.tables['tool_executions']![0]!['status']).toBe('failed'); }
