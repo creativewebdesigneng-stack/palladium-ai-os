@@ -562,11 +562,8 @@ const REGISTRY: Record<string, ToolImpl> = {
       parameters: {
         type: "object",
         properties: {
-          url: { type: "string" },
-          method: { type: "string", enum: ["GET", "POST"] },
-          body: { type: "string" },
-          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
-          query: { type: "string", description: "Optional text filter when listing connected calendar events" },
+          url: { type: "string", description: "An explicitly allowed public HTTPS URL, without embedded credentials." },
+          method: { type: "string", enum: ["GET"] },
         },
         required: ["url"],
       },
