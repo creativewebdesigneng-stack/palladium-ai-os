@@ -121,7 +121,7 @@ export default function Models() {
             <button type="button" onClick={checkNvidia}
               disabled={probeBusy || !q.data?.nvidiaConnectionProbeAllowed}
               className="mt-3 rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200 disabled:cursor-not-allowed disabled:opacity-40">
-              {probeBusy ? 'Checking model catalogue…' : 'Check NVIDIA connection (read-only)'}
+              {probeBusy ? 'Checking NIM catalogue and readiness…' : 'Check NVIDIA connection (read-only)'}
             </button>
             {!q.data?.nvidiaConnectionProbeAllowed &&
               <p className="mt-2 text-[11px] text-zinc-500">Connection checks use Blackstar's shared server key and require a platform administrator and configured NVIDIA credentials.</p>}
@@ -135,6 +135,19 @@ export default function Models() {
                 not_configured: 'Connect a server-side NVIDIA API credential in Preview first.',
               })[probeResult.status] ?? 'NVIDIA verification unavailable.'}
             </p>}
+            {probeResult && accelerator?.nvidia?.mode === 'operator_hosted_nim' && !probeResult.forbidden && (
+              <p role="status" className={`mt-2 text-xs ${probeResult.nimReadiness === 'ready' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                Self-hosted NIM server readiness: {({
+                  ready: 'Model server reports ready; GPU and Dell hardware are not certified.',
+                  not_ready: 'Model server is reachable but not ready to serve inference.',
+                  unauthorised: 'NIM health endpoint rejected the configured credential.',
+                  unsupported: 'NIM deployment does not expose a supported readiness endpoint.',
+                  unavailable: 'NIM readiness could not be checked.',
+                  not_configured: 'NIM endpoint or credentials are not configured safely.',
+                  not_applicable: 'This probe applies only to an operator-hosted NIM server.',
+                })[probeResult.nimReadiness] ?? 'Readiness was not verified.'}
+              </p>
+            )}
             <div className="mt-3 border-t border-white/10 pt-3">
               <p className="text-[11px] text-zinc-400">Real NVIDIA inference certification is a separate operator-only test. It uses up to 32 generated tokens and may incur provider charges. No request runs automatically.</p>
               <button type="button" onClick={testInference}
