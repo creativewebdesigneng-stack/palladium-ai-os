@@ -232,6 +232,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
       // Development demonstrations can never be certified as executed
       // real-world actions by the approval ledger, for any tool type.
       output['simulated'] === true || output['result']?.simulated === true ||
+      (name === 'shopping_search' && output['simulated'] !== false) ||
       (browser && (output['simulated'] !== false || output['result']?.ok !== true ||
         output['result']?.completed_steps !== input.steps.length ||
         !Array.isArray(output['result']?.outputs) ||
