@@ -21,6 +21,7 @@ const seed = () => createFakeSupabase({
     { id: 'native', user_id: 'owner', provider: 'google', status: 'connected', account_label: 'Google Account' },
     { id: 'nango', user_id: 'owner', provider: 'nango_github', status: 'connected', config: { connection_id: 'active' } },
     { id: 'missing', user_id: 'owner', provider: 'nango_slack', status: 'connected', config: {} },
+    { id: 'whitespace', user_id: 'owner', provider: 'nango_asana', status: 'connected', config: { connection_id: '    ' } },
     { id: 'other', user_id: 'other', provider: 'hubspot', status: 'connected' },
     { id: 'disconnected', user_id: 'owner', provider: 'notion', status: 'disconnected' },
   ],
@@ -35,6 +36,7 @@ describe('existing-agent connection assignment', () => {
     expect(choices.find(row => row.id === 'google')).toMatchObject({ connected: true, transport: 'native' });
     expect(choices.find(row => row.id === 'github')).toMatchObject({ connected: true, transport: 'nango' });
     expect(choices.find(row => row.id === 'slack')?.connected).toBe(false);
+    expect(choices.find(row => row.id === 'asana')?.connected).toBe(false);
     expect(choices.find(row => row.id === 'hubspot')?.connected).toBe(false);
     expect(choices.find(row => row.id === 'notion')?.connected).toBe(false);
     expect(choices.some(row => row.id === 'other')).toBe(false);
@@ -47,7 +49,7 @@ describe('existing-agent connection assignment', () => {
     expect(row.allowed_tools).toEqual(['browser', 'connected_service']);
     expect(row.requires_approval).toBe(true);
     expect(row.model_provider).toBe('groq');
-    expect(sb.tables['integrations']).toHaveLength(5);
+    expect(sb.tables['integrations']).toHaveLength(6);
   });
 
   it('allows a connected GitHub App installation without a Nango connection', async () => {
@@ -61,7 +63,7 @@ describe('existing-agent connection assignment', () => {
 
   it('rejects disconnected, bogus, and missing Nango tokens', async () => {
     const sb = seed();
-    for (const providers of [['slack'], ['notion'], ['arbitrary-provider']]) {
+    for (const providers of [['slack'], ['asana'], ['notion'], ['arbitrary-provider']]) {
       await expect(changeOwnedAgentConnectors({ ...args(sb), providers })).rejects.toThrow('Connect or reconnect');
     }
     expect(sb.tables['personal_agents']?.[0]?.['allowed_providers']).toEqual([]);
