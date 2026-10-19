@@ -836,7 +836,7 @@ export async function executeRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
-          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","compatible"].includes(p))],
+          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","nvidia","compatible"].includes(p))],
         });
       } catch (error) {
         if (externalFailure) throw externalFailure;
@@ -933,7 +933,7 @@ export async function* streamRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
-          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","compatible"].includes(p))],
+          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","nvidia","compatible"].includes(p))],
         })) {
           if (event.type === "text") yield { type: "delta", text: event.delta };
           if (event.type === "done") final = event.result;
