@@ -168,6 +168,10 @@ export default function Models() {
             <p className="mt-2 text-[11px] text-zinc-400">Readiness: {String(accelerator?.dell?.status ?? 'not_enabled').replaceAll('_', ' ')}</p>
             <p className="mt-1 text-[11px] text-zinc-400">Dell hardware verified: No · GPU worker verified: No</p>
             <p className="mt-2 text-[11px] text-zinc-500">Requires a provisioned Dell GPU host, authenticated HTTPS NVIDIA NIM endpoint and explicit operator configuration. No server is purchased or connected automatically.</p>
+            <Link to="/admin/acceptance" className="mt-3 inline-block rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200">
+              Open existing Cinema / 3D worker preflight
+            </Link>
+            <p className="mt-2 text-[11px] text-zinc-500">The existing admin worker preflight checks configured endpoints. It does not claim a Dell GPU was used without host-level evidence.</p>
           </div>
         </div>
       </section>
