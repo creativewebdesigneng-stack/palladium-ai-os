@@ -11,7 +11,7 @@ import APIManagement from '@/components/models/APIManagement';
 import GroqEvidencePanel from '@/components/models/GroqEvidencePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
-import { getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference } from '@/lib/runtime/model-management.functions';
+import { getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference, certifyNvidiaModelToolCalling } from '@/lib/runtime/model-management.functions';
 
 function moneyFromPence(value) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value ?? 0) / 100);
@@ -22,6 +22,17 @@ export default function Models() {
   const overviewFn = useServerFn(getModelRuntimeOverview);
   const probeNvidiaFn = useServerFn(probeNvidiaModelConnection);
   const certifyFn = useServerFn(certifyNvidiaModelInference);
+  const certifyToolFn = useServerFn(certifyNvidiaModelToolCalling);
+  const [toolCertification, setToolCertification] = useState(null);
+  const [toolCertifying, setToolCertifying] = useState(false);
+  const testToolCalling = async () => {
+    if (toolCertifying) return;
+    setToolCertifying(true);
+    setToolCertification(null);
+    try { setToolCertification(await certifyToolFn({ data: {} })); }
+    catch { setToolCertification({ status: 'unavailable' }); }
+    finally { setToolCertifying(false); }
+  };
   const [certification, setCertification] = useState(null);
   const [certifying, setCertifying] = useState(false);
   const testInference = async () => {
@@ -171,6 +182,30 @@ export default function Models() {
                 {certification.status === 'verified' && certification.auditReceiptId
                   ? ` Audit receipt: ${certification.auditReceiptId}` : ''}
               </p>}
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <p className="text-[11px] text-zinc-400">Separate NVIDIA tool-call format test (may incur charges): checks that the model requests one bounded calculator call. It does not execute the tool or certify agent approval/resume.</p>
+                <button type="button" onClick={testToolCalling}
+                  disabled={toolCertifying || !q.data?.nvidiaToolCallCertificationEnabled}
+                  className="mt-2 rounded-lg border border-amber-400/25 px-3 py-2 text-xs text-amber-200 disabled:cursor-not-allowed disabled:opacity-40">
+                  {toolCertifying ? 'Checking real NVIDIA tool call…' : 'Test NVIDIA model tool call (may incur charges)'}
+                </button>
+                {!q.data?.nvidiaToolCallCertificationEnabled &&
+                  <p className="mt-2 text-[11px] text-zinc-500">Requires platform administrator, NVIDIA key and NVIDIA_NIM_TOOL_PROBE_ENABLED=true in Preview.</p>}
+                {toolCertification && <p role="status" className={`mt-2 text-xs ${toolCertification.status === 'verified' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {toolCertification.forbidden ? 'Platform administrator role required.' : ({
+                    verified: 'Real NVIDIA model tool-call format verified and audited. No calculator execution or agent runtime certification occurred.',
+                    invalid_response: 'NVIDIA did not return exactly one valid calculator tool call. Not certified.',
+                    unauthorised: 'NVIDIA rejected the API credential.',
+                    quota_exhausted: 'NVIDIA inference credits or quota exhausted.',
+                    rate_limited: 'NVIDIA is rate limiting requests.',
+                    audit_unavailable: 'Required audit evidence unavailable; not certified.',
+                    not_enabled: 'NVIDIA tool-call diagnostic is not enabled by the operator.',
+                    unavailable: 'NVIDIA model tool-call test unavailable.',
+                  })[toolCertification.status] ?? 'NVIDIA tool-call verification did not complete.'}
+                  {toolCertification.status === 'verified' && toolCertification.auditReceiptId
+                    ? ` Audit receipt: ${toolCertification.auditReceiptId}` : ''}
+                </p>}
+              </div>
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
