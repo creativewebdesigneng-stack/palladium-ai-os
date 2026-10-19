@@ -558,7 +558,7 @@ const REGISTRY: Record<string, ToolImpl> = {
   http_request: {
     def: {
       name: "http_request",
-      description: "Call an allow-listed HTTP API. GET and POST only; responses are truncated.",
+      description: "Read an allow-listed public HTTPS API using GET. POST actions are blocked; use an approved connected provider action for writes.",
       parameters: {
         type: "object",
         properties: {
@@ -571,19 +571,23 @@ const REGISTRY: Record<string, ToolImpl> = {
         required: ["url"],
       },
     },
+    sensitive: true,
     run: async (input, ctx) => {
       const url = str(input["url"]);
       if (!/^https?:\/\//i.test(url)) return { error: "Only absolute http(s) URLs are supported." };
       if (isPrivateHost(url)) return { error: "That host is not reachable from the runtime." };
-      const method = str(input["method"], "GET").toUpperCase() === "POST" ? "POST" : "GET";
-      const body = str(input["body"]);
+      // General-purpose HTTP must never become a write bypass. All mutations
+      // belong to the existing connector-specific executable approval system.
+      const method = str(input["method"], "GET").toUpperCase();
+      if (method !== "GET" || input["body"] !== undefined) {
+        return { error: "General HTTP writes are disabled; use a connected provider action with its dedicated operator approval." };
+      }
       const res = await fetch(url, {
         method,
         headers: {
           "User-Agent": "PalladiumAI-Agent/1.0",
-          ...(body ? { "content-type": "application/json" } : {}),
         },
-        ...(method === "POST" && body ? { body } : {}),
+        // Do not follow redirects across the approved domain boundary.
         redirect: "error",
         signal: ctx.signal ?? AbortSignal.timeout(20_000),
       });
@@ -1656,7 +1660,7 @@ export async function executeTool(
       } };
     }
   }
-  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'database_query'].includes(name)) {
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
       return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
