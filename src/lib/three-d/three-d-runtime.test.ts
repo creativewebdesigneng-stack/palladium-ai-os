@@ -31,11 +31,18 @@ describe('3D Studio runtime', () => {
       provider: 'blackstar-game-foundry-3d',
       workflows: ['image-to-mesh', 'prompt-to-mesh'],
       formats: ['glb', 'obj'],
+      gpu: { vendor: 'nvidia', model: 'GeForce GTX 1080 Ti', vram_mib: 11264, cuda_available: true,
+        bearer_token: 'MUST_NOT_LEAK' },
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
     const result = await probeThreeDWorker();
     expect(result.healthy).toBe(true);
     expect(result.readySignal).toBe(true);
     expect(result.workflows).toContain('image-to-mesh');
+    expect(result.gpuReport).toMatchObject({
+      source: 'worker_self_report', vendor: 'nvidia', vramMiB: 11264,
+      hardwareVerified: false, renderingCertified: false,
+    });
+    expect(JSON.stringify(result.gpuReport)).not.toContain('MUST_NOT_LEAK');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/health');
   });
 
