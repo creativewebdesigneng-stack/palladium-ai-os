@@ -125,6 +125,23 @@ describe('actual tool handler functional outcomes', () => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('Unavailable', { status: 503 }))));
   for (const tool of ['web_fetch', 'http_request']) { const { result, sb } = await run(tool, { url: 'https://httpbingo.org/html' }); expect(result.ok).toBe(false); expect(sb.tables['tool_executions']![0]!['status']).toBe('failed'); }
  });
+ it('http_request GET returns bounded read-only text without following redirects', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response('Accepted public response', { status: 200 }));
+  vi.stubGlobal('fetch', fetcher);
+  const { result } = await run('http_request', { url: 'https://httpbingo.org/html', method: 'GET' });
+  expect(result).toMatchObject({ ok: true, output: { ok: true, status: 200, body: 'Accepted public response' } });
+  expect(fetcher).toHaveBeenCalledWith('https://httpbingo.org/html',
+    expect.objectContaining({ method: 'GET', redirect: 'error' }));
+ });
+ it.each(['POST', 'DELETE', 'PATCH'])('http_request refuses %s without initiating network traffic even with a direct grant', async method => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  const { result, sb } = await run('http_request', {
+    url: 'https://httpbingo.org/html', method, body: '{"action":"write"}',
+  });
+  expect(result.ok).toBe(false);
+  expect(sb.tables['tool_executions']![0]!['status']).toBe('failed');
+  expect(fetcher).not.toHaveBeenCalled();
+ });
  it('web_search parses result titles, links and snippets from provider HTML', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<a class="result__a" href="https://httpbingo.org/html">Fixture title</a><a class="result__snippet">Fixture snippet</a>')));
   expect((await run('web_search', { query: 'fixture' })).result).toMatchObject({ ok: true, output: { results: [{ title: 'Fixture title', url: 'https://httpbingo.org/html', snippet: 'Fixture snippet' }] } });
