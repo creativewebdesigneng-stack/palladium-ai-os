@@ -888,7 +888,7 @@ const REGISTRY: Record<string, ToolImpl> = {
             { provider, action: "calendar_upcoming", query, limit: 10 },
             ctx.signal,
           );
-          if (!(live && typeof live === "object" && "error" in live)) {
+          if (live && typeof live === "object" && !Array.isArray(live) && !("error" in live)) {
             return { source: provider, connected: true, ...live as Record<string, unknown> };
           }
         }
