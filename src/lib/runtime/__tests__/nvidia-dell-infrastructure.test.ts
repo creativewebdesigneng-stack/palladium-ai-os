@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ProviderError, normaliseProvider, resolveModel, runChat } from '../model-gateway.base';
+import { ProviderError, normaliseProvider, resolveModel, runChat, streamChat } from '../model-gateway.base';
 import { isModelProviderConfigured, listModelProviderDefinitions } from '../model-providers.server';
 import {
   NVIDIA_NIM_HOSTED_BASE_URL, nvidiaNimBaseUrl, nvidiaNimConfigured,
@@ -55,6 +55,57 @@ describe('NVIDIA NIM as an existing Blackstar model gateway provider', () => {
     expect(result).toMatchObject({
       text: 'NVIDIA response', usage: { input: 9, output: 3 }, provider: 'nvidia',
     });
+  });
+
+  it('reuses the existing tool-call contract for authorised NVIDIA-powered agents', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-nim-agent-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.tools[0].function.name).toBe('calculator');
+      return new Response(JSON.stringify({
+        choices: [{ message: {
+          content: null,
+          tool_calls: [{ id: 'nvidia-tool-1', function: {
+            name: 'calculator', arguments: JSON.stringify({ expression: '9 * 7' }),
+          } }],
+        } }],
+        usage: { prompt_tokens: 10, completion_tokens: 6 },
+      }), { status: 200 });
+    });
+    const result = await runChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'Calculate 9 * 7' }],
+      tools: [{ name: 'calculator', description: 'Evaluate arithmetic', parameters: {
+        type: 'object', properties: { expression: { type: 'string' } },
+      } }],
+      maxAttempts: 1,
+    });
+    expect(result).toMatchObject({
+      toolCalls: [{ id: 'nvidia-tool-1', name: 'calculator', arguments: { expression: '9 * 7' } }],
+      provider: 'nvidia', usage: { input: 10, output: 6 },
+    });
+  });
+
+  it('handles NVIDIA SSE output through the existing streaming gateway', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-nim-stream-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      'data: {"choices":[{"delta":{"content":"Hello"}}]}\\n\\n' +
+      'data: {"choices":[{"delta":{"content":" from NVIDIA"}}]}\\n\\n' +
+      'data: {"usage":{"prompt_tokens":4,"completion_tokens":3},"choices":[]}\\n\\n' +
+      'data: [DONE]\\n\\n',
+      { status: 200, headers: { 'content-type': 'text/event-stream' } },
+    ));
+    const events = [];
+    for await (const event of streamChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'hello' }], maxAttempts: 1,
+    })) events.push(event);
+    expect(events.filter(event => event.type === 'text').map(event => event.delta).join('')).toBe('Hello from NVIDIA');
+    expect(events.at(-1)).toMatchObject({ type: 'done', result: {
+      text: 'Hello from NVIDIA', provider: 'nvidia', usage: { input: 4, output: 3 },
+    } });
   });
 
   it('routes to a Dell-hosted NVIDIA NIM reverse proxy only when operator-configured', async () => {
