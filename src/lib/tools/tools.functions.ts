@@ -42,12 +42,12 @@ export const getToolFramework = createServerFn({ method: "POST" })
       sb.from("tool_executions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(60),
       sb.from("personal_agents").select("id,name,allowed_tools,requires_approval,status").eq("user_id", userId),
       getEntitlements(sb as never, userId, null),
-      // Approval receipts are inspected on the server only. Never return their
-      // raw browser evidence or private provider payload to this diagnostics UI.
+      // Owner-scoped browser and bounded local-task receipts are inspected server-side
+      // only; never return private inputs or original output to the diagnostics UI.
       sb.from("approval_requests")
-        .select("action_type,status,execution_status,execution_result")
-        .eq("user_id", userId).eq("action_type", "agent_browser_task")
-        .order("created_at", { ascending: false }).limit(60),
+        .select("action_type,status,execution_status,agent_id,details,execution_result")
+        .eq("user_id", userId).in("action_type", ["agent_browser_task", "agent_tool_task"])
+        .order("created_at", { ascending: false }).limit(120),
     ]);
 
     if (catalogue.error || permissions.error || agents.error || executions.error || approvals.error) {
