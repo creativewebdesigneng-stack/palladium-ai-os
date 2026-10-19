@@ -1,5 +1,5 @@
 import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serving-cache";
-import { nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
+import { NVIDIA_NIM_DEFAULT_MODEL, nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
 
 /**
  * Model gateway — the agent runtime is never hard-coded to one vendor.
@@ -136,7 +136,13 @@ export function resolveModel(provider: Provider, model?: string | null): string 
     const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
     if (nativeModel) return nativeModel;
   }
-  if (!m && provider === "nvidia") return nvidiaNimModel();
+  // An operator-hosted NIM deployment can have a different deployed model.
+  // The existing agent picker stores the canonical hosted default; map that
+  // specific preset to the server-configured Dell/NIM model at call time.
+  if (provider === "nvidia" &&
+      (!m || (m === NVIDIA_NIM_DEFAULT_MODEL && process.env["NVIDIA_NIM_BASE_URL"]?.trim()))) {
+    return nvidiaNimModel();
+  }
   if (!m) return DEFAULT_MODEL[provider];
   // Lovable gateway models are namespaced (`vendor/model`); keep friendly names working.
   if (provider === "lovable" && !m.includes("/")) return DEFAULT_MODEL.lovable;
