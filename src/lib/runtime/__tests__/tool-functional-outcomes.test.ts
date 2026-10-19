@@ -83,6 +83,7 @@ describe('actual tool handler functional outcomes', () => {
      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
    }, new Map([[tool, { slug: tool, requiresApproval: false, allowedDomains: ['[::1]'], spendCap: 0 }]]));
    expect(result.ok).toBe(false);
+   expect(result.output).toMatchObject({ error: 'That host is not reachable from the runtime.' });
    expect(fetcher).not.toHaveBeenCalled();
  });
  it('web_fetch and HTTP provider errors are recorded as failed', async () => {
