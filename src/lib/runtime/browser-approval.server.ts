@@ -60,6 +60,9 @@ const localInputs = {
   }).strict().refine(value => Boolean(value.document_id || value.title),
     'Document analysis approval requires an explicit document ID or title.'),
   web_fetch: z.object({ url: publicUrl }).strict(),
+  // General HTTP approvals are read-only. POST writes must use the existing
+  // provider-specific integration action + immutable approval dispatcher.
+  http_request: z.object({ url: publicUrl, method: z.literal('GET').optional() }).strict(),
   database_query: z.object({
     table: z.enum(["personal_tasks", "personal_agents", "agent_memories", "purchase_requests", "agent_tasks"]),
     limit: z.number().int().min(1).max(50).optional(),
@@ -84,7 +87,7 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   const kind = browser ? 'agent_browser_task' : 'agent_tool_task';
   if (!ctx.taskId) throw new Error('Browser approval requires an existing agent task.');
   const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
-  const networkRead = name === 'web_fetch';
+  const networkRead = name === 'web_fetch' || name === 'http_request';
   if (
     (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) ||
     (networkRead && (!ctx.allowedDomains?.length || !isDomainAllowed(payload.url, ctx.allowedDomains ?? [])))
@@ -162,7 +165,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
     if (!grant ||
       (browser && (!grant.allowedDomains.length || input.steps.some((s: any) => s.url && !isDomainAllowed(s.url, grant.allowedDomains)))) ||
-      (name === 'web_fetch' && (!grant.allowedDomains.length || !isDomainAllowed(input.url, grant.allowedDomains)))
+      (['web_fetch', 'http_request'].includes(name) && (!grant.allowedDomains.length || !isDomainAllowed(input.url, grant.allowedDomains)))
     ) throw new Error('Current tool permissions no longer allow the approved task.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
     const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
