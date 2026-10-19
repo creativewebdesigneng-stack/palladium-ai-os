@@ -12,6 +12,7 @@
 
 1. An operator creates a key at https://build.nvidia.com/settings and reviews the model's terms and rate limits. Some prototype endpoints have free evaluation use; this is **not** a promise of unlimited free production inference.
 2. In **Vercel Preview environment variables only**, set `NVIDIA_API_KEY` to the server secret. Optionally set `NVIDIA_NIM_MODEL=openai/gpt-oss-20b`. Do **not** place a key in `VITE_*`, a repository, a chat message, browser storage, screenshots or client code.
+   - `NVIDIA_NIM_FALLBACK_ENABLED` defaults to **off**. Only set it to `true` when the operator explicitly authorises metered NVIDIA as an *automatic fallback* for tasks started on other providers. Directly selecting NVIDIA works without this flag.
 3. Leave `NVIDIA_NIM_BASE_URL` **unset**. The server pins hosted inference to `https://integrate.api.nvidia.com/v1/chat/completions`.
 4. Redeploy Preview and open **Runtime Models**. NVIDIA readiness will report deployment configuration (not a successful call) and can be selected from the existing agent model menu.
 5. Select **Check NVIDIA connection (read-only)** on Runtime Models. This calls `GET /v1/models` with an 8-second timeout, no redirects, and the server-side credential. `reachable` means the selected model was listed, **not** that paid inference or agent tool calling succeeded; `unsupported` means this deployment does not support catalogue listing, not that its inference API necessarily failed. A missing key blocks the probe.
