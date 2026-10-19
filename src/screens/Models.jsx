@@ -121,7 +121,7 @@ export default function Models() {
                 unavailable: 'NVIDIA catalogue check failed. Verify Preview settings and network access.',
                 not_configured: 'Connect a server-side NVIDIA API credential in Preview first.',
               })[probeResult.status] ?? 'NVIDIA verification unavailable.'}
-            </p>
+            </p>}
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="flex items-center justify-between gap-2">
