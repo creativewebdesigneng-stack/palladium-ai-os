@@ -268,7 +268,7 @@ const REGISTRY: Record<string, ToolImpl> = {
   web_search: {
     def: {
       name: "web_search",
-      description: "Search the public web and return short result snippets.",
+      description: "Search the public web and return up to eight short result snippets. Requires operator approval when agent policy requires it.",
       parameters: {
         type: "object",
         properties: { query: { type: "string" }, limit: { type: "number" } },
@@ -1626,7 +1626,7 @@ export async function executeTool(
       } };
     }
   }
-  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis'].includes(name)) {
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
       return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
