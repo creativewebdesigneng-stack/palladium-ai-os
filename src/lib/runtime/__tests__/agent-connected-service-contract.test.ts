@@ -50,7 +50,7 @@ describe("agent connected-service contract", () => {
     expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
   });
 
-  it("lets dynamic Nango actions self-classify reads while writes remain approval-gated", async () => {
+  it("respects agent approval for connector reads while dynamic write actions use their dedicated approval dispatcher", async () => {
     const { grants } = await resolveGrantedTools(
       sb(),
       {
@@ -60,9 +60,11 @@ describe("agent connected-service contract", () => {
       },
       "enterprise",
     );
-    expect(grants.get("connected_service")?.requiresApproval).toBe(false);
-    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(false);
+    expect(grants.get("connected_service")?.requiresApproval).toBe(true);
+    expect(grants.get("nango_capabilities")?.requiresApproval).toBe(true);
+    expect(grants.get("integration_capabilities")?.requiresApproval).toBe(true);
     expect(grants.get("nango_action")?.requiresApproval).toBe(false);
+    expect(grants.get("integration_action")?.requiresApproval).toBe(false);
   });
 
   it("exposes separate approval-gated draft and send tools", async () => {
