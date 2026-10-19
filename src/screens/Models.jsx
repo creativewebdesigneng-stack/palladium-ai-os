@@ -11,7 +11,7 @@ import APIManagement from '@/components/models/APIManagement';
 import GroqEvidencePanel from '@/components/models/GroqEvidencePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
-import { getModelRuntimeOverview, probeNvidiaModelConnection } from '@/lib/runtime/model-management.functions';
+import { getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference } from '@/lib/runtime/model-management.functions';
 
 function moneyFromPence(value) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value ?? 0) / 100);
@@ -21,6 +21,17 @@ export default function Models() {
   const { session } = useWorkspace();
   const overviewFn = useServerFn(getModelRuntimeOverview);
   const probeNvidiaFn = useServerFn(probeNvidiaModelConnection);
+  const certifyFn = useServerFn(certifyNvidiaModelInference);
+  const [certification, setCertification] = useState(null);
+  const [certifying, setCertifying] = useState(false);
+  const testInference = async () => {
+    if (certifying) return;
+    setCertifying(true);
+    setCertification(null);
+    try { setCertification(await certifyFn({ data: {} })); }
+    catch { setCertification({ status: 'unavailable' }); }
+    finally { setCertifying(false); }
+  };
   const [probeResult, setProbeResult] = useState(null);
   const [probeBusy, setProbeBusy] = useState(false);
   const checkNvidia = async () => {
@@ -122,6 +133,30 @@ export default function Models() {
                 not_configured: 'Connect a server-side NVIDIA API credential in Preview first.',
               })[probeResult.status] ?? 'NVIDIA verification unavailable.'}
             </p>}
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <p className="text-[11px] text-zinc-400">Real NVIDIA inference certification is a separate operator-only test. It uses up to 32 generated tokens and may incur provider charges. No request runs automatically.</p>
+              <button type="button" onClick={testInference}
+                disabled={certifying || !q.data?.nvidiaInferenceCertificationEnabled}
+                className="mt-2 rounded-lg border border-amber-400/25 px-3 py-2 text-xs text-amber-200 disabled:cursor-not-allowed disabled:opacity-40">
+                {certifying ? 'Testing real NVIDIA inference…' : 'Test actual NVIDIA inference (may incur charges)'}
+              </button>
+              {!q.data?.nvidiaInferenceCertificationEnabled &&
+                <p className="mt-2 text-[11px] text-zinc-500">Requires a configured NVIDIA key and operator-enabled NVIDIA_NIM_INFERENCE_PROBE_ENABLED in Preview.</p>}
+              {certification && <p role="status" className={`mt-2 text-xs ${certification.status === 'verified' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                {certification.forbidden ? 'Only a Blackstar platform administrator can run this test.' : ({
+                  verified: 'Real NVIDIA inference verified and audited. GPU hardware and agent tool execution still require separate certification.',
+                  invalid_response: 'NVIDIA responded, but the fixed verification marker was not returned. Not certified.',
+                  unauthorised: 'NVIDIA rejected the configured inference credentials.',
+                  quota_exhausted: 'NVIDIA inference quota or credits are exhausted.',
+                  rate_limited: 'NVIDIA is currently rate limiting requests.',
+                  audit_unavailable: 'The required audit record is unavailable. Inference cannot be certified.',
+                  not_enabled: 'Operator inference certification is not enabled in this deployment.',
+                  unavailable: 'The real NVIDIA inference check failed. Verify model, network and provider readiness.',
+                })[certification.status] ?? 'NVIDIA inference certification did not complete.'}
+                {certification.status === 'verified' && certification.auditReceiptId
+                  ? ` Audit receipt: ${certification.auditReceiptId}` : ''}
+              </p>}
+            </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="flex items-center justify-between gap-2">
