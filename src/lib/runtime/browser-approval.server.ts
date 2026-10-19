@@ -48,6 +48,12 @@ const localInputs = {
     query: z.string().trim().min(1).max(300),
     limit: z.number().finite().int().min(1).max(50).transform(value => Math.min(8, value)).optional(),
   }).strict(),
+  shopping_search: z.object({
+    requirement: z.string().trim().min(2).max(300),
+    // A search budget is only a comparison filter, never authorisation to pay.
+    budget: z.number().finite().min(0).max(1_000_000).optional(),
+    currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).optional(),
+  }).strict(),
   // Read-only, user-scoped vault operations. Queue immutable and strictly
   // bounded input; recheck the current grant before resuming the original task.
   memory_search: z.object({
@@ -116,6 +122,9 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   if (!ctx.taskId) throw new Error('Browser approval requires an existing agent task.');
   const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
   const networkRead = name === 'web_fetch' || name === 'http_request';
+  // Retail comparison can initiate public browser navigation. Never queue
+  // it without an explicit domain boundary, even for read-only research.
+  const retailRead = name === 'shopping_search';
   // Do not create a pending OAuth read approval for an unassigned provider.
   // Execution checks the current assignment again in executeTool, so removing
   // access after approval also fails closed.
@@ -131,7 +140,8 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   }
   if (
     (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) ||
-    (networkRead && (!ctx.allowedDomains?.length || !isDomainAllowed(payload.url, ctx.allowedDomains ?? [])))
+    (networkRead && (!ctx.allowedDomains?.length || !isDomainAllowed(payload.url, ctx.allowedDomains ?? []))) ||
+    (retailRead && !ctx.allowedDomains?.length)
   ) {
     throw new Error('Tool approval is outside the current domain policy.');
   }
@@ -206,7 +216,8 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
     if (!grant ||
       (browser && (!grant.allowedDomains.length || input.steps.some((s: any) => s.url && !isDomainAllowed(s.url, grant.allowedDomains)))) ||
-      (['web_fetch', 'http_request'].includes(name) && (!grant.allowedDomains.length || !isDomainAllowed(input.url, grant.allowedDomains)))
+      (['web_fetch', 'http_request'].includes(name) && (!grant.allowedDomains.length || !isDomainAllowed(input.url, grant.allowedDomains))) ||
+      (name === 'shopping_search' && !grant.allowedDomains.length)
     ) throw new Error('Current tool permissions no longer allow the approved task.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
     const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
@@ -217,7 +228,15 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const approvedGrants = new Map(tools.grants); approvedGrants.set(name, { ...grant, requiresApproval: false });
     const executed = await executeTool(name, input, { sb: args.sb, userId: args.userId, agentId: agent.id, orgId: task.org_id ?? null, taskId, allowedProviders: agent.allowed_providers ?? [] }, approvedGrants);
     const output = executed.output as Record<string, any> | null;
-    if (!executed.ok || !output || (browser && (output['simulated'] !== false || output['result']?.ok !== true || output['result']?.completed_steps !== input.steps.length || !Array.isArray(output['result']?.outputs) || output['result'].outputs.length !== input.steps.length))) throw new Error('Approved browser task did not return verified real-browser success.');
+    if (!executed.ok || !output ||
+      // Development demonstrations can never be certified as executed
+      // real-world actions by the approval ledger, for any tool type.
+      output['simulated'] === true || output['result']?.simulated === true ||
+      (browser && (output['simulated'] !== false || output['result']?.ok !== true ||
+        output['result']?.completed_steps !== input.steps.length ||
+        !Array.isArray(output['result']?.outputs) ||
+        output['result'].outputs.length !== input.steps.length))
+    ) throw new Error('Approved tool did not return verified non-simulated success.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_result' : 'agent.tool_approval_result', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id, tool: name, provider: browser ? output['provider'] : 'local', simulated: false } });
     pending.content = compactToolResultForModel(output);
     const { executeRun } = await import('./runtime.server');
