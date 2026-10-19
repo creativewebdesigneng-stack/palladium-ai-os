@@ -57,9 +57,44 @@ describe('actual tool handler functional outcomes', () => {
    expect(out).toMatchObject({ ok: false, output: { error: expect.stringContaining('no readable indexed text') } });
  });
  it('database_query reads permitted data and refuses arbitrary tables', async () => {
-  const sb = fixture(); sb.tables['personal_tasks'] = [{ id: 'task-fixture', title: 'Fixture' }];
+  const sb = fixture(); sb.tables['personal_tasks'] = [{ id: 'task-fixture', user_id: 'owner', title: 'Fixture' }];
   expect((await run('database_query', { table: 'personal_tasks' }, sb)).result).toMatchObject({ ok: true, output: { rows: [{ id: 'task-fixture' }] } });
   expect((await run('database_query', { table: 'auth.users' }, sb)).result.ok).toBe(false);
+ });
+ it('database_query enforces owner isolation and strips private configuration and checkpoint fields', async () => {
+  const sb = fixture();
+  sb.tables['personal_agents'] = [
+    { id: 'owned', user_id: 'owner', name: 'Agent A', status: 'active', system_prompt: 'Secret prompt', preferences: { token: 'SECRET' }, allowed_providers: ['google'] },
+    { id: 'foreign', user_id: 'other-owner', name: 'Other owner', status: 'active' },
+  ];
+  const { result } = await run('database_query', { table: 'personal_agents', limit: 10 }, sb);
+  expect(result).toMatchObject({ ok: true, output: { table: 'personal_agents', rows: [{ id: 'owned', name: 'Agent A' }] } });
+  const body = JSON.stringify(result.output);
+  expect(body).not.toContain('Secret prompt');
+  expect(body).not.toContain('SECRET');
+  expect(body).not.toContain('foreign');
+  expect(body).not.toContain('allowed_providers');
+ });
+ it('database_query never returns task checkpoint, message input, output, or purchase checkout references', async () => {
+  const sb = fixture();
+  sb.tables['agent_tasks'] = [{ id: 'owned-task', user_id: 'owner', title: 'Safe title', status: 'succeeded',
+    approval_resume_state: { secret: 'checkpoint-secret' }, input: 'Private message',
+    output_text: 'Private output', planner_state: { secret: 'planner-secret' } }];
+  sb.tables['purchase_requests'] = [{ id: 'owned-purchase', user_id: 'owner', product: 'Item',
+    checkout_url: 'https://secret.example/token', checkout_reference: 'private-ref' }];
+  const tasks = await run('database_query', { table: 'agent_tasks' }, sb);
+  const purchases = await run('database_query', { table: 'purchase_requests' }, sb);
+  for (const result of [tasks.result, purchases.result]) {
+    expect(result.ok).toBe(true);
+    const output = JSON.stringify(result.output);
+    for (const secret of ['checkpoint-secret', 'Private message', 'Private output', 'planner-secret', 'private-ref', 'secret.example']) {
+      expect(output).not.toContain(secret);
+    }
+  }
+ });
+ it.each([0, -1, 51, 0.5, Infinity])('database_query rejects invalid row limit %s', async limit => {
+  const { result } = await run('database_query', { table: 'personal_tasks', limit });
+  expect(result.ok).toBe(false);
  });
  it('web_fetch strips scripts from the HTTP response', async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response('<h1>Actual parser fixture</h1><script>hidden()</script><p>Visible text</p>')); vi.stubGlobal('fetch', fetcher);
