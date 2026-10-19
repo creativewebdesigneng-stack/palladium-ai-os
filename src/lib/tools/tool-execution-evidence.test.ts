@@ -44,6 +44,21 @@ describe('agent tool evidence classification', () => {
       .toBe('approval_activity');
   });
 
+  it('never treats explicitly simulated output as live evidence, even with a matching browser receipt', () => {
+    const runs = [
+      { tool: 'calculator', status: 'succeeded', output: { simulated: true } },
+      { tool: 'memory_search', status: 'succeeded', output: { result: { simulated: true } } },
+      { tool: 'browser_task', status: 'succeeded', agent_task_id: 'task-real', output: { simulated: true } },
+    ];
+    const evidence = toolExecutionEvidence(tools, runs, approvals);
+    for (const slug of ['calculator', 'memory_search', 'browser_task']) {
+      const row = evidence.find(item => item.slug === slug);
+      expect(row?.state).toBe('simulated_only');
+      expect(row?.recordedSuccesses).toBe(0);
+      expect(row?.simulatedExecutions).toBe(1);
+    }
+  });
+
   it('never certifies inactive or absent tools or pending approval requests', () => {
     const inactive = [{ slug: 'browser_task', is_active: false, executable: true }];
     expect(toolExecutionEvidence(inactive, [{ tool: 'browser_task', status: 'succeeded', agent_task_id: 'task-real' }], approvals)[0]?.state)
