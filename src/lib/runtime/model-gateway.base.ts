@@ -415,6 +415,9 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
         method: "POST",
         headers: ep.headers,
         body: JSON.stringify(body),
+        // Never forward an operator-configured NIM request to a redirect
+        // target, even when that endpoint is reachable with HTTPS.
+        ...(args.provider === "nvidia" ? { redirect: "error" as const } : {}),
         signal,
       });
       if (res.ok) return res;
