@@ -187,6 +187,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['file_analysis', { document_id: '75b7069d-0359-4f5f-8aa0-f34e79f0d356' }],
     ['file_analysis', { title: 'Quarterly plan' }],
     ['database_query', { table: 'personal_tasks', limit: 7 }],
+    ['calendar', { action: 'list', provider: 'auto' }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -303,6 +304,10 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['database_query', { table: 'personal_agents', sql: 'select * from auth.users' }],
     ['database_query', { table: 'agent_tasks', limit: 51 }],
     ['database_query', { table: 'agent_tasks', limit: 0 }],
+    ['calendar', { action: 'propose', title: 'No implicit event write' }],
+    ['calendar', { action: 'list', provider: 'unassigned-app' }],
+    ['calendar', { action: 'list', query: 'q'.repeat(201) }],
+    ['calendar', { action: 'list', source_user_id: 'another-owner' }],
     ['http_request', { url: 'http://httpbingo.org/html' }],
     ['http_request', { url: 'https://httpbingo.org/html', method: 'POST' }],
     ['http_request', { url: 'https://httpbingo.org/html', body: '{"delete":true}' }],
