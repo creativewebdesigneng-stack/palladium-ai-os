@@ -187,6 +187,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['file_analysis', { document_id: '75b7069d-0359-4f5f-8aa0-f34e79f0d356' }],
     ['file_analysis', { title: 'Quarterly plan' }],
     ['database_query', { table: 'personal_tasks', limit: 7 }],
+    ['http_request', { url: 'https://httpbingo.org/html', method: 'GET' }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -216,6 +217,43 @@ describe('bounded local tool approvals share the existing continuation', () => {
         tool: 'web_fetch', input: { url: 'https://httpbingo.org/html' },
       },
     });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('requires allowed HTTPS domain before queuing a GET-only HTTP request', async () => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const ctx = {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2];
+    await expect(queueLocalToolApproval('http_request', {
+      url: 'https://other.example/path', method: 'GET',
+    }, ctx)).rejects.toThrow('outside the current domain policy');
+    expect(db.tables['approval_requests']).toHaveLength(1);
+    const receipt = await queueLocalToolApproval('http_request', {
+      url: 'https://httpbingo.org/html', method: 'GET',
+    }, ctx);
+    expect(receipt).toMatchObject({ status: 'awaiting_approval', requires_approval: true });
+    expect(db.tables['approval_requests']?.at(-1)).toMatchObject({
+      action_type: 'agent_tool_task', details: {
+        tool: 'http_request', input: { url: 'https://httpbingo.org/html', method: 'GET' },
+      },
+    });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when GET domain permission was revoked before approved execution', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = {
+      agent_task_id: 'task', tool: 'http_request',
+      input: { url: 'https://httpbingo.org/html', method: 'GET' },
+    };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'http_request';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['http_request', { slug: 'http_request', requiresApproval: true, allowedDomains: ['other.example'], spendCap: 0 }],
+    ]) });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
@@ -266,6 +304,11 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['database_query', { table: 'personal_agents', sql: 'select * from auth.users' }],
     ['database_query', { table: 'agent_tasks', limit: 51 }],
     ['database_query', { table: 'agent_tasks', limit: 0 }],
+    ['http_request', { url: 'http://httpbingo.org/html' }],
+    ['http_request', { url: 'https://httpbingo.org/html', method: 'POST' }],
+    ['http_request', { url: 'https://httpbingo.org/html', body: '{"delete":true}' }],
+    ['http_request', { url: 'https://httpbingo.org/html', headers: { Authorization: 'secret' } }],
+    ['http_request', { url: 'https://httpbingo.org/html', method: 'DELETE' }],
     ['web_fetch', { url: 'http://httpbingo.org/html' }],
     ['web_fetch', { url: 'https://httpbingo.org/html?session=private' }],
     ['web_fetch', { url: 'https://user:secret@httpbingo.org/html' }],
