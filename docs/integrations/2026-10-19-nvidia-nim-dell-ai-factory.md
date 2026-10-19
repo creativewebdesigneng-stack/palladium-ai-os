@@ -17,6 +17,14 @@
 5. Select **Check NVIDIA connection (read-only)** on Runtime Models. This calls `GET /v1/models` with an 8-second timeout, no redirects, and the server-side credential. `reachable` means the selected model was listed, **not** that paid inference or agent tool calling succeeded; `unsupported` means this deployment does not support catalogue listing, not that its inference API necessarily failed. A missing key blocks the probe.
 6. Run a new authorised QA agent task and separately verify model invocation, token receipt, response content, original task completion, approved tool behaviour and audits. **Do not enable automatic agent fallback or merge to Production on configuration alone.**
 
+### Separately certify real NVIDIA inference (may incur charges)
+
+The read-only `GET /models` connection check does not prove generation.
+
+**For an explicit, audited, short inference check**, a Blackstar platform admin may set `NVIDIA_NIM_INFERENCE_PROBE_ENABLED=true` in **Preview only**. The Runtime Models page then enables **Test actual NVIDIA inference (may incur charges)**. This does not run on page load, and no arbitrary user input can be passed to the provider. Before requesting tokens it verifies the operator's admin role and persists an intent audit. It sends one fixed verification prompt to the pinned NVIDIA provider/model, with no cross-provider fallback or tools, no retries, a 15-second timeout, and a 32-token output cap. A second required audit records the result; the browser gets a receipt ID, classification and numeric token usage, not credentials or raw model text.
+
+A successful fixed-marker response is evidence of **one real NVIDIA text inference**, not evidence of functional agent tool execution, stream performance or Dell hardware utilisation. Missing privileges/credentials, invalid responses, quota errors, and unavailable audit storage do not produce a successful certificate. Disable the flag again once an authorised Preview check is complete.
+
 ## Dell AI Factory / self-hosted NVIDIA NIM (optional)
 
 Dell AI Factory includes PowerEdge GPU compute, networking and storage validated for running NVIDIA software; it is *not* an external generative text API. To use a Dell system, procure/provision actual supported hardware, compatible NVIDIA NIM licensing and a securely authenticated HTTPS reverse proxy to the NIM `/v1` endpoint. Consult the NVIDIA per-model support matrix before attempting a GPU deployment.
@@ -27,6 +35,8 @@ Preview operator variables:
 - `NVIDIA_NIM_BASE_URL=https://nim.example.com/v1` — a dedicated authenticated HTTPS, publicly DNS-resolvable NIM endpoint operated by you. This must be a TLS-validated hostname; local IPs, localhost, .local/.internal, embedded credentials, querystrings and fragments are intentionally rejected. The hosted default is not modified until this is set.
 - `NVIDIA_API_KEY` — server-side bearer credential required for that NIM reverse proxy.
 - `NVIDIA_NIM_MODEL` — the actual deployed NIM model ID, where different from the hosted default.
+
+**Existing worker evidence:** Administrators can open `/admin/acceptance` to run the established read-only Cinema and 3D worker preflight probes. A healthy endpoint is not proof that Dell hardware actually completed a render or that GPU telemetry is available.
 
 **Important:** A Dell management controller (iDRAC/Redfish) must **not** be exposed directly to Vercel, and Blackstar does not currently issue Dell server management commands or report measured GPU utilisation. Running models, Game Foundry workers, Cinema Studio workers, and RTX rendering workers on actual Dell/NVIDIA machines needs separate endpoint deployment, per-GPU compatibility/VRAM verification, stable network routing, quota and acceptance tests. Existing worker contracts (`CINEMA_STUDIO_WORKER_URL`, `GAME_FOUNDRY_3D_API_URL`, etc.) should be reused rather than cloned.
 
