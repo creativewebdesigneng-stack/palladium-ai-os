@@ -1466,15 +1466,15 @@ export async function resolveGrantedTools(
 
     grants.set(slug, {
       slug,
-      requiresApproval:
-        CAPABILITY_TOOLS.has(slug) ||
-        slug === "connected_service" ||
-        DYNAMIC_ACTION_TOOLS.has(slug)
-          ? false
-          : Boolean(REGISTRY[slug]?.sensitive) ||
-            Boolean(entry?.requires_approval) ||
-            Boolean(row?.requires_approval) ||
-            Boolean(agent.requires_approval),
+      // Provider mutations are self-queued by their existing dedicated
+      // connector approval executor. Read-only connected-service access and
+      // discovery must honour account, catalogue and agent approval policies.
+      requiresApproval: DYNAMIC_ACTION_TOOLS.has(slug)
+        ? false
+        : Boolean(REGISTRY[slug]?.sensitive) ||
+          Boolean(entry?.requires_approval) ||
+          Boolean(row?.requires_approval) ||
+          Boolean(agent.requires_approval),
       allowedDomains: (row?.allowed_domains as string[] | null) ?? [],
       spendCap: row?.spend_cap == null ? null : Number(row.spend_cap),
     });
