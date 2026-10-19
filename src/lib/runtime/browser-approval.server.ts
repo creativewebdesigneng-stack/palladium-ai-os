@@ -42,6 +42,12 @@ const localInputs = {
   calculator: z.object({ expression: z.string().trim().min(1).max(500).regex(/^[0-9+\-*/(). %]+$/) }).strict(),
   current_time: z.object({}).strict(),
   data_analysis: z.object({ values: z.array(z.number().finite()).min(1).max(1000), label: z.string().max(120).optional() }).strict(),
+  // Only query/limit are executable. The approved payload normalises the model's
+  // requested result count to the web-search runtime's hard cap of eight.
+  web_search: z.object({
+    query: z.string().trim().min(1).max(300),
+    limit: z.number().finite().int().min(1).max(50).transform(value => Math.min(8, value)).optional(),
+  }).strict(),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
