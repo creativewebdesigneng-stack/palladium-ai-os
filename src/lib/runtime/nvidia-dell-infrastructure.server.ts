@@ -39,6 +39,15 @@ export function nvidiaNimKey(): string {
   return process.env['NVIDIA_API_KEY']?.trim() || '';
 }
 
+/**
+ * Enabling NVIDIA as a primary provider is separate from authorising
+ * automatic cross-provider fallback, which may consume metered tokens.
+ * Off by default even when NVIDIA_API_KEY is configured.
+ */
+export function nvidiaNimFallbackEnabled(): boolean {
+  return enabled(process.env['NVIDIA_NIM_FALLBACK_ENABLED']);
+}
+
 export function nvidiaNimConfigured() {
   if (!nvidiaNimKey()) return false;
   try { nvidiaNimBaseUrl(); return true; }
