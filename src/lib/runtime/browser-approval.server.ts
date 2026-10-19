@@ -67,6 +67,13 @@ const localInputs = {
     table: z.enum(["personal_tasks", "personal_agents", "agent_memories", "purchase_requests", "agent_tasks"]),
     limit: z.number().int().min(1).max(50).optional(),
   }).strict(),
+  // Only list is a read-only calendar operation. Event proposals/writes remain
+  // gated by the existing provider-specific action approval dispatcher.
+  calendar: z.object({
+    action: z.literal('list'),
+    provider: z.enum(['auto', 'google', 'microsoft']).optional(),
+    query: z.string().trim().max(200).optional(),
+  }).strict(),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
