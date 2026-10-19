@@ -186,6 +186,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['memory_search', { query: 'What are the operator project preferences?', category: 'user_preference' }],
     ['file_analysis', { document_id: '75b7069d-0359-4f5f-8aa0-f34e79f0d356' }],
     ['file_analysis', { title: 'Quarterly plan' }],
+    ['database_query', { table: 'personal_tasks', limit: 7 }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -261,6 +262,10 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['file_analysis', { document_id: 'not-an-id' }],
     ['file_analysis', { title: 'q'.repeat(161) }],
     ['file_analysis', { title: 'ok', download: true }],
+    ['database_query', { table: 'auth.users' }],
+    ['database_query', { table: 'personal_agents', sql: 'select * from auth.users' }],
+    ['database_query', { table: 'agent_tasks', limit: 51 }],
+    ['database_query', { table: 'agent_tasks', limit: 0 }],
     ['web_fetch', { url: 'http://httpbingo.org/html' }],
     ['web_fetch', { url: 'https://httpbingo.org/html?session=private' }],
     ['web_fetch', { url: 'https://user:secret@httpbingo.org/html' }],
@@ -309,6 +314,24 @@ describe('bounded local tool approvals share the existing continuation', () => {
     expect(call[1]).toEqual(input);
     expect(call[3].get(name).requiresApproval).toBe(false);
     expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+
+  it('executes an approved bounded database read once and resumes the existing task', async () => {
+    const payload = { table: 'personal_agents', limit: 5 };
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: 'database_query', input: payload };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'database_query';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['database_query', { slug: 'database_query', requiresApproval: true, allowedDomains: [], spendCap: null }],
+    ]) });
+    calls.execute.mockResolvedValueOnce({ ok: true, output: { table: 'personal_agents', rows: [{ id: 'owned', name: 'QA Agent' }] } });
+    const output = await executeApprovedBrowserTask(args());
+    expect(output).toMatchObject({ ok: true, provider: 'local', result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.execute.mock.calls[0]![0]).toBe('database_query');
+    expect(calls.execute.mock.calls[0]![1]).toEqual(payload);
+    expect(calls.execute.mock.calls[0]![3].get('database_query').requiresApproval).toBe(false);
     expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
   });
 
