@@ -173,9 +173,9 @@ export const runToolManually = createServerFn({ method: "POST" })
 
     // A manual test has no durable agent task to resume. Creating a generic
     // approval here produces an unexecutable request and false assurance.
-    // Read-only tools may run; connector actions with their own immutable
-    // approval dispatcher (nango_action) retain their existing route.
-    if (grant.requiresApproval && data.tool !== "nango_action") {
+    // Read-only tools may run; both aliases of the provider-neutral connector
+    // dispatcher queue immutable, independently executable approval payloads.
+    if (grant.requiresApproval && !["nango_action", "integration_action"].includes(data.tool)) {
       throw new Error(
         "This tool requires operator approval and cannot be run from the manual tester. Start an agent task so its action and approval can be resumed and audited.",
       );
@@ -198,7 +198,10 @@ export const runToolManually = createServerFn({ method: "POST" })
     const output = result.output && typeof result.output === "object" && !Array.isArray(result.output)
       ? result.output as Record<string, unknown> : null;
     const receiptId = typeof output?.["approval_request_id"] === "string" ? output["approval_request_id"] : null;
-    const awaiting = Boolean(receiptId && (output?.["requires_approval"] === true || output?.["status"] === "awaiting_approval"));
+    const awaiting = Boolean(receiptId && (
+      output?.["requires_approval"] === true || output?.["queued"] === true ||
+      output?.["status"] === "awaiting_approval" || output?.["status"] === "pending"
+    ));
     return {
       status: (awaiting ? "awaiting_approval" : result.ok ? "succeeded" : "failed") as string,
       approvalRequestId: receiptId,
