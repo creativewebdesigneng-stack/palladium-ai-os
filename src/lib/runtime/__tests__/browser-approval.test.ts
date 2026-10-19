@@ -293,6 +293,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
 
   it('does not queue connected-service or capability approvals for unassigned providers', async () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
     const context = {
       sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
       allowedProviders: ['google'],
