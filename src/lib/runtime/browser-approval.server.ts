@@ -48,6 +48,17 @@ const localInputs = {
     query: z.string().trim().min(1).max(300),
     limit: z.number().finite().int().min(1).max(50).transform(value => Math.min(8, value)).optional(),
   }).strict(),
+  // Read-only, user-scoped vault operations. Queue immutable and strictly
+  // bounded input; recheck the current grant before resuming the original task.
+  memory_search: z.object({
+    query: z.string().trim().min(1).max(300),
+    category: z.string().trim().min(1).max(80).optional(),
+  }).strict(),
+  file_analysis: z.object({
+    document_id: z.string().uuid().optional(),
+    title: z.string().trim().min(1).max(160).optional(),
+  }).strict().refine(value => Boolean(value.document_id || value.title),
+    'Document analysis approval requires an explicit document ID or title.'),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
