@@ -1,3 +1,5 @@
+import TableSurface from '@/components/palladium/TableSurface';
+
 const STATE_LABELS = {
   browser_verified: 'Verified browser execution',
   execution_recorded: 'Execution recorded',
@@ -25,8 +27,8 @@ export default function ToolEvidencePanel({ rows = [], scope }) {
     </p>
     <details className="rounded-lg border border-white/10 bg-black/20 p-3">
       <summary className="cursor-pointer text-xs font-medium text-violet-200">Review evidence for every tool</summary>
-      <div className="mt-3 max-h-80 overflow-auto">
-        <table className="w-full border-collapse text-left text-xs">
+      <TableSurface label="Agent tool execution evidence" className="mt-3" minWidth={540} maxHeight={320}>
+        <table className="text-xs">
           <thead><tr className="border-b border-white/10 text-zinc-400"><th scope="col" className="py-2 pr-2">Tool</th><th scope="col" className="py-2 pr-2">Evidence status</th><th scope="col" className="py-2">Observed runs</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.slug} className="border-b border-white/5">
             <td className="py-2 pr-2 text-zinc-200">{row.slug}</td>
@@ -34,7 +36,7 @@ export default function ToolEvidencePanel({ rows = [], scope }) {
             <td className="py-2 text-zinc-400">{row.observedAttempts || 0}</td>
           </tr>)}</tbody>
         </table>
-      </div>
+      </TableSurface>
     </details>
   </section>;
 }
