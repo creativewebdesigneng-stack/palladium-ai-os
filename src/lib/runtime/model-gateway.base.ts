@@ -1,4 +1,5 @@
 import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serving-cache";
+import { nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
 
 /**
  * Model gateway — the agent runtime is never hard-coded to one vendor.
@@ -10,13 +11,14 @@ import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serv
  *   - `anthropic`   Anthropic Messages API                -> ANTHROPIC_API_KEY
  *   - `groq`        Groq OpenAI-compatible API            -> GROQ_API_KEY
  *   - `deepseek`    DeepSeek OpenAI-compatible API        -> DEEPSEEK_API_KEY
+ *   - `nvidia`      NVIDIA hosted/self-hosted NIM API    -> NVIDIA_API_KEY
  *   - `compatible`  Any OpenAI-compatible/local endpoint  -> OPENAI_COMPATIBLE_BASE_URL
  *
  * Keys are read inside the call, server-side only. They are never returned to
  * the caller and never leave this module.
  */
 
-export type Provider = "lovable" | "gemini" | "openai" | "anthropic" | "groq" | "deepseek" | "compatible";
+export type Provider = "lovable" | "gemini" | "openai" | "anthropic" | "groq" | "deepseek" | "nvidia" | "compatible";
 
 export type ProviderAccess = {
   provider: Provider;
@@ -81,6 +83,7 @@ const DEFAULT_MODEL: Record<Provider, string> = {
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
   deepseek: "deepseek-chat",
+  nvidia: "openai/gpt-oss-20b",
   compatible: "local-model",
 };
 
@@ -97,6 +100,7 @@ export function normaliseProvider(value?: string | null): Provider {
   if (v === "anthropic" || v === "claude") return "anthropic";
   if (v === "groq") return "groq";
   if (v === "deepseek" || v === "deepseek-v3" || v === "deepseek-v3.1") return "deepseek";
+  if (v === "nvidia" || v === "nvidia-nim" || v === "nim") return "nvidia";
   if (v === "compatible" || v === "openai-compatible" || v === "local" || v === "ollama")
     return "compatible";
   // No explicit choice: an intentionally activated Blackstar-controlled runtime
@@ -132,6 +136,7 @@ export function resolveModel(provider: Provider, model?: string | null): string 
     const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
     if (nativeModel) return nativeModel;
   }
+  if (!m && provider === "nvidia") return nvidiaNimModel();
   if (!m) return DEFAULT_MODEL[provider];
   // Lovable gateway models are namespaced (`vendor/model`); keep friendly names working.
   if (provider === "lovable" && !m.includes("/")) return DEFAULT_MODEL.lovable;
@@ -179,6 +184,18 @@ function endpointFor(provider: Provider, access?: ProviderAccess | null): Endpoi
     if (!key) throw new ProviderError("Groq is not configured for this workspace.", 503, false);
     return {
       url: "https://api.groq.com/openai/v1/chat/completions",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      kind: "chat",
+    };
+  }
+  if (provider === "nvidia") {
+    const key = nvidiaNimKey();
+    if (!key) throw new ProviderError("NVIDIA NIM is not configured. Set NVIDIA_API_KEY on the server.", 503, false);
+    let base: string;
+    try { base = nvidiaNimBaseUrl(); }
+    catch { throw new ProviderError("NVIDIA NIM endpoint is not configured safely.", 503, false); }
+    return {
+      url: `${base}/chat/completions`,
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       kind: "chat",
     };
