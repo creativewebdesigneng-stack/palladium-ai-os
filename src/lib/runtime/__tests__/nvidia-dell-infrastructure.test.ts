@@ -3,7 +3,7 @@ import { ProviderError, normaliseProvider, resolveModel, runChat, streamChat } f
 import { isModelProviderConfigured, listModelProviderDefinitions } from '../model-providers.server';
 import {
   NVIDIA_NIM_HOSTED_BASE_URL, nvidiaNimBaseUrl, nvidiaNimConfigured,
-  nvidiaDellInfrastructureReadiness, probeNvidiaNimModels,
+  nvidiaDellInfrastructureReadiness, probeNvidiaNimModels, probeNvidiaNimReadiness,
 } from '../nvidia-dell-infrastructure.server';
 import { normaliseAgentModelSelection } from '@/lib/agents/agent-model-selection';
 
@@ -159,6 +159,67 @@ describe('NVIDIA NIM as an existing Blackstar model gateway provider', () => {
       messages: [{ role: 'user', content: 'test' }], maxAttempts: 1,
     })).rejects.toMatchObject<Partial<ProviderError>>({ status: 503 });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('does not query a container-only health path for hosted NVIDIA API Catalog', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    expect(await probeNvidiaNimReadiness()).toBe('not_applicable');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('probes operator-hosted NIM readiness and catalogue independently, without claiming hardware certification', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-operator-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.poweredge.example/v1');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).endsWith('/health/ready')) return new Response('', { status: 503 });
+      if (String(input).endsWith('/models')) return new Response(
+        JSON.stringify({ data: [{ id: 'openai/gpt-oss-20b' }] }), { status: 200 });
+      throw Error('Unexpected network call');
+    });
+    const result = await probeNvidiaNimModels();
+    expect(result).toMatchObject({ status: 'reachable', modelListed: true, nimReadiness: 'not_ready' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    for (const [url, opts] of fetcher.mock.calls) {
+      expect(String(url)).toMatch(/^https:\/\/nim\.poweredge\.example\/v1\/(models|health\/ready)$/);
+      expect(opts).toMatchObject({ method: 'GET', redirect: 'error' });
+      expect(new Headers(opts?.headers).get('authorization')).toBe('Bearer private-operator-key');
+    }
+    expect(JSON.stringify(result)).not.toContain('private-operator-key');
+    expect(JSON.stringify(result)).not.toContain('nim.poweredge.example');
+    expect(nvidiaDellInfrastructureReadiness().dell.hardwareVerified).toBe(false);
+  });
+
+  it.each([
+    [200, 'ready'], [401, 'unauthorised'], [403, 'unauthorised'],
+    [404, 'unsupported'], [405, 'unsupported'], [501, 'unsupported'],
+    [500, 'unavailable'], [503, 'not_ready'],
+  ] as const)('classifies operator-hosted NIM readiness HTTP %i without inferring GPU operation', async (code, status) => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.poweredge.example/v1');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: code }));
+    expect(await probeNvidiaNimReadiness()).toBe(status);
+  });
+
+  it('never contacts a hosted NIM endpoint without a configured credential or a safe HTTPS base URL', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', '');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.poweredge.example/v1');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    expect(await probeNvidiaNimReadiness()).toBe('not_configured');
+    vi.stubEnv('NVIDIA_API_KEY', 'private-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'http://localhost/v1');
+    expect(await probeNvidiaNimReadiness()).toBe('not_configured');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('sanitises hosted readiness network failures and blocks redirects', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.poweredge.example/v1');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('private-key or internal data'));
+    const status = await probeNvidiaNimReadiness();
+    expect(status).toBe('unavailable');
+    expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe('error');
   });
 
   it('provides an on-demand read-only NVIDIA probe without generation or secret leakage', async () => {
