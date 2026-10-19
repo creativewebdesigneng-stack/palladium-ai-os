@@ -35,6 +35,7 @@ export default function Models() {
   const assignments = q.data?.assignments ?? [];
   const usage = q.data?.usage ?? [];
   const astra = q.data?.astra ?? null;
+  const accelerator = q.data?.acceleratorInfrastructure ?? null;
   const totals = q.data?.totals ?? { agents: 0, activeAgents: 0, recentRuns: 0, recentCostPence: 0, configuredProviders: 0 };
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -78,6 +79,35 @@ export default function Models() {
       <BlackstarAstraActivationPanel readiness={astra} />
       <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
       <GroqEvidencePanel />
+
+      <section className="mb-6 rounded-2xl border border-violet-400/15 bg-white/[.03] p-5" aria-label="NVIDIA and Dell AI infrastructure">
+        <h2 className="text-sm font-semibold text-white">NVIDIA NIM and Dell AI Factory infrastructure</h2>
+        <p className="mt-1 text-xs text-zinc-400">Uses Blackstar's existing model routing and GPU-worker architecture. Configuration is not a live hardware or inference certification.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-white">NVIDIA NIM inference</p>
+              <span className={`text-[11px] ${accelerator?.nvidia?.configured ? 'text-emerald-300' : 'text-amber-300'}`}>
+                {accelerator?.nvidia?.configured ? 'Credentials configured' : 'Not configured'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-400">Endpoint mode: {accelerator?.nvidia?.mode === 'operator_hosted_nim' ? 'Operator-hosted NIM' : 'NVIDIA hosted API catalog'}</p>
+            <p className="mt-1 break-words text-[11px] text-violet-200">Default model: {accelerator?.nvidia?.model ?? 'openai/gpt-oss-20b'}</p>
+            <p className="mt-2 text-[11px] text-zinc-500">Set NVIDIA_API_KEY in Preview server environment; NVIDIA_NIM_MODEL and NVIDIA_NIM_BASE_URL are optional. No key is exposed here.</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-white">Dell AI Factory hosting target</p>
+              <span className="text-[11px] text-amber-300">
+                {accelerator?.dell?.selected ? 'Profile selected' : 'Not enabled'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-400">Readiness: {String(accelerator?.dell?.status ?? 'not_enabled').replaceAll('_', ' ')}</p>
+            <p className="mt-1 text-[11px] text-zinc-400">Dell hardware verified: No · GPU worker verified: No</p>
+            <p className="mt-2 text-[11px] text-zinc-500">Requires a provisioned Dell GPU host, authenticated HTTPS NVIDIA NIM endpoint and explicit operator configuration. No server is purchased or connected automatically.</p>
+          </div>
+        </div>
+      </section>
 
       <div className="mb-6"><APIManagement /></div>
 
