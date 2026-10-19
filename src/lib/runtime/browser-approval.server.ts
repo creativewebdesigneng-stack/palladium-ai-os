@@ -60,6 +60,10 @@ const localInputs = {
   }).strict().refine(value => Boolean(value.document_id || value.title),
     'Document analysis approval requires an explicit document ID or title.'),
   web_fetch: z.object({ url: publicUrl }).strict(),
+  database_query: z.object({
+    table: z.enum(["personal_tasks", "personal_agents", "agent_memories", "purchase_requests", "agent_tasks"]),
+    limit: z.number().int().min(1).max(50).optional(),
+  }).strict(),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
