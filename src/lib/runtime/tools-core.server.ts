@@ -1111,9 +1111,13 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input, ctx) => {
-      const requirement = str(input["requirement"]).slice(0, 300);
-      if (!requirement) return { error: "Describe what to shop for." };
-      const budget = Number(input["budget"] ?? 0) || ctx.spendCap || null;
+      const requirement = str(input["requirement"]).trim();
+      if (!requirement || requirement.length > 300) return { error: "Describe the shopping requirement in 300 characters or fewer." };
+      if (!ctx.allowedDomains?.length) return { error: "A retailer domain allow-list is required for shopping research." };
+      const requestedBudget = input["budget"] === undefined ? null : Number(input["budget"]);
+      if (requestedBudget !== null && (!Number.isFinite(requestedBudget) || requestedBudget < 0 || requestedBudget > 1_000_000))
+        return { error: "Shopping comparison budget must be between 0 and 1,000,000." };
+      const budget = requestedBudget || ctx.spendCap || null;
       let tool;
       try {
         tool = createBrowserTool(resolveBrowserProvider(), {
@@ -1125,6 +1129,11 @@ const REGISTRY: Record<string, ToolImpl> = {
         return { error: (error as Error).message };
       }
       try {
+        // The development provider returns demonstration listings/prices. Never
+        // let an agent or the execution ledger present those as real retail evidence.
+        if (tool.kind === "development") {
+          return { error: "Live retailer search is not configured; demonstration offers cannot be certified.", simulated: true };
+        }
         const offers = await tool.search(requirement, {
           budget,
           currency: str(input["currency"], "GBP"),
@@ -1136,12 +1145,9 @@ const REGISTRY: Record<string, ToolImpl> = {
           requirement,
           budget,
           provider: tool.provider,
-          simulated: tool.kind === "development",
+          simulated: false,
           offers: (ranked.length ? ranked : offers).slice(0, 6),
-          note:
-            tool.kind === "development"
-              ? "Development simulation — these are NOT real listings or prices. Do not present them as real products. A purchase always requires explicit approval via prepare_purchase."
-              : "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
+          note: "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
         };
       } finally {
         await tool.close();
@@ -1660,7 +1666,7 @@ export async function executeTool(
       } };
     }
   }
-  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query', 'calendar', 'connected_service', 'integration_capabilities', 'nango_capabilities'].includes(name)) {
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query', 'calendar', 'shopping_search', 'connected_service', 'integration_capabilities', 'nango_capabilities'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
       return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
