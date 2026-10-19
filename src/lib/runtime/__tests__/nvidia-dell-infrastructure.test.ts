@@ -3,7 +3,7 @@ import { ProviderError, normaliseProvider, resolveModel, runChat, streamChat } f
 import { isModelProviderConfigured, listModelProviderDefinitions } from '../model-providers.server';
 import {
   NVIDIA_NIM_HOSTED_BASE_URL, nvidiaNimBaseUrl, nvidiaNimConfigured,
-  nvidiaDellInfrastructureReadiness,
+  nvidiaDellInfrastructureReadiness, probeNvidiaNimModels,
 } from '../nvidia-dell-infrastructure.server';
 import { normaliseAgentModelSelection } from '@/lib/agents/agent-model-selection';
 
@@ -159,6 +159,71 @@ describe('NVIDIA NIM as an existing Blackstar model gateway provider', () => {
       messages: [{ role: 'user', content: 'test' }], maxAttempts: 1,
     })).rejects.toMatchObject<Partial<ProviderError>>({ status: 503 });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('provides an on-demand read-only NVIDIA probe without generation or secret leakage', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'private-readonly-probe-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ data: [{ id: 'openai/gpt-oss-20b' }] }), { status: 200 },
+    ));
+    const result = await probeNvidiaNimModels();
+    expect(result).toMatchObject({ status: 'reachable', modelListed: true,
+      configuredModel: 'openai/gpt-oss-20b', checkedAt: expect.any(String) });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, request] = fetcher.mock.calls[0]!;
+    expect(url).toBe('https://integrate.api.nvidia.com/v1/models');
+    expect(request).toMatchObject({ method: 'GET', redirect: 'error' });
+    expect(new Headers(request?.headers).get('authorization')).toBe('Bearer private-readonly-probe-key');
+    expect(JSON.stringify(result)).not.toContain('private-readonly-probe-key');
+  });
+
+  it.each([
+    [401, 'unauthorised'],
+    [403, 'unauthorised'],
+    [404, 'unsupported'],
+    [405, 'unsupported'],
+    [500, 'unavailable'],
+  ] as const)('reports NVIDIA catalogue HTTP %s without treating it as live inference', async (code, status) => {
+    vi.stubEnv('NVIDIA_API_KEY', 'hidden-probe-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: code }));
+    expect(await probeNvidiaNimModels()).toMatchObject({ status, modelListed: false });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('separates a valid catalogue connection from a missing configured model', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'hidden-probe-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ data: [{ id: 'other/model' }] }), { status: 200 },
+    ));
+    expect(await probeNvidiaNimModels()).toMatchObject({ status: 'model_missing', modelListed: false });
+  });
+
+  it('does not contact NVIDIA when the key is missing and contains upstream errors', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', '');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    expect(await probeNvidiaNimModels()).toMatchObject({ status: 'not_configured', modelListed: false });
+    expect(fetcher).not.toHaveBeenCalled();
+    vi.stubEnv('NVIDIA_API_KEY', 'hidden-probe-key');
+    fetcher.mockRejectedValue(new Error('private upstream URL and hidden-probe-key'));
+    const result = await probeNvidiaNimModels();
+    expect(result.status).toBe('unavailable');
+    expect(JSON.stringify(result)).not.toContain('hidden-probe-key');
+    expect(JSON.stringify(result)).not.toContain('private upstream URL');
+  });
+
+  it('does not follow NVIDIA model inference redirects', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'hidden-redirect-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 },
+    ));
+    await runChat({ provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'hello' }], maxAttempts: 1 });
+    expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe('error');
   });
 
   it('does not claim Dell hardware or model inference is verified from configuration alone', () => {
