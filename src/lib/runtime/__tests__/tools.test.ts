@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "./fake-supabase";
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: createFakeSupabase() }));
+vi.mock("@/lib/platform/audit.server", () => ({ writeAuditRequired: vi.fn().mockResolvedValue('approval-queued') }));
 
 import { executeTool, resolveGrantedTools, TOOL_SLUGS } from "../tools.server";
 
@@ -216,6 +217,36 @@ describe("tool execution guards", () => {
 describe("central approval enforcement", () => {
   const ctx = (db: any) =>
     ({ sb: db, userId: "user-1", orgId: null, agentId: "agent-1", taskId: "task-1", spendCap: null }) as any;
+
+  it.each([
+    ["web_fetch", { url: "https://httpbingo.org/html" }],
+    ["http_request", { url: "https://httpbingo.org/html", method: "GET" }],
+    ["shopping_search", { requirement: "replacement cycling helmet", currency: "GBP" }],
+  ])("passes the actual tool grant domain scope to approved %s, without executing it", async (name, input) => {
+    const db = sb({
+      agent_tasks: [{
+        id: "task-1", user_id: "user-1", agent_id: "agent-1",
+        status: "running", cancel_requested: false, waiting_approval_request_id: null,
+      }],
+      approval_requests: [],
+    });
+    const grants = new Map([[name, {
+      slug: name, requiresApproval: true, allowedDomains: ["httpbingo.org"], spendCap: 75,
+    }]]);
+    const result = await executeTool(name, input, ctx(db), grants as any);
+    expect(result).toMatchObject({ ok: true, output: {
+      status: "awaiting_approval", requires_approval: true,
+      approval_request_id: expect.any(String),
+    } });
+    expect(db.tables["approval_requests"]).toHaveLength(1);
+    expect(db.tables["approval_requests"][0]).toMatchObject({
+      action_type: "agent_tool_task", status: "pending",
+      details: { tool: name, agent_task_id: "task-1" },
+    });
+    expect(db.tables["agent_tasks"][0]["waiting_approval_request_id"])
+      .toBe((result.output as any).approval_request_id);
+    expect(db.tables["tool_executions"]).toHaveLength(0);
+  });
 
   it("does not execute an approval-gated clock when the active task cannot be linked", async () => {
     const db = sb();
