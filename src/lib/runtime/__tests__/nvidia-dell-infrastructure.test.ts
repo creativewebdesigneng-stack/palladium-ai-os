@@ -91,10 +91,10 @@ describe('NVIDIA NIM as an existing Blackstar model gateway provider', () => {
     vi.stubEnv('NVIDIA_API_KEY', 'private-nim-stream-key');
     vi.stubEnv('NVIDIA_NIM_BASE_URL', '');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
-      'data: {"choices":[{"delta":{"content":"Hello"}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{"content":" from NVIDIA"}}]}\\n\\n' +
-      'data: {"usage":{"prompt_tokens":4,"completion_tokens":3},"choices":[]}\\n\\n' +
-      'data: [DONE]\\n\\n',
+      'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n' +
+      'data: {"choices":[{"delta":{"content":" from NVIDIA"}}]}\n\n' +
+      'data: {"usage":{"prompt_tokens":4,"completion_tokens":3},"choices":[]}\n\n' +
+      'data: [DONE]\n\n',
       { status: 200, headers: { 'content-type': 'text/event-stream' } },
     ));
     const events = [];
