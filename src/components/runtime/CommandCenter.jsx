@@ -53,7 +53,7 @@ export default function CommandCenter({ agent, onFinished }) {
             setStatus('failed');
             setError(event.message);
           } else if (event.type === 'paused') {
-            setStatus('waiting_for_approval'); setTask(event.task); setText('Browser task paused. Review the exact request in Mission Control approvals.');
+            setStatus('waiting_for_approval'); setTask(event.task); setText('Task paused. Review the exact request in Mission Control approvals.');
           } else if (event.type === 'complete') {
             setStatus('completed');
             setError('');

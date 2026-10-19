@@ -8,9 +8,9 @@ security, workflow and tool suites also run in the full repository test suite.
 
 | Tool | Functional evidence | Live status |
 | --- | --- | --- |
-| current_time | Actual clock bounded by test start/end | Agent path blocked by QA provider/policy |
-| calculator | Real arithmetic output 708; malformed/nonfinite inputs fail | Agent path blocked by QA provider/policy |
-| data_analysis | Real count/sum/mean/min/max/median | Agent path blocked by QA provider/policy |
+| current_time | Actual clock bounded by test start/end | Live pass on checked Preview; receipts below |
+| calculator | Real arithmetic output 708; malformed/nonfinite inputs fail | Live pass on checked Preview; receipts below |
+| data_analysis | Real count/sum/mean/min/max/median | Live pass on checked Preview; receipts below |
 | web_search | Actual handler parses intercepted provider HTML | Search-provider live acceptance pending |
 | web_fetch | Actual handler strips scripts; HTTP errors fail | Separate agent-tool live acceptance pending |
 | http_request | Actual HTTP failure handling; no false success on 503 | Separate agent-tool live acceptance pending |
@@ -85,6 +85,36 @@ single-use task claim. Original output is retained as bounded tool_evidence.
 
 Automated tests cover exact queue payloads, no execution before approval, invalid
 and unbounded inputs, revoked permissions and same-task continuation. These are
-regression tests, not live agent acceptance. Live status remains pending until a
-signed-in run on the matching checked Preview produces persisted tool/audit rows.
-Other tool names cannot enter this bounded local executor.
+regression tests. The three local tools also passed genuine signed-in acceptance
+on the checked Preview below. Later commits extend the existing approval executor;
+those additional paths require their own live evidence.
+
+
+## Live local-tool acceptance — 2026-10-19
+
+Tested commit: `cc51fb5735431ab609dfbc07b3492e3cb6dc8cf4`.
+Preview deployment: `dpl_HHRsiCvVijfzDZ5TJbW1tSyCc1XP` (READY after CI passed).
+QA agent: `b2fea39e-92d3-4a1f-8928-6ff744686630` (Groq 20B).
+The existing editor persisted browser, calculator, current_time and data_analysis
+assignments. Global approval remained enabled and the browser domain remained
+httpbingo.org. Each run had zero executions while awaiting approval, displayed its
+exact input in Approval Centre, and resumed the same task after approval.
+
+| Tool | Task | Approval | Tool execution | Actual output |
+| --- | --- | --- | --- | --- |
+| calculator | fd85e396-4c27-41d8-a84c-d4c212dfeb45 | 0c5a8050-928e-42f9-9ea0-e00bb83a31db | 71d6b491-c99a-4bd5-bbf2-5449cdda173e | 12 * 59 = 708 |
+| current_time | 6daeeb33-d2fd-46f0-a599-9fd267e6846f | 754ac39d-8ca0-4628-bf84-166bfcba9758 | f15645fa-9db9-411e-b135-317792e58593 | 2026-10-19T09:19:17.923Z |
+| data_analysis | ea61ea36-d8f2-4a9e-ae8b-4c12bc187be7 | c898c914-acaf-413d-876d-8b8c1f366ea8 | 527c7126-3512-452c-9766-75d255fd29d4 | [2,4,8,10]: count 4, sum 24, mean 6, min 2, max 10, median 6 |
+
+All three tasks and approvals succeeded with exactly one persisted tool execution
+each, provider local and simulated=false. Original non-truncated tool evidence was
+retained (36, 34 and 85 characters respectively). The clock execution row was
+created at 2026-10-19T09:19:17.984041Z, approximately 61 ms after its returned time.
+Each task has successful agent.tool_approval_requested,
+agent.tool_approval_execution, agent.tool_approval_result, agent.run_result and
+agent.run audit events. These are real runtime results, not fixture outputs.
+
+This evidence applies to the tested commit, not automatically to later branch
+changes or to other tools. It does not certify complete business capabilities.
+The generic paused-task interface label was subsequently corrected to avoid
+calling calculator, clock and analysis approvals “browser” tasks.
