@@ -6,6 +6,8 @@ import {
 } from "./model-providers.server";
 import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
 import { nvidiaDellInfrastructureReadiness, probeNvidiaNimModels } from "./nvidia-dell-infrastructure.server";
+import { nvidiaInferenceProbeEnabled, certifyNvidiaInference } from "./nvidia-inference-certification.server";
+import { isPlatformAdmin } from '@/lib/marketplace/marketplace.server';
 
 type Sb = { from: (t: string) => any };
 
@@ -127,6 +129,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       // Readiness is configuration-only; not evidence of an active Dell GPU or
       // an authenticated NVIDIA model inference.
       acceleratorInfrastructure: nvidiaDellInfrastructureReadiness(),
+      nvidiaInferenceCertificationEnabled: nvidiaInferenceProbeEnabled(),
       totals: {
         agents: assignments.length,
         activeAgents: assignments.filter((agent) => agent.status === "active").length,
@@ -141,3 +144,18 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
 export const probeNvidiaModelConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => probeNvidiaNimModels());
+
+
+/**
+ * Unlike the read-only /models probe, this can use metered inference.
+ * Explicitly gated by an operator-only feature flag and an authenticated
+ * platform-admin role; no inference happens on page load.
+ */
+export const certifyNvidiaModelInference = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
+      return { forbidden: true as const };
+    }
+    return { forbidden: false as const, ...await certifyNvidiaInference({ userId: context.userId }) };
+  });
