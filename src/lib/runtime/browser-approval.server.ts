@@ -74,6 +74,27 @@ const localInputs = {
     provider: z.enum(['auto', 'google', 'microsoft']).optional(),
     query: z.string().trim().max(200).optional(),
   }).strict(),
+  // Provider capability discovery never dispatches a provider write. Empty
+  // input lists only the services already assigned to the current agent.
+  integration_capabilities: z.object({
+    provider: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]*$/).max(80).optional(),
+  }).strict(),
+  nango_capabilities: z.object({
+    provider: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]*$/).max(80).optional(),
+  }).strict(),
+  // Only the existing fixed read-only dispatcher may interpret these fields.
+  // It validates the provider/action whitelist and resolves credentials
+  // server-side; models can never supply URLs, methods or tokens.
+  connected_service: z.object({
+    provider: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]*$/).max(40),
+    action: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]*$/).max(80),
+    query: z.string().trim().max(200).optional(),
+    resource_id: z.string().trim().max(160).optional(),
+    repository: z.string().trim().max(160).optional(),
+    path: z.string().trim().max(500).optional(),
+    ref: z.string().trim().max(120).optional(),
+    limit: z.number().int().min(1).max(25).optional(),
+  }).strict(),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
@@ -95,6 +116,19 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   if (!ctx.taskId) throw new Error('Browser approval requires an existing agent task.');
   const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
   const networkRead = name === 'web_fetch' || name === 'http_request';
+  // Do not create a pending OAuth read approval for an unassigned provider.
+  // Execution checks the current assignment again in executeTool, so removing
+  // access after approval also fails closed.
+  const providerRead = name === 'connected_service' || name === 'integration_capabilities' || name === 'nango_capabilities';
+  if (providerRead) {
+    const assigned = new Set((ctx.allowedProviders ?? []).map(
+      item => typeof item === 'string' ? item.trim().toLowerCase().replace(/^nango_/, '') : '',
+    ).filter(Boolean));
+    const target = typeof payload.provider === 'string' ? payload.provider.replace(/^nango_/, '') : '';
+    if (!assigned.size || (target && !assigned.has(target))) {
+      throw new Error('Tool approval requires a currently assigned connected provider.');
+    }
+  }
   if (
     (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) ||
     (networkRead && (!ctx.allowedDomains?.length || !isDomainAllowed(payload.url, ctx.allowedDomains ?? [])))
