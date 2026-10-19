@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { findNangoProvider, isSafeNangoProviderId, NANGO_PROVIDERS } from "./nango-providers";
+import { nangoConnectionReady } from "./nango-connection-state";
 
 const providerInput = z.object({
   provider: z.string().trim().refine(isSafeNangoProviderId, "Unsupported Nango provider."),
@@ -44,7 +45,7 @@ export const listNangoConnections = createServerFn({ method: "POST" })
       return {
         ...provider,
         configured: server.nangoConfigured(),
-        connected: Boolean(connection) && connection?.status !== "error",
+        connected: nangoConnectionReady(connection),
         reconnectRequired: connection?.status === "error",
         connectionId: connection?.config?.connection_id || null,
         accountLabel: connection?.account_label || null,
@@ -111,7 +112,7 @@ export const getNangoGitHubConnection = createServerFn({ method: "POST" })
     const persisted = connection?.persisted;
     return {
       configured: true,
-      connected: Boolean(connection) && persisted?.status !== "error",
+      connected: nangoConnectionReady(persisted),
       reconnectRequired: persisted?.status === "error",
       integrationId: server.NANGO_GITHUB_INTEGRATION,
       connectionId: connection?.connection_id || connection?.id || null,
