@@ -859,17 +859,13 @@ const REGISTRY: Record<string, ToolImpl> = {
     def: {
       name: "calendar",
       description:
-        "List upcoming scheduled items, or propose a real connected-calendar event. Proposals wait for explicit approval before any external calendar write.",
+        "List upcoming items from your assigned connected calendars or your own tasks. For new external events, use an integration_action with operator approval.",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["list", "propose"] },
-          title: { type: "string" },
-          when: { type: "string", description: "ISO start date/time" },
-          end: { type: "string", description: "Optional ISO end date/time; defaults to 30 minutes after start" },
-          location: { type: "string" },
-          description: { type: "string" },
+          action: { type: "string", enum: ["list"] },
           provider: { type: "string", enum: ["auto", "google", "microsoft"] },
+          query: { type: "string", description: "Optional search filter for upcoming connected calendar events" },
         },
         required: ["action"],
       },
