@@ -270,6 +270,71 @@ describe('bounded local tool approvals share the existing continuation', () => {
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming', limit: 10 }],
+    ['integration_capabilities', { provider: 'google' }],
+    ['nango_capabilities', { provider: 'nango_google' }],
+  ])('queues owner-assigned read-only %s without making provider calls', async (name, input) => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const result = await queueLocalToolApproval(name, input, {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedProviders: ['google'],
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2]);
+    expect(result).toMatchObject({ status: 'awaiting_approval', requires_approval: true });
+    expect(db.tables['approval_requests']?.at(-1)).toMatchObject({
+      action_type: 'agent_tool_task', details: { tool: name },
+    });
+    expect(db.tables['approval_requests']?.at(-1)?.['details']?.['input'])
+      .toEqual(approvedLocalToolInput(name, input));
+    expect(db.tables['agent_tasks']?.[0]?.['waiting_approval_request_id']).toBe(result.approval_request_id);
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not queue connected-service or capability approvals for unassigned providers', async () => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    const context = {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedProviders: ['google'],
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2];
+    for (const [name, input] of [
+      ['connected_service', { provider: 'microsoft', action: 'mail_search' }],
+      ['integration_capabilities', { provider: 'slack' }],
+      ['nango_capabilities', { provider: 'nango_notion' }],
+    ] as const) {
+      await expect(queueLocalToolApproval(name, input, context))
+        .rejects.toThrow('currently assigned connected provider');
+    }
+    await expect(queueLocalToolApproval('integration_capabilities', {}, {
+      ...context, allowedProviders: [],
+    })).rejects.toThrow('currently assigned connected provider');
+    expect(db.tables['approval_requests']).toHaveLength(1);
+    expect(db.tables['agent_tasks']?.[0]?.['waiting_approval_request_id']).toBeNull();
+  });
+
+  it.each([
+    ['integration_capabilities', {}, { count: 1, capabilities: [{ provider: 'google', action: 'calendar_upcoming' }] }],
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming' }, { items: [{ id: 'read-one' }] }],
+  ])('executes an already approved %s once with the current assigned provider and unchanged tool policy', async (name, input, output) => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: name, input };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+    db.tables['personal_agents']![0]!['allowed_providers'] = ['google'];
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      [name, { slug: name, requiresApproval: true, allowedDomains: [], spendCap: 0 }],
+    ]) });
+    calls.execute.mockResolvedValueOnce({ ok: true, output });
+    const receipt = await executeApprovedBrowserTask(args());
+    expect(receipt).toMatchObject({ ok: true, provider: 'local', result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    const call = calls.execute.mock.calls[0]!;
+    expect(call[0]).toBe(name);
+    expect(call[1]).toEqual(input);
+    expect(call[2].allowedProviders).toEqual(['google']);
+    expect(call[3].get(name).requiresApproval).toBe(false);
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+
   it('accepts the observed web-search model limit and canonicalises it to eight before approval', async () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -308,6 +373,13 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['calendar', { action: 'list', provider: 'unassigned-app' }],
     ['calendar', { action: 'list', query: 'q'.repeat(201) }],
     ['calendar', { action: 'list', source_user_id: 'another-owner' }],
+    ['integration_capabilities', { user_id: 'different-owner' }],
+    ['integration_capabilities', { provider: 'bad.provider/path' }],
+    ['nango_capabilities', { provider: 'google', permission: 'write' }],
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming', access_token: 'secret' }],
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming', url: 'https://internal.test' }],
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming', limit: 26 }],
+    ['connected_service', { provider: 'google', action: 'calendar_upcoming', method: 'POST' }],
     ['http_request', { url: 'http://httpbingo.org/html' }],
     ['http_request', { url: 'https://httpbingo.org/html', method: 'POST' }],
     ['http_request', { url: 'https://httpbingo.org/html', body: '{"delete":true}' }],
