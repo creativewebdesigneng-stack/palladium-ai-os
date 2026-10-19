@@ -182,6 +182,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['calculator', { expression: '12 * 59' }],
     ['current_time', {}],
     ['data_analysis', { values: [2, 4, 8], label: 'sample' }],
+    ['web_search', { query: 'football stores UK', limit: 5 }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -194,11 +195,29 @@ describe('bounded local tool approvals share the existing continuation', () => {
     });
     expect(calls.execute).not.toHaveBeenCalled();
   });
+  it('accepts the observed web-search model limit and canonicalises it to eight before approval', async () => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const result = await queueLocalToolApproval('web_search', { query: 'football stores UK', limit: 10 }, {
+      sb: db, userId: 'owner', agentId: 'agent', taskId: 'task', orgId: null,
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2]);
+    expect(result).toMatchObject({ requires_approval: true, status: 'awaiting_approval' });
+    expect(db.tables['approval_requests']?.at(-1)?.['details']?.['input']).toEqual({
+      query: 'football stores UK', limit: 8,
+    });
+    expect(db.tables['agent_tasks']?.[0]?.['waiting_approval_request_id']).toBe(result.approval_request_id);
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['email_send', {}], ['calculator', { expression: '2^3' }],
     ['calculator', { expression: '1', extra: true }], ['current_time', { url: 'https://example.org' }],
     ['data_analysis', { values: [] }], ['data_analysis', { values: [Infinity] }],
     ['data_analysis', { values: Array(1001).fill(1) }],
+    ['web_search', { query: '' }],
+    ['web_search', { query: 'ok', url: 'https://internal.local/' }],
+    ['web_search', { query: 'ok', limit: -1 }],
+    ['web_search', { query: 'q'.repeat(301) }],
   ])('refuses unsupported or unbounded input for %s', (name, input) => {
     expect(() => approvedLocalToolInput(name as string, input)).toThrow();
   });
