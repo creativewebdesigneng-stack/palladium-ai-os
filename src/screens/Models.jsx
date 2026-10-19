@@ -11,7 +11,7 @@ import APIManagement from '@/components/models/APIManagement';
 import GroqEvidencePanel from '@/components/models/GroqEvidencePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
-import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
+import { getModelRuntimeOverview, probeNvidiaModelConnection } from '@/lib/runtime/model-management.functions';
 
 function moneyFromPence(value) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value ?? 0) / 100);
@@ -20,6 +20,19 @@ function moneyFromPence(value) {
 export default function Models() {
   const { session } = useWorkspace();
   const overviewFn = useServerFn(getModelRuntimeOverview);
+  const probeNvidiaFn = useServerFn(probeNvidiaModelConnection);
+  const [probeResult, setProbeResult] = useState(null);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const checkNvidia = async () => {
+    if (probeBusy) return;
+    setProbeBusy(true);
+    setProbeResult(null);
+    try {
+      setProbeResult(await probeNvidiaFn({ data: {} }));
+    } catch {
+      setProbeResult({ status: 'unavailable', modelListed: false });
+    } finally { setProbeBusy(false); }
+  };
   const [query, setQuery] = useState('');
   const [providerFilter, setProviderFilter] = useState('all');
 
@@ -94,6 +107,21 @@ export default function Models() {
             <p className="mt-2 text-[11px] text-zinc-400">Endpoint mode: {accelerator?.nvidia?.mode === 'operator_hosted_nim' ? 'Operator-hosted NIM' : 'NVIDIA hosted API catalog'}</p>
             <p className="mt-1 break-words text-[11px] text-violet-200">Default model: {accelerator?.nvidia?.model ?? 'openai/gpt-oss-20b'}</p>
             <p className="mt-2 text-[11px] text-zinc-500">Set NVIDIA_API_KEY in Preview server environment; NVIDIA_NIM_MODEL and NVIDIA_NIM_BASE_URL are optional. No key is exposed here.</p>
+            <button type="button" onClick={checkNvidia}
+              disabled={probeBusy || !accelerator?.nvidia?.configured}
+              className="mt-3 rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200 disabled:cursor-not-allowed disabled:opacity-40">
+              {probeBusy ? 'Checking model catalogue…' : 'Check NVIDIA connection (read-only)'}
+            </button>
+            {probeResult && <p role="status" className={`mt-2 text-xs ${probeResult.status === 'reachable' ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {({
+                reachable: 'NVIDIA catalogue reachable and selected model listed. Inference not yet verified.',
+                model_missing: 'NVIDIA catalogue reachable, but selected model not listed.',
+                unauthorised: 'NVIDIA rejected the configured API credential.',
+                unsupported: 'This NIM endpoint does not support model-list verification.',
+                unavailable: 'NVIDIA catalogue check failed. Verify Preview settings and network access.',
+                not_configured: 'Connect a server-side NVIDIA API credential in Preview first.',
+              })[probeResult.status] ?? 'NVIDIA verification unavailable.'}
+            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
             <div className="flex items-center justify-between gap-2">
