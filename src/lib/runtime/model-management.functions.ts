@@ -5,7 +5,7 @@ import {
   listModelProviderDefinitions,
 } from "./model-providers.server";
 import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
-import { nvidiaDellInfrastructureReadiness } from "./nvidia-dell-infrastructure.server";
+import { nvidiaDellInfrastructureReadiness, probeNvidiaNimModels } from "./nvidia-dell-infrastructure.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -136,3 +136,8 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       },
     };
   });
+
+/** Explicit authenticated read-only probe; never generates paid tokens. */
+export const probeNvidiaModelConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => probeNvidiaNimModels());
