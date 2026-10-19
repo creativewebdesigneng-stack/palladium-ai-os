@@ -119,12 +119,14 @@ export default function Models() {
             <p className="mt-1 break-words text-[11px] text-violet-200">Default model: {accelerator?.nvidia?.model ?? 'openai/gpt-oss-20b'}</p>
             <p className="mt-2 text-[11px] text-zinc-500">Set NVIDIA_API_KEY in Preview server environment; NVIDIA_NIM_MODEL and NVIDIA_NIM_BASE_URL are optional. No key is exposed here.</p>
             <button type="button" onClick={checkNvidia}
-              disabled={probeBusy || !accelerator?.nvidia?.configured}
+              disabled={probeBusy || !q.data?.nvidiaConnectionProbeAllowed}
               className="mt-3 rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200 disabled:cursor-not-allowed disabled:opacity-40">
               {probeBusy ? 'Checking model catalogue…' : 'Check NVIDIA connection (read-only)'}
             </button>
+            {!q.data?.nvidiaConnectionProbeAllowed &&
+              <p className="mt-2 text-[11px] text-zinc-500">Connection checks use Blackstar's shared server key and require a platform administrator and configured NVIDIA credentials.</p>}
             {probeResult && <p role="status" className={`mt-2 text-xs ${probeResult.status === 'reachable' ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {({
+              {probeResult.forbidden ? 'Only a Blackstar platform administrator may test the shared NVIDIA connection.' : ({
                 reachable: 'NVIDIA catalogue reachable and selected model listed. Inference not yet verified.',
                 model_missing: 'NVIDIA catalogue reachable, but selected model not listed.',
                 unauthorised: 'NVIDIA rejected the configured API credential.',
