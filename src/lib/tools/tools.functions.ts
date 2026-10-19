@@ -12,6 +12,7 @@ import { writeAudit } from "@/lib/platform/audit.server";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 import { executeTool, resolveGrantedTools, TOOL_MANIFEST } from "@/lib/runtime/tools.server";
 import { browserProviderStatus } from "@/lib/mission/browser-agent";
+import { toolExecutionEvidence } from "./tool-execution-evidence";
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
 
@@ -34,24 +35,39 @@ export const getToolFramework = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
 
-    const [catalogue, permissions, executions, agents, ent] = await Promise.all([
+    const [catalogue, permissions, executions, agents, ent, approvals] = await Promise.all([
       sb.from("tools").select("*").order("category", { ascending: true }),
       sb.from("tool_permissions").select("*"),
-      sb.from("tool_executions").select("*").order("created_at", { ascending: false }).limit(60),
+      sb.from("tool_executions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(60),
       sb.from("personal_agents").select("id,name,allowed_tools,requires_approval,status"),
       getEntitlements(sb as never, userId, null),
+      // Approval receipts are inspected on the server only. Never return their
+      // raw browser evidence or private provider payload to this diagnostics UI.
+      sb.from("approval_requests")
+        .select("action_type,status,execution_status,execution_result")
+        .eq("user_id", userId).eq("action_type", "agent_browser_task")
+        .order("created_at", { ascending: false }).limit(60),
     ]);
 
-    if (catalogue.error || permissions.error || agents.error) {
-      throw new Error("Could not load tool configuration and permissions.");
+    if (catalogue.error || permissions.error || agents.error || executions.error || approvals.error) {
+      throw new Error("Could not load tool configuration and permission evidence.");
     }
 
     const browser = await browserProviderStatus();
 
     const executable = new Set(TOOL_MANIFEST.map((t) => t.slug));
+    const toolEvidence = toolExecutionEvidence(
+      (catalogue.data ?? []).map((row: any) => ({
+        slug: row.slug, is_active: row.is_active, executable: executable.has(row.slug),
+      })),
+      executions.data ?? [],
+      approvals.data ?? [],
+    );
 
     return {
       plan: ent.planCode,
+      toolEvidence,
+      toolEvidenceScope: "recent_60_executions" as const,
       tools: (catalogue.data ?? []).map((t: any) => ({
         ...t,
         executable: executable.has(t.slug),
