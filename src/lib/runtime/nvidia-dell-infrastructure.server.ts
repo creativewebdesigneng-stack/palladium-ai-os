@@ -89,6 +89,36 @@ export function nvidiaDellInfrastructureReadiness() {
 }
 
 /**
+ * Read-only health evidence for an explicitly operator-hosted NIM deployment.
+ * NVIDIA's hosted API Catalog is not a self-hosted NIM container, so its
+ * container readiness endpoint is intentionally not probed.
+ * This is a model-server readiness signal, NOT a GPU or Dell attestation.
+ */
+export type NvidiaNimHealthStatus = 'not_applicable' | 'not_configured' | 'ready' |
+  'not_ready' | 'unauthorised' | 'unsupported' | 'unavailable';
+
+export async function probeNvidiaNimReadiness(): Promise<NvidiaNimHealthStatus> {
+  if (!process.env['NVIDIA_NIM_BASE_URL']?.trim()) return 'not_applicable';
+  if (!nvidiaNimConfigured()) return 'not_configured';
+  try {
+    const response = await fetch(`${nvidiaNimBaseUrl()}/health/ready`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${nvidiaNimKey()}`, Accept: 'application/json' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.status === 200) return 'ready';
+    if (response.status === 503) return 'not_ready';
+    if (response.status === 401 || response.status === 403) return 'unauthorised';
+    if (response.status === 404 || response.status === 405 || response.status === 501) return 'unsupported';
+    return 'unavailable';
+  } catch {
+    // Never surface the configured NIM endpoint, upstream body, or key.
+    return 'unavailable';
+  }
+}
+
+/**
  * Explicit operator-initiated, read-only model-catalogue probe.
  * A successful GET /models proves response from the configured endpoint,
  * but does NOT prove generation, tool calling, streaming, or Dell GPU access.
@@ -98,13 +128,15 @@ export async function probeNvidiaNimModels(): Promise<{
   checkedAt: string;
   configuredModel: string;
   modelListed: boolean;
+  nimReadiness: NvidiaNimHealthStatus;
 }> {
+  const nimReadiness = await probeNvidiaNimReadiness();
   const checkedAt = new Date().toISOString();
   const configuredModel = nvidiaNimModel();
   const result = (
     status: 'not_configured' | 'reachable' | 'model_missing' | 'unauthorised' | 'unsupported' | 'unavailable',
     modelListed = false,
-  ) => ({ status, checkedAt, configuredModel, modelListed });
+  ) => ({ status, checkedAt, configuredModel, modelListed, nimReadiness });
   if (!nvidiaNimConfigured()) return result('not_configured');
   try {
     const response = await fetch(`${nvidiaNimBaseUrl()}/models`, {
