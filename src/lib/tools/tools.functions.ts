@@ -160,6 +160,7 @@ export const runToolManually = createServerFn({ method: "POST" })
       .from("personal_agents")
       .select("id,name,allowed_tools,allowed_providers,requires_approval,org_id,org_id_fk,status")
       .eq("id", data.agentId)
+      .eq("user_id", userId)
       .maybeSingle();
     if (!agent) throw new Error("That agent is not available to you.");
 
@@ -170,29 +171,14 @@ export const runToolManually = createServerFn({ method: "POST" })
     if (!grant)
       throw new Error(`"${data.tool}" is not enabled for ${agent.name} on your current plan.`);
 
-    // nango_action performs its own schema-aware risk classification and queues
-    // an immutable provider/action payload when this grant requires approval.
+    // A manual test has no durable agent task to resume. Creating a generic
+    // approval here produces an unexecutable request and false assurance.
+    // Read-only tools may run; connector actions with their own immutable
+    // approval dispatcher (nango_action) retain their existing route.
     if (grant.requiresApproval && data.tool !== "nango_action") {
-      const { data: approval } = await sb
-        .from("approval_requests")
-        .insert({
-          user_id: userId,
-          org_id: orgId,
-          agent_id: agent.id,
-          action_type: data.tool,
-          title: `Approve ${data.tool} run`,
-          summary: `Manual ${data.tool} invocation requested for ${agent.name}.`,
-          details: { tool: data.tool, input: data.input ?? {} },
-          risk_level: "high",
-          status: "pending",
-        })
-        .select("id")
-        .maybeSingle();
-      return {
-        status: "awaiting_approval" as string,
-        approvalRequestId: (approval?.id as string | null) ?? null,
-        outputJson: null as string | null,
-      };
+      throw new Error(
+        "This tool requires operator approval and cannot be run from the manual tester. Start an agent task so its action and approval can be resumed and audited.",
+      );
     }
 
     const result = await executeTool(
@@ -209,9 +195,13 @@ export const runToolManually = createServerFn({ method: "POST" })
       grants,
     );
 
+    const output = result.output && typeof result.output === "object" && !Array.isArray(result.output)
+      ? result.output as Record<string, unknown> : null;
+    const receiptId = typeof output?.["approval_request_id"] === "string" ? output["approval_request_id"] : null;
+    const awaiting = Boolean(receiptId && (output?.["requires_approval"] === true || output?.["status"] === "awaiting_approval"));
     return {
-      status: (result.ok ? "succeeded" : "failed") as string,
-      approvalRequestId: null as string | null,
+      status: (awaiting ? "awaiting_approval" : result.ok ? "succeeded" : "failed") as string,
+      approvalRequestId: receiptId,
       outputJson: JSON.stringify(result.output ?? null),
     };
   });
