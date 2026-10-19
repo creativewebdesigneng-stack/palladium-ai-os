@@ -1669,7 +1669,12 @@ export async function executeTool(
   if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query', 'calendar', 'shopping_search', 'connected_service', 'integration_capabilities', 'nango_capabilities'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
-      return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
+      // Keep the executable approval bound to this tool's actual grant, not
+      // to the optional context defaults. This is required for domain-gated
+      // reads (web_fetch, http_request and shopping_search).
+      return { ok: true, output: await queueLocalToolApproval(name, input, {
+        ...ctx, allowedDomains: grant.allowedDomains, spendCap: grant.spendCap ?? ctx.spendCap ?? null,
+      }) };
     } catch {
       await log('failed', { error: 'Could not queue bounded tool approval.', policy_code: 'APPROVAL_QUEUE_FAILED' });
       return { ok: false, output: { requires_approval: true, error: 'Bounded tool approval could not be queued.', policy_code: 'APPROVAL_QUEUE_FAILED' } };
