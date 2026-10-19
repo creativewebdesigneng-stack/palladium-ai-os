@@ -167,7 +167,7 @@ export async function certifyNvidiaToolCalling(args: { userId: string }): Promis
       Boolean(call && typeof call.id === 'string' && call.id.trim() &&
         call.name === 'calculator' && params && typeof params === 'object' &&
         !Array.isArray(params) && Object.keys(params).length === 1 &&
-        params.expression === NVIDIA_TOOL_CALL_PROBE_EXPRESSION)
+        params['expression'] === NVIDIA_TOOL_CALL_PROBE_EXPRESSION)
       ? 'verified' : 'invalid_response';
     // IMPORTANT: Never dispatch response.toolCalls or execute calculator here.
   } catch (error) {
