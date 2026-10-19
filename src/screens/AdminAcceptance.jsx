@@ -209,6 +209,39 @@ export default function AdminAcceptance() {
                 title="3D Studio worker"
                 probe={preflight.data.threeD}
               />
+              <div className="md:col-span-3 rounded-xl border border-violet-400/15 bg-violet-400/[.035] p-4">
+                <p className="text-xs font-semibold text-violet-100">NVIDIA / GPU worker inventory (read-only)</p>
+                <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                  Optional device information reported by the existing Cinema and 3D workers. A self-report is not independently verified Dell hardware, CUDA readiness, renderer output or a successful model run.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[
+                    ['Cinema worker', preflight.data.gpuWorkers?.cinema],
+                    ['Game Foundry / 3D worker', preflight.data.gpuWorkers?.threeD],
+                  ].map(([label, worker]) => (
+                    <div key={label} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs font-medium text-zinc-200">{label}</p>
+                      {worker?.state === 'self_reported' && worker.report ? (
+                        <p className="mt-1 text-[11px] text-zinc-400">
+                          Reported: {worker.report.vendor.toUpperCase()}
+                          {worker.report.model ? ` · ${worker.report.model}` : ''}
+                          {worker.report.vramMiB !== null ? ` · ${worker.report.vramMiB} MiB VRAM` : ''}
+                          {worker.report.cudaAvailable !== null ? ` · CUDA reported ${worker.report.cudaAvailable ? 'available' : 'unavailable'}` : ''}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-zinc-500">
+                          {worker?.state === 'worker_unavailable'
+                            ? 'Worker is not healthy or reachable; no GPU claims accepted.'
+                            : 'No GPU information reported by this worker.'}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-zinc-500">
+                  Independent GPU verification and a real Cinema/Game Foundry output remain separate acceptance gates.
+                </p>
+              </div>
               <p className="md:col-span-3 text-[10px] leading-4 text-zinc-600">
                 Checked {preflight.data.checkedAt ? new Date(preflight.data.checkedAt).toLocaleString('en-GB') : 'now'} · Readiness is not external-client connection or render certification. No acceptance outcome was saved by this preflight.
               </p>
