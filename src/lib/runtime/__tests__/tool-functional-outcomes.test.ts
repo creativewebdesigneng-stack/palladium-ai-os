@@ -3,7 +3,7 @@ import { createFakeSupabase } from './fake-supabase';
 vi.mock('@/integrations/supabase/client.server', () => ({ supabaseAdmin: createFakeSupabase() }));
 import { executeTool } from '../tools.server';
 import { toolResultError } from '../tools-core.server';
-function fixture() { return createFakeSupabase({ tool_executions: [], approval_requests: [], purchase_requests: [], memory_documents: [{ id: 'doc', title: 'Fixture document', chunk_count: 1 }], memory_chunks: [{ document_id: 'doc', chunk_index: 0, content: 'Document contents for functional verification.' }] }); }
+function fixture() { return createFakeSupabase({ tool_executions: [], approval_requests: [], purchase_requests: [], memory_documents: [{ id: 'doc', user_id: 'owner', title: 'Fixture document', chunk_count: 1 }], memory_chunks: [{ user_id: 'owner', document_id: 'doc', chunk_index: 0, content: 'Document contents for functional verification.' }] }); }
 async function run(tool: string, input: Record<string, unknown>, sb = fixture()) {
  const result = await executeTool(tool, input, { sb, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task' }, new Map([[tool, { slug: tool, requiresApproval: false, allowedDomains: ['httpbingo.org'], spendCap: 100 }]]));
  return { result, sb };
@@ -40,6 +40,22 @@ describe('actual tool handler functional outcomes', () => {
  it.each(['', '1 / 0', '1 +'])('calculator records invalid arithmetic %s as failed', async expression => { expect((await run('calculator', { expression })).result.ok).toBe(false); });
  it('file_analysis returns stored document text through its real handler', async () => { expect((await run('file_analysis', { document_id: 'doc' })).result).toMatchObject({ ok: true, output: { document: { id: 'doc' }, text: 'Document contents for functional verification.' } }); });
  it('missing vault documents are failed rather than successful', async () => { expect((await run('file_analysis', { document_id: 'missing' })).result.ok).toBe(false); });
+ it('never reads a different user vault document or its private chunks', async () => {
+   const sb = fixture();
+   sb.tables['memory_documents']!.push({ id: 'other-doc', user_id: 'other-owner', title: 'Private plan', chunk_count: 1 });
+   sb.tables['memory_chunks']!.push({ document_id: 'other-doc', user_id: 'other-owner', chunk_index: 0, content: 'Private data not for owner' });
+   const foreign = (await run('file_analysis', { document_id: 'other-doc' }, sb)).result;
+   expect(foreign.ok).toBe(false);
+   const own = (await run('file_analysis', { document_id: 'doc' }, sb)).result;
+   expect(own).toMatchObject({ ok: true, output: { text: 'Document contents for functional verification.' } });
+   expect(JSON.stringify(own.output)).not.toContain('Private data not for owner');
+ });
+ it('does not claim successful vault analysis for missing or foreign indexed chunks', async () => {
+   const sb = fixture();
+   sb.tables['memory_chunks'] = [{ user_id: 'another-user', document_id: 'doc', chunk_index: 0, content: 'Another user text' }];
+   const out = (await run('file_analysis', { document_id: 'doc' }, sb)).result;
+   expect(out).toMatchObject({ ok: false, output: { error: expect.stringContaining('no readable indexed text') } });
+ });
  it('database_query reads permitted data and refuses arbitrary tables', async () => {
   const sb = fixture(); sb.tables['personal_tasks'] = [{ id: 'task-fixture', title: 'Fixture' }];
   expect((await run('database_query', { table: 'personal_tasks' }, sb)).result).toMatchObject({ ok: true, output: { rows: [{ id: 'task-fixture' }] } });
