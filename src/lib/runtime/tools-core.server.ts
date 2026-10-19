@@ -1265,19 +1265,34 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input, ctx) => {
-      const allowedTables = [
-        "personal_tasks",
-        "personal_agents",
-        "agent_memories",
-        "purchase_requests",
-        "agent_tasks",
-      ];
+      // Only return documented, non-sensitive columns. In particular, never
+      // expose personal-agent system prompts, task checkpoints, memory vectors
+      // or checkout URLs to a general-purpose database tool.
+      const readableColumns: Record<string, string[]> = {
+        personal_tasks: ["id", "title", "category", "status", "priority", "due_at", "created_at", "completed_at"],
+        personal_agents: ["id", "name", "category", "status", "model_provider", "model", "requires_approval", "created_at"],
+        agent_memories: ["id", "title", "memory_type", "category", "importance", "pinned", "created_at"],
+        purchase_requests: ["id", "product", "seller", "total", "currency", "status", "created_at"],
+        agent_tasks: ["id", "agent_id", "title", "status", "tool_calls", "created_at", "completed_at"],
+      };
       const table = str(input["table"]);
-      if (!allowedTables.includes(table)) return { error: "That table is not readable by tools." };
-      const limit = Math.min(Number(input["limit"] ?? 20) || 20, 50);
-      const { data, error } = await ctx.sb.from(table).select("*").limit(limit);
+      if (!Object.hasOwn(readableColumns, table)) return { error: "That table is not readable by tools." };
+      const fields = readableColumns[table]!;
+      const requestedLimit = input["limit"] === undefined ? 20 : Number(input["limit"]);
+      if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 50)
+        return { error: "A row limit between 1 and 50 is required." };
+      const { data, error } = await ctx.sb.from(table)
+        .select(fields.join(",")).eq("user_id", ctx.userId).limit(requestedLimit);
       if (error) return { error: "Query failed." };
-      return { table, rows: data ?? [] };
+      // Project server-side as defence in depth if query adapters ever return
+      // more fields than requested. Bound both result count and field length.
+      const rows = (data ?? []).slice(0, requestedLimit).map((row: Record<string, unknown>) =>
+        Object.fromEntries(fields.map(field => [
+          field,
+          typeof row[field] === "string" ? (row[field] as string).slice(0, 500) : row[field] ?? null,
+        ])),
+      );
+      return { table, rows };
     },
   },
 
@@ -1641,7 +1656,7 @@ export async function executeTool(
       } };
     }
   }
-  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch'].includes(name)) {
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'database_query'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
       return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
