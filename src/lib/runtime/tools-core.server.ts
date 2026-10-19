@@ -773,24 +773,31 @@ const REGISTRY: Record<string, ToolImpl> = {
     run: async (input, ctx) => {
       const documentId = str(input["document_id"]);
       const title = str(input["title"]);
+      // Explicit owner filters protect vault reads even if this context is
+      // ever changed to use a privileged server client instead of user RLS.
       let docQuery = ctx.sb
         .from("memory_documents")
         .select("id,title,mime_type,size_bytes,chunk_count")
+        .eq("user_id", ctx.userId)
         .limit(1);
       docQuery = documentId
         ? docQuery.eq("id", documentId)
         : title
           ? docQuery.ilike("title", `%${title}%`)
           : docQuery;
-      const { data: docs } = await docQuery;
+      const { data: docs, error: documentError } = await docQuery;
+      if (documentError) return { error: "Could not read the owner's document vault." };
       const doc = docs?.[0];
       if (!doc) return { error: "No matching document found in the vault." };
-      const { data: chunks } = await ctx.sb
+      const { data: chunks, error: chunkError } = await ctx.sb
         .from("memory_chunks")
         .select("chunk_index,content")
         .eq("document_id", doc.id)
+        .eq("user_id", ctx.userId)
         .order("chunk_index", { ascending: true })
         .limit(12);
+      if (chunkError) return { error: "Could not read the owner's document text." };
+      if (!chunks?.length) return { error: "This document has no readable indexed text yet." };
       return {
         document: {
           id: doc.id,
