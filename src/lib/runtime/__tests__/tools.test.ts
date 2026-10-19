@@ -72,6 +72,43 @@ describe("tool grants", () => {
     expect(grants.has("web_search")).toBe(false);
   });
 
+  it.each(["connected_service", "integration_capabilities", "nango_capabilities"])(
+    "honours agent approval policy for %s instead of silently bypassing it",
+    async slug => {
+      const db = sb();
+      const agent = { id: "a", allowed_tools: [slug], requires_approval: true };
+      const { grants } = await resolveGrantedTools(db, agent, "enterprise");
+      expect(grants.get(slug)?.requiresApproval).toBe(true);
+      const granted = await resolveGrantedTools(db, { ...agent, requires_approval: false }, "enterprise");
+      expect(granted.grants.get(slug)?.requiresApproval).toBe(false);
+    },
+  );
+
+  it.each(["connected_service", "integration_capabilities", "nango_capabilities"])(
+    "retains catalogue and explicit user approval flags for %s",
+    async slug => {
+      const db = sb();
+      db.tables["tools"].find((row: Record<string, any>) => row.slug === slug).requires_approval = true;
+      db.tables["tool_permissions"].push({
+        tool: slug, agent_id: "a", enabled: true, requires_approval: false,
+      });
+      const { grants } = await resolveGrantedTools(
+        db, { id: "a", allowed_tools: [slug], requires_approval: false }, "enterprise",
+      );
+      expect(grants.get(slug)?.requiresApproval).toBe(true);
+    },
+  );
+
+  it("keeps self-queuing connector write aliases on their dedicated approval dispatcher", async () => {
+    const { grants } = await resolveGrantedTools(sb(), {
+      id: "a", allowed_tools: ["connected_service"], requires_approval: true,
+    }, "enterprise");
+    expect(grants.get("connected_service")?.requiresApproval).toBe(true);
+    expect(grants.get("integration_capabilities")?.requiresApproval).toBe(true);
+    expect(grants.get("integration_action")?.requiresApproval).toBe(false);
+    expect(grants.get("nango_action")?.requiresApproval).toBe(false);
+  });
+
   it("marks sensitive tools as requiring human approval", async () => {
     const { grants } = await resolveGrantedTools(
       sb(),
