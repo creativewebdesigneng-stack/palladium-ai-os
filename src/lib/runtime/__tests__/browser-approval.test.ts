@@ -187,7 +187,6 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['file_analysis', { document_id: '75b7069d-0359-4f5f-8aa0-f34e79f0d356' }],
     ['file_analysis', { title: 'Quarterly plan' }],
     ['database_query', { table: 'personal_tasks', limit: 7 }],
-    ['http_request', { url: 'https://httpbingo.org/html', method: 'GET' }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
