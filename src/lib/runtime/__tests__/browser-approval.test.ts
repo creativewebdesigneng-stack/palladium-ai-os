@@ -183,6 +183,9 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['current_time', {}],
     ['data_analysis', { values: [2, 4, 8], label: 'sample' }],
     ['web_search', { query: 'football stores UK', limit: 5 }],
+    ['memory_search', { query: 'What are the operator project preferences?', category: 'user_preference' }],
+    ['file_analysis', { document_id: '75b7069d-0359-4f5f-8aa0-f34e79f0d356' }],
+    ['file_analysis', { title: 'Quarterly plan' }],
   ])('queues exact %s input without executing it', async (name, input) => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -218,6 +221,13 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['web_search', { query: 'ok', url: 'https://internal.local/' }],
     ['web_search', { query: 'ok', limit: -1 }],
     ['web_search', { query: 'q'.repeat(301) }],
+    ['memory_search', { query: '' }],
+    ['memory_search', { query: 'q'.repeat(301) }],
+    ['memory_search', { query: 'ok', user_id: 'other' }],
+    ['file_analysis', {}],
+    ['file_analysis', { document_id: 'not-an-id' }],
+    ['file_analysis', { title: 'q'.repeat(161) }],
+    ['file_analysis', { title: 'ok', download: true }],
   ])('refuses unsupported or unbounded input for %s', (name, input) => {
     expect(() => approvedLocalToolInput(name as string, input)).toThrow();
   });
@@ -241,6 +251,30 @@ describe('bounded local tool approvals share the existing continuation', () => {
     expect(calls.complete).toHaveBeenCalledWith(expect.objectContaining({ run: expect.objectContaining({ taskId: 'task', messages: [expect.objectContaining({ content: expect.stringContaining('708') })] }) }));
     expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
   });
+  it.each([
+    ['memory_search', { query: 'my project', category: 'user_preference' }, { memories: [{ content: 'Preference retained' }] }],
+    ['file_analysis', { title: 'Annual report' }, { text: 'Verified document excerpt' }],
+  ])('executes approved read-only %s once with current grant and resumes the same task', async (name, input, output) => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: name, input };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      [name, { slug: name, requiresApproval: true, allowedDomains: [], spendCap: 0 }],
+    ]) });
+    calls.execute.mockResolvedValueOnce({ ok: true, output });
+    const result = await executeApprovedBrowserTask(args());
+    expect(result).toMatchObject({
+      ok: true, provider: 'local',
+      result: { agent_task_id: 'task', task_status: 'succeeded', tool_evidence: { truncated: false } },
+    });
+    const call = calls.execute.mock.calls[0]!;
+    expect(call[0]).toBe(name);
+    expect(call[1]).toEqual(input);
+    expect(call[3].get(name).requiresApproval).toBe(false);
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+
   it('does not treat a browser grant as permission for calculator', async () => {
     db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
     db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: 'calculator', input: { expression: '1+1' } };
