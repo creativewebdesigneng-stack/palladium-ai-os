@@ -7,7 +7,7 @@
 type ToolRow = { slug: string; is_active?: boolean; executable?: boolean };
 type ExecutionRow = {
   tool: string; status: string; agent_task_id?: string | null;
-  created_at?: string; error?: string | null;
+  created_at?: string; error?: string | null; output?: unknown;
 };
 type ApprovalRow = {
   action_type?: string; status?: string; execution_status?: string;
@@ -15,13 +15,25 @@ type ApprovalRow = {
 };
 export type ToolEvidenceState =
   'browser_verified' | 'execution_recorded' | 'approval_activity' |
-  'failed_only' | 'not_tested' | 'not_executable';
+  'failed_only' | 'simulated_only' | 'not_tested' | 'not_executable';
 
 const approvalOnly = new Set([
   'request_approval', 'prepare_purchase', 'email_draft', 'email_send',
   'slack_post', 'calendar', 'connected_service_write', 'github_write',
   'integration_action', 'nango_action',
 ]);
+
+// A persisted 'succeeded' status is not proof that a tool performed a real
+// operation if the original output explicitly identifies a simulation.
+function simulatedExecution(row: ExecutionRow) {
+  const output = row.output;
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return false;
+  const record = output as Record<string, unknown>;
+  if (record['simulated'] === true) return true;
+  const result = record['result'];
+  return Boolean(result && typeof result === 'object' && !Array.isArray(result) &&
+    (result as Record<string, unknown>)['simulated'] === true);
+}
 
 function verifiedBrowserTaskIds(approvals: ApprovalRow[]) {
   const ids = new Set<string>();
@@ -46,7 +58,8 @@ export function toolExecutionEvidence(
   const browserTaskIds = verifiedBrowserTaskIds(approvals);
   return tools.map(tool => {
     const attempts = executions.filter(row => row.tool === tool.slug);
-    const successes = attempts.filter(row => row.status === 'succeeded');
+    const successes = attempts.filter(row => row.status === 'succeeded' && !simulatedExecution(row));
+    const simulated = attempts.filter(row => row.status === 'succeeded' && simulatedExecution(row));
     const failures = attempts.filter(row => row.status === 'failed');
     let state: ToolEvidenceState = 'not_tested';
     if (tool.is_active === false || tool.executable === false) {
@@ -59,12 +72,15 @@ export function toolExecutionEvidence(
     } else if (successes.length) {
       state = approvalOnly.has(tool.slug) || tool.slug === 'browser_task'
         ? 'approval_activity' : 'execution_recorded';
+    } else if (simulated.length) {
+      state = 'simulated_only';
     } else if (failures.length) {
       state = 'failed_only';
     }
     return {
       slug: tool.slug, state, observedAttempts: attempts.length,
       recordedSuccesses: successes.length, recordedFailures: failures.length,
+      simulatedExecutions: simulated.length,
       lastAttemptAt: attempts[0]?.created_at ?? null,
     };
   });
