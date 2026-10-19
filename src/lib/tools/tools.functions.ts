@@ -50,7 +50,7 @@ export const getToolFramework = createServerFn({ method: "POST" })
     ]);
 
     if (catalogue.error || permissions.error || agents.error || executions.error || approvals.error) {
-      throw new Error("Could not load tool configuration and permission evidence.");
+      throw new Error("Could not load tool configuration and permissions or execution evidence.");
     }
 
     const browser = await browserProviderStatus();
