@@ -1,6 +1,7 @@
 import { FREELLMAPI_PROFILE } from './freellmapi-profile'
+import { nvidiaNimConfigured, nvidiaNimModel } from './nvidia-dell-infrastructure.server'
 
-export type ModelProviderId = 'lovable' | 'openai' | 'anthropic' | 'gemini' | 'groq' | 'deepseek' | 'compatible' | 'freellm'
+export type ModelProviderId = 'lovable' | 'openai' | 'anthropic' | 'gemini' | 'groq' | 'deepseek' | 'nvidia' | 'compatible' | 'freellm'
 
 export type ModelProviderDefinition = {
   id: ModelProviderId
@@ -16,6 +17,7 @@ const MODEL_PROVIDER_DEFINITIONS: readonly ModelProviderDefinition[] = [
   { id: 'gemini', name: 'Google Gemini', defaultModel: 'gemini-3.6-flash' },
   { id: 'groq', name: 'Groq', defaultModel: 'openai/gpt-oss-120b' },
   { id: 'deepseek', name: 'DeepSeek V3', defaultModel: 'deepseek-chat' },
+  { id: 'nvidia', name: 'NVIDIA NIM', defaultModel: 'openai/gpt-oss-20b', integrations: ['NVIDIA API Catalog', 'Dell AI Factory'], routingNote: 'Uses the existing OpenAI-compatible model gateway. Requires NVIDIA_API_KEY. Optional NVIDIA_NIM_BASE_URL directs inference to a provisioned HTTPS NIM service on Dell hardware; no hardware is implied by configuration.' },
   { id: 'anthropic', name: 'Anthropic', defaultModel: 'claude-sonnet-4-5-20250929' },
   {
     id: 'compatible',
@@ -53,6 +55,7 @@ export function listModelProviderDefinitions(): readonly ModelProviderDefinition
   return MODEL_PROVIDER_DEFINITIONS.map((provider) => {
     if (provider.id === 'compatible') return { ...provider, defaultModel: compatibleModel }
     if (provider.id === 'freellm') return { ...provider, defaultModel: freeLlmModel }
+    if (provider.id === 'nvidia') return { ...provider, defaultModel: nvidiaNimModel() }
     return provider
   })
 }
@@ -64,6 +67,7 @@ export function isModelProviderConfigured(provider: ModelProviderId): boolean {
   if (provider === 'groq') return Boolean(process.env['GROQ_API_KEY'])
   if (provider === 'anthropic') return Boolean(process.env['ANTHROPIC_API_KEY'])
   if (provider === 'deepseek') return Boolean(process.env['DEEPSEEK_API_KEY'])
+  if (provider === 'nvidia') return nvidiaNimConfigured()
   if (provider === 'freellm') return Boolean(process.env['FREELLMAPI_BASE_URL']?.trim() && process.env['FREELLMAPI_MODEL']?.trim())
   return Boolean(process.env['OPENAI_COMPATIBLE_BASE_URL'])
 }
