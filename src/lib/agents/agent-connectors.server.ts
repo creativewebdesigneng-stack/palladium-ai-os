@@ -2,6 +2,7 @@ import { writeAudit, writeAuditRequired } from '@/lib/platform/audit.server';
 import { INTEGRATION_PROVIDERS } from '@/lib/integrations/providers';
 import { NANGO_PROVIDERS } from '@/lib/integrations/nango-providers';
 import { TOOL_MANIFEST } from '@/lib/runtime/tools.server';
+import { nangoConnectionReady } from '@/lib/integrations/nango-connection-state';
 
 type Sb = { from: (table: string) => any };
 type Connection = { provider?: string; name?: string; status?: string; account_label?: string | null; config?: Record<string, unknown> | null };
@@ -29,7 +30,7 @@ export async function listOwnedAgentConnectorChoices(args: { sb: Sb; userId: str
     const id = providerId(raw);
     if (!validId(id)) continue;
     const nango = raw.startsWith('nango_');
-    const connected = row.status === 'connected' && (!nango || Boolean(row.config?.['connection_id']));
+    const connected = nango ? nangoConnectionReady(row) : row.status === 'connected';
     const old = choices.get(id);
     if (!old && !connected) continue;
     if (connected) {
