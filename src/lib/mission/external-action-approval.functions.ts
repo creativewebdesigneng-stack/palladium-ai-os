@@ -20,7 +20,9 @@ type ExternalActionType =
   | ApprovedGitHubActionType
   | "nango_dynamic_action"
   | "external_mcp_action"
-  | "agent_skill_script";
+  | "agent_skill_script"
+  | "agent_browser_task"
+  | "agent_tool_task";
 
 const GITHUB_EXECUTABLE = new Set<ApprovedGitHubActionType>([
   "github_branch_create",
@@ -41,6 +43,8 @@ const EXECUTABLE = new Set<ExternalActionType>([
   "nango_dynamic_action",
   "external_mcp_action",
   "agent_skill_script",
+  "agent_browser_task",
+  "agent_tool_task",
   ...GITHUB_EXECUTABLE,
 ]);
 
@@ -63,6 +67,10 @@ async function executeExternalAction(
   details: Record<string, unknown>,
   approval: { id: string; agent_id?: string | null; org_id?: string | null },
 ) {
+  if (['agent_browser_task', 'agent_tool_task'].includes(type)) {
+    const { executeApprovedBrowserTask } = await import('@/lib/runtime/browser-approval.server');
+    return executeApprovedBrowserTask({ sb, userId, approvalRequestId: approval.id });
+  }
   if (type === "external_mcp_action") {
     return executeApprovedAgentMcpAction({ sb, userId, details });
   }
@@ -175,6 +183,10 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
         .maybeSingle();
       if (rejected.error) throw new Error(rejected.error.message);
       if (!rejected.data) throw new Error("This request has already been decided");
+      if (['agent_browser_task', 'agent_tool_task'].includes(type)) {
+        const { rejectBrowserApproval } = await import('@/lib/runtime/browser-approval.server');
+        await rejectBrowserApproval({ sb: approvalDb, userId, approvalRequestId: approval.id, agentId: approval.agent_id, taskId: safeDetails(approval.details)['agent_task_id'] as string });
+      }
       await updateTask(sb, userId, approval.task_id ?? null, "cancelled");
       await audit(sb, userId, approval, "external_action_rejected", "success", {});
       return { status: "rejected" as const, execution: null };
@@ -201,15 +213,22 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This request has already been decided");
 
+    // The human decision is claimed before dispatch. Unexpected runtime
+    // exceptions must not strand an approved action as "executing".
     const execution = await executeExternalAction(
       sb,
       userId,
       type,
       safeDetails(claim.data.details),
       claim.data,
-    );
+    ).catch(() => ({
+      ok: false,
+      provider: "blackstar",
+      error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+      result: undefined,
+    } as Awaited<ReturnType<typeof executeExternalAction>>));
 
-    await approvalDb
+    const finalised = await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",
@@ -222,7 +241,32 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId)
       .eq("status", "approved")
-      .eq("execution_status", "executing");
+      .eq("execution_status", "executing")
+      .select("id")
+      .maybeSingle();
+    if (finalised.error || !finalised.data) {
+      throw new Error("Could not persist the approved action execution outcome.");
+    }
+
+    // Fail closed for the exact approved browser continuation, without
+    // overwriting task cancellation or a separately completed run.
+    if (["agent_browser_task", "agent_tool_task"].includes(type) && !execution.ok) {
+      const taskId = safeDetails(approval.details)["agent_task_id"];
+      if (typeof taskId === "string" && taskId.length > 0) {
+        const closed = await approvalDb.from("agent_tasks")
+          .update({
+            status: "failed",
+            error: "Approved browser action failed; start a new authorised task. No browser success was certified.",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", taskId).eq("user_id", userId)
+          .eq("agent_id", approval.agent_id)
+          .eq("waiting_approval_request_id", approval.id)
+          .eq("cancel_requested", false)
+          .in("status", ["running", "waiting_for_approval"]);
+        if (closed.error) throw new Error("Could not close the failed approved browser task.");
+      }
+    }
 
     await updateTask(
       sb,
@@ -291,8 +335,8 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       throw new Error("This approved action is not eligible for retry");
     }
     const type = actionType(approval.action_type);
-    if (type === "agent_skill_script") {
-      throw new Error("Approved skill scripts are single-use. Request a new approval instead of retrying a failed recipe.");
+    if (type === "agent_skill_script" || ["agent_browser_task", "agent_tool_task"].includes(type)) {
+      throw new Error("This approved action is single-use. Request a new approval instead of retrying it.");
     }
 
     // Retry claims only the already-approved immutable request payload. The UI
@@ -309,15 +353,22 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (claim.error) throw new Error(claim.error.message);
     if (!claim.data) throw new Error("This action is already being retried");
 
+    // The human decision is claimed before dispatch. Unexpected runtime
+    // exceptions must not strand an approved action as "executing".
     const execution = await executeExternalAction(
       sb,
       userId,
       type,
       safeDetails(claim.data.details),
       claim.data,
-    );
+    ).catch(() => ({
+      ok: false,
+      provider: "blackstar",
+      error: "Approved action could not complete. No execution was verified; review runtime and audit evidence.",
+      result: undefined,
+    } as Awaited<ReturnType<typeof executeExternalAction>>));
 
-    await approvalDb
+    const finalised = await approvalDb
       .from("approval_requests")
       .update({
         execution_status: execution.ok ? "succeeded" : "failed",
@@ -330,7 +381,12 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("user_id", userId)
       .eq("status", "approved")
-      .eq("execution_status", "executing");
+      .eq("execution_status", "executing")
+      .select("id")
+      .maybeSingle();
+    if (finalised.error || !finalised.data) {
+      throw new Error("Could not persist the approved action execution outcome.");
+    }
 
     await updateTask(
       sb,

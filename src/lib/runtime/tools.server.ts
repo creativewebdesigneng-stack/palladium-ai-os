@@ -4,6 +4,7 @@ import {
   TOOL_SLUGS as CORE_TOOL_SLUGS,
   executeTool as executeCoreTool,
   resolveGrantedTools as resolveCoreGrantedTools,
+  toolResultError,
   type ToolContext,
   type ToolGrant,
 } from "./tools-core.server";
@@ -128,11 +129,9 @@ export async function resolveGrantedTools(
 
     grants.set(def.name, {
       slug: def.name,
-      requiresApproval: def.name === "app_studio"
-        ? Boolean(permission?.requires_approval ?? entry?.requires_approval ?? agent.requires_approval ?? false)
-        : false,
-      allowedDomains: [],
-      spendCap: null,
+      requiresApproval: Boolean(permission?.requires_approval) || Boolean(entry?.requires_approval) || Boolean(agent.requires_approval),
+      allowedDomains: (permission?.allowed_domains as string[] | null) ?? [],
+      spendCap: permission?.spend_cap == null ? null : Number(permission.spend_cap),
     });
     defs.push(def);
   }
@@ -192,12 +191,12 @@ export async function executeTool(
     return { ok: false, output: { error: harness.reason, policy_code: harness.code } };
   }
 
-  if (name === "app_studio" && grant.requiresApproval) {
-    await log("failed", { error: "App Studio draft editing requires explicit approval under this agent policy." });
+  if (grant.requiresApproval) {
+    await log("failed", { error: `Tool "${name}" requires explicit approval under this agent policy.` });
     return {
       ok: false,
       output: {
-        error: "App Studio is configured to require explicit operator approval for this agent.",
+        error: `Tool "${name}" is configured to require explicit operator approval for this agent.`,
         requires_approval: true,
         suggested_tool: "request_approval",
       },
@@ -205,7 +204,7 @@ export async function executeTool(
   }
 
   try {
-    const localCtx = { ...ctx, allowedDomains: [], spendCap: null, requiresApproval: false };
+    const localCtx = { ...ctx, allowedDomains: grant.allowedDomains, spendCap: grant.spendCap, requiresApproval: grant.requiresApproval };
     const output = name === "skill_script"
       ? await runSkillScriptTool(input, localCtx)
       : name === "social_ops"
@@ -237,6 +236,11 @@ export async function executeTool(
                         : name === "astra_async_workflow"
                           ? await runBlackstarAstraAsyncWorkflowTool(input, localCtx)
                           : await runBlackstarAstraOrchestrationTool(input, localCtx);
+    const failure = toolResultError(output);
+    if (failure) {
+      await log('failed', { error: failure.slice(0, 500), output: outputMetadata(output) });
+      return { ok: false, output };
+    }
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {

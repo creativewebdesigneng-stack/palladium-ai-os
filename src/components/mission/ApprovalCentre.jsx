@@ -113,6 +113,8 @@ export default function ApprovalCentre({
 
                   <p className="mt-2 text-sm font-semibold text-white">{a.title}</p>
                   {a.summary && <p className="mt-0.5 text-xs text-zinc-400">{a.summary}</p>}
+                  {a.action_type === 'agent_tool_task' && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-zinc-300" aria-label="Exact tool input awaiting approval">{JSON.stringify({ tool: a.details?.tool, input: a.details?.input }, null, 2)}</pre>}
+                  {a.action_type === 'agent_browser_task' && <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-zinc-300" aria-label="Exact browser steps awaiting approval">{JSON.stringify(a.details?.input?.steps ?? [], null, 2)}</pre>}
 
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
                     {a.details?.seller && <span className="inline-flex items-center gap-1"><Store className="h-3 w-3" />{a.details.seller}</span>}
@@ -176,22 +178,26 @@ export default function ApprovalCentre({
               {decided.map((d) => {
                 const executionFailed = d.status === 'approved' && d.execution_status === 'failed';
                 const executionSucceeded = d.execution_status === 'succeeded';
+                const browserNotExecuted = ['agent_browser_task', 'agent_tool_task'].includes(d.action_type) && d.status === 'approved' && d.execution_status == null;
                 return (
-                  <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
+                  <li key={d.id} className={`rounded-lg border p-2.5 ${executionFailed || browserNotExecuted ? 'border-rose-400/20 bg-rose-500/[.05]' : 'border-white/5 bg-black/15'}`}>
                     <div className="flex items-center gap-2 text-[11px]">
-                      <span className={`h-1.5 w-1.5 rounded-full ${executionFailed ? 'bg-rose-400' : d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${executionFailed || browserNotExecuted ? 'bg-rose-400' : d.status === 'approved' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                       <span className="truncate text-zinc-300">{d.title}</span>
                       <span className="ml-auto text-zinc-600">
-                        {executionFailed ? 'approved · action failed' : executionSucceeded ? 'approved · completed' : d.status}
+                        {browserNotExecuted ? 'approved · not executed' : executionFailed ? 'approved · action failed' : executionSucceeded ? 'approved · completed' : d.status}
                       </span>
                     </div>
+                    {browserNotExecuted && (
+                      <p className="mt-2 text-[10px] text-rose-200/80" role="alert">This tool approval was recorded without execution evidence. It cannot be replayed. Open the latest Blackstar Preview, run a new task and review its new approval request.</p>
+                    )}
                     {executionFailed && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[10px] text-rose-200/80">
                           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                           <span>{d.execution_error ?? 'The provider action failed. Reconnect the integration if its permissions changed, then retry.'}</span>
                         </p>
-                        {onRetry && (
+                        {onRetry && !['agent_browser_task', 'agent_tool_task'].includes(d.action_type) && (
                           <button
                             onClick={() => onRetry(d)}
                             disabled={busyId === d.id}

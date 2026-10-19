@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
+import AgentToolEditor from './AgentToolEditor';
+import AgentConnectorEditor from './AgentConnectorEditor';
 import { updateAgentModel } from '@/lib/agents/agents.functions';
 import { WIZARD_MODELS } from '@/components/agents/agentsData';
 import { AGENT_MODEL_CHOICES } from '@/lib/agents/agent-model-selection';
@@ -72,11 +74,16 @@ export default function AgentConfigPanel({ agent, onAgentUpdated }) {
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Wrench className="h-3.5 w-3.5 text-violet-400" />Enabled tools</p>
+        <AgentToolEditor key={agent.id} agent={agent} onAgentUpdated={onAgentUpdated} />
         <div className="mt-3 flex flex-wrap gap-1.5">
           {tools.length ? tools.map((t) => (
             <span key={t} className="rounded-lg bg-white/5 px-2 py-1 text-[11px] text-zinc-300">{t}</span>
           )) : <span className="text-[11px] text-zinc-600">None configured</span>}
         </div>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+        <p className="flex items-center gap-2 text-xs font-medium text-white"><Wrench className="h-3.5 w-3.5 text-violet-400" />Connected apps for this agent</p>
+        <AgentConnectorEditor key={agent.id} agent={agent} onAgentUpdated={onAgentUpdated} />
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Brain className="h-3.5 w-3.5 text-violet-400" />Memory</p>

@@ -66,7 +66,7 @@ function inspectCredentialInput(value: unknown): "credential" | "limit" | null {
   return null;
 }
 
-function normalizeHarnessDomain(value: unknown): string | null {
+export function normalizeHarnessDomain(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > 2048) return null;
   try {
     const raw = value.trim();

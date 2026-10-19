@@ -1,6 +1,7 @@
 import { decryptToken, encryptToken } from '@/lib/integrations/oauth.server'
 import { ProviderError } from './model-gateway.base'
 import type { Provider, ProviderAccess } from './model-gateway.base'
+import { nvidiaNimConfigured } from './nvidia-dell-infrastructure.server'
 
 export type UserConnectableModelProvider = Extract<Provider, 'openai' | 'anthropic'>
 
@@ -184,6 +185,7 @@ export function deploymentProviderConfigured(provider: Provider): boolean {
   if (provider === 'gemini') return Boolean(process.env['GEMINI_API_KEY'])
   if (provider === 'groq') return Boolean(process.env['GROQ_API_KEY'])
   if (provider === 'deepseek') return Boolean(process.env['DEEPSEEK_API_KEY'])
+  if (provider === 'nvidia') return nvidiaNimConfigured()
   if (provider === 'lovable') return Boolean(process.env['LOVABLE_API_KEY'])
   if (provider === 'openai') return Boolean(process.env['OPENAI_API_KEY'])
   if (provider === 'anthropic') return Boolean(process.env['ANTHROPIC_API_KEY'])

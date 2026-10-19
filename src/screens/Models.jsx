@@ -11,7 +11,7 @@ import APIManagement from '@/components/models/APIManagement';
 import GroqEvidencePanel from '@/components/models/GroqEvidencePanel';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
-import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
+import { getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference } from '@/lib/runtime/model-management.functions';
 
 function moneyFromPence(value) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value ?? 0) / 100);
@@ -20,6 +20,30 @@ function moneyFromPence(value) {
 export default function Models() {
   const { session } = useWorkspace();
   const overviewFn = useServerFn(getModelRuntimeOverview);
+  const probeNvidiaFn = useServerFn(probeNvidiaModelConnection);
+  const certifyFn = useServerFn(certifyNvidiaModelInference);
+  const [certification, setCertification] = useState(null);
+  const [certifying, setCertifying] = useState(false);
+  const testInference = async () => {
+    if (certifying) return;
+    setCertifying(true);
+    setCertification(null);
+    try { setCertification(await certifyFn({ data: {} })); }
+    catch { setCertification({ status: 'unavailable' }); }
+    finally { setCertifying(false); }
+  };
+  const [probeResult, setProbeResult] = useState(null);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const checkNvidia = async () => {
+    if (probeBusy) return;
+    setProbeBusy(true);
+    setProbeResult(null);
+    try {
+      setProbeResult(await probeNvidiaFn({ data: {} }));
+    } catch {
+      setProbeResult({ status: 'unavailable', modelListed: false });
+    } finally { setProbeBusy(false); }
+  };
   const [query, setQuery] = useState('');
   const [providerFilter, setProviderFilter] = useState('all');
 
@@ -35,6 +59,7 @@ export default function Models() {
   const assignments = q.data?.assignments ?? [];
   const usage = q.data?.usage ?? [];
   const astra = q.data?.astra ?? null;
+  const accelerator = q.data?.acceleratorInfrastructure ?? null;
   const totals = q.data?.totals ?? { agents: 0, activeAgents: 0, recentRuns: 0, recentCostPence: 0, configuredProviders: 0 };
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
 
@@ -78,6 +103,93 @@ export default function Models() {
       <BlackstarAstraActivationPanel readiness={astra} />
       <DeepSeekRuntimePanel configured={Boolean(providerById.get('deepseek')?.configured)} />
       <GroqEvidencePanel />
+
+      <section className="mb-6 rounded-2xl border border-violet-400/15 bg-white/[.03] p-5" aria-label="NVIDIA and Dell AI infrastructure">
+        <h2 className="text-sm font-semibold text-white">NVIDIA NIM and Dell AI Factory infrastructure</h2>
+        <p className="mt-1 text-xs text-zinc-400">Uses Blackstar's existing model routing and GPU-worker architecture. Configuration is not a live hardware or inference certification.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-white">NVIDIA NIM inference</p>
+              <span className={`text-[11px] ${accelerator?.nvidia?.configured ? 'text-emerald-300' : 'text-amber-300'}`}>
+                {accelerator?.nvidia?.configured ? 'Credentials configured' : 'Not configured'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-400">Endpoint mode: {accelerator?.nvidia?.mode === 'operator_hosted_nim' ? 'Operator-hosted NIM' : 'NVIDIA hosted API catalog'}</p>
+            <p className="mt-1 break-words text-[11px] text-violet-200">Default model: {accelerator?.nvidia?.model ?? 'openai/gpt-oss-20b'}</p>
+            <p className="mt-2 text-[11px] text-zinc-500">Set NVIDIA_API_KEY in Preview server environment; NVIDIA_NIM_MODEL and NVIDIA_NIM_BASE_URL are optional. No key is exposed here.</p>
+            <button type="button" onClick={checkNvidia}
+              disabled={probeBusy || !q.data?.nvidiaConnectionProbeAllowed}
+              className="mt-3 rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200 disabled:cursor-not-allowed disabled:opacity-40">
+              {probeBusy ? 'Checking NIM catalogue and readiness…' : 'Check NVIDIA connection (read-only)'}
+            </button>
+            {!q.data?.nvidiaConnectionProbeAllowed &&
+              <p className="mt-2 text-[11px] text-zinc-500">Connection checks use Blackstar's shared server key and require a platform administrator and configured NVIDIA credentials.</p>}
+            {probeResult && <p role="status" className={`mt-2 text-xs ${probeResult.status === 'reachable' ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {probeResult.forbidden ? 'Only a Blackstar platform administrator may test the shared NVIDIA connection.' : ({
+                reachable: 'NVIDIA catalogue reachable and selected model listed. Inference not yet verified.',
+                model_missing: 'NVIDIA catalogue reachable, but selected model not listed.',
+                unauthorised: 'NVIDIA rejected the configured API credential.',
+                unsupported: 'This NIM endpoint does not support model-list verification.',
+                unavailable: 'NVIDIA catalogue check failed. Verify Preview settings and network access.',
+                not_configured: 'Connect a server-side NVIDIA API credential in Preview first.',
+              })[probeResult.status] ?? 'NVIDIA verification unavailable.'}
+            </p>}
+            {probeResult && accelerator?.nvidia?.mode === 'operator_hosted_nim' && !probeResult.forbidden && (
+              <p role="status" className={`mt-2 text-xs ${probeResult.nimReadiness === 'ready' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                Self-hosted NIM server readiness: {({
+                  ready: 'Model server reports ready; GPU and Dell hardware are not certified.',
+                  not_ready: 'Model server is reachable but not ready to serve inference.',
+                  unauthorised: 'NIM health endpoint rejected the configured credential.',
+                  unsupported: 'NIM deployment does not expose a supported readiness endpoint.',
+                  unavailable: 'NIM readiness could not be checked.',
+                  not_configured: 'NIM endpoint or credentials are not configured safely.',
+                  not_applicable: 'This probe applies only to an operator-hosted NIM server.',
+                })[probeResult.nimReadiness] ?? 'Readiness was not verified.'}
+              </p>
+            )}
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <p className="text-[11px] text-zinc-400">Real NVIDIA inference certification is a separate operator-only test. It uses up to 32 generated tokens and may incur provider charges. No request runs automatically.</p>
+              <button type="button" onClick={testInference}
+                disabled={certifying || !q.data?.nvidiaInferenceCertificationEnabled}
+                className="mt-2 rounded-lg border border-amber-400/25 px-3 py-2 text-xs text-amber-200 disabled:cursor-not-allowed disabled:opacity-40">
+                {certifying ? 'Testing real NVIDIA inference…' : 'Test actual NVIDIA inference (may incur charges)'}
+              </button>
+              {!q.data?.nvidiaInferenceCertificationEnabled &&
+                <p className="mt-2 text-[11px] text-zinc-500">Requires a configured NVIDIA key and operator-enabled NVIDIA_NIM_INFERENCE_PROBE_ENABLED in Preview.</p>}
+              {certification && <p role="status" className={`mt-2 text-xs ${certification.status === 'verified' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                {certification.forbidden ? 'Only a Blackstar platform administrator can run this test.' : ({
+                  verified: 'Real NVIDIA inference verified and audited. GPU hardware and agent tool execution still require separate certification.',
+                  invalid_response: 'NVIDIA responded, but the fixed verification marker was not returned. Not certified.',
+                  unauthorised: 'NVIDIA rejected the configured inference credentials.',
+                  quota_exhausted: 'NVIDIA inference quota or credits are exhausted.',
+                  rate_limited: 'NVIDIA is currently rate limiting requests.',
+                  audit_unavailable: 'The required audit record is unavailable. Inference cannot be certified.',
+                  not_enabled: 'Operator inference certification is not enabled in this deployment.',
+                  unavailable: 'The real NVIDIA inference check failed. Verify model, network and provider readiness.',
+                })[certification.status] ?? 'NVIDIA inference certification did not complete.'}
+                {certification.status === 'verified' && certification.auditReceiptId
+                  ? ` Audit receipt: ${certification.auditReceiptId}` : ''}
+              </p>}
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-white">Dell AI Factory hosting target</p>
+              <span className="text-[11px] text-amber-300">
+                {accelerator?.dell?.selected ? 'Profile selected' : 'Not enabled'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-400">Readiness: {String(accelerator?.dell?.status ?? 'not_enabled').replaceAll('_', ' ')}</p>
+            <p className="mt-1 text-[11px] text-zinc-400">Dell hardware verified: No · GPU worker verified: No</p>
+            <p className="mt-2 text-[11px] text-zinc-500">Requires a provisioned Dell GPU host, authenticated HTTPS NVIDIA NIM endpoint and explicit operator configuration. No server is purchased or connected automatically.</p>
+            <Link to="/admin/acceptance" className="mt-3 inline-block rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200">
+              Open existing Cinema / 3D worker preflight
+            </Link>
+            <p className="mt-2 text-[11px] text-zinc-500">The existing admin worker preflight checks configured endpoints. It does not claim a Dell GPU was used without host-level evidence.</p>
+          </div>
+        </div>
+      </section>
 
       <div className="mb-6"><APIManagement /></div>
 

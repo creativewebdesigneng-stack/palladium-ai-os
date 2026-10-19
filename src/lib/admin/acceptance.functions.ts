@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { ACCEPTANCE_EVIDENCE_TABLES } from "@/lib/admin/acceptance-catalog";
 import { normalizeOperationalProbe } from "@/lib/admin/acceptance-preflight";
+import { workerGpuPreflightState } from "@/lib/runtime/gpu-worker-report";
 import { probeCinemaMasterConnection } from "@/lib/cinema/cinema-runtime.server";
 import { probeThreeDWorker } from "@/lib/three-d/three-d-runtime.server";
 import { probeBlackstarMcpRemoteIdentity } from "@/lib/mcp/mcp-readiness.server";
@@ -114,6 +115,18 @@ export const runOperationalAcceptancePreflight = createServerFn({ method: "POST"
       mcp: normalizeOperationalProbe("mcp", mcpProbe),
       cinema: normalizeOperationalProbe("cinema", cinemaProbe),
       threeD: normalizeOperationalProbe("three-d", threeDProbe),
+      // These reports come from the already-authorised Cinema and 3D /health
+      // requests above. No additional remote probes or privileged GPU service.
+      gpuWorkers: {
+        cinema: {
+          state: workerGpuPreflightState(cinemaProbe),
+          report: cinemaProbe.gpuReport,
+        },
+        threeD: {
+          state: workerGpuPreflightState(threeDProbe),
+          report: threeDProbe.gpuReport,
+        },
+      },
       evidenceRule:
         "Endpoint and worker readiness are read-only operational preflight signals. They do not prove an external client connection, render, output, transaction, acceptance result or certification.",
     };

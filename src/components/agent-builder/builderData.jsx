@@ -44,6 +44,11 @@ export const PROVIDERS = [
     models: ['openai/gpt-oss-120b'],
   },
   {
+    id: 'nvidia',
+    label: 'NVIDIA NIM (server key required)',
+    models: [AGENT_MODEL_CHOICES['nvidia-nim-oss-20b'].model],
+  },
+  {
     id: 'lovable',
     label: 'Lovable AI Gateway',
     models: ['google/gemini-3-flash-preview'],

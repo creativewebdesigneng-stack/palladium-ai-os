@@ -6,6 +6,7 @@
  * in `tool_permissions`. The frontend is never trusted for any of this.
  */
 import type { ToolDef } from "./model-gateway.server";
+import { isIP } from "node:net";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
 import {
@@ -169,7 +170,7 @@ const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
       })
       .select("id")
       .maybeSingle();
-    if (error) return { error: "Could not queue the external MCP action for approval." };
+    if (error || !data?.id) return { error: "Could not queue the external MCP action for approval." };
     return {
       queued: true,
       approval_request_id: data?.id,
@@ -210,7 +211,7 @@ const runIntegrationAction: ToolImpl["run"] = async (input, ctx) => {
       })
       .select("id")
       .maybeSingle();
-    if (error) return { error: "Could not queue the connected-app action for approval." };
+    if (error || !data?.id) return { error: "Could not queue the connected-app action for approval." };
     return {
       queued: true,
       approval_request_id: data?.id,
@@ -252,8 +253,8 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input) => {
-      const expr = str(input["expression"]).replace(/[^0-9+\-*/(). %]/g, "");
-      if (!expr) return { error: "Empty or unsupported expression." };
+      const expr = str(input["expression"]).trim();
+      if (!expr || !/^[0-9+\-*/(). %]+$/.test(expr)) return { error: "Empty or unsupported expression." };
       try {
         const value = Function(`"use strict"; return (${expr});`)();
         return Number.isFinite(value)
@@ -268,7 +269,7 @@ const REGISTRY: Record<string, ToolImpl> = {
   web_search: {
     def: {
       name: "web_search",
-      description: "Search the public web and return short result snippets.",
+      description: "Search the public web and return up to eight short result snippets. Requires operator approval when agent policy requires it.",
       parameters: {
         type: "object",
         properties: { query: { type: "string" }, limit: { type: "number" } },
@@ -316,6 +317,9 @@ const REGISTRY: Record<string, ToolImpl> = {
       if (isPrivateHost(url)) return { error: "That host is not reachable from the runtime." };
       const res = await fetch(url, {
         headers: { "User-Agent": "PalladiumAI-Agent/1.0" },
+        // Raw network tools must not follow a benign public host to a private
+        // or newly disallowed target; redirects require a fresh approval.
+        redirect: "error",
         signal: ctx.signal ?? AbortSignal.timeout(20_000),
       });
       if (!res.ok) return { error: `Fetch failed (${res.status}).` };
@@ -451,7 +455,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not raise an approval request." };
+      if (error || !data?.id) return { error: "Could not raise an approval request." };
       return {
         approval_request_id: data?.id,
         status: "pending",
@@ -554,32 +558,34 @@ const REGISTRY: Record<string, ToolImpl> = {
   http_request: {
     def: {
       name: "http_request",
-      description: "Call an allow-listed HTTP API. GET and POST only; responses are truncated.",
+      description: "Read an allow-listed public HTTPS API using GET. POST actions are blocked; use an approved connected provider action for writes.",
       parameters: {
         type: "object",
         properties: {
-          url: { type: "string" },
-          method: { type: "string", enum: ["GET", "POST"] },
-          body: { type: "string" },
-          provider: { type: "string", enum: ["auto", "google", "microsoft"] },
-          query: { type: "string", description: "Optional text filter when listing connected calendar events" },
+          url: { type: "string", description: "An explicitly allowed public HTTPS URL, without embedded credentials." },
+          method: { type: "string", enum: ["GET"] },
         },
         required: ["url"],
       },
     },
+    sensitive: true,
     run: async (input, ctx) => {
       const url = str(input["url"]);
       if (!/^https?:\/\//i.test(url)) return { error: "Only absolute http(s) URLs are supported." };
       if (isPrivateHost(url)) return { error: "That host is not reachable from the runtime." };
-      const method = str(input["method"], "GET").toUpperCase() === "POST" ? "POST" : "GET";
-      const body = str(input["body"]);
+      // General-purpose HTTP must never become a write bypass. All mutations
+      // belong to the existing connector-specific executable approval system.
+      const method = str(input["method"], "GET").toUpperCase();
+      if (method !== "GET" || input["body"] !== undefined) {
+        return { error: "General HTTP writes are disabled; use a connected provider action with its dedicated operator approval." };
+      }
       const res = await fetch(url, {
         method,
         headers: {
           "User-Agent": "PalladiumAI-Agent/1.0",
-          ...(body ? { "content-type": "application/json" } : {}),
         },
-        ...(method === "POST" && body ? { body } : {}),
+        // Do not follow redirects across the approved domain boundary.
+        redirect: "error",
         signal: ctx.signal ?? AbortSignal.timeout(20_000),
       });
       const text = (await res.text()).slice(0, 6000);
@@ -748,7 +754,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the connected-service write for approval." };
+      if (error || !data?.id) return { error: "Could not queue the connected-service write for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", provider, action };
     },
   },
@@ -773,24 +779,31 @@ const REGISTRY: Record<string, ToolImpl> = {
     run: async (input, ctx) => {
       const documentId = str(input["document_id"]);
       const title = str(input["title"]);
+      // Explicit owner filters protect vault reads even if this context is
+      // ever changed to use a privileged server client instead of user RLS.
       let docQuery = ctx.sb
         .from("memory_documents")
         .select("id,title,mime_type,size_bytes,chunk_count")
+        .eq("user_id", ctx.userId)
         .limit(1);
       docQuery = documentId
         ? docQuery.eq("id", documentId)
         : title
           ? docQuery.ilike("title", `%${title}%`)
           : docQuery;
-      const { data: docs } = await docQuery;
+      const { data: docs, error: documentError } = await docQuery;
+      if (documentError) return { error: "Could not read the owner's document vault." };
       const doc = docs?.[0];
       if (!doc) return { error: "No matching document found in the vault." };
-      const { data: chunks } = await ctx.sb
+      const { data: chunks, error: chunkError } = await ctx.sb
         .from("memory_chunks")
         .select("chunk_index,content")
         .eq("document_id", doc.id)
+        .eq("user_id", ctx.userId)
         .order("chunk_index", { ascending: true })
         .limit(12);
+      if (chunkError) return { error: "Could not read the owner's document text." };
+      if (!chunks?.length) return { error: "This document has no readable indexed text yet." };
       return {
         document: {
           id: doc.id,
@@ -846,17 +859,13 @@ const REGISTRY: Record<string, ToolImpl> = {
     def: {
       name: "calendar",
       description:
-        "List upcoming scheduled items, or propose a real connected-calendar event. Proposals wait for explicit approval before any external calendar write.",
+        "List upcoming items from your assigned connected calendars or your own tasks. For new external events, use an integration_action with operator approval.",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["list", "propose"] },
-          title: { type: "string" },
-          when: { type: "string", description: "ISO start date/time" },
-          end: { type: "string", description: "Optional ISO end date/time; defaults to 30 minutes after start" },
-          location: { type: "string" },
-          description: { type: "string" },
+          action: { type: "string", enum: ["list"] },
           provider: { type: "string", enum: ["auto", "google", "microsoft"] },
+          query: { type: "string", description: "Optional search filter for upcoming connected calendar events" },
         },
         required: ["action"],
       },
@@ -865,26 +874,33 @@ const REGISTRY: Record<string, ToolImpl> = {
       if (str(input["action"], "list") === "list") {
         const requested = str(input["provider"], "auto").toLowerCase();
         const query = str(input["query"]).slice(0, 200);
-        const providers = requested === "google" || requested === "microsoft"
+        // Calendar is a convenience view over existing connectors, not an
+        // independent provider grant. Never read an OAuth account that was not
+        // explicitly assigned to this agent.
+        const assigned = new Set((ctx.allowedProviders ?? []).map(normalizeProvider).filter(Boolean));
+        const candidates = requested === "google" || requested === "microsoft"
           ? [requested]
           : ["google", "microsoft"];
+        const providers = candidates.filter(provider => assigned.has(provider));
         for (const provider of providers) {
           const live = await readConnectedService(
             ctx.userId,
             { provider, action: "calendar_upcoming", query, limit: 10 },
             ctx.signal,
           );
-          if (!(live && typeof live === "object" && "error" in live)) {
+          if (live && typeof live === "object" && !Array.isArray(live) && !("error" in live)) {
             return { source: provider, connected: true, ...live as Record<string, unknown> };
           }
         }
-        const { data } = await ctx.sb
+        const { data, error: taskError } = await ctx.sb
           .from("personal_tasks")
           .select("id,title,due_at,status")
+          .eq("user_id", ctx.userId)
           .not("due_at", "is", null)
           .order("due_at", { ascending: true })
           .limit(10);
-        return { source: "palladium", connected: false, events: data ?? [], note: "No connected Google or Microsoft calendar was available." };
+        if (taskError) return { error: "The owner's scheduled items could not be read." };
+        return { source: "palladium", connected: false, events: data ?? [], note: "No assigned connected calendar was available." };
       }
       const title = str(input["title"]).slice(0, 200);
       if (!title) return { error: "A title is required to propose a calendar item." };
@@ -912,7 +928,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not create the calendar proposal." };
+      if (error || !task?.id) return { error: "Could not create the calendar proposal." };
       const { data: approval, error: approvalError } = await ctx.sb
         .from("approval_requests")
         .insert({
@@ -936,7 +952,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (approvalError) {
+      if (approvalError || !approval?.id) {
         if (task?.id) await ctx.sb.from("personal_tasks").update({ status: "failed" }).eq("id", task.id);
         return { error: "Could not queue the calendar proposal for approval." };
       }
@@ -986,7 +1002,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the email draft for approval." };
+      if (error || !data?.id) return { error: "Could not queue the email draft for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_draft" };
     },
   },
@@ -1033,7 +1049,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the email for approval." };
+      if (error || !data?.id) return { error: "Could not queue the email for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending", action: "email_send" };
     },
   },
@@ -1074,7 +1090,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not queue the Slack message for approval." };
+      if (error || !data?.id) return { error: "Could not queue the Slack message for approval." };
       return { queued: true, approval_request_id: data?.id, status: "pending" };
     },
   },
@@ -1095,9 +1111,13 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input, ctx) => {
-      const requirement = str(input["requirement"]).slice(0, 300);
-      if (!requirement) return { error: "Describe what to shop for." };
-      const budget = Number(input["budget"] ?? 0) || ctx.spendCap || null;
+      const requirement = str(input["requirement"]).trim();
+      if (!requirement || requirement.length > 300) return { error: "Describe the shopping requirement in 300 characters or fewer." };
+      if (!ctx.allowedDomains?.length) return { error: "A retailer domain allow-list is required for shopping research." };
+      const requestedBudget = input["budget"] === undefined ? null : Number(input["budget"]);
+      if (requestedBudget !== null && (!Number.isFinite(requestedBudget) || requestedBudget < 0 || requestedBudget > 1_000_000))
+        return { error: "Shopping comparison budget must be between 0 and 1,000,000." };
+      const budget = requestedBudget || ctx.spendCap || null;
       let tool;
       try {
         tool = createBrowserTool(resolveBrowserProvider(), {
@@ -1109,6 +1129,11 @@ const REGISTRY: Record<string, ToolImpl> = {
         return { error: (error as Error).message };
       }
       try {
+        // The development provider returns demonstration listings/prices. Never
+        // let an agent or the execution ledger present those as real retail evidence.
+        if (tool.kind === "development") {
+          return { error: "Live retailer search is not configured; demonstration offers cannot be certified.", simulated: true };
+        }
         const offers = await tool.search(requirement, {
           budget,
           currency: str(input["currency"], "GBP"),
@@ -1120,12 +1145,9 @@ const REGISTRY: Record<string, ToolImpl> = {
           requirement,
           budget,
           provider: tool.provider,
-          simulated: tool.kind === "development",
+          simulated: false,
           offers: (ranked.length ? ranked : offers).slice(0, 6),
-          note:
-            tool.kind === "development"
-              ? "Development simulation — these are NOT real listings or prices. Do not present them as real products. A purchase always requires explicit approval via prepare_purchase."
-              : "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
+          note: "Recommendations only. A purchase requires explicit approval via prepare_purchase.",
         };
       } finally {
         await tool.close();
@@ -1183,8 +1205,8 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
-      if (error) return { error: "Could not prepare the purchase." };
-      const { data: approval } = await ctx.sb
+      if (error || !pr?.id) return { error: "Could not prepare the purchase." };
+      const { data: approval, error: approvalError } = await ctx.sb
         .from("approval_requests")
         .insert({
           user_id: ctx.userId,
@@ -1210,6 +1232,7 @@ const REGISTRY: Record<string, ToolImpl> = {
         })
         .select("id")
         .maybeSingle();
+      if (approvalError || !approval?.id) return { error: "Could not queue the purchase for approval. No payment was authorised." };
       // Link the two so the approval decision drives the purchase status.
       if (pr?.id && approval?.id) {
         await ctx.sb
@@ -1252,19 +1275,34 @@ const REGISTRY: Record<string, ToolImpl> = {
       },
     },
     run: async (input, ctx) => {
-      const allowedTables = [
-        "personal_tasks",
-        "personal_agents",
-        "agent_memories",
-        "purchase_requests",
-        "agent_tasks",
-      ];
+      // Only return documented, non-sensitive columns. In particular, never
+      // expose personal-agent system prompts, task checkpoints, memory vectors
+      // or checkout URLs to a general-purpose database tool.
+      const readableColumns: Record<string, string[]> = {
+        personal_tasks: ["id", "title", "category", "status", "priority", "due_at", "created_at", "completed_at"],
+        personal_agents: ["id", "name", "category", "status", "model_provider", "model", "requires_approval", "created_at"],
+        agent_memories: ["id", "title", "memory_type", "category", "importance", "pinned", "created_at"],
+        purchase_requests: ["id", "product", "seller", "total", "currency", "status", "created_at"],
+        agent_tasks: ["id", "agent_id", "title", "status", "tool_calls", "created_at", "completed_at"],
+      };
       const table = str(input["table"]);
-      if (!allowedTables.includes(table)) return { error: "That table is not readable by tools." };
-      const limit = Math.min(Number(input["limit"] ?? 20) || 20, 50);
-      const { data, error } = await ctx.sb.from(table).select("*").limit(limit);
+      if (!Object.hasOwn(readableColumns, table)) return { error: "That table is not readable by tools." };
+      const fields = readableColumns[table]!;
+      const requestedLimit = input["limit"] === undefined ? 20 : Number(input["limit"]);
+      if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 50)
+        return { error: "A row limit between 1 and 50 is required." };
+      const { data, error } = await ctx.sb.from(table)
+        .select(fields.join(",")).eq("user_id", ctx.userId).limit(requestedLimit);
       if (error) return { error: "Query failed." };
-      return { table, rows: data ?? [] };
+      // Project server-side as defence in depth if query adapters ever return
+      // more fields than requested. Bound both result count and field length.
+      const rows = (data ?? []).slice(0, requestedLimit).map((row: Record<string, unknown>) =>
+        Object.fromEntries(fields.map(field => [
+          field,
+          typeof row[field] === "string" ? (row[field] as string).slice(0, 500) : row[field] ?? null,
+        ])),
+      );
+      return { table, rows };
     },
   },
 
@@ -1334,6 +1372,9 @@ function isPrivateHost(url: string) {
   try {
     const host = new URL(url).hostname;
     return (
+      // Reject *all* literal IP addresses, including IPv6, shorthand IPv4
+      // forms and cloud metadata endpoints. Agents use approved DNS names.
+      isIP(host.replace(/^\[/, "").replace(/\]$/, "")) !== 0 ||
       host === "localhost" ||
       host.endsWith(".local") ||
       /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
@@ -1431,21 +1472,24 @@ export async function resolveGrantedTools(
 
     grants.set(slug, {
       slug,
-      requiresApproval:
-        CAPABILITY_TOOLS.has(slug) ||
-        slug === "connected_service" ||
-        DYNAMIC_ACTION_TOOLS.has(slug)
-          ? false
-          : Boolean(REGISTRY[slug]?.sensitive) ||
-            Boolean(entry?.requires_approval) ||
-            Boolean(row?.requires_approval) ||
-            Boolean(agent.requires_approval),
+      // Provider mutations are self-queued by their existing dedicated
+      // connector approval executor. Read-only connected-service access and
+      // discovery must honour account, catalogue and agent approval policies.
+      requiresApproval: DYNAMIC_ACTION_TOOLS.has(slug)
+        ? false
+        : Boolean(REGISTRY[slug]?.sensitive) ||
+          Boolean(entry?.requires_approval) ||
+          Boolean(row?.requires_approval) ||
+          Boolean(agent.requires_approval),
       allowedDomains: (row?.allowed_domains as string[] | null) ?? [],
       spendCap: row?.spend_cap == null ? null : Number(row.spend_cap),
     });
   }
 
-  return { defs: [...grants.keys()].map((slug) => REGISTRY[slug]!.def), grants };
+  // Approval-gated browsing must use the durable bounded task, never a one-off
+  // browser session that cannot resume its navigation/extraction sequence.
+  const visible = [...grants.keys()].filter(slug => !(slug === 'browser' && grants.get(slug)?.requiresApproval && grants.has('browser_task')));
+  return { defs: visible.map((slug) => REGISTRY[slug]!.def), grants };
 }
 
 const SENSITIVE_KEY =
@@ -1485,6 +1529,17 @@ function outputMetadata(output: unknown): unknown {
   const text = JSON.stringify(output ?? null);
   if (text && text.length > 4000) return { truncated: true, bytes: text.length };
   return output;
+}
+
+/** A returned provider/handler failure is not a successful tool execution. */
+export function toolResultError(output: unknown): string | null {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return null;
+  const value = output as Record<string, unknown>;
+  const nested = value['result'] as Record<string, unknown> | null;
+  if (value['error'] || value['ok'] === false || (nested && typeof nested === 'object' && nested['ok'] === false)) {
+    return typeof value['error'] === 'string' ? value['error'] : 'Tool returned an unsuccessful result.';
+  }
+  return null;
 }
 
 /** Executes one tool call. Never throws — failures come back as tool output so
@@ -1586,6 +1641,45 @@ export async function executeTool(
     "nango_action",
     "integration_action",
   ]);
+  if (grant.requiresApproval && name === "browser_task") {
+    try {
+      const { queueBrowserApproval } = await import('./browser-approval.server');
+      const output = await queueBrowserApproval(input, { ...ctx, allowedDomains: grant.allowedDomains });
+      return { ok: true, output };
+    } catch (error) {
+      // Record a bounded reason code, not the raw exception: model-supplied
+      // targets, selectors or credentials must never leak into execution logs.
+      const message = error instanceof Error ? error.message : '';
+      const reason = error instanceof Error && error.name === 'ZodError'
+        ? 'APPROVAL_INPUT_INVALID'
+        : message.includes('current domain policy') ? 'APPROVAL_DOMAIN_DENIED'
+        : message.includes('no longer active') ? 'APPROVAL_TASK_INACTIVE'
+        : message.includes('Could not queue browser approval') ? 'APPROVAL_INSERT_FAILED'
+        : message.includes('Could not link browser approval') ? 'APPROVAL_LINK_FAILED'
+        : 'APPROVAL_QUEUE_FAILED';
+      await log('failed', { error: 'Could not queue bounded browser approval.', policy_code: reason });
+      // Preserve the approval boundary on failure: both runtimes must stop rather
+      // than accept a model's "please approve" message as a completed deliverable.
+      return { ok: false, output: {
+        requires_approval: true, policy_code: reason,
+        error: 'Browser approval could not be queued. Check the bounded input, domain policy and deployed agent approval-resume schema.',
+      } };
+    }
+  }
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query', 'calendar', 'shopping_search', 'connected_service', 'integration_capabilities', 'nango_capabilities'].includes(name)) {
+    try {
+      const { queueLocalToolApproval } = await import('./browser-approval.server');
+      // Keep the executable approval bound to this tool's actual grant, not
+      // to the optional context defaults. This is required for domain-gated
+      // reads (web_fetch, http_request and shopping_search).
+      return { ok: true, output: await queueLocalToolApproval(name, input, {
+        ...ctx, allowedDomains: grant.allowedDomains, spendCap: grant.spendCap ?? ctx.spendCap ?? null,
+      }) };
+    } catch {
+      await log('failed', { error: 'Could not queue bounded tool approval.', policy_code: 'APPROVAL_QUEUE_FAILED' });
+      return { ok: false, output: { requires_approval: true, error: 'Bounded tool approval could not be queued.', policy_code: 'APPROVAL_QUEUE_FAILED' } };
+    }
+  }
   if (grant.requiresApproval && !SELF_QUEUING_APPROVAL_TOOLS.has(name)) {
     await log("failed", { error: "Tool requires explicit approval before execution." });
     return {
@@ -1605,6 +1699,11 @@ export async function executeTool(
       spendCap: grant.spendCap ?? ctx.spendCap ?? null,
       requiresApproval: grant.requiresApproval,
     });
+    const failure = toolResultError(output);
+    if (failure) {
+      await log('failed', { error: failure.slice(0, 500), output: outputMetadata(output) });
+      return { ok: false, output };
+    }
     await log("succeeded", { output: outputMetadata(output) as never });
     return { ok: true, output };
   } catch (error) {

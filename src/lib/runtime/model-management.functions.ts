@@ -5,6 +5,9 @@ import {
   listModelProviderDefinitions,
 } from "./model-providers.server";
 import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
+import { nvidiaDellInfrastructureReadiness, nvidiaNimConfigured, probeNvidiaNimModels } from "./nvidia-dell-infrastructure.server";
+import { nvidiaInferenceProbeEnabled, certifyNvidiaInference } from "./nvidia-inference-certification.server";
+import { isPlatformAdmin } from '@/lib/marketplace/marketplace.server';
 
 type Sb = { from: (t: string) => any };
 
@@ -12,21 +15,26 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [{ data: agents, error: agentError }, { data: tasks, error: taskError }, astra] = await Promise.all([
+    const [{ data: agents, error: agentError }, { data: tasks, error: taskError }, astra, platformAdmin] = await Promise.all([
       sb
         .from("personal_agents")
         .select("id,name,status,model,model_provider,updated_at")
+        .eq("user_id", context.userId)
         .order("updated_at", { ascending: false })
         .limit(500),
       sb
         .from("agent_tasks")
         .select("id,agent_id,provider,model,status,tokens_in,tokens_out,cost_pence,created_at")
+        .eq("user_id", context.userId)
         .order("created_at", { ascending: false })
         .limit(500),
       resolveBlackstarAstraRuntimeReadiness({ sb }).catch((error) => {
         console.error("[model-management] Astra readiness unavailable", error);
         return null;
       }),
+      // Provider diagnostics can be used to probe the deployment's shared API
+      // credential; this is an operator-only capability, not an end-user test.
+      isPlatformAdmin(context.supabase as never, context.userId).catch(() => false),
     ]);
     if (agentError) throw new Error(agentError.message);
     if (taskError) throw new Error(taskError.message);
@@ -123,6 +131,11 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       assignments,
       usage,
       astra,
+      // Readiness is configuration-only; not evidence of an active Dell GPU or
+      // an authenticated NVIDIA model inference.
+      acceleratorInfrastructure: nvidiaDellInfrastructureReadiness(),
+      nvidiaConnectionProbeAllowed: platformAdmin && nvidiaNimConfigured(),
+      nvidiaInferenceCertificationEnabled: platformAdmin && nvidiaInferenceProbeEnabled(),
       totals: {
         agents: assignments.length,
         activeAgents: assignments.filter((agent) => agent.status === "active").length,
@@ -131,4 +144,29 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
         configuredProviders: providers.filter((provider) => provider.configured).length,
       },
     };
+  });
+
+/** Explicit platform-admin, read-only probe; never generates paid tokens. */
+export const probeNvidiaModelConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
+      return { forbidden: true as const };
+    }
+    return { forbidden: false as const, ...await probeNvidiaNimModels() };
+  });
+
+
+/**
+ * Unlike the read-only /models probe, this can use metered inference.
+ * Explicitly gated by an operator-only feature flag and an authenticated
+ * platform-admin role; no inference happens on page load.
+ */
+export const certifyNvidiaModelInference = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
+      return { forbidden: true as const };
+    }
+    return { forbidden: false as const, ...await certifyNvidiaInference({ userId: context.userId }) };
   });

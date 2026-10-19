@@ -158,6 +158,12 @@ describe("task state machine", () => {
 });
 
 describe("agent permissions", () => {
+  it('rejects obsolete tool assignments before creating a misleading no-tool run', async () => {
+    const sb = db([{ ...AGENT, allowed_tools: ['web', 'files', 'api', 'workflow'] }]);
+    await expect(prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'go' })).rejects.toMatchObject({ code: 'INVALID_TOOL_ASSIGNMENTS' });
+    expect(sb.tables.agent_tasks).toHaveLength(0);
+    expect(gateway.runChat).not.toHaveBeenCalled();
+  });
   it("refuses to run an agent the caller cannot read", async () => {
     const sb = db([]); // RLS-equivalent: no visible row
     await expect(
@@ -861,5 +867,104 @@ describe("model recovery boundaries", () => {
     const sb=db();const run=await prepareRun({sb,userId:USER,agentId:AGENT.id,input:"go"});
     const message=await failRun({sb:createFakeSupabase(),userId:USER,run,error:new ProviderError("Provider unavailable.",503,true)});
     expect(message).toContain("Run status could not be saved");
+  });
+});
+
+
+describe("honest completion after blocked tools", () => {
+  it("rejects empty completion before persisting success or usage", async () => {
+    const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    await expect(completeRun({ sb, userId: USER, run, result: textResult("  "), toolCallCount: 1 })).rejects.toMatchObject({ code: "EMPTY_RUN_OUTPUT" });
+    expect(sb.tables.agent_tasks[0].status).not.toBe("succeeded");
+    expect(entitlements.recordUsage).not.toHaveBeenCalled();
+    expect(audit.writeAuditRequired).not.toHaveBeenCalledWith(expect.objectContaining({ action: "agent.run_result" }));
+  });
+  it("does not complete a stream when its model returns no deliverable", async () => {
+    const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: textResult("") }; });
+    const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+    expect(events.some(event => event.type === "complete")).toBe(false);
+    expect(sb.tables.agent_tasks[0].status).toBe("failed");
+  });
+  it.each([false, true])("does not label approval-blocked browser work complete (stream=%s)", async (stream) => {
+    const sb = db([{ ...AGENT, allowed_tools: ["browser"], requires_approval: true }]);
+    sb.tables.tools.push({ slug: "browser", is_active: true }, { slug: "browser_task", is_active: true });
+    sb.tables.tool_permissions.push({ tool: "browser", agent_id: AGENT.id, enabled: true, requires_approval: true, allowed_domains: ["httpbingo.org"] });
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "Open https://httpbingo.org/html" });
+    const call = { ...textResult(""), toolCalls: [{ id: "browser-call", name: "browser", arguments: { action: "navigate", url: "https://httpbingo.org/html" } }] };
+    if (stream) {
+      gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: call }; });
+      const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.some(event => event.type === "complete")).toBe(false);
+      expect(sb.tables.agent_tasks[0].status).toBe("failed");
+      expect(events.at(-1)).toMatchObject({ type: "error", message: expect.stringContaining("no executable approval request") });
+    } else {
+      gateway.runChat.mockResolvedValueOnce(call);
+      await expect(executeRun({ sb, userId: USER, run })).rejects.toMatchObject({ code: "APPROVAL_NOT_QUEUED" });
+      expect(sb.tables.agent_tasks[0].status).not.toBe("succeeded");
+    }
+    expect(sb.tables.tool_executions).toEqual([expect.objectContaining({ tool: "browser", status: "failed" })]);
+    expect(sb.tables.approval_requests ?? []).toHaveLength(0);
+  });
+});
+
+
+describe('durable browser approval pause', () => {
+  it.each([false, true])('fails closed when the deployed approval columns are missing (stream=%s)', async stream => {
+    const sb = db([{ ...AGENT, allowed_tools: ['browser'], requires_approval: true }]);
+    sb.tables.tools.push({ slug: 'browser', is_active: true }, { slug: 'browser_task', is_active: true });
+    sb.tables.tool_permissions.push({ tool: 'browser', agent_id: AGENT.id, enabled: true, requires_approval: true, allowed_domains: ['httpbingo.org'] });
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'Read https://httpbingo.org/html' });
+    const from = sb.from.bind(sb);
+    vi.spyOn(sb, 'from').mockImplementation(name => {
+      const query = from(name);
+      if (name === 'agent_tasks') {
+        const select = query.select.bind(query);
+        query.select = (columns?: string, ...rest: any[]) => {
+          if (columns?.includes('waiting_approval_request_id')) query.maybeSingle = async () => ({ data: null, error: { code: '42703', message: 'column does not exist' } });
+          return select(columns, ...rest);
+        };
+      }
+      return query;
+    });
+    const call = { ...textResult(''), toolCalls: [{ id: 'read-page', name: 'browser_task', arguments: { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] } }] };
+    if (stream) {
+      gateway.streamChat.mockImplementationOnce(async function* () { yield { type: 'done', result: call }; });
+      const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.at(-1)).toMatchObject({ type: 'error', message: expect.stringContaining('no executable approval request') });
+      expect(events.some(event => event.type === 'complete' || event.type === 'paused')).toBe(false);
+      expect(sb.tables.agent_tasks[0].status).toBe('failed');
+      expect(gateway.streamChat).toHaveBeenCalledTimes(1);
+    } else {
+      gateway.runChat.mockResolvedValueOnce(call);
+      await expect(executeRun({ sb, userId: USER, run })).rejects.toMatchObject({ code: 'APPROVAL_NOT_QUEUED' });
+      expect(gateway.runChat).toHaveBeenCalledTimes(1);
+    }
+    expect(sb.tables.agent_tasks[0].status).not.toBe('succeeded');
+    expect(sb.tables.approval_requests ?? []).toHaveLength(0);
+    expect(sb.tables.tool_executions).toEqual([expect.objectContaining({ tool: 'browser_task', status: 'failed' })]);
+  });
+  it.each([false, true])('pauses without a second model turn or completion (stream=%s)', async stream => {
+    const sb = db([{ ...AGENT, allowed_tools: ['browser'], requires_approval: true }]);
+    sb.tables.tools.push({ slug: 'browser', is_active: true }, { slug: 'browser_task', is_active: true });
+    sb.tables.tool_permissions.push({ tool: 'browser', agent_id: AGENT.id, enabled: true, requires_approval: true, allowed_domains: ['httpbingo.org'] });
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'Read https://httpbingo.org/html' });
+    expect(run.tools.defs.map(tool => tool.name)).toContain('browser_task');
+    expect(run.tools.defs.map(tool => tool.name)).not.toContain('browser');
+    const call = { ...textResult(''), toolCalls: [{ id: 'read-page', name: 'browser_task', arguments: { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] } }, { id: 'later', name: 'current_time', arguments: {} }] };
+    if (stream) {
+      gateway.streamChat.mockImplementationOnce(async function* () { yield { type: 'done', result: call }; });
+      const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.at(-1)).toMatchObject({ type: 'paused', task: { status: 'waiting_for_approval' } });
+      expect(gateway.streamChat).toHaveBeenCalledTimes(1);
+      expect(events.some(event => event.type === 'complete')).toBe(false);
+    } else {
+      gateway.runChat.mockResolvedValueOnce(call);
+      expect(await executeRun({ sb, userId: USER, run })).toMatchObject({ status: 'waiting_for_approval' });
+      expect(gateway.runChat).toHaveBeenCalledTimes(1);
+    }
+    expect(sb.tables.approval_requests).toEqual([expect.objectContaining({ action_type: 'agent_browser_task', status: 'pending' })]);
+    expect(sb.tables.agent_tasks[0]).toMatchObject({ status: 'waiting_for_approval', waiting_approval_request_id: expect.any(String), tokens_in: 10, tokens_out: 5, tool_calls: 1 });
+    expect(sb.tables.tool_executions).toHaveLength(0);
   });
 });

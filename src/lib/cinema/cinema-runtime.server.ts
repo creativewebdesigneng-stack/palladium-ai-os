@@ -1,3 +1,4 @@
+import { normalizeWorkerGpuReport } from "@/lib/runtime/gpu-worker-report";
 export type CinemaQuality = 'preview' | 'production' | 'cinema'
 export type CinemaAspect = '16:9' | '2.39:1' | '1.85:1' | '9:16' | '1:1'
 
@@ -74,6 +75,9 @@ export async function probeCinemaMasterConnection() {
       httpStatus:response.status,
       latencyMs:Math.max(0,Date.now()-started),
       checkedAt:new Date().toISOString(),
+      // Optional, sanitized accelerator inventory from this EXISTING worker.
+      // Worker-reported only; not independently attested GPU hardware.
+      gpuReport:response.ok?normalizeWorkerGpuReport(payload):null,
       capabilities:{
         ffmpeg:payload?.ffmpeg===true?true:payload?.ffmpeg===false?false:null,
         cinema:payload?.cinema&&typeof payload.cinema==='object'?payload.cinema:null,
@@ -96,6 +100,7 @@ export async function probeCinemaMasterConnection() {
       httpStatus:null,
       latencyMs:Math.max(0,Date.now()-started),
       checkedAt:new Date().toISOString(),
+      gpuReport:null,
       capabilities:{ffmpeg:null,cinema:null},
       error:error instanceof Error?error.message.slice(0,240):'Cinema master health probe failed.',
     }

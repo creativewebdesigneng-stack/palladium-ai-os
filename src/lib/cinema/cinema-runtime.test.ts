@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { BLACKSTAR_CINEMA_MASTER_WORKER_URL, CINEMA_MAX_DURATION_MINUTES, getCinemaCapabilities, getCinemaMasterAssembly, submitCinemaRender } from './cinema-runtime.server'
+import { BLACKSTAR_CINEMA_MASTER_WORKER_URL, CINEMA_MAX_DURATION_MINUTES, getCinemaCapabilities, getCinemaMasterAssembly, probeCinemaMasterConnection, submitCinemaRender } from './cinema-runtime.server'
 
 const originalWorker=process.env['CINEMA_STUDIO_WORKER_URL']
 const originalMasterWorker=process.env['CINEMA_STUDIO_MASTER_WORKER_URL']
@@ -48,6 +48,23 @@ describe('Blackstar Cinema Studio',()=>{
   expect(result.status).toBe('completed')
   expect(result.outputUrl).toBe('https://media.example/master.mp4')
   expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${BLACKSTAR_CINEMA_MASTER_WORKER_URL}/v1/films/master-1`)
+ })
+
+ it('reads optional NVIDIA GPU inventory from existing master health without claiming a render',async()=>{
+  process.env['CINEMA_STUDIO_MASTER_WORKER_URL']='https://cinema.example.com'
+  const fetcher=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({
+    ready:true,ffmpeg:true,
+    gpu:{vendor:'nvidia',model:'NVIDIA RTX A6000',vram_mib:49152,cuda_available:true,
+      secret:'never-send'},
+  }),{status:200,headers:{'content-type':'application/json'}}))
+  const report=await probeCinemaMasterConnection()
+  expect(report.healthy).toBe(true)
+  expect(report.gpuReport).toMatchObject({
+    vendor:'nvidia',model:'NVIDIA RTX A6000',vramMiB:49152,
+    source:'worker_self_report',hardwareVerified:false,renderingCertified:false,
+  })
+  expect(JSON.stringify(report.gpuReport)).not.toContain('never-send')
+  expect(String(fetcher.mock.calls[0]?.[0])).toBe('https://cinema.example.com/health')
  })
 
  it('submits a scene-based long-form render contract to a configured worker',async()=>{

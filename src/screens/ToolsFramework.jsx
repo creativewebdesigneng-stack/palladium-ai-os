@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
 import ToolsTab from '@/components/tools-framework/ToolsTab';
+import ToolEvidencePanel from '@/components/tools-framework/ToolEvidencePanel';
 import IntegrationsTab from '@/components/tools-framework/IntegrationsTab';
 import BrowserPolicyPanel, { ExecutionLog } from '@/components/tools-framework/BrowserPolicyPanel';
 import AppStudioPanel from '@/components/tools-framework/AppStudioPanel';
@@ -155,7 +156,10 @@ export default function ToolsFramework() {
         )}
       </div>
 
-      {tab === 'tools' && <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />}
+      {tab === 'tools' && <>
+        <ToolEvidencePanel rows={framework.toolEvidence ?? []} scope={framework.toolEvidenceScope} />
+        <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />
+      </>}
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
       {tab === 'integrations' && <IntegrationsTab catalogue={integrationCatalogue} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}

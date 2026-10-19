@@ -20,12 +20,13 @@ import {
 type Sb = { from: (t: string) => any };
 
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
-const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "gemini", "deepseek", "groq", "compatible"];
+const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "gemini", "deepseek", "groq", "nvidia", "compatible"];
 const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   lovable: "google/gemini-3-flash-preview",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
+  nvidia: AGENT_MODEL_CHOICES["nvidia-nim-oss-20b"]!.model,
   compatible: "local-model",
   gemini: AGENT_MODEL_CHOICES['gemini']!.model,
   deepseek: "deepseek-chat",
@@ -323,4 +324,48 @@ export const deleteAgent = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** Updates tool selection only; existing permission and approval policy stays authoritative. */
+export const updateAgentTools = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(), tools: z.array(z.string().min(1).max(80)).max(30),
+    expectedUpdatedAt: z.string().min(1).max(80),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentTools } = await import('./agent-tools-update.server');
+    return changeOwnedAgentTools({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
+  });
+
+
+/** Lists existing OAuth/Nango/GitHub App connections for this user's agents. */
+export const listAgentConnectorChoices = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { listOwnedAgentConnectorChoices } = await import('./agent-connectors.server');
+    const { getUserGitHubInstallationId } = await import('@/lib/integrations/github-connected-service.server');
+    const githubInstallation = await getUserGitHubInstallationId(context.userId)
+      .then(id => id !== null).catch(() => false);
+    return listOwnedAgentConnectorChoices({
+      sb: context.supabase as unknown as Sb, userId: context.userId, githubInstallation,
+    });
+  });
+
+/** Assigns only actually connected apps; existing tool grants and approvals still govern execution. */
+export const updateAgentConnectors = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(),
+    providers: z.array(z.string().trim().min(1).max(80)).max(30),
+    expectedUpdatedAt: z.string().min(1).max(80),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentConnectors } = await import('./agent-connectors.server');
+    const { getUserGitHubInstallationId } = await import('@/lib/integrations/github-connected-service.server');
+    const githubInstallation = await getUserGitHubInstallationId(context.userId)
+      .then(id => id !== null).catch(() => false);
+    return changeOwnedAgentConnectors({
+      ...data, sb: context.supabase as unknown as Sb, userId: context.userId, githubInstallation,
+    });
   });

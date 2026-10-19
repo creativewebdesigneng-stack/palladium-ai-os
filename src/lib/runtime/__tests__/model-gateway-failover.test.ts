@@ -40,6 +40,54 @@ describe("model gateway provider failover", () => {
     process.env = { ...originalEnv };
   });
 
+  it("does not auto-fallback into metered NVIDIA just because a server key exists", async () => {
+    process.env["NVIDIA_API_KEY"] = "operator-key";
+    delete process.env["NVIDIA_NIM_FALLBACK_ENABLED"];
+    baseGateway.runChat.mockRejectedValue(new ProviderError("unavailable", 503, true));
+    const messages = [{ role: "user" as const, content: "test bounded failover" }];
+    await expect(runChat({ ...makeArgs(messages), allowedProviders: ["groq", "nvidia"] }))
+      .rejects.toBeInstanceOf(ProviderError);
+    expect(baseGateway.runChat).toHaveBeenCalled();
+    expect(baseGateway.runChat.mock.calls.map(([args]) => args.provider))
+      .not.toContain("nvidia");
+  });
+
+  it("allows NVIDIA cross-provider failover only with explicit operator opt-in", async () => {
+    process.env["NVIDIA_API_KEY"] = "operator-key";
+    process.env["NVIDIA_NIM_FALLBACK_ENABLED"] = "true";
+    baseGateway.runChat.mockImplementation(async (args) => {
+      if (args.provider === "nvidia") return {
+        text: "NVIDIA selected by opted-in failover", toolCalls: [],
+        usage: { input: 4, output: 8 }, provider: "nvidia",
+        model: "openai/gpt-oss-20b",
+      };
+      throw new ProviderError("unavailable", 503, true);
+    });
+    const messages = [{ role: "user" as const, content: "test allowed fallback" }];
+    const result = await runChat({
+      ...makeArgs(messages), allowedProviders: ["groq", "nvidia"],
+    });
+    expect(result.provider).toBe("nvidia");
+    expect(baseGateway.runChat.mock.calls.some(([args]) => args.provider === "nvidia")).toBe(true);
+  });
+
+  it("still allows direct NVIDIA model selection without enabling auto-fallback", async () => {
+    process.env["NVIDIA_API_KEY"] = "operator-key";
+    delete process.env["NVIDIA_NIM_FALLBACK_ENABLED"];
+    baseGateway.runChat.mockResolvedValue({
+      text: "Direct model response", toolCalls: [],
+      usage: { input: 4, output: 4 }, provider: "nvidia",
+      model: "openai/gpt-oss-20b",
+    });
+    const result = await runChat({
+      ...makeArgs([{ role: "user" as const, content: "direct NVIDIA" }]),
+      provider: "nvidia", model: "openai/gpt-oss-20b", allowedProviders: ["nvidia"],
+    });
+    expect(result.provider).toBe("nvidia");
+    expect(baseGateway.runChat.mock.calls.every(([args]) => args.provider === "nvidia"))
+      .toBe(true);
+  });
+
   it("does not use a configured vendor outside an agent's explicit provider consent", async () => {
     baseGateway.runChat.mockRejectedValue(new ProviderError("Provider unavailable", 503, true));
     webAccess.searchPublicWeb.mockResolvedValue({results:[]});
