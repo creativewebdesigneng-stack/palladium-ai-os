@@ -11,6 +11,7 @@ export const WIZARD_MODELS = [
   { id: 'deepseek', provider: 'deepseek', name: 'DeepSeek Chat', letter: 'D', grad: 'from-cyan-400 to-blue-500', desc: 'DeepSeek · deepseek-chat' },
   { id: 'groq-oss-120b', provider: 'groq', name: 'GPT-OSS 120B', letter: 'G', grad: 'from-purple-400 to-fuchsia-500', desc: 'Groq · openai/gpt-oss-120b' },
   { id: 'groq-oss-20b', provider: 'groq', name: 'GPT-OSS 20B', letter: 'G', grad: 'from-purple-400 to-indigo-500', desc: 'Groq · openai/gpt-oss-20b' },
+  { id: 'nvidia-nim-oss-20b', provider: 'nvidia', name: 'NVIDIA NIM · GPT-OSS 20B', letter: 'N', grad: 'from-lime-500 to-emerald-500', desc: 'NVIDIA API Catalog / Dell-hosted NIM · openai/gpt-oss-20b (credential required)' },
 ];
 
 
