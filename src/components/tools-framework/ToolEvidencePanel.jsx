@@ -2,7 +2,8 @@ import TableSurface from '@/components/palladium/TableSurface';
 
 const STATE_LABELS = {
   browser_verified: 'Verified browser execution',
-  execution_recorded: 'Execution recorded',
+  execution_recorded: 'Execution recorded — provider not certified',
+  simulated_only: 'Simulated result only — not certified',
   approval_activity: 'Approval/queue activity only',
   failed_only: 'Failed execution only',
   not_tested: 'No execution evidence',
@@ -17,9 +18,10 @@ export default function ToolEvidencePanel({ rows = [], scope }) {
   return <section aria-label="Agent tool evidence" className="mb-5 space-y-2 rounded-2xl border border-white/10 bg-white/[.03] p-4">
     <h2 className="text-sm font-semibold text-zinc-100">Tool execution evidence</h2>
     <p className="text-xs text-zinc-400">
-      {rows.length} registered tools. {observed} with actual execution evidence;
+      {rows.length} registered tools. {observed} with recorded non-simulated success or verified browser evidence;
       { ' ' }{totals.failed_only || 0} with failed attempts only;
-      { ' ' }{totals.not_tested || 0} not tested. No connector is certified merely for appearing in the catalogue.
+      { ' ' }{totals.not_tested || 0} not tested;
+      { ' ' }{totals.simulated_only || 0} simulated-only. No connector is certified merely for appearing in the catalogue.
     </p>
     <p className="text-[11px] text-zinc-500">
       Scope: {scope === 'recent_60_executions' ? 'up to the most recent 60 owner-scoped execution records and 60 browser approvals' : 'available execution records'}.
