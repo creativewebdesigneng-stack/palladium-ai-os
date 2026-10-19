@@ -59,6 +59,7 @@ const localInputs = {
     title: z.string().trim().min(1).max(160).optional(),
   }).strict().refine(value => Boolean(value.document_id || value.title),
     'Document analysis approval requires an explicit document ID or title.'),
+  web_fetch: z.object({ url: publicUrl }).strict(),
 };
 export function approvedLocalToolInput(name: string, input: unknown) {
   if (!Object.hasOwn(localInputs, name)) throw new Error('This tool has no bounded approval executor.');
@@ -79,8 +80,12 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   const kind = browser ? 'agent_browser_task' : 'agent_tool_task';
   if (!ctx.taskId) throw new Error('Browser approval requires an existing agent task.');
   const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
-  if (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) {
-    throw new Error('Browser approval is outside the current domain policy.');
+  const networkRead = name === 'web_fetch';
+  if (
+    (browser && (!ctx.allowedDomains?.length || payload.steps.some((s: { url?: string }) => s.url && !isDomainAllowed(s.url, ctx.allowedDomains ?? [])))) ||
+    (networkRead && (!ctx.allowedDomains?.length || !isDomainAllowed(payload.url, ctx.allowedDomains ?? [])))
+  ) {
+    throw new Error('Tool approval is outside the current domain policy.');
   }
   const { data: task, error: taskError } = await ctx.sb.from('agent_tasks').select('id,status,cancel_requested,waiting_approval_request_id')
     .eq('id', ctx.taskId).eq('agent_id', ctx.agentId).eq('user_id', ctx.userId).maybeSingle();
@@ -151,7 +156,10 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const tools = await resolveGrantedTools(args.sb, agent, entitlements.planCode);
     const grant = tools.grants.get(name);
     const { isDomainAllowed } = await import('@/lib/mission/browser-agent');
-    if (!grant || (browser && (!grant.allowedDomains.length || input.steps.some((s: any) => s.url && !isDomainAllowed(s.url, grant.allowedDomains))))) throw new Error('Current browser permissions no longer allow the approved task.');
+    if (!grant ||
+      (browser && (!grant.allowedDomains.length || input.steps.some((s: any) => s.url && !isDomainAllowed(s.url, grant.allowedDomains)))) ||
+      (name === 'web_fetch' && (!grant.allowedDomains.length || !isDomainAllowed(input.url, grant.allowedDomains)))
+    ) throw new Error('Current tool permissions no longer allow the approved task.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
     const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
       .eq('id', taskId).eq('user_id', args.userId).eq('status', 'waiting_for_approval').eq('waiting_approval_request_id', approval.id).eq('cancel_requested', false).select('id').maybeSingle();
