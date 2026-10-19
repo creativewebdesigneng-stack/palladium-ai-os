@@ -5,6 +5,7 @@ import {
   listModelProviderDefinitions,
 } from "./model-providers.server";
 import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
+import { nvidiaDellInfrastructureReadiness } from "./nvidia-dell-infrastructure.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -123,6 +124,9 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       assignments,
       usage,
       astra,
+      // Readiness is configuration-only; not evidence of an active Dell GPU or
+      // an authenticated NVIDIA model inference.
+      acceleratorInfrastructure: nvidiaDellInfrastructureReadiness(),
       totals: {
         agents: assignments.length,
         activeAgents: assignments.filter((agent) => agent.status === "active").length,
