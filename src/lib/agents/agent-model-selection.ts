@@ -9,6 +9,7 @@ export const AGENT_MODEL_CHOICES: Record<string, { provider: Provider; model: st
   llama: { provider: 'groq', model: 'llama-3.3-70b-versatile' },
   'groq-oss-120b': { provider: 'groq', model: 'openai/gpt-oss-120b' },
   'groq-oss-20b': { provider: 'groq', model: 'openai/gpt-oss-20b' },
+  'nvidia-nim-oss-20b': { provider: 'nvidia', model: 'openai/gpt-oss-20b' },
 };
 
 export function normaliseAgentModelSelection(provider?: string | null, model?: string | null) {
@@ -19,10 +20,10 @@ export function normaliseAgentModelSelection(provider?: string | null, model?: s
   const choice = AGENT_MODEL_CHOICES[legacy[requested] ?? ''];
   if (choice) return { ...choice };
   const selected = (provider ?? 'openai').trim().toLowerCase();
-  if (!['lovable', 'openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'compatible'].includes(selected)) {
+  if (!['lovable', 'openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'nvidia', 'compatible'].includes(selected)) {
     throw new Error('Unknown AI model provider. Select a supported provider.');
   }
-  if (!['lovable', 'groq', 'compatible'].includes(selected)) {
+  if (!['lovable', 'groq', 'nvidia', 'compatible'].includes(selected)) {
     const family = requested.startsWith('gemini-') ? 'gemini'
       : requested.startsWith('claude-') ? 'anthropic'
       : /^(gpt-|o[134]-)/.test(requested) ? 'openai'
