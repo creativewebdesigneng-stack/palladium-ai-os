@@ -1,3 +1,4 @@
+import { normalizeWorkerGpuReport } from "@/lib/runtime/gpu-worker-report";
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export type ThreeDJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -36,6 +37,7 @@ export async function probeThreeDWorker() {
       httpStatus: null,
       latencyMs: 0,
       checkedAt: new Date().toISOString(),
+      gpuReport:null,
       workflows: [] as string[],
       formats: [] as string[],
       error: "3D Studio execution worker is unavailable.",
@@ -62,6 +64,7 @@ export async function probeThreeDWorker() {
       httpStatus: response.status,
       latencyMs: Math.max(0, Date.now() - started),
       checkedAt: new Date().toISOString(),
+      gpuReport:healthy?normalizeWorkerGpuReport(payload):null,
       workflows: Array.isArray(payload?.workflows) ? payload.workflows.filter((item: unknown) => typeof item === "string").slice(0, 20) : [],
       formats: Array.isArray(payload?.formats) ? payload.formats.filter((item: unknown) => typeof item === "string").slice(0, 20) : [],
       error: healthy
@@ -82,6 +85,7 @@ export async function probeThreeDWorker() {
       httpStatus: null,
       latencyMs: Math.max(0, Date.now() - started),
       checkedAt: new Date().toISOString(),
+      gpuReport:null,
       workflows: [] as string[],
       formats: [] as string[],
       error: error instanceof Error ? error.message.slice(0, 240) : "3D worker health probe failed.",
