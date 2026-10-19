@@ -48,6 +48,29 @@ describe('manual agent tool invocation approval boundary', () => {
     })).rejects.toThrow('not available');
   });
 
+  it('recognises integration_action queued with a pending receipt as awaiting approval', async () => {
+    const sb = seed();
+    mocked.granted.mockResolvedValueOnce({
+      grants: new Map([['integration_action', { requiresApproval: true }]]),
+    });
+    mocked.execute.mockResolvedValueOnce({
+      ok: true,
+      output: {
+        queued: true, approval_request_id: 'immutable-approval', status: 'pending',
+        provider: 'google', action: 'calendar_create',
+      },
+    });
+    const result = await invoke({
+      data: { agentId: 'agent', tool: 'integration_action', input: {
+        provider: 'google', action: 'calendar_create', input: {},
+      } },
+      context: { supabase: sb, userId: 'owner' },
+    });
+    expect(result.status).toBe('awaiting_approval');
+    expect(result.approvalRequestId).toBe('immutable-approval');
+    expect(sb.tables['approval_requests']).toHaveLength(0);
+  });
+
   it('reports a real self-queued connector approval as pending, not tool succeeded', async () => {
     const sb = seed();
     mocked.granted.mockResolvedValueOnce({
