@@ -121,6 +121,9 @@ describe('NVIDIA NIM as an existing Blackstar model gateway provider', () => {
       });
     });
     expect(resolveModel('nvidia', '')).toBe('nvidia/custom-model');
+    // The standard existing-agent NVIDIA choice must work with an operator
+    // configured custom Dell-hosted NIM model without rewriting the agent.
+    expect(resolveModel('nvidia', 'openai/gpt-oss-20b')).toBe('nvidia/custom-model');
     const res = await runChat({
       provider: 'nvidia', model: 'nvidia/custom-model',
       messages: [{ role: 'user', content: 'hello' }], maxAttempts: 1,
