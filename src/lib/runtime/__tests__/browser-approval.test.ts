@@ -198,6 +198,39 @@ describe('bounded local tool approvals share the existing continuation', () => {
     });
     expect(calls.execute).not.toHaveBeenCalled();
   });
+  it('queues web_fetch only for explicitly allowed plain HTTPS domains', async () => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const context = {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2];
+    await expect(queueLocalToolApproval('web_fetch', { url: 'https://other.example/html' }, context))
+      .rejects.toThrow('outside the current domain policy');
+    expect(db.tables['approval_requests']).toHaveLength(1);
+    const queued = await queueLocalToolApproval('web_fetch', { url: 'https://httpbingo.org/html' }, context);
+    expect(queued).toMatchObject({ requires_approval: true, status: 'awaiting_approval' });
+    expect(db.tables['approval_requests']?.at(-1)).toMatchObject({
+      action_type: 'agent_tool_task', details: {
+        tool: 'web_fetch', input: { url: 'https://httpbingo.org/html' },
+      },
+    });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the current web_fetch domain grant before a one-shot approved network request', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = {
+      agent_task_id: 'task', tool: 'web_fetch', input: { url: 'https://httpbingo.org/html' },
+    };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'web_fetch';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['web_fetch', { slug: 'web_fetch', requiresApproval: true, allowedDomains: ['different.example'], spendCap: 0 }],
+    ]) });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it('accepts the observed web-search model limit and canonicalises it to eight before approval', async () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -228,6 +261,10 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['file_analysis', { document_id: 'not-an-id' }],
     ['file_analysis', { title: 'q'.repeat(161) }],
     ['file_analysis', { title: 'ok', download: true }],
+    ['web_fetch', { url: 'http://httpbingo.org/html' }],
+    ['web_fetch', { url: 'https://httpbingo.org/html?session=private' }],
+    ['web_fetch', { url: 'https://user:secret@httpbingo.org/html' }],
+    ['web_fetch', { url: 'https://httpbingo.org/html', method: 'POST' }],
   ])('refuses unsupported or unbounded input for %s', (name, input) => {
     expect(() => approvedLocalToolInput(name as string, input)).toThrow();
   });
