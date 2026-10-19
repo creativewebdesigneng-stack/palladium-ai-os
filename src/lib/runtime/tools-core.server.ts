@@ -878,9 +878,14 @@ const REGISTRY: Record<string, ToolImpl> = {
       if (str(input["action"], "list") === "list") {
         const requested = str(input["provider"], "auto").toLowerCase();
         const query = str(input["query"]).slice(0, 200);
-        const providers = requested === "google" || requested === "microsoft"
+        // Calendar is a convenience view over existing connectors, not an
+        // independent provider grant. Never read an OAuth account that was not
+        // explicitly assigned to this agent.
+        const assigned = new Set((ctx.allowedProviders ?? []).map(normalizeProvider).filter(Boolean));
+        const candidates = requested === "google" || requested === "microsoft"
           ? [requested]
           : ["google", "microsoft"];
+        const providers = candidates.filter(provider => assigned.has(provider));
         for (const provider of providers) {
           const live = await readConnectedService(
             ctx.userId,
@@ -891,13 +896,15 @@ const REGISTRY: Record<string, ToolImpl> = {
             return { source: provider, connected: true, ...live as Record<string, unknown> };
           }
         }
-        const { data } = await ctx.sb
+        const { data, error: taskError } = await ctx.sb
           .from("personal_tasks")
           .select("id,title,due_at,status")
+          .eq("user_id", ctx.userId)
           .not("due_at", "is", null)
           .order("due_at", { ascending: true })
           .limit(10);
-        return { source: "palladium", connected: false, events: data ?? [], note: "No connected Google or Microsoft calendar was available." };
+        if (taskError) return { error: "The owner's scheduled items could not be read." };
+        return { source: "palladium", connected: false, events: data ?? [], note: "No assigned connected calendar was available." };
       }
       const title = str(input["title"]).slice(0, 200);
       if (!title) return { error: "A title is required to propose a calendar item." };
@@ -1657,7 +1664,7 @@ export async function executeTool(
       } };
     }
   }
-  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query'].includes(name)) {
+  if (grant.requiresApproval && ['calculator', 'current_time', 'data_analysis', 'web_search', 'memory_search', 'file_analysis', 'web_fetch', 'http_request', 'database_query', 'calendar'].includes(name)) {
     try {
       const { queueLocalToolApproval } = await import('./browser-approval.server');
       return { ok: true, output: await queueLocalToolApproval(name, input, ctx) };
