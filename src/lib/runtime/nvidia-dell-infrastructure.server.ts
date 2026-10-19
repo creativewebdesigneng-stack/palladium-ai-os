@@ -78,3 +78,49 @@ export function nvidiaDellInfrastructureReadiness() {
     },
   } as const;
 }
+
+/**
+ * Explicit operator-initiated, read-only model-catalogue probe.
+ * A successful GET /models proves response from the configured endpoint,
+ * but does NOT prove generation, tool calling, streaming, or Dell GPU access.
+ */
+export async function probeNvidiaNimModels(): Promise<{
+  status: 'not_configured' | 'reachable' | 'model_missing' | 'unauthorised' | 'unsupported' | 'unavailable';
+  checkedAt: string;
+  configuredModel: string;
+  modelListed: boolean;
+}> {
+  const checkedAt = new Date().toISOString();
+  const configuredModel = nvidiaNimModel();
+  const result = (
+    status: 'not_configured' | 'reachable' | 'model_missing' | 'unauthorised' | 'unsupported' | 'unavailable',
+    modelListed = false,
+  ) => ({ status, checkedAt, configuredModel, modelListed });
+  if (!nvidiaNimConfigured()) return result('not_configured');
+  try {
+    const response = await fetch(`${nvidiaNimBaseUrl()}/models`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${nvidiaNimKey()}`,
+        Accept: 'application/json',
+      },
+      redirect: 'error',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.status === 401 || response.status === 403) return result('unauthorised');
+    if (response.status === 404 || response.status === 405 || response.status === 501) return result('unsupported');
+    if (!response.ok) return result('unavailable');
+    const data: unknown = await response.json();
+    if (!data || typeof data !== 'object' || !('data' in data)) return result('unsupported');
+    const models = (data as { data?: unknown }).data;
+    if (!Array.isArray(models)) return result('unsupported');
+    const listed = models.some((item: unknown) => item !== null &&
+      typeof item === 'object' && 'id' in item &&
+      (item as { id: unknown }).id === configuredModel);
+    return result(listed ? 'reachable' : 'model_missing', listed);
+  } catch {
+    // Never expose the actual endpoint URL, credential, returned body or an
+    // upstream exception to users; it could contain internal deployment data.
+    return result('unavailable');
+  }
+}
