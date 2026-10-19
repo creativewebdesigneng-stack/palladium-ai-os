@@ -200,6 +200,61 @@ describe('bounded local tool approvals share the existing continuation', () => {
     });
     expect(calls.execute).not.toHaveBeenCalled();
   });
+  it('queues a shopping comparison only when a retailer domain is explicitly allowed', async () => {
+    db.tables['agent_tasks']![0]!['status'] = 'running';
+    db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
+    const context = {
+      sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task',
+      allowedDomains: ['shop.example'],
+    } as unknown as Parameters<typeof queueLocalToolApproval>[2];
+    const req = { requirement: 'replacement bicycle helmet', budget: 75, currency: 'gbp' };
+    await expect(queueLocalToolApproval('shopping_search', req, {
+      ...context, allowedDomains: [],
+    })).rejects.toThrow('outside the current domain policy');
+    expect(db.tables['approval_requests']).toHaveLength(1);
+    const queued = await queueLocalToolApproval('shopping_search', req, context);
+    expect(queued).toMatchObject({ requires_approval: true, status: 'awaiting_approval' });
+    expect(db.tables['approval_requests']?.at(-1)).toMatchObject({
+      action_type: 'agent_tool_task', details: {
+        tool: 'shopping_search', input: {
+          requirement: 'replacement bicycle helmet', budget: 75, currency: 'GBP',
+        },
+      },
+    });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects simulated shopping results rather than certifying fake retail offers', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = {
+      agent_task_id: 'task', tool: 'shopping_search', input: { requirement: 'bicycle helmet', currency: 'GBP' },
+    };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'shopping_search';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['shopping_search', { slug: 'shopping_search', requiresApproval: true, allowedDomains: ['shop.example'], spendCap: 100 }],
+    ]) });
+    calls.execute.mockResolvedValueOnce({ ok: true, output: {
+      provider: 'development', simulated: true, offers: [{ price: 25, title: 'Imaginary listing' }],
+    } });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.complete).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('failed');
+  });
+
+  it('refuses shopping research when approved domains were revoked after queueing', async () => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = {
+      agent_task_id: 'task', tool: 'shopping_search', input: { requirement: 'helmet' },
+    };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = 'shopping_search';
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      ['shopping_search', { slug: 'shopping_search', requiresApproval: true, allowedDomains: [], spendCap: 100 }],
+    ]) });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it('queues web_fetch only for explicitly allowed plain HTTPS domains', async () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
@@ -359,6 +414,12 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ['web_search', { query: 'ok', url: 'https://internal.local/' }],
     ['web_search', { query: 'ok', limit: -1 }],
     ['web_search', { query: 'q'.repeat(301) }],
+    ['shopping_search', { requirement: '' }],
+    ['shopping_search', { requirement: 'x'.repeat(301) }],
+    ['shopping_search', { requirement: 'helmet', budget: -1 }],
+    ['shopping_search', { requirement: 'helmet', budget: Number.POSITIVE_INFINITY }],
+    ['shopping_search', { requirement: 'helmet', currency: 'GBP', card_number: 'secret' }],
+    ['shopping_search', { requirement: 'helmet', url: 'http://localhost/' }],
     ['memory_search', { query: '' }],
     ['memory_search', { query: 'q'.repeat(301) }],
     ['memory_search', { query: 'ok', user_id: 'other' }],
