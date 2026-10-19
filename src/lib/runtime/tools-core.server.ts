@@ -1349,7 +1349,7 @@ function isPrivateHost(url: string) {
     return (
       // Reject *all* literal IP addresses, including IPv6, shorthand IPv4
       // forms and cloud metadata endpoints. Agents use approved DNS names.
-      isIP(host) !== 0 ||
+      isIP(host.replace(/^\[/, "").replace(/\]$/, "")) !== 0 ||
       host === "localhost" ||
       host.endsWith(".local") ||
       /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
