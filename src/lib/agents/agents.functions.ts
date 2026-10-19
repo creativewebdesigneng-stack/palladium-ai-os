@@ -20,12 +20,13 @@ import {
 type Sb = { from: (t: string) => any };
 
 const AGENT_STATUSES = ["draft", "active", "paused", "archived"];
-const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "gemini", "deepseek", "groq", "compatible"];
+const MODEL_PROVIDERS = ["lovable", "openai", "anthropic", "gemini", "deepseek", "groq", "nvidia", "compatible"];
 const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   lovable: "google/gemini-3-flash-preview",
   openai: "gpt-5-mini",
   anthropic: "claude-sonnet-4-5-20250929",
   groq: "openai/gpt-oss-120b",
+  nvidia: AGENT_MODEL_CHOICES["nvidia-nim-oss-20b"]!.model,
   compatible: "local-model",
   gemini: AGENT_MODEL_CHOICES['gemini']!.model,
   deepseek: "deepseek-chat",
