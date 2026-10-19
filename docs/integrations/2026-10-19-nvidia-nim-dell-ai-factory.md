@@ -40,6 +40,26 @@ Preview operator variables:
 
 **Important:** A Dell management controller (iDRAC/Redfish) must **not** be exposed directly to Vercel, and Blackstar does not currently issue Dell server management commands or report measured GPU utilisation. Running models, Game Foundry workers, Cinema Studio workers, and RTX rendering workers on actual Dell/NVIDIA machines needs separate endpoint deployment, per-GPU compatibility/VRAM verification, stable network routing, quota and acceptance tests. Existing worker contracts (`CINEMA_STUDIO_WORKER_URL`, `GAME_FOUNDRY_3D_API_URL`, etc.) should be reused rather than cloned.
 
+### Existing Cinema and 3D GPU health preflight (optional)
+
+The existing administrator **/admin/acceptance** read-only preflight reuses Cinema and 3D worker `/health` calls. No extra GPU endpoint, controller, agent credential or worker platform is introduced. An operator who controls the **existing** Cinema Master or Modly-compatible 3D worker may extend its ready health JSON with:
+
+```json
+{
+  "ready": true,
+  "gpu": {
+    "vendor": "nvidia",
+    "model": "NVIDIA RTX A6000",
+    "vram_mib": 49152,
+    "cuda_available": true
+  }
+}
+```
+
+The app ignores unrecognised GPU vendor strings, invalid VRAM, secrets, URLs and unsafe model labels. If the worker is unhealthy, unreachable or reports `ready=false`, it does **not** claim an accelerator. The UI identifies this inventory as **worker-reported only**. A reported NVIDIA GPU does not demonstrate a paid Dell AI Factory installation, a CUDA operation, supported NIM model performance, a successful Cinema/3D job or independently attested hardware.
+
+To certify a GPU workload later, run the **existing** /admin/acceptance worker preflight and then a genuine limited Cinema/3D task with a persisted verified output and resource observations. Keep tokens and Dell iDRAC management interfaces away from public browsers and model context. No new per-worker environment variable is required for this optional health field.
+
 ### Release requirements
 
 - A real NVIDIA Chat Completions call with the **actual** operator-owned key and target model must pass; streaming and tool-call examples should be tested before assigning production agents.
