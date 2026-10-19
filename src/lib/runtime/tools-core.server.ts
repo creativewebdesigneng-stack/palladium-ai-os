@@ -6,6 +6,7 @@
  * in `tool_permissions`. The frontend is never trusted for any of this.
  */
 import type { ToolDef } from "./model-gateway.server";
+import { isIP } from "node:net";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
 import {
@@ -316,6 +317,9 @@ const REGISTRY: Record<string, ToolImpl> = {
       if (isPrivateHost(url)) return { error: "That host is not reachable from the runtime." };
       const res = await fetch(url, {
         headers: { "User-Agent": "PalladiumAI-Agent/1.0" },
+        // Raw network tools must not follow a benign public host to a private
+        // or newly disallowed target; redirects require a fresh approval.
+        redirect: "error",
         signal: ctx.signal ?? AbortSignal.timeout(20_000),
       });
       if (!res.ok) return { error: `Fetch failed (${res.status}).` };
@@ -580,6 +584,7 @@ const REGISTRY: Record<string, ToolImpl> = {
           ...(body ? { "content-type": "application/json" } : {}),
         },
         ...(method === "POST" && body ? { body } : {}),
+        redirect: "error",
         signal: ctx.signal ?? AbortSignal.timeout(20_000),
       });
       const text = (await res.text()).slice(0, 6000);
@@ -1342,6 +1347,9 @@ function isPrivateHost(url: string) {
   try {
     const host = new URL(url).hostname;
     return (
+      // Reject *all* literal IP addresses, including IPv6, shorthand IPv4
+      // forms and cloud metadata endpoints. Agents use approved DNS names.
+      isIP(host) !== 0 ||
       host === "localhost" ||
       host.endsWith(".local") ||
       /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
