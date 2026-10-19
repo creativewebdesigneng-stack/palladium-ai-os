@@ -4,7 +4,7 @@ import * as base from "./model-gateway.base";
 import type { ChatMessage, ChatResult, Provider, RunArgs, StreamEvent } from "./model-gateway.base";
 import { blackstarAstraContextCompactionOptions } from "./blackstar-astra-context-policy";
 import { compactRunContextInPlace } from "./run-context-journal.server";
-import { nvidiaNimConfigured } from './nvidia-dell-infrastructure.server';
+import { nvidiaNimConfigured, nvidiaNimFallbackEnabled } from './nvidia-dell-infrastructure.server';
 
 export * from "./model-gateway.base";
 
@@ -58,7 +58,11 @@ function markRateLimited(provider: Provider) {
 function fallbackOrder(primary: Provider): Provider[] {
   const all: Provider[] = [primary, "gemini", "groq", "deepseek", "openai", "lovable", "anthropic", "nvidia", "compatible"];
   const configured = all.filter(
-    (provider, index) => all.indexOf(provider) === index && (provider === primary || providerConfigured(provider)),
+    (provider, index) => all.indexOf(provider) === index &&
+      // Do not incur metered NVIDIA calls merely because the server has a key.
+      // Direct NVIDIA selection always works; automatic failover is opt-in.
+      (provider !== 'nvidia' || provider === primary || nvidiaNimFallbackEnabled()) &&
+      (provider === primary || providerConfigured(provider)),
   );
   if (!providerCoolingDown(primary)) return configured;
   return [...configured.filter((provider) => provider !== primary), primary];
