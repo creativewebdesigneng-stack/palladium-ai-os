@@ -14,7 +14,8 @@
 2. In **Vercel Preview environment variables only**, set `NVIDIA_API_KEY` to the server secret. Optionally set `NVIDIA_NIM_MODEL=openai/gpt-oss-20b`. Do **not** place a key in `VITE_*`, a repository, a chat message, browser storage, screenshots or client code.
 3. Leave `NVIDIA_NIM_BASE_URL` **unset**. The server pins hosted inference to `https://integrate.api.nvidia.com/v1/chat/completions`.
 4. Redeploy Preview and open **Runtime Models**. NVIDIA readiness will report deployment configuration (not a successful call) and can be selected from the existing agent model menu.
-5. Run a new authorised QA agent task and separately verify model invocation, token receipt, response content, original task completion, approved tool behaviour and audits. **Do not enable automatic agent fallback or merge to Production on configuration alone.**
+5. Select **Check NVIDIA connection (read-only)** on Runtime Models. This calls `GET /v1/models` with an 8-second timeout, no redirects, and the server-side credential. `reachable` means the selected model was listed, **not** that paid inference or agent tool calling succeeded; `unsupported` means this deployment does not support catalogue listing, not that its inference API necessarily failed. A missing key blocks the probe.
+6. Run a new authorised QA agent task and separately verify model invocation, token receipt, response content, original task completion, approved tool behaviour and audits. **Do not enable automatic agent fallback or merge to Production on configuration alone.**
 
 ## Dell AI Factory / self-hosted NVIDIA NIM (optional)
 
