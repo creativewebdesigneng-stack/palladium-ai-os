@@ -24,4 +24,17 @@ describe('Mission Control agent editor input persistence', () => {
     expect(builder).toContain("onChange={(e) => set('allowed_domains', e.target.value)}");
     expect(builder).toContain('onSave?.({');
   });
+
+  it('embeds the Personal AI editor directly in the page and never opens a second overlay', () => {
+    expect(builder).toContain("inline = false");
+    expect(builder).toContain("role={inline ? 'region' : 'dialog'}");
+    expect(builder).toContain("return inline ? editor : createPortal(editor, document.body);");
+    expect(builder).toContain('autoFocus required value={form.name}');
+    expect(builder).toContain("inline ? 'relative w-full pointer-events-auto'");
+    expect(missionControl).toContain("tab === 'personal' && builder.open && <AgentBuilder inline open");
+    expect(missionControl).toContain("tab === 'personal' && !builder.open && <PersonalAISection");
+    // The overview may continue to use the legacy modal, but the personal
+    // tab must not mount it at the same time as the inline form.
+    expect((missionControl.match(/<AgentBuilder open={builder.open}/g) ?? []).length).toBe(1);
+  });
 });
