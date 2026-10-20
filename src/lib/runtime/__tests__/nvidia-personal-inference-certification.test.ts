@@ -72,7 +72,7 @@ describe('explicit owner-key NVIDIA hosted inference certification', () => {
     expect(stub.chat).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
       provider: 'nvidia', model: 'openai/gpt-oss-20b',
       providerAccess: { provider: 'nvidia', apiKey: 'synthetic-personal-only-key' },
-      tools: [], maxTokens: 32, maxAttempts: 1, timeoutMs: 15_000,
+      tools: [], maxTokens: 128, reasoningEffort: 'low', maxAttempts: 1, timeoutMs: 15_000,
       allowedProviders: ['nvidia'],
     }));
     expect(stub.audit).toHaveBeenCalledTimes(2);
@@ -80,7 +80,7 @@ describe('explicit owner-key NVIDIA hosted inference certification', () => {
     expect(stub.audit.mock.invocationCallOrder[1]).toBeGreaterThan(stub.chat.mock.invocationCallOrder[0]!);
     expect(stub.audit.mock.calls[0]![0]).toMatchObject({
       userId: 'alice', action: 'model.nvidia_personal_inference_requested',
-      metadata: { credentialScope: 'owner', maxCompletionTokens: 32 },
+      metadata: { credentialScope: 'owner', maxCompletionTokens: 128 },
     });
     expect(stub.audit.mock.calls[1]![0]).toMatchObject({
       userId: 'alice', action: 'model.nvidia_personal_inference_result',
