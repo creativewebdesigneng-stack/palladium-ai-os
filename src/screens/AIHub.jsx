@@ -104,8 +104,8 @@ export default function AIHub() {
   return <div className="blackstar-core-page blackstar-aihub">
     <PageHeader eyebrow="Blackstar Intelligence Hub" title="Universal AI Hub" description="Discover, route, govern and execute Blackstar intelligence capabilities through one live control surface while every underlying runtime remains authoritative." />
     <div className="mx-auto max-w-6xl space-y-5">
-      <AiHubNetworkScene resources={inventory.data?.resources ?? []} providers={providers} loading={inventory.isLoading} />
       <AiHubDecisionExplorer resources={inventory.data?.resources ?? []} loading={inventory.isLoading} />
+      <AiHubNetworkScene resources={inventory.data?.resources ?? []} providers={providers} loading={inventory.isLoading} />
       <div className="grid gap-3 md:grid-cols-3"><HubMetric label="Native systems" value={providers.length} detail="Existing intelligence subsystems registered behind one canonical Hub contract." /><HubMetric label="Live resources" value={inventory.data?.counts.total ?? '—'} detail="Models, agents, media, MCP, skills, apps, datasets, compute and workflows." /><HubMetric label="Routing + policy" value="Capability-aware" detail="Actor-scoped discovery with protected approval and runtime policy enforcement." /></div>
       <RuntimeTargetsPanel session={session} />
       <section className="relative overflow-hidden rounded-[26px] border border-cyan-300/10 bg-black/35 p-5 shadow-[0_24px_80px_rgba(0,0,0,.20)] backdrop-blur-xl">
