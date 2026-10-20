@@ -32,7 +32,8 @@ import {
   resolveUserModelProviderAccess, isProviderAvailableForUser,
   markUserModelProviderUsed,
 } from '../model-provider-credentials.server';
-import { runChat } from '../model-gateway.base';
+import { ProviderError, resolveModel as resolveBaseModel, runChat } from '../model-gateway.base';
+import { resolveModel as resolveServerModel, runChat as runServerChat } from '../model-gateway.server';
 
 beforeEach(() => {
   vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', 'true');
@@ -66,6 +67,49 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     expect(mock.decrypted).toHaveBeenCalledExactlyOnceWith('encrypted:my-private-nvidia');
     expect(await isProviderAvailableForUser({ userId: 'no-key', provider: 'nvidia' })).toBe(false);
     expect(await isProviderAvailableForUser({ userId: 'owner', provider: 'nvidia' })).toBe(true);
+  });
+
+  it('keeps the hosted NVIDIA model when a personal key overrides a Dell operator model', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'operator-dell-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const own = { provider: 'nvidia' as const, apiKey: 'owner-private-key' };
+    expect(resolveBaseModel('nvidia', 'openai/gpt-oss-20b')).toBe('nvidia/dell-local-model');
+    expect(resolveBaseModel('nvidia', 'openai/gpt-oss-20b', own)).toBe('openai/gpt-oss-20b');
+    expect(resolveServerModel('nvidia', 'openai/gpt-oss-20b', own)).toBe('openai/gpt-oss-20b');
+    expect(() => resolveServerModel('nvidia', 'nvidia/dell-local-model', own))
+      .toThrow(ProviderError);
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'Hosted NVIDIA' } }] }), { status: 200 }),
+    );
+    const result = await runServerChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'hello' }],
+      providerAccess: own, maxAttempts: 1,
+      allowedProviders: ['nvidia'],
+    });
+    expect(result).toMatchObject({ provider: 'nvidia', model: 'openai/gpt-oss-20b', text: 'Hosted NVIDIA' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0]!;
+    const sent = JSON.parse(String(init?.body));
+    expect(url).toBe('https://integrate.api.nvidia.com/v1/chat/completions');
+    expect(sent.model).toBe('openai/gpt-oss-20b');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer owner-private-key');
+    expect(JSON.stringify(result)).not.toContain('owner-private-key');
+  });
+
+  it('rejects sending explicit Dell-only model through a personal key before provider network use', async () => {
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/private-model');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    await expect(runServerChat({
+      provider: 'nvidia', model: 'nvidia/private-model',
+      messages: [{ role: 'user', content: 'hello' }],
+      providerAccess: { provider: 'nvidia', apiKey: 'user-private-key' },
+      allowedProviders: ['nvidia'],
+      maxAttempts: 1,
+    })).rejects.toMatchObject({ status: 400 });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('passes the personal NVIDIA key only to NVIDIA hosted endpoint, never Dell custom proxy', async () => {
