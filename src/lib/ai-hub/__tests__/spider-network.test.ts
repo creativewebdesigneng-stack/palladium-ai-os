@@ -40,10 +40,10 @@ describe('Blackstar spider web real inventory projection', () => {
       'verified-model', 'known-tool', 'agent-1', 'workflow-1',
     ])
     expect(graph.links).toEqual([
-      { from: 'blackstar-hub', to: spiderNodeKey(inventory[0]), relation: 'planned-route' },
-      { from: 'blackstar-hub', to: spiderNodeKey(inventory[1]), relation: 'routing-candidate' },
-      { from: 'blackstar-hub', to: spiderNodeKey(inventory[2]), relation: 'registered-resource' },
-      { from: 'blackstar-hub', to: spiderNodeKey(inventory[3]), relation: 'registered-resource' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[0]!), relation: 'planned-route' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[1]!), relation: 'routing-candidate' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[2]!), relation: 'registered-resource' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[3]!), relation: 'registered-resource' },
     ])
     expect(graph.totalRegistered).toBe(4)
     expect(graph.totalMatching).toBe(4)
