@@ -8,7 +8,7 @@ const ACTIVE = new Set(['available', 'active', 'enabled'])
 const ALLOWED_KINDS = new Set(['model', 'tool'])
 
 /** A read-only explorer. It never submits a task, claims an audit, or executes a tool. */
-export default function AiHubDecisionExplorer({ resources = [], loading = false }) {
+export default function AiHubDecisionExplorer({ resources = [], receipts = [], receiptError = false, loading = false }) {
   const [capabilityName, setCapabilityName] = useState('model-inference')
   const [objective, setObjective] = useState('balanced')
   const [promptDraft, setPromptDraft] = useState('')
@@ -93,7 +93,7 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false 
         </select>
       </label>
     </div>
-    <AiHubSpiderNetwork resources={resources} selectedCapability={chosen} route={route} loading={loading} />
+    <AiHubSpiderNetwork resources={resources} receipts={receipts} receiptError={receiptError} selectedCapability={chosen} route={route} loading={loading} />
     <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-stretch">
       <div className="rounded-xl border border-white/10 bg-white/[.035] p-3">
         <p className="text-[10px] uppercase tracking-wider text-zinc-500">01 · Select</p>
