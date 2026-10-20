@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Activity, Eye, Network, Pause, Play, ShieldCheck } from 'lucide-react'
-import { buildAiHubSpiderTopology } from '@/lib/ai-hub/spider-network'
+import { buildAiHubSpiderTopology, spiderNodeKey } from '@/lib/ai-hub/spider-network'
 import { receiptsForSpiderNode } from '@/lib/ai-hub/spider-receipts'
 
 const SIGNALS = [
@@ -22,11 +22,6 @@ function webRing(radius) {
 }
 
 const RINGS = [60, 113, 173, 242, 337]
-
-function spiderNodeKey(node) {
-  // The node ID alone is not globally unique across providers or kinds.
-  return JSON.stringify([node.providerId, node.kind, node.id])
-}
 
 function DotLegend({ color, children }) {
   return <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
