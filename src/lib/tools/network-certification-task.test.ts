@@ -18,7 +18,7 @@ describe('governed network QA task preparation', () => {
     expect(result.input).toContain('Do not switch tools or attempt external writes');
     expect(result.input).not.toMatch(/secret|password|access_token|Bearer /);
     if (slug === 'web_fetch' || slug === 'http_request') expect(result.input).toContain(NETWORK_QA_PUBLIC_URL);
-    if (slug === 'http_request') expect(result.input).toContain('\\"method\\":\\"GET\\"');
+    if (slug === 'http_request') expect(result.input).toContain('"method":"GET"');
   });
   it('never converts a write, browser, or unrelated tool into a QA task', () => {
     for (const slug of ['email_send','connected_service_write','browser_task','shopping_search','calculator']) {
