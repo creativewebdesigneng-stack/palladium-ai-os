@@ -42,8 +42,8 @@ export interface AiHubCapabilityRef {
  * certainty or permission to bypass Blackstar's execution/approval gateways.
  */
 /**
- * Verified structured prompt assessment supplied by a trusted policy boundary,
- * not by free-form model text or user-editable prompt content.
+ * Structured prompt assessment for planning. Its declared source alone is
+ * not authentication; runtime use requires authoritative server verification.
  */
 export interface AiHubPromptAssessment {
   relevance: 'relevant' | 'irrelevant' | 'unknown'
