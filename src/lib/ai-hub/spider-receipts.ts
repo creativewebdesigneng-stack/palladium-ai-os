@@ -60,7 +60,8 @@ export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]):
     // incomplete evidence, not proof that execution finished.
     const status = terminal && (!persistedExecutionDate || Date.parse(persistedExecutionDate) < Date.parse(createdAt))
       ? 'not-executed' : persistedStatus
-    const executedAt = terminal && persistedExecutionDate ? persistedExecutionDate : null
+    const executedAt = status === 'recorded-success' || status === 'recorded-failure'
+      ? persistedExecutionDate : null
 
     // Explicitly allowlist fields. Never pass through prompt input, raw MCP
     // arguments, approval details, execution_result or fingerprint metadata.
