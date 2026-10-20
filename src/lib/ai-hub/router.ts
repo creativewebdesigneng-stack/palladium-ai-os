@@ -160,7 +160,7 @@ export function routeAiHubWorkload(workload: AiHubWorkload, capabilities: AiHubC
           ? 'model-escalation'
           : 'approval-required'
     const reasons = lane === 'deterministic'
-      ? ['Trusted relevance, grounding, clarity and non-approval assessment plus a verified read-only executor and sufficient observed reliability.']
+      ? ['Assessment metadata indicates relevance, grounding and clarity; executor metadata and history meet the planning floor. Operator approval is still mandatory.']
       : lane === 'model-escalation'
         ? ['Prompt or executor evidence is insufficient for deterministic routing; a configured model was selected for reasoning.']
         : approvalRequired
