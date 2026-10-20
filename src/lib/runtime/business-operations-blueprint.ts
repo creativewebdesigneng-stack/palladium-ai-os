@@ -42,7 +42,7 @@ export function prepareSixAgentBusinessDraft() {
     event_match: '',
     max_parallel_agents: '6',
     max_runtime_seconds: '600',
-    budget_pounds: '0.00',
+    budget_pounds: '1.00',
   };
 }
 
