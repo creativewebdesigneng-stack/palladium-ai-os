@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ArrowRight, BrainCircuit, Code2, GitBranch, ShieldCheck } from 'lucide-react'
 import { routeAiHubWorkload } from '@/lib/ai-hub/router'
 import AiHubSpiderNetwork from '@/components/ai-hub/AiHubSpiderNetwork'
+import { suggestSpiderCapability } from '@/lib/ai-hub/spider-prompt-preview'
 
 const ACTIVE = new Set(['available', 'active', 'enabled'])
 const ALLOWED_KINDS = new Set(['model', 'tool'])
@@ -10,6 +11,7 @@ const ALLOWED_KINDS = new Set(['model', 'tool'])
 export default function AiHubDecisionExplorer({ resources = [], loading = false }) {
   const [capabilityName, setCapabilityName] = useState('model-inference')
   const [objective, setObjective] = useState('balanced')
+  const [promptDraft, setPromptDraft] = useState('')
   const { candidates, options } = useMemo(() => {
     const active = resources.filter((resource) =>
       ALLOWED_KINDS.has(resource.kind) && ACTIVE.has(resource.status) &&
@@ -27,6 +29,7 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false 
     }))
     return { candidates, options }
   }, [resources])
+  const suggested = useMemo(() => suggestSpiderCapability(promptDraft, options), [promptDraft, options])
   const chosen = options.includes(capabilityName) ? capabilityName : options[0]
   const route = useMemo(() => chosen
     ? routeAiHubWorkload({
@@ -56,6 +59,20 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false 
         <p className="mt-2 max-w-2xl text-xs leading-5 text-zinc-400">Preview a decision using real inventory and available reliability telemetry. No task or model is executed. Historical success is not calibrated confidence.</p>
       </div>
       <span className="rounded-full border border-violet-300/20 bg-violet-400/10 px-2.5 py-1 text-[10px] uppercase tracking-wider text-violet-200">Planning only</span>
+    </div>
+    <div className="mt-5 rounded-xl border border-violet-300/15 bg-violet-400/[.035] p-3">
+      <label htmlFor="astra-spider-prompt" className="text-xs font-medium text-zinc-200">Prompt Spider · Describe a task</label>
+      <textarea id="astra-spider-prompt" value={promptDraft} maxLength={1000}
+        onChange={(event) => setPromptDraft(event.target.value)}
+        rows={2} placeholder="Example: Help me with code analysis"
+        className="mt-2 w-full resize-y rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-400" />
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="max-w-2xl text-[11px] leading-5 text-zinc-500">Private, local phrase-match preview: no prompt is sent to a model or tool. Matching does not verify relevance, truth, intent, safety or grounding.</p>
+        {suggested ? <button type="button" onClick={() => setCapabilityName(suggested.capability)}
+          className="rounded-lg border border-violet-300/20 bg-violet-300/10 px-3 py-1.5 text-xs text-violet-100 transition hover:bg-violet-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-400">
+          Use suggested capability: {suggested.capability}
+        </button> : <span className="text-[11px] text-zinc-500">{promptDraft.trim() ? 'No exact registry phrase match' : 'Enter a prompt to look for registry phrases'}</span>}
+      </div>
     </div>
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
       <label className="text-xs text-zinc-300">Required capability
