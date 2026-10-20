@@ -94,7 +94,7 @@ describe('six-agent workflow execution evidence', () => {
       workflowGateApprovals: [{ status: 'approved' }],
     });
     expect(decided.workflowGateStatus).toBe('approved');
-    expect(decided.liveExecutionCertified).toBeUndefined();
+    expect(decided.financialOutcome).toBe('unverified');
   });
 
   it('never upgrades a recorded tool success to a financial or provider certification', () => {
