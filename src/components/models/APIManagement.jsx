@@ -9,6 +9,7 @@ import {
   listModelProviderConnections,
   saveModelProviderConnection,
   testModelProviderConnection,
+  testPersonalNvidiaModelInference,
 } from '@/lib/runtime/model-provider-credentials.functions'
 
 const PROVIDER_COPY = {
@@ -33,10 +34,12 @@ export default function APIManagement() {
   const listConnections = useServerFn(listModelProviderConnections)
   const saveConnection = useServerFn(saveModelProviderConnection)
   const testConnection = useServerFn(testModelProviderConnection)
+  const testNvidiaInference = useServerFn(testPersonalNvidiaModelInference)
   const deleteConnection = useServerFn(deleteModelProviderConnection)
   const [providers, setProviders] = useState([])
   const [keys, setKeys] = useState({ openai: '', anthropic: '', nvidia: '' })
   const [busy, setBusy] = useState('')
+  const [nvidiaInferenceEvidence, setNvidiaInferenceEvidence] = useState(null)
   const [message, setMessage] = useState('')
   const [mcpUrl, setMcpUrl] = useState('/mcp')
 
@@ -67,6 +70,7 @@ export default function APIManagement() {
     try {
       const result = await saveConnection({ data: { provider, apiKey } })
       setKeys((current) => ({ ...current, [provider]: '' }))
+      if (provider === 'nvidia') setNvidiaInferenceEvidence(null)
       setMessage(`${PROVIDER_COPY[provider].name} connected and verified${result?.models?.length ? ` · ${result.models.length} models observed` : ''}.`)
       await load()
     } catch (error) {
@@ -90,11 +94,42 @@ export default function APIManagement() {
     }
   }
 
+  const verifyNvidiaInference = async () => {
+    if (busy !== '') return
+    setBusy('inference:nvidia')
+    setNvidiaInferenceEvidence(null)
+    setMessage('')
+    try {
+      // The server only accepts the authenticated owner's stored credential.
+      // A separate deliberate click may incur usage charges.
+      const evidence = await testNvidiaInference()
+      setNvidiaInferenceEvidence(evidence)
+      const labels = {
+        verified: 'Real NVIDIA hosted inference passed. Evidence was recorded.',
+        not_connected: 'Connect your personal NVIDIA API key before testing inference.',
+        not_enabled: 'Personal NVIDIA connections are disabled by the operator.',
+        unauthorised: 'NVIDIA rejected inference access. Check your Public API Endpoints entitlement.',
+        model_unavailable: 'NVIDIA model inference is unavailable for this account or model (404/410/422). Listing models does not prove inference access.',
+        quota_exhausted: 'NVIDIA inference credits or quota are exhausted.',
+        rate_limited: 'NVIDIA is temporarily rate limiting this key.',
+        invalid_response: 'NVIDIA answered but did not return the required certification marker.',
+        audit_unavailable: 'Blackstar could not persist required verification evidence; not certified.',
+        unavailable: 'NVIDIA inference could not be verified. Check provider access and retry manually.',
+      }
+      setMessage(labels[evidence?.status] ?? 'NVIDIA inference was not certified.')
+    } catch {
+      setMessage('NVIDIA inference could not be verified. No successful result was recorded.')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const disconnect = async (provider) => {
     setBusy(`delete:${provider}`)
     setMessage('')
     try {
       await deleteConnection({ data: { provider } })
+      if (provider === 'nvidia') setNvidiaInferenceEvidence(null)
       setMessage(`${PROVIDER_COPY[provider].name} personal connection removed.`)
       await load()
     } catch (error) {
@@ -158,7 +193,7 @@ export default function APIManagement() {
                     connected ? 'bg-emerald-400/10 text-emerald-300' : 'bg-white/[.04] text-zinc-600'
                   }`}>
                     {connected && <CheckCircle2 className="h-3 w-3" />}
-                    {connected ? 'Verified' : provider?.deploymentConfigured ? 'Workspace' : 'Disconnected'}
+                    {connected ? (providerId === 'nvidia' ? 'Key accepted' : 'Verified') : provider?.deploymentConfigured ? 'Workspace' : 'Disconnected'}
                   </span>
                 </div>
 
@@ -189,12 +224,36 @@ export default function APIManagement() {
                     <button type="button" disabled={busy !== ''} onClick={() => test(providerId)} className="flex items-center gap-1.5 rounded-lg border border-white/[.07] px-2.5 py-2 text-[10px] text-zinc-400 hover:bg-white/[.035] hover:text-white disabled:opacity-40">
                       {busy === `test:${providerId}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Test
                     </button>
+                    {providerId === 'nvidia' && (
+                      <button type="button" disabled={busy !== ''} onClick={verifyNvidiaInference}
+                        className="flex items-center gap-1.5 rounded-lg border border-amber-300/20 px-2.5 py-2 text-[10px] text-amber-200 hover:bg-amber-300/[.05] disabled:opacity-40">
+                        {busy === 'inference:nvidia' ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                        Verify live inference (may incur charges)
+                      </button>
+                    )}
                     <button type="button" disabled={busy !== ''} onClick={() => disconnect(providerId)} className="flex items-center gap-1.5 rounded-lg border border-rose-300/10 px-2.5 py-2 text-[10px] text-rose-300/70 hover:bg-rose-400/[.05] hover:text-rose-200 disabled:opacity-40">
                       <Trash2 className="h-3 w-3" /> Disconnect
                     </button>
                     <span className="ml-auto text-[9px] text-zinc-700">
                       {connection?.verifiedAt ? `Verified ${new Date(connection.verifiedAt).toLocaleString()}` : 'Connected'}
                     </span>
+                  </div>
+                )}
+                {providerId === 'nvidia' && (
+                  <div className="mt-3 space-y-1 border-t border-white/[.05] pt-3">
+                    <p className="text-[10px] leading-5 text-zinc-500">
+                      Connection tests validate the model catalogue only. Click Verify live inference to request
+                      one real hosted NVIDIA response (maximum 128 output tokens, low reasoning, no retries or tool execution).
+                      Your NVIDIA account may incur usage charges.
+                    </p>
+                    {nvidiaInferenceEvidence && (
+                      <p role="status" className={`text-[10px] ${nvidiaInferenceEvidence.status === 'verified' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        Inference: {nvidiaInferenceEvidence.status === 'verified' ? 'verified' : 'not verified'}
+                        {nvidiaInferenceEvidence.auditReceiptId ? ` · Audit receipt: ${nvidiaInferenceEvidence.auditReceiptId}` : ''}
+                        {Number.isSafeInteger(nvidiaInferenceEvidence.outputTokens)
+                          ? ` · Output tokens: ${nvidiaInferenceEvidence.outputTokens}` : ''}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
