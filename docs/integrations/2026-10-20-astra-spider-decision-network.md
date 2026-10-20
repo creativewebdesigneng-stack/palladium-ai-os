@@ -59,3 +59,20 @@ UI non-execution contracts. Existing `decision-explorer.test.ts` and
 This is the spider-style front-end and planning projection. The full goal
 of prompt-input parsing, trusted evidence assessment and audited provider
 execution will require the next separately certified runtime integration.
+
+## Prompt-entry preview
+
+The explorer now offers a local prompt box and a conservative literal-phrase
+matcher that can suggest an existing registry capability (e.g. the words
+"code analysis" match the registered "code-analysis" capability, if present).
+The user must explicitly apply the suggestion before routing changes.
+
+This is intentionally **not semantic classification or an LLM call**. The
+input remains in local component state and is not submitted to the model,
+worker, audit service or approval system. Unknown prompts get no
+suggestion. The selected capability and routing objective still govern the
+existing read-only planner.
+
+The longer-term work is an actual server-verified prompt relevance, grounding
+and policy assessment service, with trusted execution evidence linked to
+existing approvals and audits.
