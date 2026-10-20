@@ -179,6 +179,70 @@ describe('six-agent business team grant readiness', () => {
     expect(result.potentialProviderConfiguredCoverage).toBe(0);
   });
 
+  it('suggests six distinct existing agents with the fewest missing capability grants', () => {
+    const r = assessSixAgentBusinessReadiness({
+      runtimeEnabled: true,
+      agents: [
+        { ...configured('research', ['web_search']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('validation', ['data_analysis']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('production', ['file_analysis']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('marketing', ['web_fetch']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('finance', ['calculator']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('support', []), status: 'draft', modelProviderConfiguration: 'missing_configuration' },
+      ],
+    });
+    const plan = r.operatorReviewStaffing;
+    expect(plan).toHaveLength(6);
+    expect(new Set(plan.map((item) => item.agentId)).size).toBe(6);
+    expect(plan.filter((item) => item.readyByConfigurationOnly)).toHaveLength(2);
+    expect(plan.filter((item) => item.needsActivation)).toHaveLength(4);
+    expect(plan.filter((item) => item.reviewGrant)).toHaveLength(1);
+    const support = plan.find((item) => item.roleId === 'operations');
+    expect(support).toMatchObject({
+      agentId: 'support', agentStatus: 'draft', reviewGrant: 'email_draft',
+      needsProviderSetup: true, readyByConfigurationOnly: false,
+    });
+    expect(r.providerConfiguredDistinctCoverage).toBe(2);
+    expect(r.incomeVerified).toBe(false);
+  });
+
+  it('does not reuse one agent across role recommendations or imply absent staff exist', () => {
+    const r = assessSixAgentBusinessReadiness({
+      runtimeEnabled: true,
+      agents: [
+        { ...configured('generalist', ['web_search','data_analysis','file_analysis','web_fetch','email_draft','calculator']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('draft-generalist', ['web_search','data_analysis','file_analysis','web_fetch','email_draft','calculator']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+      ],
+    });
+    const assigned = r.operatorReviewStaffing.filter((item) => item.agentId);
+    expect(assigned).toHaveLength(2);
+    expect(new Set(assigned.map((item) => item.agentId)).size).toBe(2);
+    expect(r.operatorReviewStaffing.filter((item) => !item.agentId)).toHaveLength(4);
+    expect(r.distinctAgentRoleCoverage).toBe(1);
+    expect(r.potentialDistinctRoleCoverage).toBe(2);
+  });
+
+  it('suggests no permissions or activations when six configured active specialists exist', () => {
+    const roles = [
+      ['research', ['web_search']],
+      ['validation', ['data_analysis']],
+      ['production', ['file_analysis']],
+      ['marketing', ['web_fetch']],
+      ['operations', ['email_draft']],
+      ['audit', ['calculator']],
+    ] as const;
+    const r = assessSixAgentBusinessReadiness({
+      runtimeEnabled: true,
+      agents: roles.map(([id, tools]) => ({
+        ...configured(id, [...tools]), modelProviderConfiguration: 'user_connected' as const,
+      })),
+    });
+    expect(r.operatorReviewStaffing.every((item) => item.alreadyHasMatchingGrant)).toBe(true);
+    expect(r.operatorReviewStaffing.every((item) => item.readyByConfigurationOnly)).toBe(true);
+    expect(r.operatorReviewStaffing.every((item) => item.reviewGrant === null && !item.needsActivation && !item.needsProviderSetup)).toBe(true);
+    expect(r.liveExecutionCertified).toBe(false);
+  });
+
   it('uses owner-scoped read-only queries and never returns credentials', () => {
     expect(source).toContain('.middleware([requireSupabaseAuth])');
     expect(source).toContain(".eq('user_id', context.userId)");
@@ -202,6 +266,9 @@ describe('six-agent business team grant readiness', () => {
     expect(panel).toContain('role.draftCandidates');
     expect(panel).toContain('Each role must have a different active agent');
     expect(panel).toContain('data.assignedProviderConfiguredAgents?.some');
+    expect(panel).toContain('data.operatorReviewStaffing.map');
+    expect(panel).toContain('For operator review only');
+    expect(panel).toContain('not live-certified');
     expect(screen).toContain('<BusinessTeamReadinessPanel session={session} />');
   });
 });
