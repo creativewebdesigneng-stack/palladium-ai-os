@@ -213,6 +213,7 @@ async function persistGeneratedWorkflow(args: {
   workforceId: string | null;
   goal: string;
   plan: OrchestratorPlan;
+  businessApprovalGate: boolean;
 }) {
   const { data: workflow, error } = await args.sb
     .from("workflows")
@@ -236,21 +237,26 @@ async function persistGeneratedWorkflow(args: {
   if (error || !workflow)
     throw new OrchestratorError(error?.message ?? "Could not create the orchestration workflow.", "WORKFLOW_CREATE_FAILED", 500);
 
+  const approvalGateId = args.businessApprovalGate ? crypto.randomUUID() : null;
   const stepIds = new Map(args.plan.assignments.map((assignment) => [assignment.id, crypto.randomUUID()]));
   const steps = args.plan.assignments.map((assignment, position) => {
-    const dependencies: string[] = assignment.depends_on
+    const declaredDependencies: string[] = assignment.depends_on
       .map((id) => stepIds.get(id))
       .filter((id) => id !== undefined)
       .map((id) => String(id));
-    const upstreamTemplate = dependencies.length
-      ? `\n\nDeclared upstream evidence:\n${dependencies
+    // The first specialist(s) cannot start until the existing workflow
+    // approval step has been explicitly approved by the owner.
+    const dependencies = approvalGateId && declaredDependencies.length === 0
+      ? [approvalGateId] : declaredDependencies;
+    const upstreamTemplate = declaredDependencies.length
+      ? `\n\nDeclared upstream evidence:\n${declaredDependencies
           .map((id, index) => `Source ${index + 1}: {{steps.${id}.output}}`)
           .join("\n\n")}`
       : "";
     return {
       id: stepIds.get(assignment.id),
       workflow_id: workflow.id,
-      position,
+      position: position + (approvalGateId ? 1 : 0),
       name: assignment.title,
       kind: "agent",
       agent_id: assignment.agent_id,
@@ -272,7 +278,33 @@ async function persistGeneratedWorkflow(args: {
       },
     };
   });
-  const { error: stepError } = await args.sb.from("workflow_steps").insert(steps);
+  // Agent-step requires_approval flags are not themselves approval pauses.
+  // Use the existing durable workflow approval kind to enforce a real gate.
+  const approvalStep = approvalGateId ? {
+    id: approvalGateId,
+    workflow_id: workflow.id,
+    position: 0,
+    name: "Owner approval before six-agent business execution",
+    kind: "approval",
+    agent_id: null,
+    mode: "sequential",
+    depends_on: [],
+    condition: {},
+    input_template: null,
+    max_retries: 1,
+    retry_delay_ms: 0,
+    timeout_ms: 180_000,
+    continue_on_error: false,
+    requires_approval: true,
+    config: {
+      title: "Review six-agent business mission before execution",
+      summary: "Approve the prepared six-specialist research and draft mission. Review agent permissions, costs and constraints in Autonomous OS. This approval does not authorise external purchases, publishing, payments or outreach.",
+      risk_level: "medium",
+    },
+  } : null;
+  const { error: stepError } = await args.sb.from("workflow_steps").insert(
+    approvalStep ? [approvalStep, ...steps] : steps,
+  );
   if (stepError)
     throw new OrchestratorError(stepError.message, "WORKFLOW_STEPS_CREATE_FAILED", 500);
 
@@ -321,6 +353,7 @@ export async function planOrchestratedGoal(args: {
     workforceId: eligible.workforceId,
     goal,
     plan,
+    businessApprovalGate: args.businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id,
   });
   return { workflow, plan, goal };
 }
