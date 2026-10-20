@@ -17,6 +17,7 @@ import { planDynamicAgentTeam } from '@/lib/ai-hub/dynamic-teams.functions';
 import { planBlackstarCounterfactualDecision } from '@/lib/ai-hub/counterfactual.functions';
 import { installMarketplaceAgent } from '@/lib/marketplace/marketplace.functions';
 import { useSessionReady } from '@/lib/useSessionReady';
+import { useAuth } from '@/lib/AuthContext';
 
 const icons = { 'model-gateway': Cpu, 'agent-runtime': Bot, mcp: Network, skills: Boxes, workflows: Workflow, 'app-studio': AppWindow };
 const resourceIcons = { model: Cpu, agent: Bot, tool: Wrench, mcp: Network, workflow: Workflow, app: AppWindow, dataset: Database, compute: ServerCog, voice: Mic, image: Image, video: Video };
@@ -85,6 +86,8 @@ function ResourceCard({ resource, onRun, running, onInstall, installing, onMcp, 
 export default function AIHub() {
   const providers = createPalladiumAiHubRegistry().listProviders();
   const session = useSessionReady();
+  const { user: authUser } = useAuth();
+  const ownerId = typeof authUser?.id === 'string' ? authUser.id : null;
   const listResources = useServerFn(listAiHubResources);
   const listSpiderReceipts = useServerFn(listAiHubSpiderReceipts);
   const runHubWorkflow = useServerFn(executeAiHubWorkflow);
@@ -119,14 +122,15 @@ export default function AIHub() {
       setMcpApproval(null);
     }
   };
-  const spiderEvidence = useQuery({ queryKey:['ai-hub-spider-receipts'], queryFn:() => listSpiderReceipts({data:{limit:50}}), enabled:session === 'yes', retry:false, refetchInterval:30000, gcTime:0 });
+  // A login change must not reuse the previous account's sensitive receipt cache.
+  const spiderEvidence = useQuery({ queryKey:['ai-hub-spider-receipts',ownerId], queryFn:() => listSpiderReceipts({data:{limit:50}}), enabled:session === 'yes' && Boolean(ownerId), retry:false, refetchInterval:30000, gcTime:0 });
   const filteredResources = useMemo(() => { const resources=inventory.data?.resources ?? []; const needle=query.trim().toLowerCase(); return resources.filter((resource) => { if(kind==='marketplace' && resource.providerId!=='palladium-marketplace') return false; if(kind!=='all' && kind!=='marketplace' && resource.kind!==kind) return false; if(!needle) return true; const searchable=[resource.name,resource.kind,resource.status,resource.providerId,...Object.values(resource.metadata ?? {}),...(resource.capabilities ?? [])].filter(Boolean).join(' ').toLowerCase(); return searchable.includes(needle); }); },[inventory.data?.resources,kind,query]);
   const liveKindCount = (value) => { if(!inventory.data) return ''; if(value==='marketplace') return ` (${inventory.data.counts.marketplace})`; if(['voice','image','video'].includes(value)) return ` (${inventory.data.resources.filter((resource)=>resource.kind===value).length})`; const countKey={model:'models',agent:'agents',app:'apps',dataset:'datasets',compute:'compute',tool:'tools',mcp:'mcp',workflow:'workflows'}[value]; return countKey ? ` (${inventory.data.counts[countKey]})` : ''; };
 
   return <div className="blackstar-core-page blackstar-aihub">
     <PageHeader eyebrow="Blackstar Intelligence Hub" title="Universal AI Hub" description="Discover, route, govern and execute Blackstar intelligence capabilities through one live control surface while every underlying runtime remains authoritative." />
     <div className="mx-auto max-w-6xl space-y-5">
-      <AiHubDecisionExplorer resources={inventory.data?.resources ?? []} receipts={session === 'yes' ? spiderEvidence.data?.receipts ?? [] : []} receiptError={spiderEvidence.isError} loading={inventory.isLoading} onPrepareResource={prepareSpiderResource} />
+      <AiHubDecisionExplorer resources={inventory.data?.resources ?? []} receipts={session === 'yes' && ownerId && !spiderEvidence.isError ? spiderEvidence.data?.receipts ?? [] : []} receiptError={Boolean(ownerId && spiderEvidence.isError)} loading={inventory.isLoading} onPrepareResource={prepareSpiderResource} />
       <AiHubNetworkScene resources={inventory.data?.resources ?? []} providers={providers} loading={inventory.isLoading} />
       <div className="grid gap-3 md:grid-cols-3"><HubMetric label="Native systems" value={providers.length} detail="Existing intelligence subsystems registered behind one canonical Hub contract." /><HubMetric label="Live resources" value={inventory.data?.counts.total ?? '—'} detail="Models, agents, media, MCP, skills, apps, datasets, compute and workflows." /><HubMetric label="Routing + policy" value="Capability-aware" detail="Actor-scoped discovery with protected approval and runtime policy enforcement." /></div>
       <RuntimeTargetsPanel session={session} />
