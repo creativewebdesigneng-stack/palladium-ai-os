@@ -123,7 +123,7 @@ export function isRetiredGroqModel(model: string) {
   return RETIRED_GROQ_MODEL_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
-export function resolveModel(provider: Provider, model?: string | null): string {
+export function resolveModel(provider: Provider, model?: string | null, access?: ProviderAccess | null): string {
   const m = (model ?? "").trim();
   if (provider === "groq" && m && isRetiredGroqModel(m)) {
     throw new ProviderError(
@@ -136,12 +136,21 @@ export function resolveModel(provider: Provider, model?: string | null): string 
     const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
     if (nativeModel) return nativeModel;
   }
-  // An operator-hosted NIM deployment can have a different deployed model.
-  // The existing agent picker stores the canonical hosted default; map that
-  // specific preset to the server-configured Dell/NIM model at call time.
-  if (provider === "nvidia" &&
-      (!m || (m === NVIDIA_NIM_DEFAULT_MODEL && process.env["NVIDIA_NIM_BASE_URL"]?.trim()))) {
-    return nvidiaNimModel();
+  if (provider === "nvidia") {
+    if (access?.provider === "nvidia" && access.apiKey.trim()) {
+      // Personal credentials use only NVIDIA's public catalogue. Do not map
+      // the agent's canonical hosted preset to an operator-hosted Dell model.
+      if (!m || m === NVIDIA_NIM_DEFAULT_MODEL) return NVIDIA_NIM_DEFAULT_MODEL;
+      if (process.env["NVIDIA_NIM_BASE_URL"]?.trim() && m === nvidiaNimModel() &&
+          m !== NVIDIA_NIM_DEFAULT_MODEL) {
+        throw new ProviderError("The selected model is served by the operator NIM endpoint. Select an NVIDIA hosted model for a personal API key.", 400, false);
+      }
+      return m;
+    }
+    // Operator-hosted NIM can expose a different configured model ID.
+    if (!m || (m === NVIDIA_NIM_DEFAULT_MODEL && process.env["NVIDIA_NIM_BASE_URL"]?.trim())) {
+      return nvidiaNimModel();
+    }
   }
   if (!m) return DEFAULT_MODEL[provider];
   // Lovable gateway models are namespaced (`vendor/model`); keep friendly names working.
