@@ -41,7 +41,7 @@ A successful catalogue request (`GET /v1/models`) **does not prove** that a NVID
 The existing Personal model providers panel now distinguishes **Key accepted** from verified inference. After securely connecting a personal NVIDIA key, an authenticated user may explicitly click **Verify live inference (may incur charges)**. This reuses Blackstar's pinned NVIDIA gateway and existing required audit writer; it does not create a separate credential store, agent runtime or approval system.
 
 - One fixed synthetic prompt requesting the `BLACKSTAR_NIM_HEALTH_OK` marker, through the official NVIDIA hosted API and the authenticated owner's key only.
-- Hard bounds: `openai/gpt-oss-20b`, maximum 32 output tokens, 15-second timeout, one attempt, no alternative providers, no tool execution and no background automation.
+- Hard bounds: `openai/gpt-oss-20b`, maximum 128 output tokens, 15-second timeout, one attempt, no alternative providers, no tool execution and no background automation.
 - **Durable request-intent audit must succeed before the metered call**. A matching outcome audit receipt must be persisted before the UI may report verified success.
 - 401/403 reports inference unauthorised; 404/410/422 reports unavailable account/model access; 402 means credit/quota exhaustion; 429 means rate-limited. Errors are sanitised, and no model output, API key or endpoint is echoed to the browser or audit trail.
 - User receives only a status, timestamp, model ID, non-sensitive token counts and audit receipt.
