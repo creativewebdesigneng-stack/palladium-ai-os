@@ -98,11 +98,31 @@ describe('six-agent business team grant readiness', () => {
     expect(r.providerConfiguredDistinctCoverage).toBe(2);
   });
 
+  it('reports full role coverage separately from model-access coverage', () => {
+    const result = assessSixAgentBusinessReadiness({
+      agents: [
+        { ...configured('a', ['web_search']), modelProviderConfiguration: 'missing_configuration' },
+        { ...configured('b', ['data_analysis']), modelProviderConfiguration: 'missing_configuration' },
+        { ...configured('c', ['file_analysis']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('d', ['web_fetch']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('e', ['email_draft']), modelProviderConfiguration: 'user_connected' },
+        { ...configured('f', ['calculator']), modelProviderConfiguration: 'user_connected' },
+      ],
+      runtimeEnabled: true,
+    });
+    expect(result.distinctAgentRoleCoverage).toBe(6);
+    expect(result.providerConfiguredDistinctCoverage).toBe(4);
+    expect(result.assignedProviderConfiguredAgents).toHaveLength(6);
+    expect(result.assignedProviderConfiguredAgents.filter((match) => match.agentId !== null)).toHaveLength(4);
+    expect(result.connectedProviderVerified).toBe(false);
+  });
+
   it('uses owner-scoped read-only queries and never returns credentials', () => {
     expect(source).toContain('.middleware([requireSupabaseAuth])');
     expect(source).toContain(".eq('user_id', context.userId)");
     expect(source).toContain(".select('id,name,status,allowed_tools,model_provider')");
-    expect(source).toContain('listUserModelProviderCredentials(context.userId)');
+    expect(source).toContain('isProviderAvailableForUser({ userId: context.userId, provider })');
+    expect(source).toContain('.catch(() => false)');
     expect(source).toContain('deploymentProviderConfigured(provider)');
     expect(source).toContain(".select('enabled')");
     for (const write of ['.insert(', '.update(', '.upsert(', '.delete(', 'service_role', 'api_key']) {
@@ -110,6 +130,10 @@ describe('six-agent business team grant readiness', () => {
     }
     expect(panel).toContain('getSixAgentBusinessReadiness');
     expect(panel).toContain('Maximum roles staffed by distinct agents');
+    expect(panel).toContain('/agents/new');
+    expect(panel).toContain('Review existing draft agents');
+    expect(panel).toContain('Each of the six roles must have a different active agent');
+    expect(panel).toContain('data.assignedProviderConfiguredAgents?.some');
     expect(screen).toContain('<BusinessTeamReadinessPanel session={session} />');
   });
 });
