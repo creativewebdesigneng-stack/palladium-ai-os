@@ -48,7 +48,7 @@ describe('AI Hub evidence-gated decision routes', () => {
     expect(legacy?.decisionTrace).toBeUndefined()
   })
 
-  it('uses a verified read-only deterministic executor only with adequate actual history', () => {
+  it('uses a verified read-only deterministic executor only with adequate actual history', async () => {
     const route = routeAiHubWorkload(trustedWorkload(), [model, code])
     expect(route?.capability.id).toBe('verified-tool')
     expect(route?.decisionTrace).toMatchObject({
