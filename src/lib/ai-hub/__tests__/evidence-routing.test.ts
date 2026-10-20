@@ -25,6 +25,22 @@ function workload(evidence = true): AiHubWorkload {
   }
 }
 
+function trustedWorkload(): AiHubWorkload {
+  const request = workload()
+  request.requirements.evidenceRouting = {
+    mode: 'evidence-gated',
+    promptAssessment: {
+      relevance: 'relevant',
+      grounding: 'grounded',
+      ambiguity: 'clear',
+      approval: 'not-required',
+      source: 'blackstar-policy-verifier',
+      evidenceIds: ['verified-fixture'],
+    },
+  }
+  return request
+}
+
 describe('AI Hub evidence-gated decision routes', () => {
   it('keeps existing selection intact unless the new mode is explicitly requested', () => {
     const legacy = routeAiHubWorkload(workload(false), [model])
@@ -33,7 +49,7 @@ describe('AI Hub evidence-gated decision routes', () => {
   })
 
   it('uses a verified read-only deterministic executor only with adequate actual history', () => {
-    const route = routeAiHubWorkload(workload(), [model, code])
+    const route = routeAiHubWorkload(trustedWorkload(), [model, code])
     expect(route?.capability.id).toBe('verified-tool')
     expect(route?.decisionTrace).toMatchObject({
       status: 'planned-not-executed', lane: 'deterministic', observedRuns: 100,
@@ -47,7 +63,7 @@ describe('AI Hub evidence-gated decision routes', () => {
     const result = routeAiHubWorkload(workload(), [unknown, model])
     expect(result?.capability.id).toBe('configured-model')
     expect(result?.decisionTrace?.lane).toBe('model-escalation')
-    expect(result?.decisionTrace?.reasons.join(' ')).toContain('evidence floor')
+    expect(result?.decisionTrace?.reasons.join(' ')).toContain('insufficient for deterministic routing')
   })
 
   it('rejects unsafe and unconfigured paths into human review through the existing approval gate', async () => {
@@ -76,10 +92,36 @@ describe('AI Hub evidence-gated decision routes', () => {
   })
 
   it('never treats approval as optional even for a deterministic lane', () => {
-    const requires = workload()
+    const requires = trustedWorkload()
     requires.requirements.requireHumanApproval = true
     const plan = new AiHubOrchestrator(() => [code]).plan({ workload: requires })
-    expect(plan?.route.decisionTrace?.lane).toBe('deterministic')
+    expect(plan?.route.decisionTrace?.lane).toBe('approval-required')
     expect(plan?.requiresApproval).toBe(true)
   })
+  it('treats missing prompt grounding as a reason to escalate rather than executing code', () => {
+    const result = routeAiHubWorkload(workload(), [code, model])
+    expect(result?.decisionTrace?.lane).toBe('model-escalation')
+    expect(result?.capability.id).toBe(model.id)
+  })
+
+  it('requires approval when the prompt policy marks an otherwise grounded task as approval-required', () => {
+    const required = trustedWorkload()
+    required.requirements.evidenceRouting!.promptAssessment!.approval = 'required'
+    const result = new AiHubOrchestrator(() => [code, model]).plan({ workload: required })
+    expect(result?.route.decisionTrace?.lane).toBe('approval-required')
+    expect(result?.requiresApproval).toBe(true)
+  })
+
+  it('will not route a policy-verified irrelevant prompt', () => {
+    const irrelevant = trustedWorkload()
+    irrelevant.requirements.evidenceRouting!.promptAssessment!.relevance = 'irrelevant'
+    expect(routeAiHubWorkload(irrelevant, [code, model])).toBeNull()
+  })
+
+  it('does not accept unverified self-declared prompt confidence as permission for code execution', () => {
+    const unverified = trustedWorkload()
+    unverified.requirements.evidenceRouting!.promptAssessment!.source = 'unverified'
+    expect(routeAiHubWorkload(unverified, [code, model])?.decisionTrace?.lane).toBe('model-escalation')
+  })
+
 })
