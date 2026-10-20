@@ -2,6 +2,7 @@ import { nextAutonomousRun } from "./autonomous-schedule";
 import { planOrchestratedGoal } from "./orchestrator.server";
 import { queueWorkflowRun } from "./workflow-queue.server";
 import { planFallbackAutonomousTeam } from "./autonomous-dynamic-team.server";
+import { SIX_AGENT_BUSINESS_BLUEPRINT } from "./business-operations-blueprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -15,6 +16,7 @@ type GoalRow = {
   status: string;
   autonomy_level: string;
   max_parallel_agents: number | null;
+  success_criteria?: { blueprint_id?: string } | null;
   trigger_type: string;
   schedule_cron: string | null;
   timezone: string | null;
@@ -214,6 +216,8 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       orgId: goal.org_id,
       maxAssignments: Number(goal.max_parallel_agents ?? 4),
       forceApproval: goal.autonomy_level === "assisted",
+      businessBlueprintId: goal.success_criteria?.blueprint_id === SIX_AGENT_BUSINESS_BLUEPRINT.id
+        ? SIX_AGENT_BUSINESS_BLUEPRINT.id : null,
     });
     await persistFleet(db, goal, run.id, prepared.plan);
     const queued = await queueWorkflowRun({
