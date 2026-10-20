@@ -24,7 +24,7 @@ describe('governed six-agent business operations blueprint', () => {
     expect(draft.autonomy_level).toBe('assisted');
     expect(draft.trigger_type).toBe('manual');
     expect(draft.max_parallel_agents).toBe('6');
-    expect(draft.budget_pounds).toBe('0.00');
+    expect(draft.budget_pounds).toBe('1.00');
     expect(draft.objective).toContain('unstaffed');
     expect(draft.objective).toContain('settlement/payment records');
     expect(draft.objective).toContain('emergency stop');
