@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Activity, Eye, Network, Pause, Play, ShieldCheck } from 'lucide-react'
 import { buildAiHubSpiderTopology } from '@/lib/ai-hub/spider-network'
+import { receiptsForSpiderNode } from '@/lib/ai-hub/spider-receipts'
 
 const SIGNALS = [
   { label: 'Relevance', value: 'Not verified' },
@@ -33,7 +34,7 @@ function DotLegend({ color, children }) {
  * An interactive visual projection of existing Hub inventory and route plans.
  * Animation is a planning-path guide, NOT a worker execution or event stream.
  */
-export default function AiHubSpiderNetwork({ resources = [], selectedCapability, route = null, loading = false }) {
+export default function AiHubSpiderNetwork({ resources = [], receipts = [], receiptError = false, selectedCapability, route = null, loading = false }) {
   const reducedMotion = useReducedMotion()
   const [motionOn, setMotionOn] = useState(true)
   const [focusedId, setFocusedId] = useState(null)
@@ -45,6 +46,8 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
   const activeId = graph.nodes.some((node) => node.id === focusedId)
     ? focusedId : graph.selectedId ?? graph.nodes[0]?.id ?? null
   const activeNode = graph.nodes.find((node) => node.id === activeId)
+  const activeReceipts = activeNode ? receiptsForSpiderNode(receipts, activeNode) : []
+  const recentReceipt = activeReceipts[0]
   const planned = graph.nodes.find((node) => node.planned)
   const canAnimate = !reducedMotion && motionOn
   const matches = graph.links.filter((link) => link.relation === 'routing-candidate').length
@@ -105,6 +108,8 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
           const highlight = node.planned
           const candidate = node.eligible
           const selected = node.id === activeId
+          const recordedOutcome = receiptsForSpiderNode(receipts, node).find((receipt) =>
+            receipt.status === 'recorded-success' || receipt.status === 'recorded-failure')
           return <g key={node.providerId + ':' + node.kind + ':' + node.id}>
             {highlight && <line x1="500" y1="310" x2={node.x} y2={node.y}
               stroke="#a78bfa" strokeWidth="9" strokeOpacity=".12" filter={'url(#' + namespace + '-glow)'} aria-hidden="true" />}
@@ -119,6 +124,7 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFocusedId(node.id) } }}
               className="cursor-pointer outline-none focus-visible:opacity-90">
               {selected && <circle cx={node.x} cy={node.y} r="35" stroke="#c4b5fd" strokeWidth="1.5" fill="#a78bfa" fillOpacity=".1" />}
+              {recordedOutcome && <circle cx={node.x} cy={node.y} r="26" fill="none" stroke={recordedOutcome.status === 'recorded-success' ? '#34d399' : '#fca5a5'} strokeWidth="1.6" strokeDasharray="3 4" aria-hidden="true" />}
               <motion.circle cx={node.x} cy={node.y} r={node.planned ? 18 : 15}
                 fill={node.active ? '#130f29' : '#10121a'}
                 stroke={node.planned ? '#c4b5fd' : node.eligible ? '#67e8f9' : '#6b7280'}
@@ -156,6 +162,7 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
         <DotLegend color="bg-zinc-500">Registered</DotLegend>
         <DotLegend color="bg-cyan-300">Eligible candidate</DotLegend>
         <DotLegend color="bg-violet-300">Planned path</DotLegend>
+        <DotLegend color="bg-emerald-300">Recorded gateway success</DotLegend>
       </div>
       <p className="text-[11px] text-zinc-500">{matches} other candidate links · {graph.totalMatching} matching resources</p>
     </div>
@@ -166,6 +173,12 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
           <p className="mt-2 break-words text-sm font-medium text-white">{activeNode.name}</p>
           <p className="mt-1 break-words text-xs text-zinc-400">{activeNode.kind} · {activeNode.status} · {activeNode.providerId}</p>
           <p className="mt-2 text-xs text-zinc-500">{activeNode.planned ? 'Selected by the current read-only routing plan.' : activeNode.eligible ? 'Considered by the routing plan.' : 'Present in the existing Hub inventory; not part of this route.'}</p>
+          {receiptError ? <p className="mt-3 text-xs text-amber-300">Approval evidence is unavailable; no execution state is assumed.</p> : recentReceipt ? <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Recorded approval gateway state</p>
+            <p className="mt-1 text-xs text-zinc-200">{recentReceipt.status.replaceAll('-', ' ')}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">{recentReceipt.executedAt ? 'Gateway completion: ' + recentReceipt.executedAt : 'Approval requested: ' + recentReceipt.createdAt}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">From this user's existing AI Hub approval records. Does not independently confirm provider success.</p>
+          </div> : <p className="mt-3 text-[11px] text-zinc-500">No matching gateway receipt recorded for this node.</p>}
         </> : <p className="mt-2 text-xs text-zinc-500">Select a node to inspect its real inventory status.</p>}
       </div>
       <div className="min-w-0 rounded-xl border border-white/10 bg-white/[.03] p-3">
@@ -181,6 +194,6 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
         <p className="mt-1 text-[11px] font-medium text-zinc-300">{signal.value}</p>
       </div>)}
     </div>
-    <p className="border-t border-white/10 px-4 py-3 text-[11px] leading-5 text-zinc-500">Motion shows a proposed route, never live data flow or AI execution. The web rings are a visual guide; only registered resources and actual planner candidates create highlighted links. No tool runs or approvals are issued from this diagram. {reducedMotion ? 'Reduced-motion preference is respected.' : ''}</p>
+    <p className="border-t border-white/10 px-4 py-3 text-[11px] leading-5 text-zinc-500">Motion shows a proposed route, never live data flow or AI execution. A dotted outcome ring indicates a historical gateway receipt, not a currently running task. The web rings are a visual guide; only registered resources and actual planner candidates create highlighted links. No tool runs or approvals are issued from this diagram. {reducedMotion ? 'Reduced-motion preference is respected.' : ''}</p>
   </div>
 }
