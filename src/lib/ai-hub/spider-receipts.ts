@@ -59,7 +59,7 @@ export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]):
     // A terminal gateway status without a valid completion timestamp is
     // incomplete evidence, not proof that execution finished.
     const status = terminal && !persistedExecutionDate ? 'not-executed' : persistedStatus
-    const executedAt = terminal ? persistedExecutionDate : null
+    const executedAt = terminal && persistedExecutionDate ? persistedExecutionDate : null
 
     // Explicitly allowlist fields. Never pass through prompt input, raw MCP
     // arguments, approval details, execution_result or fingerprint metadata.
