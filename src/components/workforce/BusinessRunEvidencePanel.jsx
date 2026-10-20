@@ -48,6 +48,8 @@ export default function BusinessRunEvidencePanel({ goals = [], session }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-white/45">
         <span className="rounded-md border border-white/10 px-2 py-1">Run: {data.runStatus}</span>
+        <span className="rounded-md border border-white/10 px-2 py-1">{data.completedAssignments} step-verified completions</span>
+        {data.unverifiedCompletionClaims > 0 && <span className="rounded-md border border-amber-300/15 px-2 py-1 text-amber-100">{data.unverifiedCompletionClaims} unverified completion claims</span>}
         <span className="rounded-md border border-white/10 px-2 py-1">{data.succeededToolRecords} recorded tool successes</span>
         <span className="rounded-md border border-white/10 px-2 py-1">{data.failedToolRecords} recorded tool failures</span>
         <span className="rounded-md border border-white/10 px-2 py-1">{data.approvalRecords} approval records</span>
@@ -57,7 +59,7 @@ export default function BusinessRunEvidencePanel({ goals = [], session }) {
       <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {data.assignments.map((assignment) => <article key={assignment.assignmentId} className="rounded-xl border border-white/[.08] bg-black/25 p-3">
           <div className="flex flex-wrap items-center gap-2"><Activity className="h-3.5 w-3.5 text-violet-300" /><h4 className="text-xs font-semibold text-white">{assignment.title}</h4></div>
-          <p className="mt-2 text-[10px] text-white/40">Recorded status: <span className="text-white/75">{assignment.status}</span> · {assignment.taskRecords} agent task record(s)</p>
+          <p className="mt-2 text-[10px] text-white/40">Step-evidenced status: <span className="text-white/75">{assignment.status}</span>{assignment.recordedFleetStatus !== assignment.status && <span className="text-amber-100/70"> · fleet record: {assignment.recordedFleetStatus}</span>} · {assignment.taskRecords} agent task record(s)</p>
           <p className="mt-1 text-[10px] text-white/40">Tools: {assignment.toolRecords} recorded · {assignment.toolsSucceeded} succeeded · {assignment.toolsFailed} failed</p>
           <p className="mt-1 text-[10px] text-white/40">Approval receipts: {assignment.approvalRecords} · recorded executions: {assignment.approvalExecutionReceipts}</p>
           <p className="mt-2 text-[10px] text-cyan-200/65">{assignment.toolNames.length ? assignment.toolNames.join(', ') : 'No tool executions recorded for this assignment'}</p>
