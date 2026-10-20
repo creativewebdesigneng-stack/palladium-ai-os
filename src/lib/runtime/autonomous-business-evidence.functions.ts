@@ -9,6 +9,7 @@ import {
   type BusinessStepRun,
   type BusinessToolExecution,
   type BusinessApprovalRecord,
+  type BusinessWorkflowGateApproval,
 } from './autonomous-business-evidence';
 
 type Sb = { from: (table: string) => any };
@@ -48,6 +49,7 @@ export const getAutonomousBusinessRunEvidence = createServerFn({ method: 'POST' 
     let stepRuns: BusinessStepRun[] = [];
     let tools: BusinessToolExecution[] = [];
     let approvals: BusinessApprovalRecord[] = [];
+    let workflowGateApprovals: BusinessWorkflowGateApproval[] = [];
     let truncated = false;
 
     if (run.workflow_run_id) {
@@ -57,6 +59,20 @@ export const getAutonomousBusinessRunEvidence = createServerFn({ method: 'POST' 
         .eq('id', run.workflow_run_id).eq('user_id', owner).maybeSingle();
       if (workflowError) throw new Error(workflowError.message);
       if (!workflowRun) throw new Error('The workflow run cannot be verified for this owner.');
+
+      // The workflow-start gate has task_id=null and is not among agent tool
+      // approvals. Its owned workflow_run_id lives in the existing JSONB
+      // approval details, so query it separately without raw payloads.
+      const gateResult = await sb.from('approval_requests')
+        .select('status')
+        .eq('user_id', owner)
+        .eq('action_type', 'workflow_step')
+        .contains('details', { workflow_run_id: workflowRun.id })
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (gateResult.error) throw new Error(gateResult.error.message);
+      workflowGateApprovals = (gateResult.data ?? []) as BusinessWorkflowGateApproval[];
+      truncated ||= workflowGateApprovals.length >= 20;
 
       const [stepsResult, stepRunsResult] = await Promise.all([
         sb.from('workflow_steps').select('id,config')
@@ -99,6 +115,7 @@ export const getAutonomousBusinessRunEvidence = createServerFn({ method: 'POST' 
         stepRuns,
         tools,
         approvals,
+        workflowGateApprovals,
         truncated,
       }),
     };
