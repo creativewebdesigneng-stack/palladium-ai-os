@@ -243,7 +243,7 @@ export default function APIManagement() {
                   <div className="mt-3 space-y-1 border-t border-white/[.05] pt-3">
                     <p className="text-[10px] leading-5 text-zinc-500">
                       Connection tests validate the model catalogue only. Click Verify live inference to request
-                      one real hosted NVIDIA response (maximum 32 output tokens, no retries or tool execution).
+                      one real hosted NVIDIA response (maximum 128 output tokens, low reasoning, no retries or tool execution).
                       Your NVIDIA account may incur usage charges.
                     </p>
                     {nvidiaInferenceEvidence && (
