@@ -1,5 +1,5 @@
 import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serving-cache";
-import { NVIDIA_NIM_DEFAULT_MODEL, nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
+import { NVIDIA_NIM_DEFAULT_MODEL, NVIDIA_NIM_HOSTED_BASE_URL, nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
 
 /**
  * Model gateway — the agent runtime is never hard-coded to one vendor.
@@ -195,10 +195,12 @@ function endpointFor(provider: Provider, access?: ProviderAccess | null): Endpoi
     };
   }
   if (provider === "nvidia") {
-    const key = nvidiaNimKey();
-    if (!key) throw new ProviderError("NVIDIA NIM is not configured. Set NVIDIA_API_KEY on the server.", 503, false);
+    // User-supplied credentials are restricted to NVIDIA's official hosted API.
+    // NEVER forward a personal key to an operator-configured Dell/NIM proxy.
+    const key = personalKey || nvidiaNimKey();
+    if (!key) throw new ProviderError("NVIDIA NIM is not configured. Connect your own key or configure NVIDIA_API_KEY on the server.", 503, false);
     let base: string;
-    try { base = nvidiaNimBaseUrl(); }
+    try { base = personalKey ? NVIDIA_NIM_HOSTED_BASE_URL : nvidiaNimBaseUrl(); }
     catch { throw new ProviderError("NVIDIA NIM endpoint is not configured safely.", 503, false); }
     return {
       url: `${base}/chat/completions`,
