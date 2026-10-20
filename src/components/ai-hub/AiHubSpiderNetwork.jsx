@@ -33,7 +33,7 @@ function DotLegend({ color, children }) {
  * An interactive visual projection of existing Hub inventory and route plans.
  * Animation is a planning-path guide, NOT a worker execution or event stream.
  */
-export default function AiHubSpiderNetwork({ resources = [], selectedCapability, route = null, loading = false }) {
+export default function AiHubSpiderNetwork({ resources = [], selectedCapability, route = null, loading = false, onPrepareResource }) {
   const reducedMotion = useReducedMotion()
   const [motionOn, setMotionOn] = useState(true)
   const [focusedId, setFocusedId] = useState(null)
@@ -45,6 +45,10 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
   const activeId = graph.nodes.some((node) => node.id === focusedId)
     ? focusedId : graph.selectedId ?? graph.nodes[0]?.id ?? null
   const activeNode = graph.nodes.find((node) => node.id === activeId)
+  const canPrepare = Boolean(activeNode && activeNode.active && (
+    (['agent', 'workflow'].includes(activeNode.kind) && activeNode.status === 'active') ||
+    (activeNode.kind === 'tool' && activeNode.providerId.startsWith('external-mcp:') && activeNode.status === 'available')
+  ))
   const planned = graph.nodes.find((node) => node.planned)
   const canAnimate = !reducedMotion && motionOn
   const matches = graph.links.filter((link) => link.relation === 'routing-candidate').length
@@ -166,6 +170,11 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
           <p className="mt-2 break-words text-sm font-medium text-white">{activeNode.name}</p>
           <p className="mt-1 break-words text-xs text-zinc-400">{activeNode.kind} · {activeNode.status} · {activeNode.providerId}</p>
           <p className="mt-2 text-xs text-zinc-500">{activeNode.planned ? 'Selected by the current read-only routing plan.' : activeNode.eligible ? 'Considered by the routing plan.' : 'Present in the existing Hub inventory; not part of this route.'}</p>
+          {canPrepare && onPrepareResource && <a href="#ai-hub-execution" onClick={() => onPrepareResource(activeNode)}
+            className="mt-3 inline-flex items-center rounded-lg border border-violet-300/20 bg-violet-400/10 px-3 py-2 text-xs font-medium text-violet-100 hover:bg-violet-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-300">
+            Prepare in existing approval controls
+          </a>}
+          {canPrepare && onPrepareResource && <p className="mt-2 text-[11px] leading-5 text-zinc-500">Opens the existing execution form only. No action or approval request is sent until you choose to submit it there.</p>}
         </> : <p className="mt-2 text-xs text-zinc-500">Select a node to inspect its real inventory status.</p>}
       </div>
       <div className="min-w-0 rounded-xl border border-white/10 bg-white/[.03] p-3">
