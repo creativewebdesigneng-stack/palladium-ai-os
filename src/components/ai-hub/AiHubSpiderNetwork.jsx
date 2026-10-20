@@ -166,6 +166,7 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
         <DotLegend color="bg-zinc-500">Registered</DotLegend>
         <DotLegend color="bg-cyan-300">Eligible candidate</DotLegend>
         <DotLegend color="bg-violet-300">Planned path</DotLegend>
+        <DotLegend color="bg-emerald-300">Recorded gateway success</DotLegend>
       </div>
       <p className="text-[11px] text-zinc-500">{matches} other candidate links · {graph.totalMatching} matching resources</p>
     </div>
@@ -176,6 +177,12 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
           <p className="mt-2 break-words text-sm font-medium text-white">{activeNode.name}</p>
           <p className="mt-1 break-words text-xs text-zinc-400">{activeNode.kind} · {activeNode.status} · {activeNode.providerId}</p>
           <p className="mt-2 text-xs text-zinc-500">{activeNode.planned ? 'Selected by the current read-only routing plan.' : activeNode.eligible ? 'Considered by the routing plan.' : 'Present in the existing Hub inventory; not part of this route.'}</p>
+          {receiptError ? <p className="mt-3 text-xs text-amber-300">Approval evidence is unavailable; no execution state is assumed.</p> : recentReceipt ? <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Recorded approval gateway state</p>
+            <p className="mt-1 text-xs text-zinc-200">{recentReceipt.status.replaceAll('-', ' ')}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">{recentReceipt.executedAt ? 'Gateway completion: ' + recentReceipt.executedAt : 'Approval requested: ' + recentReceipt.createdAt}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">From this user's existing AI Hub approval records. Does not independently confirm provider success.</p>
+          </div> : <p className="mt-3 text-[11px] text-zinc-500">No matching gateway receipt recorded for this node.</p>}
           {canPrepare && !taskReady && ['agent', 'workflow'].includes(activeNode.kind) && <p className="mt-2 text-xs text-amber-200/80">Enter a task in the prompt box above to prepare this agent or workflow.</p>}
           {canPrepare && (taskReady || activeNode.kind === 'tool') && onPrepareResource && <a href="#ai-hub-execution" onClick={() => onPrepareResource(activeNode)}
             className="mt-3 inline-flex items-center rounded-lg border border-violet-300/20 bg-violet-400/10 px-3 py-2 text-xs font-medium text-violet-100 hover:bg-violet-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-300">
