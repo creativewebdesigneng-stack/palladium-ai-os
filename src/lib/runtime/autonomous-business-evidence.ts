@@ -29,6 +29,9 @@ export type BusinessApprovalRecord = {
   status: string;
   execution_status?: string | null;
 };
+export type BusinessWorkflowGateApproval = {
+  status: string;
+};
 
 export function projectBusinessRunEvidence(input: {
   runStatus: string;
@@ -37,6 +40,7 @@ export function projectBusinessRunEvidence(input: {
   stepRuns: BusinessStepRun[];
   tools: BusinessToolExecution[];
   approvals: BusinessApprovalRecord[];
+  workflowGateApprovals?: BusinessWorkflowGateApproval[];
   truncated?: boolean;
 }) {
   const stepForAssignment = new Map(input.workflowSteps.map((step) => [
@@ -74,6 +78,8 @@ export function projectBusinessRunEvidence(input: {
     succeededToolRecords: rows.reduce((sum, row) => sum + row.toolsSucceeded, 0),
     failedToolRecords: rows.reduce((sum, row) => sum + row.toolsFailed, 0),
     approvalRecords: rows.reduce((sum, row) => sum + row.approvalRecords, 0),
+    workflowGateRecords: input.workflowGateApprovals?.length ?? 0,
+    workflowGateStatus: input.workflowGateApprovals?.[0]?.status ?? 'not_recorded',
     truncated: input.truncated === true,
     financialOutcome: 'unverified' as const,
     evidenceLevel: 'internal_execution_records_only' as const,
