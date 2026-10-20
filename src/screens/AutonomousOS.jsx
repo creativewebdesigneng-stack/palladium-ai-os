@@ -11,6 +11,7 @@ import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-ap
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 import { getAutonomousRuntimeControlPlane, setAutonomousRuntimeEnabled } from '@/lib/runtime/autonomous-control-plane.functions';
 import { SIX_AGENT_BUSINESS_BLUEPRINT, prepareSixAgentBusinessDraft, businessBlueprintCriteria } from '@/lib/runtime/business-operations-blueprint';
+import BusinessRunEvidencePanel from '@/components/workforce/BusinessRunEvidencePanel';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
@@ -216,6 +217,8 @@ export default function AutonomousOS() {
         </div>
       </section>
     </div>
+
+    <BusinessRunEvidencePanel goals={data.goals ?? []} session={session} />
 
     <section className="mt-4 rounded-[28px] border border-cyan-300/10 bg-cyan-300/[.025] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[.25em] text-cyan-300/70">Opportunity planner</p><h3 className="mt-1 text-xl font-semibold text-white">Governed next-action recommendations</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-white/40">Blackstar ranks signals from your own persistent goals and routes each recommendation only through your existing active agents and workflows. This panel plans; it does not execute actions or bypass approvals.</p></div><button onClick={() => opportunitiesQuery.refetch()} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/50 hover:text-white"><RefreshCw className={`h-4 w-4 ${opportunitiesQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
