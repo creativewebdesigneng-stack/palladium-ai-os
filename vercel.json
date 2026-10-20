@@ -3,7 +3,11 @@
   "git": {
     "deploymentEnabled": {
       "internal-*": false,
-      "dependabot/**": false
+      "dependabot/**": false,
+      "main": true,
+      "feature/**": false,
+      "repair/**": false,
+      "ops/**": false
     }
   }
 }
