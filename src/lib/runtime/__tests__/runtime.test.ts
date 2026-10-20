@@ -187,6 +187,73 @@ describe("agent permissions", () => {
   });
 });
 
+describe('NVIDIA owner-key vs operator Dell model selection at task creation', () => {
+  it('persists the NVIDIA hosted preset for a personal key instead of Dell server model ID', async () => {
+    const originalBase = process.env['NVIDIA_NIM_BASE_URL'];
+    const originalModel = process.env['NVIDIA_NIM_MODEL'];
+    const originalKey = process.env['NVIDIA_API_KEY'];
+    process.env['NVIDIA_NIM_BASE_URL'] = 'https://dell-nim.example/v1';
+    process.env['NVIDIA_NIM_MODEL'] = 'dell/local-only-model';
+    process.env['NVIDIA_API_KEY'] = 'synthetic-workspace-key';
+    const access = vi.spyOn(credentials, 'resolveUserModelProviderAccess')
+      .mockResolvedValue({ provider: 'nvidia', apiKey: 'synthetic-personal-key' });
+    const availability = vi.spyOn(credentials, 'isProviderAvailableForUser')
+      .mockResolvedValue(true);
+    try {
+      const sb = db([{ ...AGENT, model_provider: 'nvidia', model: 'openai/gpt-oss-20b' }]);
+      const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'QA model selection' });
+      expect(run.provider).toBe('nvidia');
+      expect(run.model).toBe('openai/gpt-oss-20b');
+      expect(sb.tables.agent_tasks[0]?.['model']).toBe('openai/gpt-oss-20b');
+      expect(sb.tables.agent_tasks[0]?.['provider']).toBe('nvidia');
+      expect(JSON.stringify(sb.tables.agent_tasks)).not.toContain('synthetic-personal-key');
+      expect(JSON.stringify(sb.tables.agent_tasks)).not.toContain('dell/local-only-model');
+      expect(access).toHaveBeenCalledWith({ userId: USER, provider: 'nvidia' });
+      expect(availability).toHaveBeenCalledWith({ userId: USER, provider: 'nvidia' });
+      expect(gateway.runChat).not.toHaveBeenCalled();
+    } finally {
+      access.mockRestore();
+      availability.mockRestore();
+      if (originalBase === undefined) delete process.env['NVIDIA_NIM_BASE_URL'];
+      else process.env['NVIDIA_NIM_BASE_URL'] = originalBase;
+      if (originalModel === undefined) delete process.env['NVIDIA_NIM_MODEL'];
+      else process.env['NVIDIA_NIM_MODEL'] = originalModel;
+      if (originalKey === undefined) delete process.env['NVIDIA_API_KEY'];
+      else process.env['NVIDIA_API_KEY'] = originalKey;
+    }
+  });
+
+  it('rejects an explicit Dell-only model for a personal NVIDIA key before queuing any task', async () => {
+    const originalBase = process.env['NVIDIA_NIM_BASE_URL'];
+    const originalModel = process.env['NVIDIA_NIM_MODEL'];
+    const originalKey = process.env['NVIDIA_API_KEY'];
+    process.env['NVIDIA_NIM_BASE_URL'] = 'https://dell-nim.example/v1';
+    process.env['NVIDIA_NIM_MODEL'] = 'dell/local-only-model';
+    process.env['NVIDIA_API_KEY'] = 'synthetic-workspace-key';
+    const access = vi.spyOn(credentials, 'resolveUserModelProviderAccess')
+      .mockResolvedValue({ provider: 'nvidia', apiKey: 'synthetic-personal-key' });
+    const availability = vi.spyOn(credentials, 'isProviderAvailableForUser')
+      .mockResolvedValue(true);
+    try {
+      const sb = db([{ ...AGENT, model_provider: 'nvidia', model: 'dell/local-only-model' }]);
+      await expect(prepareRun({
+        sb, userId: USER, agentId: AGENT.id, input: 'Do not queue wrong model',
+      })).rejects.toMatchObject({ status: 400 });
+      expect(sb.tables.agent_tasks).toHaveLength(0);
+      expect(gateway.runChat).not.toHaveBeenCalled();
+    } finally {
+      access.mockRestore();
+      availability.mockRestore();
+      if (originalBase === undefined) delete process.env['NVIDIA_NIM_BASE_URL'];
+      else process.env['NVIDIA_NIM_BASE_URL'] = originalBase;
+      if (originalModel === undefined) delete process.env['NVIDIA_NIM_MODEL'];
+      else process.env['NVIDIA_NIM_MODEL'] = originalModel;
+      if (originalKey === undefined) delete process.env['NVIDIA_API_KEY'];
+      else process.env['NVIDIA_API_KEY'] = originalKey;
+    }
+  });
+});
+
 describe("subscription and usage limits", () => {
   it("blocks the run when the monthly task allowance is spent", async () => {
     entitlements.getEntitlements.mockResolvedValue(
