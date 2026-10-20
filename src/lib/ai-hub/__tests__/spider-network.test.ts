@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { buildAiHubSpiderTopology } from '../spider-network'
+import { suggestSpiderCapability } from '../spider-prompt-preview'
 import type { AiHubLiveResource } from '../resources'
 import type { AiHubRouteDecision } from '../contracts'
 
@@ -112,5 +113,30 @@ describe('Spider Decision Network UI integration', () => {
     expect(network).not.toContain('executeAiHubWorkflow')
     expect(network).not.toContain('executeAiHubExternalMcp')
     expect(network).not.toContain('approved: true')
+  })
+})
+
+describe('Read-only spider prompt phrase suggestion', () => {
+  const options = ['web-research', 'code-analysis', 'model-inference']
+  it('suggests only a real capability with a complete literal phrase match', () => {
+    expect(suggestSpiderCapability('Please help me with code analysis', options)).toEqual({
+      capability: 'code-analysis', matchedTerms: ['code', 'analysis'],
+    })
+    expect(suggestSpiderCapability('I want web research', options)?.capability).toBe('web-research')
+  })
+
+  it('does not hallucinate a capability for unrelated, incomplete or oversized prompt content', () => {
+    expect(suggestSpiderCapability('Book a table in Plymouth', options)).toBeNull()
+    expect(suggestSpiderCapability('code', options)).toBeNull()
+    expect(suggestSpiderCapability('x'.repeat(1001), options)).toBeNull()
+    expect(suggestSpiderCapability('', options)).toBeNull()
+    expect(suggestSpiderCapability('code analysis', [])).toBeNull()
+  })
+
+  it('keeps prompt entry local and requires a user click before updating the selected capability', () => {
+    expect(explorer).toContain('setPromptDraft')
+    expect(explorer).toContain('suggestSpiderCapability(promptDraft, options)')
+    expect(explorer).toContain('onClick={() => setCapabilityName(suggested.capability)}')
+    expect(explorer).toContain('no prompt is sent to a model or tool')
   })
 })
