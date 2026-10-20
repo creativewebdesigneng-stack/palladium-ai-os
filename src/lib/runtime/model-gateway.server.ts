@@ -1,7 +1,7 @@
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import { runGeminiNative, streamGeminiNative } from "./gemini-provider.server";
 import * as base from "./model-gateway.base";
-import type { ChatMessage, ChatResult, Provider, RunArgs, StreamEvent } from "./model-gateway.base";
+import type { ChatMessage, ChatResult, Provider, ProviderAccess, RunArgs, StreamEvent } from "./model-gateway.base";
 import { blackstarAstraContextCompactionOptions } from "./blackstar-astra-context-policy";
 import { compactRunContextInPlace } from "./run-context-journal.server";
 import { nvidiaNimConfigured, nvidiaNimFallbackEnabled } from './nvidia-dell-infrastructure.server';
@@ -19,12 +19,12 @@ const RATE_LIMIT_COOLDOWN_MS = 60_000;
 /** The low-level base keeps provider compatibility details; the server gateway
  * owns production model policy. 3.6 Flash is the Gemini model proven healthy
  * in this deployment and is also used to migrate the former 3.7 default. */
-export function resolveModel(provider: Provider, model?: string | null): string {
+export function resolveModel(provider: Provider, model?: string | null, access?: ProviderAccess | null): string {
   const requested = (model ?? "").trim();
   if (provider === "gemini" && (!requested || requested === "gemini-3.7-flash")) {
     return GEMINI_MODEL_FALLBACK;
   }
-  return base.resolveModel(provider, model);
+  return base.resolveModel(provider, model, access);
 }
 
 const activeProviderByConversation = new WeakMap<ChatMessage[], ActiveProvider>();
@@ -68,8 +68,8 @@ function fallbackOrder(primary: Provider): Provider[] {
   return [...configured.filter((provider) => provider !== primary), primary];
 }
 
-function modelCandidates(provider: Provider, model: string): string[] {
-  const candidates = [resolveModel(provider, model)];
+function modelCandidates(provider: Provider, model: string, access?: ProviderAccess | null): string[] {
+  const candidates = [resolveModel(provider, model, access)];
   if (provider === "gemini" && !candidates.includes(GEMINI_MODEL_FALLBACK)) candidates.push(GEMINI_MODEL_FALLBACK);
   if (provider === "groq" && model !== GROQ_MODEL_FALLBACK) candidates.push(GROQ_MODEL_FALLBACK);
   if (provider === "openai" && model !== OPENAI_MODEL_FALLBACK) candidates.push(OPENAI_MODEL_FALLBACK);
@@ -137,9 +137,9 @@ function liveSearchOnlyResult(
 
 async function tryProviderModels(args: RunArgs, provider: Provider, model: string) {
   let lastError: unknown;
-  for (const candidate of modelCandidates(provider, model)) {
+  const providerAccess = args.providerAccess?.provider === provider ? args.providerAccess : null;
+  for (const candidate of modelCandidates(provider, model, providerAccess)) {
     try {
-      const providerAccess = args.providerAccess?.provider === provider ? args.providerAccess : null;
       const callArgs = { ...args, provider, model: candidate, providerAccess };
       if (isAstraGroqBootstrapRequest(provider, candidate)) return await runAstraGroqBootstrap(callArgs);
       return provider === "gemini" ? await runGeminiNative(callArgs) : await base.runChat(callArgs);
@@ -218,7 +218,7 @@ export async function runChatPinned(args: RunArgs): Promise<ChatResult> {
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
   );
-  const model = resolveModel(args.provider, args.model);
+  const model = resolveModel(args.provider, args.model, args.providerAccess);
   const callArgs = { ...args, model };
   if (isAstraGroqBootstrapRequest(args.provider, model)) {
     return runAstraGroqBootstrap(callArgs);
@@ -237,7 +237,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   const cached = activeProviderByConversation.get(args.messages);
   const remembered = cached && (!args.allowedProviders || args.allowedProviders.includes(cached.provider)) ? cached : undefined;
   const primaryProvider = remembered?.provider ?? args.provider;
-  const primaryModel = remembered?.model ?? resolveModel(primaryProvider, args.model);
+  const primaryModel = remembered?.model ?? resolveModel(primaryProvider, args.model, args.providerAccess);
   let lastError: unknown;
 
   for (const provider of fallbackOrder(primaryProvider).filter(p => !args.allowedProviders || args.allowedProviders.includes(p))) {

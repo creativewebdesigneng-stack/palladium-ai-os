@@ -280,7 +280,6 @@ export async function prepareRun(args: {
   try { selection = normaliseAgentModelSelection(agent.model_provider || normaliseProvider(agent.model_provider), agent.model); }
   catch { throw new RuntimeError("The saved provider/model selection is invalid. Edit this agent and select a matching provider and model.", "INVALID_MODEL_SELECTION", 400); }
   const provider = normaliseProvider(selection.provider);
-  const model = resolveModel(provider, selection.model);
   if (!(await isProviderAvailableForUser({ userId: args.userId, provider }))) {
     throw new RuntimeError(
       `The '${provider}' model provider is not configured for this workspace or connected by this user.`,
@@ -288,6 +287,14 @@ export async function prepareRun(args: {
       503,
     );
   }
+  // Resolve NVIDIA's persisted agent model against the *owner's* credential
+  // before the task ID/model are recorded. A personal NVIDIA API Catalog key
+  // must never inherit the different model ID of an operator-hosted Dell NIM.
+  // This retrieves no key into task storage, notifications or audit metadata.
+  const personalNvidiaAccess = provider === 'nvidia'
+    ? await resolveUserModelProviderAccess({ userId: args.userId, provider })
+    : null;
+  const model = resolveModel(provider, selection.model, personalNvidiaAccess);
   try {
     await writeAuditRequired({userId: args.userId, orgId, action: "agent.run_requested", targetType: "personal_agent", targetId: agent.id, agentId: agent.id, metadata: {provider, model}});
   } catch {
