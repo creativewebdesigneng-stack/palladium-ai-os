@@ -103,6 +103,43 @@ describe('AiHubExecutionGateway', () => {
     expect(approvalGate.complete).toHaveBeenCalledWith('approval-1', expect.anything(), expect.objectContaining({ status: 'completed' }))
   })
 
+  it('records adapter non-completion instead of a false gateway success after approval', async () => {
+    const approvalGate = {
+      request: vi.fn(async () => 'approval-1'),
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => undefined),
+    }
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
+    const execute = vi.fn(async () => ({
+      status: 'failed' as const,
+      adapter: 'model-gateway' as const,
+      error: 'Inner runtime is waiting for separate tool approval',
+    }))
+    gateway.registerAdapter('model-gateway', execute)
+    const context = { tenantId: 'tenant-1', actorId: 'actor-1', approvalRequestId: 'approval-1' }
+    const result = await gateway.execute(createPlan(true), context)
+    expect(result.status).toBe('failed')
+    expect(execute).toHaveBeenCalledOnce()
+    expect(approvalGate.complete).toHaveBeenCalledWith(
+      'approval-1', context, expect.objectContaining({ status: 'failed' }),
+    )
+  })
+
+  it('does not claim a completed gateway outcome when final persistence fails', async () => {
+    const approvalGate = {
+      request: vi.fn(async () => 'approval-1'),
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => { throw new Error('Gateway outcome was not persisted') }),
+    }
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), approvalGate)
+    gateway.registerAdapter('model-gateway', async () => ({
+      status: 'completed' as const, adapter: 'model-gateway' as const,
+    }))
+    await expect(gateway.execute(createPlan(true), {
+      tenantId: 'tenant-1', actorId: 'actor-1', approvalRequestId: 'approval-1',
+    })).rejects.toThrow('Gateway outcome was not persisted')
+  })
+
   it('rejects execution without tenant and actor identity', async () => {
     const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry())
     await expect(gateway.execute(createPlan(), { tenantId: '', actorId: '' })).rejects.toThrow('tenant and actor identity')
