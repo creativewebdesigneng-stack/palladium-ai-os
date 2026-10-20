@@ -14,6 +14,8 @@ import {
 } from "@/lib/agents/agent-performance";
 import { normaliseProvider, resolveModel, runChat, type ChatMessage } from "./model-gateway.server";
 import { executeWorkflow } from "./workforce.server";
+import { planSixAgentBusinessTeam } from "./six-agent-business-plan";
+import { SIX_AGENT_BUSINESS_BLUEPRINT } from "./business-operations-blueprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -285,6 +287,7 @@ export async function planOrchestratedGoal(args: {
   orgId?: string | null;
   maxAssignments?: number;
   forceApproval?: boolean;
+  businessBlueprintId?: string | null;
 }) {
   const goal = String(args.goal ?? "").trim();
   if (!goal) throw new OrchestratorError("Give the Orchestrator a goal.", "EMPTY_GOAL");
@@ -297,10 +300,20 @@ export async function planOrchestratedGoal(args: {
     ...(args.workforceId !== undefined ? { workforceId: args.workforceId } : {}),
     ...(args.orgId !== undefined ? { orgId: args.orgId } : {}),
   });
-  const plan = await createDelegationPlan(goal, eligible.agents, {
-    maxAssignments: Math.min(Math.max(Number(args.maxAssignments ?? 12) || 1, 1), 12),
-    forceApproval: args.forceApproval === true,
-  });
+  const maximumAssignments = Math.min(Math.max(Number(args.maxAssignments ?? 12) || 1, 1), 12);
+  // The explicitly marked six-role blueprint does not permit the model fallback
+  // to present one general agent as six independent business specialists.
+  // Generic orchestration is unchanged.
+  const plan = args.businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id
+    ? planSixAgentBusinessTeam({
+        goal,
+        candidates: eligible.agents,
+        maxAssignments: maximumAssignments,
+      })
+    : await createDelegationPlan(goal, eligible.agents, {
+        maxAssignments: maximumAssignments,
+        forceApproval: args.forceApproval === true,
+      });
   const workflow = await persistGeneratedWorkflow({
     sb: args.sb,
     userId: args.userId,
