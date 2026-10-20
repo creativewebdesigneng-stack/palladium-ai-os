@@ -57,7 +57,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
     const personalProviderIds = new Set(
       personalConnections
         .filter((item: { enabled: boolean }) => item.enabled)
-        .map((item: { provider: "openai" | "anthropic" }) => item.provider),
+        .map((item: { provider: "openai" | "anthropic" | "nvidia" }) => item.provider),
     );
 
     const usageByModel = new Map<string, UsageRow>();
@@ -114,7 +114,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       routingNote?: string;
     }> = listModelProviderDefinitions().map((provider) => {
       const deploymentConfigured = isModelProviderConfigured(provider.id);
-      const personalConnected = personalProviderIds.has(provider.id as "openai" | "anthropic");
+      const personalConnected = personalProviderIds.has(provider.id as "openai" | "anthropic" | "nvidia");
       return {
       id: provider.id,
       name: provider.name,
