@@ -72,10 +72,10 @@ describe('AI Hub Spider recorded approval evidence', () => {
   it('matches existing nodes by both capability and provider to prevent collisions', () => {
     const receipts = toAiHubSpiderReceipts([
       approval('first', 'approved', 'succeeded'),
-      approval('second', 'approved', 'failed', 'external-mcp:server-1', 'agent-1'),
+      approval('second', 'approved', 'failed', 'external-mcp:server-1', 'agent-1', 'external-mcp:agent-1'),
     ])
     expect(receiptsForSpiderNode(receipts, { providerId: 'palladium-agent-runtime', kind: 'agent', id: 'agent-1' }).map((r) => r.id)).toEqual(['first'])
-    expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'tool', id: 'agent-1' }).map((r) => r.id)).toEqual([])
+    expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'tool', id: 'agent-1' }).map((r) => r.id)).toEqual(['second'])
     expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'agent', id: 'agent-1' }).map((r) => r.id)).toEqual([])
   })
   it('never assigns a workflow receipt to an agent or a tool sharing its ID and provider', () => {
