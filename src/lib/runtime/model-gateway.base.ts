@@ -518,12 +518,23 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 }
 
 function safeJson(value: unknown): Record<string, unknown> {
-  if (typeof value !== "string") return (value as Record<string, unknown>) ?? {};
-  try {
-    return JSON.parse(value || "{}");
-  } catch {
-    return {};
+  // Treat absent arguments as the empty object for genuine no-argument tools,
+  // but never silently turn malformed/model-truncated JSON into an executable
+  // empty argument object. The agent runtime owns tool authorisation; malformed
+  // transport responses must fail before reaching it.
+  if (value == null || value === "") return {};
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new ProviderError("The model returned invalid tool-call arguments.", 502, false);
+    }
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new ProviderError("The model returned non-object tool-call arguments.", 502, false);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 /* ---------------------------------------------------------------------- stream */
