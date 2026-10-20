@@ -12,6 +12,12 @@
 - NVIDIA Catalog use may have access/usage restrictions or charges; a successful model-list probe **does not** certify inference, streaming, model tool-call behavior or Dell hardware.
 - Existing separate, platform-admin-only paid diagnostic switches remain unchanged; a user's personal key does not activate those admin probes.
 
+## Explicit default-off rollout switch
+
+The new `NVIDIA_PERSONAL_CREDENTIALS_ENABLED` server environment flag defaults to **OFF**. While off, NVIDIA is **not shown** as a personal credential option and server handlers reject Connect/Test/Delete requests before reaching NVIDIA or the credential table. Existing workspace NVIDIA model routing and operator diagnostic actions remain unaffected.
+
+After the migration is independently reviewed and applied, enable `NVIDIA_PERSONAL_CREDENTIALS_ENABLED=true` for Preview only, verify the complete acceptance steps, then separately approve the Production enablement. A code merge alone must not expose a non-working personal connection form.
+
 ## Required migration before enabling user-owned NVIDIA storage
 
 Apply `supabase/migrations/20261020012000_allow_nvidia_personal_provider_credentials.sql` through the team's approved deployment process **before deploying this feature to Production**. The existing database provider constraint currently permits only OpenAI and Anthropic, so connecting NVIDIA will fail without the migration. No other schema changes are needed.
@@ -29,7 +35,7 @@ Verify afterward that the allowed names include `nvidia` and that `anon`/`authen
 
 ## Preview acceptance
 
-1. Review migration + CI, then apply the migration in a dedicated **isolated** test database first. Production requires a separately approved schema rollout.
+1. Review migration + CI, then apply the migration in a dedicated **isolated** test database first. Production requires a separately approved schema rollout. Enable `NVIDIA_PERSONAL_CREDENTIALS_ENABLED=true` only in that tested environment after migration.
 2. In a signed-in test account, connect a real user-owned NVIDIA Catalog key in Runtime Models. Never paste the key into chat, PR comments or test logs.
 3. Verify that the key is not returned to the browser, data is persisted as ciphertext, the row belongs to the test account, and a different user cannot list, test or execute with that key.
 4. Run a directly selected NVIDIA test agent, capturing real provider receipt, tokens, task status and audit evidence. Verify streamed and non-streamed flows separately. Revoke the key and verify subsequent runs fail closed.
