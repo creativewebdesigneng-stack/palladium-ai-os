@@ -12,6 +12,7 @@ import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.funct
 import { getAutonomousRuntimeControlPlane, setAutonomousRuntimeEnabled } from '@/lib/runtime/autonomous-control-plane.functions';
 import { SIX_AGENT_BUSINESS_BLUEPRINT, prepareSixAgentBusinessDraft, businessBlueprintCriteria } from '@/lib/runtime/business-operations-blueprint';
 import BusinessRunEvidencePanel from '@/components/workforce/BusinessRunEvidencePanel';
+import BusinessTeamReadinessPanel from '@/components/workforce/BusinessTeamReadinessPanel';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
@@ -218,6 +219,7 @@ export default function AutonomousOS() {
       </section>
     </div>
 
+    <BusinessTeamReadinessPanel session={session} />
     <BusinessRunEvidencePanel goals={data.goals ?? []} session={session} />
 
     <section className="mt-4 rounded-[28px] border border-cyan-300/10 bg-cyan-300/[.025] p-5 sm:p-6">
