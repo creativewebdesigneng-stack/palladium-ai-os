@@ -5,7 +5,7 @@ import ToolCard from './ToolCard';
 import ToolDetailDrawer from './ToolDetailDrawer';
 import { TOOL_CATEGORIES } from './toolsData';
 
-export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleTool }) {
+export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleTool, selectedAgent, toolPermissions, onGovernedReadTest }) {
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(null);
@@ -49,7 +49,8 @@ export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleT
         </div>
       )}
 
-      <ToolDetailDrawer tool={open} isAdmin={isAdmin} onClose={() => setOpen(null)} onToggle={onToggleTool} onRun={onRunTool} />
+      <ToolDetailDrawer tool={open} isAdmin={isAdmin} onClose={() => setOpen(null)} onToggle={onToggleTool}
+        onRun={onRunTool} selectedAgent={selectedAgent} toolPermissions={toolPermissions} onGovernedReadTest={onGovernedReadTest} />
     </>
   );
 }
