@@ -11,6 +11,8 @@ import IntegrationsTab from '@/components/tools-framework/IntegrationsTab';
 import BrowserPolicyPanel, { ExecutionLog } from '@/components/tools-framework/BrowserPolicyPanel';
 import AppStudioPanel from '@/components/tools-framework/AppStudioPanel';
 import { getToolFramework, saveToolPermission, runToolManually } from '@/lib/tools/tools.functions';
+import { runAgentTask } from '@/lib/runtime/runtime.functions';
+import { networkCertificationTask } from '@/lib/tools/network-certification-task';
 
 const TABS = [
   { id: 'tools', label: 'Tools', icon: Blocks },
@@ -84,6 +86,7 @@ export default function ToolsFramework() {
   useEffect(() => { load(); }, [load]);
 
   const tools = framework.tools.map(toCard);
+  const selectedAgent = framework.agents.find(a => a.id === agentId) ?? null;
 
   const runTool = async (tool, inputStr) => {
     const planGate = tool.required_plan === 'free' ? true : tool.required_plan === 'pro' ? gate('runTasks') : gate('advancedTools');
@@ -97,6 +100,24 @@ export default function ToolsFramework() {
     const output = res.outputJson ? JSON.parse(res.outputJson) : null;
     if (res.status === 'failed') throw new Error(output?.error || 'Tool run failed');
     return output;
+  };
+
+  // This explicit operator action uses Blackstar's existing authenticated agent
+  // task runtime, not the manual tester's unresumable approval path. It may
+  // incur model usage; no approval, grant or domain restriction is bypassed.
+  const launchGovernedReadTest = async (tool) => {
+    if (!gate('runTasks')) throw new Error('Agent-task access is required.');
+    const prepared = networkCertificationTask(tool, selectedAgent, framework.permissions ?? []);
+    if (!prepared.eligible || !prepared.input) throw new Error(prepared.reason);
+    const result = await runAgentTask({ data: { agent_id: selectedAgent.id, input: prepared.input } });
+    const task = result?.task ?? result;
+    await load();
+    return {
+      id: task?.id ?? null,
+      status: task?.status ?? 'unconfirmed',
+      // A returned task is not evidence of a tool call or its completion.
+      verification: 'unverified_until_execution_receipt',
+    };
   };
 
   const persist = async (payload, successTitle) => {
@@ -158,7 +179,8 @@ export default function ToolsFramework() {
 
       {tab === 'tools' && <>
         <ToolEvidencePanel rows={framework.toolEvidence ?? []} scope={framework.toolEvidenceScope} />
-        <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />
+        <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool}
+          selectedAgent={selectedAgent} toolPermissions={framework.permissions ?? []} onGovernedReadTest={launchGovernedReadTest} />
       </>}
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
