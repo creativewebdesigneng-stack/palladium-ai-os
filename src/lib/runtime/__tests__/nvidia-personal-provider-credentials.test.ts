@@ -33,7 +33,8 @@ import {
   markUserModelProviderUsed,
 } from '../model-provider-credentials.server';
 import { ProviderError, resolveModel as resolveBaseModel, runChat } from '../model-gateway.base';
-import { resolveModel as resolveServerModel, runChat as runServerChat } from '../model-gateway.server';
+import { resolveModel as resolveServerModel, runChat as runServerChat,
+  streamChat as streamServerChat } from '../model-gateway.server';
 
 beforeEach(() => {
   vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', 'true');
@@ -150,6 +151,93 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     expect(res.text).toBe('Dell server result');
     expect(fetcher.mock.calls[0]?.[0]).toBe('https://nim.dell.example/v1/chat/completions');
     expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('authorization')).toBe('Bearer server-deployment-key');
+  });
+
+  it('streams real SSE transport with the personal NVIDIA model, not the Dell operator model', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'operator-nim-test-only');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+
+    // Fake only the remote NVIDIA HTTP response. Exercise actual server gateway
+    // model resolution and the existing low-level event-stream parser together.
+    const sse = [
+      'data: ' + JSON.stringify({ choices: [{ delta: { content: 'Hosted ' } }] }),
+      '',
+      'data: ' + JSON.stringify({ choices: [{ delta: { content: 'NVIDIA' } }] }),
+      '',
+      'data: ' + JSON.stringify({ choices: [], usage: { prompt_tokens: 6, completion_tokens: 2 } }),
+      '',
+      'data: [DONE]', '', '',
+    ].join('\n');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+    );
+    const events = [];
+    for await (const event of streamServerChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'Hello' }],
+      providerAccess: { provider: 'nvidia', apiKey: 'personal-only-nvidia-test-key' },
+      allowedProviders: ['nvidia'], maxAttempts: 1,
+    })) events.push(event);
+
+    expect(events.filter(e => e.type === 'text').map(e => e.delta)).toEqual(['Hosted ', 'NVIDIA']);
+    const done = events.find(e => e.type === 'done');
+    expect(done?.result).toMatchObject({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b', text: 'Hosted NVIDIA',
+      usage: { input: 6, output: 2 }, toolCalls: [],
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0]!;
+    expect(url).toBe('https://integrate.api.nvidia.com/v1/chat/completions');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer personal-only-nvidia-test-key');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      model: 'openai/gpt-oss-20b', stream: true,
+      stream_options: { include_usage: true },
+    });
+    expect(JSON.stringify(events)).not.toContain('personal-only-nvidia-test-key');
+    expect(JSON.stringify(events)).not.toContain('nim.dell.example');
+  });
+
+  it('streams operator NIM with the configured Dell model, not the NVIDIA hosted preset', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'operator-only-dell-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: 'Dell' } }] }) +
+        '\\n\\ndata: [DONE]\\n\\n'.replaceAll('\\n', '\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+    );
+    const events = [];
+    for await (const event of streamServerChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'Hello' }],
+      maxAttempts: 1, allowedProviders: ['nvidia'],
+    })) events.push(event);
+    expect(events.find(e => e.type === 'done')?.result).toMatchObject({
+      provider: 'nvidia', model: 'nvidia/dell-local-model', text: 'Dell',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0]!;
+    expect(url).toBe('https://nim.dell.example/v1/chat/completions');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer operator-only-dell-key');
+    expect(JSON.parse(String(init?.body)).model).toBe('nvidia/dell-local-model');
+  });
+
+  it('refuses a Dell-only streaming model with a personal key before any network call', async () => {
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    const events = [];
+    await expect((async () => {
+      for await (const event of streamServerChat({
+        provider: 'nvidia', model: 'nvidia/dell-local-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+        providerAccess: { provider: 'nvidia', apiKey: 'private-personal-key' },
+        allowedProviders: ['nvidia'], maxAttempts: 1,
+      })) events.push(event);
+    })()).rejects.toMatchObject({ status: 400, retryable: false });
+    expect(events).toHaveLength(0);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('scopes personal credential usage metadata to user and nvidia only', async () => {
