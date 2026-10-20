@@ -105,7 +105,7 @@ describe('Spider Decision Network UI integration', () => {
   it('honours reduced motion, is keyboard accessible and never claims an execution happened', () => {
     expect(network).toContain('useReducedMotion')
     expect(network).toContain('onKeyDown')
-    expect(network).toContain('Planning')
+    expect(network).toContain('PLAN ONLY')
     expect(network).toContain('not executed')
     expect(network).toContain('Motion shows a proposed route')
     expect(network).not.toContain('executeAiHubAgent')
