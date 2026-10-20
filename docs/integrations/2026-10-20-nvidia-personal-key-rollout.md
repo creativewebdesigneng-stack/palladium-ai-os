@@ -1,6 +1,6 @@
 # NVIDIA personal API keys — staged Blackstar rollout (20 October 2026)
 
-**Branch:** `feature/nvidia-personal-credentials-20261020`. This extends Blackstar's original owner-scoped encrypted `model_provider_credentials` table and its existing Runtime Models/API Management UI. It does not add a connector, credential database, key brokerage service or routing framework.
+**Merged foundation:** PR #1007. **Routing repair:** `repair/nvidia-personal-model-routing-20261020`. This extends Blackstar's original owner-scoped encrypted `model_provider_credentials` table and its existing Runtime Models/API Management UI. It does not add a connector, credential database, key brokerage service or routing framework.
 
 ## Behaviour
 
@@ -8,6 +8,7 @@
 - Verification uses only `GET https://integrate.api.nvidia.com/v1/models`, a bounded 12-second read-only call. Unexpected HTML/JSON without model-list data is **not** treated as verified.
 - Keys are encrypted by the existing AES-GCM encrypt/decrypt utility before being stored; no plaintext provider key is returned to the browser, logs or audits.
 - Runtime use is limited to the authenticated owner's personal NVIDIA choice, with the existing usage and approval policies. Personal NVIDIA credentials are **always** sent to NVIDIA's official hosted API Catalog, even if the platform operator configured a separate Dell-hosted `NVIDIA_NIM_BASE_URL`. No personal credential may be sent to an arbitrary tenant/agent hostname.
+- **Model routing safety:** Resolve the authenticated owner's personal NVIDIA credential before persisting an agent task's model ID. A personal key keeps the NVIDIA hosted default (`openai/gpt-oss-20b`) even if Blackstar has an operator-configured Dell/NIM model. Explicit operator-only model IDs are rejected for personal NVIDIA API Catalog keys, without network calls.
 - There is **no automatic NVIDIA metered fallback** from unrelated models. The existing operator flag `NVIDIA_NIM_FALLBACK_ENABLED` remains off by default.
 - NVIDIA Catalog use may have access/usage restrictions or charges; a successful model-list probe **does not** certify inference, streaming, model tool-call behavior or Dell hardware.
 - Existing separate, platform-admin-only paid diagnostic switches remain unchanged; a user's personal key does not activate those admin probes.
@@ -41,4 +42,4 @@ Verify afterward that the allowed names include `nvidia` and that `anon`/`authen
 4. Run a directly selected NVIDIA test agent, capturing real provider receipt, tokens, task status and audit evidence. Verify streamed and non-streamed flows separately. Revoke the key and verify subsequent runs fail closed.
 5. If Dell NIM is configured, verify personal NVIDIA key outbound requests **still target NVIDIA's hosted API**. Dell hardware certification is separate.
 
-Until the migration and live owned-key acceptance pass, this remains an **unmerged feature proposal**; no claim of real personal NVIDIA or Dell inference success.
+The personal credential code was merged in PR #1007 with the default-off feature flag; the follow-up model-routing correction is staged separately. The database migration and live owner-key acceptance are **not complete**. No claim of real personal NVIDIA or Dell inference success.
