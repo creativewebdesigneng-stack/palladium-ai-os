@@ -53,6 +53,13 @@ describe('AI Hub Spider recorded approval evidence', () => {
     expect(receipts.map((receipt) => receipt.executedAt)).toEqual([null, null])
   })
 
+  it('does not certify a completion timestamp older than its approval request', () => {
+    const impossible = { ...approval('clock-skew', 'approved', 'succeeded'), executed_at: '2026-10-19T12:00:00Z' }
+    const receipts = toAiHubSpiderReceipts([impossible])
+    expect(receipts[0]?.status).toBe('not-executed')
+    expect(receipts[0]?.executedAt).toBe('2026-10-19T12:00:00Z')
+  })
+
   it('returns only allowlisted fields; input, raw results and fingerprint are never exposed', () => {
     const receipts = toAiHubSpiderReceipts([approval('1', 'approved', 'succeeded')])
     expect(receipts).toEqual([{
