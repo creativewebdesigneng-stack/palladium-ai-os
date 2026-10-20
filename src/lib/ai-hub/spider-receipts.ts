@@ -58,7 +58,8 @@ export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]):
     const persistedExecutionDate = safeDate(row['executed_at'])
     // A terminal gateway status without a valid completion timestamp is
     // incomplete evidence, not proof that execution finished.
-    const status = terminal && !persistedExecutionDate ? 'not-executed' : persistedStatus
+    const status = terminal && (!persistedExecutionDate || Date.parse(persistedExecutionDate) < Date.parse(createdAt))
+      ? 'not-executed' : persistedStatus
     const executedAt = terminal && persistedExecutionDate ? persistedExecutionDate : null
 
     // Explicitly allowlist fields. Never pass through prompt input, raw MCP
