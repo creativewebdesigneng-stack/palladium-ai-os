@@ -163,3 +163,15 @@ export const deleteModelProviderConnection = createServerFn({ method: 'POST' })
     })
     return { disconnected: true, provider: data.provider }
   })
+
+/**
+ * Explicit paid diagnostic for the *authenticated owner* of a personal NVIDIA
+ * key. Catalogue tests never imply inference access. This intentionally uses
+ * the existing pinned NVIDIA gateway + required mission audit infrastructure.
+ */
+export const testPersonalNvidiaModelInference = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { certifyPersonalNvidiaInference } = await import('./nvidia-inference-certification.server')
+    return certifyPersonalNvidiaInference({ userId: context.userId })
+  })
