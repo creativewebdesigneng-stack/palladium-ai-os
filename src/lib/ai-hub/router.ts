@@ -118,8 +118,10 @@ export function routeAiHubWorkload(workload: AiHubWorkload, capabilities: AiHubC
   const policy = workload.requirements.evidenceRouting
   // Prevent callers from weakening the default evidence floor. Scores are
   // smoothed historical reliability, not a calibrated confidence probability.
-  const minObservedRuns = Math.max(20, Math.floor(policy?.minObservedRuns ?? 20))
-  const minReliability = Math.max(0.8, Math.min(1, policy?.minReliability ?? 0.8))
+  const minObservedRuns = Number.isFinite(policy?.minObservedRuns)
+    ? Math.max(20, Math.floor(policy!.minObservedRuns!)) : 20
+  const minReliability = Number.isFinite(policy?.minReliability)
+    ? Math.max(0.8, Math.min(1, policy!.minReliability!)) : 0.8
   let selected = ranked[0]
   let decisionTrace: AiHubDecisionTrace | undefined
   if (policy?.mode === 'evidence-gated' && selected) {
@@ -137,8 +139,7 @@ export function routeAiHubWorkload(workload: AiHubWorkload, capabilities: AiHubC
     // in an inventory but known unconfigured must never be selected.
     const model = ranked.find(({ capability }) =>
       capability.kind === 'model' &&
-      capability.metadata?.['configured'] !== false &&
-      capability.metadata?.['configured'] !== 'false',
+      (capability.metadata?.['configured'] === true || capability.metadata?.['configured'] === 'true'),
     )
     selected = trustedCode ?? model ?? selected
     const lane: AiHubDecisionTrace['lane'] = trustedCode
