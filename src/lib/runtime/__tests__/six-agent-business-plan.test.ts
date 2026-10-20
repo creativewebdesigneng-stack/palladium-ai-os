@@ -25,7 +25,7 @@ const workflowEngine = readFileSync(new URL('../workforce.server.ts', import.met
 
 describe('six-agent mission deterministic orchestration', () => {
   it('staffs six distinct eligible agents without model hallucination', () => {
-    const plan = planSixAgentBusinessTeam({ goal, candidates, maxAssignments: 6 });
+    const plan = planSixAgentBusinessTeam({ providerConfiguredAgentIds: candidates.map((candidate) => candidate.id),  goal, candidates, maxAssignments: 6 });
     expect(plan.version).toBe(1);
     expect(plan.assignments).toHaveLength(6);
     expect(new Set(plan.assignments.map((item) => item.agent_id)).size).toBe(6);
@@ -38,7 +38,7 @@ describe('six-agent mission deterministic orchestration', () => {
   });
 
   it('includes valid noncyclic dependencies and reconciles finance last', () => {
-    const plan = planSixAgentBusinessTeam({ goal, candidates, maxAssignments: 6 });
+    const plan = planSixAgentBusinessTeam({ providerConfiguredAgentIds: candidates.map((candidate) => candidate.id),  goal, candidates, maxAssignments: 6 });
     const positions = new Map(plan.assignments.map((value, index) => [value.id, index]));
     for (const assignment of plan.assignments) {
       for (const dependency of assignment.depends_on) {
@@ -51,22 +51,54 @@ describe('six-agent mission deterministic orchestration', () => {
   });
 
   it('fails closed instead of pretending that one agent supplies a six-agent team', () => {
-    expect(() => planSixAgentBusinessTeam({
+    expect(() => planSixAgentBusinessTeam({ providerConfiguredAgentIds: candidates.map((candidate) => candidate.id), 
       goal, candidates: [make('generalist', ['web_search', 'data_analysis', 'file_analysis', 'email_draft', 'calculator'])],
       maxAssignments: 6,
     })).toThrow(/1\/6 roles/);
-    expect(() => planSixAgentBusinessTeam({ goal, candidates, maxAssignments: 5 }))
+    expect(() => planSixAgentBusinessTeam({ providerConfiguredAgentIds: candidates.map((candidate) => candidate.id),  goal, candidates, maxAssignments: 5 }))
       .toThrow(/needs 6 assignments/);
   });
 
   it('reports missing capabilities as blockers and does not create incomplete workflows', () => {
-    expect(() => planSixAgentBusinessTeam({
+    expect(() => planSixAgentBusinessTeam({ providerConfiguredAgentIds: candidates.map((candidate) => candidate.id), 
       goal, candidates: candidates.filter((agent) => agent.id !== 'support-agent'), maxAssignments: 6,
     })).toThrow(/Missing grants: Customer & Operations/);
     expect(orchestrator).toContain('businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id');
     expect(orchestrator).toContain('await persistGeneratedWorkflow');
     expect(orchestrator).toContain('await createDelegationPlan');
     expect(orchestrator).toContain('planSixAgentBusinessTeam');
+  });
+
+  it('fails closed when tools are assigned but the selected model providers are unavailable', () => {
+    expect(() => planSixAgentBusinessTeam({
+      goal, candidates, maxAssignments: 6,
+      providerConfiguredAgentIds: [],
+    })).toThrow(/0\/6 distinct roles/);
+    expect(() => planSixAgentBusinessTeam({
+      goal, candidates, maxAssignments: 6,
+      providerConfiguredAgentIds: candidates.slice(0, 5).map((agent) => agent.id),
+    })).toThrow(/5\/6 distinct roles/);
+  });
+
+  it('assigns a configured model-capable alternative, never the unconfigured first match', () => {
+    const alt = make('configured-web-alternative', ['web_search']);
+    const plan = planSixAgentBusinessTeam({
+      goal,
+      candidates: [candidates[0]!, alt, ...candidates.slice(1)],
+      maxAssignments: 6,
+      providerConfiguredAgentIds: [alt.id, ...candidates.slice(1).map((agent) => agent.id)],
+    });
+    expect(plan.assignments.find((role) => role.id === 'research')?.agent_id).toBe(alt.id);
+    expect(plan.assignments).toHaveLength(6);
+    expect(new Set(plan.assignments.map((role) => role.agent_id)).size).toBe(6);
+  });
+
+  it('checks provider availability through existing owner-scoped resolver before persistence', () => {
+    expect(orchestrator).toContain('isProviderAvailableForUser({ userId: args.userId, provider })');
+    expect(orchestrator).toContain('providerConfiguredAgentIds');
+    expect(orchestrator.indexOf('isProviderAvailableForUser({ userId: args.userId, provider })'))
+      .toBeLessThan(orchestrator.indexOf('await persistGeneratedWorkflow'));
+    expect(orchestrator).not.toContain('process.env["GROQ_API_KEY"]');
   });
 
   it('uses an executable owner approval step before the first agent, not just inert agent flags', () => {
