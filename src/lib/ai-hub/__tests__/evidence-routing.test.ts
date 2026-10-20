@@ -56,6 +56,16 @@ describe('AI Hub evidence-gated decision routes', () => {
       thresholds: { minObservedRuns: 20, minReliability: 0.8 },
     })
     expect(route?.policyChecks).toContain('evidence-gated-routing')
+    // The planned deterministic lane must still require approval to execute,
+    // even if its metadata and prompt assessment claim to be verified.
+    const plan = new AiHubOrchestrator(() => [model, code]).plan({ workload: trustedWorkload() })
+    expect(plan?.route.decisionTrace?.lane).toBe('deterministic')
+    expect(plan?.requiresApproval).toBe(true)
+    const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry())
+    if (!plan) throw new Error('Expected evidence-based plan')
+    await expect(gateway.execute({ ...plan, requiresApproval: false }, {
+      tenantId: 'tenant-1', actorId: 'actor-1',
+    })).rejects.toThrow('cannot proceed without approval')
   })
 
   it('escalates to a configured model when execution evidence is missing, never invents tool confidence', () => {
@@ -64,6 +74,8 @@ describe('AI Hub evidence-gated decision routes', () => {
     expect(result?.capability.id).toBe('configured-model')
     expect(result?.decisionTrace?.lane).toBe('model-escalation')
     expect(result?.decisionTrace?.reasons.join(' ')).toContain('insufficient for deterministic routing')
+    const plan = new AiHubOrchestrator(() => [unknown, model]).plan({ workload: workload() })
+    expect(plan?.requiresApproval).toBe(true)
   })
 
   it('rejects unsafe and unconfigured paths into human review through the existing approval gate', async () => {
@@ -83,7 +95,7 @@ describe('AI Hub evidence-gated decision routes', () => {
     expect(execute).not.toHaveBeenCalled()
     await expect(gateway.execute({ ...plan, requiresApproval: false }, {
       tenantId: 'tenant-1', actorId: 'actor-1',
-    })).rejects.toThrow('cannot execute without approval')
+    })).rejects.toThrow('cannot proceed without approval')
     expect(execute).not.toHaveBeenCalled()
   })
 
