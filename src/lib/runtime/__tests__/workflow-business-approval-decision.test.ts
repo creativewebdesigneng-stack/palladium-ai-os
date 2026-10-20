@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   adminDb: null as unknown,
-  executions: [] as Array<Record<string, unknown>>,
-  notices: [] as Array<Record<string, unknown>>,
+  executions: [] as Array<Record<string, unknown> & { runId?: unknown; completed?: unknown }>,
+  notices: [] as Array<Record<string, unknown> & { type?: unknown }>,
 }));
 
 vi.mock("@/integrations/supabase/client.server", () => ({
@@ -24,8 +24,21 @@ vi.mock("../workforce.server", () => ({
 
 import { decideWorkflowApproval } from "../workflow-approval-decision.server";
 
-type Row = Record<string, any>;
-type Tables = Record<string, Row[]>;
+type Row = Record<string, any> & {
+  status?: string;
+  user_id?: string;
+  action_type?: string;
+  task_id?: string | null;
+  waiting_approval_request_id?: string | null;
+  cancel_requested?: boolean;
+};
+type Tables = Record<string, Row[]> & {
+  approval_requests: Row[];
+  workflow_runs: Row[];
+  workflows: Row[];
+  workflow_steps: Row[];
+  workflow_step_runs: Row[];
+};
 
 function pendingRecords(): Tables {
   return {
