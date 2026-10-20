@@ -15,6 +15,11 @@ export interface SpiderResourceNode {
   active: boolean
 }
 
+/** Stable, collision-resistant identity for a visible inventory node. */
+export function spiderNodeKey(node: Pick<SpiderResourceNode, 'providerId' | 'kind' | 'id'>): string {
+  return JSON.stringify([node.providerId, node.kind, node.id])
+}
+
 export interface SpiderResourceLink {
   from: 'blackstar-hub'
   to: string
