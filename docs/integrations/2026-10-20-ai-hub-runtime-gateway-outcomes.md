@@ -49,3 +49,19 @@ checks and Preview must pass before merge.
 No live run, external tool call, new connector, migration, or provider
 certification is claimed by these unit tests. The user must still authorise
 real tool execution before its end-to-end outcome is certified.
+
+## Durable approval receipt acknowledgement
+
+The existing `createAiHubApprovalGate.complete` is now fail-closed. It updates
+only a matching `ai_hub_execution` approval row still in `approved` and
+`executing` state for the actor/organisation, then requires the database to
+return that exact updated approval ID. A zero-row update (for example,
+approval revoked during execution), an unexpected row ID, or a DB error must
+**not** be interpreted as a successfully persisted gateway outcome.
+
+This check does not reverse an underlying external side effect. If the
+adapter ran but approval finalisation fails, the caller receives an error
+and the run must be reconciled from canonical task/workflow/provider records.
+No automatic retry or second execution is attempted here. New regression
+tests cover successful and failed receipt writes, missing/revoked approvals,
+and gateway behaviour when finalisation throws.
