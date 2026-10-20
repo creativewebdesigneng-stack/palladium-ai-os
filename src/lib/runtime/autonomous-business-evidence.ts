@@ -49,6 +49,19 @@ export function projectBusinessRunEvidence(input: {
   const rows = input.assignments.map((assignment) => {
     const stepId = stepForAssignment.get(assignment.assignment_id);
     const matchingSteps = stepId ? input.stepRuns.filter((step) => step.step_id === stepId) : [];
+    // Only step-run evidence can establish specialist completion. Fleet status
+    // may be stale or may have been overwritten by a workflow-level reconciler.
+    // A missing or contradictory step record must never certify completion.
+    const stepStatuses = new Set(matchingSteps.map((step) => step.status));
+    const evidenceStatus =
+      stepStatuses.has('failed') ? 'failed'
+      : stepStatuses.has('cancelled') ? 'cancelled'
+      : stepStatuses.has('succeeded') || stepStatuses.has('completed') ? 'completed'
+      : stepStatuses.has('running') || stepStatuses.has('waiting_for_tool') ? 'running'
+      : stepStatuses.has('skipped') ? 'skipped'
+      : stepStatuses.has('waiting_for_approval') ? 'waiting_for_approval'
+      : stepStatuses.has('pending') || stepStatuses.has('queued') ? 'queued'
+      : assignment.status === 'completed' ? 'unverified_completion' : assignment.status;
     const taskIds = new Set(matchingSteps.map((step) => step.task_id).filter((id): id is string => Boolean(id)));
     const recordedTools = input.tools.filter((tool) => tool.agent_task_id !== null && taskIds.has(tool.agent_task_id));
     const recordedApprovals = input.approvals.filter((approval) => approval.task_id !== null && taskIds.has(approval.task_id));
@@ -56,7 +69,9 @@ export function projectBusinessRunEvidence(input: {
       assignmentId: assignment.assignment_id,
       title: assignment.title,
       agentId: assignment.agent_id,
-      status: assignment.status,
+      status: evidenceStatus,
+      recordedFleetStatus: assignment.status,
+      stepCompletionVerified: evidenceStatus === 'completed',
       requiresApproval: assignment.requires_approval === true,
       stepRecords: matchingSteps.length,
       taskRecords: taskIds.size,
@@ -73,7 +88,8 @@ export function projectBusinessRunEvidence(input: {
     assignments: rows,
     plannedAssignments: rows.length,
     distinctAgentsAssigned: new Set(rows.map((row) => row.agentId).filter(Boolean)).size,
-    completedAssignments: rows.filter((row) => row.status === 'completed').length,
+    completedAssignments: rows.filter((row) => row.stepCompletionVerified).length,
+    unverifiedCompletionClaims: rows.filter((row) => row.recordedFleetStatus === 'completed' && !row.stepCompletionVerified).length,
     recordedToolCalls: rows.reduce((sum, row) => sum + row.toolRecords, 0),
     succeededToolRecords: rows.reduce((sum, row) => sum + row.toolsSucceeded, 0),
     failedToolRecords: rows.reduce((sum, row) => sum + row.toolsFailed, 0),
