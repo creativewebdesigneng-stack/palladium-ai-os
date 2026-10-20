@@ -70,7 +70,10 @@ export class AiHubOrchestrator {
       placement,
       ...(spatial ? { spatial } : {}),
       ...(physical ? { physical } : {}),
-      requiresApproval: request.workload.requirements.requireHumanApproval === true || physical?.requiresApproval === true,
+      // Evidence routing is preview-only until a server-verified prompt assessor
+      // and executor attestations are wired to this gateway. Do not let a
+      // caller-provided assessment silently authorise execution.
+      requiresApproval: request.workload.requirements.requireHumanApproval === true || physical?.requiresApproval === true || route.decisionTrace !== undefined,
       executionBoundary: 'palladium-policy-gateway',
     }
   }
