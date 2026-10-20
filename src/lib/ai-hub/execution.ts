@@ -47,10 +47,11 @@ export class AiHubExecutionGateway {
       throw new Error('AI Hub execution requires tenant and actor identity')
     }
     this.assertPlacement(plan, context)
-    // Fail closed if a constructed plan attempts to run a human-review lane
-    // while omitting the established approval gateway.
-    if (plan.route.decisionTrace?.lane === 'approval-required' && !plan.requiresApproval) {
-      throw new Error('Evidence-gated human review cannot execute without approval')
+    // Until prompt-verifier and executor attestations are independently
+    // validated server-side, no evidence-gated route may bypass the existing
+    // operator approval gate, including purported deterministic and model lanes.
+    if (plan.route.decisionTrace && !plan.requiresApproval) {
+      throw new Error('Evidence-gated execution cannot proceed without approval')
     }
 
     if (plan.requiresApproval) {
