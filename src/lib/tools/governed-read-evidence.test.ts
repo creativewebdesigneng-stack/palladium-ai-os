@@ -44,8 +44,8 @@ function fixture(tool: Name = 'web_fetch', overrides: Record<string, unknown> = 
   const spec = specs[tool];
   const content = JSON.stringify(spec.output);
   return createFakeSupabase({
-    agent_tasks: [{ ...task, ...(overrides.task as object || {}) }],
-    tools: [{ slug: tool, is_active: overrides.active !== false }],
+    agent_tasks: [{ ...task, ...(overrides['task'] as object || {}) }],
+    tools: [{ slug: tool, is_active: overrides['active'] !== false }],
     tool_executions: [{
       user_id: 'owner', agent_id: 'qa-agent', agent_task_id: taskId,
       tool, status: 'succeeded', input: spec.input, output: spec.output,
@@ -59,7 +59,7 @@ function fixture(tool: Name = 'web_fetch', overrides: Record<string, unknown> = 
         task_status: 'succeeded',
         tool_evidence: { format: 'json', content, characters: content.length, truncated: false },
       },
-      ...(overrides.approval as object || {}),
+      ...(overrides['approval'] as object || {}),
     }],
   });
 }
@@ -109,8 +109,8 @@ describe('owner-scoped network QA verification endpoint', () => {
   it('refuses a receipt from another agent, a simulated result or disabled catalogue', async () => {
     for (const kind of ['foreign_agent', 'simulated', 'disabled'] as const) {
       const sb = fixture('web_fetch', kind === 'disabled' ? { active: false } : {});
-      if (kind === 'foreign_agent') sb.tables['approval_requests']![0]!.agent_id = 'another-agent';
-      if (kind === 'simulated') sb.tables['tool_executions']![0]!.output = { simulated: true };
+      if (kind === 'foreign_agent') sb.tables['approval_requests']![0]!['agent_id'] = 'another-agent';
+      if (kind === 'simulated') sb.tables['tool_executions']![0]!['output'] = { simulated: true };
       const result = await invoke(sb);
       expect(result.verified).toBe(false);
     }
@@ -118,7 +118,7 @@ describe('owner-scoped network QA verification endpoint', () => {
 
   it('does not infer evidence from a mismatched approved request', async () => {
     const sb = fixture();
-    sb.tables['approval_requests']![0]!.details.input = { url: 'https://another.example/path' };
+    sb.tables['approval_requests']![0]!['details']['input'] = { url: 'https://another.example/path' };
     expect((await invoke(sb)).verified).toBe(false);
   });
 });
