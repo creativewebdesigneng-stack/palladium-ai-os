@@ -110,7 +110,7 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
     },
 
     async claim(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext, approvalRequestId: string) {
-      const details = approvalDetails(plan)
+      const details = approvalDetails(plan, context)
       const executionDb = await privilegedApprovalDb()
       let query = executionDb
         .from('approval_requests')
