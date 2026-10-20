@@ -62,6 +62,7 @@ describe('AI Hub durable approval gate', () => {
       },
     })
     expect(JSON.stringify(inserted)).not.toContain('do-not-store')
+    expect((inserted?.details as Record<string, unknown>)?.ai_hub_input_fingerprint).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it('atomically claims resume only through the matching actor, scope, workload, provider and capability', async () => {
@@ -80,7 +81,7 @@ describe('AI Hub durable approval gate', () => {
     privilegedWriter.from=db.from
 
     const approved = await createAiHubApprovalGate(db).claim(
-      plan, { tenantId: 'tenant-1', actorId: 'actor-1' }, 'approval-1',
+      plan, { tenantId: 'tenant-1', actorId: 'actor-1', input: 'authorised task' }, 'approval-1',
     )
 
     expect(approved).toBe(true)
@@ -90,6 +91,7 @@ describe('AI Hub durable approval gate', () => {
       ['details->>ai_hub_workload_id', 'workload-1'],
       ['details->>ai_hub_provider_id', 'palladium-model-gateway'],
       ['details->>ai_hub_capability_id', 'reasoner'],
+      ['details->>ai_hub_input_fingerprint', expect.stringMatching(/^[0-9a-f]{64}$/)],
     ]))
   })
 })
