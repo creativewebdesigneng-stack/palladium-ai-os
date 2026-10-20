@@ -53,9 +53,13 @@ export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]):
       typeof workloadId !== 'string' || !workloadId ||
       !createdAt
     ) return []
-    const status = classifyApprovalState(row['status'], row['execution_status'])
-    const executedAt = status === 'recorded-success' || status === 'recorded-failure'
-      ? safeDate(row['executed_at']) : null
+    const persistedStatus = classifyApprovalState(row['status'], row['execution_status'])
+    const terminal = persistedStatus === 'recorded-success' || persistedStatus === 'recorded-failure'
+    const persistedExecutionDate = safeDate(row['executed_at'])
+    // A terminal gateway status without a valid completion timestamp is
+    // incomplete evidence, not proof that execution finished.
+    const status = terminal && !persistedExecutionDate ? 'not-executed' : persistedStatus
+    const executedAt = terminal ? persistedExecutionDate : null
 
     // Explicitly allowlist fields. Never pass through prompt input, raw MCP
     // arguments, approval details, execution_result or fingerprint metadata.
