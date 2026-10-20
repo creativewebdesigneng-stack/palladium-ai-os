@@ -9,7 +9,7 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@/integrations/supabase/auth-middleware', () => ({ requireSupabaseAuth: {} }));
 
 const calls = vi.hoisted(() => ({
-  saved: vi.fn(), removed: vi.fn(), listed: vi.fn(), access: vi.fn(), audit: vi.fn(),
+  saved: vi.fn(), removed: vi.fn(), listed: vi.fn(), access: vi.fn(), audit: vi.fn(), personalInference: vi.fn(),
 }));
 vi.mock('../model-provider-credentials.server', () => ({
   nvidiaPersonalCredentialsEnabled: () => ['1', 'true', 'on', 'yes'].includes(
@@ -20,9 +20,11 @@ vi.mock('../model-provider-credentials.server', () => ({
   resolveUserModelProviderAccess: calls.access,
 }));
 vi.mock('@/lib/platform/audit.server', () => ({ writeAudit: calls.audit }));
+vi.mock('../nvidia-inference-certification.server', () => ({ certifyPersonalNvidiaInference: calls.personalInference }));
 
 import { saveModelProviderConnection, testModelProviderConnection,
-  deleteModelProviderConnection, listModelProviderConnections } from '../model-provider-credentials.functions';
+  deleteModelProviderConnection, listModelProviderConnections,
+  testPersonalNvidiaModelInference } from '../model-provider-credentials.functions';
 
 const invoke = (fn: any, data: object = {}, userId = 'owner') =>
   fn({ context: { userId }, data });
@@ -35,10 +37,18 @@ beforeEach(() => {
   calls.listed.mockResolvedValue([{ provider: 'nvidia', enabled: true, verifiedAt: '2026-10-20T00:00:00Z' }]);
   calls.removed.mockResolvedValue(undefined);
   calls.audit.mockResolvedValue(undefined);
+  calls.personalInference.mockResolvedValue({ status: 'verified', auditReceiptId: 'receipt' });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe('NVIDIA owner-managed personal model connection handlers', () => {
+  it('routes manual NVIDIA inference verification only to authenticated owner identity', async () => {
+    const output = await invoke(testPersonalNvidiaModelInference, {}, 'alice');
+    expect(output).toMatchObject({ status: 'verified', auditReceiptId: 'receipt' });
+    expect(calls.personalInference).toHaveBeenCalledExactlyOnceWith({ userId: 'alice' });
+  });
+
+
   it('does not surface or accept NVIDIA personal connections before operator enablement', async () => {
     vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', '');
     const fetcher = vi.spyOn(globalThis, 'fetch');
