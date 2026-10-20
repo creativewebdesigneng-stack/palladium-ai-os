@@ -20,17 +20,21 @@ export function planSixAgentBusinessTeam(args: {
   goal: string;
   candidates: OrchestratorCandidate[];
   maxAssignments: number;
+  /** Available via Blackstar's existing owner-scoped model credential resolver. */
+  providerConfiguredAgentIds: readonly string[];
 }): OrchestratorPlan {
   const totalRoles = SIX_AGENT_BUSINESS_BLUEPRINT.roles.length;
   if (args.maxAssignments < totalRoles) {
     throw new Error(`The business blueprint needs ${totalRoles} assignments. Increase the goal's specialist limit before running.`);
   }
+  const configuredIds = new Set(args.providerConfiguredAgentIds);
   const readiness = assessSixAgentBusinessReadiness({
     agents: args.candidates.map((agent) => ({
       id: agent.id,
       name: agent.name,
       status: 'active',
       allowed_tools: agent.allowed_tools ?? null,
+      modelProviderConfiguration: configuredIds.has(agent.id) ? 'deployment_configured' : 'missing_configuration',
     })),
     runtimeEnabled: true,
   });
@@ -45,8 +49,15 @@ export function planSixAgentBusinessTeam(args: {
     );
   }
 
+  if (readiness.providerConfiguredDistinctCoverage !== totalRoles) {
+    throw new Error(
+      `Six-Agent Business Operations cannot start: only ${readiness.providerConfiguredDistinctCoverage}/${totalRoles} distinct roles have both matching tool grants and an available model provider. ` +
+      'Connect or configure each specialist model in the existing AI Hub and check its inference before retrying.',
+    );
+  }
+
   const assignments = SIX_AGENT_BUSINESS_BLUEPRINT.roles.map((role) => {
-    const matched = readiness.assignedDistinctAgents.find((value) => value.roleId === role.id);
+    const matched = readiness.assignedProviderConfiguredAgents.find((value) => value.roleId === role.id);
     if (!matched?.agentId) throw new Error(`No distinct authorised specialist for ${role.name}.`);
     return {
       id: role.id,
@@ -68,6 +79,9 @@ export function planSixAgentBusinessTeam(args: {
       requires_approval: true,
     };
   });
+  if (assignments.some((assignment) => !configuredIds.has(assignment.agent_id))) {
+    throw new Error('A selected business specialist no longer has a configured model route.');
+  }
   if (new Set(assignments.map((assignment) => assignment.agent_id)).size !== totalRoles) {
     throw new Error('Six business roles did not match six distinct agents.');
   }
