@@ -22,6 +22,11 @@ const PROVIDER_COPY = {
     detail: 'Use your own Claude API key for Blackstar model execution.',
     placeholder: 'sk-ant-…',
   },
+  nvidia: {
+    name: 'NVIDIA NIM',
+    detail: 'Use your own NVIDIA API Catalog key for agent inference. Keys are sent only to NVIDIA-hosted endpoints, never to a custom Dell proxy. Usage may be rate-limited or charged.',
+    placeholder: 'nvapi-…',
+  },
 }
 
 export default function APIManagement() {
@@ -30,7 +35,7 @@ export default function APIManagement() {
   const testConnection = useServerFn(testModelProviderConnection)
   const deleteConnection = useServerFn(deleteModelProviderConnection)
   const [providers, setProviders] = useState([])
-  const [keys, setKeys] = useState({ openai: '', anthropic: '' })
+  const [keys, setKeys] = useState({ openai: '', anthropic: '', nvidia: '' })
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [mcpUrl, setMcpUrl] = useState('/mcp')
@@ -117,7 +122,7 @@ export default function APIManagement() {
               <KeyRound className="h-4 w-4 text-violet-300" />
               <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-violet-200/70">Personal model providers</p>
             </div>
-            <h2 className="mt-2 text-lg font-semibold tracking-[-.03em] text-white">Bring your own OpenAI or Anthropic API access</h2>
+            <h2 className="mt-2 text-lg font-semibold tracking-[-.03em] text-white">Bring your own OpenAI, Anthropic or NVIDIA API access</h2>
             <p className="mt-2 max-w-3xl text-xs leading-5 text-zinc-500">
               Keys are verified server-side, encrypted before persistence and never returned to this browser. A personal key is used only for your authenticated model runs.
             </p>
@@ -128,7 +133,7 @@ export default function APIManagement() {
         </div>
 
         <div className="grid gap-3 xl:grid-cols-2">
-          {['openai', 'anthropic'].map((providerId) => {
+          {['openai', 'anthropic', 'nvidia'].map((providerId) => {
             const provider = byId.get(providerId)
             const connection = provider?.connection
             const connected = Boolean(connection?.enabled)
