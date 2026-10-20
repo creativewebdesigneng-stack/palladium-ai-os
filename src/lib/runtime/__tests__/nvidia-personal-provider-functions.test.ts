@@ -12,6 +12,8 @@ const calls = vi.hoisted(() => ({
   saved: vi.fn(), removed: vi.fn(), listed: vi.fn(), access: vi.fn(), audit: vi.fn(),
 }));
 vi.mock('../model-provider-credentials.server', () => ({
+  nvidiaPersonalCredentialsEnabled: () => ['1', 'true', 'on', 'yes'].includes(
+    process.env['NVIDIA_PERSONAL_CREDENTIALS_ENABLED']?.trim().toLowerCase() ?? ''),
   saveUserModelProviderCredential: calls.saved,
   deleteUserModelProviderCredential: calls.removed,
   listUserModelProviderCredentials: calls.listed,
