@@ -342,6 +342,59 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
       url === 'https://integrate.api.nvidia.com/v1/chat/completions')).toBe(true);
   });
 
+  it.each([
+    ['unterminated JSON', '{"steps":[', /invalid tool-call arguments/],
+    ['array JSON', '[]', /non-object tool-call arguments/],
+    ['null JSON', 'null', /non-object tool-call arguments/],
+  ])('rejects NVIDIA %s in streamed and ordinary tool-call responses', async (_case, malformed, message) => {
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://private.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    vi.stubEnv('NVIDIA_API_KEY', 'synthetic-dell-token');
+    const model = 'nvidia/dell-local-model';
+    const call = { index: 0, id: 'bad-tool-call', type: 'function',
+      function: { name: 'browser_task', arguments: malformed } };
+    const http = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.stream) {
+        const sse = [
+          'data: ' + JSON.stringify({ choices: [{ delta: { tool_calls: [call] } }] }),
+          '', 'data: [DONE]', '', '',
+        ].join(String.fromCharCode(10));
+        return new Response(sse, { status: 200,
+          headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: null, tool_calls: [call] } }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    const args = {
+      provider: 'nvidia' as const, model,
+      messages: [{ role: 'user' as const, content: 'Open https://httpbingo.org/html' }],
+      maxAttempts: 1, allowedProviders: ['nvidia' as const],
+      tools: [{
+        name: 'browser_task',
+        description: 'Requires operator approval for browser work',
+        parameters: { type: 'object', properties: { steps: { type: 'array' } } },
+      }],
+    };
+    const ordinary = await runServerChat(args).then(
+      () => null, error => error as ProviderError,
+    );
+    expect(ordinary).toBeInstanceOf(ProviderError);
+    expect(ordinary?.message).toMatch(message);
+    expect(ordinary?.status).toBe(502);
+    await expect((async () => {
+      for await (const _event of streamServerChat(args)) {
+        throw new Error('No tool events may be emitted for invalid arguments');
+      }
+    })()).rejects.toMatchObject({ status: 502, message: expect.stringMatching(message) });
+    expect(http).toHaveBeenCalledTimes(2);
+    expect(http.mock.calls.every(([url]) =>
+      url === 'https://private.dell.example/v1/chat/completions')).toBe(true);
+    expect(JSON.stringify(ordinary)).not.toContain(malformed);
+    // Parsing must not invoke a browser worker or create any approval.
+  });
+
   it('sanitises operator-hosted Dell NIM upstream responses without revealing its private URL', async () => {
     vi.stubEnv('NVIDIA_API_KEY', 'operator-server-key');
     vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://private.dell.example/v1');
