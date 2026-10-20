@@ -164,7 +164,7 @@ export default function AutonomousOS() {
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-amber-200/70">Starts as an assisted, manual, zero-spend goal with a maximum of six specialist assignments. Review the populated goal below and explicitly create it. Missing agents, provider access and financial proof remain visible blockers. Change scheduling or budget only if you deliberately choose to.</p>
+      <p className="mt-3 text-xs text-amber-200/70">Starts as an assisted, manual goal with a £1 ceiling for observed agent/runtime costs and up to six specialist assignments. No external purchases, transfers, trades or publishing are authorised by this preset; existing approval rules still apply. Review the populated form before creating it. The amount is editable, and specialist/provider availability must be verified.</p>
     </section>
 
     <div className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]">
