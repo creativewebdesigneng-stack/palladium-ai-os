@@ -43,7 +43,7 @@ export default function BusinessTeamReadinessPanel({ session }) {
         {data.roles.map((role) => <article key={role.id} className="rounded-xl border border-white/[.07] bg-black/20 p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="text-xs font-semibold text-white">{role.title}</h4><span className={role.candidates.length ? 'text-[10px] text-cyan-200' : 'text-[10px] text-amber-200'}>{role.candidates.length ? 'Grant match only' : 'No tool grant match'}</span></div>
           <p className="mt-2 text-[11px] leading-5 text-white/45">{role.candidates.length ? role.candidates.map((agent) => agent.name).join(', ') : 'Configure an eligible specialist and assign its approved tools in Agent Builder.'}</p>
-          {role.candidates.length > 0 && <p className="mt-2 text-[10px] leading-4 text-white/40">Model configuration: {role.candidates.map((agent) => `${agent.name} · ${agent.modelProvider}: ${agent.modelProviderConfiguration === 'missing_configuration' ? 'not configured' : agent.modelProviderConfiguration === 'deployment_configured' ? 'deployment credentials present' : 'owner connection recorded'}`).join(' / ')}</p>
+          {role.candidates.length > 0 && <p className="mt-2 text-[10px] leading-4 text-white/40">Model configuration: {role.candidates.map((agent) => `${agent.name} · ${agent.modelProvider}: ${agent.modelProviderConfiguration === 'missing_configuration' ? 'not configured' : agent.modelProviderConfiguration === 'deployment_configured' ? 'deployment credentials present' : 'owner connection recorded'}`).join(' / ')}</p>}
           <p className="mt-2 text-[10px] leading-4 text-white/30">Matching tool grants: {role.acceptedTools.join(', ')}</p>
         </article>)}
       </div>
