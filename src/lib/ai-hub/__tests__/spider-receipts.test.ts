@@ -96,7 +96,7 @@ describe('AI Hub Spider recorded approval evidence', () => {
   it('uses the newest request, not an older successful run, even if supplied out of order', () => {
     const oldSuccess = { ...approval('old-success', 'approved', 'succeeded'), created_at: '2026-10-18T10:00:00Z' }
     const newerPending = { ...approval('new-pending', 'pending', null), created_at: '2026-10-20T10:00:00Z' }
-    const latestFailure = { ...approval('latest-failure', 'approved', 'failed'), created_at: '2026-10-21T10:00:00Z' }
+    const latestFailure = { ...approval('latest-failure', 'approved', 'failed'), created_at: '2026-10-21T10:00:00Z', executed_at: '2026-10-21T10:05:00Z' }
     const node = { providerId: 'palladium-agent-runtime', kind: 'agent', id: 'agent-1' }
     const pending = toAiHubSpiderReceipts([oldSuccess, newerPending])
     expect(latestSpiderReceiptForNode(pending, node)?.status).toBe('awaiting-approval')
