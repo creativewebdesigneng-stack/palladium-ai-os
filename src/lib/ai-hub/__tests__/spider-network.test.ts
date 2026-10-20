@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { buildAiHubSpiderTopology } from '../spider-network'
+import { buildAiHubSpiderTopology, spiderNodeKey } from '../spider-network'
 import { suggestSpiderCapability } from '../spider-prompt-preview'
 import type { AiHubLiveResource } from '../resources'
 import type { AiHubRouteDecision } from '../contracts'
@@ -71,6 +71,19 @@ describe('Blackstar spider web real inventory projection', () => {
     expect(graph.links[0]?.relation).toBe('registered-resource')
   })
 
+  it('distinguishes same-ID nodes across different providers and resource kinds', () => {
+    const first = { ...resource('shared-id', 'agent'), providerId: 'provider-one' }
+    const second = { ...resource('shared-id', 'agent'), providerId: 'provider-two' }
+    const third = { ...resource('shared-id', 'workflow'), providerId: 'provider-one' }
+    const graph = buildAiHubSpiderTopology([first, second, third], 'search', null)
+    expect(graph.nodes).toHaveLength(3)
+    const keys = graph.nodes.map(spiderNodeKey)
+    expect(new Set(keys).size).toBe(3)
+    expect(spiderNodeKey(first)).toBe(spiderNodeKey({ ...first }))
+    expect(spiderNodeKey(first)).not.toBe(spiderNodeKey(second))
+    expect(spiderNodeKey(first)).not.toBe(spiderNodeKey(third))
+  })
+
   it('is empty for missing inventory, deduplicates resources and remains layout-deterministic', () => {
     expect(buildAiHubSpiderTopology([], 'search', selected)).toMatchObject({
       nodes: [], links: [], selectedId: null, totalRegistered: 0,
@@ -104,6 +117,8 @@ describe('Spider Decision Network UI integration', () => {
     expect(explorer).toContain('onPrepareResource={onPrepareResource ?')
     expect(explorer).toContain('taskReady={Boolean(promptDraft.trim())}')
     expect(network).toContain("buildAiHubSpiderTopology(resources, selectedCapability, route)")
+    expect(network).toContain('spiderNodeKey(node) === focusedKey')
+    expect(network).toContain('setFocusedKey(spiderNodeKey(node))')
   })
 
   it('honours reduced motion, is keyboard accessible and never claims an execution happened', () => {
