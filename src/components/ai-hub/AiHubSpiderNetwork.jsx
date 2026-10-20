@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Activity, Eye, Network, Pause, Play, ShieldCheck } from 'lucide-react'
 import { buildAiHubSpiderTopology, spiderNodeKey } from '@/lib/ai-hub/spider-network'
-import { receiptsForSpiderNode } from '@/lib/ai-hub/spider-receipts'
+import { latestSpiderReceiptForNode } from '@/lib/ai-hub/spider-receipts'
 
 const SIGNALS = [
   { label: 'Relevance', value: 'Not verified' },
@@ -50,8 +50,7 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
     (['agent', 'workflow'].includes(activeNode.kind) && activeNode.status === 'active') ||
     (activeNode.kind === 'tool' && activeNode.providerId.startsWith('external-mcp:') && activeNode.status === 'available')
   ))
-  const activeReceipts = activeNode ? receiptsForSpiderNode(receipts, activeNode) : []
-  const recentReceipt = activeReceipts[0]
+  const recentReceipt = activeNode ? latestSpiderReceiptForNode(receipts, activeNode) : null
   const planned = graph.nodes.find((node) => node.planned)
   const canAnimate = !reducedMotion && motionOn
   const matches = graph.links.filter((link) => link.relation === 'routing-candidate').length
@@ -112,8 +111,8 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
           const highlight = node.planned
           const candidate = node.eligible
           const selected = node === activeNode
-          const recordedOutcome = receiptsForSpiderNode(receipts, node).find((receipt) =>
-            receipt.status === 'recorded-success' || receipt.status === 'recorded-failure')
+          const recordedOutcome = latestSpiderReceiptForNode(receipts, node)
+          const hasCompletedReceipt = recordedOutcome?.status === 'recorded-success' || recordedOutcome?.status === 'recorded-failure'
           return <g key={spiderNodeKey(node)}>
             {highlight && <line x1="500" y1="310" x2={node.x} y2={node.y}
               stroke="#a78bfa" strokeWidth="9" strokeOpacity=".12" filter={'url(#' + namespace + '-glow)'} aria-hidden="true" />}
@@ -127,7 +126,7 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
               onClick={() => setFocusedKey(spiderNodeKey(node))}
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFocusedKey(spiderNodeKey(node)) } }}
               className="cursor-pointer outline-none focus-visible:opacity-90">
-              {recordedOutcome && <circle cx={node.x} cy={node.y} r="26" fill="none" stroke={recordedOutcome.status === 'recorded-success' ? '#34d399' : '#fca5a5'} strokeWidth="1.6" strokeDasharray="3 4" aria-hidden="true" />}
+              {hasCompletedReceipt && <circle cx={node.x} cy={node.y} r="26" fill="none" stroke={recordedOutcome.status === 'recorded-success' ? '#34d399' : '#fca5a5'} strokeWidth="1.6" strokeDasharray="3 4" aria-hidden="true" />}
               {selected && <circle cx={node.x} cy={node.y} r="35" stroke="#c4b5fd" strokeWidth="1.5" fill="#a78bfa" fillOpacity=".1" />}
               <motion.circle cx={node.x} cy={node.y} r={node.planned ? 18 : 15}
                 fill={node.active ? '#130f29' : '#10121a'}
@@ -166,7 +165,7 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
         <DotLegend color="bg-zinc-500">Registered</DotLegend>
         <DotLegend color="bg-cyan-300">Eligible candidate</DotLegend>
         <DotLegend color="bg-violet-300">Planned path</DotLegend>
-        <DotLegend color="bg-emerald-300">Recorded gateway success</DotLegend>
+        <DotLegend color="bg-emerald-300">Latest gateway completion (green) or failure (red)</DotLegend>
       </div>
       <p className="text-[11px] text-zinc-500">{matches} other candidate links · {graph.totalMatching} matching resources</p>
     </div>
