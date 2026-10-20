@@ -5,6 +5,7 @@ import { AppWindow, Bot, Boxes, Cpu, Database, Image, Mic, Network, Play, Scale,
 import PageHeader from '@/components/palladium/PageHeader';
 import AiHubNetworkScene from '@/components/ai-hub/AiHubNetworkScene';
 import AiHubDecisionExplorer from '@/components/ai-hub/AiHubDecisionExplorer';
+import { resolveSpiderPreparedAction } from '@/lib/ai-hub/spider-actions';
 import RuntimeTargetsPanel from '@/components/ai-hub/RuntimeTargetsPanel';
 import { Failed, Loading } from '@/components/business/live';
 import { friendlyMessage } from '@/lib/errors';
@@ -102,19 +103,16 @@ export default function AIHub() {
   // Only existing tenant inventory may be prepared. The operator still
   // submits through existing authenticated agent/workflow/MCP approval forms.
   const prepareSpiderResource = (node, taskDraft) => {
-    const resource = (inventory.data?.resources ?? []).find((item) =>
-      item.id === node.id && item.kind === node.kind && item.providerId === node.providerId
-    );
-    if (!resource || resource.status !== node.status) return;
-    if ((resource.kind === 'agent' || resource.kind === 'workflow') && resource.status === 'active') {
-      if (typeof taskDraft !== 'string' || !taskDraft.trim() || taskDraft.length > 1000) return;
-      setGoal(taskDraft.trim());
-      setKind(resource.kind);
-      setQuery(resource.name);
-    } else if (resource.kind === 'tool' && resource.providerId.startsWith('external-mcp:') && resource.status === 'available') {
+    const result = resolveSpiderPreparedAction(inventory.data?.resources ?? [], node, taskDraft);
+    if (!result) return;
+    if (result.kind === 'agent-workflow') {
+      setGoal(result.goal);
+      setKind(result.resource.kind);
+      setQuery(result.resource.name);
+    } else if (result.kind === 'external-mcp') {
       setKind('tool');
-      setQuery(resource.name);
-      setSelectedMcp(resource);
+      setQuery(result.resource.name);
+      setSelectedMcp(result.resource);
       setMcpInput('{}');
       setMcpApproval(null);
     }
