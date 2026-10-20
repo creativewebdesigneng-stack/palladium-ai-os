@@ -198,6 +198,68 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     expect(JSON.stringify(events)).not.toContain('nim.dell.example');
   });
 
+  it('reassembles fragmented NVIDIA streamed tool-call arguments without executing the tool', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'operator-nim-test-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://private.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const requestedTool = {
+      name: 'browser_task',
+      description: 'Open a permitted public page after existing Blackstar approval',
+      parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+    };
+    // Realistic OpenAI-compatible SSE framing: one tool call is split over
+    // function-name and JSON-argument deltas. The gateway must parse it but
+    // MUST NOT run it; policy/approval belongs solely to the agent runtime.
+    const chunks = [
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_nim_browser',
+        type: 'function', function: { name: 'browser_task', arguments: '' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0,
+        function: { arguments: '{"url":"https://httpbingo.org' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0,
+        function: { arguments: '/html"}' } }] } }] },
+      { choices: [], usage: { prompt_tokens: 17, completion_tokens: 24 } },
+    ];
+    const sse = [
+      ...chunks.flatMap(chunk => ['data: ' + JSON.stringify(chunk), '']),
+      'data: [DONE]', '', '',
+    ].join(String.fromCharCode(10));
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    const events: StreamEvent[] = [];
+    for await (const event of streamServerChat({
+      provider: 'nvidia',
+      model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'Open the public HTML page' }],
+      tools: [requestedTool],
+      allowedProviders: ['nvidia'],
+      maxAttempts: 1,
+    })) events.push(event);
+    const expectedCall = {
+      id: 'call_nim_browser',
+      name: 'browser_task',
+      arguments: { url: 'https://httpbingo.org/html' },
+    };
+    expect(events.filter(e => e.type === 'tool_calls')).toEqual([
+      { type: 'tool_calls', toolCalls: [expectedCall] },
+    ]);
+    expect(events.find(e => e.type === 'done')?.result).toMatchObject({
+      provider: 'nvidia', model: 'nvidia/dell-local-model', text: '',
+      toolCalls: [expectedCall], usage: { input: 17, output: 24 },
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0]!;
+    expect(url).toBe('https://private.dell.example/v1/chat/completions');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer operator-nim-test-key');
+    const sent = JSON.parse(String(init?.body));
+    expect(sent.model).toBe('nvidia/dell-local-model');
+    expect(sent.stream).toBe(true);
+    expect(sent.tools?.[0]).toMatchObject({ type: 'function',
+      function: { name: 'browser_task' } });
+    // Only the model request is made; no browser_task callback, navigation,
+    // or other tool execution is performed by this parsing layer.
+  });
+
   it('streams operator NIM with the configured Dell model, not the NVIDIA hosted preset', async () => {
     vi.stubEnv('NVIDIA_API_KEY', 'operator-only-dell-key');
     vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
