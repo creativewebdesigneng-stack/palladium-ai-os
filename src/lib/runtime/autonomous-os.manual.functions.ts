@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { planOrchestratedGoal } from "./orchestrator.server";
 import { queueWorkflowRun } from "./workflow-queue.server";
+import { SIX_AGENT_BUSINESS_BLUEPRINT } from "./business-operations-blueprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -65,7 +66,7 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
     }
     const { data: goal, error } = await sb
       .from("autonomous_goals")
-      .select("id,user_id,org_id,workforce_id,name,objective,status,autonomy_level,max_parallel_agents")
+      .select("id,user_id,org_id,workforce_id,name,objective,status,autonomy_level,max_parallel_agents,success_criteria")
       .eq("id", data.id)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -116,6 +117,8 @@ export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
         orgId: goal.org_id ?? null,
         maxAssignments: Number(goal.max_parallel_agents ?? 4),
         forceApproval: goal.autonomy_level === "assisted",
+        businessBlueprintId: goal.success_criteria?.blueprint_id === SIX_AGENT_BUSINESS_BLUEPRINT.id
+          ? SIX_AGENT_BUSINESS_BLUEPRINT.id : null,
       });
       await persistFleet(sb, {
         goalId: goal.id,
