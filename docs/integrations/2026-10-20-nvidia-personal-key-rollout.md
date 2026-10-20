@@ -42,6 +42,7 @@ The existing agent streaming gateway now applies the **same model resolution** a
 - With an operator-managed Dell NIM endpoint and **no personal key**, the canonical preset maps to the operator's configured `NVIDIA_NIM_MODEL`.
 - A personal key paired with an explicit Dell-only model ID is rejected before any network request.
 - Tests exercise the actual Blackstar server gateway and streaming/SSE parser using isolated mocked HTTP responses, asserting request destination, model ID, streaming event payloads, identity isolation and fail-closed mismatch. **These do not constitute paid NVIDIA/Dell inference evidence.**
+- Upstream NVIDIA/Dell HTTP error **bodies are never copied into agent exception text**, even for 404, 422 and 5xx responses. Error category and retry policy remain available, but upstream bodies might echo private API keys, hosted account IDs or on-premise Dell NIM hostnames. Both streamed and ordinary runtime paths are covered by redaction tests.
 
 ## Personal-key live inference certification (separate, metered)
 
