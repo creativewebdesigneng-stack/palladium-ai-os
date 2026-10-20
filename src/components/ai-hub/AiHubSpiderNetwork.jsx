@@ -23,6 +23,11 @@ function webRing(radius) {
 
 const RINGS = [60, 113, 173, 242, 337]
 
+function spiderNodeKey(node) {
+  // The node ID alone is not globally unique across providers or kinds.
+  return JSON.stringify([node.providerId, node.kind, node.id])
+}
+
 function DotLegend({ color, children }) {
   return <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
     <span className={'h-2 w-2 rounded-full ' + color} />
@@ -37,15 +42,15 @@ function DotLegend({ color, children }) {
 export default function AiHubSpiderNetwork({ resources = [], receipts = [], receiptError = false, selectedCapability, route = null, loading = false, onPrepareResource, taskReady = false }) {
   const reducedMotion = useReducedMotion()
   const [motionOn, setMotionOn] = useState(true)
-  const [focusedId, setFocusedId] = useState(null)
+  const [focusedKey, setFocusedKey] = useState(null)
   const namespace = useId().replace(/:/g, '')
   const graph = useMemo(
     () => buildAiHubSpiderTopology(resources, selectedCapability, route),
     [resources, selectedCapability, route],
   )
-  const activeId = graph.nodes.some((node) => node.id === focusedId)
-    ? focusedId : graph.selectedId ?? graph.nodes[0]?.id ?? null
-  const activeNode = graph.nodes.find((node) => node.id === activeId)
+  const activeNode = graph.nodes.find((node) => spiderNodeKey(node) === focusedKey)
+    ?? graph.nodes.find((node) => node.planned)
+    ?? graph.nodes[0]
   const canPrepare = Boolean(activeNode && activeNode.active && (
     (['agent', 'workflow'].includes(activeNode.kind) && activeNode.status === 'active') ||
     (activeNode.kind === 'tool' && activeNode.providerId.startsWith('external-mcp:') && activeNode.status === 'available')
@@ -111,10 +116,10 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
         {graph.nodes.map((node) => {
           const highlight = node.planned
           const candidate = node.eligible
-          const selected = node.id === activeId
+          const selected = node === activeNode
           const recordedOutcome = receiptsForSpiderNode(receipts, node).find((receipt) =>
             receipt.status === 'recorded-success' || receipt.status === 'recorded-failure')
-          return <g key={node.providerId + ':' + node.kind + ':' + node.id}>
+          return <g key={spiderNodeKey(node)}>
             {highlight && <line x1="500" y1="310" x2={node.x} y2={node.y}
               stroke="#a78bfa" strokeWidth="9" strokeOpacity=".12" filter={'url(#' + namespace + '-glow)'} aria-hidden="true" />}
             <line x1="500" y1="310" x2={node.x} y2={node.y}
@@ -124,8 +129,8 @@ export default function AiHubSpiderNetwork({ resources = [], receipts = [], rece
               strokeDasharray={highlight ? 'none' : candidate ? '5 5' : '2 8'}
               aria-hidden="true" />
             <g role="button" tabIndex={0} aria-label={'Inspect ' + node.name + ', ' + node.kind + ', ' + node.status}
-              onClick={() => setFocusedId(node.id)}
-              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFocusedId(node.id) } }}
+              onClick={() => setFocusedKey(spiderNodeKey(node))}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFocusedKey(spiderNodeKey(node)) } }}
               className="cursor-pointer outline-none focus-visible:opacity-90">
               {recordedOutcome && <circle cx={node.x} cy={node.y} r="26" fill="none" stroke={recordedOutcome.status === 'recorded-success' ? '#34d399' : '#fca5a5'} strokeWidth="1.6" strokeDasharray="3 4" aria-hidden="true" />}
               {selected && <circle cx={node.x} cy={node.y} r="35" stroke="#c4b5fd" strokeWidth="1.5" fill="#a78bfa" fillOpacity=".1" />}
