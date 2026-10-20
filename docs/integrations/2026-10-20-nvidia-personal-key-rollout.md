@@ -34,6 +34,20 @@ where conrelid = 'public.model_provider_credentials'::regclass
 
 Verify afterward that the allowed names include `nvidia` and that `anon`/`authenticated` do not receive direct write/read table privileges. Do not bypass RLS or move credentials into a client-side table.
 
+## Personal-key live inference certification (separate, metered)
+
+A successful catalogue request (`GET /v1/models`) **does not prove** that a NVIDIA Build account is entitled to `POST /v1/chat/completions`. For example, some accounts can list models but receive 403/404 for actual inference.
+
+The existing Personal model providers panel now distinguishes **Key accepted** from verified inference. After securely connecting a personal NVIDIA key, an authenticated user may explicitly click **Verify live inference (may incur charges)**. This reuses Blackstar's pinned NVIDIA gateway and existing required audit writer; it does not create a separate credential store, agent runtime or approval system.
+
+- One fixed synthetic prompt requesting the `BLACKSTAR_NIM_HEALTH_OK` marker, through the official NVIDIA hosted API and the authenticated owner's key only.
+- Hard bounds: `openai/gpt-oss-20b`, maximum 32 output tokens, 15-second timeout, one attempt, no alternative providers, no tool execution and no background automation.
+- **Durable request-intent audit must succeed before the metered call**. A matching outcome audit receipt must be persisted before the UI may report verified success.
+- 401/403 reports inference unauthorised; 404/410/422 reports unavailable account/model access; 402 means credit/quota exhaustion; 429 means rate-limited. Errors are sanitised, and no model output, API key or endpoint is echoed to the browser or audit trail.
+- User receives only a status, timestamp, model ID, non-sensitive token counts and audit receipt.
+- The test proves a small response from a hosted NVIDIA model **only**. It does **not** certify streaming, personal-agent approvals, browser tools, Dell hardware/GPU placement or sustained performance.
+- Operator-owned diagnostic flags remain unchanged. No inference request runs on connect, list, page load or catalogue Test. The user chooses whether to incur NVIDIA charges.
+
 ## Preview acceptance
 
 1. Review migration + CI, then apply the migration in a dedicated **isolated** test database first. Production requires a separately approved schema rollout. Enable `NVIDIA_PERSONAL_CREDENTIALS_ENABLED=true` only in that tested environment after migration.
