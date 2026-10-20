@@ -40,10 +40,10 @@ describe('Blackstar spider web real inventory projection', () => {
       'verified-model', 'known-tool', 'agent-1', 'workflow-1',
     ])
     expect(graph.links).toEqual([
-      { from: 'blackstar-hub', to: 'verified-model', relation: 'planned-route' },
-      { from: 'blackstar-hub', to: 'known-tool', relation: 'routing-candidate' },
-      { from: 'blackstar-hub', to: 'agent-1', relation: 'registered-resource' },
-      { from: 'blackstar-hub', to: 'workflow-1', relation: 'registered-resource' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[0]), relation: 'planned-route' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[1]), relation: 'routing-candidate' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[2]), relation: 'registered-resource' },
+      { from: 'blackstar-hub', to: spiderNodeKey(inventory[3]), relation: 'registered-resource' },
     ])
     expect(graph.totalRegistered).toBe(4)
     expect(graph.totalMatching).toBe(4)
@@ -82,6 +82,51 @@ describe('Blackstar spider web real inventory projection', () => {
     expect(spiderNodeKey(first)).toBe(spiderNodeKey({ ...first }))
     expect(spiderNodeKey(first)).not.toBe(spiderNodeKey(second))
     expect(spiderNodeKey(first)).not.toBe(spiderNodeKey(third))
+  })
+
+  it('never attributes a planned route or candidate link to another provider with the same ID', () => {
+    const first = { ...resource('shared-model', 'model'), providerId: 'provider-one' }
+    const second = { ...resource('shared-model', 'model'), providerId: 'provider-two' }
+    const chosenRoute: AiHubRouteDecision = {
+      ...selected,
+      capability: { ...selected.capability, id: 'shared-model', providerId: 'provider-two' },
+      decisionTrace: {
+        ...selected.decisionTrace!,
+        selectedCapabilityId: 'shared-model',
+        consideredCapabilityIds: ['shared-model'],
+      },
+    }
+    const graph = buildAiHubSpiderTopology([first, second], 'search', chosenRoute)
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.nodes.filter((node) => node.planned).map((node) => node.providerId)).toEqual(['provider-two'])
+    expect(graph.nodes.filter((node) => node.eligible).map((node) => node.providerId)).toEqual(['provider-two'])
+    expect(new Set(graph.links.map((link) => link.to)).size).toBe(2)
+    expect(graph.links.find((link) => link.relation === 'planned-route')?.to).toBe(spiderNodeKey(second))
+
+    const missingRoute = {
+      ...chosenRoute,
+      capability: { ...chosenRoute.capability, providerId: 'provider-three' },
+    }
+    const absent = buildAiHubSpiderTopology([first, second], 'search', missingRoute)
+    expect(absent.selectedId).toBeNull()
+    expect(absent.nodes.every((node) => !node.planned && !node.eligible)).toBe(true)
+  })
+
+  it('does not infer candidates from ambiguous bare IDs across different kinds', () => {
+    const agent = { ...resource('same-id', 'agent'), providerId: 'shared-provider' }
+    const workflow = { ...resource('same-id', 'workflow'), providerId: 'shared-provider' }
+    const route: AiHubRouteDecision = {
+      ...selected,
+      decisionTrace: {
+        ...selected.decisionTrace!,
+        selectedCapabilityId: 'verified-model',
+        consideredCapabilityIds: ['same-id'],
+      },
+    }
+    const graph = buildAiHubSpiderTopology([agent, workflow], 'search', route)
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.nodes.every((node) => node.eligible === false && node.planned === false)).toBe(true)
+    expect(new Set(graph.links.map((link) => link.to)).size).toBe(2)
   })
 
   it('is empty for missing inventory, deduplicates resources and remains layout-deterministic', () => {
