@@ -5,6 +5,8 @@ import { projectBusinessRunEvidence } from '../autonomous-business-evidence';
 const source = readFileSync(new URL('../autonomous-business-evidence.functions.ts', import.meta.url), 'utf8');
 const panel = readFileSync(new URL('../../../components/workforce/BusinessRunEvidencePanel.jsx', import.meta.url), 'utf8');
 const screen = readFileSync(new URL('../../../screens/AutonomousOS.jsx', import.meta.url), 'utf8');
+const scheduler = readFileSync(new URL('../autonomous-os.scheduler.server.ts', import.meta.url), 'utf8');
+const fleetReconciliationSql = readFileSync(new URL('../../../../supabase/migrations/20260919174000_reconcile_autonomous_safety_activity.sql', import.meta.url), 'utf8');
 
 const empty = {
   runStatus: 'not_started',
@@ -111,6 +113,56 @@ describe('six-agent workflow execution evidence', () => {
     expect(result.financialOutcome).toBe('unverified');
     expect(result.evidenceLevel).toBe('internal_execution_records_only');
     expect(result.truncated).toBe(true);
+  });
+
+  it('never counts blanket completed fleet statuses without individual successful step receipts', () => {
+    const result = projectBusinessRunEvidence({
+      ...empty,
+      runStatus: 'completed',
+      assignments: [
+        { assignment_id: 'research', title: 'Research', agent_id: 'a', status: 'completed' },
+        { assignment_id: 'validation', title: 'Validation', agent_id: 'b', status: 'completed' },
+        { assignment_id: 'delivery', title: 'Delivery', agent_id: 'c', status: 'completed' },
+      ],
+      workflowSteps: [
+        { id: 's1', config: { orchestrator_assignment_id: 'research' } },
+        { id: 's2', config: { orchestrator_assignment_id: 'validation' } },
+      ],
+      stepRuns: [
+        { step_id: 's1', task_id: 't1', status: 'succeeded' },
+        { step_id: 's2', task_id: 't2', status: 'failed' },
+      ],
+    });
+    expect(result.completedAssignments).toBe(1);
+    expect(result.unverifiedCompletionClaims).toBe(2);
+    expect(result.assignments.map((item) => item.status)).toEqual([
+      'completed', 'failed', 'unverified_completion',
+    ]);
+    expect(result.financialOutcome).toBe('unverified');
+  });
+
+  it('does not treat an approval pause or a pending specialist as a successful task', () => {
+    const result = projectBusinessRunEvidence({
+      ...empty,
+      runStatus: 'waiting_for_approval',
+      assignments: [{ assignment_id: 'research', title: 'Research', agent_id: 'a', status: 'completed' }],
+      workflowSteps: [{ id: 's1', config: { orchestrator_assignment_id: 'research' } }],
+      stepRuns: [{ step_id: 's1', task_id: null, status: 'pending' }],
+      workflowGateApprovals: [{ status: 'pending' }],
+    });
+    expect(result.completedAssignments).toBe(0);
+    expect(result.assignments[0]?.status).toBe('queued');
+    expect(result.unverifiedCompletionClaims).toBe(1);
+    expect(result.workflowGateStatus).toBe('pending');
+  });
+
+  it('uses the existing per-workflow-step DB trigger rather than overwriting all agent statuses', () => {
+    const reconciliation = scheduler.split('export async function reconcileAutonomousGoalRuns')[1]!.split('export async function processDueAutonomousGoals')[0]!;
+    expect(reconciliation).not.toContain('.from("autonomous_goal_fleet_assignments")');
+    expect(fleetReconciliationSql).toContain('function public.sync_autonomous_fleet_step_state()');
+    expect(fleetReconciliationSql).toContain('after insert or update of status on public.workflow_step_runs');
+    expect(panel).toContain('step-verified completions');
+    expect(panel).toContain('unverified completion claims');
   });
 
   it('keeps all DB lookups within the authenticated owner and never selects tool payloads', () => {
