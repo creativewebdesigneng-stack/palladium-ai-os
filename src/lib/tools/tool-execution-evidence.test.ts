@@ -118,3 +118,65 @@ describe('agent tool evidence classification', () => {
     }]).every(row => row.state === 'not_tested')).toBe(true);
   });
 });
+
+const approvedNetwork = (tool: string, task: string, input: Record<string, unknown>, output: Record<string, unknown>) => {
+  const content = JSON.stringify(output);
+  return {
+    agent_id: 'owned-agent', action_type: 'agent_tool_task', status: 'approved', execution_status: 'succeeded',
+    details: { agent_task_id: task, tool, input },
+    execution_result: { provider: ({ web_search: 'web_search_http', web_fetch: 'public_https_fetch', http_request: 'public_https_get' } as Record<string, string>)[tool],
+      agent_task_id: task, simulated: false, task_status: 'succeeded',
+      tool_evidence: { format: 'json', characters: content.length, truncated: false, content },
+    },
+  };
+};
+
+describe('signed-in network execution receipt prerequisites', () => {
+  const searchInput = { query: 'public agency report', limit: 5 };
+  const searchOutput = { query: 'public agency report', results: [{ title: 'Agency', url: 'https://example.org/report', snippet: 'Public report' }] };
+  const fetchInput = { url: 'https://httpbingo.org/html' };
+  const fetchOutput = { url: 'https://httpbingo.org/html', text: 'Public HTML page body' };
+  const httpInput = { url: 'https://httpbingo.org/html', method: 'GET' };
+  const httpOutput = { ok: true, status: 200, body: 'Public GET response body' };
+  const cases = [
+    { name: 'web_search', input: searchInput, output: searchOutput },
+    { name: 'web_fetch', input: fetchInput, output: fetchOutput },
+    { name: 'http_request', input: httpInput, output: httpOutput },
+  ];
+  const networkTools = cases.map(item => ({ slug: item.name, is_active: true, executable: true }));
+
+  it.each(cases)('requires matched agent, task, bounded request, completed receipt and original output for $name', ({name,input,output}) => {
+    const execution = { ...success(name, 'network-task'), input };
+    const receipt = approvedNetwork(name, 'network-task', input, output);
+    expect(toolExecutionEvidence(networkTools, [execution], [receipt]).find(row => row.slug === name)?.state).toBe('network_verified');
+    expect(toolExecutionEvidence(networkTools, [execution], []).find(row => row.slug === name)?.state).toBe('execution_recorded');
+    const invalid = [
+      { ...receipt, agent_id: 'another-agent' },
+      { ...receipt, details: { ...receipt.details, agent_task_id: 'another-task' } },
+      { ...receipt, execution_status: 'executing' },
+      { ...receipt, execution_result: { ...receipt.execution_result, simulated: true } },
+      { ...receipt, execution_result: { ...receipt.execution_result, provider: 'local' } },
+      { ...receipt, execution_result: { ...receipt.execution_result, tool_evidence: { ...receipt.execution_result.tool_evidence, truncated: true } } },
+    ];
+    for (const bad of invalid) {
+      expect(toolExecutionEvidence(networkTools, [execution], [bad]).find(row => row.slug === name)?.state).toBe('execution_recorded');
+    }
+    expect(toolExecutionEvidence(networkTools, [{ ...execution, input: { fake: true } }], [receipt]).find(row => row.slug === name)?.state).toBe('execution_recorded');
+    expect(toolExecutionEvidence(networkTools, [{ ...execution, output: { simulated: true } }], [receipt]).find(row => row.slug === name)?.state).toBe('simulated_only');
+  });
+
+  it('rejects missing content, empty search, wrong fetch URL and a failed HTTP status without inflating certification', () => {
+    const malformed = [
+      { name: 'web_search', input: searchInput, output: { query: searchInput.query, results: [] } },
+      { name: 'web_search', input: searchInput, output: { ...searchOutput, results: [{ title: 'Fake', url: 'http://invalid.example', snippet: 'Not HTTPS' }] } },
+      { name: 'web_fetch', input: fetchInput, output: { ...fetchOutput, url: 'https://other.example/page' } },
+      { name: 'web_fetch', input: fetchInput, output: { ...fetchOutput, text: '' } },
+      { name: 'http_request', input: httpInput, output: { ...httpOutput, ok: false, status: 503 } },
+      { name: 'http_request', input: httpInput, output: { ...httpOutput, body: '' } },
+    ];
+    for (const {name,input,output} of malformed) {
+      const receipt = approvedNetwork(name,'network-task',input,output);
+      expect(toolExecutionEvidence(networkTools,[{...success(name,'network-task'),input}],[receipt]).find(row => row.slug === name)?.state).toBe('execution_recorded');
+    }
+  });
+});
