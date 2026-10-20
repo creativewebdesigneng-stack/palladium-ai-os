@@ -405,6 +405,29 @@ describe('bounded local tool approvals share the existing continuation', () => {
     expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
   });
 
+  it.each([
+    ['web_search', { query: 'Blackstar tools', limit: 8 }, { query: 'Blackstar tools', results: [{ title: 'Example', url: 'https://example.org', snippet: 'Test' }] }, 'web_search_http'],
+    ['web_fetch', { url: 'https://httpbingo.org/html' }, { url: 'https://httpbingo.org/html', text: 'Page body' }, 'public_https_fetch'],
+    ['http_request', { url: 'https://httpbingo.org/html', method: 'GET' }, { status: 200, ok: true, body: 'Page body' }, 'public_https_get'],
+  ] as const)('records a bounded %s approval as a network route, not local execution', async (name, input, output, route) => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: name, input };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      [name, { slug: name, requiresApproval: true, allowedDomains: ['httpbingo.org'], spendCap: 0 }],
+    ]) });
+    // Fixture output tests receipt integrity only, not live provider certification.
+    calls.execute.mockResolvedValueOnce({ ok: true, output });
+    const receipt = await executeApprovedBrowserTask(args());
+    expect(receipt).toMatchObject({ ok: true, provider: route, result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'agent.tool_approval_result', metadata: expect.objectContaining({ provider: route, tool: name, simulated: false }),
+    }));
+    expect(calls.execute.mock.calls[0]![3].get(name).requiresApproval).toBe(false);
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+
   it('accepts the observed web-search model limit and canonicalises it to eight before approval', async () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     db.tables['agent_tasks']![0]!['waiting_approval_request_id'] = null;
