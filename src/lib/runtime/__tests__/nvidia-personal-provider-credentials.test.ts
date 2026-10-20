@@ -204,7 +204,7 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: 'Dell' } }] }) +
-        '\\n\\ndata: [DONE]\\n\\n'.replaceAll('\\n', '\n'),
+        '\\n\\ndata: [DONE]\\n\\n',
         { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
     );
     const events = [];
