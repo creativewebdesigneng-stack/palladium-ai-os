@@ -1,7 +1,8 @@
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 import { ProviderError } from './model-gateway.base';
 import { runChatPinned } from './model-gateway.server';
-import { nvidiaNimConfigured, nvidiaNimModel } from './nvidia-dell-infrastructure.server';
+import { NVIDIA_NIM_DEFAULT_MODEL, nvidiaNimConfigured, nvidiaNimModel } from './nvidia-dell-infrastructure.server';
+import { nvidiaPersonalCredentialsEnabled, resolveUserModelProviderAccess } from './model-provider-credentials.server';
 
 export const NVIDIA_INFERENCE_CERTIFICATION_MARKER = 'BLACKSTAR_NIM_HEALTH_OK';
 const enabled = (value: string | undefined) =>
@@ -18,7 +19,8 @@ export function nvidiaInferenceProbeEnabled() {
 }
 
 type Status = 'verified' | 'not_enabled' | 'invalid_response' | 'unauthorised' |
-  'quota_exhausted' | 'rate_limited' | 'unavailable' | 'audit_unavailable';
+  'quota_exhausted' | 'rate_limited' | 'unavailable' | 'audit_unavailable' |
+  'not_connected' | 'model_unavailable';
 
 type CertificationResult = {
   status: Status;
@@ -187,6 +189,100 @@ export async function certifyNvidiaToolCalling(args: { userId: string }): Promis
     });
     return result(status, inputTokens, outputTokens, receiptId);
   } catch {
+    return result('audit_unavailable');
+  }
+}
+
+/**
+ * Owner-initiated NVIDIA hosted API inference check.
+ *
+ * Unlike the existing administrator-only NIM probe, this uses ONLY the
+ * authenticated owner's encrypted NVIDIA API Catalog credential. A successful
+ * GET /models proves the key was accepted for catalogue access, but not that
+ * chat completions are authorised for that account. This checks the latter.
+ * Explicit request only, one 32-token call, no retry, tool or vendor fallback.
+ */
+export async function certifyPersonalNvidiaInference(args: { userId: string }): Promise<CertificationResult> {
+  const model = NVIDIA_NIM_DEFAULT_MODEL;
+  const checkedAt = new Date().toISOString();
+  const result = (status: Status, inputTokens: number | null = null,
+    outputTokens: number | null = null, auditReceiptId: string | null = null): CertificationResult =>
+    ({ status, checkedAt, model, inputTokens, outputTokens, auditReceiptId });
+  if (!nvidiaPersonalCredentialsEnabled()) return result('not_enabled');
+
+  // The owner is derived from requireSupabaseAuth middleware, never client input.
+  // Do not fall back to the deployment's configured credential.
+  let providerAccess;
+  try {
+    providerAccess = await resolveUserModelProviderAccess({
+      userId: args.userId, provider: 'nvidia',
+    });
+  } catch {
+    return result('unavailable');
+  }
+  if (!providerAccess?.apiKey || providerAccess.provider !== 'nvidia') {
+    return result('not_connected');
+  }
+
+  let requestId: string;
+  try {
+    requestId = await writeAuditRequired({
+      userId: args.userId, action: 'model.nvidia_personal_inference_requested',
+      status: 'success', targetType: 'model_provider', targetId: 'nvidia',
+      metadata: { model, maxCompletionTokens: 32, provider: 'nvidia',
+        credentialScope: 'owner', chargedProvider: 'nvidia', toolsExecuted: false },
+    });
+  } catch {
+    return result('audit_unavailable');
+  }
+
+  let status: Status = 'unavailable';
+  let inputTokens: number | null = null;
+  let outputTokens: number | null = null;
+  try {
+    const response = await runChatPinned({
+      provider: 'nvidia',
+      model,
+      providerAccess,
+      messages: [{ role: 'user', content:
+        `Connection certification. Reply with exactly ${NVIDIA_INFERENCE_CERTIFICATION_MARKER} and nothing else.` }],
+      tools: [],
+      temperature: 0,
+      maxTokens: 32,
+      maxAttempts: 1,
+      timeoutMs: 15_000,
+      allowedProviders: ['nvidia'],
+    });
+    inputTokens = Number.isSafeInteger(response.usage.input) && response.usage.input >= 0
+      ? response.usage.input : null;
+    outputTokens = Number.isSafeInteger(response.usage.output) && response.usage.output >= 0
+      ? response.usage.output : null;
+    status = response.provider === 'nvidia' && response.model === model &&
+      response.toolCalls.length === 0 &&
+      response.text.trim() === NVIDIA_INFERENCE_CERTIFICATION_MARKER
+      ? 'verified' : 'invalid_response';
+  } catch (error) {
+    if (error instanceof ProviderError) {
+      status = error.status === 401 || error.status === 403 ? 'unauthorised'
+        : error.status === 404 || error.status === 410 || error.status === 422
+          ? 'model_unavailable'
+        : error.status === 402 ? 'quota_exhausted'
+        : error.status === 429 ? 'rate_limited'
+        : 'unavailable';
+    }
+  }
+  try {
+    const receiptId = await writeAuditRequired({
+      userId: args.userId, action: 'model.nvidia_personal_inference_result',
+      status: status === 'verified' ? 'success' : 'failed',
+      targetType: 'model_provider', targetId: 'nvidia',
+      metadata: { requestId, model, credentialScope: 'owner',
+        result: status, checkedAt, inputTokens, outputTokens,
+        toolsExecuted: false },
+    });
+    return result(status, inputTokens, outputTokens, receiptId);
+  } catch {
+    // Provider success without durable audit evidence is never certified.
     return result('audit_unavailable');
   }
 }
