@@ -39,6 +39,20 @@ describe('Astra Spider authorised resource preparation', () => {
     expect(resolveSpiderPreparedAction(inventory, inventory[3]!, 'task')).toBeNull()
     expect(resolveSpiderPreparedAction([], inventory[0]!, 'task')).toBeNull()
   })
+  it('fails closed when the live inventory contains duplicate execution identities', () => {
+    const agent = inventory[0]!
+    const duplicate = { ...agent, name: 'Conflicting execution target' }
+    expect(resolveSpiderPreparedAction([...inventory, duplicate], agent, 'Run')).toBeNull()
+    const mcp = inventory[2]!
+    expect(resolveSpiderPreparedAction([...inventory, { ...mcp }], mcp, '')).toBeNull()
+  })
+  it('bounds the trimmed goal, not its padded representation', () => {
+    const agent = inventory[0]!
+    expect(resolveSpiderPreparedAction(inventory, agent, '  ' + 'x'.repeat(1000) + '  ')).toEqual({
+      kind: 'agent-workflow', resource: agent, goal: 'x'.repeat(1000),
+    })
+    expect(resolveSpiderPreparedAction(inventory, agent, '  ' + 'x'.repeat(1001) + '  ')).toBeNull()
+  })
   it('rejects blank and oversized agent instructions', () => {
     expect(resolveSpiderPreparedAction(inventory, inventory[0], '')).toBeNull()
     expect(resolveSpiderPreparedAction(inventory, inventory[0], ' \n ')).toBeNull()

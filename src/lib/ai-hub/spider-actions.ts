@@ -24,13 +24,20 @@ export function resolveSpiderPreparedAction(
 ): SpiderPreparedAction | null {
   if (!node || typeof node.id !== 'string' || !node.id ||
       typeof node.providerId !== 'string' || !node.providerId) return null
-  const resource = resources.find((item) =>
+  // Refuse ambiguous inventory identities rather than taking the first match.
+  // A duplicated resource key must never be allowed to select a different
+  // execution target depending on inventory ordering.
+  const matches = resources.filter((item) =>
     item.id === node.id && item.kind === node.kind && item.providerId === node.providerId
   )
-  if (!resource || resource.status !== node.status) return null
+  if (matches.length !== 1) return null
+  const resource = matches[0]!
+  if (resource.status !== node.status) return null
   if ((resource.kind === 'agent' || resource.kind === 'workflow') && resource.status === 'active') {
-    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 1000) return null
-    return { kind: 'agent-workflow', resource, goal: prompt.trim() }
+    if (typeof prompt !== 'string') return null
+    const goal = prompt.trim()
+    if (!goal || goal.length > 1000) return null
+    return { kind: 'agent-workflow', resource, goal }
   }
   if (resource.kind === 'tool' && resource.providerId.startsWith('external-mcp:') &&
       resource.status === 'available') {
