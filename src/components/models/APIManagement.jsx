@@ -133,7 +133,7 @@ export default function APIManagement() {
         </div>
 
         <div className="grid gap-3 xl:grid-cols-2">
-          {['openai', 'anthropic', 'nvidia'].map((providerId) => {
+          {['openai', 'anthropic', ...(byId.has('nvidia') ? ['nvidia'] : [])].map((providerId) => {
             const provider = byId.get(providerId)
             const connection = provider?.connection
             const connected = Boolean(connection?.enabled)
