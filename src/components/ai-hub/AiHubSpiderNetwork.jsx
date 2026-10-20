@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Activity, Eye, Network, Pause, Play, ShieldCheck } from 'lucide-react'
 import { buildAiHubSpiderTopology } from '@/lib/ai-hub/spider-network'
+import { receiptsForSpiderNode } from '@/lib/ai-hub/spider-receipts'
 
 const SIGNALS = [
   { label: 'Relevance', value: 'Not verified' },
@@ -33,7 +34,7 @@ function DotLegend({ color, children }) {
  * An interactive visual projection of existing Hub inventory and route plans.
  * Animation is a planning-path guide, NOT a worker execution or event stream.
  */
-export default function AiHubSpiderNetwork({ resources = [], selectedCapability, route = null, loading = false, onPrepareResource, taskReady = false }) {
+export default function AiHubSpiderNetwork({ resources = [], receipts = [], receiptError = false, selectedCapability, route = null, loading = false, onPrepareResource, taskReady = false }) {
   const reducedMotion = useReducedMotion()
   const [motionOn, setMotionOn] = useState(true)
   const [focusedId, setFocusedId] = useState(null)
@@ -49,6 +50,8 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
     (['agent', 'workflow'].includes(activeNode.kind) && activeNode.status === 'active') ||
     (activeNode.kind === 'tool' && activeNode.providerId.startsWith('external-mcp:') && activeNode.status === 'available')
   ))
+  const activeReceipts = activeNode ? receiptsForSpiderNode(receipts, activeNode) : []
+  const recentReceipt = activeReceipts[0]
   const planned = graph.nodes.find((node) => node.planned)
   const canAnimate = !reducedMotion && motionOn
   const matches = graph.links.filter((link) => link.relation === 'routing-candidate').length
@@ -109,6 +112,8 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
           const highlight = node.planned
           const candidate = node.eligible
           const selected = node.id === activeId
+          const recordedOutcome = receiptsForSpiderNode(receipts, node).find((receipt) =>
+            receipt.status === 'recorded-success' || receipt.status === 'recorded-failure')
           return <g key={node.providerId + ':' + node.kind + ':' + node.id}>
             {highlight && <line x1="500" y1="310" x2={node.x} y2={node.y}
               stroke="#a78bfa" strokeWidth="9" strokeOpacity=".12" filter={'url(#' + namespace + '-glow)'} aria-hidden="true" />}
@@ -122,6 +127,7 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
               onClick={() => setFocusedId(node.id)}
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFocusedId(node.id) } }}
               className="cursor-pointer outline-none focus-visible:opacity-90">
+              {recordedOutcome && <circle cx={node.x} cy={node.y} r="26" fill="none" stroke={recordedOutcome.status === 'recorded-success' ? '#34d399' : '#fca5a5'} strokeWidth="1.6" strokeDasharray="3 4" aria-hidden="true" />}
               {selected && <circle cx={node.x} cy={node.y} r="35" stroke="#c4b5fd" strokeWidth="1.5" fill="#a78bfa" fillOpacity=".1" />}
               <motion.circle cx={node.x} cy={node.y} r={node.planned ? 18 : 15}
                 fill={node.active ? '#130f29' : '#10121a'}
@@ -160,6 +166,7 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
         <DotLegend color="bg-zinc-500">Registered</DotLegend>
         <DotLegend color="bg-cyan-300">Eligible candidate</DotLegend>
         <DotLegend color="bg-violet-300">Planned path</DotLegend>
+        <DotLegend color="bg-emerald-300">Recorded gateway success</DotLegend>
       </div>
       <p className="text-[11px] text-zinc-500">{matches} other candidate links · {graph.totalMatching} matching resources</p>
     </div>
@@ -170,6 +177,12 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
           <p className="mt-2 break-words text-sm font-medium text-white">{activeNode.name}</p>
           <p className="mt-1 break-words text-xs text-zinc-400">{activeNode.kind} · {activeNode.status} · {activeNode.providerId}</p>
           <p className="mt-2 text-xs text-zinc-500">{activeNode.planned ? 'Selected by the current read-only routing plan.' : activeNode.eligible ? 'Considered by the routing plan.' : 'Present in the existing Hub inventory; not part of this route.'}</p>
+          {receiptError ? <p className="mt-3 text-xs text-amber-300">Approval evidence is unavailable; no execution state is assumed.</p> : recentReceipt ? <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Recorded approval gateway state</p>
+            <p className="mt-1 text-xs text-zinc-200">{recentReceipt.status.replaceAll('-', ' ')}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">{recentReceipt.executedAt ? 'Gateway completion: ' + recentReceipt.executedAt : 'Approval requested: ' + recentReceipt.createdAt}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">From this user's existing AI Hub approval records. Does not independently confirm provider success.</p>
+          </div> : <p className="mt-3 text-[11px] text-zinc-500">No matching gateway receipt recorded for this node.</p>}
           {canPrepare && !taskReady && ['agent', 'workflow'].includes(activeNode.kind) && <p className="mt-2 text-xs text-amber-200/80">Enter a task in the prompt box above to prepare this agent or workflow.</p>}
           {canPrepare && (taskReady || activeNode.kind === 'tool') && onPrepareResource && <a href="#ai-hub-execution" onClick={() => onPrepareResource(activeNode)}
             className="mt-3 inline-flex items-center rounded-lg border border-violet-300/20 bg-violet-400/10 px-3 py-2 text-xs font-medium text-violet-100 hover:bg-violet-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-300">
