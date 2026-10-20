@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { assessSixAgentBusinessReadiness, type BusinessReadinessAgent } from './business-team-readiness';
 import { normaliseProvider } from './model-gateway.base';
-import { deploymentProviderConfigured, listUserModelProviderCredentials } from './model-provider-credentials.server';
+import { deploymentProviderConfigured, isProviderAvailableForUser } from './model-provider-credentials.server';
 
 type Sb = { from: (table: string) => any };
 
@@ -11,7 +11,7 @@ export const getSixAgentBusinessReadiness = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
-    const [agentsResult, runtimeResult, userConnections] = await Promise.all([
+    const [agentsResult, runtimeResult] = await Promise.all([
       sb.from('personal_agents')
         .select('id,name,status,allowed_tools,model_provider')
         .eq('user_id', context.userId)
@@ -21,26 +21,32 @@ export const getSixAgentBusinessReadiness = createServerFn({ method: 'POST' })
         .select('enabled')
         .eq('user_id', context.userId)
         .maybeSingle(),
-      listUserModelProviderCredentials(context.userId),
     ]);
     if (agentsResult.error) throw new Error(agentsResult.error.message);
     if (runtimeResult.error) throw new Error(runtimeResult.error.message);
-    const configuredPersonalProviders = new Set<string>(userConnections
-      .filter((connection: { enabled: boolean }) => connection.enabled)
-      .map((connection: { provider: string }) => connection.provider));
-    const agents = ((agentsResult.data ?? []) as (BusinessReadinessAgent & { model_provider?: string | null })[])
-      .slice(0, 100)
-      .map((agent) => {
-        const provider = normaliseProvider(agent.model_provider);
-        return {
-          ...agent,
-          modelProvider: provider,
-          modelProviderConfiguration: deploymentProviderConfigured(provider)
+    const visible = ((agentsResult.data ?? []) as (BusinessReadinessAgent & { model_provider?: string | null })[])
+      .slice(0, 100);
+    const providers = [...new Set(visible.map((agent) => normaliseProvider(agent.model_provider)))];
+    // Use exactly the same owner-scoped, credential-aware availability check
+    // that the six-agent runtime uses. The check returns a boolean, not tokens.
+    // Fail closed on invalid or undecryptable personal connections; dashboard
+    // "connected" must not disagree with the planner about usable configuration.
+    const availableProviders = new Map(await Promise.all(providers.map(async (provider) => [
+      provider,
+      await isProviderAvailableForUser({ userId: context.userId, provider }).catch(() => false),
+    ] as const)));
+    const agents = visible.map((agent) => {
+      const provider = normaliseProvider(agent.model_provider);
+      return {
+        ...agent,
+        modelProvider: provider,
+        modelProviderConfiguration: !availableProviders.get(provider)
+          ? 'missing_configuration' as const
+          : deploymentProviderConfigured(provider)
             ? 'deployment_configured' as const
-            : configuredPersonalProviders.has(provider as 'openai' | 'anthropic' | 'nvidia')
-              ? 'user_connected' as const : 'missing_configuration' as const,
-        };
-      });
+            : 'user_connected' as const,
+      };
+    });
     return assessSixAgentBusinessReadiness({
       agents,
       runtimeEnabled: runtimeResult.data?.enabled !== false,
