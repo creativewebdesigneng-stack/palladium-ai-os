@@ -25,9 +25,9 @@ export const getSixAgentBusinessReadiness = createServerFn({ method: 'POST' })
     ]);
     if (agentsResult.error) throw new Error(agentsResult.error.message);
     if (runtimeResult.error) throw new Error(runtimeResult.error.message);
-    const configuredPersonalProviders = new Set(userConnections
-      .filter((connection) => connection.enabled)
-      .map((connection) => connection.provider));
+    const configuredPersonalProviders = new Set<string>(userConnections
+      .filter((connection: { enabled: boolean }) => connection.enabled)
+      .map((connection: { provider: string }) => connection.provider));
     const agents = ((agentsResult.data ?? []) as (BusinessReadinessAgent & { model_provider?: string | null })[])
       .slice(0, 100)
       .map((agent) => {
