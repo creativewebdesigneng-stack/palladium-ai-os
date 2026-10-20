@@ -131,6 +131,7 @@ describe('AI Hub Spider approval evidence boundary', () => {
     expect(screen).toContain('useServerFn(listAiHubSpiderReceipts)')
     expect(screen).toContain("enabled:session === 'yes'")
     expect(screen).toContain("queryKey:['ai-hub-spider-receipts',ownerId]")
+    expect(screen).toContain("queryKey:['ai-hub-live-resources',ownerId]")
     expect(screen).toContain("enabled:session === 'yes' && Boolean(ownerId)")
     expect(screen).toContain("!spiderEvidence.isError ? spiderEvidence.data?.receipts ?? [] : []")
     expect(explorer).toContain('receipts={receipts}')
