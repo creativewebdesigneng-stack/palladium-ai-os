@@ -70,7 +70,7 @@ export class AiHubOrchestrator {
       placement,
       ...(spatial ? { spatial } : {}),
       ...(physical ? { physical } : {}),
-      requiresApproval: request.workload.requirements.requireHumanApproval === true || physical?.requiresApproval === true,
+      requiresApproval: request.workload.requirements.requireHumanApproval === true || physical?.requiresApproval === true || route.decisionTrace?.lane === 'approval-required',
       executionBoundary: 'palladium-policy-gateway',
     }
   }
