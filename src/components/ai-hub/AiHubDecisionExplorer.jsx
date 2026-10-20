@@ -93,7 +93,7 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false,
         </select>
       </label>
     </div>
-    <AiHubSpiderNetwork resources={resources} selectedCapability={chosen} route={route} loading={loading} onPrepareResource={onPrepareResource ? (node) => onPrepareResource(node, promptDraft.trim()) : undefined} />
+    <AiHubSpiderNetwork resources={resources} selectedCapability={chosen} route={route} loading={loading} taskReady={Boolean(promptDraft.trim())} onPrepareResource={onPrepareResource ? (node) => onPrepareResource(node, promptDraft.trim()) : undefined} />
     <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-stretch">
       <div className="rounded-xl border border-white/10 bg-white/[.035] p-3">
         <p className="text-[10px] uppercase tracking-wider text-zinc-500">01 · Select</p>
