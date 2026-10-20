@@ -202,10 +202,12 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     vi.stubEnv('NVIDIA_API_KEY', 'operator-only-dell-key');
     vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
     vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const sse = [
+      'data: ' + JSON.stringify({ choices: [{ delta: { content: 'Dell' } }] }),
+      '', 'data: [DONE]', '', '',
+    ].join(String.fromCharCode(10));
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: 'Dell' } }] }) +
-        '\\n\\ndata: [DONE]\\n\\n',
-        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+      new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
     );
     const events: StreamEvent[] = [];
     for await (const event of streamServerChat({
