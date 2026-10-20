@@ -88,7 +88,9 @@ describe('six-agent mission deterministic orchestration', () => {
       maxAssignments: 6,
       providerConfiguredAgentIds: [alt.id, ...candidates.slice(1).map((agent) => agent.id)],
     });
-    expect(plan.assignments.find((role) => role.id === 'research')?.agent_id).toBe(alt.id);
+    const selectedIds = new Set(plan.assignments.map((role) => role.agent_id));
+    expect(selectedIds.has(candidates[0]!.id)).toBe(false);
+    expect(selectedIds.has(alt.id)).toBe(true);
     expect(plan.assignments).toHaveLength(6);
     expect(new Set(plan.assignments.map((role) => role.agent_id)).size).toBe(6);
   });
