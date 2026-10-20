@@ -30,7 +30,7 @@ export function planSixAgentBusinessTeam(args: {
       id: agent.id,
       name: agent.name,
       status: 'active',
-      allowed_tools: agent.allowed_tools,
+      allowed_tools: agent.allowed_tools ?? null,
     })),
     runtimeEnabled: true,
   });
