@@ -140,8 +140,7 @@ export async function resolveUserModelProviderAccess(args: {
   userId: string
   provider: Provider
 }): Promise<ProviderAccess | null> {
-  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return
-  if (args.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) return null
+  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return null
   if (args.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) return null
   if (!hasSupabaseAdminEnvironment()) return null
   const sb = await admin()
@@ -176,6 +175,7 @@ export async function markUserModelProviderUsed(args: {
   error?: string | null
 }) {
   if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return
+  if (args.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) return
   if (!hasSupabaseAdminEnvironment()) return
   const sb = await admin()
   const now = new Date().toISOString()
