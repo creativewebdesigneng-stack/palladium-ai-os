@@ -23,7 +23,7 @@ machine; do **not** add a second execution or approval architecture.
 
 - The AI Hub adapter now returns completed only when the persisted underlying
   agent task / workforce run has status `succeeded`.
-- For all other/missing states, the **AI Hub gateway attempt** returns
+- The successful return must also be independently confirmed with an authenticated,\n  owner-scoped read of the **canonical** `agent_tasks` or `workflow_runs` row,\n  filtered by exact run ID, `user_id`, and agent/workflow resource ID.\n  Missing rows, read errors, and non-succeeded persisted rows fail closed.\n  This protects against the Workforce fallback success object when the final\n  read is unavailable and prevents a stale/colliding run from being credited.\n- For all other/missing states, the **AI Hub gateway attempt** returns
   failed. A separate nested tool or workflow approval remains in its
   authoritative runtime, and must be resumed in Agent Tasks / Workforce.
   This is **not** a cancellation or rewrite of the underlying task.
