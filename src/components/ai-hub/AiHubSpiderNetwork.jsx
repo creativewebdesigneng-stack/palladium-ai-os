@@ -75,7 +75,7 @@ export default function AiHubSpiderNetwork({ resources = [], selectedCapability,
     </div>
     <div className="relative overflow-x-auto bg-[radial-gradient(ellipse_at_center,rgba(80,37,151,.17),rgba(4,4,12,0)_55%)]">
       <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(140,92,246,.07)_1px,transparent_1px),linear-gradient(90deg,rgba(140,92,246,.07)_1px,transparent_1px)] [background-size:27px_27px]" aria-hidden="true" />
-      <svg role="img" aria-label="Spider web map of registered Blackstar models, tools, agents and providers. Highlighted lines are planning candidates, not live executions."
+      <svg role="group" aria-label="Spider web map of registered Blackstar models, tools, agents and providers. Highlighted lines are planning candidates, not live executions."
         viewBox="0 0 1000 620" className="relative mx-auto block min-w-[660px] w-full" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id={namespace + '-core'}>
