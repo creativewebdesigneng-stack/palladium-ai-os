@@ -92,10 +92,19 @@ export function assessSixAgentBusinessReadiness(
     agentForRole.set(roleIndex, agentId);
   }
 
+  const providerAgentForRole = new Map<number, string>();
+  for (const [agentId, roleIndex] of assignedProviderAgentToRole) {
+    providerAgentForRole.set(roleIndex, agentId);
+  }
+
   return {
     assignedDistinctAgents: roles.map((role, roleIndex) => ({
       roleId: role.id,
       agentId: agentForRole.get(roleIndex) ?? null,
+    })),
+    assignedProviderConfiguredAgents: roles.map((role, roleIndex) => ({
+      roleId: role.id,
+      agentId: providerAgentForRole.get(roleIndex) ?? null,
     })),
     runtimeEnabled: input.runtimeEnabled,
     activeAgentCount: new Set(active.map((agent) => agent.id)).size,
