@@ -123,6 +123,7 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
         .eq('details->>ai_hub_workload_id', details.ai_hub_workload_id)
         .eq('details->>ai_hub_provider_id', details.ai_hub_provider_id)
         .eq('details->>ai_hub_capability_id', details.ai_hub_capability_id)
+        .eq('details->>ai_hub_input_fingerprint', details.ai_hub_input_fingerprint)
       query = context.approvalOrgId ? query.eq('org_id', context.approvalOrgId) : query.is('org_id', null)
       const { data, error } = await query
         .select('id')
