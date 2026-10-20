@@ -35,6 +35,18 @@ asks the existing router for a planned decision trace:
 4. **Human review**: if neither qualifies, plan an eligible resource but require
    the existing human approval gate before any dispatch. No candidate => no plan.
 
+**Release safety gate:** until a trusted server-side prompt verifier and
+real tool attestations are connected, **all evidence-gated orchestration
+plans require operator approval**, even the deterministic and model lanes.
+The AI Hub execution gateway rejects any crafted evidence-gated plan with
+`requiresApproval: false` before dispatch. This is a temporary, intentional
+fail-closed restriction, not a claim of fully autonomous execution.
+
+The `source: 'blackstar-policy-verifier'` and supplied evidence identifiers
+in the planning contract are not themselves cryptographic or independently
+authenticated. Their origin must be validated by an authoritative server
+before any future approval-free policy is considered.
+
 Existing `requireHumanApproval`, tenant policy, capability matching and
 runtime controls **still apply on every lane**. There is no auto-permission
 for "read-only" or purported deterministic tools. A forged plan that marks
