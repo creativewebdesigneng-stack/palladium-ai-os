@@ -34,6 +34,17 @@ where conrelid = 'public.model_provider_credentials'::regclass
 
 Verify afterward that the allowed names include `nvidia` and that `anon`/`authenticated` do not receive direct write/read table privileges. Do not bypass RLS or move credentials into a client-side table.
 
+## NVIDIA/Dell streaming model routing parity
+
+The existing agent streaming gateway now applies the **same model resolution** as non-streaming and pinned calls before sending any event-stream request:
+
+- With a personally connected NVIDIA API Catalog key, the hosted `openai/gpt-oss-20b` preset stays hosted and the personal key is sent only to NVIDIA's official API.
+- With an operator-managed Dell NIM endpoint and **no personal key**, the canonical preset maps to the operator's configured `NVIDIA_NIM_MODEL`.
+- A personal key paired with an explicit Dell-only model ID is rejected before any network request.
+- Tests exercise the actual Blackstar server gateway and streaming/SSE parser using isolated mocked HTTP responses, asserting request destination, model ID, streaming event payloads, identity isolation and fail-closed mismatch. **These do not constitute paid NVIDIA/Dell inference evidence.**
+- Upstream NVIDIA/Dell HTTP error **bodies are never copied into agent exception text**, even for 404, 422 and 5xx responses. Error category and retry policy remain available, but upstream bodies might echo private API keys, hosted account IDs or on-premise Dell NIM hostnames. Both streamed and ordinary runtime paths are covered by redaction tests.
+- **Malformed streamed or non-streamed tool arguments fail closed.** The shared existing model gateway rejects incomplete JSON, arrays, and non-object argument values with a sanitised provider error, rather than replacing malformed arguments with an executable empty object. No tool call or approval is emitted from that malformed provider turn; genuine no-argument tools remain supported with an empty object.
+
 ## Personal-key live inference certification (separate, metered)
 
 A successful catalogue request (`GET /v1/models`) **does not prove** that a NVIDIA Build account is entitled to `POST /v1/chat/completions`. For example, some accounts can list models but receive 403/404 for actual inference.

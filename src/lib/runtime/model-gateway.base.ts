@@ -375,7 +375,7 @@ export type RunArgs = {
 
 const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
-function providerError(status: number, body: string) {
+function providerError(status: number, body: string, provider?: Provider) {
   const trimmed = body.slice(0, 400);
   if (status === 429) {
     let type = "";
@@ -404,6 +404,17 @@ function providerError(status: number, body: string) {
     return new ProviderError("AI credits are exhausted for this workspace.", 402, false);
   if (status === 401 || status === 403)
     return new ProviderError("The model provider rejected the runtime credentials.", status, false);
+  // NVIDIA NIM can run at an operator-hosted Dell endpoint or via a user's
+  // private NVIDIA API key. Upstream error bodies are untrusted and may
+  // contain echoed credentials, private hostnames or account identifiers.
+  // Do not forward those details into task errors, notifications or audits.
+  if (provider === "nvidia") {
+    return new ProviderError(
+      `NVIDIA model request failed (HTTP ${status}). Check model access, endpoint readiness and provider availability.`,
+      status,
+      RETRY_STATUS.has(status),
+    );
+  }
   return new ProviderError(
     `Model provider error (${status}): ${trimmed}`,
     status,
@@ -433,7 +444,7 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
       });
       if (res.ok) return res;
       const text = await res.text();
-      const err = providerError(res.status, text);
+      const err = providerError(res.status, text, args.provider);
       if (!err.retryable || attempt === maxAttempts - 1) throw err;
       lastError = err;
     } catch (error) {
@@ -507,12 +518,23 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 }
 
 function safeJson(value: unknown): Record<string, unknown> {
-  if (typeof value !== "string") return (value as Record<string, unknown>) ?? {};
-  try {
-    return JSON.parse(value || "{}");
-  } catch {
-    return {};
+  // Treat absent arguments as the empty object for genuine no-argument tools,
+  // but never silently turn malformed/model-truncated JSON into an executable
+  // empty argument object. The agent runtime owns tool authorisation; malformed
+  // transport responses must fail before reaching it.
+  if (value == null || value === "") return {};
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new ProviderError("The model returned invalid tool-call arguments.", 502, false);
+    }
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new ProviderError("The model returned non-object tool-call arguments.", 502, false);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 /* ---------------------------------------------------------------------- stream */

@@ -976,6 +976,92 @@ describe("honest completion after blocked tools", () => {
 });
 
 
+describe('NVIDIA agent tool approval evidence', () => {
+  it.each([false, true])('queues NVIDIA browser tool approval without execution (stream=%s)', async stream => {
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://operator.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'dell/operator-model');
+    vi.stubEnv('NVIDIA_API_KEY', 'synthetic-operator-key');
+    const ownerKey = 'synthetic-nvidia-personal-secret';
+    const access = vi.spyOn(credentials, 'resolveUserModelProviderAccess')
+      .mockResolvedValue({ provider: 'nvidia', apiKey: ownerKey });
+    const available = vi.spyOn(credentials, 'isProviderAvailableForUser')
+      .mockResolvedValue(true);
+    try {
+      const sb = db([{
+        ...AGENT, model_provider: 'nvidia', model: 'openai/gpt-oss-20b',
+        allowed_tools: ['browser'], requires_approval: true,
+      }]);
+      sb.tables.tools.push(
+        { slug: 'browser', is_active: true },
+        { slug: 'browser_task', is_active: true },
+      );
+      sb.tables.tool_permissions.push({
+        tool: 'browser', agent_id: AGENT.id, enabled: true,
+        requires_approval: true, allowed_domains: ['httpbingo.org'],
+      });
+      const run = await prepareRun({
+        sb, userId: USER, agentId: AGENT.id, input: 'Read https://httpbingo.org/html',
+      });
+      expect(run).toMatchObject({ provider: 'nvidia', model: 'openai/gpt-oss-20b' });
+      expect(run.tools.defs.map(tool => tool.name)).toContain('browser_task');
+
+      // Simulated NVIDIA result only. Existing runtime must queue approval and
+      // NOT open the browser or dispatch the tool before operator permission.
+      const modelResult = {
+        text: '', provider: 'nvidia' as const, model: 'openai/gpt-oss-20b',
+        toolCalls: [{
+          id: 'nvidia-browser-call', name: 'browser_task',
+          arguments: { steps: [
+            { action: 'navigate', url: 'https://httpbingo.org/html' },
+            { action: 'extract', selector: 'body' },
+          ] },
+        }],
+        usage: { input: 21, output: 12 },
+      };
+      if (stream) {
+        gateway.streamChat.mockImplementationOnce(async function* () {
+          yield { type: 'tool_calls', toolCalls: modelResult.toolCalls };
+          yield { type: 'done', result: modelResult };
+        });
+        const events = [];
+        for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+        expect(events.at(-1)).toMatchObject({
+          type: 'paused', task: { status: 'waiting_for_approval' },
+        });
+        expect(events.some(event => event.type === 'complete')).toBe(false);
+      } else {
+        gateway.runChat.mockResolvedValueOnce(modelResult);
+        expect(await executeRun({ sb, userId: USER, run }))
+          .toMatchObject({ status: 'waiting_for_approval' });
+      }
+      const invoked = stream ? gateway.streamChat : gateway.runChat;
+      expect(invoked).toHaveBeenCalledTimes(1);
+      expect(invoked).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'nvidia', model: 'openai/gpt-oss-20b',
+        providerAccess: { provider: 'nvidia', apiKey: ownerKey },
+        allowedProviders: ['nvidia'],
+      }));
+      expect(sb.tables.approval_requests).toEqual([expect.objectContaining({
+        action_type: 'agent_browser_task', status: 'pending',
+      })]);
+      expect(sb.tables.agent_tasks[0]).toMatchObject({
+        provider: 'nvidia', model: 'openai/gpt-oss-20b',
+        status: 'waiting_for_approval', waiting_approval_request_id: expect.any(String),
+        tokens_in: 21, tokens_out: 12, tool_calls: 1,
+      });
+      expect(sb.tables.tool_executions).toHaveLength(0);
+      // The credential must never be persisted in an agent task or approval.
+      expect(JSON.stringify(sb.tables.agent_tasks)).not.toContain(ownerKey);
+      expect(JSON.stringify(sb.tables.approval_requests)).not.toContain(ownerKey);
+      expect(access).toHaveBeenCalledWith({ userId: USER, provider: 'nvidia' });
+    } finally {
+      access.mockRestore();
+      available.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe('durable browser approval pause', () => {
   it.each([false, true])('fails closed when the deployed approval columns are missing (stream=%s)', async stream => {
     const sb = db([{ ...AGENT, allowed_tools: ['browser'], requires_approval: true }]);
