@@ -149,7 +149,7 @@ export default function AutonomousOS() {
         </div>
         <button
           type="button"
-          onClick={() => setDraft({ ...prepareSixAgentBusinessDraft() })}
+          onClick={() => setDraft(prepareSixAgentBusinessDraft())}
           className="rounded-xl border border-violet-300/25 bg-violet-300/10 px-4 py-2.5 text-sm font-semibold text-violet-100 transition hover:bg-violet-300/15"
         >
           Prepare six-agent mission
