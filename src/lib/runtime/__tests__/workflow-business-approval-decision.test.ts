@@ -18,7 +18,7 @@ vi.mock("../workforce.server", () => ({
   },
   executeWorkflowRun: async (args: Record<string, unknown>) => {
     mocks.executions.push(args);
-    return { run: { id: args.runId, status: "succeeded" }, paused: false };
+    return { run: { id: args['runId'], status: "succeeded" }, paused: false };
   },
 }));
 
