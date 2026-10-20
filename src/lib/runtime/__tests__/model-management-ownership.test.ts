@@ -11,6 +11,7 @@ vi.mock('@/integrations/supabase/auth-middleware', () => ({ requireSupabaseAuth:
 
 const mocked = vi.hoisted(() => ({
   admin: vi.fn(), probe: vi.fn(), certEnabled: vi.fn(), cert: vi.fn(),
+  toolEnabled: vi.fn(), toolCert: vi.fn(),
   nvidiaReady: vi.fn(), credentials: vi.fn(),
 }));
 vi.mock('@/lib/marketplace/marketplace.server', () => ({ isPlatformAdmin: mocked.admin }));
@@ -21,6 +22,7 @@ vi.mock('../nvidia-dell-infrastructure.server', () => ({
 }));
 vi.mock('../nvidia-inference-certification.server', () => ({
   nvidiaInferenceProbeEnabled: mocked.certEnabled, certifyNvidiaInference: mocked.cert,
+  nvidiaToolCallProbeEnabled: mocked.toolEnabled, certifyNvidiaToolCalling: mocked.toolCert,
 }));
 vi.mock('../blackstar-astra-runtime-readiness.server', () => ({
   resolveBlackstarAstraRuntimeReadiness: vi.fn().mockResolvedValue(null),
@@ -36,6 +38,7 @@ vi.mock('../model-providers.server', () => ({
 }));
 import {
   getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference,
+  certifyNvidiaModelToolCalling,
 } from '../model-management.functions';
 
 const db = () => createFakeSupabase({
@@ -62,6 +65,7 @@ beforeEach(() => {
   mocked.admin.mockResolvedValue(false);
   mocked.nvidiaReady.mockReturnValue(true);
   mocked.certEnabled.mockReturnValue(true);
+  mocked.toolEnabled.mockReturnValue(true);
   mocked.credentials.mockResolvedValue([]);
   mocked.probe.mockResolvedValue({ status: 'reachable', modelListed: true });
 });
@@ -79,6 +83,7 @@ describe('Runtime Models NVIDIA diagnostics and ownership', () => {
     expect(JSON.stringify(result)).not.toMatch(/Foreign private agent|private-model|secret-model|555/);
     expect(result.nvidiaConnectionProbeAllowed).toBe(false);
     expect(result.nvidiaInferenceCertificationEnabled).toBe(false);
+    expect(result.nvidiaToolCallCertificationEnabled).toBe(false);
   });
 
   it('allows an admin to see diagnostics buttons without claiming inference or hardware proof', async () => {
@@ -86,6 +91,7 @@ describe('Runtime Models NVIDIA diagnostics and ownership', () => {
     const result = await invoke(getModelRuntimeOverview, db());
     expect(result.nvidiaConnectionProbeAllowed).toBe(true);
     expect(result.nvidiaInferenceCertificationEnabled).toBe(true);
+    expect(result.nvidiaToolCallCertificationEnabled).toBe(true);
     expect(result.acceleratorInfrastructure.dell.hardwareVerified).toBe(false);
   });
 
@@ -109,6 +115,20 @@ describe('Runtime Models NVIDIA diagnostics and ownership', () => {
     const overview = await invoke(getModelRuntimeOverview, db());
     expect(overview.nvidiaConnectionProbeAllowed).toBe(false);
     expect(overview.nvidiaInferenceCertificationEnabled).toBe(false);
+  });
+
+  it('denies tool-call format testing to ordinary users without provider use', async () => {
+    const output = await invoke(certifyNvidiaModelToolCalling, db());
+    expect(output).toEqual({ forbidden: true });
+    expect(mocked.toolCert).not.toHaveBeenCalled();
+  });
+
+  it('permits tool-call format testing only after platform-admin check', async () => {
+    mocked.admin.mockResolvedValue(true);
+    mocked.toolCert.mockResolvedValue({ status: 'verified', auditReceiptId: 'receipt' });
+    const output = await invoke(certifyNvidiaModelToolCalling, db());
+    expect(output).toMatchObject({ forbidden: false, status: 'verified' });
+    expect(mocked.toolCert).toHaveBeenCalledWith({ userId: 'owner' });
   });
 
   it('preserves administrator-only gate for chargeable inference certification', async () => {

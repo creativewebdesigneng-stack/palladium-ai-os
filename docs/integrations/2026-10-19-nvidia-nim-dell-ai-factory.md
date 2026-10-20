@@ -27,6 +27,16 @@ The read-only `GET /models` connection check does not prove generation.
 
 A successful fixed-marker response is evidence of **one real NVIDIA text inference**, not evidence of functional agent tool execution, stream performance or Dell hardware utilisation. Missing privileges/credentials, invalid responses, quota errors, and unavailable audit storage do not produce a successful certificate. Disable the flag again once an authorised Preview check is complete.
 
+### Separate operator-only NVIDIA model tool-call acceptance (may incur charges)
+
+Model text certification above does **not** prove the NIM model emits a usable tool-call payload. Blackstar now has a separately gated, explicit **Test NVIDIA model tool call (may incur charges)** action on the existing Runtime Models screen.
+
+1. Set `NVIDIA_API_KEY` and `NVIDIA_NIM_TOOL_PROBE_ENABLED=true` in **Vercel Preview server environment only**. This test is independent of `NVIDIA_NIM_INFERENCE_PROBE_ENABLED`, and never runs on page load.
+2. Sign in as a Blackstar **platform administrator**, open Runtime Models, and manually click the tool-call test. Before contacting NVIDIA, an intent audit must be durably written. The existing pinned NVIDIA gateway sends one fixed request (64 output-token limit, 15 seconds, no retry or provider fallback) with one constrained `calculator` tool definition and expression `8 * 9`.
+3. The result is only `verified` if the actual NVIDIA model returns exactly one structured `calculator` tool call with that one allowed expression and the expected provider/model. A matching completed outcome audit is required; the UI shows the evidence receipt and non-sensitive usage totals.
+4. **The calculator is never executed in this test.** It verifies the model's tool-call *format only*, not Blackstar agent permissions, approval continuation, tool execution, Dell hardware, workload throughput or streaming. Full agent tool use still needs a separately authorised QA agent/task and persisted execution evidence.
+5. Disable the tool-probe flag after acceptance, or leave it unconfigured until there is a real operator-owned NVIDIA key and explicit consent to incur charges. Never copy API keys into the repository, screenshots, chat, browser code or audit metadata.
+
 ## Dell AI Factory / self-hosted NVIDIA NIM (optional)
 
 Dell AI Factory includes PowerEdge GPU compute, networking and storage validated for running NVIDIA software; it is *not* an external generative text API. To use a Dell system, procure/provision actual supported hardware, compatible NVIDIA NIM licensing and a securely authenticated HTTPS reverse proxy to the NIM `/v1` endpoint. Consult the NVIDIA per-model support matrix before attempting a GPU deployment.

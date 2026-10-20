@@ -6,7 +6,8 @@ import {
 } from "./model-providers.server";
 import { resolveBlackstarAstraRuntimeReadiness } from "./blackstar-astra-runtime-readiness.server";
 import { nvidiaDellInfrastructureReadiness, nvidiaNimConfigured, probeNvidiaNimModels } from "./nvidia-dell-infrastructure.server";
-import { nvidiaInferenceProbeEnabled, certifyNvidiaInference } from "./nvidia-inference-certification.server";
+import { nvidiaInferenceProbeEnabled, certifyNvidiaInference,
+  nvidiaToolCallProbeEnabled, certifyNvidiaToolCalling } from "./nvidia-inference-certification.server";
 import { isPlatformAdmin } from '@/lib/marketplace/marketplace.server';
 
 type Sb = { from: (t: string) => any };
@@ -136,6 +137,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
       acceleratorInfrastructure: nvidiaDellInfrastructureReadiness(),
       nvidiaConnectionProbeAllowed: platformAdmin && nvidiaNimConfigured(),
       nvidiaInferenceCertificationEnabled: platformAdmin && nvidiaInferenceProbeEnabled(),
+      nvidiaToolCallCertificationEnabled: platformAdmin && nvidiaToolCallProbeEnabled(),
       totals: {
         agents: assignments.length,
         activeAgents: assignments.filter((agent) => agent.status === "active").length,
@@ -169,4 +171,17 @@ export const certifyNvidiaModelInference = createServerFn({ method: "POST" })
       return { forbidden: true as const };
     }
     return { forbidden: false as const, ...await certifyNvidiaInference({ userId: context.userId }) };
+  });
+
+/**
+ * Separate metered, tool-format-only NVIDIA acceptance. No tool execution.
+ * Uses existing authenticated platform admin and required audit enforcement.
+ */
+export const certifyNvidiaModelToolCalling = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
+      return { forbidden: true as const };
+    }
+    return { forbidden: false as const, ...await certifyNvidiaToolCalling({ userId: context.userId }) };
   });
