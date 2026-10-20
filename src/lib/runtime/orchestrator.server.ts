@@ -16,6 +16,7 @@ import { normaliseProvider, resolveModel, runChat, type ChatMessage } from "./mo
 import { executeWorkflow } from "./workforce.server";
 import { planSixAgentBusinessTeam } from "./six-agent-business-plan";
 import { SIX_AGENT_BUSINESS_BLUEPRINT } from "./business-operations-blueprint";
+import { isProviderAvailableForUser } from "./model-provider-credentials.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -336,11 +337,28 @@ export async function planOrchestratedGoal(args: {
   // The explicitly marked six-role blueprint does not permit the model fallback
   // to present one general agent as six independent business specialists.
   // Generic orchestration is unchanged.
+  // Check only the providers selected by real eligible agents, once per
+  // provider. The existing owner-scoped resolver checks deployment routes
+  // or a decryptable user connection; it never returns credentials here.
+  // A configured route is NOT a successful inference or certification.
+  let providerConfiguredAgentIds: string[] = [];
+  if (args.businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id) {
+    const providers = [...new Set(eligible.agents.map((agent) => normaliseProvider(agent.model_provider)))];
+    const availability = new Map(await Promise.all(providers.map(async (provider) => [
+      provider,
+      await isProviderAvailableForUser({ userId: args.userId, provider }),
+    ] as const)));
+    providerConfiguredAgentIds = eligible.agents
+      .filter((agent) => availability.get(normaliseProvider(agent.model_provider)) === true)
+      .map((agent) => agent.id);
+  }
+
   const plan = args.businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id
     ? planSixAgentBusinessTeam({
         goal,
         candidates: eligible.agents,
         maxAssignments: maximumAssignments,
+        providerConfiguredAgentIds,
       })
     : await createDelegationPlan(goal, eligible.agents, {
         maxAssignments: maximumAssignments,
