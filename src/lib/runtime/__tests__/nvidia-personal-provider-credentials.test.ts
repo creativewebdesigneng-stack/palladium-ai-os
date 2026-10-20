@@ -242,6 +242,61 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it.each([404, 422, 503])('redacts upstream NVIDIA HTTP %i error bodies from both agent paths', async status => {
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://internal.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
+    const upstream = JSON.stringify({ error: {
+      message: 'private-personal-key internal.dell.example user-private-account-id',
+    } });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(upstream, { status, headers: { 'Content-Type': 'application/json' } }),
+    );
+    const args = {
+      provider: 'nvidia' as const, model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user' as const, content: 'Hello' }],
+      providerAccess: { provider: 'nvidia' as const, apiKey: 'private-personal-key' },
+      allowedProviders: ['nvidia' as const], maxAttempts: 1,
+    };
+    const thrown = await runServerChat(args).then(
+      () => null, error => error as ProviderError,
+    );
+    expect(thrown).toBeInstanceOf(ProviderError);
+    expect(thrown?.status).toBe(status);
+    expect(thrown?.message).not.toContain('private-personal-key');
+    expect(thrown?.message).not.toContain('internal.dell.example');
+    expect(thrown?.message).not.toContain('user-private-account-id');
+    await expect((async () => {
+      for await (const _event of streamServerChat(args)) {
+        throw new Error('No streaming events expected on HTTP error');
+      }
+    })()).rejects.toMatchObject({
+      status,
+      message: expect.not.stringContaining('private-personal-key'),
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls.every(([url]) =>
+      url === 'https://integrate.api.nvidia.com/v1/chat/completions')).toBe(true);
+  });
+
+  it('sanitises operator-hosted Dell NIM upstream responses without revealing its private URL', async () => {
+    vi.stubEnv('NVIDIA_API_KEY', 'operator-server-key');
+    vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://private.dell.example/v1');
+    vi.stubEnv('NVIDIA_NIM_MODEL', 'dell/local-only-model');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      'Operator URL https://private.dell.example/v1 token operator-server-key',
+      { status: 502 },
+    ));
+    const error = await runServerChat({
+      provider: 'nvidia', model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: 'Hello' }],
+      allowedProviders: ['nvidia'], maxAttempts: 1,
+    }).then(() => null, e => e as ProviderError);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error?.status).toBe(502);
+    expect(error?.message).not.toContain('private.dell.example');
+    expect(error?.message).not.toContain('operator-server-key');
+  });
+
   it('scopes personal credential usage metadata to user and nvidia only', async () => {
     await markUserModelProviderUsed({ userId: 'owner', provider: 'nvidia' });
     expect(mock.queries[0]).toMatchObject({
