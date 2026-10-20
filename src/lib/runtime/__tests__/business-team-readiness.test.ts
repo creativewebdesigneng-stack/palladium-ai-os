@@ -200,7 +200,7 @@ describe('six-agent business team grant readiness', () => {
     expect(panel).toContain('data.potentialDistinctRoleCoverage');
     expect(panel).toContain('data.potentialProviderConfiguredCoverage');
     expect(panel).toContain('role.draftCandidates');
-    expect(panel).toContain('Each of the six roles must have a different active agent');
+    expect(panel).toContain('Each role must have a different active agent');
     expect(panel).toContain('data.assignedProviderConfiguredAgents?.some');
     expect(screen).toContain('<BusinessTeamReadinessPanel session={session} />');
   });
