@@ -106,7 +106,7 @@
     "@electric-sql/pglite": "0.5.9",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.25.1",
-    "@types/node": "^22.16.5",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
