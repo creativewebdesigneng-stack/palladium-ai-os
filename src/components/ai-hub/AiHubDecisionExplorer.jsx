@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight, BrainCircuit, Code2, GitBranch, ShieldCheck } from 'lucide-react'
 import { routeAiHubWorkload } from '@/lib/ai-hub/router'
+import AiHubSpiderNetwork from '@/components/ai-hub/AiHubSpiderNetwork'
 
 const ACTIVE = new Set(['available', 'active', 'enabled'])
 const ALLOWED_KINDS = new Set(['model', 'tool'])
@@ -75,6 +76,7 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false 
         </select>
       </label>
     </div>
+    <AiHubSpiderNetwork resources={resources} selectedCapability={chosen} route={route} loading={loading} />
     <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-stretch">
       <div className="rounded-xl border border-white/10 bg-white/[.035] p-3">
         <p className="text-[10px] uppercase tracking-wider text-zinc-500">01 · Select</p>
