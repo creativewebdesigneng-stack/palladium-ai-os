@@ -1,4 +1,5 @@
 import { notify } from "@/lib/notifications/notify.server";
+import { fingerprintWorkflowApprovalPlan, type ApprovalPlanStep } from "./workflow-approval-plan-fingerprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -64,6 +65,21 @@ export async function pauseForWorkflowApproval(args: {
     500,
   );
 
+  // The six-agent owner gate binds the exact agent roster, dependencies and
+  // action templates that the operator is asked to approve. Mutating the plan
+  // while the gate is pending will require a fresh approval.
+  let planFingerprint: string | null = null;
+  if (config["snapshot_required"] === true) {
+    const { data: planSteps, error: planError } = await args.db
+      .from("workflow_steps")
+      .select("id,kind,agent_id,position,mode,depends_on,condition,input_template,max_retries,retry_delay_ms,timeout_ms,continue_on_error,requires_approval,config")
+      .eq("workflow_id", args.workflowId);
+    if (planError || !Array.isArray(planSteps) || !planSteps.some((item: ApprovalPlanStep) => item.id === args.step.id)) {
+      throw new Error("The six-agent approval plan could not be verified. No approval was created.");
+    }
+    planFingerprint = await fingerprintWorkflowApprovalPlan(planSteps as ApprovalPlanStep[]);
+  }
+
   const { data: stepRun, error: stepRunError } = await args.db
     .from("workflow_step_runs")
     .insert({
@@ -90,6 +106,7 @@ export async function pauseForWorkflowApproval(args: {
     workflow_id: args.workflowId,
     workflow_step_id: args.step.id,
     workflow_step_run_id: stepRun.id,
+    ...(planFingerprint ? { plan_fingerprint: planFingerprint } : {}),
   };
   const expiry = expiresAt(config["expires_at"]);
   const { data: approval, error: approvalError } = await args.db
