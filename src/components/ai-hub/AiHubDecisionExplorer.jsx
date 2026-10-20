@@ -41,7 +41,7 @@ export default function AiHubDecisionExplorer({ resources = [], loading = false 
       }, candidates)
     : null, [chosen, objective, candidates])
   const trace = route?.decisionTrace
-  const laneName = trace?.lane === 'deterministic' ? 'Verified deterministic tool'
+  const laneName = trace?.lane === 'deterministic' ? 'Deterministic candidate'
     : trace?.lane === 'model-escalation' ? 'AI model escalation'
       : trace ? 'Human review required' : 'No eligible route'
   const LaneIcon = trace?.lane === 'deterministic' ? Code2
