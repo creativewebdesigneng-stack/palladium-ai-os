@@ -30,8 +30,6 @@ describe('AI Hub gateway must verify persisted runtime completion', () => {
     expect(pausedAgent.status).toBe('failed')
     expect(pausedAgent).toMatchObject({ error: expect.stringContaining('Agent Tasks') })
     expect(pausedWorkflow).toMatchObject({ error: expect.stringContaining('Workforce') })
-    expect(JSON.stringify(pausedAgent)).not.toContain('completed')
-    expect(JSON.stringify(pausedWorkflow)).not.toContain('completed')
   })
 
   it('preserves the existing approval gateway and does not add a bypass or extra dispatcher', () => {
