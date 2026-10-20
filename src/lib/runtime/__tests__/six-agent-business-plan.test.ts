@@ -21,6 +21,7 @@ const candidates = [
 const orchestrator = readFileSync(new URL('../orchestrator.server.ts', import.meta.url), 'utf8');
 const manual = readFileSync(new URL('../autonomous-os.manual.functions.ts', import.meta.url), 'utf8');
 const scheduler = readFileSync(new URL('../autonomous-os.scheduler.server.ts', import.meta.url), 'utf8');
+const workflowEngine = readFileSync(new URL('../workforce.server.ts', import.meta.url), 'utf8');
 
 describe('six-agent mission deterministic orchestration', () => {
   it('staffs six distinct eligible agents without model hallucination', () => {
@@ -66,6 +67,17 @@ describe('six-agent mission deterministic orchestration', () => {
     expect(orchestrator).toContain('await persistGeneratedWorkflow');
     expect(orchestrator).toContain('await createDelegationPlan');
     expect(orchestrator).toContain('planSixAgentBusinessTeam');
+  });
+
+  it('uses an executable owner approval step before the first agent, not just inert agent flags', () => {
+    expect(orchestrator).toContain('const approvalGateId = args.businessApprovalGate ? crypto.randomUUID() : null');
+    expect(orchestrator).toContain('const dependencies = approvalGateId && declaredDependencies.length === 0');
+    expect(orchestrator).toContain('kind: "approval"');
+    expect(orchestrator).toContain('approvalStep ? [approvalStep, ...steps] : steps');
+    expect(orchestrator).toContain('businessApprovalGate: args.businessBlueprintId === SIX_AGENT_BUSINESS_BLUEPRINT.id');
+    expect(orchestrator).toContain('requires_approval: true');
+    expect(workflowEngine).toContain('if (step.kind === "approval")');
+    expect(workflowEngine).toContain('pauseForWorkflowApproval({');
   });
 
   it('enforces the same persisted-blueprint marker in manual and scheduled execution', () => {
