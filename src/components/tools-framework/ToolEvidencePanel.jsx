@@ -3,6 +3,7 @@ import TableSurface from '@/components/palladium/TableSurface';
 const STATE_LABELS = {
   browser_verified: 'Verified approved browser task',
   local_verified: 'Verified approved local task',
+  network_verified: 'Verified approved network read',
   execution_recorded: 'Execution recorded — provider not certified',
   simulated_only: 'Simulated result only — not certified',
   approval_activity: 'Approval/queue activity only',
@@ -15,7 +16,7 @@ export default function ToolEvidencePanel({ rows = [], scope }) {
   const totals = Object.fromEntries(Object.keys(STATE_LABELS).map(key => [
     key, rows.filter(row => row.state === key).length,
   ]));
-  const verified = (totals.browser_verified || 0) + (totals.local_verified || 0);
+  const verified = (totals.browser_verified || 0) + (totals.local_verified || 0) + (totals.network_verified || 0);
   const recorded = totals.execution_recorded || 0;
   return <section aria-label="Agent tool evidence" className="mb-5 space-y-2 rounded-2xl border border-white/10 bg-white/[.03] p-4">
     <h2 className="text-sm font-semibold text-zinc-100">Tool execution evidence</h2>
@@ -28,7 +29,7 @@ export default function ToolEvidencePanel({ rows = [], scope }) {
     </p>
     <p className="text-[11px] text-zinc-500">
       Scope: {scope === 'recent_60_executions' ? 'up to the most recent 60 owner-scoped execution records and 60 browser approvals' : 'available execution records'}.
-      A recorded success alone is not a certification. Verified browser and bounded local tasks need matching approved receipts, original non-simulated outputs and completed task status. Other provider and worker tools require separate live checks.
+      A recorded success alone is not a certification. Verified browser, local and public network reads need matched approved receipts, real bounded outputs and completed task status. Connected services and GPU workers still need separate live checks.
     </p>
     <details className="rounded-lg border border-white/10 bg-black/20 p-3">
       <summary className="cursor-pointer text-xs font-medium text-violet-200">Review evidence for every tool</summary>
