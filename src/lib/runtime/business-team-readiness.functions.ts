@@ -15,7 +15,10 @@ export const getSixAgentBusinessReadiness = createServerFn({ method: 'POST' })
       sb.from('personal_agents')
         .select('id,name,status,allowed_tools,model_provider')
         .eq('user_id', context.userId)
-        .eq('status', 'active')
+        // Count active and draft specialists; drafts are advisory candidates
+        // only and must never be treated as eligible to execute.
+        .in('status', ['active', 'draft'])
+        .order('status', { ascending: true })
         .limit(101),
       sb.from('autonomous_runtime_controls')
         .select('enabled')
