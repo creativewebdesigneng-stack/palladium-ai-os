@@ -82,6 +82,63 @@ export const getToolFramework = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Read-only, task-scoped network certification check for the authenticated
+ * operator. Reuse the Tool Framework's existing evidence classifier; neither
+ * approval requests nor tool executions are created, updated or returned raw.
+ */
+export const getGovernedReadEvidence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { taskId: string; tool: string }) => {
+    const tool = String(input?.tool ?? "");
+    const taskId = String(input?.taskId ?? "");
+    if (!["web_search", "web_fetch", "http_request"].includes(tool) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)) {
+      throw new Error("A valid network QA tool and task ID are required.");
+    }
+    return { tool, taskId };
+  })
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const userId = context.userId;
+    const { data: task, error: taskError } = await sb.from("agent_tasks")
+      .select("id,agent_id,status").eq("id", data.taskId)
+      .eq("user_id", userId).maybeSingle();
+    if (taskError || !task || !task.agent_id) throw new Error("That agent task is not available to you.");
+
+    const [runs, receipts, catalogue] = await Promise.all([
+      sb.from("tool_executions").select("agent_task_id,agent_id,tool,status,input,output,created_at")
+        .eq("user_id", userId).eq("agent_id", task.agent_id)
+        .eq("agent_task_id", task.id).eq("tool", data.tool)
+        .order("created_at", { ascending: false }).limit(25),
+      sb.from("approval_requests").select("action_type,status,execution_status,agent_id,details,execution_result")
+        .eq("user_id", userId).eq("agent_id", task.agent_id)
+        .eq("action_type", "agent_tool_task")
+        .contains("details", { agent_task_id: task.id, tool: data.tool })
+        .order("created_at", { ascending: false }).limit(25),
+      sb.from("tools").select("slug,is_active").eq("slug", data.tool).maybeSingle(),
+    ]);
+    if (runs.error || receipts.error || catalogue.error) {
+      throw new Error("Could not verify the original task, tool execution and approval receipts.");
+    }
+    const evidence = toolExecutionEvidence([{
+      slug: data.tool,
+      is_active: catalogue.data?.is_active === true,
+      executable: TOOL_MANIFEST.some(row => row.slug === data.tool),
+    }], runs.data ?? [], receipts.data ?? [])[0];
+    // A receipt alone is insufficient if the original task never finished.
+    const verified = task.status === "succeeded" && evidence?.state === "network_verified";
+    return {
+      taskId: task.id,
+      tool: data.tool,
+      taskStatus: task.status,
+      evidenceState: evidence?.state ?? "not_tested",
+      verified,
+      attempts: evidence?.observedAttempts ?? 0,
+      approvalPending: (receipts.data ?? []).some((row: any) => row.status === "pending"),
+    };
+  });
+
 /* ----------------------------------------------------------------- permissions */
 
 export const saveToolPermission = createServerFn({ method: "POST" })
