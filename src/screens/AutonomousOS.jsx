@@ -10,6 +10,7 @@ import { recommendBlackstarOpportunityActions } from '@/lib/ai-hub/opportunity-a
 import { requestBlackstarOpportunityApproval } from '@/lib/ai-hub/opportunity-approval.functions';
 import { queueAutonomousGoalNow } from '@/lib/runtime/autonomous-os.manual.functions';
 import { getAutonomousRuntimeControlPlane, setAutonomousRuntimeEnabled } from '@/lib/runtime/autonomous-control-plane.functions';
+import { SIX_AGENT_BUSINESS_BLUEPRINT, prepareSixAgentBusinessDraft, businessBlueprintCriteria } from '@/lib/runtime/business-operations-blueprint';
 
 const badge = (status) => {
   if (status === 'completed') return 'border-emerald-300/20 bg-emerald-300/[.06] text-emerald-200';
@@ -26,6 +27,7 @@ const when = (value) => {
 };
 
 const emptyDraft = () => ({
+  blueprint_id: null,
   name: '',
   objective: '',
   autonomy_level: 'guarded',
@@ -125,7 +127,7 @@ export default function AutonomousOS() {
       budget_pence: budgetPounds === null ? null : Math.round(budgetPounds * 100),
       require_approval_for_external_actions: true,
       allow_replanning: true,
-      success_criteria: [],
+      success_criteria: businessBlueprintCriteria(draft.blueprint_id),
     });
   };
 
@@ -137,6 +139,33 @@ export default function AutonomousOS() {
 
   return <>
     <PageHeader eyebrow="Autonomous Intelligence" title="Autonomous OS" description="Persistent goals that Blackstar can plan, delegate to specialist fleets, execute, observe and govern through the existing agent runtime." />
+
+    <section aria-labelledby="six-agent-business-heading" className="mb-4 rounded-[28px] border border-violet-300/15 bg-violet-400/[.035] p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-violet-300">Reusable mission blueprint</p>
+          <h2 id="six-agent-business-heading" className="mt-1 text-xl font-semibold text-white">Six-Agent Business Operations</h2>
+          <p className="mt-2 text-sm leading-6 text-white/50">{SIX_AGENT_BUSINESS_BLUEPRINT.description} Uses the existing Workforce and runtime; it does not provision agents, connect accounts or guarantee income.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDraft({ ...prepareSixAgentBusinessDraft() })}
+          className="rounded-xl border border-violet-300/25 bg-violet-300/10 px-4 py-2.5 text-sm font-semibold text-violet-100 transition hover:bg-violet-300/15"
+        >
+          Prepare six-agent mission
+        </button>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {SIX_AGENT_BUSINESS_BLUEPRINT.roles.map((role, index) => (
+          <div key={role.id} className="rounded-xl border border-white/[.07] bg-black/20 p-3">
+            <p className="text-xs font-semibold text-white/85">{index + 1}. {role.name}</p>
+            <p className="mt-1 text-[11px] leading-5 text-white/40">{role.task}</p>
+            <p className="mt-2 text-[10px] text-cyan-200/60">Evidence: {role.evidence}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-amber-200/70">Starts as an assisted, manual, zero-spend goal with a maximum of six specialist assignments. Review the populated goal below and explicitly create it. Missing agents, provider access and financial proof remain visible blockers. Change scheduling or budget only if you deliberately choose to.</p>
+    </section>
 
     <div className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]">
       <section className="relative overflow-hidden rounded-[28px] border border-violet-300/15 bg-black/45 p-5 shadow-[0_30px_100px_rgba(0,0,0,.35)] backdrop-blur-2xl sm:p-6">
