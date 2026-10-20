@@ -8,13 +8,14 @@ function approval(
   execution_status: string | null,
   providerId = 'palladium-agent-runtime',
   capabilityId = 'agent-1',
+  workloadId = 'agent:' + capabilityId,
 ) {
   return {
     id, action_type: 'ai_hub_execution', status, execution_status,
     created_at: '2026-10-20T12:00:00Z',
     executed_at: '2026-10-20T12:05:00Z',
     details: {
-      ai_hub_workload_id: 'agent:agent-1',
+      ai_hub_workload_id: workloadId,
       ai_hub_provider_id: providerId,
       ai_hub_capability_id: capabilityId,
       ai_hub_input_fingerprint: 'must-not-leak',
@@ -73,8 +74,25 @@ describe('AI Hub Spider recorded approval evidence', () => {
       approval('first', 'approved', 'succeeded'),
       approval('second', 'approved', 'failed', 'external-mcp:server-1', 'agent-1'),
     ])
-    expect(receiptsForSpiderNode(receipts, { providerId: 'palladium-agent-runtime', id: 'agent-1' }).map((r) => r.id)).toEqual(['first'])
-    expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', id: 'agent-1' }).map((r) => r.id)).toEqual(['second'])
+    expect(receiptsForSpiderNode(receipts, { providerId: 'palladium-agent-runtime', kind: 'agent', id: 'agent-1' }).map((r) => r.id)).toEqual(['first'])
+    expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'tool', id: 'agent-1' }).map((r) => r.id)).toEqual([])
+    expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'agent', id: 'agent-1' }).map((r) => r.id)).toEqual([])
+  })
+  it('never assigns a workflow receipt to an agent or a tool sharing its ID and provider', () => {
+    const rows = [
+      approval('agent', 'approved', 'succeeded', 'shared-provider', 'same', 'agent:same'),
+      approval('workflow', 'approved', 'failed', 'shared-provider', 'same', 'workflow:same'),
+      approval('tool', 'approved', 'succeeded', 'external-mcp:server-1', 'server-1:same', 'external-mcp:server-1:same'),
+    ]
+    const receipts = toAiHubSpiderReceipts(rows)
+    const match = (providerId: string, kind: string, id: string) =>
+      receiptsForSpiderNode(receipts, { providerId, kind, id }).map((receipt) => receipt.id)
+    expect(match('shared-provider', 'agent', 'same')).toEqual(['agent'])
+    expect(match('shared-provider', 'workflow', 'same')).toEqual(['workflow'])
+    expect(match('shared-provider', 'tool', 'same')).toEqual([])
+    expect(match('external-mcp:server-1', 'tool', 'server-1:same')).toEqual(['tool'])
+    expect(match('external-mcp:server-1', 'agent', 'server-1:same')).toEqual([])
+    expect(match('shared-provider', 'model', 'same')).toEqual([])
   })
 })
 
