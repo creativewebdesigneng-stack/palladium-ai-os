@@ -41,10 +41,24 @@ export interface AiHubCapabilityRef {
  * Optional planning policy. Historical task success is a heuristic, never calibrated
  * certainty or permission to bypass Blackstar's execution/approval gateways.
  */
+/**
+ * Verified structured prompt assessment supplied by a trusted policy boundary,
+ * not by free-form model text or user-editable prompt content.
+ */
+export interface AiHubPromptAssessment {
+  relevance: 'relevant' | 'irrelevant' | 'unknown'
+  grounding: 'grounded' | 'ungrounded' | 'unknown'
+  ambiguity: 'clear' | 'ambiguous' | 'unknown'
+  approval: 'required' | 'not-required' | 'unknown'
+  source: 'blackstar-policy-verifier' | 'unverified'
+  evidenceIds?: string[]
+}
+
 export interface AiHubEvidenceRoutingPolicy {
   mode: 'evidence-gated'
   minObservedRuns?: number
   minReliability?: number
+  promptAssessment?: AiHubPromptAssessment
 }
 
 /** Decision *plan* evidence; this is not an execution or audit receipt. */
