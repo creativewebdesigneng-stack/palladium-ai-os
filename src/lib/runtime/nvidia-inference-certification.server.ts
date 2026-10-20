@@ -229,7 +229,7 @@ export async function certifyPersonalNvidiaInference(args: { userId: string }): 
     requestId = await writeAuditRequired({
       userId: args.userId, action: 'model.nvidia_personal_inference_requested',
       status: 'success', targetType: 'model_provider', targetId: 'nvidia',
-      metadata: { model, maxCompletionTokens: 32, provider: 'nvidia',
+      metadata: { model, maxCompletionTokens: 128, provider: 'nvidia',
         credentialScope: 'owner', chargedProvider: 'nvidia', toolsExecuted: false },
     });
   } catch {
@@ -248,7 +248,8 @@ export async function certifyPersonalNvidiaInference(args: { userId: string }): 
         `Connection certification. Reply with exactly ${NVIDIA_INFERENCE_CERTIFICATION_MARKER} and nothing else.` }],
       tools: [],
       temperature: 0,
-      maxTokens: 32,
+      maxTokens: 128,
+      reasoningEffort: 'low',
       maxAttempts: 1,
       timeoutMs: 15_000,
       allowedProviders: ['nvidia'],
