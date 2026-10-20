@@ -49,3 +49,50 @@ export function workflowGatewayOutcome(result: unknown): AiHubRuntimeOutcome {
     error: 'The workflow did not reach a persisted succeeded state. Check Workforce for its actual status and evidence.',
   }
 }
+
+/**
+ * A returned success object alone cannot certify persistence. In particular,
+ * Workforce may return a fallback {id, status} if its final SELECT is missing.
+ * Confirm the exact owned task/run in the canonical table before the outer
+ * approval gateway persists a recorded-success receipt.
+ */
+export async function confirmPersistedAiHubRuntimeOutcome(args: {
+  sb: { from: (table: string) => any }
+  userId: string
+  resourceId: string
+  kind: 'agent' | 'workflow'
+  runtime: unknown
+}): Promise<AiHubRuntimeOutcome> {
+  const outcome = args.kind === 'agent'
+    ? agentGatewayOutcome(args.runtime)
+    : workflowGatewayOutcome(args.runtime)
+  // A pause or failure is already non-terminal; do not claim success or
+  // start a new lookup that could mask the actionable underlying status.
+  if (outcome.status !== 'completed') return outcome
+
+  const key = args.kind === 'agent' ? 'task' : 'run'
+  const nested = args.runtime && typeof args.runtime === 'object' && !Array.isArray(args.runtime)
+    ? (args.runtime as Record<string, unknown>)[key] : null
+  const record = nested && typeof nested === 'object' && !Array.isArray(nested)
+    ? nested as Record<string, unknown> : null
+  const id = record?.['id']
+  if (typeof id !== 'string' || !id || !args.userId || !args.resourceId) {
+    return { status: 'failed', error: 'AI Hub cannot verify the owned runtime completion record.' }
+  }
+  const table = args.kind === 'agent' ? 'agent_tasks' : 'workflow_runs'
+  const resourceKey = args.kind === 'agent' ? 'agent_id' : 'workflow_id'
+  try {
+    const { data, error } = await args.sb.from(table)
+      .select('id,status')
+      .eq('id', id)
+      .eq('user_id', args.userId)
+      .eq(resourceKey, args.resourceId)
+      .maybeSingle()
+    if (error || data?.id !== id || data?.status !== 'succeeded') {
+      return { status: 'failed', error: 'AI Hub could not confirm a persisted succeeded run for this owned resource.' }
+    }
+  } catch {
+    return { status: 'failed', error: 'AI Hub could not verify the canonical runtime record.' }
+  }
+  return outcome
+}
