@@ -100,6 +100,7 @@ describe('Spider Decision Network UI integration', () => {
     expect(screen.indexOf('<AiHubDecisionExplorer')).toBeLessThan(screen.indexOf('<AiHubNetworkScene'))
     expect(explorer).toContain('import AiHubSpiderNetwork')
     expect(explorer).toContain('<AiHubSpiderNetwork resources={resources} selectedCapability={chosen} route={route} loading={loading}')
+    expect(explorer).toContain('receipts={receipts} receiptError={receiptError}')
     expect(explorer).toContain('onPrepareResource={onPrepareResource ?')
     expect(explorer).toContain('taskReady={Boolean(promptDraft.trim())}')
     expect(network).toContain("buildAiHubSpiderTopology(resources, selectedCapability, route)")
