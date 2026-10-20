@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 import type { UserConnectableModelProvider } from './model-provider-credentials.server'
 
-const providerSchema = z.enum(['openai', 'anthropic'])
+const providerSchema = z.enum(['openai', 'anthropic', 'nvidia'])
 const saveSchema = z.object({
   provider: providerSchema,
   apiKey: z.string().trim().min(20).max(8192),
@@ -26,23 +26,43 @@ async function probeProviderKey(provider: UserConnectableModelProvider, apiKey: 
         headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
         signal,
       })
-    : await fetch('https://api.anthropic.com/v1/models?limit=20', {
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          Accept: 'application/json',
-        },
-        signal,
-      })
+    : provider === 'nvidia'
+      ? await fetch('https://integrate.api.nvidia.com/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+          signal,
+          redirect: 'error',
+        })
+      : await fetch('https://api.anthropic.com/v1/models?limit=20', {
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            Accept: 'application/json',
+          },
+          signal,
+        })
 
   const text = await response.text()
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} rejected that API key.`)
+      throw new Error(`${provider === 'openai' ? 'OpenAI' : provider === 'nvidia' ? 'NVIDIA' : 'Anthropic'} rejected that API key.`)
     }
-    throw new Error(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} connection test returned HTTP ${response.status}.`)
+    throw new Error(`${provider === 'openai' ? 'OpenAI' : provider === 'nvidia' ? 'NVIDIA' : 'Anthropic'} connection test returned HTTP ${response.status}.`)
   }
 
+  // NVIDIA personal access requires a genuinely parseable model catalogue,
+  // not just HTTP 200 from an auth gateway or unrelated webpage.
+  if (provider === 'nvidia') {
+    try {
+      const catalogue: unknown = JSON.parse(text)
+      if (!catalogue || typeof catalogue !== 'object' ||
+          !('data' in catalogue) ||
+          !Array.isArray((catalogue as { data: unknown }).data)) {
+        throw new Error('Invalid NVIDIA model catalogue')
+      }
+    } catch {
+      throw new Error('NVIDIA did not return a valid model catalogue; the credential was not saved.')
+    }
+  }
   let payload: Record<string, unknown> = {}
   try { payload = JSON.parse(text) as Record<string, unknown> } catch { /* successful empty/unreadable payload remains a valid HTTP probe */ }
   const rows = Array.isArray(payload['data']) ? payload['data'] : []
@@ -72,6 +92,12 @@ export const listModelProviderConnections = createServerFn({ method: 'POST' })
           name: 'Anthropic',
           deploymentConfigured: Boolean(process.env['ANTHROPIC_API_KEY']),
           connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'anthropic') ?? null,
+        },
+        {
+          id: 'nvidia' as const,
+          name: 'NVIDIA NIM',
+          deploymentConfigured: Boolean(process.env['NVIDIA_API_KEY']),
+          connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'nvidia') ?? null,
         },
       ],
     }
