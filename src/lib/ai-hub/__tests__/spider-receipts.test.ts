@@ -130,6 +130,9 @@ describe('AI Hub Spider approval evidence boundary', () => {
   it('shows the evidence in the existing spider and does not dispatch actions', () => {
     expect(screen).toContain('useServerFn(listAiHubSpiderReceipts)')
     expect(screen).toContain("enabled:session === 'yes'")
+    expect(screen).toContain("queryKey:['ai-hub-spider-receipts',ownerId]")
+    expect(screen).toContain("enabled:session === 'yes' && Boolean(ownerId)")
+    expect(screen).toContain("!spiderEvidence.isError ? spiderEvidence.data?.receipts ?? [] : []")
     expect(explorer).toContain('receipts={receipts}')
     expect(spider).toContain('latestSpiderReceiptForNode')
     expect(spider).toContain('hasCompletedReceipt')
