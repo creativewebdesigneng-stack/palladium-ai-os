@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { AiHubApprovalGate, AiHubExecutionContext } from './execution'
 import type { AiHubOrchestrationPlan } from './orchestrator'
 
@@ -8,18 +9,69 @@ async function privilegedApprovalDb(): Promise<SupabaseLike> {
   return supabaseAdmin as unknown as SupabaseLike
 }
 
-function approvalDetails(plan: AiHubOrchestrationPlan) {
+/**
+ * Produce a canonical, bounded representation for approval fingerprinting.
+ * Never save raw goals, MCP arguments, or other task input in approval details.
+ */
+function canonicalApprovalInput(input: unknown): string {
+  const visited = new WeakSet<object>()
+  const normalise = (value: unknown, depth: number): unknown => {
+    if (depth > 20) throw new Error('AI Hub approval input is too deeply nested')
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (Array.isArray(value)) {
+      if (visited.has(value)) throw new Error('AI Hub approval input cannot contain cycles')
+      if (value.length > 2000) throw new Error('AI Hub approval input is too large')
+      visited.add(value)
+      const result = value.map((item) => normalise(item, depth + 1))
+      visited.delete(value)
+      return result
+    }
+    if (value && typeof value === 'object') {
+      if (visited.has(value)) throw new Error('AI Hub approval input cannot contain cycles')
+      const prototype = Object.getPrototypeOf(value)
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new Error('AI Hub approval input must be plain JSON')
+      }
+      visited.add(value)
+      const entries = Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      if (entries.length > 2000) throw new Error('AI Hub approval input is too large')
+      const result: Record<string, unknown> = Object.create(null)
+      for (const [key, item] of entries) result[key] = normalise(item, depth + 1)
+      visited.delete(value)
+      return result
+    }
+    throw new Error('AI Hub approval requires a JSON-serialisable task input')
+  }
+
+  const serialised = JSON.stringify(normalise(input, 0))
+  if (!serialised || serialised.length > 30000) throw new Error('AI Hub approval input is missing or too large')
+  return serialised
+}
+
+function approvalDetails(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext) {
+  const canonicalInput = canonicalApprovalInput(context.input)
+  // The digest is a binding fingerprint, not encryption or a signed attestation.
+  // It binds both the decision identity and the exact task input, and is
+  // independently recomputed on claim rather than accepted from the client.
+  const fingerprint = createHash('sha256').update(JSON.stringify([
+    'ai-hub-input-v1', context.actorId, context.tenantId,
+    context.approvalOrgId ?? null, plan.workloadId,
+    plan.route.capability.providerId, plan.route.capability.id,
+    canonicalInput,
+  ])).digest('hex')
   return {
     ai_hub_workload_id: plan.workloadId,
     ai_hub_provider_id: plan.route.capability.providerId,
     ai_hub_capability_id: plan.route.capability.id,
+    ai_hub_input_fingerprint: fingerprint,
   }
 }
 
 export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
   return {
     async request(plan: AiHubOrchestrationPlan, context: AiHubExecutionContext) {
-      const details = approvalDetails(plan)
+      const details = approvalDetails(plan, context)
       let existingQuery = db
         .from('approval_requests')
         .select('id')
@@ -30,6 +82,7 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
         .eq('details->>ai_hub_workload_id', details.ai_hub_workload_id)
         .eq('details->>ai_hub_provider_id', details.ai_hub_provider_id)
         .eq('details->>ai_hub_capability_id', details.ai_hub_capability_id)
+        .eq('details->>ai_hub_input_fingerprint', details.ai_hub_input_fingerprint)
       existingQuery = context.approvalOrgId ? existingQuery.eq('org_id', context.approvalOrgId) : existingQuery.is('org_id', null)
       const { data: existing, error: existingError } = await existingQuery.maybeSingle()
       if (existingError) throw new Error(existingError.message)
