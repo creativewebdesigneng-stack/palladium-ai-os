@@ -211,6 +211,7 @@ export const executeAiHubExternalMcp = createServerFn({ method: 'POST' })
       tenantId: server.org_id ?? context.userId,
       approvalOrgId: server.org_id ?? null,
       actorId: context.userId,
+      input: toolInput,
       ...(data.approvalRequestId ? { approvalRequestId: data.approvalRequestId } : {}),
     })
     if (result.status === 'waiting_for_approval') return { status: result.status, adapter: result.adapter, approvalRequestId: result.approvalRequestId ?? '' }
