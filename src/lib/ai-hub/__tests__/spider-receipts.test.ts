@@ -45,6 +45,14 @@ describe('AI Hub Spider recorded approval evidence', () => {
     expect(receipts[5]?.executedAt).toBeNull()
   })
 
+  it('does not report terminal execution without a valid persisted completion timestamp', () => {
+    const success = { ...approval('missing', 'approved', 'succeeded'), executed_at: null }
+    const failed = { ...approval('invalid', 'approved', 'failed'), executed_at: 'not-a-date' }
+    const receipts = toAiHubSpiderReceipts([success, failed])
+    expect(receipts.map((receipt) => receipt.status)).toEqual(['not-executed', 'not-executed'])
+    expect(receipts.map((receipt) => receipt.executedAt)).toEqual([null, null])
+  })
+
   it('returns only allowlisted fields; input, raw results and fingerprint are never exposed', () => {
     const receipts = toAiHubSpiderReceipts([approval('1', 'approved', 'succeeded')])
     expect(receipts).toEqual([{
