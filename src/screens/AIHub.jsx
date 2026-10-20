@@ -103,7 +103,7 @@ export default function AIHub() {
   const mcpExecution = useMutation({ mutationFn:({resource,inputJson:submittedInput,approvalRequestId}) => runHubMcp({data:{resourceId:resource.id,inputJson:submittedInput,...(approvalRequestId ? {approvalRequestId}:{})}}), onSuccess:(result,variables) => { if(result.status === 'waiting_for_approval') setMcpApproval({resource:variables.resource,inputJson:variables.inputJson,approvalRequestId:result.approvalRequestId}); else setMcpApproval(null); } });
   const teamPlanning = useMutation({ mutationFn:() => planTeam({data:{missionId:teamMission.trim(),requiredCapabilities:[...new Set(teamCapabilities.split(',').map((value)=>value.trim()).filter(Boolean))],maxTeamSize:6,minTrustScore:0.65,maxActiveWorkloads:5}}) });
   const counterfactualPlanning = useMutation({ mutationFn:() => { const scenarios=JSON.parse(scenarioJson); return planCounterfactual({data:{decisionId:decisionId.trim(),scenarios}}); } });
-  const inventory = useQuery({ queryKey:['ai-hub-live-resources'], queryFn:() => listResources({data:{limit:100}}), enabled:session === 'yes', retry:false, refetchInterval:15000 });
+  const inventory = useQuery({ queryKey:['ai-hub-live-resources',ownerId], queryFn:() => listResources({data:{limit:100}}), enabled:session === 'yes' && Boolean(ownerId), retry:false, refetchInterval:15000 });
   // Astra Spider is a selection surface, not a new execution gateway.
   // Only existing tenant inventory may be prepared. The operator still
   // submits through existing authenticated agent/workflow/MCP approval forms.
