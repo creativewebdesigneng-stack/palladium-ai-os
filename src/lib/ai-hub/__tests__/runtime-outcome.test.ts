@@ -42,4 +42,12 @@ describe('AI Hub gateway must verify persisted runtime completion', () => {
     expect(source).not.toContain("return { status: 'completed', adapter: 'agent-runtime' }")
     expect(source).not.toContain("return { status: 'completed', adapter: 'workflows' }")
   })
+
+  it('shows failed adapter responses instead of suppressing them as successful mutations', () => {
+    const screen = readFileSync(new URL('../../../screens/AIHub.jsx', import.meta.url), 'utf8')
+    expect(screen).toContain("execution.data?.status==='failed'")
+    expect(screen).toContain("mcpExecution.data?.status==='failed'")
+    expect(screen).toContain("execution.data.error || 'The Hub action did not complete.")
+    expect(screen).toContain("mcpExecution.data.error || 'The MCP tool did not complete.")
+  })
 })
