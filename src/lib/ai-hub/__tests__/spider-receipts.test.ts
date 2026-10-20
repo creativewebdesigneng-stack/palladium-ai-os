@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { receiptsForSpiderNode, toAiHubSpiderReceipts } from '../spider-receipts'
+import { latestSpiderReceiptForNode, receiptsForSpiderNode, toAiHubSpiderReceipts } from '../spider-receipts'
 
 function approval(
   id: string,
@@ -78,6 +78,19 @@ describe('AI Hub Spider recorded approval evidence', () => {
     expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'tool', id: 'agent-1' }).map((r) => r.id)).toEqual(['second'])
     expect(receiptsForSpiderNode(receipts, { providerId: 'external-mcp:server-1', kind: 'agent', id: 'agent-1' }).map((r) => r.id)).toEqual([])
   })
+  it('uses the newest request, not an older successful run, even if supplied out of order', () => {
+    const oldSuccess = { ...approval('old-success', 'approved', 'succeeded'), created_at: '2026-10-18T10:00:00Z' }
+    const newerPending = { ...approval('new-pending', 'pending', null), created_at: '2026-10-20T10:00:00Z' }
+    const latestFailure = { ...approval('latest-failure', 'approved', 'failed'), created_at: '2026-10-21T10:00:00Z' }
+    const node = { providerId: 'palladium-agent-runtime', kind: 'agent', id: 'agent-1' }
+    const pending = toAiHubSpiderReceipts([oldSuccess, newerPending])
+    expect(latestSpiderReceiptForNode(pending, node)?.status).toBe('awaiting-approval')
+    expect(latestSpiderReceiptForNode(pending, node)?.id).toBe('new-pending')
+    expect(latestSpiderReceiptForNode(toAiHubSpiderReceipts([latestFailure, newerPending, oldSuccess]), node)?.status)
+      .toBe('recorded-failure')
+    expect(latestSpiderReceiptForNode(pending, { ...node, providerId: 'other-provider' })).toBeNull()
+  })
+
   it('never assigns a workflow receipt to an agent or a tool sharing its ID and provider', () => {
     const rows = [
       approval('agent', 'approved', 'succeeded', 'shared-provider', 'same', 'agent:same'),
@@ -118,7 +131,8 @@ describe('AI Hub Spider approval evidence boundary', () => {
     expect(screen).toContain('useServerFn(listAiHubSpiderReceipts)')
     expect(screen).toContain("enabled:session === 'yes'")
     expect(explorer).toContain('receipts={receipts}')
-    expect(spider).toContain('receiptsForSpiderNode')
+    expect(spider).toContain('latestSpiderReceiptForNode')
+    expect(spider).toContain('hasCompletedReceipt')
     expect(spider).toContain('Does not independently confirm provider success.')
     expect(spider).not.toContain('executeAiHubAgent')
     expect(spider).not.toContain('approved: true')
