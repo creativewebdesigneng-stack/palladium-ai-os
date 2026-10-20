@@ -25,13 +25,14 @@ This is our own extension of the existing AI Hub Intelligence Router.
 The optional `workload.requirements.evidenceRouting = { mode: 'evidence-gated' }`
 asks the existing router for a planned decision trace:
 
-1. **Deterministic tool**: a tool must explicitly declare
+1. **Prompt assessment**: structured relevance, grounding, ambiguity and approval signals must come from the trusted Blackstar policy-verifier boundary with evidence identifiers before the deterministic lane is even considered. A verified irrelevant prompt is rejected; an approval-required prompt always goes to human review. Unverified or missing assessments never authorise deterministic execution.
+2. **Deterministic tool**: a tool must explicitly declare
    `executionClass: 'deterministic'`, `verifiedExecutor: true` and
    `readOnly: true`, with >=20 observed executions and >=0.8 Bayesian-smoothed
    historical success. These are planning conditions, not proof the tool is safe.
-2. **Model escalation**: if no tool qualifies, a matching model can be selected
+3. **Model escalation**: if no tool qualifies, a matching model can be selected
    *only* when inventory metadata explicitly says `configured: true`.
-3. **Human review**: if neither qualifies, plan an eligible resource but require
+4. **Human review**: if neither qualifies, plan an eligible resource but require
    the existing human approval gate before any dispatch. No candidate => no plan.
 
 Existing `requireHumanApproval`, tenant policy, capability matching and
@@ -56,7 +57,7 @@ transmitted, task created, provider invoked or side effect performed.
 - The existing AI Hub execution entrypoints for explicitly selected agents,
   workflows and MCP tools still follow their original approval behaviour.
   They are **not** silently switched into this optional policy.
-- Existing tool inventory does not yet certify deterministic executors with
+- Neither the UI nor the generic agent-runtime path currently supplies a trusted prompt assessment automatically. This change adds the policy contract and fail-closed planner, not a new independently certified prompt classifier. The existing tool inventory does not yet certify deterministic executors with
   enough real execution evidence. Until certification data is available,
   corresponding candidates fall back to model escalation or human review.
 - Historical task success is only a heuristic, not calibrated confidence.
