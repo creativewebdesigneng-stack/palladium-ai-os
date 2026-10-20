@@ -32,6 +32,14 @@ export default function BusinessTeamReadinessPanel({ session }) {
     {session === 'yes' && readiness.isLoading && <p className="mt-4 text-sm text-white/40">Checking available agent assignments…</p>}
     {readiness.isError && <p className="mt-4 text-sm text-rose-300"><AlertTriangle className="mr-1 inline h-4 w-4" />{friendlyMessage(readiness.error)}</p>}
     {data && <>
+      {data.providerConfiguredDistinctCoverage < data.requiredRoles && <div role="status" className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[.035] p-3">
+        <p className="text-xs font-semibold text-amber-100">Six-agent mission is not ready to execute</p>
+        <p className="mt-1 text-xs leading-5 text-white/55">{Math.max(0, data.requiredRoles - data.activeAgentCount) > 0 ? `At least ${data.requiredRoles - data.activeAgentCount} additional active agents are needed. ` : ''}Each of the six roles must have a different active agent, a relevant tool grant and an available model route. Configuration is not live certification.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href="/agents" className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-white/80 hover:border-white/30">Review existing draft agents</a>
+          <a href="/agents/new" className="rounded-lg border border-cyan-300/20 px-3 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-300/[.06]">Configure new specialist</a>
+        </div>
+      </div>}
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-white/[.07] p-3"><Users className="h-4 w-4 text-cyan-200/65" /><p className="mt-2 text-xl font-semibold text-white">{data.activeAgentCount}</p><p className="mt-1 text-[11px] text-white/45">Active agents visible to owner</p></div>
         <div className="rounded-xl border border-white/[.07] p-3"><Users className="h-4 w-4 text-violet-200/65" /><p className="mt-2 text-xl font-semibold text-white">{data.distinctAgentRoleCoverage} / {data.requiredRoles}</p><p className="mt-1 text-[11px] text-white/45">Maximum roles staffed by distinct agents with matching grants</p></div>
@@ -41,7 +49,7 @@ export default function BusinessTeamReadinessPanel({ session }) {
       {data.truncated && <p className="mt-3 text-xs text-amber-200">Agent query limit reached; coverage is incomplete.</p>}
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {data.roles.map((role) => <article key={role.id} className="rounded-xl border border-white/[.07] bg-black/20 p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="text-xs font-semibold text-white">{role.title}</h4><span className={role.candidates.length ? 'text-[10px] text-cyan-200' : 'text-[10px] text-amber-200'}>{role.candidates.length ? 'Grant match only' : 'No tool grant match'}</span></div>
+          <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="text-xs font-semibold text-white">{role.title}</h4><span className={data.assignedProviderConfiguredAgents?.some((match) => match.roleId === role.id && match.agentId) ? 'text-[10px] text-cyan-200' : 'text-[10px] text-amber-200'}>{data.assignedProviderConfiguredAgents?.some((match) => match.roleId === role.id && match.agentId) ? 'Provider-configured grant match' : role.candidates.length ? 'Distinct provider-ready specialist needed' : 'No tool grant match'}</span></div>
           <p className="mt-2 text-[11px] leading-5 text-white/45">{role.candidates.length ? role.candidates.map((agent) => agent.name).join(', ') : 'Configure an eligible specialist and assign its approved tools in Agent Builder.'}</p>
           {role.candidates.length > 0 && <p className="mt-2 text-[10px] leading-4 text-white/40">Model configuration: {role.candidates.map((agent) => `${agent.name} · ${agent.modelProvider}: ${agent.modelProviderConfiguration === 'missing_configuration' ? 'not configured' : agent.modelProviderConfiguration === 'deployment_configured' ? 'deployment credentials present' : 'owner connection recorded'}`).join(' / ')}</p>}
           <p className="mt-2 text-[10px] leading-4 text-white/30">Matching tool grants: {role.acceptedTools.join(', ')}</p>
