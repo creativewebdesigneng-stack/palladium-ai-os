@@ -6,6 +6,8 @@ export type BusinessReadinessAgent = {
   name: string;
   status: string;
   allowed_tools?: string[] | null;
+  modelProvider?: string | null;
+  modelProviderConfiguration?: 'deployment_configured' | 'user_connected' | 'missing_configuration';
 };
 
 const ROLE_CAPABILITY: Record<(typeof SIX_AGENT_BUSINESS_BLUEPRINT.roles)[number]['id'], BusinessCapabilityId> = {
@@ -39,7 +41,12 @@ export function assessSixAgentBusinessReadiness(
       title: role.name,
       capabilityId,
       acceptedTools: [...acceptedTools],
-      candidates: candidates.map((agent) => ({ id: agent.id, name: agent.name })),
+      candidates: candidates.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        modelProvider: agent.modelProvider ?? 'unspecified',
+        modelProviderConfiguration: agent.modelProviderConfiguration ?? 'missing_configuration',
+      })),
       status: candidates.length ? 'configured_unverified' as const : 'missing_tool_grants' as const,
     };
   });
@@ -61,6 +68,25 @@ export function assessSixAgentBusinessReadiness(
   };
   roles.forEach((_role, index) => allocate(index, new Set<string>()));
 
+  // Configuration of a preferred model provider is only a first readiness
+  // signal, not proof of a live inference call. A role may have several
+  // qualified agents, so match independently rather than reusing grant-only
+  // assignments and inadvertently understating viable team coverage.
+  const assignedProviderAgentToRole = new Map<string, number>();
+  const allocateProvider = (roleIndex: number, visited: Set<string>): boolean => {
+    for (const candidate of roles[roleIndex]!.candidates) {
+      if (candidate.modelProviderConfiguration === 'missing_configuration' || visited.has(candidate.id)) continue;
+      visited.add(candidate.id);
+      const earlier = assignedProviderAgentToRole.get(candidate.id);
+      if (earlier === undefined || allocateProvider(earlier, visited)) {
+        assignedProviderAgentToRole.set(candidate.id, roleIndex);
+        return true;
+      }
+    }
+    return false;
+  };
+  roles.forEach((_role, index) => allocateProvider(index, new Set<string>()));
+
   const agentForRole = new Map<number, string>();
   for (const [agentId, roleIndex] of assignedAgentToRole) {
     agentForRole.set(roleIndex, agentId);
@@ -73,6 +99,8 @@ export function assessSixAgentBusinessReadiness(
     })),
     runtimeEnabled: input.runtimeEnabled,
     activeAgentCount: new Set(active.map((agent) => agent.id)).size,
+    providerConfiguredAgentCount: new Set(active.filter((agent) => agent.modelProviderConfiguration !== undefined && agent.modelProviderConfiguration !== 'missing_configuration').map((agent) => agent.id)).size,
+    providerConfiguredDistinctCoverage: assignedProviderAgentToRole.size,
     roles,
     configuredRoles: roles.filter((role) => role.status === 'configured_unverified').length,
     distinctAgentRoleCoverage: assignedAgentToRole.size,
