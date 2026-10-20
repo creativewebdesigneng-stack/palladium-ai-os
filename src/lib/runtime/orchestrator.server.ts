@@ -301,6 +301,7 @@ async function persistGeneratedWorkflow(args: {
       title: "Review six-agent business mission before execution",
       summary: "Approve the prepared six-specialist research and draft mission. Review agent permissions, costs and constraints in Autonomous OS. This approval does not authorise external purchases, publishing, payments or outreach.",
       risk_level: "medium",
+      snapshot_required: true,
     },
   } : null;
   const { error: stepError } = await args.sb.from("workflow_steps").insert(
