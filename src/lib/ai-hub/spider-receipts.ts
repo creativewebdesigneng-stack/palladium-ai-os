@@ -1,0 +1,81 @@
+/**
+ * Blackstar AI Hub Spider: presentation-safe evidence derived exclusively from
+ * already persisted approval_requests. No execution or new approvals happen here.
+ */
+export type AiHubSpiderReceiptStatus =
+  | 'awaiting-approval' | 'approved-not-executed' | 'executing'
+  | 'recorded-success' | 'recorded-failure' | 'not-executed'
+
+export interface AiHubSpiderReceipt {
+  id: string
+  providerId: string
+  capabilityId: string
+  workloadId: string
+  status: AiHubSpiderReceiptStatus
+  createdAt: string
+  executedAt: string | null
+  source: 'approval_requests'
+}
+
+function safeDate(value: unknown): string | null {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null
+}
+
+function asDetails(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function classifyApprovalState(approval: unknown, execution: unknown): AiHubSpiderReceiptStatus {
+  // Terminal outcomes must have been persisted by the established gateway;
+  // an 'approved' request by itself is not an executed tool run.
+  if (approval === 'approved' && execution === 'succeeded') return 'recorded-success'
+  if (approval === 'approved' && execution === 'failed') return 'recorded-failure'
+  if (approval === 'approved' && execution === 'executing') return 'executing'
+  if (approval === 'approved' && execution == null) return 'approved-not-executed'
+  if (approval === 'pending' && execution == null) return 'awaiting-approval'
+  return 'not-executed'
+}
+
+export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]): AiHubSpiderReceipt[] {
+  return rows.slice(0, 100).flatMap((row) => {
+    if (row['action_type'] !== 'ai_hub_execution') return []
+    const details = asDetails(row['details'])
+    const id = row['id']
+    const capabilityId = details?.['ai_hub_capability_id']
+    const providerId = details?.['ai_hub_provider_id']
+    const workloadId = details?.['ai_hub_workload_id']
+    const createdAt = safeDate(row['created_at'])
+    if (
+      typeof id !== 'string' || !id ||
+      typeof capabilityId !== 'string' || !capabilityId ||
+      typeof providerId !== 'string' || !providerId ||
+      typeof workloadId !== 'string' || !workloadId ||
+      !createdAt
+    ) return []
+    const status = classifyApprovalState(row['status'], row['execution_status'])
+    const executedAt = status === 'recorded-success' || status === 'recorded-failure'
+      ? safeDate(row['executed_at']) : null
+
+    // Explicitly allowlist fields. Never pass through prompt input, raw MCP
+    // arguments, approval details, execution_result or fingerprint metadata.
+    return [{
+      id,
+      providerId,
+      capabilityId,
+      workloadId,
+      status,
+      createdAt,
+      executedAt,
+      source: 'approval_requests' as const,
+    }]
+  })
+}
+
+/** Receipts must match the *provider and capability*, not a colliding name. */
+export function receiptsForSpiderNode(
+  receipts: readonly AiHubSpiderReceipt[],
+  node: { providerId: string; id: string },
+): AiHubSpiderReceipt[] {
+  return receipts.filter((item) => item.providerId === node.providerId && item.capabilityId === node.id)
+}
