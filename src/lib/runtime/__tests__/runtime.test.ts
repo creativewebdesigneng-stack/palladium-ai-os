@@ -222,6 +222,8 @@ describe("subscription and usage limits", () => {
     const sb = db();
     gateway.runChat.mockResolvedValue(textResult());
     const run = await prepareRun({ sb, userId: USER, agentId: "agent-1", input: "summarise" });
+    expect(run.messages[0]?.content).toContain("invoke that tool with the exact intended arguments");
+    expect(run.messages[0]?.content).toContain("Writing an approval request in your answer does not queue an approval");
     await executeRun({ sb, userId: USER, run });
 
     const usage = entitlements.recordUsage.mock.calls.map((c: any[]) => c[0]);
@@ -232,6 +234,8 @@ describe("subscription and usage limits", () => {
 
     const row = sb.tables["agent_tasks"][0];
     expect(row.status).toBe("succeeded");
+    expect(row.tool_calls).toBe(0);
+    expect(row.output.tool_calls).toBe(0);
     expect(row.completed_at).toBeTruthy();
   });
 });

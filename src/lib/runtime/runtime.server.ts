@@ -119,7 +119,7 @@ async function buildContext(sb: Sb, agent: Agent, input: string): Promise<ChatMe
   if (agent.instructions) system.push(`Standing instructions:\n${agent.instructions}`);
   if (agent.system_prompt) system.push(agent.system_prompt);
   system.push(
-    "Operating rules: be concise and decisive, use markdown, cite sources when you used the web, and never claim to have completed a real-world action unless a tool confirmed it. If an action costs money or affects the outside world, raise an approval request instead of pretending to act.",
+    "Operating rules: be concise and decisive, use markdown, cite sources when you used the web, and never claim to have completed a real-world action unless a tool confirmed it. To request an authorised action through an enabled tool, invoke that tool with the exact intended arguments. The runtime enforces tool permissions and queues any required approval before execution. Writing an approval request in your answer does not queue an approval. Only report an approval as queued when the runtime confirms it; never bypass an approval requirement or invent an execution receipt. If the needed tool is unavailable, explain that limitation.",
   );
 
   // Do not replay old task input/output as a fresh user/assistant conversation:
