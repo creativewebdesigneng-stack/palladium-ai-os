@@ -35,6 +35,7 @@ import {
 import { runChat } from '../model-gateway.base';
 
 beforeEach(() => {
+  vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', 'true');
   mock.rows.clear();
   mock.queries.length = 0;
   mock.decrypted.mockClear();
@@ -46,6 +47,13 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe('NVIDIA personal model key: existing user-owned credential flow', () => {
+  it('refuses to decrypt disabled personal NVIDIA connections', async () => {
+    vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', '');
+    mock.rows.set('owner', { api_key_ciphertext: 'encrypted:owner-secret', enabled: true });
+    expect(await resolveUserModelProviderAccess({ userId: 'owner', provider: 'nvidia' })).toBeNull();
+    expect(mock.decrypted).not.toHaveBeenCalled();
+  });
+
   it('only decrypts credentials from the authenticated user row, not another owner', async () => {
     mock.rows.set('owner', { api_key_ciphertext: 'encrypted:my-private-nvidia', enabled: true });
     mock.rows.set('other', { api_key_ciphertext: 'encrypted:foreign-private-nvidia', enabled: true });
