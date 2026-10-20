@@ -72,10 +72,24 @@ export function toAiHubSpiderReceipts(rows: readonly Record<string, unknown>[]):
   })
 }
 
-/** Receipts must match the *provider and capability*, not a colliding name. */
+/**
+ * Match a receipt to the precise registered execution resource.
+ * AI Hub persists the workload prefix for each executable kind, so a tool,
+ * agent and workflow sharing a provider and ID cannot inherit each other's
+ * approval or recorded gateway outcome.
+ */
 export function receiptsForSpiderNode(
   receipts: readonly AiHubSpiderReceipt[],
-  node: { providerId: string; id: string },
+  node: { providerId: string; kind: string; id: string },
 ): AiHubSpiderReceipt[] {
-  return receipts.filter((item) => item.providerId === node.providerId && item.capabilityId === node.id)
+  const workloadId = node.kind === 'agent' ? `agent:${node.id}`
+    : node.kind === 'workflow' ? `workflow:${node.id}`
+      : node.kind === 'tool' && node.providerId.startsWith('external-mcp:')
+        ? `external-mcp:${node.id}`
+        : null
+  if (!workloadId) return []
+  return receipts.filter((item) =>
+    item.providerId === node.providerId &&
+    item.capabilityId === node.id &&
+    item.workloadId === workloadId)
 }
