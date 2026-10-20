@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
-import type { UserConnectableModelProvider } from './model-provider-credentials.server'
+import { nvidiaPersonalCredentialsEnabled, type UserConnectableModelProvider } from './model-provider-credentials.server'
 
 const providerSchema = z.enum(['openai', 'anthropic', 'nvidia'])
 const saveSchema = z.object({
@@ -93,12 +93,12 @@ export const listModelProviderConnections = createServerFn({ method: 'POST' })
           deploymentConfigured: Boolean(process.env['ANTHROPIC_API_KEY']),
           connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'anthropic') ?? null,
         },
-        {
+        ...(nvidiaPersonalCredentialsEnabled() ? [{
           id: 'nvidia' as const,
           name: 'NVIDIA NIM',
           deploymentConfigured: Boolean(process.env['NVIDIA_API_KEY']),
           connection: connections.find((item: { provider: UserConnectableModelProvider }) => item.provider === 'nvidia') ?? null,
-        },
+        }] : []),
       ],
     }
   })
@@ -107,6 +107,9 @@ export const saveModelProviderConnection = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => saveSchema.parse(input))
   .handler(async ({ data, context }) => {
+    if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
+      throw new Error('Personal NVIDIA connections are not enabled on this deployment.')
+    }
     const probe = await probeProviderKey(data.provider, data.apiKey)
     const { saveUserModelProviderCredential } = await import('./model-provider-credentials.server')
     const connection = await saveUserModelProviderCredential({
@@ -131,6 +134,9 @@ export const testModelProviderConnection = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
+    if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
+      throw new Error('Personal NVIDIA connections are not enabled on this deployment.')
+    }
     const { resolveUserModelProviderAccess } = await import('./model-provider-credentials.server')
     const access = await resolveUserModelProviderAccess({ userId: context.userId, provider: data.provider })
     if (!access?.apiKey) throw new Error('No personal API key is connected for that provider.')
@@ -142,6 +148,9 @@ export const deleteModelProviderConnection = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ provider: providerSchema }).parse(input))
   .handler(async ({ data, context }) => {
+    if (data.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
+      throw new Error('Personal NVIDIA connections are not enabled on this deployment.')
+    }
     const { deleteUserModelProviderCredential } = await import('./model-provider-credentials.server')
     await deleteUserModelProviderCredential({ userId: context.userId, provider: data.provider })
     await writeAudit({
