@@ -51,6 +51,7 @@ export default function BusinessRunEvidencePanel({ goals = [], session }) {
         <span className="rounded-md border border-white/10 px-2 py-1">{data.succeededToolRecords} recorded tool successes</span>
         <span className="rounded-md border border-white/10 px-2 py-1">{data.failedToolRecords} recorded tool failures</span>
         <span className="rounded-md border border-white/10 px-2 py-1">{data.approvalRecords} approval records</span>
+        <span className="rounded-md border border-amber-300/15 px-2 py-1 text-amber-100">Owner start gate: {data.workflowGateStatus} ({data.workflowGateRecords} record(s))</span>
       </div>
       {data.truncated && <p className="mt-3 text-xs text-amber-200">Record limit reached. Counts may be incomplete; inspect the full audit trail before certifying outcomes.</p>}
       <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
