@@ -3,7 +3,7 @@ import { ProviderError } from './model-gateway.base'
 import type { Provider, ProviderAccess } from './model-gateway.base'
 import { nvidiaNimConfigured } from './nvidia-dell-infrastructure.server'
 
-export type UserConnectableModelProvider = Extract<Provider, 'openai' | 'anthropic'>
+export type UserConnectableModelProvider = Extract<Provider, 'openai' | 'anthropic' | 'nvidia'>
 
 type CredentialRow = {
   id: string
@@ -20,7 +20,7 @@ type CredentialRow = {
 }
 
 function assertConnectableProvider(provider: Provider): asserts provider is UserConnectableModelProvider {
-  if (provider !== 'openai' && provider !== 'anthropic') {
+  if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'nvidia') {
     throw new Error('This provider does not support user-owned API credentials.')
   }
 }
@@ -84,7 +84,7 @@ export async function saveUserModelProviderCredential(args: {
     .upsert({
       user_id: args.userId,
       provider,
-      label: (args.label?.trim() || (provider === 'openai' ? 'OpenAI' : 'Anthropic')).slice(0, 120),
+      label: (args.label?.trim() || (provider === 'openai' ? 'OpenAI' : provider === 'nvidia' ? 'NVIDIA NIM' : 'Anthropic')).slice(0, 120),
       api_key_ciphertext: encryptToken(key),
       enabled: true,
       verified_at: args.verifiedAt ?? now,
@@ -125,7 +125,7 @@ export async function resolveUserModelProviderAccess(args: {
   userId: string
   provider: Provider
 }): Promise<ProviderAccess | null> {
-  if (args.provider !== 'openai' && args.provider !== 'anthropic') return null
+  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return null
   if (!hasSupabaseAdminEnvironment()) return null
   const sb = await admin()
   const { data, error } = await sb
@@ -158,7 +158,7 @@ export async function markUserModelProviderUsed(args: {
   provider: Provider
   error?: string | null
 }) {
-  if (args.provider !== 'openai' && args.provider !== 'anthropic') return
+  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return
   if (!hasSupabaseAdminEnvironment()) return
   const sb = await admin()
   const now = new Date().toISOString()
