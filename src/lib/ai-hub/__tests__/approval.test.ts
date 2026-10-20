@@ -62,7 +62,7 @@ describe('AI Hub durable approval gate', () => {
       },
     })
     expect(JSON.stringify(inserted)).not.toContain('do-not-store')
-    expect((inserted?.details as Record<string, unknown>)?.ai_hub_input_fingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect((inserted?.['details'] as Record<string, unknown>)?.['ai_hub_input_fingerprint']).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it('atomically claims resume only through the matching actor, scope, workload, provider and capability', async () => {
@@ -111,7 +111,7 @@ describe('AI Hub durable approval gate', () => {
       tenantId: 'tenant-1', actorId: 'actor-1',
       input: { objective: 'approved', options: { alpha: true, beta: 2 } },
     })
-    const approvedFingerprint = inserted?.details?.ai_hub_input_fingerprint
+    const approvedFingerprint = (inserted?.['details'] as Record<string, unknown>)?.['ai_hub_input_fingerprint']
     expect(approvedFingerprint).toMatch(/^[a-f0-9]{64}$/)
 
     let matchedFingerprint = false
@@ -151,7 +151,7 @@ describe('AI Hub durable approval gate', () => {
     await expect(gate.claim(plan, { tenantId: 'tenant-1', actorId: 'actor-1' }, 'approval-1'))
       .rejects.toThrow('JSON-serialisable')
     const cyclic: Record<string, unknown> = {}
-    cyclic.self = cyclic
+    cyclic['self'] = cyclic
     await expect(gate.request(plan, { tenantId: 'tenant-1', actorId: 'actor-1', input: cyclic }))
       .rejects.toThrow('cannot contain cycles')
   })
