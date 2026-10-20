@@ -76,6 +76,27 @@ describe('six-agent workflow execution evidence', () => {
     expect(JSON.stringify(result)).not.toContain('bank_transfer');
   });
 
+  it('reports the distinct owner workflow-start gate without treating it as a tool execution', () => {
+    const pending = projectBusinessRunEvidence({
+      ...empty,
+      runStatus: 'waiting_for_approval',
+      workflowGateApprovals: [{ status: 'pending' }],
+    });
+    expect(pending.workflowGateRecords).toBe(1);
+    expect(pending.workflowGateStatus).toBe('pending');
+    expect(pending.approvalRecords).toBe(0);
+    expect(pending.recordedToolCalls).toBe(0);
+    expect(pending.financialOutcome).toBe('unverified');
+
+    const decided = projectBusinessRunEvidence({
+      ...empty,
+      runStatus: 'queued',
+      workflowGateApprovals: [{ status: 'approved' }],
+    });
+    expect(decided.workflowGateStatus).toBe('approved');
+    expect(decided.liveExecutionCertified).toBeUndefined();
+  });
+
   it('never upgrades a recorded tool success to a financial or provider certification', () => {
     const result = projectBusinessRunEvidence({
       ...empty,
@@ -101,6 +122,10 @@ describe('six-agent workflow execution evidence', () => {
     expect(source).toContain(".eq('user_id', owner).in('task_id', taskIds)");
     expect(source).toContain(".select('agent_task_id,tool,status')");
     expect(source).not.toContain(".select('input,output')");
+    expect(source).toContain(".eq('action_type', 'workflow_step')");
+    expect(source).toContain(".contains('details', { workflow_run_id: workflowRun.id })");
+    expect(source).toContain(".select('status')");
+    expect(panel).toContain('Owner start gate: {data.workflowGateStatus}');
     expect(panel).toContain('Financial outcome: unverified.');
     expect(screen).toContain('<BusinessRunEvidencePanel goals={data.goals ?? []} session={session} />');
   });
