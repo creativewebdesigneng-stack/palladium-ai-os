@@ -359,11 +359,11 @@ export async function reconcileAutonomousGoalRuns(dbOverride?: Sb) {
         completed_at: terminal ? workflowRun.completed_at ?? now : null,
       })
       .eq("id", run.id);
-    await db
-      .from("autonomous_goal_fleet_assignments")
-      .update({ status: nextStatus })
-      .eq("run_id", run.id)
-      .in("status", ["queued", "running", "waiting_for_approval"]);
+    // DO NOT copy a workflow-wide state onto individual specialist assignments.
+    // The existing autonomous_fleet_step_state database trigger records each
+    // assignment's actual workflow_step_runs status. A workflow-wide success,
+    // failure or approval pause is not proof that every agent step completed.
+    // In particular, unstarted and skipped steps must remain distinguishable.
 
     await writeEvent(db, {
       goalId: run.goal_id,
