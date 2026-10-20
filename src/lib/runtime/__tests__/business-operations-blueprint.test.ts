@@ -36,9 +36,9 @@ describe('governed six-agent business operations blueprint', () => {
     expect(businessBlueprintCriteria(undefined)).toEqual({});
     expect(businessBlueprintCriteria('other')).toEqual({});
     const criteria = businessBlueprintCriteria(SIX_AGENT_BUSINESS_BLUEPRINT.id);
-    expect(criteria.approval_required_for_external_actions).toBe(true);
-    expect(criteria.no_income_guarantees).toBe(true);
-    expect(criteria.max_specialist_roles).toBe(6);
+    expect(criteria['approval_required_for_external_actions']).toBe(true);
+    expect(criteria['no_income_guarantees']).toBe(true);
+    expect(criteria['max_specialist_roles']).toBe(6);
     expect(server).toContain('success_criteria: z.record(z.string(), z.unknown()).default({})');
     expect(screen).toContain('success_criteria: businessBlueprintCriteria(draft.blueprint_id)');
   });
