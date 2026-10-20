@@ -66,10 +66,44 @@ describe('six-agent business team grant readiness', () => {
     expect(result.truncated).toBe(true);
   });
 
+  it('reports configured model access separately from tool-grant matches', () => {
+    const r = assessSixAgentBusinessReadiness({
+      agents: [
+        { ...configured('web-specialist', ['web_search']), modelProvider: 'groq', modelProviderConfiguration: 'missing_configuration' },
+        { ...configured('analyst', ['data_analysis']), modelProvider: 'gemini', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('producer', ['file_analysis']), modelProvider: 'openai', modelProviderConfiguration: 'user_connected' },
+        { ...configured('support', ['email_draft']), modelProvider: 'anthropic', modelProviderConfiguration: 'user_connected' },
+        { ...configured('growth', ['web_fetch']), modelProvider: 'gemini', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('finance', ['calculator']), modelProvider: 'lovable', modelProviderConfiguration: 'missing_configuration' },
+      ],
+      runtimeEnabled: true,
+    });
+    expect(r.distinctAgentRoleCoverage).toBe(6);
+    expect(r.providerConfiguredAgentCount).toBe(4);
+    expect(r.providerConfiguredDistinctCoverage).toBe(4);
+    expect(r.liveExecutionCertified).toBe(false);
+    expect(r.incomeVerified).toBe(false);
+    expect(r.roles.find((role) => role.id === 'research')?.candidates[0]?.modelProviderConfiguration).toBe('missing_configuration');
+  });
+
+  it('maximises model-ready staffing separately even when first grant match is not configured', () => {
+    const r = assessSixAgentBusinessReadiness({
+      agents: [
+        { ...configured('unconfigured', ['web_search','data_analysis']), modelProviderConfiguration: 'missing_configuration' },
+        { ...configured('research', ['web_search']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('validator', ['data_analysis']), modelProviderConfiguration: 'user_connected' },
+      ],
+      runtimeEnabled: true,
+    });
+    expect(r.providerConfiguredDistinctCoverage).toBe(2);
+  });
+
   it('uses owner-scoped read-only queries and never returns credentials', () => {
     expect(source).toContain('.middleware([requireSupabaseAuth])');
     expect(source).toContain(".eq('user_id', context.userId)");
-    expect(source).toContain(".select('id,name,status,allowed_tools')");
+    expect(source).toContain(".select('id,name,status,allowed_tools,model_provider')");
+    expect(source).toContain('listUserModelProviderCredentials(context.userId)');
+    expect(source).toContain('deploymentProviderConfigured(provider)');
     expect(source).toContain(".select('enabled')");
     for (const write of ['.insert(', '.update(', '.upsert(', '.delete(', 'service_role', 'api_key']) {
       expect(source).not.toContain(write);
