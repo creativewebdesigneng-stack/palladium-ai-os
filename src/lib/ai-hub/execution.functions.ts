@@ -5,7 +5,7 @@ import { executeAgentTask } from '@/lib/runtime/agent-task-execution.server'
 import { callExternalMcpTool, listExternalMcpTools } from '@/lib/mcp/external-mcp.server'
 import { createAiHubApprovalGate } from './approval.server'
 import { AiHubExecutionGateway } from './execution'
-import { agentGatewayOutcome, workflowGatewayOutcome } from './runtime-outcome'
+import { confirmPersistedAiHubRuntimeOutcome } from './runtime-outcome'
 import type { AiHubOrchestrationPlan } from './orchestrator'
 import type { AiHubDeploymentTarget } from './contracts'
 import { createPalladiumAiHubRegistry } from './registry'
@@ -84,7 +84,7 @@ export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
         input: data.goal,
         trigger: 'ai-hub',
       })
-      return { ...workflowGatewayOutcome(runtime), adapter: 'workflows' }
+      return { ...await confirmPersistedAiHubRuntimeOutcome({ sb, userId: context.userId, resourceId: workflow.id, kind: 'workflow', runtime }), adapter: 'workflows' }
     })
 
     const result = await gateway.execute(plan, {
@@ -133,7 +133,7 @@ export const executeAiHubAgent = createServerFn({ method: 'POST' })
     const gateway = new AiHubExecutionGateway(createPalladiumAiHubRegistry(), createAiHubApprovalGate(sb))
     gateway.registerAdapter('agent-runtime', async () => {
       const runtime = await executeAgentTask({ sb, userId: context.userId, agentId: agent.id, input: data.goal })
-      return { ...agentGatewayOutcome(runtime), adapter: 'agent-runtime' }
+      return { ...await confirmPersistedAiHubRuntimeOutcome({ sb, userId: context.userId, resourceId: agent.id, kind: 'agent', runtime }), adapter: 'agent-runtime' }
     })
     const result = await gateway.execute(plan, {
       tenantId: agent.org_id ?? context.userId,
