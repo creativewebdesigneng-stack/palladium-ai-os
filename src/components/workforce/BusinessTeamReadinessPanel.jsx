@@ -59,6 +59,26 @@ export default function BusinessTeamReadinessPanel({ session }) {
           <p className="mt-2 text-[10px] leading-4 text-white/30">Matching tool grants: {role.acceptedTools.join(', ')}</p>
         </article>)}
       </div>
+      {data.operatorReviewStaffing && <section aria-label="Operator staffing review" className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <h4 className="text-sm font-semibold text-white">Suggested six-role staffing review</h4>
+        <p className="mt-1 text-xs leading-5 text-white/50">Read-only matching of different existing agents, minimising extra grants and setup changes. This is not a request to enable tools, activate drafts or execute a mission. Review each role, provider connection and policy in Agent Builder first.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {data.operatorReviewStaffing.map((item) => <article key={item.roleId} className="rounded-lg border border-white/10 p-3">
+            <p className="text-xs font-semibold text-white">{item.roleTitle}</p>
+            {item.agentId
+              ? <a href={`/agents/${encodeURIComponent(item.agentId)}`} className="mt-2 block text-xs text-cyan-200 hover:underline">Review {item.agentName} in existing Agent Builder</a>
+              : <p className="mt-2 text-xs text-amber-100">No unused existing active/draft agent available for this role.</p>}
+            {item.agentId && <div className="mt-2 space-y-1 text-[11px] leading-4 text-white/55">
+              <p>{item.alreadyHasMatchingGrant ? 'Relevant tool grant already recorded' : 'No matching capability grant recorded'}</p>
+              {item.reviewGrant && <p className="text-amber-100/80">For operator review only: consider whether `{item.reviewGrant}` is needed and permitted. Not granted.</p>}
+              {item.needsActivation && <p>Draft agent: review and activate separately only when approved.</p>}
+              {item.needsProviderSetup && <p>Model route unavailable: configure or change the provider and test inference.</p>}
+              {!item.needsProviderSetup && <p>Model configuration found; actual inference not verified.</p>}
+              {item.readyByConfigurationOnly && <p className="text-cyan-100/70">Eligible by configuration, not live-certified.</p>}
+            </div>}
+          </article>)}
+        </div>
+      </section>}
       <p className="mt-4 text-xs leading-5 text-amber-100/70">Next gate: fix missing model-provider configuration and certify live model calls, tool runs and connections for each role with non-simulated receipts. Do not treat grants, model selection, internal credits or planning results as proof of provider execution or earned money.</p>
     </>}
   </section>;
