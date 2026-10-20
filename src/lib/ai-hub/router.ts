@@ -125,16 +125,26 @@ export function routeAiHubWorkload(workload: AiHubWorkload, capabilities: AiHubC
   let selected = ranked[0]
   let decisionTrace: AiHubDecisionTrace | undefined
   if (policy?.mode === 'evidence-gated' && selected) {
+    const prompt = policy.promptAssessment
+    // A prompt marked irrelevant must not dispatch any provider or tool.
+    if (prompt?.relevance === 'irrelevant' && prompt.source === 'blackstar-policy-verifier') return null
+    const verifiedPrompt = prompt?.source === 'blackstar-policy-verifier' &&
+      prompt.relevance === 'relevant' &&
+      prompt.grounding === 'grounded' &&
+      prompt.ambiguity === 'clear' &&
+      prompt.approval === 'not-required' &&
+      (prompt.evidenceIds?.length ?? 0) > 0
+    const approvalRequired = prompt?.approval === 'required' || workload.requirements.requireHumanApproval === true
     // A deterministic lane requires explicit verified executor metadata and
     // sufficient *observed* outcomes. Unknown samples never become green.
-    const trustedCode = ranked.find(({ capability, signals }) =>
+    const trustedCode = !approvalRequired && verifiedPrompt ? ranked.find(({ capability, signals }) =>
       capability.kind === 'tool' &&
       capability.metadata?.['executionClass'] === 'deterministic' &&
       capability.metadata?.['verifiedExecutor'] === true &&
       capability.metadata?.['readOnly'] === true &&
       signals.observedRuns >= minObservedRuns &&
       signals.reliabilityScore >= minReliability,
-    )
+    ) : undefined
     // Model fallback only targets a configured model; a provider advertised
     // in an inventory but known unconfigured must never be selected.
     const model = ranked.find(({ capability }) =>
@@ -142,16 +152,20 @@ export function routeAiHubWorkload(workload: AiHubWorkload, capabilities: AiHubC
       (capability.metadata?.['configured'] === true || capability.metadata?.['configured'] === 'true'),
     )
     selected = trustedCode ?? model ?? selected
-    const lane: AiHubDecisionTrace['lane'] = trustedCode
-      ? 'deterministic'
-      : model
-        ? 'model-escalation'
-        : 'approval-required'
+    const lane: AiHubDecisionTrace['lane'] = approvalRequired
+      ? 'approval-required'
+      : trustedCode
+        ? 'deterministic'
+        : model
+          ? 'model-escalation'
+          : 'approval-required'
     const reasons = lane === 'deterministic'
-      ? ['Verified read-only executor and adequate observed reliability; existing tool policy still governs execution.']
+      ? ['Trusted relevance, grounding, clarity and non-approval assessment plus a verified read-only executor and sufficient observed reliability.']
       : lane === 'model-escalation'
-        ? ['No deterministic executor met the evidence floor; a configured model was selected for reasoning.']
-        : ['No verified deterministic executor or configured model was eligible; human review is required.']
+        ? ['Prompt or executor evidence is insufficient for deterministic routing; a configured model was selected for reasoning.']
+        : approvalRequired
+          ? ['The prompt or workload requires approval; existing human review is mandatory.']
+          : ['No qualified deterministic executor or explicitly configured model was eligible; human review is required.']
     decisionTrace = {
       status: 'planned-not-executed',
       lane,
