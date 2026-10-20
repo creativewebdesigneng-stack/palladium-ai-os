@@ -5,6 +5,14 @@ import { nvidiaNimConfigured } from './nvidia-dell-infrastructure.server'
 
 export type UserConnectableModelProvider = Extract<Provider, 'openai' | 'anthropic' | 'nvidia'>
 
+/** Roll out only after the existing table's provider constraint allows NVIDIA. */
+export function nvidiaPersonalCredentialsEnabled() {
+  return ['true', '1', 'yes', 'on'].includes(
+    process.env['NVIDIA_PERSONAL_CREDENTIALS_ENABLED']?.trim().toLowerCase() ?? '',
+  )
+}
+
+
 type CredentialRow = {
   id: string
   user_id: string
@@ -20,6 +28,9 @@ type CredentialRow = {
 }
 
 function assertConnectableProvider(provider: Provider): asserts provider is UserConnectableModelProvider {
+  if (provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) {
+    throw new Error('Personal NVIDIA connections are not enabled on this deployment.')
+  }
   if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'nvidia') {
     throw new Error('This provider does not support user-owned API credentials.')
   }
@@ -52,7 +63,10 @@ export async function listUserModelProviderCredentials(userId: string) {
     if (String(error.code ?? '') === '42P01') return []
     throw new Error('Could not load personal model provider connections.')
   }
-  return (data ?? []).map((row: Record<string, unknown>) => ({
+  return (data ?? [])
+    .filter((row: Record<string, unknown>) =>
+      row['provider'] !== 'nvidia' || nvidiaPersonalCredentialsEnabled())
+    .map((row: Record<string, unknown>) => ({
     id: String(row['id']),
     provider: String(row['provider']) as UserConnectableModelProvider,
     label: String(row['label'] ?? ''),
@@ -112,6 +126,7 @@ export async function deleteUserModelProviderCredential(args: {
   userId: string
   provider: UserConnectableModelProvider
 }) {
+  assertConnectableProvider(args.provider)
   const sb = await admin()
   const { error } = await sb
     .from('model_provider_credentials')
@@ -125,7 +140,9 @@ export async function resolveUserModelProviderAccess(args: {
   userId: string
   provider: Provider
 }): Promise<ProviderAccess | null> {
-  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return null
+  if (args.provider !== 'openai' && args.provider !== 'anthropic' && args.provider !== 'nvidia') return
+  if (args.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) return null
+  if (args.provider === 'nvidia' && !nvidiaPersonalCredentialsEnabled()) return null
   if (!hasSupabaseAdminEnvironment()) return null
   const sb = await admin()
   const { data, error } = await sb
