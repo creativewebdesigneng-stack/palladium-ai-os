@@ -32,7 +32,7 @@ import {
   resolveUserModelProviderAccess, isProviderAvailableForUser,
   markUserModelProviderUsed,
 } from '../model-provider-credentials.server';
-import { ProviderError, resolveModel as resolveBaseModel, runChat } from '../model-gateway.base';
+import { ProviderError, resolveModel as resolveBaseModel, runChat, type StreamEvent } from '../model-gateway.base';
 import { resolveModel as resolveServerModel, runChat as runServerChat,
   streamChat as streamServerChat } from '../model-gateway.server';
 
@@ -172,7 +172,7 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
     );
-    const events = [];
+    const events: StreamEvent[] = [];
     for await (const event of streamServerChat({
       provider: 'nvidia', model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: 'Hello' }],
@@ -207,7 +207,7 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
         '\\n\\ndata: [DONE]\\n\\n',
         { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
     );
-    const events = [];
+    const events: StreamEvent[] = [];
     for await (const event of streamServerChat({
       provider: 'nvidia', model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: 'Hello' }],
@@ -227,7 +227,7 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://nim.dell.example/v1');
     vi.stubEnv('NVIDIA_NIM_MODEL', 'nvidia/dell-local-model');
     const fetcher = vi.spyOn(globalThis, 'fetch');
-    const events = [];
+    const events: StreamEvent[] = [];
     await expect((async () => {
       for await (const event of streamServerChat({
         provider: 'nvidia', model: 'nvidia/dell-local-model',
