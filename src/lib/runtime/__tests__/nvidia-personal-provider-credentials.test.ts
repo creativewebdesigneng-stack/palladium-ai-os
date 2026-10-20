@@ -248,7 +248,9 @@ describe('NVIDIA personal model key: existing user-owned credential flow', () =>
     const upstream = JSON.stringify({ error: {
       message: 'private-personal-key internal.dell.example user-private-account-id',
     } });
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    // Return a distinct Response per call: the non-streaming test consumes
+    // the first body before streaming receives the second one.
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
       new Response(upstream, { status, headers: { 'Content-Type': 'application/json' } }),
     );
     const args = {
