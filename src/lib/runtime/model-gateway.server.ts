@@ -303,5 +303,12 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
     }
     return;
   }
-  yield* base.streamChat(args);
+  // Streaming must apply the same owner-key and Dell-NIM model selection as
+  // runChat/runChatPinned. Without this, a direct stream could send the hosted
+  // preset to a Dell-only endpoint, or a Dell-only model to a personal key.
+  // Model resolution fails closed before any network request.
+  const streamModel = args.provider === "nvidia"
+    ? resolveModel(args.provider, args.model, args.providerAccess)
+    : args.model;
+  yield* base.streamChat({ ...args, model: streamModel });
 }
