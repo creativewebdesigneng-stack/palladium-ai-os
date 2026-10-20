@@ -93,3 +93,21 @@ export function receiptsForSpiderNode(
     item.capabilityId === node.id &&
     item.workloadId === workloadId)
 }
+
+/**
+ * Report only the most recently requested approval state for a registered
+ * resource. Showing an older success while a newer request is pending would
+ * misleadingly suggest that the current task has completed.
+ * Server results arrive newest-first, but use timestamps here to avoid relying
+ * on the order when this helper is called with other bounded receipt arrays.
+ */
+export function latestSpiderReceiptForNode(
+  receipts: readonly AiHubSpiderReceipt[],
+  node: { providerId: string; kind: string; id: string },
+): AiHubSpiderReceipt | null {
+  const matching = receiptsForSpiderNode(receipts, node)
+  return matching.reduce<AiHubSpiderReceipt | null>((latest, receipt) => {
+    if (!latest || Date.parse(receipt.createdAt) > Date.parse(latest.createdAt)) return receipt
+    return latest
+  }, null)
+}
