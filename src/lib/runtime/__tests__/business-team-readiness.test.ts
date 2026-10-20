@@ -117,9 +117,74 @@ describe('six-agent business team grant readiness', () => {
     expect(result.connectedProviderVerified).toBe(false);
   });
 
+  it('separates active staffing from potential draft coverage without executing drafts', () => {
+    const ready = (id: string, tools: string[], status: string) => ({
+      ...configured(id, tools), status,
+      modelProviderConfiguration: 'deployment_configured' as const,
+    });
+    const result = assessSixAgentBusinessReadiness({
+      agents: [
+        ready('active-research', ['web_search'], 'active'),
+        ready('active-analyst', ['data_analysis'], 'active'),
+        ready('draft-producer', ['file_analysis'], 'draft'),
+        ready('draft-marketing', ['web_fetch'], 'draft'),
+        ready('draft-support', ['email_draft'], 'draft'),
+        ready('draft-audit', ['calculator'], 'draft'),
+        ready('no-grants', [], 'draft'),
+      ],
+      runtimeEnabled: true,
+    });
+    expect(result.activeAgentCount).toBe(2);
+    expect(result.draftAgentCount).toBe(5);
+    expect(result.draftAgentsWithToolGrants).toBe(4);
+    expect(result.distinctAgentRoleCoverage).toBe(2);
+    expect(result.providerConfiguredDistinctCoverage).toBe(2);
+    expect(result.potentialDistinctRoleCoverage).toBe(6);
+    expect(result.potentialProviderConfiguredCoverage).toBe(6);
+    expect(result.assignedProviderConfiguredAgents.filter((row) => row.agentId !== null)).toHaveLength(2);
+    expect(result.roles.find((role) => role.id === 'operations')?.candidates).toHaveLength(0);
+    expect(result.roles.find((role) => role.id === 'operations')?.draftCandidates.map((a) => a.id))
+      .toEqual(['draft-support']);
+    expect(result.liveExecutionCertified).toBe(false);
+    expect(result.incomeVerified).toBe(false);
+  });
+
+  it('identifies a missing role that activating every existing draft cannot solve', () => {
+    const result = assessSixAgentBusinessReadiness({
+      agents: [
+        { ...configured('a', ['web_search']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('b', ['data_analysis']), modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('c', ['file_analysis']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('d', ['web_fetch']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+        { ...configured('e', ['calculator']), status: 'draft', modelProviderConfiguration: 'deployment_configured' },
+      ],
+      runtimeEnabled: true,
+    });
+    expect(result.potentialDistinctRoleCoverage).toBe(5);
+    expect(result.potentialProviderConfiguredCoverage).toBe(5);
+    expect(result.roles.find((role) => role.id === 'operations')?.candidates).toHaveLength(0);
+    expect(result.roles.find((role) => role.id === 'operations')?.draftCandidates).toHaveLength(0);
+  });
+
+  it('never treats draft providers as operational when no model route is configured', () => {
+    const result = assessSixAgentBusinessReadiness({
+      agents: [
+        { ...configured('draft-a', ['email_draft']), status: 'draft', modelProviderConfiguration: 'missing_configuration' },
+      ],
+      runtimeEnabled: true,
+    });
+    expect(result.distinctAgentRoleCoverage).toBe(0);
+    expect(result.providerConfiguredDistinctCoverage).toBe(0);
+    expect(result.potentialDistinctRoleCoverage).toBe(1);
+    expect(result.potentialProviderConfiguredCoverage).toBe(0);
+  });
+
   it('uses owner-scoped read-only queries and never returns credentials', () => {
     expect(source).toContain('.middleware([requireSupabaseAuth])');
     expect(source).toContain(".eq('user_id', context.userId)");
+    expect(source).toContain(".in('status', ['active', 'draft'])");
+    expect(source).toContain(".order('status', { ascending: true })");
+    expect(source).not.toContain(".eq('status', 'active')");
     expect(source).toContain(".select('id,name,status,allowed_tools,model_provider')");
     expect(source).toContain('isProviderAvailableForUser({ userId: context.userId, provider })');
     expect(source).toContain('.catch(() => false)');
@@ -132,6 +197,9 @@ describe('six-agent business team grant readiness', () => {
     expect(panel).toContain('Maximum roles staffed by distinct agents');
     expect(panel).toContain('/agents/new');
     expect(panel).toContain('Review existing draft agents');
+    expect(panel).toContain('data.potentialDistinctRoleCoverage');
+    expect(panel).toContain('data.potentialProviderConfiguredCoverage');
+    expect(panel).toContain('role.draftCandidates');
     expect(panel).toContain('Each of the six roles must have a different active agent');
     expect(panel).toContain('data.assignedProviderConfiguredAgents?.some');
     expect(screen).toContain('<BusinessTeamReadinessPanel session={session} />');
