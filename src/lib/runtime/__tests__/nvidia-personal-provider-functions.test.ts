@@ -27,6 +27,7 @@ const invoke = (fn: any, data: object = {}, userId = 'owner') =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', 'true');
   calls.saved.mockResolvedValue({ provider: 'nvidia', enabled: true, verifiedAt: '2026-10-20T00:00:00Z' });
   calls.access.mockResolvedValue({ provider: 'nvidia', apiKey: 'personal-private-test-nvidia-key' });
   calls.listed.mockResolvedValue([{ provider: 'nvidia', enabled: true, verifiedAt: '2026-10-20T00:00:00Z' }]);
@@ -36,6 +37,18 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe('NVIDIA owner-managed personal model connection handlers', () => {
+  it('does not surface or accept NVIDIA personal connections before operator enablement', async () => {
+    vi.stubEnv('NVIDIA_PERSONAL_CREDENTIALS_ENABLED', '');
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    const overview = await invoke(listModelProviderConnections);
+    expect(overview.providers.some((x: { id: string }) => x.id === 'nvidia')).toBe(false);
+    await expect(invoke(saveModelProviderConnection, {
+      provider: 'nvidia', apiKey: 'personal-private-test-nvidia-key',
+    })).rejects.toThrow(/not enabled/);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(calls.saved).not.toHaveBeenCalled();
+  });
+
   it('probes official NVIDIA catalogue with user key, then saves only for authenticated owner', async () => {
     vi.stubEnv('NVIDIA_NIM_BASE_URL', 'https://operator.dell.example/v1');
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
