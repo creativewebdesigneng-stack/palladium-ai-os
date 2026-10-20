@@ -37,6 +37,29 @@ export interface AiHubCapabilityRef {
   metadata?: Record<string, unknown>
 }
 
+/**
+ * Optional planning policy. Historical task success is a heuristic, never calibrated
+ * certainty or permission to bypass Blackstar's execution/approval gateways.
+ */
+export interface AiHubEvidenceRoutingPolicy {
+  mode: 'evidence-gated'
+  minObservedRuns?: number
+  minReliability?: number
+}
+
+/** Decision *plan* evidence; this is not an execution or audit receipt. */
+export interface AiHubDecisionTrace {
+  status: 'planned-not-executed'
+  lane: 'deterministic' | 'model-escalation' | 'approval-required'
+  consideredCapabilityIds: string[]
+  selectedCapabilityId: string
+  observedRuns: number
+  reliabilityScore: number
+  evaluationCount: number
+  thresholds: { minObservedRuns: number; minReliability: number }
+  reasons: string[]
+}
+
 export interface AiHubWorkloadRequirements {
   capabilities: string[]
   preferredKinds?: AiHubCapabilityKind[]
@@ -48,6 +71,8 @@ export interface AiHubWorkloadRequirements {
   requirePrivateExecution?: boolean
   requireHumanApproval?: boolean
   routingObjective?: AiHubRoutingObjective
+  /** Opt-in evidence routing. Existing routing remains the default. */
+  evidenceRouting?: AiHubEvidenceRoutingPolicy
   /** Require a capability explicitly marked as offline-capable and place it on edge/device. */
   requireOfflineExecution?: boolean
   /** Maximum device memory available to the workload. Capability metadata may declare minDeviceMemoryMb. */
@@ -84,4 +109,5 @@ export interface AiHubRouteDecision {
   reason: string
   policyChecks: string[]
   routingSignals?: AiHubRoutingSignals
+  decisionTrace?: AiHubDecisionTrace
 }
