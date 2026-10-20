@@ -47,6 +47,12 @@ export class AiHubExecutionGateway {
       throw new Error('AI Hub execution requires tenant and actor identity')
     }
     this.assertPlacement(plan, context)
+    // Until prompt-verifier and executor attestations are independently
+    // validated server-side, no evidence-gated route may bypass the existing
+    // operator approval gate, including purported deterministic and model lanes.
+    if (plan.route.decisionTrace && !plan.requiresApproval) {
+      throw new Error('Evidence-gated execution cannot proceed without approval')
+    }
 
     if (plan.requiresApproval) {
       const provider = this.resolveProvider(plan)
