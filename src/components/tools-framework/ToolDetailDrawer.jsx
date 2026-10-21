@@ -1,20 +1,54 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Play, Loader2, Power, ShieldAlert, KeyRound } from 'lucide-react';
 import { PERMISSION_META, PLAN_BADGE } from './toolsData';
+import { networkCertificationTask, isNetworkCertificationTool } from '@/lib/tools/network-certification-task';
+import { Link } from 'react-router-dom';
 
-export default function ToolDetailDrawer({ tool, isAdmin, onClose, onToggle, onRun }) {
+export default function ToolDetailDrawer({ tool, isAdmin, onClose, onToggle, onRun, selectedAgent,
+  toolPermissions = [], onGovernedReadTest, onCheckGovernedReadTest, resumedTaskId }) {
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [launchingQa, setLaunchingQa] = useState(false);
+  const [qaResult, setQaResult] = useState(null);
+  const [qaError, setQaError] = useState('');
+  const [qaEvidence, setQaEvidence] = useState(null);
+  const [checkingQa, setCheckingQa] = useState(false);
+  useEffect(() => {
+    setQaResult(null); setQaEvidence(null); setQaError('');
+  }, [tool?.slug, selectedAgent?.id]);
   if (!tool) return null;
 
   const plan = PLAN_BADGE[tool.required_plan] || PLAN_BADGE.free;
+  const assignedOverride = toolPermissions.find(p => p.tool === tool.slug && p.agent_id === selectedAgent?.id);
+  const manualApprovalBlocked = Boolean(
+    (selectedAgent?.requires_approval || tool.requires_approval || assignedOverride?.requires_approval) &&
+    !['nango_action', 'integration_action'].includes(tool.slug)
+  );
+  const qaSupported = isNetworkCertificationTool(tool.slug);
+  const qaReady = qaSupported ? networkCertificationTask(tool, selectedAgent, toolPermissions) : null;
   const run = async () => {
     setRunning(true); setError(''); setResult(null);
     try { const r = await onRun(tool, input); setResult(r); }
     catch (e) { setError(e.message || 'Run failed'); }
     finally { setRunning(false); }
+  };
+
+  const activeQaTaskId = qaResult?.id || resumedTaskId;
+  const verifyReadTest = async () => {
+    if (!activeQaTaskId || checkingQa || !onCheckGovernedReadTest) return;
+    setCheckingQa(true); setQaError('');
+    try { setQaEvidence(await onCheckGovernedReadTest(tool, activeQaTaskId)); }
+    catch (error) { setQaError(error.message || 'Could not read this task evidence.'); }
+    finally { setCheckingQa(false); }
+  };
+  const launchReadTest = async () => {
+    if (!qaReady?.eligible || launchingQa || !onGovernedReadTest) return;
+    setLaunchingQa(true); setQaResult(null); setQaEvidence(null); setQaError('');
+    try { setQaResult(await onGovernedReadTest(tool)); }
+    catch (e) { setQaError(e.message || 'Agent task could not start'); }
+    finally { setLaunchingQa(false); }
   };
 
   return (
@@ -50,14 +84,51 @@ export default function ToolDetailDrawer({ tool, isAdmin, onClose, onToggle, onR
         <div className="mt-4">
           <p className="mb-1 text-[11px] font-medium text-zinc-400">Test input</p>
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={3} placeholder="JSON or text input for this tool…" className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-violet-400/40 focus:outline-none" />
-          <button onClick={run} disabled={running} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50">
-            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}Run tool
-          </button>
+          {manualApprovalBlocked ? (
+            <p className="mt-2 text-[11px] text-amber-300">Manual testing cannot complete an approval-required tool. Use an approved agent task instead; no approval will be bypassed.</p>
+          ) : (
+            <button onClick={run} disabled={running} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50">
+              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}Run tool
+            </button>
+          )}
           {error && <p className="mt-2 flex items-center gap-1.5 text-[11px] text-rose-400"><ShieldAlert className="h-3.5 w-3.5" />{error}</p>}
           {result !== null && (
             <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-black/40 p-2 text-[10px] text-emerald-300">{JSON.stringify(result, null, 2)}</pre>
           )}
         </div>
+
+        {qaSupported && (
+          <section className="mt-5 space-y-2 rounded-xl border border-violet-300/15 bg-violet-500/[.04] p-3" aria-label="Governed network tool certification">
+            <p className="text-xs font-semibold text-violet-100">Governed read-only certification task</p>
+            <p className="text-[11px] text-zinc-400">Use the selected active agent to attempt the exact bounded public test through the existing runtime and Approval Centre. The agent model may incur usage charges. You must still approve any queued operation.</p>
+            <p className="text-[11px] text-zinc-400">Selected agent: {selectedAgent?.name || 'None selected'}</p>
+            {!qaReady?.eligible && <p className="text-[11px] text-amber-300">{qaReady?.reason}</p>}
+            <button onClick={launchReadTest} disabled={!qaReady?.eligible || launchingQa || !onGovernedReadTest}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/25 bg-violet-500/20 px-3 py-1.5 text-xs font-medium text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-40">
+              {launchingQa ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              Start governed agent test
+            </button>
+            {qaError && <p role="alert" className="text-[11px] text-rose-300">{qaError}</p>}
+            {qaResult && <p className="text-[11px] text-zinc-300">Agent task response: {qaResult.status}. This does not certify the tool.</p>}
+            {activeQaTaskId && <div className="space-y-2 border-t border-violet-300/10 pt-2">
+              <p className="text-[11px] text-zinc-400">Tracked QA task: {String(activeQaTaskId).slice(0, 8)}…</p>
+              <Link to="/mission-control?tab=approvals" className="inline-block text-[11px] text-violet-300 underline">
+                Open Approval Centre for the human decision
+              </Link>
+              <button onClick={verifyReadTest} disabled={checkingQa || !onCheckGovernedReadTest}
+                className="block rounded-lg border border-violet-300/20 bg-black/25 px-3 py-1.5 text-[11px] font-semibold text-violet-100 disabled:opacity-40">
+                {checkingQa ? 'Checking original receipts…' : 'Check this task’s execution evidence'}
+              </button>
+              {qaEvidence && <div className="space-y-1 rounded-lg border border-white/10 bg-black/30 p-3 text-[11px]">
+                <p className={qaEvidence.verified ? 'font-semibold text-emerald-300' : 'font-semibold text-amber-300'}>
+                  {qaEvidence.verified ? 'Verified — matching approved network execution' : 'Not verified — real execution evidence still required'}
+                </p>
+                <p className="text-zinc-400">Task: {qaEvidence.taskStatus} · Evidence: {qaEvidence.evidenceState} · Attempts: {qaEvidence.attempts}</p>
+                {qaEvidence.approvalPending && <p className="text-amber-300">Operator approval is still pending.</p>}
+              </div>}
+            </div>}
+          </section>
+        )}
 
         <div className="mt-5 border-t border-white/10 pt-4">
           <p className="mb-2 text-[11px] font-medium text-zinc-400">Admin controls</p>

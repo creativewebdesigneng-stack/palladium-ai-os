@@ -110,6 +110,17 @@ export async function queueLocalToolApproval(name: string, input: unknown, ctx: 
   const payload = approvedLocalToolInput(name, input);
   return queueApproval(payload, ctx, name);
 }
+// Route provenance is NOT an assertion of external-provider certification.
+// Never label every approved read as "local": web/connected reads can use a
+// network even though they share the same immutable approval/resume executor.
+const approvedExecutionRoutes: Record<string, string> = {
+  calculator: 'local', current_time: 'local', data_analysis: 'local',
+  web_search: 'web_search_http', web_fetch: 'public_https_fetch', http_request: 'public_https_get',
+};
+export function approvedExecutionRoute(tool: string) {
+  return tool === 'browser_task' ? 'playwright' : approvedExecutionRoutes[tool] ?? 'tool_runtime';
+}
+
 type Sb = { from: (table: string) => any };
 
 /** Uses the existing immutable approval ledger; no browser runs while queueing. */
@@ -186,8 +197,8 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     if (error || !approval || !['agent_browser_task', 'agent_tool_task'].includes(approval.action_type) || approval.status !== 'approved' || approval.execution_status !== 'executing') throw new Error('Browser approval is not claimed for execution.');
     if (!approval.expires_at || !Number.isFinite(new Date(approval.expires_at).getTime()) || new Date(approval.expires_at).getTime() <= Date.now()) throw new Error('Browser approval has expired.');
     const browser = approval.action_type === 'agent_browser_task';
-    executionProvider = browser ? 'playwright' : 'local';
     const name = browser ? 'browser_task' : approval.details?.tool;
+    executionProvider = approvedExecutionRoute(name);
     const input: any = browser ? approvedBrowserInput(approval.details?.input) : approvedLocalToolInput(name, approval.details?.input);
     const taskId = approval.details?.agent_task_id;
     const { data: task, error: taskError } = await args.sb.from('agent_tasks').select('*')
@@ -238,7 +249,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
         !Array.isArray(output['result']?.outputs) ||
         output['result'].outputs.length !== input.steps.length))
     ) throw new Error('Approved tool did not return verified non-simulated success.');
-    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_result' : 'agent.tool_approval_result', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id, tool: name, provider: browser ? output['provider'] : 'local', simulated: false } });
+    await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_result' : 'agent.tool_approval_result', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id, tool: name, provider: browser ? output['provider'] : executionProvider, simulated: false } });
     pending.content = compactToolResultForModel(output);
     const { executeRun } = await import('./runtime.server');
     const { normaliseProvider } = await import('./model-gateway.server');
@@ -257,7 +268,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
         initialUsage: { input: Number(task.tokens_in ?? 0), output: Number(task.tokens_out ?? 0) },
         initialToolCallCount: Number(task.tool_calls ?? 1) });
     }
-    return { ok: true, provider: browser ? String(output['provider']) : 'local', result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
+    return { ok: true, provider: browser ? String(output['provider']) : executionProvider, result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
   } catch (error) {
     if (claimedTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', claimedTask).eq('user_id', args.userId).in('status', ['running', 'waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
     return { ok: false, provider: executionProvider, error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
