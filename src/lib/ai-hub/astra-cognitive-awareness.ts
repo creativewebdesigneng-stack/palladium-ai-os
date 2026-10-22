@@ -48,7 +48,7 @@ export function deriveAstraCognitiveAwareness(args: {
     if (r.kind === 'agent') {
       for (const capability of r.capabilities ?? []) toolNames.add(capability.trim().toLowerCase())
     }
-    if (r.kind === 'tool' && r.metadata?.resourceType !== 'skill') {
+    if (r.kind === 'tool' && r.metadata?.['resourceType'] !== 'skill') {
       toolNames.add(r.id.trim().toLowerCase())
       for (const capability of r.capabilities ?? []) toolNames.add(capability.trim().toLowerCase())
     }
