@@ -1,6 +1,15 @@
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
+import { ASTRA_DIVERSE_CODING_CASES, ASTRA_DIVERSE_REASONING_CASES } from './astra-certification-diverse-text-cases'
 
+// Preserve v1 for vision, whose deterministic PNG generator is bound to v1 case IDs.
 export const ASTRA_CERTIFICATION_SUITE_VERSION = 'v1' as const
+export const ASTRA_DIVERSE_TEXT_SUITE_VERSION = 'v2' as const
+
+export function astraCertificationVersionForClass(taskClass: NativeIntelligenceTaskClass): 'v1' | 'v2' {
+  return taskClass === 'reasoning' || taskClass === 'coding'
+    ? ASTRA_DIVERSE_TEXT_SUITE_VERSION
+    : ASTRA_CERTIFICATION_SUITE_VERSION
+}
 export const ASTRA_CERTIFICATION_CASE_COUNT = 20
 
 export type AstraCertificationTaskClass = NativeIntelligenceTaskClass
@@ -45,20 +54,31 @@ export function isAstraCertificationTaskClass(taskClass: NativeIntelligenceTaskC
 }
 
 export function astraCertificationSuiteId(taskClass: AstraCertificationTaskClass): string {
-  return `blackstar-astra-${taskClass}-certification-${ASTRA_CERTIFICATION_SUITE_VERSION}`
+  return `blackstar-astra-${taskClass}-certification-${astraCertificationVersionForClass(taskClass)}`
 }
 
 export function listAstraCertificationBenchmarkCases(taskClass: AstraCertificationTaskClass): AstraCertificationBenchmarkCase[] {
   const suiteId = astraCertificationSuiteId(taskClass)
-  return CASE_TOPICS.map((topic, index) => ({
-    suiteId,
-    caseId: `${ASTRA_CERTIFICATION_SUITE_VERSION}-${String(index + 1).padStart(2, '0')}-${topic}`,
-    taskClass,
-    name: `Astra ${taskClass} certification ${index + 1}/20`,
-    prompt: PROMPT_BUILDERS[taskClass](topic, index),
-    criteria: CRITERIA[taskClass],
-    modality: taskClass === 'vision' ? 'vision' : 'text',
-  }))
+  const version = astraCertificationVersionForClass(taskClass)
+  return CASE_TOPICS.map((topic, index) => {
+    // Keep v1 cases for other task classes until their own diverse suites are
+    // tested. Never re-interpret or silently re-sign old v1 results as v2.
+    const challenge = taskClass === 'reasoning'
+      ? ASTRA_DIVERSE_REASONING_CASES[index]
+      : taskClass === 'coding' ? ASTRA_DIVERSE_CODING_CASES[index] : null
+    const prompt = challenge
+      ? `Astra ${taskClass} benchmark ${index + 1}/20 (${topic}). ${challenge} Provide your solution, assumptions, independently checkable tests or calculations, and explicitly state uncertainty where evidence is missing.`
+      : PROMPT_BUILDERS[taskClass](topic, index)
+    return {
+      suiteId,
+      caseId: `${version}-${String(index + 1).padStart(2, '0')}-${topic}`,
+      taskClass,
+      name: `Astra ${taskClass} certification ${index + 1}/20`,
+      prompt,
+      criteria: CRITERIA[taskClass],
+      modality: taskClass === 'vision' ? 'vision' : 'text',
+    }
+  })
 }
 
 export function getAstraCertificationBenchmarkCase(taskClass: NativeIntelligenceTaskClass, caseId: string): AstraCertificationBenchmarkCase | null {
