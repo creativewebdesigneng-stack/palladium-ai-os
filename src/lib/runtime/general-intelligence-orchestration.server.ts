@@ -1,5 +1,6 @@
 import type { OrchestratorAssignment, OrchestratorPlan } from '@/lib/agents/agent-orchestrator'
 import { executeAgentTask } from './agent-task-execution.server'
+import { confirmPersistedAiHubRuntimeOutcome } from '@/lib/ai-hub/runtime-outcome'
 
 type Sb = { from: (table: string) => any }
 
@@ -14,6 +15,45 @@ export type GeneralIntelligenceAssignmentResult = {
 export type GeneralIntelligenceOrchestrationResult = {
   status: 'completed' | 'waiting_for_approval' | 'failed'
   results: GeneralIntelligenceAssignmentResult[]
+}
+
+export type VerifiedGeneralIntelligenceTask =
+  | { status: 'completed'; output: string }
+  | { status: 'waiting_for_approval' | 'failed'; reason: string }
+
+/**
+ * Reuses AI Hub's existing exact-owner/resource persistence verifier. An agent
+ * function returning is not proof that its task completed. This adapter only
+ * interprets the recorded outcome; it grants no tools or permissions.
+ */
+export async function confirmGeneralIntelligenceAgentTask(args: {
+  sb: Sb
+  userId: string
+  agentId: string
+  runtime: unknown
+}): Promise<VerifiedGeneralIntelligenceTask> {
+  const result = args.runtime && typeof args.runtime === 'object' && !Array.isArray(args.runtime)
+    ? args.runtime as Record<string, unknown> : null
+  const task = result?.['task'] && typeof result['task'] === 'object' && !Array.isArray(result['task'])
+    ? result['task'] as Record<string, unknown> : null
+  if (task?.['status'] === 'waiting_for_approval' || task?.['status'] === 'awaiting_approval') {
+    return {
+      status: 'waiting_for_approval',
+      reason: 'The authorised agent task is waiting for its existing tool approval; Astra did not complete this assignment.',
+    }
+  }
+
+  const verified = await confirmPersistedAiHubRuntimeOutcome({
+    sb: args.sb,
+    userId: args.userId,
+    resourceId: args.agentId,
+    kind: 'agent',
+    runtime: args.runtime,
+  })
+  if (verified.status !== 'completed') {
+    return { status: 'failed', reason: verified.error }
+  }
+  return { status: 'completed', output: typeof result?.['output'] === 'string' ? result['output'] : '' }
 }
 
 function dependencyContext(
@@ -114,11 +154,26 @@ export async function executeGeneralIntelligenceOrchestration(args: {
           agentId: assignment.agent_id,
           input: dependencyContext(assignment, completed),
         })
+        const verified = await confirmGeneralIntelligenceAgentTask({
+          sb: args.sb,
+          userId: args.userId,
+          agentId: assignment.agent_id,
+          runtime: executed,
+        })
+        if (verified.status !== 'completed') {
+          results.push({
+            assignment_id: assignment.id,
+            agent_id: assignment.agent_id,
+            status: verified.status,
+            error: verified.reason,
+          })
+          return { status: verified.status, results }
+        }
         const done: GeneralIntelligenceAssignmentResult = {
           assignment_id: assignment.id,
           agent_id: assignment.agent_id,
           status: 'completed',
-          output: executed.output,
+          output: verified.output,
         }
         completed.set(assignment.id, done)
         results.push(done)

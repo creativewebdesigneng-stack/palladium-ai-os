@@ -10,6 +10,7 @@ import {
 } from './general-intelligence-collective.server'
 import {
   executeGeneralIntelligenceOrchestration,
+  confirmGeneralIntelligenceAgentTask,
   type GeneralIntelligenceOrchestrationResult,
 } from './general-intelligence-orchestration.server'
 import { loadPermissionSafeVerifiedKnowledge } from './general-intelligence-verified-knowledge.server'
@@ -102,7 +103,12 @@ export async function executeAssessedGeneralIntelligence(args: {
   if (args.assessment.mode === 'direct') {
     try {
       const executed = await execute({ sb: args.sb, userId: args.userId, agentId: selected[0]!, input: args.assessment.goal.objective })
-      return { status: 'completed', mode: 'direct', output: executed.output }
+      const verified = await confirmGeneralIntelligenceAgentTask({
+        sb: args.sb, userId: args.userId, agentId: selected[0]!, runtime: executed,
+      })
+      return verified.status === 'completed'
+        ? { status: 'completed', mode: 'direct', output: verified.output }
+        : { status: verified.status, mode: 'direct', reason: verified.reason }
     } catch (error) {
       return { status: 'failed', mode: 'direct', reason: error instanceof Error ? error.message : 'Direct General Intelligence execution failed.' }
     }
@@ -171,7 +177,16 @@ export async function executeAssessedGeneralIntelligence(args: {
       ? { assessment: args.assessment, orchestration, collective }
       : { assessment: args.assessment, orchestration }
     const synthesis = await execute({ sb: args.sb, userId: args.userId, agentId: synthesisAgentId, input: synthesisInput(inputArgs) })
-    return withCollective({ status: 'completed' as const, mode: args.assessment.mode, output: synthesis.output, orchestration, synthesis_agent_id: synthesisAgentId }, collective)
+    const verified = await confirmGeneralIntelligenceAgentTask({
+      sb: args.sb, userId: args.userId, agentId: synthesisAgentId, runtime: synthesis,
+    })
+    if (verified.status !== 'completed') {
+      return withCollective({
+        status: verified.status, mode: args.assessment.mode, orchestration,
+        synthesis_agent_id: synthesisAgentId, reason: verified.reason,
+      }, collective)
+    }
+    return withCollective({ status: 'completed' as const, mode: args.assessment.mode, output: verified.output, orchestration, synthesis_agent_id: synthesisAgentId }, collective)
   } catch (error) {
     return withCollective({ status: 'failed' as const, mode: args.assessment.mode, orchestration, synthesis_agent_id: synthesisAgentId, reason: error instanceof Error ? error.message : 'General Intelligence synthesis failed.' }, collective)
   }
