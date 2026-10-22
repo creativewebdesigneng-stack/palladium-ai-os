@@ -369,3 +369,15 @@ export const updateAgentConnectors = createServerFn({ method: 'POST' })
       ...data, sb: context.supabase as unknown as Sb, userId: context.userId, githubInstallation,
     });
   });
+
+/** Edit standing instructions without rewriting other agent configuration. */
+export const updateAgentInstructions = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(), instructions: z.string().max(8000),
+    expectedUpdatedAt: z.string().min(1).max(80),
+  }).strict().parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeOwnedAgentInstructions } = await import('./agent-instructions-update.server');
+    return changeOwnedAgentInstructions({ ...data, sb: context.supabase as unknown as Sb, userId: context.userId });
+  });
