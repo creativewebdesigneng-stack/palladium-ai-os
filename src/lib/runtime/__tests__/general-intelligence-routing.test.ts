@@ -5,7 +5,7 @@ import { executeAssessedGeneralIntelligence } from '../general-intelligence-rout
 
 const sb = { from: vi.fn(() => {
   const filters = new Map<string, unknown>()
-  const query = {
+  const query: any = {
     select: (_columns: string) => query,
     eq: (column: string, value: unknown) => { filters.set(column, value); return query },
     maybeSingle: async () => ({
@@ -254,7 +254,7 @@ describe('assessed General Intelligence routing', () => {
 
   it('rejects unpersisted success on a direct run', async () => {
     const database = { from: vi.fn(() => {
-      const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
+      const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
       return q
     }) }
     const executeTask = vi.fn(async () => ({
@@ -266,6 +266,27 @@ describe('assessed General Intelligence routing', () => {
     })
     expect(result.status).toBe('failed')
     expect(result.output).toBeUndefined()
+  })
+
+  it('preserves a synthesis approval pause after delegated evidence is returned', async () => {
+    const executeTask = vi.fn(async () => ({
+      task: { id: 'synthesis-pending', status: 'waiting_for_approval' },
+      output: '',
+    }))
+    const executeOrchestration = vi.fn(async () => ({
+      status: 'completed' as const,
+      results: [{ assignment_id: 'research', agent_id: 'agent-a', status: 'completed' as const, output: 'prior evidence' }],
+    }))
+    const result = await executeAssessedGeneralIntelligence({
+      sb, userId: 'user-1', assessment: assessment('delegate',['agent-a']),
+      authorisedAgentIds: ['agent-a'],
+      plan: { ...plan, assignments: [plan.assignments[0]!] },
+      executeTask: executeTask as never,
+      executeOrchestration: executeOrchestration as never,
+    })
+    expect(result.status).toBe('waiting_for_approval')
+    expect(result.output).toBeUndefined()
+    expect(executeTask).toHaveBeenCalledTimes(1)
   })
 
 })

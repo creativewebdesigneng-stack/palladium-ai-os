@@ -4,7 +4,7 @@ import { executeGeneralIntelligenceOrchestration } from '../general-intelligence
 
 const sb = { from: vi.fn(() => {
   const filters = new Map<string, unknown>()
-  const query = {
+  const query: any = {
     select: (_columns: string) => query,
     eq: (column: string, value: unknown) => { filters.set(column, value); return query },
     maybeSingle: async () => ({
@@ -144,7 +144,7 @@ describe('general intelligence multi-agent orchestration', () => {
 
   it('does not trust a success-shaped return if the canonical task record is missing', async () => {
     const database = { from: vi.fn(() => {
-      const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
+      const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
       return q
     }) }
     const executeAssignment = vi.fn(async () => ({
