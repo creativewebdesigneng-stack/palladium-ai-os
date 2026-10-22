@@ -37,14 +37,17 @@ describe('Astra certification benchmark suite', () => {
 
 
 describe('Astra certification current-profile gating contract', () => {
-  it('requires benchmark completion to track the current execution profile in the server plan', async () => {
+  it('requires signed persisted verifier evidence before the plan counts cases', async () => {
     const { readFile } = await import('node:fs/promises')
-    const source = await readFile(
-      new URL('../astra-certification-benchmark.server.ts', import.meta.url),
-      'utf8',
-    )
-    expect(source).toContain("astra?.['model'] === expectedModel")
-    expect(source).toContain("sameAstraCertificationExecutionProfile(astra?.['execution_profile'], expectedProfile)")
-    expect(source).toContain("astra?.['execution_prompt_hash'] === expectedPromptHash")
+    const [planSource, verifierSource] = await Promise.all([
+      readFile(new URL('../astra-certification-benchmark.server.ts', import.meta.url), 'utf8'),
+      readFile(new URL('../astra-evaluation-verifier.server.ts', import.meta.url), 'utf8'),
+    ])
+    expect(planSource).toContain('const verifiedCaseIds = await listVerifiedAstraEvaluationCaseIds(scope)')
+    expect(verifierSource).toContain("metadata?.['model'] === model")
+    expect(verifierSource).toContain("sameAstraCertificationExecutionProfile(metadata?.['execution_profile'], expectedExecution.profile)")
+    expect(verifierSource).toContain("metadata?.['execution_prompt_hash'] === expectedExecution.executionPromptHash")
+    expect(verifierSource).toContain("return validProvenanceSignature(metadata?.['provenance_signature']")
+    expect(verifierSource).toContain('runScores.length !== runResponses.length')
   })
 })
