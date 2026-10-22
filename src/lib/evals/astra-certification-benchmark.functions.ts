@@ -96,10 +96,18 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
       import('./astra-certification-judge-policy.server'),
     ])
     const plan = await getAstraCertificationBenchmarkPlan({ userId: context.userId, orgId: data.orgId ?? null, taskClass: data.taskClass })
+    const [{ inspectAstraCertificationPreflight }, { blackstarAstraModelForTaskClass }] = await Promise.all([
+      import('./astra-certification-preflight'),
+      import('@/lib/runtime/blackstar-astra-engine-profile'),
+    ])
+    const preflight = inspectAstraCertificationPreflight({
+      taskClass: data.taskClass,
+      candidateModel: blackstarAstraModelForTaskClass(data.taskClass),
+    })
     const trustedJudges = listServerApprovedAstraCertificationJudges()
       .filter((judge) => data.taskClass !== 'vision' || judge.provider !== 'freellm')
       .map((judge) => ({ provider: judge.provider, model: judge.model, label: judge.label }))
-    return { ...plan, trustedJudges }
+    return { ...plan, trustedJudges, preflight }
   })
 
 export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
