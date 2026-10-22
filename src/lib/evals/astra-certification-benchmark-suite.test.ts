@@ -7,6 +7,7 @@ import {
   listAstraCertificationBenchmarkCases,
 } from './astra-certification-benchmark-suite'
 import { ASTRA_DIVERSE_REASONING_CASES, ASTRA_DIVERSE_CODING_CASES } from './astra-certification-diverse-text-cases'
+import { ASTRA_DIVERSE_AGENTIC_CASES, ASTRA_DIVERSE_GENERAL_CASES, ASTRA_DIVERSE_TOOL_USE_CASES } from './astra-certification-diverse-operational-cases'
 
 describe('Astra v2 reasoning and coding calibration', () => {
   it('contains exactly 20 substantive, independently distinguishable scenarios per upgraded class', () => {
@@ -40,9 +41,9 @@ describe('Astra v2 reasoning and coding calibration', () => {
     expect(getAstraCertificationBenchmarkCase('reasoning', first.caseId)).toEqual(first)
     expect(getAstraCertificationBenchmarkCase('reasoning', first.caseId.replace(/^v2-/, 'v1-'))).toBeNull()
     expect(getAstraCertificationBenchmarkCase('coding', 'v1-01-constraint-satisfaction')).toBeNull()
-    expect(astraCertificationVersionForClass('general')).toBe('v1')
-    expect(astraCertificationVersionForClass('agentic')).toBe('v1')
-    expect(astraCertificationVersionForClass('tool_use')).toBe('v1')
+    expect(astraCertificationVersionForClass('general')).toBe('v2')
+    expect(astraCertificationVersionForClass('agentic')).toBe('v2')
+    expect(astraCertificationVersionForClass('tool_use')).toBe('v2')
   })
 
   it('pins v2 criteria and keeps cross-class prompts distinct', () => {
@@ -54,5 +55,36 @@ describe('Astra v2 reasoning and coding calibration', () => {
       expect(reasoning[i]?.prompt).not.toEqual(coding[i]?.prompt)
       expect(reasoning[i]?.caseId).toEqual(coding[i]?.caseId)
     }
+  })
+})
+
+describe('Astra diverse General Intelligence, tool-use and agentic suites', () => {
+  const expected = [
+    ['general', ASTRA_DIVERSE_GENERAL_CASES],
+    ['tool_use', ASTRA_DIVERSE_TOOL_USE_CASES],
+    ['agentic', ASTRA_DIVERSE_AGENTIC_CASES],
+  ] as const
+
+  it.each(expected)('%s has 20 distinct v2 prompts while preserving signed case identity', (taskClass, prompts) => {
+    const cases = listAstraCertificationBenchmarkCases(taskClass)
+    expect(cases).toHaveLength(ASTRA_CERTIFICATION_CASE_COUNT)
+    expect(prompts).toHaveLength(ASTRA_CERTIFICATION_CASE_COUNT)
+    expect(new Set(prompts).size).toBe(20)
+    for (let index = 0; index < 20; index++) {
+      const entry = cases[index]!
+      expect(entry.prompt).toContain(prompts[index]!)
+      expect(entry.caseId).toMatch(/^v2-\d{2}-/)
+      expect(entry.modality).toBe('text')
+      expect(entry.suiteId).toBe(astraCertificationSuiteId(taskClass))
+      expect(getAstraCertificationBenchmarkCase(taskClass, entry.caseId)).toEqual(entry)
+      expect(getAstraCertificationBenchmarkCase(taskClass, entry.caseId.replace(/^v2-/, 'v1-'))).toBeNull()
+    }
+  })
+
+  it('does not mix operational test families or claim public cases are blind tests', () => {
+    const all = expected.flatMap(([taskClass]) => listAstraCertificationBenchmarkCases(taskClass).map(c => c.prompt))
+    expect(all).toHaveLength(60)
+    expect(new Set(all).size).toBe(60)
+    expect(listAstraCertificationBenchmarkCases('vision')[0]?.caseId).toMatch(/^v1-/)
   })
 })
