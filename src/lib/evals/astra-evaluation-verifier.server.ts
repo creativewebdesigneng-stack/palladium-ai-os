@@ -306,6 +306,19 @@ async function matchingRuns(scope: Scope) {
   return { model, runs: distinctRuns }
 }
 
+/**
+ * Authoritative completed-case evidence for the certification planner.
+ * matchingRuns checks owner scope, exact suite and case, persisted candidate
+ * responses, evaluator scores and HMAC attestation on those persisted rows.
+ */
+export async function listVerifiedAstraEvaluationCaseIds(scope: Scope): Promise<string[]> {
+  await assertScopeAccess(scope)
+  if (!isBlackstarAstraEngineConfigured()) return []
+  if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) return []
+  const { runs } = await matchingRuns(scope)
+  return runs.map((run) => astraMetadata(run)?.['case_id']).filter((id): id is string => typeof id === 'string')
+}
+
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
   const visionConfigured = scope.taskClass !== 'vision' || isBlackstarAstraVisionConfigured()
   const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured

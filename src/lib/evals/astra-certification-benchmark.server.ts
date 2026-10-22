@@ -11,7 +11,7 @@ import {
 } from '@/lib/evals/astra-certification-execution-profile'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute } from '@/lib/evals/freellm-evaluator.server'
-import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
+import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, listVerifiedAstraEvaluationCaseIds, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 
@@ -90,42 +90,10 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
   }
   const suiteId = astraCertificationSuiteId(scope.taskClass)
   const cases = listAstraCertificationBenchmarkCases(scope.taskClass)
-  let query = db.from('model_eval_runs').select('id,metadata,status,completed_at').eq('status', 'completed').not('completed_at', 'is', null).order('completed_at', { ascending: false }).limit(200)
-  query = scope.orgId ? query.eq('org_id', scope.orgId) : query.is('org_id', null).eq('user_id', scope.userId)
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  const completedCaseIds = new Set<string>()
-  const expectedModel = blackstarAstraModelForTaskClass(scope.taskClass)
-  const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
-  for (const row of data ?? []) {
-    const astra = metadataObject(metadataObject(row.metadata)?.['astra_activation'])
-    const caseId = typeof astra?.['case_id'] === 'string' ? astra['case_id'] : null
-    if (!caseId) continue
-    const benchmarkCase = getAstraCertificationBenchmarkCase(scope.taskClass, caseId)
-    if (!benchmarkCase) continue
-
-    const expectedProfile = resolveAstraCertificationExecutionProfile(
-      scope.taskClass,
-      expectedModel,
-    )
-    const expectedPromptHash = hashAstraCertificationExecutionPrompt(
-      buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, expectedProfile),
-    )
-    if (
-      astra?.['server_verified'] === true
-      && astra?.['provenance_version'] === PROVENANCE_VERSION
-      && astra?.['suite_id'] === suiteId
-      && astra?.['task_class'] === scope.taskClass
-      && astra?.['provider'] === 'compatible'
-      && astra?.['model'] === expectedModel
-      && astra?.['engine_id'] === BLACKSTAR_ASTRA_ENGINE_PROFILE.id
-      && astra?.['system_prompt_hash'] === emptySystemPromptHash
-      && sameAstraCertificationExecutionProfile(astra?.['execution_profile'], expectedProfile)
-      && astra?.['execution_prompt_hash'] === expectedPromptHash
-    ) {
-      completedCaseIds.add(caseId)
-    }
-  }
+  // Only the signed owner-scoped run verifier may mark a case completed.
+  // User-facing metadata labels alone cannot establish a verified run.
+  const verifiedCaseIds = await listVerifiedAstraEvaluationCaseIds(scope)
+  const completedCaseIds = new Set(cases.filter((benchmarkCase) => verifiedCaseIds.includes(benchmarkCase.caseId)).map((benchmarkCase) => benchmarkCase.caseId))
   return {
     taskClass: scope.taskClass, certificationSupported: true, suiteId, completedCases: completedCaseIds.size, totalCases: cases.length,
     cases: cases.map((benchmarkCase) => ({ caseId: benchmarkCase.caseId, name: benchmarkCase.name, prompt: benchmarkCase.prompt, criteria: [...benchmarkCase.criteria], modality: benchmarkCase.modality, completed: completedCaseIds.has(benchmarkCase.caseId) })),
