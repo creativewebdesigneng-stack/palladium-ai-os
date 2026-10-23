@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
+import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute } from './freellm-evaluator.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
@@ -331,7 +333,11 @@ async function matchingRuns(scope: Scope) {
     return true
   })
 
-  return { model, runs: distinctRuns }
+  const quality = inspectAstraVerifiedScoreFloor({
+    runIds: distinctRuns.map((run) => run.id),
+    responses, scores, candidateModel: model,
+  })
+  return { model, runs: distinctRuns, quality }
 }
 
 /**
@@ -350,14 +356,17 @@ export async function listVerifiedAstraEvaluationCaseIds(scope: Scope): Promise<
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
   const visionConfigured = scope.taskClass !== 'vision' || isBlackstarAstraVisionConfigured()
   const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured
-  const { model, runs } = await matchingRuns(scope)
+  const { model, runs, quality } = await matchingRuns(scope)
   return {
     taskClass: scope.taskClass,
     provider: 'compatible' as const,
     model,
     completedRuns: runs.length,
     minimumRuns: MIN_RUNS,
-    readyToCertify: supported && runs.length >= MIN_RUNS,
+    readyToCertify: supported && quality.readyToCertify,
+    averageScore: quality.averageScore,
+    minimumQualifyingScore: NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
+    qualityFloorMet: quality.qualityFloorMet,
     certificationSupported: supported,
   }
 }
@@ -370,9 +379,12 @@ export async function certifyAstraEvaluation(scope: Scope) {
     throw new Error('Vision certification requires a dedicated multimodal Astra endpoint and BLACKSTAR_ASTRA_VISION_MODEL.')
   }
 
-  const { model, runs } = await matchingRuns(scope)
+  const { model, runs, quality } = await matchingRuns(scope)
   if (runs.length < MIN_RUNS) {
     throw new Error(`All ${MIN_RUNS} distinct trusted benchmark cases are required for ${scope.taskClass} certification.`)
+  }
+  if (!quality.readyToCertify) {
+    throw new Error(`Astra evaluation score is below the existing Native Intelligence qualification floor of ${NATIVE_INTELLIGENCE_MIN_EVAL_SCORE}. No certification evidence was issued.`)
   }
 
   const sourceRuns = runs.slice(0, MIN_RUNS).sort((a, b) => {
