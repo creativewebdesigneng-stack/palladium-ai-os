@@ -33,6 +33,26 @@ describe('Astra trusted runner gates independent evaluation before spending or p
     caseId: listAstraCertificationBenchmarkCases('reasoning')[0]!.caseId,
   })
 
+  it('rejects a Groq-only Qwen bootstrap without charging, recording or certifying it as Blackstar-native', async () => {
+    for (const [key, value] of Object.entries(baseEnv)) vi.stubEnv(key, value)
+    vi.stubEnv('OPENAI_COMPATIBLE_BASE_URL', '')
+    vi.stubEnv('BLACKSTAR_ASTRA_MODEL', 'qwen/qwen3.8-27b')
+    vi.stubEnv('BLACKSTAR_NATIVE_MODEL', '')
+    vi.stubEnv('GROQ_API_KEY', 'mock-development-bootstrap')
+    await expect(run()).rejects.toThrow(/independent FreeLLM evaluator/)
+    expect(fake.from).not.toHaveBeenCalled()
+    expect(fake.runChatPinned).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unpinned compatible endpoint even if the judge is correctly configured', async () => {
+    for (const [key, value] of Object.entries(baseEnv)) vi.stubEnv(key, value)
+    vi.stubEnv('BLACKSTAR_ASTRA_MODEL', 'blackstar-astra-v0.1')
+    vi.stubEnv('BLACKSTAR_NATIVE_MODEL', '')
+    await expect(run()).rejects.toThrow(/independent FreeLLM evaluator/)
+    expect(fake.from).not.toHaveBeenCalled()
+    expect(fake.runChatPinned).not.toHaveBeenCalled()
+  })
+
   it('does not create a run or call the model when the judge resolves to the candidate model', async () => {
     for (const [key, value] of Object.entries(baseEnv)) vi.stubEnv(key, value)
     vi.stubEnv('FREELLMAPI_ROUTED_MODEL', 'candidate-model')
