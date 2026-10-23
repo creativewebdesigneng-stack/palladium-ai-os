@@ -31,7 +31,7 @@ await db.exec([
 await db.exec(readFileSync('supabase/migrations/20261023030200_harden_astra_certification_rpc.sql', 'utf8'))
 
 check((await query("select has_function_privilege('anon','public.certify_native_intelligence_model_evaluation(uuid[],text,text,text,text,text,text,text,text,text)','EXECUTE') as allowed"))[0].allowed===false, 'anonymous callers denied')
-check((await query("select has_function_privilege('authenticated','public.certify_native_intelligence_model_evaluation(uuid[],text,text,text,text,text,text,text,text,text,text)','EXECUTE') as allowed"))[0].allowed===false, 'authenticated callers denied')
+check((await query("select has_function_privilege('authenticated','public.certify_native_intelligence_model_evaluation(uuid[],text,text,text,text,text,text,text,text,text)','EXECUTE') as allowed"))[0].allowed===false, 'authenticated callers denied')
 check((await query("select has_function_privilege('service_role','public.certify_native_intelligence_model_evaluation(uuid[],text,text,text,text,text,text,text,text,text)','EXECUTE') as allowed"))[0].allowed===true, 'service role preserved')
 
 for (let i=0;i<ids.length;i++){
