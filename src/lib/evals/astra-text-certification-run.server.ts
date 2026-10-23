@@ -127,6 +127,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         timeoutMs: executionProfile.timeoutMs,
         reasoningEffort: executionProfile.reasoningEffort,
         maxAttempts: executionProfile.maxAttempts,
+        // Require an exact model ID from the upstream response. The generic
+        // compatible gateway otherwise echoes the requested ID for UI usage.
+        requireResponseModelIdentity: true,
       })
     } catch (error) {
       stage = candidateFailureStage(error)
