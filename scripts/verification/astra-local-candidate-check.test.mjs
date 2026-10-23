@@ -43,6 +43,37 @@ describe('Astra local candidate diagnostic', () => {
     assert.equal(result.responseShapeValid, true)
     assert.equal(result.certified, false)
   })
+  it('refuses redirects from the model listing without leaving loopback', async () => {
+    let calls = 0
+    const result = await inspectLocalCandidate({
+      baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen-local', probe: true, timeoutMs: 3000,
+    }, async (_url, options) => {
+      calls++
+      assert.equal(options.redirect, 'error')
+      return Response.redirect('https://untrusted.example/v1/models', 302)
+    })
+    assert.equal(calls, 1)
+    assert.equal(result.modelListing, 'http_302')
+    assert.equal(result.inference, 'not_started')
+    assert.equal(result.certified, false)
+  })
+  it('refuses redirects from the chat route and never treats them as inference', async () => {
+    let calls = 0
+    const result = await inspectLocalCandidate({
+      baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen-local', probe: true, timeoutMs: 3000,
+    }, async (url, options) => {
+      calls++
+      assert.equal(options.redirect, 'error')
+      if (url.endsWith('/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'qwen-local' }] }), { status: 200 })
+      }
+      return Response.redirect('http://192.168.1.2:31415/v1/chat/completions', 302)
+    })
+    assert.equal(calls, 2)
+    assert.equal(result.inference, 'http_302')
+    assert.equal(result.responseShapeValid, false)
+    assert.equal(result.certified, false)
+  })
   it('does not run inference for an unlisted model', async () => {
     let calls = 0
     const result = await inspectLocalCandidate({ baseUrl: 'http://localhost:11434/v1', model: 'unknown', probe: true, timeoutMs: 3000 }, async () => {
