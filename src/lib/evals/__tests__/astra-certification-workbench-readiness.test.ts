@@ -15,6 +15,15 @@ describe('Astra operator certification readiness wiring', () => {
     expect(ui).toContain('Routes configured, not yet independently tested')
   })
 
+  it('explains missing signing authority without exposing credentials', async () => {
+    const [ui, fn] = await Promise.all([readFile(workbenchFile, 'utf8'), readFile(fnFile, 'utf8')])
+    expect(ui).toContain("blockers?.includes('astra_provenance_signing_key_missing')")
+    expect(ui).toContain('Astra provenance signing authority is missing or invalid')
+    expect(fn).toContain("code: 'provenance_signing_not_ready'")
+    expect(fn).toContain('An operator must configure a dedicated server-side signing key.')
+    expect(ui).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
+  })
+
   it('requires explicit paid-batch consent in both mutation handlers and both buttons', async () => {
     const ui = await readFile(workbenchFile, 'utf8')
     expect(ui.match(/if \(!batchConsent\)/g)).toHaveLength(2)
