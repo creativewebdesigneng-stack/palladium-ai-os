@@ -19,6 +19,7 @@ afterEach(() => {
 describe('Astra trusted runner gates independent evaluation before spending or persistence', () => {
   const baseEnv = {
     OPENAI_COMPATIBLE_BASE_URL: 'https://candidate.invalid/v1',
+    OPENAI_COMPATIBLE_API_KEY: 'candidate-test-token',
     BLACKSTAR_ASTRA_MODEL: 'candidate-model',
     FREELLMAPI_BASE_URL: 'https://evaluator.invalid/v1',
     FREELLMAPI_API_KEY: 'never-log-me',
