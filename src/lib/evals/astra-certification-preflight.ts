@@ -2,6 +2,7 @@ import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-m
 import { isIndependentFreeLlmRouteProvider, isPinnedFreeLlmCertificationModel } from './astra-certification-judge-policy'
 import { resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
 import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
+import { hasAstraProvenanceSigningAuthority } from './astra-provenance-signing-key'
 
 /**
  * Safe, configuration-only readiness for the EXISTING certification runner.
@@ -41,15 +42,18 @@ export function inspectAstraCertificationPreflight(args: {
     }
   }
 
+  const signingConfigured = hasAstraProvenanceSigningAuthority(env)
   const blockers: string[] = []
   if (!candidateConfigured) blockers.push('astra_candidate_route_missing')
   if (!judgePinned) blockers.push('pinned_independent_evaluator_missing')
+  if (!signingConfigured) blockers.push('astra_provenance_signing_key_missing')
   const ready = blockers.length === 0
   return {
     version: 1 as const,
     taskClass: args.taskClass,
     candidateConfigured,
     independentJudgeConfigured: Boolean(judgePinned),
+    provenanceSigningConfigured: signingConfigured,
     canAttemptTextCertification: ready,
     state: ready ? 'configured_unprobed' as const : 'configuration_missing' as const,
     blockers,
