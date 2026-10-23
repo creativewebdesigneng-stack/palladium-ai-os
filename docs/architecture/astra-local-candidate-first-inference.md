@@ -20,7 +20,7 @@ node scripts/verification/astra-local-candidate-check.mjs --model "EXACT_MODEL_N
 
 `--probe` is opt-in and sends exactly one small real chat request. A response with `inference: real_response_received` and `responseShapeValid: true` proves **only local inference**, not remote reachability, model ownership, evaluator independence or certification. If the model is not listed or cannot complete, do not claim success. Do not post API keys, worker tokens or private tunnel URLs.
 
-If your local OpenAI-compatible bridge is listening on port 31415 rather than Ollama 11434, add `--base-url http://127.0.0.1:31415/v1`. Only loopback HTTP endpoints are accepted. The script does not configure or expose Tailscale Funnel, does not change Vercel, and never writes to Supabase.
+If your local OpenAI-compatible bridge is listening on port 31415 rather than Ollama 11434, add `--base-url http://127.0.0.1:31415/v1`. Only loopback HTTP endpoints are accepted, and HTTP redirects are refused for both model listing and chat inference, preventing an apparently local service from redirecting the probe to a LAN or internet endpoint. The script does not configure or expose Tailscale Funnel, does not change Vercel, and never writes to Supabase.
 
 ## Remote Preview and certification gates
 
