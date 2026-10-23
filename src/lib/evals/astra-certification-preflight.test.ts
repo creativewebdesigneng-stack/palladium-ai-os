@@ -61,6 +61,20 @@ describe('Astra certification configuration-only preflight', () => {
     expect(legacy.canAttemptTextCertification).toBe(true)
   })
 
+  it('blocks an unauthenticated candidate even when the model and judge are pinned', () => {
+    const result = inspectAstraCertificationPreflight({
+      taskClass: 'coding', candidateModel: 'candidate',
+      env: { ...base, OPENAI_COMPATIBLE_API_KEY: '' },
+    })
+    expect(result).toMatchObject({
+      candidateConfigured: true, candidateAuthConfigured: false,
+      independentJudgeConfigured: true, provenanceSigningConfigured: true,
+      canAttemptTextCertification: false, state: 'configuration_missing',
+    })
+    expect(result.blockers).toContain('astra_candidate_auth_missing')
+    expect(JSON.stringify(result)).not.toContain('never-return-this-key')
+  })
+
   it('refuses unpinned or routed-to-the-candidate evaluators', () => {
     for (const patch of [
       { FREELLMAPI_MODEL: 'auto' },
