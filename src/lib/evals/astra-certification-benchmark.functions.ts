@@ -63,6 +63,9 @@ function classifyAstraTextCertificationFailure(error: unknown) {
   if (message.includes('freellm') && (message.includes('not configured') || message.includes('required for trusted'))) {
     return { code: 'evaluator_not_ready', message: 'The authenticated, route-pinned independent evaluator is not ready for trusted text certification.' } as const
   }
+  if (message.includes('astra provenance signing authority is missing or invalid')) {
+    return { code: 'provenance_signing_not_ready', message: 'Astra evidence signing is not configured for this deployment. An operator must configure a dedicated server-side signing key.' } as const
+  }
   if (message.includes('unknown astra text certification benchmark case')) {
     return { code: 'benchmark_case_invalid', message: 'The selected server-owned certification case is no longer valid.' } as const
   }
