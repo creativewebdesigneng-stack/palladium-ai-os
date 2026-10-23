@@ -95,6 +95,23 @@ begin
     if v_verified_case_count<>v_sample_count then
       raise exception 'Each Astra source run must represent a distinct trusted benchmark case';
     end if;
+    -- A single trusted Astra case produces one pinned candidate response.
+    -- Multiple responses for the same candidate in one run could skew that
+    -- case's average even if each response has exactly one judge score.
+    if exists (
+      select 1
+      from public.model_eval_runs runs
+      left join public.model_eval_responses response
+        on response.run_id=runs.id
+        and response.provider=p_provider
+        and response.model=p_model
+      where runs.id=any(v_run_ids)
+      group by runs.id
+      having count(response.id)<>1
+    ) then
+      raise exception 'Each Astra benchmark run must have exactly one response for the pinned candidate model';
+    end if;
+
     if exists (
       select 1
       from public.model_eval_responses response
