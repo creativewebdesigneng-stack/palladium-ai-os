@@ -1,3 +1,4 @@
+import { blackstarNativeOnlyEnabled, enforceBlackstarNativeOnly } from "./blackstar-native-only-policy";
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import { runGeminiNative, streamGeminiNative } from "./gemini-provider.server";
 import * as base from "./model-gateway.base";
@@ -214,6 +215,7 @@ async function rescueAuthorizedWebSearch(args: RunArgs, primaryProvider: Provide
  * cross-provider failover, remembered providers, or web-search rescue.
  */
 export async function runChatPinned(args: RunArgs): Promise<ChatResult> {
+  enforceBlackstarNativeOnly(args);
   compactRunContextInPlace(
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
@@ -230,10 +232,13 @@ export async function runChatPinned(args: RunArgs): Promise<ChatResult> {
 
 /** Non-streaming model calls get bounded cross-provider failover. */
 export async function runChat(args: RunArgs): Promise<ChatResult> {
+  enforceBlackstarNativeOnly(args);
   compactRunContextInPlace(
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
   );
+  // Strict deployment policy bypasses cached providers, bootstrap and web rescue.
+  if (blackstarNativeOnlyEnabled()) return base.runChat(args);
   const cached = activeProviderByConversation.get(args.messages);
   const remembered = cached && (!args.allowedProviders || args.allowedProviders.includes(cached.provider)) ? cached : undefined;
   const primaryProvider = remembered?.provider ?? args.provider;
@@ -267,6 +272,7 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 /** Streaming shares the same bounded context policy. Gemini uses its native
  * transport and emits the same runtime event contract. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
+  enforceBlackstarNativeOnly(args);
   compactRunContextInPlace(
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
