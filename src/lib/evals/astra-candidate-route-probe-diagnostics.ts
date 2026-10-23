@@ -48,6 +48,7 @@ export function safeAstraCandidateModelId(model: string): string | null {
 }
 
 export function classifyAstraCandidateRouteProbeStatus(status: number): AstraTextCertificationStage {
+  if (status >= 300 && status < 400) return 'candidate_request_rejected'
   if (status === 401 || status === 403) return 'candidate_credentials_rejected'
   if (status === 429) return 'candidate_rate_limited'
   if (status === 408 || status === 504) return 'candidate_timeout_or_unreachable'
