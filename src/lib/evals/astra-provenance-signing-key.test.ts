@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
+import { hasAstraProvenanceSigningAuthority, resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
 
 const legacy = 'legacy-service-role-credential'
 const dedicated = 'a'.repeat(64)
@@ -31,6 +31,20 @@ describe('Astra provenance signing authority', () => {
         SUPABASE_SERVICE_ROLE_KEY: legacy,
       })).toThrow(/signing key is invalid/)
     }
+  })
+
+  it('reports only readiness, never credential material', () => {
+    expect(hasAstraProvenanceSigningAuthority({
+      BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: dedicated,
+    })).toBe(true)
+    expect(hasAstraProvenanceSigningAuthority({
+      SUPABASE_SERVICE_ROLE_KEY: legacy,
+    })).toBe(true)
+    expect(hasAstraProvenanceSigningAuthority({
+      BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: 'weak',
+      SUPABASE_SERVICE_ROLE_KEY: legacy,
+    })).toBe(false)
+    expect(hasAstraProvenanceSigningAuthority({})).toBe(false)
   })
 
   it('refuses to sign evidence without either server-side secret', () => {
