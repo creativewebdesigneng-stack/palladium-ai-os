@@ -270,6 +270,7 @@ export default function AstraCertificationWorkbench() {
       {taskClass !== 'vision' && benchmark.data?.preflight && <div role="status" className="mt-3 rounded-xl border border-violet-400/20 bg-violet-400/[.04] p-3 text-xs text-violet-100">
         <p className="font-semibold">{canRun ? 'Routes configured, not yet independently tested' : 'Certification is blocked by server configuration'}</p>
         {benchmark.data.preflight.blockers?.includes('astra_candidate_route_missing') && <p className="mt-1">Astra candidate serving route is missing on this deployment.</p>}
+        {benchmark.data.preflight.blockers?.includes('astra_candidate_auth_missing') && <p className="mt-1">The pinned Astra candidate endpoint has no server-side authentication configured. Add a dedicated candidate API key before certification.</p>}
         {benchmark.data.preflight.blockers?.includes('pinned_independent_evaluator_missing') && <p className="mt-1">An independently pinned evaluator is missing on this deployment.</p>}
         {benchmark.data.preflight.blockers?.includes('astra_provenance_signing_key_missing') && <p className="mt-1">Astra provenance signing authority is missing or invalid on this deployment. An operator must configure a dedicated server-side signing key before certification can run.</p>}
         {!canRun && !benchmark.data.preflight.blockers?.length && <p className="mt-1">Astra serving identity or the approved evaluator is unavailable.</p>}
