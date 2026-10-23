@@ -20,3 +20,13 @@ export function resolveAstraProvenanceSigningKey(env: NodeJS.ProcessEnv = proces
   }
   return legacy
 }
+
+/** Configuration-only status; never return signing material to a caller. */
+export function hasAstraProvenanceSigningAuthority(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    resolveAstraProvenanceSigningKey(env)
+    return true
+  } catch {
+    return false
+  }
+}
