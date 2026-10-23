@@ -5,6 +5,7 @@ import { hasPinnedAstraCertificationCandidate } from './astra-certification-cand
 import { collectAstraCertificationRunPages, collectAstraRunEvidenceBatches } from './astra-certification-run-pages'
 import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
 import { validateAstraCertificationRpcEvidence } from './astra-certification-rpc-evidence'
+import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
 import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute } from './freellm-evaluator.server'
@@ -119,9 +120,7 @@ export function hashAstraEvaluationSystemPrompt(value?: string | null): string {
 }
 
 function provenanceSecret(): string {
-  const secret = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!secret) throw new Error('Astra evaluation provenance is unavailable because the server verification key is not configured.')
-  return secret
+  return resolveAstraProvenanceSigningKey()
 }
 
 function normalizeProvenance(input: AstraEvaluationProvenanceInput) {
