@@ -14,6 +14,8 @@ describe('Astra DB certification RPC is last-line quality protection', () => {
     expect(migration).toContain("count(distinct runs.metadata->'astra_activation'->>'case_id')")
     expect(migration).toContain("if p_model_id='blackstar-astra-v0.1' then")
     expect(migration).toContain('v_astra_valid_count<>v_sample_count')
+    expect(migration).toContain('An Astra response is missing exactly one valid judge score')
+    expect(migration).toContain('score.score between 0 and 100')
     for (const field of ['suite_id', 'task_class', 'provider', 'model', 'provenance_signature', 'server_verified']) {
       expect(migration).toContain("runs.metadata->'astra_activation'->>'" + field + "'")
     }
