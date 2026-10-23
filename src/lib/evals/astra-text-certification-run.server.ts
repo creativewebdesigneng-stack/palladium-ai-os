@@ -15,6 +15,8 @@ import { astraCertificationStageError, candidateFailureStage, evaluatorFailureSt
 import { probeAstraCandidateRouteAfterGenericError } from './astra-candidate-route-probe.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
+import { inspectAstraCertificationPreflight } from './astra-certification-preflight'
+import { buildAstraJudgeMessages, parseSingleAstraJudgeScore } from './astra-certification-judge-context'
 
 type Db = { from: (table: string) => any }
 const db = supabaseAdmin as unknown as Db
@@ -35,26 +37,6 @@ export type AstraCandidateModelFailureDetail = {
 
 type AstraCertificationDiagnosticError = Error & {
   astraCandidateModelDiagnostic?: AstraCandidateModelFailureDetail
-}
-
-function parseSingleJudge(raw: string) {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? raw
-  const first = fenced.indexOf('[')
-  const last = fenced.lastIndexOf(']')
-  if (first < 0 || last <= first) throw new Error('The FreeLLM judge returned an invalid score format.')
-  const parsed = JSON.parse(fenced.slice(first, last + 1)) as Array<Record<string, unknown>>
-  if (!Array.isArray(parsed) || parsed.length !== 1) throw new Error('The FreeLLM judge must score exactly one Astra candidate.')
-  const entry = parsed[0] ?? {}
-  const index = Number(entry['index'])
-  const score = Number(entry['score'])
-  if (index !== 0 || !Number.isFinite(score) || score < 0 || score > 100) {
-    throw new Error('The FreeLLM judge returned an invalid Astra candidate score.')
-  }
-  return {
-    score,
-    verdict: typeof entry['verdict'] === 'string' ? entry['verdict'].slice(0, 120) : null,
-    reasoning: typeof entry['reasoning'] === 'string' ? entry['reasoning'].slice(0, 2000) : null,
-  }
 }
 
 async function assertScopeAccess(input: RunInput) {
@@ -80,6 +62,15 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   }
 
   const model = blackstarAstraModelForTaskClass(input.taskClass)
+  const preflight = inspectAstraCertificationPreflight({
+    taskClass: input.taskClass,
+    candidateModel: model,
+  })
+  if (!preflight.canAttemptTextCertification) {
+    // Reject unpinned, self-judged or missing evaluator routes before a
+    // model request, token spend or evaluation record is created.
+    throw new Error('An authenticated, route-pinned, independent FreeLLM evaluator is required for trusted Astra text certification.')
+  }
   const systemPromptHash = hashAstraEvaluationSystemPrompt(null)
   const executionProfile = resolveAstraCertificationExecutionProfile(input.taskClass, model)
   const executionPrompt = buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, executionProfile)
@@ -178,16 +169,11 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     try {
       judgeResult = await runFreeLlmJudge({
         model: evaluator.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an impartial certification evaluator. Score the single candidate from 0 to 100 against the supplied criteria. Do not reward verbosity. Return ONLY a JSON array with one object containing index, score, verdict and reasoning.',
-          },
-          {
-            role: 'user',
-            content: `TRUSTED BENCHMARK PROMPT\n${benchmarkCase.prompt}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE\nRESPONSE 0\n${candidate.text}`,
-          },
-        ],
+        messages: buildAstraJudgeMessages({
+          benchmarkPrompt: benchmarkCase.prompt,
+          criteria: benchmarkCase.criteria,
+          candidateText: candidate.text,
+        }),
         temperature: 0,
         maxTokens: 1000,
         timeoutMs: 90_000,
@@ -208,7 +194,7 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     }
 
     stage = 'judge_response'
-    const judged = parseSingleJudge(judgeResult.text)
+    const judged = parseSingleAstraJudgeScore(judgeResult.text)
     const score = {
       run_id: run.id,
       response_id: response.id,
