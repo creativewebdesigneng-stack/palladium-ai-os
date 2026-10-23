@@ -5,3 +5,5 @@ The signed evaluation verifier previously fetched 200 newest completed runs befo
 It examines bounded pages until the matching history is exhausted and throws a clear error at the safety limit rather than silently treating missing older cases as certification failures or success. Every fetched row still passes the existing owner, signed HMAC, score-link, independent judge and quality-floor verification.
 
 This change reads only; it does not issue evidence, migrate the database, set credentials, bypass approval controls or modify Production.
+
+Related candidate response and score rows are retrieved in batches of at most 50 run IDs. This avoids oversized PostgREST `IN` query URLs when history spans hundreds of matching signed runs. A failed chunk prevents partial evidence from being considered; existing signature and judge integrity checks still determine whether any row qualifies.

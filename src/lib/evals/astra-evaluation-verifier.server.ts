@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
 import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
-import { collectAstraCertificationRunPages } from './astra-certification-run-pages'
+import { collectAstraCertificationRunPages, collectAstraRunEvidenceBatches } from './astra-certification-run-pages'
 import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
 import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
@@ -268,22 +268,27 @@ async function matchingRuns(scope: Scope) {
 
   if (!tagged.length) return { model, runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
 
+  // The historical candidate list can now exceed one PostgREST URL/query
+  // window. Fetch scores and responses for bounded run-id batches, never by
+  // serializing thousands of UUIDs in a single .in(...) query.
   const runIds = tagged.map((run) => run.id)
-  const [{ data: responseData, error: responseError }, { data: scoreData, error: scoreError }] = await Promise.all([
-    astraEvalAdmin
-      .from('model_eval_responses')
-      .select('id,run_id,provider,model,response_text,latency_ms,input_tokens,output_tokens')
-      .in('run_id', runIds),
-    astraEvalAdmin
-      .from('model_eval_scores')
-      .select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria')
-      .in('run_id', runIds),
-  ])
-  if (responseError) throw new Error(responseError.message)
-  if (scoreError) throw new Error(scoreError.message)
-
-  const responses = (responseData ?? []) as ArenaResponse[]
-  const scores = (scoreData ?? []) as ArenaScore[]
+  const { responses, scores } = await collectAstraRunEvidenceBatches<ArenaResponse, ArenaScore>(
+    runIds, async (ids) => {
+      const [{ data: responseData, error: responseError }, { data: scoreData, error: scoreError }] = await Promise.all([
+        astraEvalAdmin
+          .from('model_eval_responses')
+          .select('id,run_id,provider,model,response_text,latency_ms,input_tokens,output_tokens')
+          .in('run_id', ids),
+        astraEvalAdmin
+          .from('model_eval_scores')
+          .select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria')
+          .in('run_id', ids),
+      ])
+      if (responseError) throw new Error(responseError.message)
+      if (scoreError) throw new Error(scoreError.message)
+      return { responses: (responseData ?? []) as ArenaResponse[], scores: (scoreData ?? []) as ArenaScore[] }
+    },
+  )
   const verifiedRuns = tagged.filter((run) => {
     const metadata = astraMetadata(run)
     const caseId = metadata?.['case_id']
