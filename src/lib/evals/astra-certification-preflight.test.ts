@@ -5,6 +5,7 @@ const base = {
   OPENAI_COMPATIBLE_BASE_URL: 'https://example.test/v1',
   OPENAI_COMPATIBLE_API_KEY: 'never-return-this-key',
   BLACKSTAR_ASTRA_MODEL: 'candidate',
+  BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: 's'.repeat(64),
   FREELLMAPI_BASE_URL: 'https://judge.example.test/v1',
   FREELLMAPI_API_KEY: 'another-hidden-key',
   FREELLMAPI_MODEL: 'judge-model',
@@ -17,14 +18,15 @@ describe('Astra certification configuration-only preflight', () => {
     const result = inspectAstraCertificationPreflight({ taskClass: 'reasoning', candidateModel: 'candidate', env: {} })
     expect(result).toMatchObject({
       canAttemptTextCertification: false, state: 'configuration_missing',
-      blockers: ['astra_candidate_route_missing', 'pinned_independent_evaluator_missing'],
+      blockers: ['astra_candidate_route_missing', 'pinned_independent_evaluator_missing', 'astra_provenance_signing_key_missing'],
     })
   })
   it('indicates configured-but-unprobed and never claims completed certification', () => {
     const result = inspectAstraCertificationPreflight({ taskClass: 'coding', candidateModel: 'candidate', env: base })
     expect(result).toMatchObject({
       state: 'configured_unprobed', candidateConfigured: true,
-      independentJudgeConfigured: true, canAttemptTextCertification: true, blockers: [],
+      independentJudgeConfigured: true, provenanceSigningConfigured: true,
+      canAttemptTextCertification: true, blockers: [],
     })
     const json = JSON.stringify(result)
     expect(json).not.toContain('never-return-this-key')
@@ -33,6 +35,32 @@ describe('Astra certification configuration-only preflight', () => {
     expect(json).not.toContain('judge-model')
     expect(json).not.toContain('certified_success')
   })
+  it('reports missing or invalid signing authority without leaking the secret', () => {
+    for (const patch of [
+      { BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: '' },
+      { BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: 'weak-key' },
+      { BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: 's'.repeat(64) + ' ' },
+    ]) {
+      const result = inspectAstraCertificationPreflight({
+        taskClass: 'coding', candidateModel: 'candidate',
+        env: { ...base, SUPABASE_SERVICE_ROLE_KEY: 'legacy-secret', ...patch },
+      })
+      expect(result).toMatchObject({
+        state: 'configuration_missing', provenanceSigningConfigured: false,
+        canAttemptTextCertification: false,
+      })
+      expect(result.blockers).toContain('astra_provenance_signing_key_missing')
+      expect(JSON.stringify(result)).not.toContain('legacy-secret')
+      expect(JSON.stringify(result)).not.toContain('weak-key')
+    }
+    const legacy = inspectAstraCertificationPreflight({
+      taskClass: 'coding', candidateModel: 'candidate',
+      env: { ...base, BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY: undefined, SUPABASE_SERVICE_ROLE_KEY: 'legacy-secret' },
+    })
+    expect(legacy.provenanceSigningConfigured).toBe(true)
+    expect(legacy.canAttemptTextCertification).toBe(true)
+  })
+
   it('refuses unpinned or routed-to-the-candidate evaluators', () => {
     for (const patch of [
       { FREELLMAPI_MODEL: 'auto' },
