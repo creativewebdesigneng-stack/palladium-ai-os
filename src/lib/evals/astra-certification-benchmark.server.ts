@@ -116,7 +116,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   const { data: run, error: runError } = await db.from('model_eval_runs').select('id,user_id,org_id,prompt,status,judge_provider,judge_model,metadata,completed_at').eq('id', input.runId).maybeSingle()
   if (runError) throw new Error(runError.message)
   if (!run || run.status !== 'completed' || !run.completed_at) throw new Error('Only completed Model Arena runs can be attested.')
-  if (input.orgId ? run.org_id !== input.orgId : run.org_id !== null || run.user_id !== input.userId) throw new Error('Evaluation run does not belong to this scope.')
+  if (run.user_id !== input.userId || run.org_id !== (input.orgId ?? null)) throw new Error('Evaluation run does not belong to this exact owner/workspace scope.')
   if (run.prompt !== benchmarkCase.prompt) throw new Error('Evaluation prompt does not match the trusted benchmark case.')
   const runMetadata = metadataObject(run.metadata) ?? {}
   if (stableJson(runMetadata['criteria'] ?? null) !== stableJson(benchmarkCase.criteria)) throw new Error('Evaluation criteria do not match the trusted benchmark case.')
