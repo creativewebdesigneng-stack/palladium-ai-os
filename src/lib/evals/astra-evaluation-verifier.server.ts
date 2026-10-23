@@ -24,7 +24,6 @@ import {
 import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelForTaskClass,
-  isBlackstarAstraEngineConfigured,
   isBlackstarAstraVisionConfigured,
 } from '@/lib/runtime/blackstar-astra-engine-profile'
 

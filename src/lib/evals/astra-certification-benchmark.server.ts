@@ -15,7 +15,7 @@ import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge, ju
 import { matchesPinnedFreeLlmRoute } from '@/lib/evals/freellm-evaluator.server'
 import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, listVerifiedAstraEvaluationCaseIds, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
-import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
+import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 
 type Scope = { userId: string; orgId?: string | null; taskClass: NativeIntelligenceTaskClass }
 type AttestationInput = Scope & { runId: string; caseId: string }
