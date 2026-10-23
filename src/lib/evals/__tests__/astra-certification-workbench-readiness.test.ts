@@ -13,6 +13,7 @@ describe('Astra operator certification readiness wiring', () => {
     expect(ui).toContain("taskClass !== 'vision' && (benchmark.data?.preflight?.state !== 'configured_unprobed'")
     expect(ui).toContain('role="status"')
     expect(ui).toContain('Routes configured, not yet independently tested')
+    expect(ui).toContain("blockers?.includes('astra_candidate_auth_missing')")
   })
 
   it('explains missing signing authority without exposing credentials', async () => {
