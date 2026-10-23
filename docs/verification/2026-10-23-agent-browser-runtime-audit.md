@@ -10,7 +10,7 @@ thresholds and evaluator signatures are outside this change.
 | Boundary | Existing implementation | Finding |
 | --- | --- | --- |
 | Builder → saved configuration | `src/screens/AgentBuilder.jsx`, `src/lib/agents/agents.functions.ts`, `agent-tools-update.server.ts` | `allowed_tools` is persisted; owner and updated-at checks protect editing. Live reload acceptance still required. |
-| Workforce presentation | `src/components/workforce/normalize.jsx` | Reads `allowed_tools`; completed count derives from succeeded/completed tasks, not tool invocations. Its performance series is synthetic; it is not execution evidence. |
+| Workforce presentation | `src/components/workforce/normalize.jsx` | Reads `allowed_tools`; completed count derives from succeeded/completed tasks, not tool invocations. Its historical synthetic performance series was removed in the telemetry follow-up below. |
 | Runtime grants | `src/lib/runtime/runtime.server.ts`, `tools-core.server.ts`, `tools.server.ts` | Active catalogue, explicit assignments, permissions, plan and approval govern dispatch. Skill registration is not a tool grant. |
 | Skills and connected services | `src/lib/runtime/agent-skills`, `src/lib/integrations/agent-integration-runtime.server.ts`, `src/lib/mcp/agent-mcp-runtime.server.ts` | Reused unchanged. Full automated suite exercises these contracts; no live MCP/provider certification claimed. |
 | Model → tool | `model-gateway.server.ts`, runtime `invokeGuardedTool` | Model tool calls pass existing harness and dispatcher. Live inference not performed in this audit. |
@@ -120,3 +120,28 @@ branch and confirm its database is approved for isolated test writes. Do not
 assume a READY Preview has a browser worker or isolated database. An exact-SHA
 API deployment records the SHA as its ref, so branch-scoped settings must be
 verified against the actual deployment context as well.
+
+## Follow-up: truthful Workforce telemetry
+
+Fixed the existing backend-to-Workforce mapping so `waiting_for_tool` remains
+Working, `waiting_for_approval` appears Awaiting approval, and queued/pending
+work stays visible. New status filters/badges use the existing Workforce UI.
+Queued work does not override a paused/archived agent's configured state;
+executing work takes priority over queued work. Current task titles remain
+visible while waiting. Aggregate executing counts include waiting-for-tool.
+
+Removed the synthetic seven-day sine-wave chart and stopped deriving historical
+points from an aggregate success percentage. The profile now explicitly says
+daily performance history is unavailable. No history collector or duplicate
+telemetry store was added. Empty outcome sets produce an unavailable success
+rate across the card, profile and aggregate displays; measured 0%, 67% and 100%
+remain distinct. Existing completed/succeeded and failed task counts remain the
+success-rate denominator. Cancelled and pending work do not count as success.
+
+Eleven new regressions exercise state mapping, actual rendered React card,
+overview and performance output, paused/archived queue handling, task isolation,
+measured/no-data distinction and aggregate counters. Together with the two
+existing output tests, the targeted run passes 13 tests. React review: no new
+hooks/effects, network requests, mutation controls or authority changes; removed
+unused chart imports and added safe status-style fallbacks. This is rendered
+component/fixture evidence, not authenticated live UI acceptance.

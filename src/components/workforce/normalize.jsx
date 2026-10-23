@@ -33,27 +33,27 @@ function relTime(iso) {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
-// Synthetic 7-point performance series anchored on the real success rate so
-// the drawer chart always has data while remaining honest about performance.
-function synthSeries(perf) {
-  const base = Math.max(35, Math.min(95, perf || 65));
-  const out = [];
-  for (let i = 0; i < 7; i++) {
-    out.push(Math.max(20, Math.min(100, base + Math.round(Math.sin(i * 1.3) * 7 - 3))));
-  }
-  return out;
+export function workforceSuccessRate(completed, failed) {
+  return completed + failed ? Math.round((completed / (completed + failed)) * 100) : null;
+}
+
+export function formatWorkforcePercentage(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value}%` : '—';
 }
 
 const STATUS_MAP = { draft: 'Idle', active: 'Online', paused: 'Paused', archived: 'Offline' };
-const TASK_STATUS_MAP = { pending: 'Queued', running: 'Running', succeeded: 'Completed', completed: 'Completed', failed: 'Failed' };
+const TASK_STATUS_MAP = { pending: 'Queued', queued: 'Queued', running: 'Running', waiting_for_tool: 'Waiting for tool', waiting_for_approval: 'Awaiting approval', cancelled: 'Cancelled', succeeded: 'Completed', completed: 'Completed', failed: 'Failed' };
 
 export function mapAgentToWf(a, tasks = []) {
   const myTasks = tasks.filter((t) => t.agent_id === a.id);
-  const running = myTasks.find((t) => t.status === 'running');
+  const running = myTasks.find((t) => ['running', 'waiting_for_tool'].includes(t.status));
+  const approval = myTasks.find((t) => t.status === 'waiting_for_approval');
+  const queued = myTasks.find((t) => ['queued', 'pending'].includes(t.status));
+  const current = running ?? approval ?? queued;
   const completed = myTasks.filter((t) => ['completed', 'succeeded'].includes(t.status)).length;
   const failed = myTasks.filter((t) => t.status === 'failed').length;
-  const perf = completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0;
-  const status = running ? 'Working' : STATUS_MAP[a.status] || 'Idle';
+  const perf = workforceSuccessRate(completed, failed);
+  const status = running ? 'Working' : approval ? 'Awaiting approval' : queued && !['paused', 'archived'].includes(a.status) ? 'Queued' : STATUS_MAP[a.status] || 'Idle';
   const identity = agentIdentityFromPreferences(a.preferences);
 
   return {
@@ -65,7 +65,7 @@ export function mapAgentToWf(a, tasks = []) {
     identity,
     preferences: a.preferences ?? {},
     status,
-    currentTask: running ? running.title : a.status === 'active' ? 'Available' : '—',
+    currentTask: current ? current.title : a.status === 'active' ? 'Available' : '—',
     model: a.model || '—',
     tools: Array.isArray(a.allowed_tools) ? a.allowed_tools : Array.isArray(a.tools) ? a.tools : [],
     projects: [],
@@ -92,7 +92,8 @@ export function mapAgentToWf(a, tasks = []) {
     memory: [],
     knowledge: [],
     integrations: [],
-    perfSeries: synthSeries(perf),
+    // Daily history is unavailable; never fabricate points from an aggregate.
+    perfSeries: [],
     activity: [],
     permissions: [],
     _backend: true,
@@ -103,4 +104,22 @@ export function agentByIdName(agents) {
   const map = {};
   for (const a of agents) map[a.id] = a.name;
   return map;
+}
+export function buildWorkforceOverview(agents, tasks, usage) {
+  const count = (s) => tasks.filter((t) => t.status === s).length;
+  const running = count('running') + count('waiting_for_tool');
+  const pending = count('pending') + count('queued');
+  const completed = count('succeeded') + count('completed');
+  const failed = count('failed');
+  return {
+    totalAgents: agents.length,
+    activeAgents: agents.filter((a) => a.status === 'active').length,
+    runningTasks: running,
+    pendingTasks: pending,
+    completedTasks: completed,
+    failedTasks: failed,
+    totalTasks: tasks.length,
+    performance: workforceSuccessRate(completed, failed),
+    usage: usage || {},
+  };
 }

@@ -1,7 +1,7 @@
+import { formatWorkforcePercentage } from './normalize';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, CheckCircle2, TrendingUp, Wrench, Plug, Brain, BookOpen, ShieldCheck, Activity, FolderKanban, Bot, BadgeCheck, AlertTriangle, Loader2 } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 import { STATUS_STYLE, PROFILE_TABS, TASK_STATUS_STYLE, PRIORITY_STYLE, TOOL_ICON } from './wfData';
 import { useServerFn } from '@tanstack/react-start';
@@ -10,7 +10,7 @@ import { getAgentBusinessCertification } from '@/lib/agents/agent-business-certi
 export default function AgentProfileDrawer({ agent, onClose }) {
   const [tab, setTab] = useState('overview');
   if (!agent) return null;
-  const st = STATUS_STYLE[agent.status];
+  const st = STATUS_STYLE[agent.status] || STATUS_STYLE.Idle;
 
   return (
     <div className="fixed inset-0 z-50">
@@ -84,7 +84,7 @@ function Overview({ agent }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Stat label="Type" value={o.type} icon={Bot} />
         <Stat label="Created" value={o.created} icon={Clock} />
-        <Stat label="Success rate" value={`${o.successRate}%`} icon={CheckCircle2} />
+        <Stat label="Success rate" value={formatWorkforcePercentage(o.successRate)} icon={CheckCircle2} />
         <Stat label="Avg duration" value={o.avgDuration} icon={Clock} />
         <Stat label="Tasks done" value={String(o.tasksDone)} icon={Activity} />
         <Stat label="Cost / run" value={o.cost} icon={TrendingUp} />
@@ -186,26 +186,16 @@ function Integrations({ agent }) {
   );
 }
 
-function Performance({ agent }) {
-  const data = agent.perfSeries.map((v, i) => ({ d: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i], v }));
+export function Performance({ agent }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Success" value={`${agent.performance}%`} icon={CheckCircle2} />
+        <Stat label="Success" value={formatWorkforcePercentage(agent.performance)} icon={CheckCircle2} />
         <Stat label="Tasks" value={String(agent.overview.tasksDone)} icon={Activity} />
         <Stat label="Avg time" value={agent.overview.avgDuration} icon={Clock} />
       </div>
       <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-        <p className="mb-2 text-[10px] uppercase tracking-wider text-zinc-600">7-day trend</p>
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <XAxis dataKey="d" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#101119', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} labelStyle={{ color: '#a1a1aa' }} />
-              <Line type="monotone" dataKey="v" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 2, fill: '#8b5cf6' }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <p className="text-xs text-zinc-400">Daily performance history is not available.</p>
       </div>
     </div>
   );
