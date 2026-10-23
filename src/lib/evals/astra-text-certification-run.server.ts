@@ -18,6 +18,7 @@ import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 import { inspectAstraCertificationPreflight } from './astra-certification-preflight'
 import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
 import { finalizeAstraCertificationRun } from './astra-certification-run-finalization'
+import { failAstraCertificationRunIfRunning } from './astra-certification-run-failure'
 import { buildAstraJudgeMessages, parseSingleAstraJudgeScore } from './astra-certification-judge-context'
 
 type Db = { from: (table: string) => any }
@@ -282,11 +283,18 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     const diagnostic = error instanceof Error && error.message.startsWith('BLACKSTAR_ASTRA_CERT_STAGE:')
       ? error
       : astraCertificationStageError(stage)
-    await db.from('model_eval_runs').update({
-      status: 'failed',
-      completed_at: new Date().toISOString(),
-      metadata: { ...runMetadata, failure_stage: stage },
-    }).eq('id', run.id)
+    try {
+      await failAstraCertificationRunIfRunning(db, {
+        runId: run.id,
+        userId: input.userId,
+        orgId: input.orgId ?? null,
+        metadata: { ...runMetadata, failure_stage: stage },
+        completedAt: new Date().toISOString(),
+      })
+    } catch {
+      // Preserve the bounded original stage diagnostic. Cleanup errors cannot
+      // turn a failed certification into a success or disclose DB internals.
+    }
     throw diagnostic
   }
 }
