@@ -24,7 +24,7 @@ export function parseArgs(argv) {
 export function assertLoopbackCompatibleBase(value) {
   let url
   try { url = new URL(value) } catch { throw new Error('Invalid compatible base URL') }
-  if (url.protocol !== 'http:' || !LOCAL_HOSTS.has(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname.replace(/\\/+$/, '') !== '/v1') {
+  if (url.protocol !== 'http:' || !LOCAL_HOSTS.has(url.hostname) || url.username || url.password || url.search || url.hash || !['/v1', '/v1/'].includes(url.pathname)) {
     throw new Error('For safety, only a loopback HTTP /v1 URL without embedded credentials is allowed')
   }
   return url.origin + '/v1'
