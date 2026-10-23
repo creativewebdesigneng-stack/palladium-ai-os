@@ -205,7 +205,9 @@ async function matchingRuns(scope: Scope) {
   if (!hasPinnedAstraCertificationCandidate({
     taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
   })) {
-    throw new Error('Native Astra certification serving is not configured with an explicit pinned candidate model on this deployment.')
+    // Read-only status checks must be available before Preview is configured.
+    // An unconfigured candidate has no verified cases or certification quality.
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
     return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
@@ -360,7 +362,10 @@ export async function listVerifiedAstraEvaluationCaseIds(scope: Scope): Promise<
 
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
   const visionConfigured = scope.taskClass !== 'vision' || isBlackstarAstraVisionConfigured()
-  const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured
+  const candidateConfigured = hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })
+  const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured && candidateConfigured
   const { model, runs, quality } = await matchingRuns(scope)
   return {
     taskClass: scope.taskClass,
@@ -368,6 +373,7 @@ export async function getAstraEvaluationCertificationStatus(scope: Scope) {
     model,
     completedRuns: runs.length,
     minimumRuns: MIN_RUNS,
+    candidateConfigured,
     readyToCertify: supported && quality.readyToCertify,
     averageScore: quality.averageScore,
     minimumQualifyingScore: NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
@@ -384,6 +390,11 @@ export async function certifyAstraEvaluation(scope: Scope) {
     throw new Error('Vision certification requires a dedicated multimodal Astra endpoint and BLACKSTAR_ASTRA_VISION_MODEL.')
   }
 
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) {
+    throw new Error('A pinned native Astra candidate route is required before certification evidence can be issued.')
+  }
   const { model, runs, quality } = await matchingRuns(scope)
   if (runs.length < MIN_RUNS) {
     throw new Error(`All ${MIN_RUNS} distinct trusted benchmark cases are required for ${scope.taskClass} certification.`)
