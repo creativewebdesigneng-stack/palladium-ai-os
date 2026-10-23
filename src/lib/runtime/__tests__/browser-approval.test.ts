@@ -177,6 +177,32 @@ describe('bounded approved browser execution', () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();
   });
+  it('does not fail a task another invocation resumed during permission checks', async () => {
+    const grants = await calls.resolve();
+    calls.resolve.mockImplementationOnce(async () => {
+      db.tables['agent_tasks']![0]!['status'] = 'running';
+      return grants;
+    });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('running');
+  });
+  it('does not claim or fail a task reassigned during permission checks', async () => {
+    const grants = await calls.resolve();
+    calls.resolve.mockImplementationOnce(async () => {
+      db.tables['agent_tasks']![0]!['agent_id'] = 'replacement';
+      return grants;
+    });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('waiting_for_approval');
+  });
+  it('persists pre-dispatch permission failure only on the still-bound paused task', async () => {
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map() });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('failed');
+  });
   it('refuses cancelled tasks', async () => {
     db.tables['agent_tasks']![0]!['cancel_requested'] = true;
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();

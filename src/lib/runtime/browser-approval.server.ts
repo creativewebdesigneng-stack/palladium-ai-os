@@ -177,7 +177,8 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
 
 /** Called only after the Approval Centre's single-use pending -> executing claim. */
 export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string; approvalRequestId: string }): Promise<{ ok: boolean; provider: string; error?: string; result?: { agent_task_id: string; simulated: boolean; task_status: string; browser_evidence?: ReturnType<typeof browserApprovalEvidence>; tool_evidence?: ReturnType<typeof browserApprovalEvidence> } }> {
-  let claimedTask: string | null = null;
+  let boundTask: { id: string; agentId: string } | null = null;
+  let taskClaimed = false;
   let executionProvider = 'unknown';
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
   const db = supabaseAdmin as unknown as Sb;
@@ -205,7 +206,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
       try { return JSON.parse(message.content).approval_request_id === approval.id; } catch { return false; }
     });
     if (!pending) throw new Error('Approved browser continuation does not contain this request.');
-    claimedTask = taskId;
+    boundTask = { id: taskId, agentId: approval.agent_id };
     const { data: agent, error: agentError } = await args.sb.from('personal_agents').select('*')
       .eq('id', approval.agent_id).eq('user_id', args.userId).maybeSingle();
     if (agentError || !agent || agent.status === 'archived') throw new Error('The browser agent is no longer available.');
@@ -222,9 +223,9 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     ) throw new Error('Current tool permissions no longer allow the approved task.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
     const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
-      .eq('id', taskId).eq('user_id', args.userId).eq('status', 'waiting_for_approval').eq('waiting_approval_request_id', approval.id).eq('cancel_requested', false).select('id').maybeSingle();
+      .eq('id', taskId).eq('user_id', args.userId).eq('agent_id', approval.agent_id).eq('status', 'waiting_for_approval').eq('waiting_approval_request_id', approval.id).eq('cancel_requested', false).select('id').maybeSingle();
     if (claim.error || !claim.data) throw new Error('This browser task has already resumed or was cancelled.');
-    claimedTask = taskId;
+    taskClaimed = true;
     // Waive only this exact, immutable approved call; current domain/plan/tool gates still apply.
     const approvedGrants = new Map(tools.grants); approvedGrants.set(name, { ...grant, requiresApproval: false });
     const executed = await executeTool(name, input, { sb: args.sb, userId: args.userId, agentId: agent.id, orgId: task.org_id ?? null, taskId, allowedProviders: agent.allowed_providers ?? [] }, approvedGrants);
@@ -260,7 +261,8 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     }
     return { ok: true, provider: browser ? String(output['provider']) : 'local', result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
   } catch (error) {
-    if (claimedTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', claimedTask).eq('user_id', args.userId).in('status', ['running', 'waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
+    // A failed claim never owns a running task; preserve another invocation's work.
+    if (boundTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', boundTask.id).eq('user_id', args.userId).eq('agent_id', boundTask.agentId).in('status', taskClaimed ? ['running', 'waiting_for_approval'] : ['waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
     return { ok: false, provider: executionProvider, error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
   }
 }

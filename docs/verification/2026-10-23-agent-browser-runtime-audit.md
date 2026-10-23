@@ -168,3 +168,9 @@ that remains an explicit error requiring inspection. Current resume checks still
 require the exact task/agent/request link, so an unlinked request cannot execute
 through this handler. This repair does not make insert+link a database transaction
 or certify exactly-once behavior.
+
+### Approval resume ownership follow-up
+
+The resume handler set its cleanup ownership before claiming the task. A claim loser could consequently fail another invocation's running task; the claim also omitted the agent identity checked during the earlier read. The handler now tracks the bound task/agent separately from a successful claim, rechecks agent identity in the conditional claim and cleanup, and restricts pre-claim cleanup to the still-paused task. Permission failures still close a correctly bound paused task without dispatching its tool.
+
+Two deterministic interleaving regressions fail against the previous implementation (running task overwritten; reassigned task dispatched). With the repair, all 105 approval tests pass, including a third regression preserving pre-dispatch failure persistence. These use the existing database double, not live concurrency evidence. Approval Centre's single-use request claim remains the first protection; this repair strengthens the task boundary and does not establish exactly-once execution. Live authenticated acceptance remains blocked as described above.
