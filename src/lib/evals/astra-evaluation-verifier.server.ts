@@ -4,6 +4,7 @@ import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-li
 import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
 import { collectAstraCertificationRunPages, collectAstraRunEvidenceBatches } from './astra-certification-run-pages'
 import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
+import { validateAstraCertificationRpcEvidence } from './astra-certification-rpc-evidence'
 import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute } from './freellm-evaluator.server'
@@ -468,16 +469,30 @@ export async function certifyAstraEvaluation(scope: Scope) {
   })
   if (error) throw new Error(error.message)
 
-  const evidence = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : data as Record<string, unknown> | null
+  const evidence = validateAstraCertificationRpcEvidence(data, {
+    userId: scope.userId,
+    orgId: scope.orgId ?? null,
+    modelId: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
+    provider: 'compatible',
+    model,
+    suiteId,
+    taskClass: scope.taskClass,
+    sampleCount: sourceRuns.length,
+    minimumScore: NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
+    benchmarkHash,
+    evaluatorHash,
+    modelConfigHash,
+    verifier: VERIFIER_ID,
+  })
   return {
-    id: typeof evidence?.['id'] === 'string' ? evidence['id'] : null,
+    id: evidence.id,
     taskClass: scope.taskClass,
     provider: 'compatible' as const,
     model,
     suiteId,
     sampleCount: sourceRuns.length,
-    score: evidence?.['score'] == null ? null : Number(evidence['score']),
-    completedAt: typeof evidence?.['completed_at'] === 'string' ? evidence['completed_at'] : null,
-    verifiedAt: typeof evidence?.['verified_at'] === 'string' ? evidence['verified_at'] : null,
+    score: evidence.score,
+    completedAt: evidence.completedAt,
+    verifiedAt: evidence.verifiedAt,
   }
 }
