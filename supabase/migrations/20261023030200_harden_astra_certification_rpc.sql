@@ -94,7 +94,8 @@ begin
     where runs.id=any(v_run_ids);
     if v_verified_case_count<>v_sample_count then
       raise exception 'Each Astra source run must represent a distinct trusted benchmark case';
-      if exists (
+    end if;
+    if exists (
       select 1
       from public.model_eval_responses response
       where response.run_id=any(v_run_ids)
@@ -114,7 +115,6 @@ begin
     ) then
       raise exception 'An Astra response is missing exactly one valid judge score';
     end if;
-  end if;
   end if;
 
   with per_run as (
