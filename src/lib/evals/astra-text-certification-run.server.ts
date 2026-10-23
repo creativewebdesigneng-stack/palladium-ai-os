@@ -16,6 +16,7 @@ import { probeAstraCandidateRouteAfterGenericError } from './astra-candidate-rou
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 import { inspectAstraCertificationPreflight } from './astra-certification-preflight'
+import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
 import { buildAstraJudgeMessages, parseSingleAstraJudgeScore } from './astra-certification-judge-context'
 
 type Db = { from: (table: string) => any }
@@ -71,6 +72,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     // model request, token spend or evaluation record is created.
     throw new Error('An authenticated, route-pinned, independent FreeLLM evaluator is required for trusted Astra text certification.')
   }
+  // Fail before model spend or creating a running record if evidence cannot be
+  // signed. A Preview-only signing key does not grant database admin rights.
+  resolveAstraProvenanceSigningKey()
   const systemPromptHash = hashAstraEvaluationSystemPrompt(null)
   const executionProfile = resolveAstraCertificationExecutionProfile(input.taskClass, model)
   const executionPrompt = buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, executionProfile)
