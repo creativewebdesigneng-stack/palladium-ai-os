@@ -15,6 +15,7 @@
     "backend:check": "tsc --noEmit && vitest run",
     "smoke:production": "node scripts/production-smoke.mjs",
     "test:trust-fabric": "node scripts/verification/trust-fabric-recovery.mjs",
+    "test:astra-certification-rpc": "node scripts/verification/astra-certification-rpc.mjs",
     "test:connector-recovery": "node scripts/verification/connector-recovery.mjs",
     "test:browser-recovery": "node scripts/verification/browser-schema-recovery.mjs",
     "test:customer-recovery": "node scripts/verification/customer-operations-recovery.mjs",

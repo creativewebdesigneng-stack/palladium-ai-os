@@ -99,6 +99,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+      - name: Astra certification isolated Postgres quality and scope tests
+        run: bun run test:astra-certification-rpc
+
       - name: Trust Fabric isolated Postgres access-control tests
         run: bun run test:trust-fabric
 
