@@ -14,6 +14,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  astra-native-certification-policy:
+    name: Astra native-route policy (dependency-free)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Verify bootstrap and pinned-route separation
+        run: bun scripts/verification/astra-native-certification-policy.mjs
+
   backend-check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
