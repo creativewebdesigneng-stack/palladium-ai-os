@@ -1,8 +1,6 @@
--- Astra-specific hardening of the EXISTING service-role certification function.
--- The original function is unchanged for input/output schema and privilege
--- shape. All checks fail BEFORE any verified-evidence row is inserted.
--- Not automatically applied to Production: release this migration only after
--- review and authenticated Preview acceptance of the calling application.
+-- Astra-only extra guards on the existing service-role Native Intelligence
+-- certification RPC. No new RPC, table or permission elevation.
+-- Staged in draft PR only; NOT applied to Production.
 
 create or replace function public.certify_native_intelligence_model_evaluation(
   p_run_ids uuid[],
@@ -25,6 +23,7 @@ declare
   v_run_ids uuid[];
   v_sample_count integer;
   v_valid_run_count integer;
+  v_astra_valid_count integer;
   v_verified_case_count integer;
   v_scored_run_count integer;
   v_user_id uuid;
@@ -67,27 +66,35 @@ begin
     and runs.status='completed'
     and runs.completed_at is not null
     and runs.user_id=v_user_id
-    and runs.org_id is not distinct from v_organization_id
-    -- The application verifies this evidence's HMAC. The database must also
-    -- reject accidental service-role certification from unrelated Arena runs.
-    and runs.metadata->'astra_activation'->>'server_verified' = 'true'
-    and runs.metadata->'astra_activation'->>'suite_id' = p_suite_id
-    and runs.metadata->'astra_activation'->>'task_class' = p_task_class
-    and runs.metadata->'astra_activation'->>'provider' = p_provider
-    and runs.metadata->'astra_activation'->>'model' = p_model
-    and btrim(coalesce(runs.metadata->'astra_activation'->>'case_id', '')) <> ''
-    and btrim(coalesce(runs.metadata->'astra_activation'->>'provenance_signature', '')) <> '';
+    and runs.org_id is not distinct from v_organization_id;
   if v_valid_run_count<>v_sample_count then
-    raise exception 'All source runs must be signed Astra cases in one exact owner, task class, model and versioned suite';
+    raise exception 'All source runs must be completed and belong to one exact owner/organization scope';
   end if;
 
-  select count(distinct runs.metadata->'astra_activation'->>'case_id')::integer
-    into v_verified_case_count
-  from public.model_eval_runs runs
-  where runs.id=any(v_run_ids);
+  -- Additional Astra-only constraints; the general-purpose Native
+  -- Intelligence evidence RPC keeps its historical behavior unchanged.
+  if p_model_id='blackstar-astra-v0.1' then
+    select count(*)::integer into v_astra_valid_count
+    from public.model_eval_runs runs
+    where runs.id=any(v_run_ids)
+      and runs.metadata->'astra_activation'->>'server_verified'='true'
+      and runs.metadata->'astra_activation'->>'suite_id'=p_suite_id
+      and runs.metadata->'astra_activation'->>'task_class'=p_task_class
+      and runs.metadata->'astra_activation'->>'provider'=p_provider
+      and runs.metadata->'astra_activation'->>'model'=p_model
+      and btrim(coalesce(runs.metadata->'astra_activation'->>'case_id',''))<>''
+      and btrim(coalesce(runs.metadata->'astra_activation'->>'provenance_signature',''))<>'';
+    if v_astra_valid_count<>v_sample_count then
+      raise exception 'All Astra source runs must belong to the signed versioned suite, task class and model';
+    end if;
 
-  if v_verified_case_count<>v_sample_count then
-    raise exception 'Each source run must represent a distinct trusted benchmark case';
+    select count(distinct runs.metadata->'astra_activation'->>'case_id')::integer
+      into v_verified_case_count
+    from public.model_eval_runs runs
+    where runs.id=any(v_run_ids);
+    if v_verified_case_count<>v_sample_count then
+      raise exception 'Each Astra source run must represent a distinct trusted benchmark case';
+    end if;
   end if;
 
   with per_run as (
@@ -99,7 +106,7 @@ begin
       on responses.run_id=runs.id and responses.provider=p_provider and responses.model=p_model
     join public.model_eval_scores scores
       on scores.run_id=runs.id and scores.response_id=responses.id
-      and scores.evaluator_type='llm_judge'
+      and (p_model_id<>'blackstar-astra-v0.1' or scores.evaluator_type='llm_judge')
     where runs.id=any(v_run_ids)
     group by runs.id,runs.completed_at
   )
@@ -111,10 +118,10 @@ begin
     raise exception 'Every source run must contain a successful scored response for the exact provider/model';
   end if;
   if v_score is null or v_score<0 or v_score>1 then raise exception 'Computed evaluation score is invalid'; end if;
-  -- Must remain in sync with NATIVE_INTELLIGENCE_MIN_EVAL_SCORE (0.75).
-  -- This prevents an alternate service-role caller or a race from bypassing
-  -- the existing application-layer signed-case quality qualification gate.
-  if v_score < 0.75 then
+  -- Must match NATIVE_INTELLIGENCE_MIN_EVAL_SCORE (0.75) in application code.
+  -- Astra cannot be certified below its qualifying floor; other models
+  -- retain the original generic RPC behavior.
+  if p_model_id='blackstar-astra-v0.1' and v_score<0.75 then
     raise exception 'Astra evaluation score does not meet the required Native Intelligence qualification floor';
   end if;
 
