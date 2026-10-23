@@ -100,7 +100,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
-    "zod": "^4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
@@ -138,6 +138,7 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "seroval": "1.6.7",
     "seroval-plugins": "1.6.7",
-    "launch-editor": "2.14.2"
+    "launch-editor": "2.14.2",
+    "zod": "4.6.6"
   }
 }
