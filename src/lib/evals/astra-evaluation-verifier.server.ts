@@ -1,5 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
+import { matchesPinnedFreeLlmRoute } from './freellm-evaluator.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import {
   ASTRA_CERTIFICATION_CASE_COUNT,
@@ -273,7 +276,32 @@ async function matchingRuns(scope: Scope) {
     const runResponses = responses.filter((response) => response.run_id === run.id)
     const runScores = scores.filter((score) => score.run_id === run.id)
     const hasExactAstraResponse = runResponses.some((response) => response.provider === 'compatible' && response.model === model)
-    if (!hasExactAstraResponse || runResponses.length === 0 || runScores.length !== runResponses.length) return false
+    if (!hasExactAstraResponse || !hasLinkedAstraEvaluationEvidence({
+      runId: run.id, responses: runResponses, scores: runScores,
+      judgeProvider: run.judge_provider, judgeModel: run.judge_model,
+      expectedCriteria: benchmarkCase.criteria,
+    })) return false
+
+    // A valid HMAC is necessary but does not prove that the original scorer was
+    // independent. Re-check the persisted judge route, without inventing it
+    // from a service-side metadata flag.
+    if (!isTrustedAstraCertificationJudge(run.judge_provider, run.judge_model) ||
+      run.judge_provider === 'compatible' || run.judge_model === model) return false
+    if (run.judge_provider === 'freellm') {
+      const identities = runScores.map((score) => {
+        const criteria = score.criteria && typeof score.criteria === 'object' && !Array.isArray(score.criteria)
+          ? score.criteria as Record<string, unknown> : {}
+        return {
+          provider: criteria['judgeRoutedProvider'],
+          model: criteria['judgeRoutedModel'],
+          via: criteria['judgeRoutedVia'],
+        }
+      })
+      if (!identities.every((item) => typeof item.via === 'string' && Boolean(item.via.trim())
+        && isIndependentFreeLlmRouteProvider(item.provider)
+        && typeof item.model === 'string' && item.model !== model
+        && matchesPinnedFreeLlmRoute({ routedProvider: item.provider as string, routedModel: item.model as string }))) return false
+    }
 
     return validProvenanceSignature(metadata?.['provenance_signature'], {
       runId: run.id,

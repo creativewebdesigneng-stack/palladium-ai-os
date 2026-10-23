@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import { astraCertificationSuiteId, getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass, listAstraCertificationBenchmarkCases } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
@@ -133,7 +134,11 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
     db.from('model_eval_scores').select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria').eq('run_id', run.id),
   ])
   if (responseError) throw new Error(responseError.message); if (scoreError) throw new Error(scoreError.message)
-  if (!responses?.length || scores?.length !== responses.length) throw new Error('Evaluation evidence is incomplete.')
+  if (!hasLinkedAstraEvaluationEvidence({
+    runId: run.id, responses: responses ?? [], scores: scores ?? [],
+    judgeProvider: run.judge_provider, judgeModel: run.judge_model,
+    expectedCriteria: benchmarkCase.criteria,
+  })) throw new Error('Evaluation response/score linkage or independent judge data is incomplete.')
   if (!responses.some((response: any) => response.provider === 'compatible' && response.model === expectedModel)) throw new Error('Evaluation is missing the exact Astra response.')
   if (input.taskClass === 'vision') {
     const expectedGroundTruth = getAstraVisionBenchmarkGroundTruth(input.caseId)
