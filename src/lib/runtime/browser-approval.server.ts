@@ -159,9 +159,10 @@ async function queueApproval(payload: any, ctx: ToolContext, name: string) {
   }).select('id').maybeSingle();
   if (error || !approval?.id) throw new Error('Could not queue browser approval.');
   const paused = await ctx.sb.from('agent_tasks').update({ waiting_approval_request_id: approval.id })
-    .eq('id', ctx.taskId).eq('user_id', ctx.userId).eq('cancel_requested', false).in('status', ['running', 'waiting_for_tool']).select('id').maybeSingle();
+    .eq('id', ctx.taskId).eq('user_id', ctx.userId).eq('agent_id', ctx.agentId)
+    .is('waiting_approval_request_id', null).eq('cancel_requested', false).in('status', ['running', 'waiting_for_tool']).select('id').maybeSingle();
   if (paused.error || !paused.data) {
-    // A concurrent cancellation can win after the approval INSERT. Never leave
+    // A concurrent cancellation, reassignment or approval can win after INSERT. Never leave
     // that orphaned request actionable in Mission Control.
     const closed = await ctx.sb.from('approval_requests').update({ status: 'cancelled' })
       .eq('id', approval.id).eq('user_id', ctx.userId).eq('agent_id', ctx.agentId)

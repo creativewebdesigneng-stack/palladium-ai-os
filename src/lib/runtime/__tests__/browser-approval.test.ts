@@ -91,6 +91,44 @@ describe('bounded browser approval input and queueing', () => {
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
+  it.each(['browser_task', 'calculator'])('links only one concurrent %s approval and cancels the loser', async name => {
+    db.tables['approval_requests'] = [];
+    db.tables['agent_tasks'] = [{ id: 'task', user_id: 'owner', agent_id: 'agent',
+      status: 'waiting_for_tool', cancel_requested: false, waiting_approval_request_id: null }];
+    const ctx = { sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task', allowedDomains: ['httpbingo.org'] } as unknown as Parameters<typeof queueBrowserApproval>[1];
+    const queue = () => name === 'browser_task'
+      ? queueBrowserApproval(input, ctx)
+      : queueLocalToolApproval('calculator', { expression: '6 * 7' }, ctx);
+    const results = await Promise.allSettled([queue(), queue()]);
+    const winners = results.filter(result => result.status === 'fulfilled');
+    expect(winners).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const pending = db.tables['approval_requests']!.filter(row => row['status'] === 'pending');
+    const cancelled = db.tables['approval_requests']!.filter(row => row['status'] === 'cancelled');
+    expect(pending).toHaveLength(1);
+    expect(cancelled).toHaveLength(1);
+    expect(db.tables['agent_tasks']![0]!['waiting_approval_request_id']).toBe(pending[0]!['id']);
+    if (winners[0]?.status === 'fulfilled') expect(winners[0].value.approval_request_id).toBe(pending[0]!['id']);
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not link an old agent approval after concurrent task reassignment', async () => {
+    db.tables['approval_requests'] = [];
+    db.tables['agent_tasks'] = [{ id: 'task', user_id: 'owner', agent_id: 'agent',
+      status: 'waiting_for_tool', cancel_requested: false, waiting_approval_request_id: null }];
+    let accesses = 0;
+    const racingDb = { ...db, from: (table: string) => {
+      if (table === 'agent_tasks' && ++accesses === 2) db.tables['agent_tasks']![0]!['agent_id'] = 'other-agent';
+      return db.from(table);
+    } };
+    await expect(queueBrowserApproval(input, {
+      sb: racingDb, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task', allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueBrowserApproval>[1])).rejects.toThrow('Could not link browser approval');
+    expect(db.tables['agent_tasks']![0]!['waiting_approval_request_id']).toBeNull();
+    expect(db.tables['approval_requests']![0]!['status']).toBe('cancelled');
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it('fails closed on conflicting starting URLs, unsafe steps, and unsupported budgets', () => {
     const safeSteps = [{ action: 'navigate' }, { action: 'read' }];
     expect(() => approvedBrowserInput({ url: 'https://httpbingo.org/html', steps: [

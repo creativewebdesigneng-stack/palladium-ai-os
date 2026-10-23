@@ -145,3 +145,26 @@ existing output tests, the targeted run passes 13 tests. React review: no new
 hooks/effects, network requests, mutation controls or authority changes; removed
 unused chart imports and added safe status-style fallbacks. This is rendered
 component/fixture evidence, not authenticated live UI acceptance.
+
+## Follow-up: approval-link concurrency
+
+Confirmed a queue race: two requests could both observe no pending task approval,
+insert separate requests and then overwrite the same task link. The shared
+browser/local-tool queue now links with a conditional update requiring the
+original owner and agent, an empty `waiting_approval_request_id`, an active task
+state and no cancellation. Only one request can win the empty-link transition;
+the loser follows the existing pending-request cancellation cleanup. A task
+reassigned between read and link cannot receive the former agent's approval.
+
+Three regressions cover concurrent browser requests, concurrent calculator
+requests and reassignment during linking. All three fail against the original
+implementation (99 existing tests pass), and all 102 approval tests pass with
+the repair. No tool executes during queueing. These use the existing isolated
+Supabase double and do not prove live database concurrency or authorized browser
+execution. No schema, RPC or new queue was added.
+
+The existing cleanup can itself fail or lose a race to an operator decision;
+that remains an explicit error requiring inspection. Current resume checks still
+require the exact task/agent/request link, so an unlinked request cannot execute
+through this handler. This repair does not make insert+link a database transaction
+or certify exactly-once behavior.
