@@ -57,6 +57,29 @@ await denied(call(),'low scoring Astra may not be certified')
 check(Number((await query('select count(*)::integer as n from public.model_eval_verified_evidence'))[0].n)===1,'failing score does not create evidence')
 await query('update public.model_eval_scores set score=90')
 
+// An additional score for the same Astra response must never raise its average.
+await query('insert into public.model_eval_scores(id,run_id,response_id,evaluator_type,score) values ($1::uuid,$2::uuid,$3::uuid,$4,$5)', [
+  uuid(701), ids[0], responseIds[0], 'llm_judge', 100,
+])
+await denied(call(), 'duplicate candidate judge score rejected')
+await query('delete from public.model_eval_scores where id=$1::uuid', [uuid(701)])
+
+// A missing score also invalidates the full certification case set.
+await query('delete from public.model_eval_scores where id=$1::uuid', [scoreIds[0]])
+await denied(call(), 'unscored candidate response rejected')
+await query('insert into public.model_eval_scores(id,run_id,response_id,evaluator_type,score) values ($1::uuid,$2::uuid,$3::uuid,$4,$5)', [
+  scoreIds[0], ids[0], responseIds[0], 'llm_judge', 90,
+])
+
+// Comparison candidates never contribute to the exact Astra-model average.
+await query('insert into public.model_eval_responses(id,run_id,provider,model) values ($1::uuid,$2::uuid,$3,$4)', [
+  uuid(801), ids[0], 'compatible', 'comparison-model',
+])
+await query('insert into public.model_eval_scores(id,run_id,response_id,evaluator_type,score) values ($1::uuid,$2::uuid,$3::uuid,$4,$5)', [
+  uuid(901), ids[0], uuid(801), 'llm_judge', 100,
+])
+check(Number((await query(call()))[0].score)===0.9, 'comparison candidate scores excluded')
+
 await query("update public.model_eval_runs set metadata=jsonb_set(metadata,'{astra_activation,suite_id}',to_jsonb($1::text)) where id=$2::uuid",['wrong-suite',ids[0]])
 await denied(call(),'Astra versioned suite mismatch denied')
 await query("update public.model_eval_runs set metadata=jsonb_set(metadata,'{astra_activation,suite_id}',to_jsonb($1::text)) where id=$2::uuid",[suite,ids[0]])
