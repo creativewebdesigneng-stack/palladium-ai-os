@@ -28,6 +28,8 @@ export function inspectAstraCertificationPreflight(args: {
     && isPinnedFreeLlmCertificationModel(evaluator.routedModel)
     && evaluator.routedModel !== args.candidateModel
 
+  const signingConfigured = hasAstraProvenanceSigningAuthority(env)
+
   if (args.taskClass === 'vision') {
     const visionModelConfigured = candidateConfigured && Boolean(nativeRoute && env['BLACKSTAR_ASTRA_VISION_MODEL']?.trim())
     return {
@@ -35,6 +37,7 @@ export function inspectAstraCertificationPreflight(args: {
       taskClass: args.taskClass,
       candidateConfigured: visionModelConfigured,
       independentJudgeConfigured: false,
+      provenanceSigningConfigured: signingConfigured,
       canAttemptTextCertification: false,
       state: 'vision_separate_flow' as const,
       blockers: visionModelConfigured ? [] : ['astra_vision_route_missing'],
@@ -42,7 +45,6 @@ export function inspectAstraCertificationPreflight(args: {
     }
   }
 
-  const signingConfigured = hasAstraProvenanceSigningAuthority(env)
   const blockers: string[] = []
   if (!candidateConfigured) blockers.push('astra_candidate_route_missing')
   if (!judgePinned) blockers.push('pinned_independent_evaluator_missing')
