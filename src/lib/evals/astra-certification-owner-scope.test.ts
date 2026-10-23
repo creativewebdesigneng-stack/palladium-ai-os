@@ -37,13 +37,18 @@ describe('Astra certification requires an exact evaluation owner even inside an 
     const calls: Array<[string, string]> = []
     const history = {
       select: vi.fn().mockReturnThis(),
+      not: vi.fn().mockReturnThis(),
       contains: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       eq: vi.fn().mockImplementation((key: string, value: string) => {
         calls.push([key, value])
         return history
       }),
-      range: vi.fn().mockResolvedValue({ data: [], error: null }),
+      range: vi.fn().mockReturnThis(),
+      // PostgREST's range() remains a query builder until awaited.
+      then: vi.fn((resolve: (value: { data: never[]; error: null }) => void) => {
+        resolve({ data: [], error: null })
+      }),
     }
     mocked.from.mockImplementation((table: string) => {
       if (table === 'organisation_members') return membership()
