@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
 import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
 import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
@@ -202,8 +203,10 @@ async function assertScopeAccess(scope: Scope) {
 
 async function matchingRuns(scope: Scope) {
   await assertScopeAccess(scope)
-  if (!isBlackstarAstraEngineConfigured()) {
-    throw new Error('Blackstar Astra serving is not configured on this deployment.')
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) {
+    throw new Error('Native Astra certification serving is not configured with an explicit pinned candidate model on this deployment.')
   }
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
     return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
@@ -348,7 +351,9 @@ async function matchingRuns(scope: Scope) {
  */
 export async function listVerifiedAstraEvaluationCaseIds(scope: Scope): Promise<string[]> {
   await assertScopeAccess(scope)
-  if (!isBlackstarAstraEngineConfigured()) return []
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) return []
   if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) return []
   const { runs } = await matchingRuns(scope)
   return runs.map((run) => astraMetadata(run)?.['case_id']).filter((id): id is string => typeof id === 'string')

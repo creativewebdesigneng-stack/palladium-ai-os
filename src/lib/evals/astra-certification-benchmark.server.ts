@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import { astraCertificationSuiteId, getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass, listAstraCertificationBenchmarkCases } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
@@ -104,7 +105,9 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
 export async function attestAstraCertificationBenchmarkRun(input: AttestationInput) {
   await assertScopeAccess(input)
   if (!isAstraCertificationTaskClass(input.taskClass)) throw new Error('This task class does not have a trusted benchmark suite.')
-  if (!isBlackstarAstraEngineConfigured()) throw new Error('Blackstar Astra serving is not configured on this deployment.')
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: input.taskClass, candidateModel: blackstarAstraModelForTaskClass(input.taskClass),
+  })) throw new Error('Native Astra certification serving is not configured with an explicit pinned model.')
   if (input.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) throw new Error('A dedicated multimodal Astra model is required for vision certification.')
 
   const benchmarkCase = getAstraCertificationBenchmarkCase(input.taskClass, input.caseId)

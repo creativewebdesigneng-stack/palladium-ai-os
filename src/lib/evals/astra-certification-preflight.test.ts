@@ -4,6 +4,7 @@ import { inspectAstraCertificationPreflight } from './astra-certification-prefli
 const base = {
   OPENAI_COMPATIBLE_BASE_URL: 'https://example.test/v1',
   OPENAI_COMPATIBLE_API_KEY: 'never-return-this-key',
+  BLACKSTAR_ASTRA_MODEL: 'candidate',
   FREELLMAPI_BASE_URL: 'https://judge.example.test/v1',
   FREELLMAPI_API_KEY: 'another-hidden-key',
   FREELLMAPI_MODEL: 'judge-model',
@@ -52,8 +53,10 @@ describe('Astra certification configuration-only preflight', () => {
       taskClass: 'general', candidateModel: 'qwen/qwen3.8-27b',
       env: { ...rest, GROQ_API_KEY: 'hidden-bootstrap' },
     })
-    expect(result.state).toBe('configured_unprobed')
-    expect(result.candidateConfigured).toBe(true)
+    expect(result.state).toBe('configuration_missing')
+    expect(result.candidateConfigured).toBe(false)
+    expect(result.canAttemptTextCertification).toBe(false)
+    expect(result.blockers).toContain('astra_candidate_route_missing')
     expect(JSON.stringify(result)).not.toContain('hidden-bootstrap')
   })
   it('does not mislabel a text benchmark as a working multimodal vision evaluator', () => {

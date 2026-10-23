@@ -1,6 +1,7 @@
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isPinnedFreeLlmCertificationModel } from './astra-certification-judge-policy'
 import { resolveFreeLlmEvaluatorConfig } from './freellm-evaluator.server'
+import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
 
 /**
  * Safe, configuration-only readiness for the EXISTING certification runner.
@@ -14,8 +15,11 @@ export function inspectAstraCertificationPreflight(args: {
 }) {
   const env = args.env ?? process.env
   const nativeRoute = Boolean(env['OPENAI_COMPATIBLE_BASE_URL']?.trim())
-  const bootstrap = !nativeRoute && Boolean(env['GROQ_API_KEY']?.trim())
-  const candidateConfigured = nativeRoute || bootstrap
+  // An external Groq bootstrap can power development, but is not proof of
+  // native Astra candidate inference and must not qualify for certification.
+  const candidateConfigured = hasPinnedAstraCertificationCandidate({
+    taskClass: args.taskClass, candidateModel: args.candidateModel, env,
+  })
   const evaluator = resolveFreeLlmEvaluatorConfig(env)
   const judgePinned = evaluator.certificationConfigured
     && isPinnedFreeLlmCertificationModel(evaluator.model)
@@ -24,7 +28,7 @@ export function inspectAstraCertificationPreflight(args: {
     && evaluator.routedModel !== args.candidateModel
 
   if (args.taskClass === 'vision') {
-    const visionModelConfigured = Boolean(nativeRoute && env['BLACKSTAR_ASTRA_VISION_MODEL']?.trim())
+    const visionModelConfigured = candidateConfigured && Boolean(nativeRoute && env['BLACKSTAR_ASTRA_VISION_MODEL']?.trim())
     return {
       version: 1 as const,
       taskClass: args.taskClass,
@@ -49,6 +53,6 @@ export function inspectAstraCertificationPreflight(args: {
     canAttemptTextCertification: ready,
     state: ready ? 'configured_unprobed' as const : 'configuration_missing' as const,
     blockers,
-    note: 'Configuration-only preflight. Actual model reachability, credential validity, returned judge route, permissions and signed run evidence must be checked by a genuine authorized certification execution.',
+    note: 'Configuration-only preflight. Groq bootstrap and an unpinned compatible endpoint cannot establish native Astra certification. Endpoint availability does not establish model ownership. Real inference, credentials, evaluator independence, and signed evidence remain unproven.',
   }
 }
