@@ -175,7 +175,16 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   const suiteId = benchmarkCase.suiteId
   const provenanceSignature = signAstraEvaluationEvidence({ ...baseProvenance, suiteId, caseId: benchmarkCase.caseId })
   const nextMetadata = { ...runMetadata, astra_activation: { ...astra, provenance_version: PROVENANCE_VERSION, suite_id: suiteId, case_id: benchmarkCase.caseId, provenance_signature: provenanceSignature } }
-  const { error: updateError } = await db.from('model_eval_runs').update({ metadata: nextMetadata }).eq('id', run.id)
+  // An acknowledged write with zero matched rows is not an attestation.
+  // Scope the final write again because the run may have been revoked,
+  // transferred, or cancelled after the earlier read/signature checks.
+  let update = db.from('model_eval_runs').update({ metadata: nextMetadata })
+    .eq('id', run.id)
+    .eq('user_id', input.userId)
+    .eq('status', 'completed')
+  update = input.orgId ? update.eq('org_id', input.orgId) : update.is('org_id', null)
+  const { data: persisted, error: updateError } = await update.select('id').maybeSingle()
   if (updateError) throw new Error(updateError.message)
+  if (persisted?.id !== run.id) throw new Error('Astra attestation was not persisted for the exact authorized run.')
   return { runId: run.id, taskClass: input.taskClass, provider: 'compatible' as const, model: expectedModel, suiteId, caseId: benchmarkCase.caseId, attested: true }
 }
