@@ -1,3 +1,4 @@
+import { isToolExecutionUnconfirmed } from "./tool-execution-evidence";
 import type { AgentOperatingProfile } from "@/lib/agents/agent-spec";
 import {
   applyReplan,
@@ -283,6 +284,12 @@ async function invokePlannedTool(args: {
     },
     args.run.tools.grants,
   );
+  if (isToolExecutionUnconfirmed(exec.output)) {
+    throw new RuntimeError(
+      "Tool execution evidence could not be confirmed. The action may already have occurred. Inspect the task and provider before retrying.",
+      "TOOL_EXECUTION_EVIDENCE_UNCONFIRMED", 503,
+    );
+  }
   args.guard.record(args.call, exec.output);
   return {
     ok: exec.ok,

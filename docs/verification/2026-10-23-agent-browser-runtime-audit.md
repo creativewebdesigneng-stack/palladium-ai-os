@@ -31,14 +31,14 @@ This is an acknowledgement safeguard, not an atomic side-effect transaction or
 an exactly-once executor. A timed-out response can leave a real ledger row or a
 real external action despite an unconfirmed response. Operators must inspect
 the task/provider before retrying. Failed/denied attempts remain best-effort
-logged; this change does not guarantee database availability or stop a later
-model from independently requesting another action. No schema changes.
+logged; this change does not guarantee database availability or exactly-once
+side effects. No schema changes.
 
 ## Local validation
 
 - PASS: frozen Bun 1.3.14 install with unchanged lockfile.
 - PASS: production build and generated-route TypeScript check.
-- PASS: full Vitest suite, 689 files / 3,561 tests, including eight new
+- PASS: full Vitest suite, 689 files / 3,564 tests, including eight new
   persistence cases across real calculator and HTML Studio handlers with a
   database double. CI's non-secret provider placeholder is required for runtime
   preflight tests; an initial run without it failed 33 tests, corrected without
@@ -84,3 +84,39 @@ secrets, and keep automated versus live evidence separate.
 
 No merge, Production deployment, financial action or Astra certification change
 is authorized by this repair.
+
+## Follow-up: stop automatic continuation on unconfirmed evidence
+
+The ordinary/streaming loop and planned loop previously returned the
+unconfirmed-evidence diagnostic to the model, allowing a second inference to
+retry or claim completion. Both invocation boundaries now halt with
+`TOOL_EXECUTION_EVIDENCE_UNCONFIRMED` before model continuation or planned
+recovery. Existing caller-owned `failRun` handling persists non-streaming
+failures; streaming retains its existing failure persistence. A shared pure
+predicate recognises this exact dispatcher diagnostic; ordinary tool failures
+retain their existing recovery semantics.
+
+Three integration regressions cover ordinary, streaming and planned paths:
+exactly one tool invocation, no subsequent model turn, no completion, and
+persisted failure through the applicable runtime/caller boundary. The first
+ordinary test assumed executeRun itself saved failures; corrected it to exercise
+the existing caller-owned failRun contract instead. All 3,564 tests pass.
+Already-dispatched parallel read calls cannot be rolled back by this guard, and
+new operator-initiated runs remain separate actions. This is not exactly-once
+execution or proof of a real browser task.
+
+### Read-only Preview configuration finding
+
+Vercel non-decrypted metadata inspection found `PLAYWRIGHT_BROWSER_ENDPOINT`
+and `PLAYWRIGHT_BROWSER_TOKEN` scoped to the old
+`repair/agent-tool-verification` Preview branch, not
+`repair/agent-browser-evidence-20261023`. Another historical integration branch
+has an endpoint entry. A general Preview `GROQ_API_KEY` entry exists, as do
+Preview Supabase configuration entries; presence alone proves neither usable
+credentials nor database isolation. No values were decrypted, copied or changed.
+
+Before live acceptance, configure a matched endpoint/token for this exact
+branch and confirm its database is approved for isolated test writes. Do not
+assume a READY Preview has a browser worker or isolated database. An exact-SHA
+API deployment records the SHA as its ref, so branch-scoped settings must be
+verified against the actual deployment context as well.
