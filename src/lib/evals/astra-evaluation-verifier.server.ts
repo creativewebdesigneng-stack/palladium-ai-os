@@ -242,9 +242,12 @@ async function matchingRuns(scope: Scope) {
       .order('id', { ascending: false })
       .range(from, to)
 
+    // Organisation membership grants workspace access, but never ownership of
+    // another member's native-model certification evidence.
+    query = query.eq('user_id', scope.userId)
     query = scope.orgId
       ? query.eq('org_id', scope.orgId)
-      : query.is('org_id', null).eq('user_id', scope.userId)
+      : query.is('org_id', null)
 
     const { data: batch, error } = await query
     if (error) throw new Error(error.message)
