@@ -17,6 +17,7 @@ import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlac
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
 import { inspectAstraCertificationPreflight } from './astra-certification-preflight'
 import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
+import { finalizeAstraCertificationRun } from './astra-certification-run-finalization'
 import { buildAstraJudgeMessages, parseSingleAstraJudgeScore } from './astra-certification-judge-context'
 
 type Db = { from: (table: string) => any }
@@ -248,14 +249,15 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     }
 
     stage = 'run_finalize'
-    const { error: completeError } = await db.from('model_eval_runs').update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      judge_provider: judgeResult.provider,
-      judge_model: judgeResult.model,
+    await finalizeAstraCertificationRun(db, {
+      runId: run.id,
+      userId: input.userId,
+      orgId: input.orgId ?? null,
+      judgeProvider: judgeResult.provider,
+      judgeModel: judgeResult.model,
       metadata: completedMetadata,
-    }).eq('id', run.id)
-    if (completeError) throw astraCertificationStageError(stage)
+      completedAt: new Date().toISOString(),
+    })
 
     stage = 'attestation'
     const attested = await attestAstraCertificationBenchmarkRun({
