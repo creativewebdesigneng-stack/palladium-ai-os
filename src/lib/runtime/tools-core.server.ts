@@ -1557,17 +1557,22 @@ export async function executeTool(
     status: "succeeded" | "failed" | "cancelled",
     extra: Record<string, unknown>,
   ) => {
-    await ctx.sb.from("tool_executions").insert({
-      user_id: ctx.userId,
-      org_id: ctx.orgId,
-      agent_id: ctx.agentId,
-      agent_task_id: ctx.taskId || null,
-      tool: name,
-      input: inputMetadata(input),
-      status,
-      duration_ms: Date.now() - started,
-      ...extra,
-    });
+    try {
+      const { data, error } = await ctx.sb.from("tool_executions").insert({
+        user_id: ctx.userId,
+        org_id: ctx.orgId,
+        agent_id: ctx.agentId,
+        agent_task_id: ctx.taskId || null,
+        tool: name,
+        input: inputMetadata(input),
+        status,
+        duration_ms: Date.now() - started,
+        ...extra,
+      }).select("id").maybeSingle();
+      return !error && Boolean(data?.id);
+    } catch {
+      return false;
+    }
   };
 
   if (!tool || !grant) {
@@ -1704,7 +1709,16 @@ export async function executeTool(
       await log('failed', { error: failure.slice(0, 500), output: outputMetadata(output) });
       return { ok: false, output };
     }
-    await log("succeeded", { output: outputMetadata(output) as never });
+    if (!await log("succeeded", { output: outputMetadata(output) as never })) {
+      // The handler may already have acted. Do not repeat it or acknowledge
+      // durable success when the execution ledger did not confirm the write.
+      return { ok: false, output: {
+        error: "Tool ran, but its execution record could not be confirmed. Inspect the task before retrying; the action may already have occurred.",
+        code: "TOOL_EXECUTION_EVIDENCE_UNCONFIRMED",
+        execution_may_have_occurred: true,
+        retry_safe: false,
+      } };
+    }
     return { ok: true, output };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Tool execution failed.";

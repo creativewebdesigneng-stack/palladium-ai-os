@@ -146,11 +146,19 @@ export function createAiHubApprovalGate(db: SupabaseLike): AiHubApprovalGate {
         })
         .eq('id', approvalRequestId)
         .eq('user_id', context.actorId)
+        .eq('action_type', 'ai_hub_execution')
         .eq('status', 'approved')
         .eq('execution_status', 'executing')
       query = context.approvalOrgId ? query.eq('org_id', context.approvalOrgId) : query.is('org_id', null)
-      const { error } = await query
+      // Returning from the adapter is not a durable completion receipt. An
+      // approval could have been revoked between claim and finalisation.
+      // Never report a recorded outcome unless exactly the approved row was
+      // updated and returned by the canonical database.
+      const { data, error } = await query.select('id').maybeSingle()
       if (error) throw new Error(error.message)
+      if (data?.id !== approvalRequestId) {
+        throw new Error('AI Hub outcome was not recorded against the approved execution request.')
+      }
     },
   }
 }

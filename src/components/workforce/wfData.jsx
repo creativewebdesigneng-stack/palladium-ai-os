@@ -13,9 +13,11 @@ export const OVERVIEW = [
   { label: 'Failed Jobs', value: '12', sub: 'needs attention', icon: AlertTriangle, color: 'from-rose-500 to-red-600' },
 ];
 
-export const STATUSES = ['Online', 'Working', 'Idle', 'Paused', 'Offline', 'Error'];
+export const STATUSES = ['Online', 'Working', 'Awaiting approval', 'Queued', 'Idle', 'Paused', 'Offline', 'Error'];
 
 export const STATUS_STYLE = {
+  'Awaiting approval': { dot: 'bg-amber-400', text: 'text-amber-400', bg: 'bg-amber-400/10' },
+  Queued: { dot: 'bg-zinc-500', text: 'text-zinc-400', bg: 'bg-white/5' },
   Online: { dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-400/10' },
   Working: { dot: 'bg-violet-400', text: 'text-violet-400', bg: 'bg-violet-400/10' },
   Idle: { dot: 'bg-zinc-500', text: 'text-zinc-400', bg: 'bg-white/5' },
@@ -198,6 +200,9 @@ export const PROFILE_TABS = [
 ];
 
 export const TASK_STATUS_STYLE = {
+  'Waiting for tool': 'bg-violet-400/10 text-violet-300',
+  'Awaiting approval': 'bg-amber-400/10 text-amber-400',
+  Cancelled: 'bg-white/5 text-zinc-400',
   Running: 'bg-emerald-400/10 text-emerald-400', Queued: 'bg-white/5 text-zinc-400',
   Paused: 'bg-amber-400/10 text-amber-400', Completed: 'bg-violet-400/10 text-violet-300',
   Failed: 'bg-rose-400/10 text-rose-400',

@@ -1,3 +1,4 @@
+import { blackstarNativeOnlyEnabled, enforceBlackstarNativeOnly } from "./blackstar-native-only-policy";
 import { resolveBlackstarAstraServingCacheControl } from "./blackstar-astra-serving-cache";
 import { NVIDIA_NIM_DEFAULT_MODEL, NVIDIA_NIM_HOSTED_BASE_URL, nvidiaNimBaseUrl, nvidiaNimKey, nvidiaNimModel } from "./nvidia-dell-infrastructure.server";
 
@@ -106,6 +107,7 @@ export function normaliseProvider(value?: string | null): Provider {
   // No explicit choice: an intentionally activated Blackstar-controlled runtime
   // is the primary route. External providers remain bounded fallback lanes.
   if (!v) {
+    if (blackstarNativeOnlyEnabled()) return "compatible";
     if (blackstarNativePrimaryEnabled()) return "compatible";
     if (process.env["GEMINI_API_KEY"]) return "gemini";
     if (process.env["GROQ_API_KEY"]) return "groq";
@@ -132,7 +134,7 @@ export function resolveModel(provider: Provider, model?: string | null, access?:
       false,
     );
   }
-  if (!m && provider === "compatible" && blackstarNativePrimaryEnabled()) {
+  if (!m && provider === "compatible" && (blackstarNativePrimaryEnabled() || blackstarNativeOnlyEnabled())) {
     const nativeModel = process.env["BLACKSTAR_NATIVE_MODEL"]?.trim();
     if (nativeModel) return nativeModel;
   }
@@ -437,9 +439,9 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
         method: "POST",
         headers: ep.headers,
         body: JSON.stringify(body),
-        // Never forward an operator-configured NIM request to a redirect
-        // target, even when that endpoint is reachable with HTTPS.
-        ...(args.provider === "nvidia" ? { redirect: "error" as const } : {}),
+        // Never forward restricted native or operator-configured NIM requests
+        // to redirect targets.
+        ...((args.provider === "nvidia" || blackstarNativeOnlyEnabled()) ? { redirect: "error" as const } : {}),
         signal,
       });
       if (res.ok) return res;
@@ -479,6 +481,7 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
 /* ------------------------------------------------------------------ non-stream */
 
 export async function runChat(args: RunArgs): Promise<ChatResult> {
+  enforceBlackstarNativeOnly(args);
   const res = await send(args, false);
   const json = (await res.json()) as any;
 
@@ -542,6 +545,7 @@ function safeJson(value: unknown): Record<string, unknown> {
 /** Streams a single model turn. Yields text deltas, then a `done` event with the
  * assembled result (including any tool calls) so the caller can continue a loop. */
 export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
+  enforceBlackstarNativeOnly(args);
   const res = await send(args, true);
   if (!res.body) throw new ProviderError("The model provider returned an empty stream.", 502, true);
 

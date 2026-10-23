@@ -1,10 +1,11 @@
+import { formatWorkforcePercentage } from './normalize';
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { STATUS_STYLE, TOOL_ICON } from './wfData';
 import AgentIdentityAvatar from '@/components/agents/AgentIdentityAvatar';
 
 export default function AgentCard({ agent, onOpen }) {
-  const st = STATUS_STYLE[agent.status];
+  const st = STATUS_STYLE[agent.status] || STATUS_STYLE.Idle;
   return (
     <motion.button
       onClick={() => onOpen(agent)}
@@ -35,7 +36,7 @@ export default function AgentCard({ agent, onOpen }) {
       <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-zinc-600">Performance</p>
-          <p className="text-sm font-semibold text-white">{agent.performance}%</p>
+          <p className="text-sm font-semibold text-white">{formatWorkforcePercentage(agent.performance)}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-wider text-zinc-600">Last active</p>

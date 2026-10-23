@@ -363,3 +363,20 @@ describe('planned browser approval pause', () => {
     expect(runtime.completeRun).not.toHaveBeenCalled(); expect(toolsMod.executeTool).toHaveBeenCalledTimes(1);
   });
 });
+
+it('halts planned recovery when a tool may have acted without confirmed evidence', async () => {
+  const sb = db();
+  const prepared = run(sb, new Map([grant('web_search')]));
+  gateway.runChat.mockResolvedValueOnce(planningResult).mockResolvedValue(toolResult([
+    { id: 'search', name: 'web_search', arguments: { query: 'evidence' } },
+  ]));
+  toolsMod.executeTool.mockResolvedValue({ ok: false, output: {
+    code: 'TOOL_EXECUTION_EVIDENCE_UNCONFIRMED', execution_may_have_occurred: true, retry_safe: false,
+  } });
+  await expect(executePlannedRun({ sb, userId: 'user-1', run: prepared })).rejects.toMatchObject({
+    code: 'TOOL_EXECUTION_EVIDENCE_UNCONFIRMED',
+  });
+  expect(toolsMod.executeTool).toHaveBeenCalledTimes(1);
+  expect(gateway.runChat).toHaveBeenCalledTimes(2);
+  expect(runtime.completeRun).not.toHaveBeenCalled();
+});

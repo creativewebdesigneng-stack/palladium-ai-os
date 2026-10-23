@@ -1,3 +1,4 @@
+import { isToolExecutionUnconfirmed } from "./tool-execution-evidence";
 /**
  * The PalladiumAI agent runtime.
  *
@@ -692,6 +693,12 @@ async function invokeGuardedTool(
     },
     deps.grants,
   );
+  if (isToolExecutionUnconfirmed(exec.output)) {
+    throw new RuntimeError(
+      "Tool execution evidence could not be confirmed. The action may already have occurred. Inspect the task and provider before retrying.",
+      "TOOL_EXECUTION_EVIDENCE_UNCONFIRMED", 503,
+    );
+  }
   deps.guard.record(call, exec.output);
   return {
     ok: exec.ok,

@@ -91,6 +91,44 @@ describe('bounded browser approval input and queueing', () => {
     expect(calls.execute).not.toHaveBeenCalled();
   });
 
+  it.each(['browser_task', 'calculator'])('links only one concurrent %s approval and cancels the loser', async name => {
+    db.tables['approval_requests'] = [];
+    db.tables['agent_tasks'] = [{ id: 'task', user_id: 'owner', agent_id: 'agent',
+      status: 'waiting_for_tool', cancel_requested: false, waiting_approval_request_id: null }];
+    const ctx = { sb: db, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task', allowedDomains: ['httpbingo.org'] } as unknown as Parameters<typeof queueBrowserApproval>[1];
+    const queue = () => name === 'browser_task'
+      ? queueBrowserApproval(input, ctx)
+      : queueLocalToolApproval('calculator', { expression: '6 * 7' }, ctx);
+    const results = await Promise.allSettled([queue(), queue()]);
+    const winners = results.filter(result => result.status === 'fulfilled');
+    expect(winners).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const pending = db.tables['approval_requests']!.filter(row => row['status'] === 'pending');
+    const cancelled = db.tables['approval_requests']!.filter(row => row['status'] === 'cancelled');
+    expect(pending).toHaveLength(1);
+    expect(cancelled).toHaveLength(1);
+    expect(db.tables['agent_tasks']![0]!['waiting_approval_request_id']).toBe(pending[0]!['id']);
+    if (winners[0]?.status === 'fulfilled') expect(winners[0].value.approval_request_id).toBe(pending[0]!['id']);
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not link an old agent approval after concurrent task reassignment', async () => {
+    db.tables['approval_requests'] = [];
+    db.tables['agent_tasks'] = [{ id: 'task', user_id: 'owner', agent_id: 'agent',
+      status: 'waiting_for_tool', cancel_requested: false, waiting_approval_request_id: null }];
+    let accesses = 0;
+    const racingDb = { ...db, from: (table: string) => {
+      if (table === 'agent_tasks' && ++accesses === 2) db.tables['agent_tasks']![0]!['agent_id'] = 'other-agent';
+      return db.from(table);
+    } };
+    await expect(queueBrowserApproval(input, {
+      sb: racingDb, userId: 'owner', orgId: null, agentId: 'agent', taskId: 'task', allowedDomains: ['httpbingo.org'],
+    } as unknown as Parameters<typeof queueBrowserApproval>[1])).rejects.toThrow('Could not link browser approval');
+    expect(db.tables['agent_tasks']![0]!['waiting_approval_request_id']).toBeNull();
+    expect(db.tables['approval_requests']![0]!['status']).toBe('cancelled');
+    expect(calls.execute).not.toHaveBeenCalled();
+  });
+
   it('fails closed on conflicting starting URLs, unsafe steps, and unsupported budgets', () => {
     const safeSteps = [{ action: 'navigate' }, { action: 'read' }];
     expect(() => approvedBrowserInput({ url: 'https://httpbingo.org/html', steps: [
@@ -139,6 +177,32 @@ describe('bounded approved browser execution', () => {
     db.tables['agent_tasks']![0]!['status'] = 'running';
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();
   });
+  it('does not fail a task another invocation resumed during permission checks', async () => {
+    const grants = await calls.resolve();
+    calls.resolve.mockImplementationOnce(async () => {
+      db.tables['agent_tasks']![0]!['status'] = 'running';
+      return grants;
+    });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('running');
+  });
+  it('does not claim or fail a task reassigned during permission checks', async () => {
+    const grants = await calls.resolve();
+    calls.resolve.mockImplementationOnce(async () => {
+      db.tables['agent_tasks']![0]!['agent_id'] = 'replacement';
+      return grants;
+    });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('waiting_for_approval');
+  });
+  it('persists pre-dispatch permission failure only on the still-bound paused task', async () => {
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map() });
+    expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
+    expect(calls.execute).not.toHaveBeenCalled();
+    expect(db.tables['agent_tasks']![0]!['status']).toBe('failed');
+  });
   it('refuses cancelled tasks', async () => {
     db.tables['agent_tasks']![0]!['cancel_requested'] = true;
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();
@@ -151,6 +215,31 @@ describe('bounded approved browser execution', () => {
     db.tables['approval_requests']![0]!['expires_at'] = '2020-01-01';
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
     expect(await executeApprovedBrowserTask({ ...args(), userId: 'other' })).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();
+  });
+  it.each(['browser_task', 'calculator'])('preserves uncertain %s execution warnings in the receipt and task', async name => {
+    if (name === 'calculator') {
+      const approval = db.tables['approval_requests']![0]!;
+      approval['action_type'] = 'agent_tool_task';
+      approval['details'] = { agent_task_id: 'task', tool: name, input: { expression: '2 + 2' } };
+      db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+      calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([[name, { requiresApproval: true, allowedDomains: [] }]]) });
+    }
+    calls.execute.mockResolvedValueOnce({ ok: false, output: {
+      code: 'TOOL_EXECUTION_EVIDENCE_UNCONFIRMED', execution_may_have_occurred: true,
+      retry_safe: false, error: 'private database diagnostic must not escape',
+    } });
+    const receipt = await executeApprovedBrowserTask(args());
+    expect(receipt).toMatchObject({ ok: false, error: expect.stringContaining('may already have occurred') });
+    const task = db.tables['agent_tasks']![0]!;
+    expect(task['status']).toBe('failed');
+    expect(task['error']).toContain('before retrying');
+    expect(task['error']).toBe(receipt.error);
+    expect(receipt.error).not.toContain('private database');
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.complete).not.toHaveBeenCalled();
+    expect(calls.planned).not.toHaveBeenCalled();
+    expect(calls.audit.mock.calls.map(call => call[0].action)).not.toContain('agent.browser_approval_result');
+    expect(calls.audit.mock.calls.map(call => call[0].action)).not.toContain('agent.tool_approval_result');
   });
   it('never completes simulated or failed browser results', async () => {
     calls.execute.mockResolvedValueOnce({ ok: true, output: { simulated: true, result: { ok: true } } });

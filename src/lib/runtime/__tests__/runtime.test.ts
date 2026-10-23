@@ -1121,3 +1121,33 @@ describe('durable browser approval pause', () => {
     expect(sb.tables.tool_executions).toHaveLength(0);
   });
 });
+
+describe('unconfirmed tool evidence stops the run', () => {
+  it.each([false, true])('prevents retry and success after an unconfirmed ledger write (stream=%s)', async stream => {
+    const sb = db([{ ...AGENT, allowed_tools: ['calculator'] }]);
+    sb.tables.tools.push({ slug: 'calculator', is_active: true });
+    const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: 'Calculate 6 * 7' });
+    const originalFrom = sb.from.bind(sb);
+    const inserts = vi.fn(() => ({ select: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'write unavailable' } }) }) }));
+    sb.from = (table: string) => table === 'tool_executions' ? { insert: inserts } : originalFrom(table);
+    const call = { ...textResult(''), toolCalls: [{ id: 'calc', name: 'calculator', arguments: { expression: '6 * 7' } }] };
+    if (stream) {
+      gateway.streamChat.mockImplementation(async function* () { yield { type: 'done', result: call }; });
+      const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
+      expect(events.some(event => event.type === 'complete')).toBe(false);
+      expect(events.at(-1)).toMatchObject({ type: 'error', message: expect.stringContaining('may already have occurred') });
+      expect(gateway.streamChat).toHaveBeenCalledTimes(1);
+    } else {
+      gateway.runChat.mockResolvedValue(call);
+      // The non-streaming executor delegates failure persistence to its caller
+      // (agent-task-execution.server.ts); exercise that same failRun boundary.
+      await expect(executeRun({ sb, userId: USER, run }).catch(async error => {
+        await failRun({ sb, userId: USER, run, error });
+        throw error;
+      })).rejects.toMatchObject({ code: 'TOOL_EXECUTION_EVIDENCE_UNCONFIRMED' });
+      expect(gateway.runChat).toHaveBeenCalledTimes(1);
+    }
+    expect(inserts).toHaveBeenCalledTimes(1);
+    expect(sb.tables.agent_tasks[0]).toMatchObject({ status: 'failed', error: expect.stringContaining('may already have occurred') });
+  });
+});

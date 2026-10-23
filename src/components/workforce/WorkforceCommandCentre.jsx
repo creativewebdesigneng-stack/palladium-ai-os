@@ -1,3 +1,4 @@
+import { formatWorkforcePercentage } from './normalize';
 import { motion } from 'framer-motion';
 import { Bot, Activity, CheckCircle2, AlertTriangle, Gauge, Cpu } from 'lucide-react';
 import { SectionHead } from './wfShared';
@@ -120,7 +121,7 @@ export default function WorkforceCommandCentre({ overview, loading }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-white/[.065] bg-black/25 p-4 backdrop-blur-xl">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-zinc-600"><Cpu className="h-3 w-3" />Completion reliability</div>
-            <p className="mt-3 text-3xl font-semibold tracking-[-.04em] text-white">{loading ? '—' : `${o.performance ?? 0}%`}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-[-.04em] text-white">{loading ? '—' : formatWorkforcePercentage(o.performance)}</p>
             <p className="mt-1 text-[10px] text-zinc-600">successful completions vs terminal runs</p>
           </div>
           <div className="rounded-2xl border border-white/[.065] bg-black/25 p-4 backdrop-blur-xl">

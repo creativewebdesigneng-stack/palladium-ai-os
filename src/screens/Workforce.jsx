@@ -14,7 +14,7 @@ import DepartmentGrid from '@/components/workforce/DepartmentGrid';
 import CreateDepartmentModal from '@/components/workforce/CreateDepartmentModal';
 import AgentCommsFeed from '@/components/workforce/AgentCommsFeed';
 import { STATUSES } from '@/components/workforce/wfData';
-import { mapAgentToWf } from '@/components/workforce/normalize';
+import { mapAgentToWf, buildWorkforceOverview, formatWorkforcePercentage } from '@/components/workforce/normalize';
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -29,24 +29,6 @@ import {
 
 // Derives the command-centre metrics from the caller's own agents and task
 // ledger. Nothing is mocked: every number comes from RLS-scoped rows.
-function buildOverview(agents, tasks, usage) {
-  const count = (s) => tasks.filter((t) => t.status === s).length;
-  const running = count('running');
-  const pending = count('pending') + count('queued');
-  const completed = count('succeeded') + count('completed');
-  const failed = count('failed');
-  return {
-    totalAgents: agents.length,
-    activeAgents: agents.filter((a) => a.status === 'active').length,
-    runningTasks: running,
-    pendingTasks: pending,
-    completedTasks: completed,
-    failedTasks: failed,
-    totalTasks: tasks.length,
-    performance: completed + failed ? Math.round((completed / (completed + failed)) * 100) : 0,
-    usage: usage || {},
-  };
-}
 
 export default function Workforce() {
   const { gate } = useUpgrade();
@@ -95,7 +77,7 @@ export default function Workforce() {
     loadAll();
   }, [session, loadAll]);
 
-  const overview = useMemo(() => buildOverview(agents, tasks, usage), [agents, tasks, usage]);
+  const overview = useMemo(() => buildWorkforceOverview(agents, tasks, usage), [agents, tasks, usage]);
   const wfAgents = useMemo(() => agents.map((a) => mapAgentToWf(a, tasks)), [agents, tasks]);
   const filtered = statusFilter === 'All' ? wfAgents : wfAgents.filter((a) => a.status === statusFilter);
 
@@ -139,7 +121,7 @@ export default function Workforce() {
         </div>
         <div className="rounded-2xl border border-white/[.07] bg-black/25 p-4 backdrop-blur-xl">
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.2em] text-emerald-300/70"><Bot className="h-3.5 w-3.5" />Reliability</div>
-          <p className="mt-2 text-sm text-zinc-300">{overview.performance}% successful completion across the current task ledger.</p>
+          <p className="mt-2 text-sm text-zinc-300">{overview.performance === null ? 'No completed runs to measure yet.' : `${formatWorkforcePercentage(overview.performance)} successful completion across the current task ledger.`}</p>
         </div>
       </div>
 
