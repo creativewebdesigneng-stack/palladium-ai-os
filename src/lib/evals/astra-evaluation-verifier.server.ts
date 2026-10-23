@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
 import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
+import { collectAstraCertificationRunPages } from './astra-certification-run-pages'
 import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
 import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
@@ -219,22 +220,38 @@ async function matchingRuns(scope: Scope) {
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
   const suiteId = astraCertificationSuiteId(scope.taskClass)
   const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
-  let query = astraEvalAdmin
-    .from('model_eval_runs')
-    .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
-    .eq('status', 'completed')
-    .not('completed_at', 'is', null)
-    .order('completed_at', { ascending: false })
-    .limit(200)
+  // Scope and versioned-suite filters must execute inside Postgres BEFORE
+  // pagination. Otherwise 200 unrelated recent runs can hide signed Astra
+  // evidence and reset visible progress for a legitimate operator.
+  const data = await collectAstraCertificationRunPages<ArenaRun>(async (from, to) => {
+    let query = astraEvalAdmin
+      .from('model_eval_runs')
+      .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null)
+      .contains('metadata', {
+        astra_activation: {
+          server_verified: true,
+          suite_id: suiteId,
+          task_class: scope.taskClass,
+          provider: 'compatible',
+          model,
+        },
+      })
+      .order('completed_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to)
 
-  query = scope.orgId
-    ? query.eq('org_id', scope.orgId)
-    : query.is('org_id', null).eq('user_id', scope.userId)
+    query = scope.orgId
+      ? query.eq('org_id', scope.orgId)
+      : query.is('org_id', null).eq('user_id', scope.userId)
 
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
+    const { data: batch, error } = await query
+    if (error) throw new Error(error.message)
+    return (batch ?? []) as ArenaRun[]
+  })
 
-  const tagged = ((data ?? []) as ArenaRun[]).filter((run) => {
+  const tagged = data.filter((run) => {
     const metadata = astraMetadata(run)
     const expectedExecution = expectedExecutionEvidence(scope.taskClass, model, run.prompt)
     return metadata?.['server_verified'] === true
