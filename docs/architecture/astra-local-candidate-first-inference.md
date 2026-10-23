@@ -28,4 +28,6 @@ After a **real local pass**, separately provision an authenticated HTTPS reverse
 
 Provision an isolated Supabase branch only after confirming possible compute charges. Apply and test the pending Astra certification migration there, run one authorized benchmark case, and verify the actual persisted response, judge score, HMAC provenance and scoped attestation. The target is 20 real qualifying cases per task class, not a simulated success percentage.
 
+For **trusted certification** (as opposed to the local connectivity diagnostic), the compatible gateway now requires the actual upstream `chat/completions` JSON response to contain a `model` string exactly matching the pinned candidate model ID. Missing or mismatched model IDs fail closed before response evidence is persisted; redirects are refused for both the main candidate call and authenticated route probes. This checks a provider's declared model identity, **not cryptographic proof of model weights, ownership or training origin**. A separate independent evaluator and signed persisted run are still required.
+
 CI runs the diagnostic's unit tests; these mock HTTP to prove its safety boundaries. They do not replace a real inference test on the operator's PC.
