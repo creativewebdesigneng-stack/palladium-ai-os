@@ -69,6 +69,16 @@ describe('Astra trusted runner gates independent evaluation before spending or p
     expect(fake.runChatPinned).not.toHaveBeenCalled()
   })
 
+  it('rejects missing signing authority before charging the model or creating a run', async () => {
+    for (const [key, value] of Object.entries(baseEnv)) vi.stubEnv(key, value)
+    vi.stubEnv('BLACKSTAR_NATIVE_MODEL', '')
+    vi.stubEnv('BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY', '')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '')
+    await expect(run()).rejects.toThrow(/signing key is invalid/)
+    expect(fake.from).not.toHaveBeenCalled()
+    expect(fake.runChatPinned).not.toHaveBeenCalled()
+  })
+
   it('rejects missing evaluator credentials before any persisted record or inference request', async () => {
     for (const [key, value] of Object.entries(baseEnv)) vi.stubEnv(key, value)
     vi.stubEnv('FREELLMAPI_API_KEY', '')
