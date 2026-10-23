@@ -96,6 +96,7 @@ type AdminDb = {
 }
 
 const MIN_RUNS = ASTRA_CERTIFICATION_CASE_COUNT
+const emptyCertifiedQuality = { averageScore: null, qualityFloorMet: false, readyToCertify: false }
 const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v4'
 const PROVENANCE_VERSION = ASTRA_CERTIFICATION_PROVENANCE_VERSION
 const astraEvalAdmin = supabaseAdmin as unknown as AdminDb
@@ -205,10 +206,10 @@ async function matchingRuns(scope: Scope) {
     throw new Error('Blackstar Astra serving is not configured on this deployment.')
   }
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
-    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
   if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) {
-    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
 
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
@@ -244,7 +245,7 @@ async function matchingRuns(scope: Scope) {
       && typeof metadata?.['case_id'] === 'string'
   })
 
-  if (!tagged.length) return { model, runs: [] as ArenaRun[] }
+  if (!tagged.length) return { model, runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
 
   const runIds = tagged.map((run) => run.id)
   const [{ data: responseData, error: responseError }, { data: scoreData, error: scoreError }] = await Promise.all([
