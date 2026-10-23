@@ -21,6 +21,9 @@ export function inspectAstraCertificationPreflight(args: {
   const candidateConfigured = hasPinnedAstraCertificationCandidate({
     taskClass: args.taskClass, candidateModel: args.candidateModel, env,
   })
+  // Certification from a hosted runtime must not silently trust an unauthenticated
+  // candidate endpoint, even if a model ID is explicitly pinned.
+  const candidateAuthConfigured = Boolean(env['OPENAI_COMPATIBLE_API_KEY']?.trim())
   const evaluator = resolveFreeLlmEvaluatorConfig(env)
   const judgePinned = evaluator.certificationConfigured
     && isPinnedFreeLlmCertificationModel(evaluator.model)
@@ -47,6 +50,7 @@ export function inspectAstraCertificationPreflight(args: {
 
   const blockers: string[] = []
   if (!candidateConfigured) blockers.push('astra_candidate_route_missing')
+  if (candidateConfigured && !candidateAuthConfigured) blockers.push('astra_candidate_auth_missing')
   if (!judgePinned) blockers.push('pinned_independent_evaluator_missing')
   if (!signingConfigured) blockers.push('astra_provenance_signing_key_missing')
   const ready = blockers.length === 0
@@ -54,6 +58,7 @@ export function inspectAstraCertificationPreflight(args: {
     version: 1 as const,
     taskClass: args.taskClass,
     candidateConfigured,
+    candidateAuthConfigured,
     independentJudgeConfigured: Boolean(judgePinned),
     provenanceSigningConfigured: signingConfigured,
     canAttemptTextCertification: ready,
