@@ -22,7 +22,7 @@ describe('Astra authenticated candidate diagnostic redirect boundary', () => {
     configureCandidate()
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       expect(init.redirect).toBe('error')
-      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-private-key')
+      expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer test-private-key')
       return Response.redirect('https://other.example/v1/models', 302)
     })
     vi.stubGlobal('fetch', fetchMock)
