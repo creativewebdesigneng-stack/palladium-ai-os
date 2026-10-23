@@ -72,7 +72,7 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   if (!preflight.canAttemptTextCertification) {
     // Diagnose signing separately from model/evaluator configuration. Never
     // disclose a secret value or attempt model inference on a failed preflight.
-    if (!preflight.provenanceSigningConfigured) {
+    if (preflight.candidateConfigured && preflight.independentJudgeConfigured && !preflight.provenanceSigningConfigured) {
       throw new Error('Astra provenance signing authority is missing or invalid.')
     }
     throw new Error('An authenticated, route-pinned, independent FreeLLM evaluator is required for trusted Astra text certification.')
