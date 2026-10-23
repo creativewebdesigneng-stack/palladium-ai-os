@@ -80,6 +80,18 @@ await query('insert into public.model_eval_scores(id,run_id,response_id,evaluato
 ])
 check(Number((await query(call()))[0].score)===0.9, 'comparison candidate scores excluded')
 
+// Multiple scores across distinct responses for the *same pinned candidate*
+// must not skew a single Astra case. Comparison models remain allowed.
+await query('insert into public.model_eval_responses(id,run_id,provider,model) values ($1::uuid,$2::uuid,$3,$4)', [
+  uuid(802), ids[0], 'compatible', model,
+])
+await query('insert into public.model_eval_scores(id,run_id,response_id,evaluator_type,score) values ($1::uuid,$2::uuid,$3::uuid,$4,$5)', [
+  uuid(902), ids[0], uuid(802), 'llm_judge', 100,
+])
+await denied(call(), 'multiple pinned Astra candidate responses in one run rejected')
+await query('delete from public.model_eval_scores where id=$1::uuid', [uuid(902)])
+await query('delete from public.model_eval_responses where id=$1::uuid', [uuid(802)])
+
 await query("update public.model_eval_runs set metadata=jsonb_set(metadata,'{astra_activation,suite_id}',to_jsonb($1::text)) where id=$2::uuid",['wrong-suite',ids[0]])
 await denied(call(),'Astra versioned suite mismatch denied')
 await query("update public.model_eval_runs set metadata=jsonb_set(metadata,'{astra_activation,suite_id}',to_jsonb($1::text)) where id=$2::uuid",[suite,ids[0]])
