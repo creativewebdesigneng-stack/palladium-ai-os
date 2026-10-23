@@ -56,7 +56,8 @@ export async function inspectLocalCandidate(args, fetchImpl = fetch) {
   if (process.env.OPENAI_COMPATIBLE_API_KEY) headers.Authorization = `Bearer ${process.env.OPENAI_COMPATIBLE_API_KEY}`
   let models
   try {
-    const response = await fetchImpl(`${base}/models`, { headers, signal: AbortSignal.timeout(args.timeoutMs) })
+    // A loopback-only check must not follow a redirect to a LAN or public host.
+    const response = await fetchImpl(`${base}/models`, { headers, redirect: 'error', signal: AbortSignal.timeout(args.timeoutMs) })
     if (!response.ok) { report.modelListing = `http_${response.status}`; return report }
     models = parseModelIds(await response.json())
     report.modelListing = 'ok'
@@ -69,6 +70,7 @@ export async function inspectLocalCandidate(args, fetchImpl = fetch) {
   try {
     const response = await fetchImpl(`${base}/chat/completions`, {
       method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      redirect: 'error',
       signal: AbortSignal.timeout(args.timeoutMs),
       body: JSON.stringify({ model: args.model, stream: false, max_tokens: 16,
         messages: [{ role: 'user', content: 'Reply with OK.' }] }),
