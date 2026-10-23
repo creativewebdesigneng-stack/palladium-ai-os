@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isToolExecutionUnconfirmed } from './tool-execution-evidence';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 import type { ToolContext } from './tools-core.server';
 
@@ -180,6 +181,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
   let boundTask: { id: string; agentId: string } | null = null;
   let taskClaimed = false;
   let executionProvider = 'unknown';
+  let taskFailureMessage = 'Approved browser execution failed. Inspect approval and tool evidence.';
   const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
   const db = supabaseAdmin as unknown as Sb;
   try {
@@ -230,6 +232,10 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     const approvedGrants = new Map(tools.grants); approvedGrants.set(name, { ...grant, requiresApproval: false });
     const executed = await executeTool(name, input, { sb: args.sb, userId: args.userId, agentId: agent.id, orgId: task.org_id ?? null, taskId, allowedProviders: agent.allowed_providers ?? [] }, approvedGrants);
     const output = executed.output as Record<string, any> | null;
+    if (isToolExecutionUnconfirmed(output)) {
+      taskFailureMessage = 'Tool execution evidence could not be confirmed. The action may already have occurred. Inspect the task and provider before retrying.';
+      throw new Error(taskFailureMessage);
+    }
     if (!executed.ok || !output ||
       // Development demonstrations can never be certified as executed
       // real-world actions by the approval ledger, for any tool type.
@@ -262,7 +268,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
     return { ok: true, provider: browser ? String(output['provider']) : 'local', result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
   } catch (error) {
     // A failed claim never owns a running task; preserve another invocation's work.
-    if (boundTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', boundTask.id).eq('user_id', args.userId).eq('agent_id', boundTask.agentId).in('status', taskClaimed ? ['running', 'waiting_for_approval'] : ['waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
+    if (boundTask) await db.from('agent_tasks').update({ status: 'failed', error: taskFailureMessage, completed_at: new Date().toISOString() }).eq('id', boundTask.id).eq('user_id', args.userId).eq('agent_id', boundTask.agentId).in('status', taskClaimed ? ['running', 'waiting_for_approval'] : ['waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
     return { ok: false, provider: executionProvider, error: error instanceof Error ? error.message : 'Browser approval execution failed.' };
   }
 }

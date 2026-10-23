@@ -216,6 +216,31 @@ describe('bounded approved browser execution', () => {
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false });
     expect(await executeApprovedBrowserTask({ ...args(), userId: 'other' })).toMatchObject({ ok: false }); expect(calls.execute).not.toHaveBeenCalled();
   });
+  it.each(['browser_task', 'calculator'])('preserves uncertain %s execution warnings in the receipt and task', async name => {
+    if (name === 'calculator') {
+      const approval = db.tables['approval_requests']![0]!;
+      approval['action_type'] = 'agent_tool_task';
+      approval['details'] = { agent_task_id: 'task', tool: name, input: { expression: '2 + 2' } };
+      db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+      calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([[name, { requiresApproval: true, allowedDomains: [] }]]) });
+    }
+    calls.execute.mockResolvedValueOnce({ ok: false, output: {
+      code: 'TOOL_EXECUTION_EVIDENCE_UNCONFIRMED', execution_may_have_occurred: true,
+      retry_safe: false, error: 'private database diagnostic must not escape',
+    } });
+    const receipt = await executeApprovedBrowserTask(args());
+    expect(receipt).toMatchObject({ ok: false, error: expect.stringContaining('may already have occurred') });
+    const task = db.tables['agent_tasks']![0]!;
+    expect(task['status']).toBe('failed');
+    expect(task['error']).toContain('before retrying');
+    expect(task['error']).toBe(receipt.error);
+    expect(receipt.error).not.toContain('private database');
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.complete).not.toHaveBeenCalled();
+    expect(calls.planned).not.toHaveBeenCalled();
+    expect(calls.audit.mock.calls.map(call => call[0].action)).not.toContain('agent.browser_approval_result');
+    expect(calls.audit.mock.calls.map(call => call[0].action)).not.toContain('agent.tool_approval_result');
+  });
   it('never completes simulated or failed browser results', async () => {
     calls.execute.mockResolvedValueOnce({ ok: true, output: { simulated: true, result: { ok: true } } });
     expect(await executeApprovedBrowserTask(args())).toMatchObject({ ok: false }); expect(calls.complete).not.toHaveBeenCalled();
