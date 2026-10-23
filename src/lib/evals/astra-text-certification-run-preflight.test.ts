@@ -74,7 +74,7 @@ describe('Astra trusted runner gates independent evaluation before spending or p
     vi.stubEnv('BLACKSTAR_NATIVE_MODEL', '')
     vi.stubEnv('BLACKSTAR_ASTRA_PROVENANCE_SIGNING_KEY', '')
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '')
-    await expect(run()).rejects.toThrow(/signing key is invalid/)
+    await expect(run()).rejects.toThrow(/provenance signing authority is missing or invalid/)
     expect(fake.from).not.toHaveBeenCalled()
     expect(fake.runChatPinned).not.toHaveBeenCalled()
   })
