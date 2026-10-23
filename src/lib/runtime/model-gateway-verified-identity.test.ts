@@ -33,7 +33,7 @@ describe('exact upstream model identity for trusted Astra candidate inference', 
     setCandidateEnv()
     const request = vi.fn(async (_url: string, options: RequestInit) => {
       expect(options.redirect).toBe('error')
-      expect((options.headers as Record<string, string>).Authorization).toBe('Bearer private-candidate-token')
+      expect((options.headers as Record<string, string>)['Authorization']).toBe('Bearer private-candidate-token')
       return chatResponse('pinned-candidate')
     })
     vi.stubGlobal('fetch', request)
