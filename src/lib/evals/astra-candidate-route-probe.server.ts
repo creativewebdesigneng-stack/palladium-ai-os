@@ -64,6 +64,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
       routeResponse = await fetch(`${base}/models`, {
         method: 'GET',
         headers: { Accept: 'application/json', ...authHeaders() },
+        redirect: 'error',
         signal: routeTimeout.signal,
       })
     } finally {
@@ -99,6 +100,7 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
           stream: false,
           max_tokens: 1,
         }),
+        redirect: 'error',
         signal: chatTimeout.signal,
       })
       const stage = classifyAstraCandidateChatProbeStatus(chatResponse.status, modelListed)
