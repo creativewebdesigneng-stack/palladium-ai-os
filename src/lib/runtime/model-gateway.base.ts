@@ -371,6 +371,8 @@ export type RunArgs = {
   providerAccess?: ProviderAccess | null;
   /** Explicit provider consent for agent calls; undefined retains other callers existing policy. */
   allowedProviders?: Provider[];
+  /** Trusted certification only: reject absent/mismatched upstream model identity. */
+  requireResponseModelIdentity?: boolean;
 };
 
 const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -439,7 +441,8 @@ async function send(args: RunArgs, stream: boolean): Promise<Response> {
         body: JSON.stringify(body),
         // Never forward an operator-configured NIM request to a redirect
         // target, even when that endpoint is reachable with HTTPS.
-        ...(args.provider === "nvidia" ? { redirect: "error" as const } : {}),
+        ...(args.provider === "nvidia" || (args.provider === "compatible" && args.requireResponseModelIdentity)
+          ? { redirect: "error" as const } : {}),
         signal,
       });
       if (res.ok) return res;
@@ -503,6 +506,14 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
     };
   }
 
+  // Normal compatible-model requests retain their existing permissive API
+  // behavior. Certification must verify the *upstream response* model identity,
+  // rather than echoing the requested model and treating that as proof.
+  if (args.provider === "compatible" && args.requireResponseModelIdentity) {
+    if (typeof json.model !== "string" || json.model !== args.model) {
+      throw new ProviderError("The compatible model endpoint did not attest the exact requested model.", 502, false);
+    }
+  }
   const msg = json.choices?.[0]?.message ?? {};
   return {
     text: (msg.content ?? "").trim(),
