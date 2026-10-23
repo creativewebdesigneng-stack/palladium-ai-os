@@ -31,14 +31,28 @@ export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.e
   } as const;
 }
 
-export function parseFreeLlmRouteIdentity(headers: Headers): FreeLlmRouteIdentity {
+export function parseFreeLlmRouteIdentity(
+  headers: Headers,
+  env: NodeJS.ProcessEnv = process.env,
+): FreeLlmRouteIdentity {
   const routedVia = headers.get("x-routed-via")?.trim() || "";
   const segments = routedVia.split("/").map((segment) => segment.trim()).filter(Boolean);
-  if (segments.length < 2) {
+  if (segments.length < 2 || segments.some((segment) => segment !== segment.trim())) {
     throw new ProviderError("FreeLLMAPI response did not include a valid X-Routed-Via identity.", 502, false);
   }
-  const routedProvider = segments.at(-2) || "";
-  const routedModel = segments.at(-1) || "";
+  const config = resolveFreeLlmEvaluatorConfig(env);
+  // A pinned upstream model may itself contain slashes (e.g. openai/gpt-oss).
+  // Taking only the final two segments would silently change its identity.
+  // Accept the exact pinned provider/model suffix, with optional router prefix;
+  // all other identities retain the legacy parser and fail the pinned check.
+  const pinnedSuffix = config.routedProvider && config.routedModel
+    ? `${config.routedProvider}/${config.routedModel}`
+    : null;
+  const exactPinnedRoute = Boolean(pinnedSuffix && (
+    routedVia === pinnedSuffix || routedVia.endsWith(`/${pinnedSuffix}`)
+  ));
+  const routedProvider = exactPinnedRoute ? config.routedProvider! : segments.at(-2) || "";
+  const routedModel = exactPinnedRoute ? config.routedModel! : segments.at(-1) || "";
   if (!routedProvider || !routedModel) {
     throw new ProviderError("FreeLLMAPI response did not include a valid routed provider/model identity.", 502, false);
   }
