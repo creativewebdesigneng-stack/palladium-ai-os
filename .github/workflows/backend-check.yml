@@ -25,9 +25,11 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - name: Resolve patched Undici packages and lockfile
+      - name: Resolve patched Undici packages and lockfile from scratch
         run: |
+          rm bun.lock
           bun install
+          grep -E '"undici(8)?": \[' bun.lock
           bun pm ls | grep -E 'undici(@|8@)' || true
       - name: Upload integrity-resolved lock
         uses: actions/upload-artifact@v7
