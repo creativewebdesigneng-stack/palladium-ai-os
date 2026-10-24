@@ -18,6 +18,8 @@ export type BusinessStepRun = {
   step_id: string;
   task_id: string | null;
   status: string;
+  attempt?: number | null;
+  started_at?: string | null;
 };
 export type BusinessToolExecution = {
   agent_task_id: string | null;
@@ -49,22 +51,36 @@ export function projectBusinessRunEvidence(input: {
   const rows = input.assignments.map((assignment) => {
     const stepId = stepForAssignment.get(assignment.assignment_id);
     const matchingSteps = stepId ? input.stepRuns.filter((step) => step.step_id === stepId) : [];
-    // Only step-run evidence can establish specialist completion. Fleet status
-    // may be stale or may have been overwritten by a workflow-level reconciler.
-    // A missing or contradictory step record must never certify completion.
-    const stepStatuses = new Set(matchingSteps.map((step) => step.status));
+    // The workflow executor writes one row per attempt. A failed first attempt
+    // must not override a successful retry, and a later failure must not be
+    // hidden by an earlier success. started_at is preferred because recovered
+    // workers may restart attempt numbering. If absent, use attempt ordering.
+    const sorted = [...matchingSteps].sort((a, b) => {
+      const aTime = a.started_at ? Date.parse(a.started_at) : NaN;
+      const bTime = b.started_at ? Date.parse(b.started_at) : NaN;
+      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return aTime - bTime;
+      const attemptDiff = (a.attempt ?? 0) - (b.attempt ?? 0);
+      if (attemptDiff) return attemptDiff;
+      // Ambiguous order is not positive evidence of successful completion.
+      const priority = (status: string) => status === 'succeeded' || status === 'completed' ? 0 : 1;
+      return priority(a.status) - priority(b.status);
+    });
+    const latest = sorted.at(-1);
     const evidenceStatus =
-      stepStatuses.has('failed') ? 'failed'
-      : stepStatuses.has('cancelled') ? 'cancelled'
-      : stepStatuses.has('succeeded') || stepStatuses.has('completed') ? 'completed'
-      : stepStatuses.has('running') || stepStatuses.has('waiting_for_tool') ? 'running'
-      : stepStatuses.has('skipped') ? 'skipped'
-      : stepStatuses.has('waiting_for_approval') ? 'waiting_for_approval'
-      : stepStatuses.has('pending') || stepStatuses.has('queued') ? 'queued'
+      latest?.status === 'failed' ? 'failed'
+      : latest?.status === 'cancelled' ? 'cancelled'
+      : latest?.status === 'succeeded' || latest?.status === 'completed'
+        ? (latest.task_id ? 'completed' : 'unverified_completion')
+      : latest?.status === 'running' || latest?.status === 'waiting_for_tool' ? 'running'
+      : latest?.status === 'skipped' ? 'skipped'
+      : latest?.status === 'waiting_for_approval' ? 'waiting_for_approval'
+      : latest?.status === 'pending' || latest?.status === 'queued' ? 'queued'
       : assignment.status === 'completed' ? 'unverified_completion' : assignment.status;
     const taskIds = new Set(matchingSteps.map((step) => step.task_id).filter((id): id is string => Boolean(id)));
     const recordedTools = input.tools.filter((tool) => tool.agent_task_id !== null && taskIds.has(tool.agent_task_id));
     const recordedApprovals = input.approvals.filter((approval) => approval.task_id !== null && taskIds.has(approval.task_id));
+    const latestToolReceipts = latest?.task_id
+      ? recordedTools.filter((tool) => tool.agent_task_id === latest.task_id) : [];
     return {
       assignmentId: assignment.assignment_id,
       title: assignment.title,
@@ -75,6 +91,9 @@ export function projectBusinessRunEvidence(input: {
       requiresApproval: assignment.requires_approval === true,
       stepRecords: matchingSteps.length,
       taskRecords: taskIds.size,
+      latestAttempt: latest?.attempt ?? null,
+      latestTaskId: latest?.task_id ?? null,
+      latestToolSuccesses: latestToolReceipts.filter((tool) => tool.status === 'succeeded').length,
       toolRecords: recordedTools.length,
       toolsSucceeded: recordedTools.filter((tool) => tool.status === 'succeeded').length,
       toolsFailed: recordedTools.filter((tool) => tool.status === 'failed').length,
@@ -83,8 +102,35 @@ export function projectBusinessRunEvidence(input: {
       approvalExecutionReceipts: recordedApprovals.filter((approval) => approval.execution_status === 'succeeded').length,
     };
   });
+  // This is an INTERNAL receipt completeness checklist, not an external
+  // provider test, income verification or permission to publish/charge money.
+  // Deliberately fail closed on truncated or contradictory records.
+  const gateStatus = input.workflowGateApprovals?.[0]?.status ?? 'not_recorded';
+  const acceptanceChecks = [
+    { id: 'run', label: 'Overall workflow completed', passed: input.runStatus === 'completed' },
+    { id: 'gate', label: 'Owner start approval recorded', passed: gateStatus === 'approved' },
+    { id: 'roster', label: 'Six distinct staffed roles recorded', passed: rows.length === 6 &&
+        new Set(rows.map((row) => row.agentId).filter(Boolean)).size === 6 &&
+        new Set(rows.map((row) => row.assignmentId)).size === 6 },
+    { id: 'steps', label: 'Six agent tasks succeeded with individual step receipts',
+      passed: rows.length === 6 && rows.every((row) => row.stepCompletionVerified && Boolean(row.latestTaskId)) },
+    { id: 'tools', label: 'A successful tool receipt belongs to each final agent attempt',
+      passed: rows.length === 6 && rows.every((row) => row.latestToolSuccesses > 0) },
+    { id: 'audit', label: 'Receipt queries were not truncated and do not contradict completion',
+      passed: input.truncated !== true &&
+        rows.every((row) => row.recordedFleetStatus !== 'completed' || row.stepCompletionVerified) },
+  ];
+  const internalAcceptance = {
+    status: acceptanceChecks.every((check) => check.passed) ? 'receipts_complete' as const : 'incomplete' as const,
+    checks: acceptanceChecks,
+    completedChecks: acceptanceChecks.filter((check) => check.passed).length,
+    totalChecks: acceptanceChecks.length,
+    liveProviderCertified: false as const,
+    externalOutcomesCertified: false as const,
+  };
   return {
     runStatus: input.runStatus,
+    internalAcceptance,
     assignments: rows,
     plannedAssignments: rows.length,
     distinctAgentsAssigned: new Set(rows.map((row) => row.agentId).filter(Boolean)).size,
