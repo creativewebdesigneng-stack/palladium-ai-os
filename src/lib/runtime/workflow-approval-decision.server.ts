@@ -1,5 +1,6 @@
 import { notify } from "@/lib/notifications/notify.server";
 import { executeWorkflowRun, WorkforceError, type StepOutcome } from "./workforce.server";
+import { fingerprintWorkflowApprovalPlan, type ApprovalPlanStep } from "./workflow-approval-plan-fingerprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -10,6 +11,7 @@ type ApprovalDetails = {
   workflow_id: string;
   workflow_step_id: string;
   workflow_step_run_id: string;
+  plan_fingerprint?: string;
 };
 
 function asId(value: unknown): string | null {
@@ -26,7 +28,14 @@ function detailsOf(value: unknown): ApprovalDetails | null {
   const workflow_step_id = asId(row["workflow_step_id"]);
   const workflow_step_run_id = asId(row["workflow_step_run_id"]);
   if (!workflow_run_id || !workflow_id || !workflow_step_id || !workflow_step_run_id) return null;
-  return { workflow_run_id, workflow_id, workflow_step_id, workflow_step_run_id };
+  const fingerprint = row["plan_fingerprint"];
+  // An invalid or tampered checksum must never disable a required plan check.
+  if (fingerprint !== undefined &&
+      (typeof fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(fingerprint))) return null;
+  return {
+    workflow_run_id, workflow_id, workflow_step_id, workflow_step_run_id,
+    ...(fingerprint ? { plan_fingerprint: fingerprint } : {}),
+  };
 }
 
 async function admin(): Promise<Sb> {
@@ -74,7 +83,7 @@ export async function decideWorkflowApproval(args: {
 }) {
   const { data: approval, error: approvalReadError } = await args.sb
     .from("approval_requests")
-    .select("id,user_id,org_id,status,details,title")
+    .select("id,user_id,org_id,status,details,title,action_type,task_id")
     .eq("id", args.approvalRequestId)
     .maybeSingle();
   if (approvalReadError) throw new WorkforceError(approvalReadError.message, "APPROVAL_READ_FAILED");
@@ -84,6 +93,8 @@ export async function decideWorkflowApproval(args: {
     throw new WorkforceError("Only the workflow owner can decide this approval.", "FORBIDDEN");
   if (approval.status !== "pending")
     throw new WorkforceError("This approval request has already been decided.", "ALREADY_DECIDED");
+  if (approval.action_type !== "workflow_step" || approval.task_id !== null)
+    throw new WorkforceError("This request is not an authorised workflow approval gate.", "INVALID_APPROVAL_KIND");
 
   const details = detailsOf(approval.details);
   if (!details)
@@ -128,6 +139,35 @@ export async function decideWorkflowApproval(args: {
     throw new WorkforceError("Workflow approval association is no longer valid.", "INVALID_LINK");
   if (waitingStep.kind !== "approval")
     throw new WorkforceError("The waiting workflow step is not an approval gate.", "INVALID_LINK");
+  if (workflow.status !== "active")
+    throw new WorkforceError("This workflow was deactivated while awaiting approval.", "WORKFLOW_INACTIVE");
+  if (!Array.isArray(rawSteps) || !rawSteps.some((step: { id?: string }) => step.id === waitingStep.id))
+    throw new WorkforceError("Workflow steps have changed or cannot be verified.", "INVALID_LINK");
+
+  if (waitingStep.config?.snapshot_required === true && !details.plan_fingerprint) {
+    throw new WorkforceError("The six-agent approval has no recorded plan fingerprint.", "PLAN_SNAPSHOT_MISSING");
+  }
+  if (details.plan_fingerprint) {
+    const currentFingerprint = await fingerprintWorkflowApprovalPlan(rawSteps as ApprovalPlanStep[]);
+    if (currentFingerprint !== details.plan_fingerprint)
+      throw new WorkforceError("This workflow plan changed while awaiting approval. Review a newly queued mission before authorising execution.", "PLAN_CHANGED");
+  }
+
+  // A valid approval must refer to the owner's real, still-waiting step ledger.
+  // Check before mutating the decision so an incorrect or missing ledger does
+  // not consume a pending operator approval and strand the workflow.
+  const { data: stepLedger, error: stepReadError } = await args.sb
+    .from("workflow_step_runs")
+    .select("id")
+    .eq("id", details.workflow_step_run_id)
+    .eq("run_id", run.id)
+    .eq("step_id", waitingStep.id)
+    .eq("user_id", args.userId)
+    .eq("kind", "approval")
+    .eq("status", "waiting_for_approval")
+    .maybeSingle();
+  if (stepReadError || !stepLedger)
+    throw new WorkforceError("The workflow approval step ledger is missing or already decided.", "STALE_APPROVAL");
 
   const db = await admin();
   const now = new Date().toISOString();
@@ -157,6 +197,8 @@ export async function decideWorkflowApproval(args: {
     .eq("user_id", args.userId)
     .eq("status", "waiting_for_approval")
     .eq("waiting_approval_request_id", approval.id)
+    .eq("waiting_step_id", waitingStep.id)
+    .eq("cancel_requested", false)
     .select("id")
     .maybeSingle();
   if (claimError) throw new WorkforceError(claimError.message, "RESUME_CLAIM_FAILED");
@@ -172,7 +214,7 @@ export async function decideWorkflowApproval(args: {
 
   // The step ledger is the audit record for this decision. If it cannot be
   // finalised we must fail loudly rather than resume on an inconsistent ledger.
-  const { error: stepLedgerError } = await db
+  const { data: updatedLedger, error: stepLedgerError } = await db
     .from("workflow_step_runs")
     .update({
       status: outcome.status,
@@ -185,9 +227,14 @@ export async function decideWorkflowApproval(args: {
     })
     .eq("id", details.workflow_step_run_id)
     .eq("run_id", run.id)
-    .eq("step_id", waitingStep.id);
-  if (stepLedgerError)
-    throw new WorkforceError(stepLedgerError.message, "APPROVAL_STEP_LEDGER_FAILED");
+    .eq("step_id", waitingStep.id)
+    .eq("user_id", args.userId)
+    .eq("kind", "approval")
+    .eq("status", "waiting_for_approval")
+    .select("id")
+    .maybeSingle();
+  if (stepLedgerError || !updatedLedger)
+    throw new WorkforceError(stepLedgerError?.message ?? "Approval step ledger changed before recording the decision.", "APPROVAL_STEP_LEDGER_FAILED");
 
 
   const completed = Array.isArray(run.step_results) ? (run.step_results as StepOutcome[]) : [];

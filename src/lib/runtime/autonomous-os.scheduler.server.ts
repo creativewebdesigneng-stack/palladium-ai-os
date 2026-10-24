@@ -2,6 +2,7 @@ import { nextAutonomousRun } from "./autonomous-schedule";
 import { planOrchestratedGoal } from "./orchestrator.server";
 import { queueWorkflowRun } from "./workflow-queue.server";
 import { planFallbackAutonomousTeam } from "./autonomous-dynamic-team.server";
+import { SIX_AGENT_BUSINESS_BLUEPRINT } from "./business-operations-blueprint";
 
 type Sb = { from: (table: string) => any };
 
@@ -15,6 +16,7 @@ type GoalRow = {
   status: string;
   autonomy_level: string;
   max_parallel_agents: number | null;
+  success_criteria?: { blueprint_id?: string } | null;
   trigger_type: string;
   schedule_cron: string | null;
   timezone: string | null;
@@ -214,6 +216,8 @@ async function queueClaimedGoal(db: Sb, goal: GoalRow) {
       orgId: goal.org_id,
       maxAssignments: Number(goal.max_parallel_agents ?? 4),
       forceApproval: goal.autonomy_level === "assisted",
+      businessBlueprintId: goal.success_criteria?.blueprint_id === SIX_AGENT_BUSINESS_BLUEPRINT.id
+        ? SIX_AGENT_BUSINESS_BLUEPRINT.id : null,
     });
     await persistFleet(db, goal, run.id, prepared.plan);
     const queued = await queueWorkflowRun({
@@ -355,11 +359,11 @@ export async function reconcileAutonomousGoalRuns(dbOverride?: Sb) {
         completed_at: terminal ? workflowRun.completed_at ?? now : null,
       })
       .eq("id", run.id);
-    await db
-      .from("autonomous_goal_fleet_assignments")
-      .update({ status: nextStatus })
-      .eq("run_id", run.id)
-      .in("status", ["queued", "running", "waiting_for_approval"]);
+    // DO NOT copy a workflow-wide state onto individual specialist assignments.
+    // The existing autonomous_fleet_step_state database trigger records each
+    // assignment's actual workflow_step_runs status. A workflow-wide success,
+    // failure or approval pause is not proof that every agent step completed.
+    // In particular, unstarted and skipped steps must remain distinguishable.
 
     await writeEvent(db, {
       goalId: run.goal_id,
