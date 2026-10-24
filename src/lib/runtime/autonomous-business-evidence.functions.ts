@@ -77,7 +77,7 @@ export const getAutonomousBusinessRunEvidence = createServerFn({ method: 'POST' 
       const [stepsResult, stepRunsResult] = await Promise.all([
         sb.from('workflow_steps').select('id,config')
           .eq('workflow_id', workflowRun.workflow_id).limit(50),
-        sb.from('workflow_step_runs').select('step_id,task_id,status')
+        sb.from('workflow_step_runs').select('step_id,task_id,status,attempt,started_at')
           .eq('run_id', workflowRun.id).eq('user_id', owner).limit(MAX_STEP_RUNS),
       ]);
       if (stepsResult.error) throw new Error(stepsResult.error.message);
