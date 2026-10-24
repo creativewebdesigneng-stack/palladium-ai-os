@@ -16,7 +16,10 @@ describe('Astra local candidate diagnostic', () => {
   it('requires real OpenAI-compatible response shapes', () => {
     assert.deepEqual(parseModelIds({ data: [{ id: 'qwen-local' }] }), ['qwen-local'])
     assert.throws(() => parseModelIds({ models: ['qwen-local'] }), /models response/)
-    assert.deepEqual(parseChatResult({ choices: [{ message: { content: 'OK' } }] }), { nonempty: true, characters: 2 })
+    assert.deepEqual(parseChatResult({ choices: [{ message: { content: 'OK' } }] }), { nonempty: true, characters: 2, upstreamModelIdentity: 'not_checked' })
+    assert.equal(parseChatResult({ model: 'qwen-local', choices: [{ message: { content: 'OK' } }] }, 'qwen-local').upstreamModelIdentity, 'match')
+    assert.equal(parseChatResult({ model: 'other', choices: [{ message: { content: 'OK' } }] }, 'qwen-local').upstreamModelIdentity, 'mismatch')
+    assert.equal(parseChatResult({ choices: [{ message: { content: 'OK' } }] }, 'qwen-local').upstreamModelIdentity, 'missing')
     assert.throws(() => parseChatResult({ choices: [{ message: { content: '' } }] }), /chat response/)
   })
   it('does not infer or claim certification during listing', async () => {
@@ -35,13 +38,25 @@ describe('Astra local candidate diagnostic', () => {
     const result = await inspectLocalCandidate({ baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen-local', probe: true, timeoutMs: 3000 }, async (url, options) => {
       calls.push({ url, options })
       if (url.endsWith('/models')) return new Response(JSON.stringify({ data: [{ id: 'qwen-local' }] }), { status: 200 })
-      return new Response(JSON.stringify({ choices: [{ message: { content: 'OK' } }] }), { status: 200 })
+      return new Response(JSON.stringify({ model: 'qwen-local', choices: [{ message: { content: 'OK' } }] }), { status: 200 })
     })
     assert.equal(calls.length, 2)
     assert.equal(JSON.parse(calls[1].options.body).model, 'qwen-local')
     assert.equal(result.inference, 'real_response_received')
     assert.equal(result.responseShapeValid, true)
     assert.equal(result.certified, false)
+  })
+  it('refuses to treat a missing or different upstream model ID as verified inference', async () => {
+    for (const upstreamModel of [undefined, 'different-model']) {
+      const result = await inspectLocalCandidate({ baseUrl: 'http://localhost:11434/v1', model: 'qwen-local', probe: true, timeoutMs: 3000 }, async (url) => {
+        if (url.endsWith('/models')) return new Response(JSON.stringify({ data: [{ id: 'qwen-local' }] }), { status: 200 })
+        return new Response(JSON.stringify({ ...(upstreamModel ? { model: upstreamModel } : {}), choices: [{ message: { content: 'OK' } }] }), { status: 200 })
+      })
+      assert.equal(result.certified, false)
+      assert.equal(result.responseShapeValid, true)
+      assert.equal(result.upstreamModelIdentity, upstreamModel ? 'mismatch' : 'missing')
+      assert.equal(result.inference, upstreamModel ? 'upstream_model_identity_mismatch' : 'upstream_model_identity_missing')
+    }
   })
   it('refuses redirects from the model listing without leaving loopback', async () => {
     let calls = 0
