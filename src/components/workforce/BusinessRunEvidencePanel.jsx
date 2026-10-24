@@ -56,6 +56,22 @@ export default function BusinessRunEvidencePanel({ goals = [], session }) {
         <span className="rounded-md border border-amber-300/15 px-2 py-1 text-amber-100">Owner start gate: {data.workflowGateStatus} ({data.workflowGateRecords} record(s))</span>
       </div>
       {data.truncated && <p className="mt-3 text-xs text-amber-200">Record limit reached. Counts may be incomplete; inspect the full audit trail before certifying outcomes.</p>}
+      <div className="mt-4 rounded-xl border border-white/[.08] bg-black/25 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-xs font-semibold text-white">Live-mission internal receipt checklist</h4>
+          <span className={data.internalAcceptance.status === 'receipts_complete' ? 'text-[11px] text-cyan-200' : 'text-[11px] text-amber-200'}>
+            {data.internalAcceptance.completedChecks}/{data.internalAcceptance.totalChecks} checks evidenced
+          </span>
+        </div>
+        <p className="mt-2 text-[11px] leading-5 text-white/45">Read-only checks of persisted Blackstar records. Even all six passing does not independently certify live provider access, output quality or financial outcomes.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {data.internalAcceptance.checks.map((check) => <p key={check.id} className="flex items-start gap-2 text-[11px] leading-5 text-white/65">
+            <span aria-hidden="true" className={check.passed ? 'text-cyan-200' : 'text-amber-200'}>{check.passed ? '✓' : '○'}</span>
+            {check.label}
+          </p>)}
+        </div>
+      </div>
+
       <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {data.assignments.map((assignment) => <article key={assignment.assignmentId} className="rounded-xl border border-white/[.08] bg-black/25 p-3">
           <div className="flex flex-wrap items-center gap-2"><Activity className="h-3.5 w-3.5 text-violet-300" /><h4 className="text-xs font-semibold text-white">{assignment.title}</h4></div>
