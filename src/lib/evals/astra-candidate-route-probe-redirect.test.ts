@@ -18,6 +18,38 @@ function configureCandidate() {
 }
 
 describe('Astra authenticated candidate diagnostic redirect boundary', () => {
+  it('diagnoses the exact failed coding specialist rather than the default Astra model', async () => {
+    configureCandidate()
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'pinned-candidate' }, { id: 'other-model' }] }), { status: 200 })
+      }
+      expect(JSON.parse(String(init.body)).model).toBe('coding-specialist')
+      return new Response('', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const result = await probeAstraCandidateRouteAfterGenericError('coding-specialist')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(result).toMatchObject({ stage: 'candidate_model_not_found', expectedModel: 'coding-specialist' })
+    expect(result.advertisedModelIds).toContain('pinned-candidate')
+    expect(JSON.stringify(result)).not.toContain('test-private-key')
+  })
+
+  it('distinguishes a present reasoning specialist from a missing chat route', async () => {
+    configureCandidate()
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'pinned-candidate' }, { id: 'reasoning-specialist' }] }), { status: 200 })
+      }
+      expect(JSON.parse(String(init.body)).model).toBe('reasoning-specialist')
+      return new Response('', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const result = await probeAstraCandidateRouteAfterGenericError('reasoning-specialist')
+    expect(result.stage).toBe('candidate_chat_route_not_found')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
   it('refuses redirects while checking models and never makes a chat request', async () => {
     configureCandidate()
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {

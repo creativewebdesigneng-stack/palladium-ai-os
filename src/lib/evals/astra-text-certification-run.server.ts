@@ -140,7 +140,7 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         || stage === 'candidate_timeout_or_unreachable'
       ) {
         const originalStage = stage
-        const probe = await probeAstraCandidateRouteAfterGenericError()
+        const probe = await probeAstraCandidateRouteAfterGenericError(model)
         stage = originalStage === 'candidate_timeout_or_unreachable'
           && probe.stage === 'candidate_route_reachable_runtime_failure'
           ? 'candidate_generation_timeout'

@@ -85,7 +85,7 @@ function withTimeout(signal: AbortSignal) {
   return { signal: controller.signal, cleanup: () => clearTimeout(timer) }
 }
 
-export async function probeAstraCandidateRouteAfterGenericError(): Promise<AstraCandidateRouteProbeResult> {
+export async function probeAstraCandidateRouteAfterGenericError(attemptedModel = blackstarAstraModelDescriptor().model): Promise<AstraCandidateRouteProbeResult> {
   const raw = process.env['OPENAI_COMPATIBLE_BASE_URL']?.trim()
   if (!raw) return { stage: 'candidate_route_not_configured' as AstraTextCertificationStage }
   const base = normalizeCompatibleBaseUrl(raw)
@@ -94,7 +94,8 @@ export async function probeAstraCandidateRouteAfterGenericError(): Promise<Astra
     let routeStage: AstraTextCertificationStage
     let modelListed: boolean | null = null
     let advertisedModelIds: string[] = []
-    const model = blackstarAstraModelDescriptor().model
+    // Probe the actual failed task-class model, which can differ from Astra's base model.
+    const model = attemptedModel
     const expectedModel = safeAstraCandidateModelId(model) ?? undefined
     try {
       const routeResponse = await fetch(`${base}/models`, {
