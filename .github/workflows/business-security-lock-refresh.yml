@@ -27,12 +27,15 @@ jobs:
           const fs = require('node:fs')
           const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
           manifest.dependencies.zod = '4.6.6'
+          // E2B >=2.56 drops the vulnerable pinned undici8 fallback alias.
+          // The CI build and TypeScript tests must validate SDK compatibility.
+          manifest.dependencies.e2b = '2.59.0'
+          delete manifest.overrides.undici8
           manifest.overrides = {
             ...manifest.overrides,
             'body-parser': '2.4.0',
             'zod': '4.6.6',
-            'undici': '7.30.1',
-            'undici8@npm:undici@8.10.2': 'npm:undici@8.12.2',
+            'undici': '8.12.3',
           }
           fs.writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n')
           NODE
