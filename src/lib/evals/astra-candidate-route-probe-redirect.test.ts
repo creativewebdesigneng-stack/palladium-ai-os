@@ -32,6 +32,35 @@ describe('Astra authenticated candidate diagnostic redirect boundary', () => {
     expect(JSON.stringify(result)).not.toContain('test-private-key')
   })
 
+  it('does not read declared-oversized /models bodies and never exposes their contents', async () => {
+    configureCandidate()
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.endsWith('/models')) {
+        return new Response('do-not-expose-private-provider-content', {
+          headers: { 'content-length': '500000', 'content-type': 'application/json' },
+        })
+      }
+      return new Response('', { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const result = await probeAstraCandidateRouteAfterGenericError()
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(JSON.stringify(result)).not.toContain('do-not-expose-private-provider-content')
+    expect(result.stage).toBe('candidate_model_or_chat_route_not_found')
+  })
+
+  it('rejects chunked-oversized /models bodies without leaking provider content', async () => {
+    configureCandidate()
+    const fetcher = vi.fn(async (url: string) => url.endsWith('/models')
+      ? new Response('x'.repeat(130 * 1024))
+      : new Response('', { status: 404 }))
+    vi.stubGlobal('fetch', fetcher)
+    const result = await probeAstraCandidateRouteAfterGenericError()
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(result.stage).toBe('candidate_model_or_chat_route_not_found')
+    expect(JSON.stringify(result)).not.toContain('xxxxx')
+  })
+
   it('refuses redirects while checking chat after a valid model listing', async () => {
     configureCandidate()
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {

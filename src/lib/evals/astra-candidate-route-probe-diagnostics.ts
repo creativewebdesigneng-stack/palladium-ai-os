@@ -62,10 +62,30 @@ export function classifyAstraCandidateRouteProbeStatus(status: number): AstraTex
  */
 export function isAstraCandidateModelListed(payload: unknown, model: string): boolean | null {
   const target = safeAstraCandidateModelId(model)
-  if (!target) return null
-  const identifiers = safeAstraAdvertisedModelIds(payload)
-  if (!identifiers.length) return null
-  return identifiers.includes(target)
+  if (!target || !payload || typeof payload !== 'object') return null
+  // The five-ID limit belongs to diagnostics shown to an operator, not
+  // membership detection. A real model can appear later in a /models list.
+  const models = payload as { data?: unknown; models?: unknown }
+  let sawValidIdentifier = false
+  const includes = (value: unknown) => {
+    const id = safeModelId(value)
+    if (!id) return false
+    sawValidIdentifier = true
+    return id === target
+  }
+  if (Array.isArray(models.data)) {
+    for (const item of models.data) {
+      if (item && typeof item === 'object' && includes((item as { id?: unknown }).id)) return true
+    }
+  }
+  if (Array.isArray(models.models)) {
+    for (const item of models.models) {
+      if (!item || typeof item !== 'object') continue
+      const listed = item as { name?: unknown; model?: unknown }
+      if (includes(listed.name) || includes(listed.model)) return true
+    }
+  }
+  return sawValidIdentifier ? false : null
 }
 
 /**

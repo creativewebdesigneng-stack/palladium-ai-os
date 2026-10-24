@@ -28,6 +28,16 @@ describe('Astra candidate route probe', () => {
     expect(isAstraCandidateModelListed({ unexpected: [] }, 'qwen3:8b-q4_K_M')).toBeNull()
   })
 
+  it('recognizes a pinned candidate beyond the first five diagnostic identifiers', () => {
+    const models = Array.from({ length: 18 }, (_, i) => ({ id: `other-model-${i}` }))
+    models.push({ id: 'actual-pinned-candidate' })
+    expect(isAstraCandidateModelListed({ data: models }, 'actual-pinned-candidate')).toBe(true)
+    expect(safeAstraAdvertisedModelIds({ data: models })).toHaveLength(5)
+    expect(isAstraCandidateModelListed({ data: models }, 'absent-candidate')).toBe(false)
+    expect(isAstraCandidateModelListed({ data: [{ id: 'invalid identifier' }] }, 'actual-pinned-candidate')).toBeNull()
+    expect(isAstraCandidateModelListed({ models: models.map(({ id }) => ({ name: id })) }, 'actual-pinned-candidate')).toBe(true)
+  })
+
   it('extracts only bounded identifier-shaped advertised model ids', () => {
     const payload = {
       data: [
