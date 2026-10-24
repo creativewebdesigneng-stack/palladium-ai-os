@@ -165,6 +165,103 @@ describe('six-agent workflow execution evidence', () => {
     expect(panel).toContain('unverified completion claims');
   });
 
+  it('uses the latest recorded agent attempt rather than an earlier failed retry', () => {
+    const result = projectBusinessRunEvidence({
+      ...empty,
+      runStatus: 'running',
+      assignments: [{ assignment_id: 'research', title: 'Research', agent_id: 'one', status: 'completed' }],
+      workflowSteps: [{ id: 's1', config: { orchestrator_assignment_id: 'research' } }],
+      stepRuns: [
+        { step_id: 's1', task_id: 'failed-task', status: 'failed', attempt: 1, started_at: '2026-10-20T10:00:00Z' },
+        { step_id: 's1', task_id: 'successful-task', status: 'succeeded', attempt: 2, started_at: '2026-10-20T10:01:00Z' },
+      ],
+      tools: [
+        { agent_task_id: 'failed-task', tool: 'web_search', status: 'failed' },
+        { agent_task_id: 'successful-task', tool: 'web_search', status: 'succeeded' },
+      ],
+    });
+    expect(result.completedAssignments).toBe(1);
+    expect(result.assignments[0]).toMatchObject({
+      status: 'completed', latestAttempt: 2, latestTaskId: 'successful-task',
+      latestToolSuccesses: 1, stepRecords: 2, toolsFailed: 1,
+    });
+    expect(result.internalAcceptance.status).toBe('incomplete');
+  });
+
+  it('does not hide a later failed or ongoing attempt behind a previous success', () => {
+    const inputs = {
+      ...empty,
+      runStatus: 'completed',
+      assignments: [{ assignment_id: 'audit', title: 'Audit', agent_id: 'one', status: 'completed' }],
+      workflowSteps: [{ id: 's1', config: { orchestrator_assignment_id: 'audit' } }],
+      stepRuns: [
+        { step_id: 's1', task_id: 'old', status: 'succeeded', attempt: 1, started_at: '2026-10-20T10:00:00Z' },
+        { step_id: 's1', task_id: 'new', status: 'failed', attempt: 2, started_at: '2026-10-20T10:01:00Z' },
+      ],
+    };
+    const failed = projectBusinessRunEvidence(inputs);
+    expect(failed.completedAssignments).toBe(0);
+    expect(failed.assignments[0]?.status).toBe('failed');
+    const pending = projectBusinessRunEvidence({
+      ...inputs,
+      stepRuns: [...inputs.stepRuns.slice(0, 1), {
+        step_id: 's1', task_id: 'new', status: 'running', attempt: 2,
+        started_at: '2026-10-20T10:01:00Z',
+      }],
+    });
+    expect(pending.completedAssignments).toBe(0);
+    expect(pending.assignments[0]?.status).toBe('running');
+  });
+
+  it('requires a task receipt even when a step reports successful completion', () => {
+    const result = projectBusinessRunEvidence({
+      ...empty, runStatus: 'completed',
+      assignments: [{ assignment_id: 'research', title: 'Research', agent_id: 'a', status: 'completed' }],
+      workflowSteps: [{ id: 'step', config: { orchestrator_assignment_id: 'research' } }],
+      stepRuns: [{ step_id: 'step', task_id: null, status: 'succeeded' }],
+    });
+    expect(result.completedAssignments).toBe(0);
+    expect(result.assignments[0]?.status).toBe('unverified_completion');
+  });
+
+  it('checks six distinct internally evidenced tasks, tools and owner approval without certifying providers', () => {
+    const roles = ['research', 'validation', 'production', 'marketing', 'operations', 'audit'];
+    const fixture = {
+      ...empty,
+      runStatus: 'completed',
+      assignments: roles.map((role, i) => ({
+        assignment_id: role, title: role, agent_id: `agent-${i}`, status: 'completed',
+      })),
+      workflowSteps: roles.map((role, i) => ({
+        id: `step-${i}`, config: { orchestrator_assignment_id: role },
+      })),
+      stepRuns: roles.map((_role, i) => ({
+        step_id: `step-${i}`, task_id: `task-${i}`, status: 'succeeded', attempt: 1,
+      })),
+      tools: roles.map((_role, i) => ({
+        agent_task_id: `task-${i}`, tool: 'web_search', status: 'succeeded',
+      })),
+      workflowGateApprovals: [{ status: 'approved' }],
+    };
+    const complete = projectBusinessRunEvidence(fixture);
+    expect(complete.internalAcceptance).toMatchObject({
+      status: 'receipts_complete', completedChecks: 6, totalChecks: 6,
+      liveProviderCertified: false, externalOutcomesCertified: false,
+    });
+    expect(complete.financialOutcome).toBe('unverified');
+    const noApproval = projectBusinessRunEvidence({
+      ...fixture, workflowGateApprovals: [{ status: 'denied' }],
+    });
+    expect(noApproval.internalAcceptance.status).toBe('incomplete');
+    const wrongTool = projectBusinessRunEvidence({
+      ...fixture,
+      tools: [...fixture.tools.slice(0, 5), { agent_task_id: 'unrelated', tool: 'web_search', status: 'succeeded' }],
+    });
+    expect(wrongTool.internalAcceptance.checks.find((check) => check.id === 'tools')?.passed).toBe(false);
+    const truncated = projectBusinessRunEvidence({ ...fixture, truncated: true });
+    expect(truncated.internalAcceptance.status).toBe('incomplete');
+  });
+
   it('keeps all DB lookups within the authenticated owner and never selects tool payloads', () => {
     expect(source).toContain('.middleware([requireSupabaseAuth])');
     expect(source).toContain(".eq('id', data.goalId).eq('user_id', owner)");
@@ -177,6 +274,9 @@ describe('six-agent workflow execution evidence', () => {
     expect(source).toContain(".eq('action_type', 'workflow_step')");
     expect(source).toContain(".contains('details', { workflow_run_id: workflowRun.id })");
     expect(source).toContain(".select('status')");
+    expect(source).toContain(".select('step_id,task_id,status,attempt,started_at')");
+    expect(panel).toContain('Live-mission internal receipt checklist');
+    expect(panel).toContain('data.internalAcceptance.checks.map');
     expect(panel).toContain('Owner start gate: {data.workflowGateStatus}');
     expect(panel).toContain('Financial outcome: unverified.');
     expect(screen).toContain('<BusinessRunEvidencePanel goals={data.goals ?? []} session={session} />');
