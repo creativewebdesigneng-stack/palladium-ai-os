@@ -33,10 +33,13 @@ export function parseModelIds(json) {
   if (!json || !Array.isArray(json.data)) throw new Error('Invalid models response')
   return json.data.map(x => x?.id).filter(x => typeof x === 'string' && x.length > 0)
 }
-export function parseChatResult(json) {
+export function parseChatResult(json, expectedModel) {
   const text = json?.choices?.[0]?.message?.content
   if (typeof text !== 'string' || !text.trim()) throw new Error('Invalid chat response')
-  return { nonempty: true, characters: text.trim().length }
+  const upstreamModelIdentity = !expectedModel ? 'not_checked'
+    : typeof json?.model !== 'string' || !json.model ? 'missing'
+      : json.model === expectedModel ? 'match' : 'mismatch'
+  return { nonempty: true, characters: text.trim().length, upstreamModelIdentity }
 }
 function safeError(error) {
   if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return 'timeout'
