@@ -52,7 +52,7 @@ export async function inspectLocalCandidate(args, fetchImpl = fetch) {
     kind: 'blackstar_astra_local_candidate_diagnostic', certified: false,
     transport: 'loopback_only', modelListing: 'not_checked',
     requestedModelAvailable: null, inference: args.probe ? 'not_started' : 'not_requested',
-    responseShapeValid: false,
+    responseShapeValid: false, upstreamModelIdentity: 'not_checked',
   }
   const headers = { Accept: 'application/json' }
   // Never print the optional token; only send it to the validated loopback endpoint.
@@ -79,10 +79,14 @@ export async function inspectLocalCandidate(args, fetchImpl = fetch) {
         messages: [{ role: 'user', content: 'Reply with OK.' }] }),
     })
     if (!response.ok) { report.inference = `http_${response.status}`; return report }
-    const result = parseChatResult(await response.json())
-    report.inference = 'real_response_received'
+    const result = parseChatResult(await response.json(), args.model)
     report.responseShapeValid = result.nonempty
     report.responseCharacters = result.characters
+    report.upstreamModelIdentity = result.upstreamModelIdentity
+    report.inference = result.upstreamModelIdentity === 'match'
+      ? 'real_response_received'
+      : result.upstreamModelIdentity === 'missing'
+        ? 'upstream_model_identity_missing' : 'upstream_model_identity_mismatch'
   } catch (error) { report.inference = error instanceof Error && error.message === 'Invalid chat response' ? 'invalid_response_shape' : safeError(error) }
   return report
 }
