@@ -28,6 +28,7 @@ export default function AstraCertificationWorkbench() {
   const [activeCaseId, setActiveCaseId] = useState(null);
   const [autoRunProgress, setAutoRunProgress] = useState(null);
   const [fastQualificationResult, setFastQualificationResult] = useState(null);
+  const [batchConsent, setBatchConsent] = useState(false);
   const autoRunStopRequested = useRef(false);
 
   const benchmarkFn = useServerFn(getAstraCertificationBenchmark);
@@ -45,6 +46,8 @@ export default function AstraCertificationWorkbench() {
   const judgeIsTrusted = useMemo(() => trustedJudges.some((entry) => entry.provider === judge.provider && entry.model === judge.model), [trustedJudges, judge]);
   const judgeIsCandidate = useMemo(() => judgeMatchesCandidate(judge, [reference]), [judge, reference]);
 
+  useEffect(() => { setBatchConsent(false); }, [taskClass]);
+
   useEffect(() => {
     if (taskClass !== 'vision' || judgeIsTrusted || trustedJudges.length === 0) return;
     const next = trustedJudges[0];
@@ -52,6 +55,7 @@ export default function AstraCertificationWorkbench() {
   }, [taskClass, judgeIsTrusted, trustedJudges]);
 
   const executeTrustedCase = async (benchmarkCase) => {
+    if (taskClass !== 'vision' && (benchmark.data?.preflight?.state !== 'configured_unprobed' || benchmark.data?.preflight?.canAttemptTextCertification !== true)) throw new Error('Astra candidate and independent evaluator configuration must pass authenticated preflight before execution.');
     if (!status.data?.model) throw new Error('Astra serving identity is unavailable.');
 
     if (taskClass !== 'vision') {
@@ -90,6 +94,7 @@ export default function AstraCertificationWorkbench() {
 
   const autoRunCases = useMutation({
     mutationFn: async () => {
+      if (!batchConsent) throw new Error('Confirm potentially paid batch execution before starting.');
       const remainingCases = (benchmark.data?.cases ?? []).filter((benchmarkCase) => !benchmarkCase.completed);
       if (!remainingCases.length) return { completed: 0, total: 0, stopped: false };
 
@@ -115,12 +120,14 @@ export default function AstraCertificationWorkbench() {
     },
     onSettled: async () => {
       setActiveCaseId(null);
+      setBatchConsent(false);
       await refreshCertificationState();
     },
   });
 
   const fastQualifyAndCertify = useMutation({
     mutationFn: async () => {
+      if (!batchConsent) throw new Error('Confirm potentially paid batch execution before starting.');
       if (taskClass === 'vision') {
         throw new Error('Fast qualification is currently available for trusted text certification classes.');
       }
@@ -216,6 +223,7 @@ export default function AstraCertificationWorkbench() {
     },
     onSettled: async () => {
       setActiveCaseId(null);
+      setBatchConsent(false);
       await refreshCertificationState();
       await queryClient.invalidateQueries({ queryKey: ['model-runtime-overview'] });
     },
@@ -233,10 +241,13 @@ export default function AstraCertificationWorkbench() {
   const supported = benchmark.data?.certificationSupported !== false;
   const completed = benchmark.data?.completedCases ?? 0;
   const total = benchmark.data?.totalCases ?? 20;
+  const belowQualityFloor = total > 0 && completed >= total && status.data?.qualityFloorMet === false;
+  const minQualifyingPercent = Math.round((status.data?.minimumQualifyingScore ?? 0.75) * 100);
+  const verifiedAveragePercent = Number.isFinite(status.data?.averageScore) ? (status.data.averageScore * 100).toFixed(1) : null;
   const referenceProviderAllowed = VISION_PROVIDERS.includes(reference.provider);
   const canRun = taskClass === 'vision'
     ? supported && referenceProviderAllowed && judgeIsTrusted && Boolean(status.data?.model) && Boolean(reference.model.trim()) && Boolean(judge.model.trim()) && !judgeIsCandidate
-    : supported && Boolean(status.data?.model) && Boolean(freeLlmJudge);
+    : supported && benchmark.data?.preflight?.state === 'configured_unprobed' && benchmark.data?.preflight?.canAttemptTextCertification === true && Boolean(status.data?.model) && Boolean(freeLlmJudge);
 
   return (
     <section className="mb-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.035] p-5">
@@ -256,9 +267,19 @@ export default function AstraCertificationWorkbench() {
         </> : <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Trusted independent judge<div className="input mt-1.5 flex min-h-10 items-center px-3 text-xs normal-case tracking-normal text-emerald-200">{freeLlmJudge ? freeLlmJudge.label : 'Authenticated FreeLLM evaluator not configured'}</div></div>}
       </div>
 
+      {taskClass !== 'vision' && benchmark.data?.preflight && <div role="status" className="mt-3 rounded-xl border border-violet-400/20 bg-violet-400/[.04] p-3 text-xs text-violet-100">
+        <p className="font-semibold">{canRun ? 'Routes configured, not yet independently tested' : 'Certification is blocked by server configuration'}</p>
+        {benchmark.data.preflight.blockers?.includes('astra_candidate_route_missing') && <p className="mt-1">Astra candidate serving route is missing on this deployment.</p>}
+        {benchmark.data.preflight.blockers?.includes('astra_candidate_auth_missing') && <p className="mt-1">The pinned Astra candidate endpoint has no server-side authentication configured. Add a dedicated candidate API key before certification.</p>}
+        {benchmark.data.preflight.blockers?.includes('pinned_independent_evaluator_missing') && <p className="mt-1">An independently pinned evaluator is missing on this deployment.</p>}
+        {benchmark.data.preflight.blockers?.includes('astra_provenance_signing_key_missing') && <p className="mt-1">Astra provenance signing authority is missing or invalid on this deployment. An operator must configure a dedicated server-side signing key before certification can run.</p>}
+        {!canRun && !benchmark.data.preflight.blockers?.length && <p className="mt-1">Astra serving identity or the approved evaluator is unavailable.</p>}
+        {canRun && <p className="mt-1">Configuration does not prove connectivity, accuracy, or successful evaluation. Run one authorised case first.</p>}
+      </div>}
       {taskClass === 'vision' && supported && <p className="mt-3 inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.05] p-3 text-xs text-violet-200"><Eye className="h-3.5 w-3.5" />Trusted vision mode: each case renders a deterministic PNG on the server, binds its SHA-256 digest, and scores responses against a server-owned ground-truth key.</p>}
       {taskClass !== 'vision' && freeLlmJudge && <p className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-3 text-xs text-emerald-200">Trusted text mode is locked to the deployment's authenticated FreeLLMAPI evaluator and exact server-pinned model. Each request executes one server-owned case, verifies independent route evidence, signs provenance, and attests the result before it counts toward certification.</p>}
       {taskClass !== 'vision' && !freeLlmJudge && benchmark.data && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">Trusted text certification is blocked until the authenticated FreeLLM evaluator URL, private bridge credential, and exact model are configured in the deployment.</p>}
+      {belowQualityFloor && <p role="status" className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">All benchmark cases have verified runs, but the candidate model has not met the {minQualifyingPercent}% quality floor{verifiedAveragePercent == null ? '.' : ` (verified average: ${verifiedAveragePercent}%).`} Certification evidence cannot be issued.</p>}
       {taskClass === 'vision' && !referenceProviderAllowed && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">Choose a reference provider supported by trusted vision mode before running certification.</p>}
       {taskClass === 'vision' && !judgeIsTrusted && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">Choose a server-approved trusted judge before running certification.</p>}
       {taskClass === 'vision' && judgeIsCandidate && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3 text-xs text-amber-200">The certification judge must be different from every candidate. Choose another reference model or trusted judge.</p>}
@@ -273,11 +294,15 @@ export default function AstraCertificationWorkbench() {
             <p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-zinc-500">{benchmarkCase.prompt}</p>
           </button>)}
         </div>
+        <label className="mt-4 flex items-start gap-2 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-zinc-300">
+          <input type="checkbox" className="mt-0.5" checked={batchConsent} onChange={(event) => setBatchConsent(event.target.checked)} disabled={!canRun || autoRunCases.isPending || fastQualifyAndCertify.isPending} />
+          <span>I authorise multiple model and evaluator calls in this batch. Provider charges may apply. Stop only takes effect after the current case.</span>
+        </label>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" disabled={!nextCase || !canRun || runCase.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => nextCase && runCase.mutate(nextCase)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.08] px-4 py-2.5 text-xs font-medium text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{runCase.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}{runCase.isPending ? 'Running and attesting…' : nextCase ? 'Run next trusted case' : 'All trusted cases complete'}</button>
-          {!fastQualifyAndCertify.isPending ? <button type="button" disabled={taskClass === 'vision' || !nextCase || !canRun || runCase.isPending || autoRunCases.isPending} onClick={() => fastQualifyAndCertify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/[.08] px-4 py-2.5 text-xs font-medium text-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />Fast qualify → full certify</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
-          {!autoRunCases.isPending ? <button type="button" disabled={!nextCase || !canRun || runCase.isPending || fastQualifyAndCertify.isPending} onClick={() => autoRunCases.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.07] px-4 py-2.5 text-xs font-medium text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" />Auto-run remaining trusted cases</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
-          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
+          {!fastQualifyAndCertify.isPending ? <button type="button" disabled={taskClass === 'vision' || !nextCase || !canRun || !batchConsent || runCase.isPending || autoRunCases.isPending} onClick={() => fastQualifyAndCertify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/[.08] px-4 py-2.5 text-xs font-medium text-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />Fast qualify → full certify</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
+          {!autoRunCases.isPending ? <button type="button" disabled={!nextCase || !canRun || !batchConsent || runCase.isPending || fastQualifyAndCertify.isPending} onClick={() => autoRunCases.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.07] px-4 py-2.5 text-xs font-medium text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" />Auto-run remaining trusted cases</button> : <button type="button" onClick={() => { autoRunStopRequested.current = true; }} className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[.07] px-4 py-2.5 text-xs font-medium text-amber-100"><Loader2 className="h-3.5 w-3.5 animate-spin" />Stop after current case {autoRunProgress ? `(${autoRunProgress.completed}/${autoRunProgress.total})` : ''}</button>}
+          <button type="button" disabled={!status.data?.readyToCertify || certify.isPending || autoRunCases.isPending || fastQualifyAndCertify.isPending} onClick={() => certify.mutate()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-xs font-medium text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">{certify.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}{certify.isPending ? 'Issuing evidence…' : status.data?.readyToCertify ? 'Issue verified evidence' : belowQualityFloor ? 'Quality floor not met' : `Need ${Math.max(0, (status.data?.minimumRuns ?? 20) - (status.data?.completedRuns ?? 0))} more cases`}</button>
           {status.data?.model && <span className="text-[10px] text-zinc-500">Astra identity: <code className="text-cyan-200">compatible/{status.data.model}</code></span>}
         </div>
       </>}

@@ -1,5 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
+import { persistAstraBenchmarkAttestation } from './astra-certification-attestation-persistence'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import { astraCertificationSuiteId, getAstraCertificationBenchmarkCase, isAstraCertificationTaskClass, listAstraCertificationBenchmarkCases } from '@/lib/evals/astra-certification-benchmark-suite'
 import {
@@ -11,9 +14,9 @@ import {
 } from '@/lib/evals/astra-certification-execution-profile'
 import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge, judgeMatchesCandidate } from '@/lib/evals/astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute } from '@/lib/evals/freellm-evaluator.server'
-import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
+import { hashAstraEvaluationSystemPrompt, signAstraEvaluationEvidence, listVerifiedAstraEvaluationCaseIds, type AstraEvaluationProvenanceInput } from '@/lib/evals/astra-evaluation-verifier.server'
 import { getAstraVisionBenchmarkGroundTruth, renderAstraVisionBenchmarkMedia } from '@/lib/evals/astra-vision-benchmark-media.server'
-import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
+import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraVisionConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 
 type Scope = { userId: string; orgId?: string | null; taskClass: NativeIntelligenceTaskClass }
 type AttestationInput = Scope & { runId: string; caseId: string }
@@ -90,42 +93,10 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
   }
   const suiteId = astraCertificationSuiteId(scope.taskClass)
   const cases = listAstraCertificationBenchmarkCases(scope.taskClass)
-  let query = db.from('model_eval_runs').select('id,metadata,status,completed_at').eq('status', 'completed').not('completed_at', 'is', null).order('completed_at', { ascending: false }).limit(200)
-  query = scope.orgId ? query.eq('org_id', scope.orgId) : query.is('org_id', null).eq('user_id', scope.userId)
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  const completedCaseIds = new Set<string>()
-  const expectedModel = blackstarAstraModelForTaskClass(scope.taskClass)
-  const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
-  for (const row of data ?? []) {
-    const astra = metadataObject(metadataObject(row.metadata)?.['astra_activation'])
-    const caseId = typeof astra?.['case_id'] === 'string' ? astra['case_id'] : null
-    if (!caseId) continue
-    const benchmarkCase = getAstraCertificationBenchmarkCase(scope.taskClass, caseId)
-    if (!benchmarkCase) continue
-
-    const expectedProfile = resolveAstraCertificationExecutionProfile(
-      scope.taskClass,
-      expectedModel,
-    )
-    const expectedPromptHash = hashAstraCertificationExecutionPrompt(
-      buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, expectedProfile),
-    )
-    if (
-      astra?.['server_verified'] === true
-      && astra?.['provenance_version'] === PROVENANCE_VERSION
-      && astra?.['suite_id'] === suiteId
-      && astra?.['task_class'] === scope.taskClass
-      && astra?.['provider'] === 'compatible'
-      && astra?.['model'] === expectedModel
-      && astra?.['engine_id'] === BLACKSTAR_ASTRA_ENGINE_PROFILE.id
-      && astra?.['system_prompt_hash'] === emptySystemPromptHash
-      && sameAstraCertificationExecutionProfile(astra?.['execution_profile'], expectedProfile)
-      && astra?.['execution_prompt_hash'] === expectedPromptHash
-    ) {
-      completedCaseIds.add(caseId)
-    }
-  }
+  // Only the signed owner-scoped run verifier may mark a case completed.
+  // User-facing metadata labels alone cannot establish a verified run.
+  const verifiedCaseIds = await listVerifiedAstraEvaluationCaseIds(scope)
+  const completedCaseIds = new Set(cases.filter((benchmarkCase) => verifiedCaseIds.includes(benchmarkCase.caseId)).map((benchmarkCase) => benchmarkCase.caseId))
   return {
     taskClass: scope.taskClass, certificationSupported: true, suiteId, completedCases: completedCaseIds.size, totalCases: cases.length,
     cases: cases.map((benchmarkCase) => ({ caseId: benchmarkCase.caseId, name: benchmarkCase.name, prompt: benchmarkCase.prompt, criteria: [...benchmarkCase.criteria], modality: benchmarkCase.modality, completed: completedCaseIds.has(benchmarkCase.caseId) })),
@@ -135,7 +106,9 @@ export async function getAstraCertificationBenchmarkPlan(scope: Scope) {
 export async function attestAstraCertificationBenchmarkRun(input: AttestationInput) {
   await assertScopeAccess(input)
   if (!isAstraCertificationTaskClass(input.taskClass)) throw new Error('This task class does not have a trusted benchmark suite.')
-  if (!isBlackstarAstraEngineConfigured()) throw new Error('Blackstar Astra serving is not configured on this deployment.')
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: input.taskClass, candidateModel: blackstarAstraModelForTaskClass(input.taskClass),
+  })) throw new Error('Native Astra certification serving is not configured with an explicit pinned model.')
   if (input.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) throw new Error('A dedicated multimodal Astra model is required for vision certification.')
 
   const benchmarkCase = getAstraCertificationBenchmarkCase(input.taskClass, input.caseId)
@@ -144,7 +117,7 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   const { data: run, error: runError } = await db.from('model_eval_runs').select('id,user_id,org_id,prompt,status,judge_provider,judge_model,metadata,completed_at').eq('id', input.runId).maybeSingle()
   if (runError) throw new Error(runError.message)
   if (!run || run.status !== 'completed' || !run.completed_at) throw new Error('Only completed Model Arena runs can be attested.')
-  if (input.orgId ? run.org_id !== input.orgId : run.org_id !== null || run.user_id !== input.userId) throw new Error('Evaluation run does not belong to this scope.')
+  if (run.user_id !== input.userId || run.org_id !== (input.orgId ?? null)) throw new Error('Evaluation run does not belong to this exact owner/workspace scope.')
   if (run.prompt !== benchmarkCase.prompt) throw new Error('Evaluation prompt does not match the trusted benchmark case.')
   const runMetadata = metadataObject(run.metadata) ?? {}
   if (stableJson(runMetadata['criteria'] ?? null) !== stableJson(benchmarkCase.criteria)) throw new Error('Evaluation criteria do not match the trusted benchmark case.')
@@ -165,7 +138,11 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
     db.from('model_eval_scores').select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria').eq('run_id', run.id),
   ])
   if (responseError) throw new Error(responseError.message); if (scoreError) throw new Error(scoreError.message)
-  if (!responses?.length || scores?.length !== responses.length) throw new Error('Evaluation evidence is incomplete.')
+  if (!hasLinkedAstraEvaluationEvidence({
+    runId: run.id, responses: responses ?? [], scores: scores ?? [],
+    judgeProvider: run.judge_provider, judgeModel: run.judge_model,
+    expectedCriteria: benchmarkCase.criteria,
+  })) throw new Error('Evaluation response/score linkage or independent judge data is incomplete.')
   if (!responses.some((response: any) => response.provider === 'compatible' && response.model === expectedModel)) throw new Error('Evaluation is missing the exact Astra response.')
   if (input.taskClass === 'vision') {
     const expectedGroundTruth = getAstraVisionBenchmarkGroundTruth(input.caseId)
@@ -199,7 +176,12 @@ export async function attestAstraCertificationBenchmarkRun(input: AttestationInp
   const suiteId = benchmarkCase.suiteId
   const provenanceSignature = signAstraEvaluationEvidence({ ...baseProvenance, suiteId, caseId: benchmarkCase.caseId })
   const nextMetadata = { ...runMetadata, astra_activation: { ...astra, provenance_version: PROVENANCE_VERSION, suite_id: suiteId, case_id: benchmarkCase.caseId, provenance_signature: provenanceSignature } }
-  const { error: updateError } = await db.from('model_eval_runs').update({ metadata: nextMetadata }).eq('id', run.id)
-  if (updateError) throw new Error(updateError.message)
+  // Persistence must confirm an exact owner-scoped row after signing.
+  await persistAstraBenchmarkAttestation(db, {
+    runId: run.id,
+    userId: input.userId,
+    orgId: input.orgId ?? null,
+    metadata: nextMetadata,
+  })
   return { runId: run.id, taskClass: input.taskClass, provider: 'compatible' as const, model: expectedModel, suiteId, caseId: benchmarkCase.caseId, attested: true }
 }

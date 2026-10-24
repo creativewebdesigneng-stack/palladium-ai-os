@@ -3,7 +3,19 @@ import type { GeneralIntelligenceAssessment } from '@/lib/agents/general-intelli
 import type { OrchestratorPlan } from '@/lib/agents/agent-orchestrator'
 import { executeAssessedGeneralIntelligence } from '../general-intelligence-routing.server'
 
-const sb = { from: vi.fn() }
+const sb = { from: vi.fn(() => {
+  const filters = new Map<string, unknown>()
+  const query: any = {
+    select: (_columns: string) => query,
+    eq: (column: string, value: unknown) => { filters.set(column, value); return query },
+    maybeSingle: async () => ({
+      data: filters.get('id') && filters.get('user_id') === 'user-1' && filters.get('agent_id')
+        ? { id: filters.get('id'), status: 'succeeded' } : null,
+      error: null,
+    }),
+  }
+  return query
+}) }
 
 function assessment(
   mode: GeneralIntelligenceAssessment['mode'],
@@ -60,7 +72,7 @@ const plan: OrchestratorPlan = {
 
 describe('assessed General Intelligence routing', () => {
   it('routes direct mode through one selected authorised agent', async () => {
-    const executeTask = vi.fn(async () => ({ task: {}, output: 'direct result' }))
+    const executeTask = vi.fn(async () => ({ task: { id: 'task-agent-a', status: 'succeeded' }, output: 'direct result' }))
     const result = await executeAssessedGeneralIntelligence({
       sb,
       userId: 'user-1',
@@ -91,7 +103,7 @@ describe('assessed General Intelligence routing', () => {
 
   it('routes delegate mode into authorised orchestration then synthesises through a selected agent', async () => {
     const executeTask = vi.fn(async (args: { agentId: string; input: string }) => ({
-      task: {},
+      task: { id: 'task-' + args.agentId, status: 'succeeded' },
       output: args.input.includes('BLACKSTAR AUTHORISED MULTI-AGENT SYNTHESIS') ? 'synthesised result' : 'child result',
     }))
     const executeOrchestration = vi.fn(async () => ({
@@ -126,7 +138,7 @@ describe('assessed General Intelligence routing', () => {
 
   it('injects only permission-safe verified knowledge relevant to an authorised delegated assignment', async () => {
     const executeTask = vi.fn(async (args: { agentId: string; input: string }) => ({
-      task: {},
+      task: { id: 'task-' + args.agentId, status: 'succeeded' },
       output: args.input.includes('BLACKSTAR AUTHORISED MULTI-AGENT SYNTHESIS') ? 'synthesised result' : 'child result',
     }))
     const loadVerifiedKnowledge = vi.fn(async () => [{
@@ -228,4 +240,53 @@ describe('assessed General Intelligence routing', () => {
     expect(result.status).toBe('escalated')
     expect(executeTask).not.toHaveBeenCalled()
   })
+  it('never claims direct completion while a tool approval is pending', async () => {
+    const executeTask = vi.fn(async () => ({
+      task: { id: 'waiting-direct', status: 'waiting_for_approval' }, output: '',
+    }))
+    const result = await executeAssessedGeneralIntelligence({
+      sb, userId: 'user-1', assessment: assessment('direct', ['agent-a']),
+      authorisedAgentIds: ['agent-a'], executeTask: executeTask as never,
+    })
+    expect(result.status).toBe('waiting_for_approval')
+    expect(result.output).toBeUndefined()
+  })
+
+  it('rejects unpersisted success on a direct run', async () => {
+    const database = { from: vi.fn(() => {
+      const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
+      return q
+    }) }
+    const executeTask = vi.fn(async () => ({
+      task: { id: 'unpersisted', status: 'succeeded' }, output: 'not verified',
+    }))
+    const result = await executeAssessedGeneralIntelligence({
+      sb: database, userId: 'user-1', assessment: assessment('direct', ['agent-a']),
+      authorisedAgentIds: ['agent-a'], executeTask: executeTask as never,
+    })
+    expect(result.status).toBe('failed')
+    expect(result.output).toBeUndefined()
+  })
+
+  it('preserves a synthesis approval pause after delegated evidence is returned', async () => {
+    const executeTask = vi.fn(async () => ({
+      task: { id: 'synthesis-pending', status: 'waiting_for_approval' },
+      output: '',
+    }))
+    const executeOrchestration = vi.fn(async () => ({
+      status: 'completed' as const,
+      results: [{ assignment_id: 'research', agent_id: 'agent-a', status: 'completed' as const, output: 'prior evidence' }],
+    }))
+    const result = await executeAssessedGeneralIntelligence({
+      sb, userId: 'user-1', assessment: assessment('delegate',['agent-a']),
+      authorisedAgentIds: ['agent-a'],
+      plan: { ...plan, assignments: [plan.assignments[0]!] },
+      executeTask: executeTask as never,
+      executeOrchestration: executeOrchestration as never,
+    })
+    expect(result.status).toBe('waiting_for_approval')
+    expect(result.output).toBeUndefined()
+    expect(executeTask).toHaveBeenCalledTimes(1)
+  })
+
 })

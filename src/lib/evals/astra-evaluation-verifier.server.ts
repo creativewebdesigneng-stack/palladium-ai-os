@@ -1,5 +1,14 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { hasLinkedAstraEvaluationEvidence } from './astra-evaluation-evidence-links'
+import { hasPinnedAstraCertificationCandidate } from './astra-certification-candidate-policy'
+import { collectAstraCertificationRunPages, collectAstraRunEvidenceBatches } from './astra-certification-run-pages'
+import { inspectAstraVerifiedScoreFloor } from './astra-certification-quality-floor'
+import { validateAstraCertificationRpcEvidence } from './astra-certification-rpc-evidence'
+import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
+import { NATIVE_INTELLIGENCE_MIN_EVAL_SCORE } from '@/lib/ai/native-intelligence-model-platform'
+import { isIndependentFreeLlmRouteProvider, isTrustedAstraCertificationJudge } from './astra-certification-judge-policy'
+import { matchesPinnedFreeLlmRoute } from './freellm-evaluator.server'
 import type { NativeIntelligenceTaskClass } from '@/lib/ai/native-intelligence-model-platform'
 import {
   ASTRA_CERTIFICATION_CASE_COUNT,
@@ -18,7 +27,6 @@ import {
 import {
   BLACKSTAR_ASTRA_ENGINE_PROFILE,
   blackstarAstraModelForTaskClass,
-  isBlackstarAstraEngineConfigured,
   isBlackstarAstraVisionConfigured,
 } from '@/lib/runtime/blackstar-astra-engine-profile'
 
@@ -91,6 +99,7 @@ type AdminDb = {
 }
 
 const MIN_RUNS = ASTRA_CERTIFICATION_CASE_COUNT
+const emptyCertifiedQuality = { averageScore: null, qualityFloorMet: false, readyToCertify: false }
 const VERIFIER_ID = 'blackstar-native-intelligence-verifier-v4'
 const PROVENANCE_VERSION = ASTRA_CERTIFICATION_PROVENANCE_VERSION
 const astraEvalAdmin = supabaseAdmin as unknown as AdminDb
@@ -111,9 +120,7 @@ export function hashAstraEvaluationSystemPrompt(value?: string | null): string {
 }
 
 function provenanceSecret(): string {
-  const secret = process.env['SUPABASE_SERVICE_ROLE_KEY']
-  if (!secret) throw new Error('Astra evaluation provenance is unavailable because the server verification key is not configured.')
-  return secret
+  return resolveAstraProvenanceSigningKey()
 }
 
 function normalizeProvenance(input: AstraEvaluationProvenanceInput) {
@@ -196,35 +203,58 @@ async function assertScopeAccess(scope: Scope) {
 
 async function matchingRuns(scope: Scope) {
   await assertScopeAccess(scope)
-  if (!isBlackstarAstraEngineConfigured()) {
-    throw new Error('Blackstar Astra serving is not configured on this deployment.')
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) {
+    // Read-only status checks must be available before Preview is configured.
+    // An unconfigured candidate has no verified cases or certification quality.
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
   if (!isAstraCertificationTaskClass(scope.taskClass)) {
-    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
   if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) {
-    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[] }
+    return { model: blackstarAstraModelForTaskClass(scope.taskClass), runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
   }
 
   const model = blackstarAstraModelForTaskClass(scope.taskClass)
   const suiteId = astraCertificationSuiteId(scope.taskClass)
   const emptySystemPromptHash = hashAstraEvaluationSystemPrompt(null)
-  let query = astraEvalAdmin
-    .from('model_eval_runs')
-    .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
-    .eq('status', 'completed')
-    .not('completed_at', 'is', null)
-    .order('completed_at', { ascending: false })
-    .limit(200)
+  // Scope and versioned-suite filters must execute inside Postgres BEFORE
+  // pagination. Otherwise 200 unrelated recent runs can hide signed Astra
+  // evidence and reset visible progress for a legitimate operator.
+  const data = await collectAstraCertificationRunPages<ArenaRun>(async (from, to) => {
+    let query = astraEvalAdmin
+      .from('model_eval_runs')
+      .select('id,user_id,org_id,prompt,judge_provider,judge_model,metadata,completed_at')
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null)
+      .contains('metadata', {
+        astra_activation: {
+          server_verified: true,
+          suite_id: suiteId,
+          task_class: scope.taskClass,
+          provider: 'compatible',
+          model,
+        },
+      })
+      .order('completed_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to)
 
-  query = scope.orgId
-    ? query.eq('org_id', scope.orgId)
-    : query.is('org_id', null).eq('user_id', scope.userId)
+    // Organisation membership grants workspace access, but never ownership of
+    // another member's native-model certification evidence.
+    query = query.eq('user_id', scope.userId)
+    query = scope.orgId
+      ? query.eq('org_id', scope.orgId)
+      : query.is('org_id', null)
 
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
+    const { data: batch, error } = await query
+    if (error) throw new Error(error.message)
+    return (batch ?? []) as ArenaRun[]
+  })
 
-  const tagged = ((data ?? []) as ArenaRun[]).filter((run) => {
+  const tagged = data.filter((run) => {
     const metadata = astraMetadata(run)
     const expectedExecution = expectedExecutionEvidence(scope.taskClass, model, run.prompt)
     return metadata?.['server_verified'] === true
@@ -239,24 +269,29 @@ async function matchingRuns(scope: Scope) {
       && typeof metadata?.['case_id'] === 'string'
   })
 
-  if (!tagged.length) return { model, runs: [] as ArenaRun[] }
+  if (!tagged.length) return { model, runs: [] as ArenaRun[], quality: emptyCertifiedQuality }
 
+  // The historical candidate list can now exceed one PostgREST URL/query
+  // window. Fetch scores and responses for bounded run-id batches, never by
+  // serializing thousands of UUIDs in a single .in(...) query.
   const runIds = tagged.map((run) => run.id)
-  const [{ data: responseData, error: responseError }, { data: scoreData, error: scoreError }] = await Promise.all([
-    astraEvalAdmin
-      .from('model_eval_responses')
-      .select('id,run_id,provider,model,response_text,latency_ms,input_tokens,output_tokens')
-      .in('run_id', runIds),
-    astraEvalAdmin
-      .from('model_eval_scores')
-      .select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria')
-      .in('run_id', runIds),
-  ])
-  if (responseError) throw new Error(responseError.message)
-  if (scoreError) throw new Error(scoreError.message)
-
-  const responses = (responseData ?? []) as ArenaResponse[]
-  const scores = (scoreData ?? []) as ArenaScore[]
+  const { responses, scores } = await collectAstraRunEvidenceBatches<ArenaResponse, ArenaScore>(
+    runIds, async (ids) => {
+      const [{ data: responseData, error: responseError }, { data: scoreData, error: scoreError }] = await Promise.all([
+        astraEvalAdmin
+          .from('model_eval_responses')
+          .select('id,run_id,provider,model,response_text,latency_ms,input_tokens,output_tokens')
+          .in('run_id', ids),
+        astraEvalAdmin
+          .from('model_eval_scores')
+          .select('run_id,response_id,evaluator_type,score,verdict,reasoning,criteria')
+          .in('run_id', ids),
+      ])
+      if (responseError) throw new Error(responseError.message)
+      if (scoreError) throw new Error(scoreError.message)
+      return { responses: (responseData ?? []) as ArenaResponse[], scores: (scoreData ?? []) as ArenaScore[] }
+    },
+  )
   const verifiedRuns = tagged.filter((run) => {
     const metadata = astraMetadata(run)
     const caseId = metadata?.['case_id']
@@ -273,7 +308,32 @@ async function matchingRuns(scope: Scope) {
     const runResponses = responses.filter((response) => response.run_id === run.id)
     const runScores = scores.filter((score) => score.run_id === run.id)
     const hasExactAstraResponse = runResponses.some((response) => response.provider === 'compatible' && response.model === model)
-    if (!hasExactAstraResponse || runResponses.length === 0 || runScores.length !== runResponses.length) return false
+    if (!hasExactAstraResponse || !hasLinkedAstraEvaluationEvidence({
+      runId: run.id, responses: runResponses, scores: runScores,
+      judgeProvider: run.judge_provider, judgeModel: run.judge_model,
+      expectedCriteria: benchmarkCase.criteria,
+    })) return false
+
+    // A valid HMAC is necessary but does not prove that the original scorer was
+    // independent. Re-check the persisted judge route, without inventing it
+    // from a service-side metadata flag.
+    if (!isTrustedAstraCertificationJudge(run.judge_provider, run.judge_model) ||
+      run.judge_provider === 'compatible' || run.judge_model === model) return false
+    if (run.judge_provider === 'freellm') {
+      const identities = runScores.map((score) => {
+        const criteria = score.criteria && typeof score.criteria === 'object' && !Array.isArray(score.criteria)
+          ? score.criteria as Record<string, unknown> : {}
+        return {
+          provider: criteria['judgeRoutedProvider'],
+          model: criteria['judgeRoutedModel'],
+          via: criteria['judgeRoutedVia'],
+        }
+      })
+      if (!identities.every((item) => typeof item.via === 'string' && Boolean(item.via.trim())
+        && isIndependentFreeLlmRouteProvider(item.provider)
+        && typeof item.model === 'string' && item.model !== model
+        && matchesPinnedFreeLlmRoute({ routedProvider: item.provider as string, routedModel: item.model as string }))) return false
+    }
 
     return validProvenanceSignature(metadata?.['provenance_signature'], {
       runId: run.id,
@@ -303,20 +363,46 @@ async function matchingRuns(scope: Scope) {
     return true
   })
 
-  return { model, runs: distinctRuns }
+  const quality = inspectAstraVerifiedScoreFloor({
+    runIds: distinctRuns.map((run) => run.id),
+    responses, scores, candidateModel: model,
+  })
+  return { model, runs: distinctRuns, quality }
+}
+
+/**
+ * Authoritative completed-case evidence for the certification planner.
+ * matchingRuns checks owner scope, exact suite and case, persisted candidate
+ * responses, evaluator scores and HMAC attestation on those persisted rows.
+ */
+export async function listVerifiedAstraEvaluationCaseIds(scope: Scope): Promise<string[]> {
+  await assertScopeAccess(scope)
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) return []
+  if (scope.taskClass === 'vision' && !isBlackstarAstraVisionConfigured()) return []
+  const { runs } = await matchingRuns(scope)
+  return runs.map((run) => astraMetadata(run)?.['case_id']).filter((id): id is string => typeof id === 'string')
 }
 
 export async function getAstraEvaluationCertificationStatus(scope: Scope) {
   const visionConfigured = scope.taskClass !== 'vision' || isBlackstarAstraVisionConfigured()
-  const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured
-  const { model, runs } = await matchingRuns(scope)
+  const candidateConfigured = hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })
+  const supported = isAstraCertificationTaskClass(scope.taskClass) && visionConfigured && candidateConfigured
+  const { model, runs, quality } = await matchingRuns(scope)
   return {
     taskClass: scope.taskClass,
     provider: 'compatible' as const,
     model,
     completedRuns: runs.length,
     minimumRuns: MIN_RUNS,
-    readyToCertify: supported && runs.length >= MIN_RUNS,
+    candidateConfigured,
+    readyToCertify: supported && quality.readyToCertify,
+    averageScore: quality.averageScore,
+    minimumQualifyingScore: NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
+    qualityFloorMet: quality.qualityFloorMet,
     certificationSupported: supported,
   }
 }
@@ -329,9 +415,17 @@ export async function certifyAstraEvaluation(scope: Scope) {
     throw new Error('Vision certification requires a dedicated multimodal Astra endpoint and BLACKSTAR_ASTRA_VISION_MODEL.')
   }
 
-  const { model, runs } = await matchingRuns(scope)
+  if (!hasPinnedAstraCertificationCandidate({
+    taskClass: scope.taskClass, candidateModel: blackstarAstraModelForTaskClass(scope.taskClass),
+  })) {
+    throw new Error('A pinned native Astra candidate route is required before certification evidence can be issued.')
+  }
+  const { model, runs, quality } = await matchingRuns(scope)
   if (runs.length < MIN_RUNS) {
     throw new Error(`All ${MIN_RUNS} distinct trusted benchmark cases are required for ${scope.taskClass} certification.`)
+  }
+  if (!quality.readyToCertify) {
+    throw new Error(`Astra evaluation score is below the existing Native Intelligence qualification floor of ${NATIVE_INTELLIGENCE_MIN_EVAL_SCORE}. No certification evidence was issued.`)
   }
 
   const sourceRuns = runs.slice(0, MIN_RUNS).sort((a, b) => {
@@ -374,16 +468,30 @@ export async function certifyAstraEvaluation(scope: Scope) {
   })
   if (error) throw new Error(error.message)
 
-  const evidence = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : data as Record<string, unknown> | null
+  const evidence = validateAstraCertificationRpcEvidence(data, {
+    userId: scope.userId,
+    orgId: scope.orgId ?? null,
+    modelId: BLACKSTAR_ASTRA_ENGINE_PROFILE.id,
+    provider: 'compatible',
+    model,
+    suiteId,
+    taskClass: scope.taskClass,
+    sampleCount: sourceRuns.length,
+    minimumScore: NATIVE_INTELLIGENCE_MIN_EVAL_SCORE,
+    benchmarkHash,
+    evaluatorHash,
+    modelConfigHash,
+    verifier: VERIFIER_ID,
+  })
   return {
-    id: typeof evidence?.['id'] === 'string' ? evidence['id'] : null,
+    id: evidence.id,
     taskClass: scope.taskClass,
     provider: 'compatible' as const,
     model,
     suiteId,
     sampleCount: sourceRuns.length,
-    score: evidence?.['score'] == null ? null : Number(evidence['score']),
-    completedAt: typeof evidence?.['completed_at'] === 'string' ? evidence['completed_at'] : null,
-    verifiedAt: typeof evidence?.['verified_at'] === 'string' ? evidence['verified_at'] : null,
+    score: evidence.score,
+    completedAt: evidence.completedAt,
+    verifiedAt: evidence.verifiedAt,
   }
 }

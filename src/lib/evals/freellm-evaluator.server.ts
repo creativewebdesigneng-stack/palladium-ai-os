@@ -31,14 +31,28 @@ export function resolveFreeLlmEvaluatorConfig(env: NodeJS.ProcessEnv = process.e
   } as const;
 }
 
-export function parseFreeLlmRouteIdentity(headers: Headers): FreeLlmRouteIdentity {
+export function parseFreeLlmRouteIdentity(
+  headers: Headers,
+  env: NodeJS.ProcessEnv = process.env,
+): FreeLlmRouteIdentity {
   const routedVia = headers.get("x-routed-via")?.trim() || "";
   const segments = routedVia.split("/").map((segment) => segment.trim()).filter(Boolean);
-  if (segments.length < 2) {
+  if (segments.length < 2 || segments.some((segment) => segment !== segment.trim())) {
     throw new ProviderError("FreeLLMAPI response did not include a valid X-Routed-Via identity.", 502, false);
   }
-  const routedProvider = segments.at(-2) || "";
-  const routedModel = segments.at(-1) || "";
+  const config = resolveFreeLlmEvaluatorConfig(env);
+  // A pinned upstream model may itself contain slashes (e.g. openai/gpt-oss).
+  // Taking only the final two segments would silently change its identity.
+  // Accept the exact pinned provider/model suffix, with optional router prefix;
+  // all other identities retain the legacy parser and fail the pinned check.
+  const pinnedSuffix = config.routedProvider && config.routedModel
+    ? `${config.routedProvider}/${config.routedModel}`
+    : null;
+  const exactPinnedRoute = Boolean(pinnedSuffix && (
+    routedVia === pinnedSuffix || routedVia.endsWith(`/${pinnedSuffix}`)
+  ));
+  const routedProvider = exactPinnedRoute ? config.routedProvider! : segments.at(-2) || "";
+  const routedModel = exactPinnedRoute ? config.routedModel! : segments.at(-1) || "";
   if (!routedProvider || !routedModel) {
     throw new ProviderError("FreeLLMAPI response did not include a valid routed provider/model identity.", 502, false);
   }
@@ -59,6 +73,42 @@ export function matchesPinnedFreeLlmRoute(
       && route.routedProvider === config.routedProvider
       && route.routedModel === config.routedModel,
   );
+}
+
+const MAX_FREELLM_RESPONSE_BYTES = 256 * 1024;
+
+/** Consume untrusted evaluator output without buffering an unbounded response. */
+async function readBoundedFreeLlmResponse(response: Response): Promise<string> {
+  const declaredBytes = response.headers.get("content-length");
+  if (declaredBytes && Number.isFinite(Number(declaredBytes))
+    && Number(declaredBytes) > MAX_FREELLM_RESPONSE_BYTES) {
+    throw new ProviderError("FreeLLMAPI returned an oversized evaluator response.", 502, false);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_FREELLM_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new ProviderError("FreeLLMAPI returned an oversized evaluator response.", 502, false);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let position = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, position);
+    position += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export async function runFreeLlmJudge(args: {
@@ -95,6 +145,9 @@ export async function runFreeLlmJudge(args: {
   try {
     response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
+      // Never forward evaluator authorization or scoring prompts to a
+      // redirected endpoint. Treat redirects as transport failures.
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
@@ -113,7 +166,6 @@ export async function runFreeLlmJudge(args: {
     throw new ProviderError("The FreeLLMAPI evaluator did not respond in time.", 504, true);
   }
 
-  const body = await response.text();
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       throw new ProviderError("FreeLLMAPI rejected the evaluator credentials.", response.status, false);
@@ -121,10 +173,12 @@ export async function runFreeLlmJudge(args: {
     if (response.status === 429) {
       throw new ProviderError("FreeLLMAPI is rate limiting the evaluator lane.", 429, true);
     }
-    throw new ProviderError(`FreeLLMAPI evaluator error (${response.status}): ${body.slice(0, 400)}`, response.status, response.status >= 500);
+    // Remote error documents are untrusted and may echo credentials or prompts.
+    throw new ProviderError(`FreeLLMAPI evaluator error (${response.status}).`, response.status, response.status >= 500);
   }
 
   const routeIdentity = parseFreeLlmRouteIdentity(response.headers);
+  const body = await readBoundedFreeLlmResponse(response);
   let json: any;
   try {
     json = JSON.parse(body);

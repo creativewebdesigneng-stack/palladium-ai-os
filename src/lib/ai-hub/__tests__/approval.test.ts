@@ -143,6 +143,60 @@ describe('AI Hub durable approval gate', () => {
     expect(unchanged).toBe(true)
   })
 
+  it('persists exact approved gateway completion only when the updated receipt is returned', async () => {
+    const filters: Array<[string, unknown]> = []
+    let update: Record<string, unknown> | undefined
+    privilegedWriter.from = () => ({
+      update(values: Record<string, unknown>) { update = values; return this },
+      select() { return this },
+      eq(key: string, value: unknown) { filters.push([key, value]); return this },
+      is(key: string, value: unknown) { filters.push([key, value]); return this },
+      async maybeSingle() { return { data: { id: 'approval-1' }, error: null } },
+    })
+    await createAiHubApprovalGate({ from: () => ({}) }).complete('approval-1', {
+      tenantId: 'tenant-1', actorId: 'actor-1', approvalOrgId: null,
+    }, { status: 'completed', adapter: 'model-gateway' })
+    expect(update).toMatchObject({
+      execution_status: 'succeeded',
+      execution_error: null,
+      execution_result: { adapter: 'model-gateway' },
+    })
+    expect(typeof update?.['executed_at']).toBe('string')
+    expect(filters).toEqual(expect.arrayContaining([
+      ['id', 'approval-1'], ['user_id', 'actor-1'],
+      ['action_type', 'ai_hub_execution'], ['status', 'approved'],
+      ['execution_status', 'executing'], ['org_id', null],
+    ]))
+  })
+
+  it('records failed gateway attempts but never acknowledges revoked or missing approvals', async () => {
+    let persisted: Record<string, unknown> | undefined
+    let returnedId: string | null = 'approval-2'
+    privilegedWriter.from = () => ({
+      update(values: Record<string, unknown>) { persisted = values; return this },
+      select() { return this },
+      eq() { return this },
+      is() { return this },
+      async maybeSingle() { return { data: returnedId ? { id: returnedId } : null, error: null } },
+    })
+    const gate = createAiHubApprovalGate({ from: () => ({}) })
+    const context = { tenantId: 'tenant-1', actorId: 'actor-1' }
+    await gate.complete('approval-2', context, {
+      status: 'failed', adapter: 'agent-runtime', error: 'Nested approval still pending',
+    })
+    expect(persisted).toMatchObject({
+      execution_status: 'failed', execution_error: 'Nested approval still pending',
+    })
+    returnedId = null
+    await expect(gate.complete('approval-2', context, {
+      status: 'completed', adapter: 'agent-runtime',
+    })).rejects.toThrow('not recorded against the approved execution')
+    returnedId = 'different-approval'
+    await expect(gate.complete('approval-2', context, {
+      status: 'completed', adapter: 'agent-runtime',
+    })).rejects.toThrow('not recorded against the approved execution')
+  })
+
   it('fails closed if approval input is missing or non-serialisable', async () => {
     const db = { from: () => ({}) }
     const gate = createAiHubApprovalGate(db)

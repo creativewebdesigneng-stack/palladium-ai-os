@@ -15,6 +15,11 @@ import { astraCertificationStageError, candidateFailureStage, evaluatorFailureSt
 import { probeAstraCandidateRouteAfterGenericError } from './astra-candidate-route-probe.server'
 import { BLACKSTAR_ASTRA_ENGINE_PROFILE, blackstarAstraModelForTaskClass, isBlackstarAstraEngineConfigured } from '@/lib/runtime/blackstar-astra-engine-profile'
 import { runChatPinned } from '@/lib/runtime/model-gateway.server'
+import { inspectAstraCertificationPreflight } from './astra-certification-preflight'
+import { resolveAstraProvenanceSigningKey } from './astra-provenance-signing-key'
+import { finalizeAstraCertificationRun } from './astra-certification-run-finalization'
+import { failAstraCertificationRunIfRunning } from './astra-certification-run-failure'
+import { buildAstraJudgeMessages, parseSingleAstraJudgeScore } from './astra-certification-judge-context'
 
 type Db = { from: (table: string) => any }
 const db = supabaseAdmin as unknown as Db
@@ -35,26 +40,6 @@ export type AstraCandidateModelFailureDetail = {
 
 type AstraCertificationDiagnosticError = Error & {
   astraCandidateModelDiagnostic?: AstraCandidateModelFailureDetail
-}
-
-function parseSingleJudge(raw: string) {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? raw
-  const first = fenced.indexOf('[')
-  const last = fenced.lastIndexOf(']')
-  if (first < 0 || last <= first) throw new Error('The FreeLLM judge returned an invalid score format.')
-  const parsed = JSON.parse(fenced.slice(first, last + 1)) as Array<Record<string, unknown>>
-  if (!Array.isArray(parsed) || parsed.length !== 1) throw new Error('The FreeLLM judge must score exactly one Astra candidate.')
-  const entry = parsed[0] ?? {}
-  const index = Number(entry['index'])
-  const score = Number(entry['score'])
-  if (index !== 0 || !Number.isFinite(score) || score < 0 || score > 100) {
-    throw new Error('The FreeLLM judge returned an invalid Astra candidate score.')
-  }
-  return {
-    score,
-    verdict: typeof entry['verdict'] === 'string' ? entry['verdict'].slice(0, 120) : null,
-    reasoning: typeof entry['reasoning'] === 'string' ? entry['reasoning'].slice(0, 2000) : null,
-  }
 }
 
 async function assertScopeAccess(input: RunInput) {
@@ -80,6 +65,21 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
   }
 
   const model = blackstarAstraModelForTaskClass(input.taskClass)
+  const preflight = inspectAstraCertificationPreflight({
+    taskClass: input.taskClass,
+    candidateModel: model,
+  })
+  if (!preflight.canAttemptTextCertification) {
+    // Diagnose signing separately from model/evaluator configuration. Never
+    // disclose a secret value or attempt model inference on a failed preflight.
+    if (preflight.candidateConfigured && preflight.independentJudgeConfigured && !preflight.provenanceSigningConfigured) {
+      throw new Error('Astra provenance signing authority is missing or invalid.')
+    }
+    throw new Error('An authenticated, route-pinned, independent FreeLLM evaluator is required for trusted Astra text certification.')
+  }
+  // Fail before model spend or creating a running record if evidence cannot be
+  // signed. A Preview-only signing key does not grant database admin rights.
+  resolveAstraProvenanceSigningKey()
   const systemPromptHash = hashAstraEvaluationSystemPrompt(null)
   const executionProfile = resolveAstraCertificationExecutionProfile(input.taskClass, model)
   const executionPrompt = buildAstraCertificationExecutionPrompt(benchmarkCase.prompt, executionProfile)
@@ -127,6 +127,9 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         timeoutMs: executionProfile.timeoutMs,
         reasoningEffort: executionProfile.reasoningEffort,
         maxAttempts: executionProfile.maxAttempts,
+        // Require an exact model ID from the upstream response. The generic
+        // compatible gateway otherwise echoes the requested ID for UI usage.
+        requireResponseModelIdentity: true,
       })
     } catch (error) {
       stage = candidateFailureStage(error)
@@ -137,7 +140,7 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
         || stage === 'candidate_timeout_or_unreachable'
       ) {
         const originalStage = stage
-        const probe = await probeAstraCandidateRouteAfterGenericError()
+        const probe = await probeAstraCandidateRouteAfterGenericError(model)
         stage = originalStage === 'candidate_timeout_or_unreachable'
           && probe.stage === 'candidate_route_reachable_runtime_failure'
           ? 'candidate_generation_timeout'
@@ -178,16 +181,11 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     try {
       judgeResult = await runFreeLlmJudge({
         model: evaluator.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an impartial certification evaluator. Score the single candidate from 0 to 100 against the supplied criteria. Do not reward verbosity. Return ONLY a JSON array with one object containing index, score, verdict and reasoning.',
-          },
-          {
-            role: 'user',
-            content: `TRUSTED BENCHMARK PROMPT\n${benchmarkCase.prompt}\n\nCRITERIA\n${benchmarkCase.criteria.join('; ')}\n\nCANDIDATE\nRESPONSE 0\n${candidate.text}`,
-          },
-        ],
+        messages: buildAstraJudgeMessages({
+          benchmarkPrompt: benchmarkCase.prompt,
+          criteria: benchmarkCase.criteria,
+          candidateText: candidate.text,
+        }),
         temperature: 0,
         maxTokens: 1000,
         timeoutMs: 90_000,
@@ -208,7 +206,7 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     }
 
     stage = 'judge_response'
-    const judged = parseSingleJudge(judgeResult.text)
+    const judged = parseSingleAstraJudgeScore(judgeResult.text)
     const score = {
       run_id: run.id,
       response_id: response.id,
@@ -258,14 +256,15 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     }
 
     stage = 'run_finalize'
-    const { error: completeError } = await db.from('model_eval_runs').update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      judge_provider: judgeResult.provider,
-      judge_model: judgeResult.model,
+    await finalizeAstraCertificationRun(db, {
+      runId: run.id,
+      userId: input.userId,
+      orgId: input.orgId ?? null,
+      judgeProvider: judgeResult.provider,
+      judgeModel: judgeResult.model,
       metadata: completedMetadata,
-    }).eq('id', run.id)
-    if (completeError) throw astraCertificationStageError(stage)
+      completedAt: new Date().toISOString(),
+    })
 
     stage = 'attestation'
     const attested = await attestAstraCertificationBenchmarkRun({
@@ -290,11 +289,18 @@ export async function runTrustedAstraTextCertificationCase(input: RunInput) {
     const diagnostic = error instanceof Error && error.message.startsWith('BLACKSTAR_ASTRA_CERT_STAGE:')
       ? error
       : astraCertificationStageError(stage)
-    await db.from('model_eval_runs').update({
-      status: 'failed',
-      completed_at: new Date().toISOString(),
-      metadata: { ...runMetadata, failure_stage: stage },
-    }).eq('id', run.id)
+    try {
+      await failAstraCertificationRunIfRunning(db, {
+        runId: run.id,
+        userId: input.userId,
+        orgId: input.orgId ?? null,
+        metadata: { ...runMetadata, failure_stage: stage },
+        completedAt: new Date().toISOString(),
+      })
+    } catch {
+      // Preserve the bounded original stage diagnostic. Cleanup errors cannot
+      // turn a failed certification into a success or disclose DB internals.
+    }
     throw diagnostic
   }
 }

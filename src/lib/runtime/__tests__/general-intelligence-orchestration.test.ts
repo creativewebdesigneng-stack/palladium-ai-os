@@ -2,7 +2,19 @@ import { describe, expect, it, vi } from 'vitest'
 import type { OrchestratorPlan } from '@/lib/agents/agent-orchestrator'
 import { executeGeneralIntelligenceOrchestration } from '../general-intelligence-orchestration.server'
 
-const sb = { from: vi.fn() }
+const sb = { from: vi.fn(() => {
+  const filters = new Map<string, unknown>()
+  const query: any = {
+    select: (_columns: string) => query,
+    eq: (column: string, value: unknown) => { filters.set(column, value); return query },
+    maybeSingle: async () => ({
+      data: filters.get('id') && filters.get('user_id') === 'user-1' && filters.get('agent_id')
+        ? { id: filters.get('id'), status: 'succeeded' } : null,
+      error: null,
+    }),
+  }
+  return query
+}) }
 
 function plan(assignments: OrchestratorPlan['assignments']): OrchestratorPlan {
   return { version: 1, goal: 'Cross-domain objective', summary: 'Delegate safely', assignments }
@@ -28,7 +40,7 @@ describe('general intelligence multi-agent orchestration', () => {
     const calls: Array<{ agentId: string; input: string }> = []
     const executeAssignment = vi.fn(async (args: { agentId: string; input: string }) => {
       calls.push(args)
-      return { task: {}, output: args.agentId === 'research' ? 'Verified research evidence' : 'Final synthesis' }
+      return { task: { id: 'task-' + args.agentId, status: 'succeeded' }, output: args.agentId === 'research' ? 'Verified research evidence' : 'Final synthesis' }
     })
 
     const result = await executeGeneralIntelligenceOrchestration({
@@ -81,7 +93,7 @@ describe('general intelligence multi-agent orchestration', () => {
   it('does not execute dependent work after an upstream agent fails', async () => {
     const executeAssignment = vi.fn(async (args: { agentId: string }) => {
       if (args.agentId === 'first') throw new Error('verification failed')
-      return { task: {}, output: 'must not run' }
+      return { task: { id: 'task-' + args.agentId, status: 'succeeded' }, output: 'must not run' }
     })
 
     const result = await executeGeneralIntelligenceOrchestration({
@@ -114,4 +126,40 @@ describe('general intelligence multi-agent orchestration', () => {
     expect(result.results[0]?.error).toContain('not part of the authorised plan')
     expect(executeAssignment).not.toHaveBeenCalled()
   })
+  it('pauses at a nested tool approval and never schedules dependent agents', async () => {
+    const executeAssignment = vi.fn(async () => ({
+      task: { id: 'pending-1', status: 'waiting_for_approval' },
+      output: '',
+    }))
+    const result = await executeGeneralIntelligenceOrchestration({
+      sb, userId: 'user-1',
+      plan: plan([assignment('step-a','agent-a'), assignment('step-b','agent-b',['step-a'])]),
+      authorisedAgentIds: ['agent-a','agent-b'],
+      executeAssignment: executeAssignment as never,
+    })
+    expect(result.status).toBe('waiting_for_approval')
+    expect(result.results[0]?.status).toBe('waiting_for_approval')
+    expect(executeAssignment).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not trust a success-shaped return if the canonical task record is missing', async () => {
+    const database = { from: vi.fn(() => {
+      const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
+      return q
+    }) }
+    const executeAssignment = vi.fn(async () => ({
+      task: { id: 'fabricated-success', status: 'succeeded' },
+      output: 'unverified output',
+    }))
+    const result = await executeGeneralIntelligenceOrchestration({
+      sb: database, userId: 'user-1',
+      plan: plan([assignment('step-a','agent-a'), assignment('step-b','agent-b',['step-a'])]),
+      authorisedAgentIds: ['agent-a','agent-b'],
+      executeAssignment: executeAssignment as never,
+    })
+    expect(result.status).toBe('failed')
+    expect(result.results[0]?.status).toBe('failed')
+    expect(executeAssignment).toHaveBeenCalledTimes(1)
+  })
+
 })

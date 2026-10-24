@@ -15,6 +15,7 @@
     "backend:check": "tsc --noEmit && vitest run",
     "smoke:production": "node scripts/production-smoke.mjs",
     "test:trust-fabric": "node scripts/verification/trust-fabric-recovery.mjs",
+    "test:astra-certification-rpc": "node scripts/verification/astra-certification-rpc.mjs",
     "test:connector-recovery": "node scripts/verification/connector-recovery.mjs",
     "test:browser-recovery": "node scripts/verification/browser-schema-recovery.mjs",
     "test:customer-recovery": "node scripts/verification/customer-operations-recovery.mjs",
@@ -100,7 +101,8 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7",
+    "undici8": "npm:undici@8.12.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
@@ -120,7 +122,7 @@
     "prettier": "^3.9.9",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.1",
+    "vite": "8.3.3",
     "vitest": "^5.0.2"
   },
   "overrides": {
@@ -130,13 +132,16 @@
     "follow-redirects": "1.16.1",
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
-    "undici": "7.29.1",
-    "undici8": "npm:undici@8.10.2",
+    "undici": "7.30.1",
+    "undici8": "npm:undici@8.12.2",
     "source-map-js": "1.2.2",
     "shell-quote": "1.12.0",
     "proxy-addr": "2.0.8",
     "@modelcontextprotocol/sdk": "1.32.1",
     "seroval": "1.6.7",
-    "seroval-plugins": "1.6.7"
+    "seroval-plugins": "1.6.7",
+    "launch-editor": "2.14.2",
+    "zod": "4.6.7",
+    "body-parser": "2.4.0"
   }
 }

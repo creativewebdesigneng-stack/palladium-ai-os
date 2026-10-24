@@ -63,6 +63,9 @@ function classifyAstraTextCertificationFailure(error: unknown) {
   if (message.includes('freellm') && (message.includes('not configured') || message.includes('required for trusted'))) {
     return { code: 'evaluator_not_ready', message: 'The authenticated, route-pinned independent evaluator is not ready for trusted text certification.' } as const
   }
+  if (message.includes('astra provenance signing authority is missing or invalid')) {
+    return { code: 'provenance_signing_not_ready', message: 'Astra evidence signing is not configured for this deployment. An operator must configure a dedicated server-side signing key.' } as const
+  }
   if (message.includes('unknown astra text certification benchmark case')) {
     return { code: 'benchmark_case_invalid', message: 'The selected server-owned certification case is no longer valid.' } as const
   }
@@ -96,10 +99,18 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
       import('./astra-certification-judge-policy.server'),
     ])
     const plan = await getAstraCertificationBenchmarkPlan({ userId: context.userId, orgId: data.orgId ?? null, taskClass: data.taskClass })
+    const [{ inspectAstraCertificationPreflight }, { blackstarAstraModelForTaskClass }] = await Promise.all([
+      import('./astra-certification-preflight'),
+      import('@/lib/runtime/blackstar-astra-engine-profile'),
+    ])
+    const preflight = inspectAstraCertificationPreflight({
+      taskClass: data.taskClass,
+      candidateModel: blackstarAstraModelForTaskClass(data.taskClass),
+    })
     const trustedJudges = listServerApprovedAstraCertificationJudges()
       .filter((judge) => data.taskClass !== 'vision' || judge.provider !== 'freellm')
       .map((judge) => ({ provider: judge.provider, model: judge.model, label: judge.label }))
-    return { ...plan, trustedJudges }
+    return { ...plan, trustedJudges, preflight }
   })
 
 export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
