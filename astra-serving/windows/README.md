@@ -19,14 +19,23 @@ The script:
 3. starts Ollama bound to `127.0.0.1:11434` when needed;
 4. pulls `qwen3:8b-q4_K_M` by default;
 5. verifies `GET /v1/models` contains the exact model identity;
-6. sends a real `POST /v1/chat/completions` smoke test;
-7. prints the Blackstar server-only environment values for local development.
+6. sends a real `POST /v1/chat/completions` smoke test and checks the model followed the challenge;
+7. queries Ollama `GET /api/ps` **after inference** and fails if the active model has zero GPU VRAM residency or invalid telemetry;
+8. prints the Blackstar server-only environment values for local development.
 
 To try another model:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-ollama.ps1 -Model "MODEL_NAME"
 ```
+
+## Prove the GTX 1080 Ti is running the model
+
+Do not confuse an installed GPU, a successful Ollama API response, and actual GPU-backed inference. The bootstrap now checks the exact loaded model in Ollama's live `/api/ps` telemetry and requires nonzero `size_vram`. It reports the proportion of loaded model memory resident in VRAM and warns if it is below 75%. This is a **local GPU smoke test**, not evidence of model quality, production routing, or agent tool execution.
+
+- If `nvidia-smi` is missing or `size_vram` is zero, inspect the NVIDIA driver and Ollama GPU support. Do not claim that the GPU test passed.
+- If the 8B quantized model runs out of memory or mostly offloads to CPU, rerun with a smaller model: `powershell -ExecutionPolicy Bypass -File .\\astra-serving\\windows\\setup-blackstar-ollama.ps1 -Model "qwen3:4b"`. Use the **same exact model ID** in Blackstar's server-only configuration.
+- The script needs a real Windows NVIDIA PC to validate GPU inference. Repository unit tests can only verify the script's contract; they cannot simulate a GPU pass.
 
 ## Blackstar local environment
 
