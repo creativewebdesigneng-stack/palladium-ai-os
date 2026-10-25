@@ -26,6 +26,16 @@ describe('Blackstar Windows Ollama serving bundle', () => {
     expect(setup).toContain('TimeoutSec 300')
   })
 
+  it('refuses to claim GPU success from a CPU-only API response', () => {
+    expect(setup).toContain('http://127.0.0.1:11434')
+    expect(setup).toContain('/api/ps')
+    expect(setup).toContain('size_vram')
+    expect(setup).toContain('if ($gpuBytes -le 0)')
+    expect(setup).toContain('Inference may have run on CPU')
+    expect(setup).toContain('Active model GPU residency')
+    expect(setup).toContain("if ($text -notmatch 'BLACKSTAR_READY')")
+  })
+
   it('prints the exact Blackstar native-primary environment contract', () => {
     expect(setup).toContain('OPENAI_COMPATIBLE_BASE_URL=$OpenAiBaseUrl')
     expect(setup).toContain('BLACKSTAR_NATIVE_MODEL=$Model')
