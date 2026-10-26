@@ -68,6 +68,8 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(setup).toContain('if (-not $isCloudflareState -or $previousProxyPid -le 0 -or $previousTunnelPid -le 0 -or $proxyLive -or $tunnelLive)')
     expect(setup).toContain('Move-Item -LiteralPath $statePath -Destination $archivedState')
     expect(setup).not.toContain('Stop-Process -Id $pidValue -Force')
+    expect(tailscaleSetup).toContain('if (Test-Path (Join-Path $runtimeDir "bridge.json"))')
+    expect(tailscaleSetup).not.toContain('Stop-Process -Id $pidValue -Force')
   })
 
   it('does not reset shared Tailscale Funnel or kill unrelated process IDs when stopping the model bridge', () => {
