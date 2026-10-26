@@ -55,7 +55,7 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(setup).toContain('bridge.json')
     expect(setup).not.toMatch(/token\s*=\s*\$token[\s\S]*ConvertTo-Json/)
     expect(stop).toContain('Stop-Process')
-    expect(stop).toContain('Ollama remains localhost-only')
+    expect(stop).toContain('Ollama and Tailscale Funnel were not changed')
   })
 
   it('preserves active bridges and only recovers explicitly requested stopped Cloudflare state', () => {
