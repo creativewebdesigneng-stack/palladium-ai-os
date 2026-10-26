@@ -141,6 +141,7 @@
     "body-parser": "2.4.0",
     "zod": "4.6.6",
     "vite": "8.3.3",
-    "launch-editor": "2.14.2"
+    "launch-editor": "2.14.2",
+    "undici8@npm:undici@8.10.2": "npm:undici@8.12.2"
   }
 }
