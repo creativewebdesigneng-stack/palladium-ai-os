@@ -27,4 +27,8 @@ foreach ($pidValue in @($state.tunnel_pid, $state.proxy_pid)) {
   }
 }
 Remove-Item $statePath -Force -ErrorAction SilentlyContinue
+# The bearer key was stored with this user's Windows DPAPI. Remove the stale
+# credential after stopping the proxy so it cannot be accidentally reused.
+$tokenPath = Join-Path $env:LOCALAPPDATA "Blackstar\runtime\bridge-token.clixml"
+Remove-Item $tokenPath -Force -ErrorAction SilentlyContinue
 Write-Host "Blackstar cloud bridge stopped. Ollama remains localhost-only."
