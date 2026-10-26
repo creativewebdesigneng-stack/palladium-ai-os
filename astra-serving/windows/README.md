@@ -63,16 +63,31 @@ From PowerShell at the repository root:
 powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-cloud-bridge.ps1
 ```
 
-The bridge verifies local Ollama/model discovery first, installs `cloudflared` through `winget` when needed, creates a cryptographically random bearer token, verifies the localhost proxy, creates the TLS tunnel, and finally verifies authenticated model discovery through the public tunnel before printing any deployment values.
+The bridge verifies local Ollama/model discovery first, installs `cloudflared` through `winget` when needed, creates a cryptographically random bearer token, verifies the localhost proxy, creates the TLS tunnel, waits for the tunnel to register and its temporary hostname to resolve through Windows DNS, then verifies authenticated model discovery through the public tunnel. It does **not** declare success on a registered QUIC connection alone.
 
-On success it prints four **server-only** values:
+On success it prints four **server-only** configuration entries:
 
 ```dotenv
 OPENAI_COMPATIBLE_BASE_URL=https://<temporary-host>.trycloudflare.com/v1
-OPENAI_COMPATIBLE_API_KEY=<generated-random-bearer-token>
+OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>
 BLACKSTAR_NATIVE_MODEL=qwen3:8b-q4_K_M
 BLACKSTAR_NATIVE_PRIMARY=true
 ```
+
+The real bearer token is stored encrypted with the Windows user's DPAPI and copied to the clipboard, not printed in PowerShell. Paste it directly into the **Preview** environment's server-only `OPENAI_COMPATIBLE_API_KEY` setting, not into this chat or Git. If the clipboard was missed, run `powershell -ExecutionPolicy Bypass -File .\\astra-serving\\windows\\copy-blackstar-bridge-token.ps1` to copy it again.
+
+### If the temporary hostname cannot be resolved
+
+A successful QUIC/TCP Cloudflare tunnel connection is **not** proof that Windows can resolve the temporary `trycloudflare.com` hostname. The script now retries both tunnel registration and Windows DNS for a bounded interval, then diagnoses the hostname via Cloudflare's public DNS without changing your DNS settings. After the script stops on failure, its old Quick Tunnel hostname may cease to exist.
+
+For an unresolved hostname **while that same tunnel is still running**, compare these two diagnostic commands using the hostname printed by that running tunnel:
+
+```powershell
+Resolve-DnsName <temporary-host>.trycloudflare.com -Type A
+Resolve-DnsName <temporary-host>.trycloudflare.com -Server 1.1.1.1 -Type A
+```
+
+If public DNS resolves the name but your default DNS does not, investigate local DNS filtering or cached negative responses. If neither resolves, stop and retry the bridge for a fresh Quick Tunnel hostname. If the remote endpoint resolves but fails authentication or model discovery, do **not** bypass the bearer proxy, change localhost binding, or call it a GPU failure. Do not reset a separate browser-worker Tailscale Funnel.
 
 The bearer token must stay secret and must never be exposed through a `VITE_` variable or committed to Git. Blackstar's existing compatible-provider gateway sends `OPENAI_COMPATIBLE_API_KEY` as an `Authorization: Bearer ...` header, so no separate provider path is created for this bridge.
 
