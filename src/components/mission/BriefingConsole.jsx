@@ -386,6 +386,14 @@ export default function BriefingConsole({ briefing, loading, agents = [], submit
                       {!isUser && (message.optimistic || meta) && <span className={`font-mono text-[7px] ${meta?.tone === 'red' ? 'text-rose-300' : meta?.tone === 'yellow' ? 'text-amber-300' : meta?.tone === 'green' ? 'text-emerald-300' : 'text-cyan-300'}`}>{meta ? meta.label.toUpperCase() : 'PROCESSING'}</span>}
                     </div>
                     <div className="text-[11px] leading-5 text-white/75">{isUser ? <div className="whitespace-pre-wrap">{message.text}</div> : <AssistantText>{message.text}</AssistantText>}</div>
+                    {!isUser && message.task?.status === 'completed' && message.task.result?.provider && (
+                      <details className="mt-2 text-[9px] text-cyan-100/60">
+                        <summary className="cursor-pointer">Execution evidence</summary>
+                        <p>{message.task.result.provider} / {message.task.result.model}</p>
+                        <p>Tokens: {message.task.result.input_tokens ?? 0} in · {message.task.result.output_tokens ?? 0} out · Tool calls: {message.task.result.tool_calls ?? 0}</p>
+                        {message.task.result.agent_run_id && <p>Run: {message.task.result.agent_run_id}</p>}
+                      </details>
+                    )}
                     {!isUser && message.optimistic && !message.task && <div className="mt-2 flex items-center gap-1.5 font-mono text-[7px] text-cyan-300"><Loader2 className="h-3 w-3 animate-spin" />Searching neural pathways…</div>}
                   </div>
                 );
