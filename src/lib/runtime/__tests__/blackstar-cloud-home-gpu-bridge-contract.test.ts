@@ -58,6 +58,27 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(stop).toContain('Ollama remains localhost-only')
   })
 
+  it('preserves active bridges and only recovers explicitly requested stopped Cloudflare state', () => {
+    expect(setup).toContain('[switch]$RecoverStaleState')
+    expect(setup).toContain('$previousTransport -eq "cloudflare-quick-tunnel"')
+    expect(setup).toContain('$previousTunnelPid -gt 0')
+    expect(setup).toContain('Get-Process -Id $previousProxyPid')
+    expect(setup).toContain('Get-Process -Id $previousTunnelPid')
+    expect(setup).toContain('if (-not $RecoverStaleState)')
+    expect(setup).toContain('if (-not $isCloudflareState -or $previousProxyPid -le 0 -or $previousTunnelPid -le 0 -or $proxyLive -or $tunnelLive)')
+    expect(setup).toContain('Move-Item -LiteralPath $statePath -Destination $archivedState')
+    expect(setup).not.toContain('Stop-Process -Id $pidValue -Force')
+  })
+
+  it('does not reset shared Tailscale Funnel or kill unrelated process IDs when stopping the model bridge', () => {
+    expect(stop).not.toContain('funnel reset')
+    expect(stop).toContain('if ($transport -eq "tailscale-funnel")')
+    expect(stop).toContain('Get-CimInstance Win32_Process')
+    expect(stop).toContain('blackstar-ollama-bearer-proxy')
+    expect(stop).toContain('cloudflared.exe')
+    expect(stop).toContain('does not match this Cloudflare model proxy')
+  })
+
   it('documents that the quick tunnel is temporary and not certification', () => {
     expect(readme).toContain('Quick Tunnel is a development bridge, not the final production topology')
     expect(readme).toContain('does not create Model Arena runs, attestations or verified evidence')
