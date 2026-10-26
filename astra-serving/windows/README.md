@@ -76,6 +76,30 @@ BLACKSTAR_NATIVE_PRIMARY=true
 
 The real bearer token is stored encrypted with the Windows user's DPAPI and copied to the clipboard, not printed in PowerShell. Paste it directly into the **Preview** environment's server-only `OPENAI_COMPATIBLE_API_KEY` setting, not into this chat or Git. If the clipboard was missed, run `powershell -ExecutionPolicy Bypass -File .\\astra-serving\\windows\\copy-blackstar-bridge-token.ps1` to copy it again.
 
+### If another Blackstar model bridge state already exists
+
+The startup script deliberately refuses to overwrite `%LOCALAPPDATA%\Blackstar\runtime\bridge.json`, which is shared by older model-bridge transports. This file is **not** the browser worker's Tailscale Funnel configuration.
+
+First inspect the record and the recorded processes without disclosing credentials:
+
+```powershell
+$state = Get-Content "$env:LOCALAPPDATA\Blackstar\runtime\bridge.json" -Raw | ConvertFrom-Json
+$state | Select-Object transport,started_at,model,proxy_port,proxy_pid,tunnel_pid | Format-List
+@($state.proxy_pid, $state.tunnel_pid) | Where-Object { $_ } | ForEach-Object {
+  Get-Process -Id $_ -ErrorAction SilentlyContinue | Select-Object Id,ProcessName
+}
+```
+
+If the transport is `cloudflare-quick-tunnel` (or a legacy Cloudflare record with a tunnel PID), **and both recorded processes are absent**, explicitly archive that stopped session and start a new one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-cloud-bridge.ps1 -Model "qwen3:8b-q4_K_M" -RecoverStaleState
+```
+
+This recovery **will not** stop live processes, reset Tailscale, or overwrite a record for another transport. It refuses ambiguous or active sessions. For an active Cloudflare bridge, inspect the session before using the updated stop helper; for a Tailscale state, **do not** use the Cloudflare recovery flag or `tailscale funnel reset`. Find the existing model Funnel mapping and retire only that specific model route, preserving the browser worker.
+
+The stop helper refuses to modify a Tailscale record and validates that the recorded Cloudflare tunnel and proxy PIDs still belong to those processes before stopping them. Failed attempts do not change Production or expose Ollama port 11434.
+
 ### If the temporary hostname cannot be resolved
 
 A successful QUIC/TCP Cloudflare tunnel connection is **not** proof that Windows can resolve the temporary `trycloudflare.com` hostname. The script now retries both tunnel registration and Windows DNS for a bounded interval, then diagnoses the hostname via Cloudflare's public DNS without changing your DNS settings. After the script stops on failure, its old Quick Tunnel hostname may cease to exist.
