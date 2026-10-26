@@ -5,6 +5,8 @@ import { resolve } from 'node:path'
 const root = process.cwd()
 const setup = readFileSync(resolve(root, 'astra-serving/windows/setup-blackstar-ollama.ps1'), 'utf8')
 const readme = readFileSync(resolve(root, 'astra-serving/windows/README.md'), 'utf8')
+const bridge = readFileSync(resolve(root, 'astra-serving/windows/setup-blackstar-cloud-bridge.ps1'), 'utf8')
+const stopBridge = readFileSync(resolve(root, 'astra-serving/windows/stop-blackstar-cloud-bridge.ps1'), 'utf8')
 
 describe('Blackstar Windows Ollama serving bundle', () => {
   it('keeps the default Ollama listener on localhost and uses the compatible /v1 contract', () => {
@@ -46,6 +48,30 @@ describe('Blackstar Windows Ollama serving bundle', () => {
     expect(setup).not.toMatch(/OPENAI_COMPATIBLE_API_KEY\s*=\s*[^$\r\n]+/)
     expect(setup).not.toMatch(/model_eval_verified_evidence|model_eval_runs|attest/i)
     expect(readme).toContain('does not create Model Arena runs, attestations or verified evidence')
+  })
+
+  it('waits for Quick Tunnel registration and Windows DNS before authenticating remotely', () => {
+    expect(bridge).toContain('Registered tunnel connection')
+    expect(bridge).toContain('[System.Net.Dns]::GetHostAddresses($hostName)')
+    expect(bridge).toContain('Resolve-DnsName -Name $hostName -Server "1.1.1.1"')
+    expect(bridge).toContain('Cloudflare public DNS resolves the hostname')
+    expect(bridge).toContain('The temporary tunnel hostname was not resolvable after bounded retries')
+    expect(bridge).toContain('$remoteModels = Invoke-RestMethod')
+    expect(bridge).toContain('@($remoteModels.data | ForEach-Object { $_.id }) -contains $Model')
+  })
+
+  it('never prints the bearer token and only persists bridge state after validation', () => {
+    expect(bridge).not.toContain('OPENAI_COMPATIBLE_API_KEY=$token')
+    expect(bridge).toContain('Set-Clipboard -Value $token')
+    expect(bridge).toContain('Export-Clixml -Path $tokenSecretPath')
+    expect(bridge).toContain('OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>')
+    expect(bridge).toContain('OPENAI_COMPATIBLE_API_KEY=<stored encrypted; use copy-blackstar-bridge-token.ps1>')
+    expect(bridge.indexOf('Export-Clixml -Path $tokenSecretPath')).toBeLessThan(bridge.indexOf('$stateSaved = $true'))
+    expect(bridge).toContain('if ($stateSaved) { Remove-Item $statePath')
+    expect(bridge).toContain('if ($tokenSaved) { Remove-Item $tokenSecretPath')
+    expect(bridge).toContain('if (Test-Path $statePath)')
+    expect(bridge).not.toMatch(/0\.0\.0\.0:11434/)
+    expect(stopBridge).toContain('bridge.json')
   })
 
   it('warns against directly exposing the Ollama port to the public internet', () => {
