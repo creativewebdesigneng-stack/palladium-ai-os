@@ -14,6 +14,11 @@ $tokenSecretPath = Join-Path $runtimeDir "bridge-token.clixml"
 $proxyStdoutPath = Join-Path $runtimeDir "native-proxy.stdout.log"
 $proxyStderrPath = Join-Path $runtimeDir "native-proxy.stderr.log"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+# The Cloudflare and Tailscale model-bridge scripts share these process/token
+# records. Refuse to replace a record for an already-running model bridge.
+if (Test-Path (Join-Path $runtimeDir "bridge.json")) {
+  throw "An existing Blackstar model bridge state was found. Inspect it before starting a different model transport. No Funnel configuration or token was changed."
+}
 
 function Resolve-TailscalePath {
   $cmd = Get-Command tailscale -ErrorAction SilentlyContinue
@@ -43,9 +48,7 @@ function Resolve-ProxyPort([int]$RequestedPort) {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue" -ErrorAction SilentlyContinue
     $commandLine = if ($processInfo) { [string]$processInfo.CommandLine } else { "" }
     if ($commandLine -match "blackstar-ollama-bearer-proxy\.ps1") {
-      Write-Host "Stopping stale Blackstar proxy process $pidValue..."
-      Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
-      Start-Sleep -Milliseconds 500
+      Write-Host "Another Blackstar model proxy owns port $RequestedPort (PID $pidValue). It will not be stopped."
     }
   }
 
