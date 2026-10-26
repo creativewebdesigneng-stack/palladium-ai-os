@@ -94,6 +94,24 @@ describe("personal task execution", () => {
     toolLayer.resolveGrantedTools.mockResolvedValue({ defs: [], grants: new Map() });
   });
 
+  it("does not expose assigned tools when the request explicitly forbids tools", async () => {
+    gateway.runChat.mockResolvedValue({
+      text: "391 ASTRA_AGENT_OK", toolCalls: [], provider: "compatible",
+      model: "qwen3:8b-q4_K_M", usage: { input: 20, output: 10 },
+    });
+    const sb = fakeSb();
+    const result = await executePersonalTask({
+      sb: sb as any, userId: "user-1",
+      task: { ...task, request: "Without tools, calculate 17 × 23. /no_think", required_tools: [] },
+      agent: { ...agent, allowed_tools: ["browser", "memory_write"] },
+    });
+    expect(toolLayer.resolveGrantedTools).not.toHaveBeenCalled();
+    expect(toolLayer.executeTool).not.toHaveBeenCalled();
+    expect(gateway.runChat.mock.calls[0]?.[0].tools).toEqual([]);
+    expect(result).toMatchObject({ status: "completed", provider: "compatible", model: "qwen3:8b-q4_K_M", toolCalls: 0 });
+    expect(sb.updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed")?.patch["result"]).toMatchObject({ provider: "compatible", model: "qwen3:8b-q4_K_M", agent_run_id: "run-1" });
+  });
+
   it("creates an auditable agent run linked to the personal task", async () => {
     gateway.runChat.mockResolvedValue({
       text: "Here is the plan.",

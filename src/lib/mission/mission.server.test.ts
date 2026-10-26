@@ -23,3 +23,29 @@ describe("routeRequest connected-service routing", () => {
     expect(decision.requiredTools).not.toContain("nango_action");
   });
 });
+
+
+describe("Mission Control whole-word routing", () => {
+  it.each([
+    "Native Astra acceptance test. Without tools, browsing, memory writes or external actions: calculate 17 × 23 and give one sentence explaining the calculation. End with ASTRA_AGENT_OK. /no_think",
+    "Calculate 17 * 23. /no_think",
+    "Think carefully about this arithmetic problem",
+  ])("keeps local reasoning out of Live Explorer: %s", (request) => {
+    const decision = routeRequest(request);
+    expect(decision.category).toBe("custom");
+    expect(decision.requiredTools).toEqual([]);
+    expect(decision.requiresApproval).toBe(false);
+  });
+
+  it.each(["Find compatible printer ink", "Compare laptops under £500", "Find office chairs", "Show shopping deals"])("preserves genuine shopping discovery: %s", (request) => {
+    const decision = routeRequest(request);
+    expect(decision.category).toBe("shopping");
+    expect(decision.requiredTools).toContain("browser");
+    expect(decision.requiresApproval).toBe(false);
+  });
+
+  it("keeps purchase approval requirements", () => {
+    expect(routeRequest("Without tools, buy printer ink under £30").requiresApproval).toBe(true);
+    expect(routeRequest("Buy printer ink under £30").requiresApproval).toBe(true);
+  });
+});

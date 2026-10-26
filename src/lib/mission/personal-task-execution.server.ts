@@ -28,6 +28,8 @@ import {
   type PersonalTaskPendingToolCall,
 } from "./personal-task-approval.server";
 
+import { requestsNoTools } from "./request-policy";
+
 type Sb = { from: (table: string) => any };
 
 export type PersonalTaskRow = {
@@ -430,6 +432,9 @@ async function resolvePersonalTools(args: {
   task: PersonalTaskRow;
   agent: PersonalAgentRow;
 }) {
+  if (requestsNoTools(args.task.request)) {
+    return { defs: [] as ToolDef[], grants: new Map<string, ToolGrant>() };
+  }
   const entitlements = await getEntitlements(args.sb as never, args.userId, args.orgId);
 
   if (args.agent?.id && args.agent.allowed_tools?.length) {

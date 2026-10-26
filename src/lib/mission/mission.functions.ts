@@ -772,6 +772,30 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
     }
 
     const execution = await executePersonalTask({ sb, userId, task, agent });
+    await log(sb, userId, "personal_task.execution_result", {
+      agent_id: agent?.id ?? null,
+      target_type: "personal_task",
+      target_id: task.id,
+      status: execution.status === "failed" ? "failed" : "success",
+      metadata: {
+        execution_status: execution.status,
+        agent_run_id: execution.runId ?? null,
+        ...(execution.status === "completed" ? {
+          provider: execution.provider,
+          model: execution.model,
+          input_tokens: execution.usage.input,
+          output_tokens: execution.usage.output,
+          tool_calls: execution.toolCalls,
+        } : {}),
+      },
+    });
+    if (execution.status === "waiting_for_approval") {
+      await activity(sb, userId, `Agent waiting for approval: ${decision.title}`, "awaiting_approval", {
+        agent_id: agent?.id ?? null,
+        task_id: task.id,
+      });
+      return { taskId: task.id, decision, execution };
+    }
     if (execution.status === "failed") {
       await activity(sb, userId, `Agent could not complete: ${decision.title}`, "failed", {
         agent_id: agent?.id ?? null,
