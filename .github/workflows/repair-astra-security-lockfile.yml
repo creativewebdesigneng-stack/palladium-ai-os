@@ -35,7 +35,6 @@ jobs:
           const lock = readFileSync('bun.lock', 'utf8')
           const pins = [
             '"undici": ["undici@7.30.1"',
-            '"undici8": ["undici@8.12.2"',
             '"body-parser": ["body-parser@2.4.0"',
             '"zod": ["zod@4.6.6"',
             '"vite": ["vite@8.3.3"',
@@ -43,6 +42,11 @@ jobs:
           ]
           for (const pin of pins) {
             if (!lock.includes(pin)) throw Error('Expected secure pinned resolution missing: ' + pin)
+          }
+          // The optional aliased E2B Undici 8 package may be pruned by a real
+          // Bun resolution. If present, its resolved identity must be patched.
+          if (lock.includes('"undici8": ["undici@') && !lock.includes('"undici8": ["undici@8.12.2"')) {
+            throw Error('Unsafe optional undici8 resolution')
           }
           NODE
       - name: Verify frozen lockfile and security
