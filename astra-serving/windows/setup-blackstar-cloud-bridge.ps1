@@ -1,6 +1,7 @@
 param(
   [int]$ProxyPort = 12780,
-  [string]$Model = "qwen3:8b-q4_K_M"
+  [string]$Model = "qwen3:8b-q4_K_M",
+  [switch]$RecoverStaleState
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,10 +10,41 @@ $runtimeDir = Join-Path $env:LOCALAPPDATA "Blackstar\runtime"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 $statePath = Join-Path $runtimeDir "bridge.json"
 $tokenSecretPath = Join-Path $runtimeDir "bridge-token.clixml"
-# The Tailscale and Cloudflare development bridges share the same managed state.
-# Never overwrite a running bridge (or its bearer credential) on another transport.
+# Cloudflare and Tailscale model bridges share one state file. We may only
+# recover a Cloudflare Quick Tunnel record when BOTH recorded processes are
+# absent. Never reset Tailscale or terminate any existing process here.
 if (Test-Path $statePath) {
-  throw "An existing Blackstar model bridge state was found. Stop/reconcile the existing model bridge before starting another. Do not reset an unrelated browser-worker Funnel."
+  try {
+    $previous = Get-Content -LiteralPath $statePath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Existing Blackstar bridge state is unreadable. Inspect bridge.json manually; no process or token was changed."
+  }
+  $previousTransport = [string]$previous.transport
+  $previousProxyPid = [int]$previous.proxy_pid
+  $previousTunnelPid = [int]$previous.tunnel_pid
+  $isCloudflareState = ($previousTransport -eq "cloudflare-quick-tunnel" -or
+    (-not $previousTransport -and $previousTunnelPid -gt 0))
+  $proxyLive = $false
+  $tunnelLive = $false
+  if ($previousProxyPid -gt 0) {
+    $proxyLive = ($null -ne (Get-Process -Id $previousProxyPid -ErrorAction SilentlyContinue))
+  }
+  if ($previousTunnelPid -gt 0) {
+    $tunnelLive = ($null -ne (Get-Process -Id $previousTunnelPid -ErrorAction SilentlyContinue))
+  }
+  $transportLabel = if ($previousTransport) { $previousTransport } else { "legacy/unspecified" }
+  Write-Host "Existing model bridge record: transport=$transportLabel; proxy PID=$previousProxyPid live=$proxyLive; tunnel PID=$previousTunnelPid live=$tunnelLive."
+  if (-not $RecoverStaleState) {
+    throw "An existing model bridge record is present. No state, credential or process was changed. If it is a stale Cloudflare bridge (both recorded processes absent), rerun with -RecoverStaleState. Do not reset a browser-worker Funnel."
+  }
+  if (-not $isCloudflareState -or $previousProxyPid -le 0 -or $previousTunnelPid -le 0 -or $proxyLive -or $tunnelLive) {
+    throw "Refusing stale-state recovery: this is not a verified stopped Cloudflare bridge. Inspect the transport and live processes; do not remove the model state or reset Tailscale."
+  }
+  # The previous tunnel and proxy are both gone, so there is no live Quick
+  # Tunnel route to interrupt. Archive metadata rather than deleting it.
+  $archivedState = Join-Path $runtimeDir ("bridge.stale-" + [guid]::NewGuid().ToString("N") + ".json")
+  Move-Item -LiteralPath $statePath -Destination $archivedState -ErrorAction Stop
+  Write-Host "Archived stopped Cloudflare bridge metadata; starting a fresh authenticated bridge."
 }
 
 function Resolve-CloudflaredPath {
@@ -48,9 +80,7 @@ function Resolve-ProxyPort([int]$RequestedPort) {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue" -ErrorAction SilentlyContinue
     $commandLine = if ($processInfo) { [string]$processInfo.CommandLine } else { "" }
     if ($commandLine -match "blackstar-ollama-bearer-proxy\.ps1") {
-      Write-Host "Stopping stale Blackstar proxy process $pidValue from a previous failed bridge attempt..."
-      Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
-      Start-Sleep -Milliseconds 500
+      Write-Host "A Blackstar proxy already owns port $RequestedPort (PID $pidValue). It will not be stopped."
     }
   }
 
