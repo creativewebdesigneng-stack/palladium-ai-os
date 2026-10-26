@@ -39,11 +39,15 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(tailscaleSetup).toContain('max_tokens = 1')
   })
 
-  it('uses TLS tunnel output and verifies the remote route before printing deployment values', () => {
+  it('uses TLS tunnel output, checks DNS and verifies the remote route before printing deployment values', () => {
     expect(setup).toContain('trycloudflare.com')
-    expect(setup).toContain('Verifying authenticated remote model discovery')
+    expect(setup).toContain('Verifying tunnel registration, hostname DNS and authenticated remote model discovery')
+    expect(setup).toContain('Registered tunnel connection')
+    expect(setup).toContain('[System.Net.Dns]::GetHostAddresses($hostName)')
+    expect(setup).toContain('Resolve-DnsName -Name $hostName -Server "1.1.1.1"')
     expect(setup).toContain('OPENAI_COMPATIBLE_BASE_URL=$tunnelUrl/v1')
-    expect(setup).toContain('OPENAI_COMPATIBLE_API_KEY=$token')
+    expect(setup).not.toContain('OPENAI_COMPATIBLE_API_KEY=$token')
+    expect(setup).toContain('OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>')
     expect(setup).toContain('BLACKSTAR_NATIVE_PRIMARY=true')
   })
 
