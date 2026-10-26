@@ -110,6 +110,8 @@ $env:BLACKSTAR_BRIDGE_TOKEN = $token
 $proxy = $null
 $tunnel = $null
 $bridgeReady = $false
+$tokenSaved = $false
+$stateSaved = $false
 try {
   Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
@@ -233,18 +235,23 @@ try {
     throw "The authenticated remote bridge did not become ready. Last state: $remoteError`nCloudflared log:`n$tail"
   }
 
+  # Persist the secret using Windows DPAPI under this user; never display it in
+  # PowerShell output or log files. The existing copy helper retrieves it safely.
+  $secure = ConvertTo-SecureString -String $token -AsPlainText -Force
+  $secure | Export-Clixml -Path $tokenSecretPath
+  $tokenSaved = $true
+
+  # Publish state only after the authenticated remote route and encrypted token
+  # have been verified. Failed attempts must not leave a fake ready record.
   @{
+    transport = "cloudflare-quick-tunnel"
     proxy_pid = $proxy.Id
     tunnel_pid = $tunnel.Id
     proxy_port = $ProxyPort
     tunnel_url = $tunnelUrl
     started_at = (Get-Date).ToString("o")
   } | ConvertTo-Json | Set-Content -Path $statePath -Encoding UTF8
-
-  # Persist the secret using Windows DPAPI under this user; never display it in
-  # PowerShell output or log files. The existing copy helper retrieves it safely.
-  $secure = ConvertTo-SecureString -String $token -AsPlainText -Force
-  $secure | Export-Clixml -Path $tokenSecretPath
+  $stateSaved = $true
   $copied = $false
   try {
     Set-Clipboard -Value $token
@@ -273,6 +280,8 @@ try {
   Write-Host "To stop the bridge: powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\stop-blackstar-cloud-bridge.ps1"
 } finally {
   if (-not $bridgeReady) {
+    if ($stateSaved) { Remove-Item $statePath -Force -ErrorAction SilentlyContinue }
+    if ($tokenSaved) { Remove-Item $tokenSecretPath -Force -ErrorAction SilentlyContinue }
     if ($tunnel -and -not $tunnel.HasExited) {
       Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue
     }
