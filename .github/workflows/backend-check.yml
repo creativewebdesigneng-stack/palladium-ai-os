@@ -163,6 +163,25 @@ jobs:
             }
           }
 
+      - name: Astra Windows cloud bridge PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($path in @(
+            'astra-serving/windows/setup-blackstar-cloud-bridge.ps1',
+            'astra-serving/windows/stop-blackstar-cloud-bridge.ps1'
+          )) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path).Path, [ref]$tokens, [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "Invalid Astra Windows PowerShell syntax: $path"
+            }
+          }
+
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
         run: |
