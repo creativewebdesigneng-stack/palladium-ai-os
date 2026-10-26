@@ -6,6 +6,7 @@ on:
       - feature/blackstar-local-gpu-verification-20261025
     paths:
       - .github/workflows/repair-astra-security-lockfile.yml
+      - package.json
 
 permissions:
   contents: write
