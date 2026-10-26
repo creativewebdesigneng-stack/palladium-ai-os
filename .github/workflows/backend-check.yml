@@ -169,6 +169,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           foreach ($path in @(
             'astra-serving/windows/setup-blackstar-cloud-bridge.ps1',
+            'astra-serving/windows/setup-blackstar-tailscale-funnel.ps1',
             'astra-serving/windows/stop-blackstar-cloud-bridge.ps1'
           )) {
             $tokens = $null
