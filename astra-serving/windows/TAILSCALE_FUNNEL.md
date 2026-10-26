@@ -60,7 +60,7 @@ Paste the clipboard value into the server-only `OPENAI_COMPATIBLE_API_KEY` secre
 powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\stop-blackstar-cloud-bridge.ps1
 ```
 
-The stop helper resets the Tailscale Funnel configuration when this transport is active and stops the Blackstar localhost proxy.
+The shared model-bridge stop helper now **refuses to reset Tailscale Funnel** automatically, because that machine-wide action could disable the Playwright browser worker or another independent Funnel mapping. Inspect the active `tailscale funnel status` first, identify the specific model proxy route and retire only that route with Tailscale's targeted controls. Do not use `tailscale funnel reset` to clear a stale Blackstar model state or as a generic recovery action. The Cloudflare Quick Tunnel stop path is separate and validates its process IDs before stopping them.
 
 ## Certification boundary
 
