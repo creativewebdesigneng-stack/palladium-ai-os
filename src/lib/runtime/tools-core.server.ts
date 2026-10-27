@@ -1389,7 +1389,7 @@ function isPrivateHost(url: string) {
 
 export const TOOL_SLUGS = Object.keys(REGISTRY);
 /** Canonical one-step schema for runtimes with their own durable approval loop. */
-export const BROWSER_TOOL_DEF = REGISTRY.browser!.def;
+export const BROWSER_TOOL_DEF = REGISTRY["browser"]!.def;
 
 /** Public, client-safe description of every executable tool. */
 export const TOOL_MANIFEST = Object.entries(REGISTRY).map(([slug, impl]) => ({
