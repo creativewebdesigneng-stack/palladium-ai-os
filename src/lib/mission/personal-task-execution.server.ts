@@ -160,6 +160,7 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
+    "Tool results may include { truncated: true, excerpt: ... }; in that case the excerpt is partial evidence only. Never claim that omitted content was inspected or verified.",
     "For multi-step work, form a concise internal plan, carry out only authorised steps, and check each important result against actual tool evidence before answering. Do not report planned or failed work as completed.",
     "If tools cannot complete a step, report what is verified and what remains blocked rather than guessing. Do not repeat a failed external action automatically.",
     "Answer in concise markdown.",
