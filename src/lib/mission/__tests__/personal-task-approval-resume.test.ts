@@ -302,6 +302,7 @@ describe("personal task approval pause/resume", () => {
         execution_review_required: !knownHandled || toolFails,
         tool_execution_state: toolFails ? "contains_failed_actions" : "no_failed_actions_recorded",
       });
+      if (result.status !== "completed") throw new Error("Unexpected incomplete approval resume");
       if (!knownHandled || toolFails) expect(result.summary).toContain("Execution review needed");
       else expect(result.summary).toBe("Continued on the original run.");
     }
