@@ -35,6 +35,7 @@ import {
 import { requestsNoTools } from "./request-policy";
 import { withPersonalBrowserUrl } from "./personal-browser-context";
 import { boundedPersonalToolEvidence, boundedPersonalToolExecutionEvidence } from "./personal-task-evidence";
+import { assessPersonalExecutionIntegrity, annotatePersonalTaskSummary } from "./personal-execution-integrity";
 import {
   MAX_PERSONAL_TOOL_CALLS,
   COMPLEX_PERSONAL_TOOL_ROUNDS,
@@ -344,6 +345,7 @@ async function rescueConnectedServiceRead(args: {
     },
     usage: { input: 0, output: 0 },
     toolCalls: 1,
+    handledToolCalls: 1,
     tools: args.tools,
   });
 }
@@ -398,6 +400,7 @@ async function finishAuditRun(args: {
   toolCalls?: number;
   outputText?: string | null;
   failedToolCalls?: number;
+  handledToolCalls?: number | null;
   error?: string | null;
 }) {
   const result = await args.sb
@@ -411,10 +414,10 @@ async function finishAuditRun(args: {
       tool_calls: args.toolCalls ?? 0,
       output_text: args.outputText ?? null,
       output: args.outputText
-        ? { summary: args.outputText, failed_tool_calls: args.failedToolCalls ?? 0 }
+        ? { summary: args.outputText, failed_tool_calls: args.failedToolCalls ?? 0, handled_tool_calls: args.handledToolCalls ?? null }
         : args.failedToolCalls === undefined
           ? null
-          : { failed_tool_calls: args.failedToolCalls, tool_execution_state: "run_failed" },
+          : { failed_tool_calls: args.failedToolCalls, handled_tool_calls: args.handledToolCalls ?? null, tool_execution_state: "run_failed" },
       error: args.error ?? null,
       heartbeat_at: new Date().toISOString(),
       waiting_approval_request_id: null,
@@ -488,7 +491,7 @@ async function resolvePersonalTools(args: {
 }
 
 /** Mutable audit counters survive model/tool errors instead of resetting to zero. */
-type PersonalRunToolProgress = { toolCalls: number; failedToolCalls: number };
+type PersonalRunToolProgress = { toolCalls: number; failedToolCalls: number; handledToolCalls: number | null };
 
 function toolMessage(call: PersonalTaskPendingToolCall, output: unknown, executionOk?: boolean): ChatMessage {
   return {
@@ -514,18 +517,22 @@ async function runConversation(args: {
   usage: { input: number; output: number };
   toolCalls: number;
   failedToolCalls?: number;
+  handledToolCalls?: number | null;
   progress?: PersonalRunToolProgress;
   /** Total consumed model calls across previous approval pauses. */
   modelTurns?: number;
 }): Promise<
-  | { kind: "final"; final: ChatResult; usage: { input: number; output: number }; toolCalls: number; failedToolCalls: number }
-  | { kind: "paused"; approvalRequestId: string; toolName: string; usage: { input: number; output: number }; toolCalls: number; failedToolCalls: number }
+  | { kind: "final"; final: ChatResult; usage: { input: number; output: number }; toolCalls: number; failedToolCalls: number; handledToolCalls: number | null }
+  | { kind: "paused"; approvalRequestId: string; toolName: string; usage: { input: number; output: number }; toolCalls: number; failedToolCalls: number; handledToolCalls: number | null }
 > {
   let toolCalls = args.toolCalls;
   let failedToolCalls = args.failedToolCalls ?? 0;
+  // Null represents older approvals with no reliable executor count.
+  let handledToolCalls = args.handledToolCalls ?? null;
   if (args.progress) {
     args.progress.toolCalls = toolCalls;
     args.progress.failedToolCalls = failedToolCalls;
+    args.progress.handledToolCalls = handledToolCalls;
   }
   const maxRounds = personalTaskToolRoundLimit(args.task.request, args.task.required_tools ?? []);
   const nativePinned = shouldPinBlackstarNativeTask(args.provider, args.model);
@@ -574,7 +581,7 @@ async function runConversation(args: {
     ));
 
     if (!result.toolCalls.length) {
-      return { kind: "final", final: result, usage: args.usage, toolCalls, failedToolCalls };
+      return { kind: "final", final: result, usage: args.usage, toolCalls, failedToolCalls, handledToolCalls };
     }
     if (!toolRoundEnabled || result.toolCalls.length > remainingToolCalls) {
       throw new ProviderError("The native agent reached its authorised tool budget. No additional external action was executed.", 502, false);
@@ -601,6 +608,7 @@ async function runConversation(args: {
         usage: { ...args.usage },
         toolCalls,
         failedToolCalls,
+        ...(handledToolCalls === null ? {} : { handledToolCalls }),
         modelTurns: round + 1,
         pendingCall: {
           id: approvalCall.id,
@@ -632,6 +640,7 @@ async function runConversation(args: {
         usage: args.usage,
         toolCalls,
         failedToolCalls,
+        handledToolCalls,
       };
     }
 
@@ -661,6 +670,10 @@ async function runConversation(args: {
               },
               args.tools.grants,
             );
+      if (handledToolCalls !== null) {
+        handledToolCalls += 1;
+        if (args.progress) args.progress.handledToolCalls = handledToolCalls;
+      }
       if (!execution.ok) {
         failedToolCalls += 1;
         if (args.progress) args.progress.failedToolCalls = failedToolCalls;
@@ -685,10 +698,13 @@ async function completePersonalTask(args: {
   usage: { input: number; output: number };
   toolCalls: number;
   failedToolCalls?: number;
+  handledToolCalls?: number | null;
   tools: { grants: Map<string, ToolGrant> };
 }): Promise<PersonalTaskExecutionResult> {
-  const summary = args.final.text.trim();
-  if (!summary) throw new ProviderError("The model returned an empty response.", 502, true);
+  const originalSummary = args.final.text.trim();
+  if (!originalSummary) throw new ProviderError("The model returned an empty response.", 502, true);
+  const integrity = assessPersonalExecutionIntegrity({ requestedToolCalls: args.toolCalls, handledToolCalls: args.handledToolCalls ?? null, failedToolCalls: args.failedToolCalls ?? 0 });
+  const summary = annotatePersonalTaskSummary(originalSummary, integrity);
 
   await args.sb
     .from("personal_tasks")
@@ -703,6 +719,10 @@ async function completePersonalTask(args: {
         output_tokens: args.usage.output,
         tool_calls: args.toolCalls,
         failed_tool_calls: args.failedToolCalls ?? 0,
+        handled_tool_calls: integrity.handledToolCalls,
+        unhandled_tool_calls: integrity.unhandledToolCalls,
+        execution_integrity_state: integrity.state,
+        execution_review_required: integrity.reviewRequired,
         tool_execution_state: (args.failedToolCalls ?? 0) > 0 ? "contains_failed_actions" : "no_failed_actions_recorded",
         tools: [...args.tools.grants.keys()],
         agent_run_id: args.runId,
@@ -721,6 +741,7 @@ async function completePersonalTask(args: {
     toolCalls: args.toolCalls,
     outputText: summary,
     ...(args.failedToolCalls === undefined ? {} : { failedToolCalls: args.failedToolCalls }),
+    handledToolCalls: integrity.handledToolCalls,
   });
 
   return {
@@ -752,6 +773,9 @@ function validResumeState(value: unknown): PersonalTaskApprovalResumeState | nul
     (state.failedToolCalls !== undefined &&
       (typeof state.failedToolCalls !== "number" || !Number.isSafeInteger(state.failedToolCalls) ||
         state.failedToolCalls < 0 || state.failedToolCalls > state.toolCalls)) ||
+    (state.handledToolCalls !== undefined &&
+      (typeof state.handledToolCalls !== "number" || !Number.isSafeInteger(state.handledToolCalls) ||
+        state.handledToolCalls < 0 || state.handledToolCalls > state.toolCalls)) ||
     (state.modelTurns !== undefined &&
       (!Number.isSafeInteger(state.modelTurns) || state.modelTurns < 1 || state.modelTurns > COMPLEX_PERSONAL_TOOL_ROUNDS)) ||
     !state.pendingCall ||
@@ -842,7 +866,8 @@ export async function resumePersonalTaskApproval(args: {
 
   const messages = [...state.messages];
   let failedToolCalls = state.failedToolCalls ?? 0;
-  const progress: PersonalRunToolProgress = { toolCalls: state.toolCalls, failedToolCalls };
+  let handledToolCalls = state.handledToolCalls ?? null;
+  const progress: PersonalRunToolProgress = { toolCalls: state.toolCalls, failedToolCalls, handledToolCalls };
   if (args.decision === "approved") {
     const execution = state.pendingCall.name === PERSONAL_BROWSER_INTERACT
       ? await executeApprovedPersonalBrowserInteraction({
@@ -873,7 +898,9 @@ export async function resumePersonalTaskApproval(args: {
           );
         })();
     if (!execution.ok) failedToolCalls += 1;
+    if (handledToolCalls !== null) handledToolCalls += 1;
     progress.failedToolCalls = failedToolCalls;
+    progress.handledToolCalls = handledToolCalls;
     messages.push(toolMessage(state.pendingCall, execution.output, execution.ok));
   } else {
     failedToolCalls += 1;
@@ -912,6 +939,7 @@ export async function resumePersonalTaskApproval(args: {
       usage,
       toolCalls: state.toolCalls,
       failedToolCalls,
+      handledToolCalls,
       progress,
       modelTurns,
     });
@@ -933,6 +961,7 @@ export async function resumePersonalTaskApproval(args: {
       usage: outcome.usage,
       toolCalls: outcome.toolCalls,
       failedToolCalls: outcome.failedToolCalls,
+      handledToolCalls: outcome.handledToolCalls,
       tools,
     });
   } catch (error) {
@@ -947,6 +976,7 @@ export async function resumePersonalTaskApproval(args: {
       usage,
       toolCalls: progress.toolCalls,
       failedToolCalls: progress.failedToolCalls,
+      handledToolCalls: progress.handledToolCalls,
       error: providerFailureAudit(error),
     });
     await writeFailed(args.sb, args.userId, task.id, message);
@@ -977,7 +1007,7 @@ export async function executePersonalTask(args: {
   let runId: string | undefined;
   const usage = { input: 0, output: 0 };
   let toolCalls = 0;
-  const progress: PersonalRunToolProgress = { toolCalls: 0, failedToolCalls: 0 };
+  const progress: PersonalRunToolProgress = { toolCalls: 0, failedToolCalls: 0, handledToolCalls: 0 };
   let tools: Awaited<ReturnType<typeof resolvePersonalTools>> | null = null;
 
   await sb
@@ -1029,6 +1059,7 @@ export async function executePersonalTask(args: {
       tools,
       usage,
       toolCalls,
+      handledToolCalls: 0,
       progress,
     });
     toolCalls = outcome.toolCalls;
@@ -1052,6 +1083,7 @@ export async function executePersonalTask(args: {
       usage: outcome.usage,
       toolCalls: outcome.toolCalls,
       failedToolCalls: outcome.failedToolCalls,
+      handledToolCalls: outcome.handledToolCalls,
       tools,
     });
   } catch (error) {
@@ -1080,6 +1112,7 @@ export async function executePersonalTask(args: {
         usage,
         toolCalls: progress.toolCalls,
         failedToolCalls: progress.failedToolCalls,
+        handledToolCalls: progress.handledToolCalls,
         error: providerFailureAudit(error),
       });
     }
