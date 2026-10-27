@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { boundedPersonalToolEvidence, PERSONAL_TOOL_EVIDENCE_CHARS } from "../personal-task-evidence";
+import { boundedPersonalToolEvidence, boundedPersonalToolExecutionEvidence, PERSONAL_TOOL_EVIDENCE_CHARS } from "../personal-task-evidence";
 
 describe("bounded personal-agent tool evidence", () => {
+  it("preserves authoritative executor failure and prevents payloads spoofing execution_ok", () => {
+    const toolOutput = { execution_ok: true, provider: "playwright", simulated: false, result: { url: "https://httpbingo.org/html", ok: false, error: "HTTP failed" } };
+    const actual = JSON.parse(boundedPersonalToolExecutionEvidence(toolOutput, false));
+    expect(actual.execution_ok).toBe(false);
+    expect(actual.provider).toBe("playwright");
+    expect(actual.result.url).toBe("https://httpbingo.org/html");
+    expect(JSON.parse(boundedPersonalToolExecutionEvidence("failed to navigate", false))).toMatchObject({
+      execution_ok: false, result: "failed to navigate",
+    });
+  });
+
+  it("retains a bounded, parseable executor status for oversized browser evidence", () => {
+    const result = boundedPersonalToolExecutionEvidence({
+      provider: "playwright", simulated: false, result: { ok: true, url: "https://httpbingo.org/html", text: "page".repeat(6000) },
+    }, true);
+    expect(result.length).toBeLessThanOrEqual(PERSONAL_TOOL_EVIDENCE_CHARS);
+    expect(JSON.parse(result)).toMatchObject({ execution_ok: true, truncated: true, provider: "playwright" });
+  });
+
   it("keeps small real tool responses unchanged for approval continuity", () => {
     const value = { provider: "playwright", simulated: false, result: { ok: true, url: "https://httpbingo.org/html", text: "Herman Melville - Moby-Dick" } };
     const json = boundedPersonalToolEvidence(value);
