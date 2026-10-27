@@ -754,6 +754,9 @@ export async function resumePersonalTaskApproval(args: {
     .eq("user_id", args.userId)
     .maybeSingle();
   if (taskError || !task) throw new Error(taskError?.message ?? "Personal task not found.");
+  if (modelTurns > personalTaskToolRoundLimit(task.request, task.required_tools ?? [])) {
+    throw new Error("Personal task exhausted its model-turn budget before this approval could resume.");
+  }
 
   const agentRes = task.agent_id
     ? await args.sb
