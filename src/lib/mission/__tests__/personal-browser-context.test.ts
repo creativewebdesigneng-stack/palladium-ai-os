@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, ToolCall } from "@/lib/runtime/model-gateway.base";
 import { withPersonalBrowserUrl } from "../personal-browser-context";
+import { boundedPersonalToolEvidence } from "../personal-task-evidence";
 
 const url = "https://httpbingo.org/html";
 const read: ToolCall = { id: "read-1", name: "browser", arguments: { action: "read", selector: "h1" } };
@@ -45,6 +46,18 @@ describe("personal browser URL continuity", () => {
     const latest = navigation({ error: "network failed" }).map((m): ChatMessage => ({ ...m, ...(m.role === "assistant" ? { tool_calls: (m.tool_calls ?? []).map((c) => ({ ...c, id: "nav-2" })) } : { tool_call_id: "nav-2" }) }));
     expect(withPersonalBrowserUrl(read, [...navigation(success), ...latest], ["httpbingo.org"])).toBe(read);
   });
+  it("inherits only verified, allowed URLs even when the successful navigation tool JSON was compacted", () => {
+    const oversizedNavigation = { ...success, result: { ...success.result, text: "verified page text ".repeat(2000) } };
+    const messages: ChatMessage[] = [
+      navigation(success)[0]!,
+      { role: "tool", tool_call_id: "nav-1", name: "browser", content: boundedPersonalToolEvidence(oversizedNavigation) },
+    ];
+    expect(withPersonalBrowserUrl(read, messages, ["httpbingo.org"]).arguments["url"]).toBe(url);
+    const contaminated = { ...oversizedNavigation, simulated: true };
+    const unsafe = [...messages.slice(0, 1), { ...messages[1]!, content: boundedPersonalToolEvidence(contaminated) }];
+    expect(withPersonalBrowserUrl(read, unsafe, ["httpbingo.org"])).toBe(read);
+  });
+
   it("never supplies a target for write actions or unmatched tool results", () => {
     const click = { ...read, arguments: { action: "click", selector: "button" } };
     expect(withPersonalBrowserUrl(click, navigation(success), ["httpbingo.org"])).toBe(click);
