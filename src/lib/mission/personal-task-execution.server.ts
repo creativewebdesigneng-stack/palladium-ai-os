@@ -32,6 +32,7 @@ import {
 
 import { requestsNoTools } from "./request-policy";
 import { withPersonalBrowserUrl } from "./personal-browser-context";
+import { boundedPersonalToolEvidence } from "./personal-task-evidence";
 import {
   MAX_PERSONAL_TOOL_CALLS,
   personalTaskToolRoundLimit,
@@ -479,7 +480,7 @@ function toolMessage(call: PersonalTaskPendingToolCall, output: unknown): ChatMe
     role: "tool",
     tool_call_id: call.id,
     name: call.name,
-    content: JSON.stringify(output).slice(0, 8000),
+    content: boundedPersonalToolEvidence(output),
   };
 }
 
