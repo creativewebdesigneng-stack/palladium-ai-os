@@ -42,7 +42,7 @@ describe("Blackstar Astra native quality diagnostics", () => {
     });
     expect(deep.prompt).not.toContain("/no_think");
     expect(deep.prompt.trim().endsWith("/think")).toBe(true);
-    expect(deep.prompt.replace(/\\s*\\/think\\s*$/, " /no_think")).toBe(fast.prompt);
+    expect(deep.prompt.replace(/\s*\/think\s*$/, " /no_think")).toBe(fast.prompt);
     expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":7}').passed).toBe(false);
     expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":6}').passed).toBe(true);
   });
