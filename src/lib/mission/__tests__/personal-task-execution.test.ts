@@ -381,6 +381,31 @@ describe("personal task execution", () => {
     expect(completed?.filters).toMatchObject({ id: "task-1", user_id: "user-1" });
   });
 
+  it("surfaces failed real tool executions to Astra and records incomplete evidence in both ledgers", async () => {
+    const grant = { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null };
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [{ name: "connected_service", description: "Read a service", parameters: { type: "object", properties: {} } }],
+      grants: new Map([["connected_service", grant]]),
+    });
+    toolLayer.executeTool.mockResolvedValue({ ok: false, output: { execution_ok: true, error: "GitHub connector unavailable" } });
+    const response = { provider: "openai", model: "gpt-test", usage: { input: 2, output: 3 } };
+    gateway.runChat
+      .mockResolvedValueOnce({ ...response, text: "", toolCalls: [{ id: "call-failed", name: "connected_service", arguments: { action: "read" } }] })
+      .mockResolvedValueOnce({ ...response, text: "The connected read was unavailable.", toolCalls: [] });
+    const sb = fakeSb();
+    const result = await executePersonalTask({
+      sb: sb as any, userId: "user-1", task,
+      agent: { ...agent, allowed_tools: ["connected_service"] },
+    });
+    expect(result.status).toBe("completed");
+    const feedback = gateway.runChat.mock.calls[1]?.[0].messages.find((m: any) => m.role === "tool");
+    expect(JSON.parse(feedback.content)).toMatchObject({ execution_ok: false, error: "GitHub connector unavailable" });
+    const stored = sb.updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed");
+    expect(stored?.patch["result"]).toMatchObject({ failed_tool_calls: 1, tool_execution_state: "contains_failed_actions" });
+    const audit = sb.updates.find((u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded");
+    expect(audit?.patch["output"]).toMatchObject({ failed_tool_calls: 1 });
+  });
+
   it("runs an allowed read-only tool with the agent run as its audit task", async () => {
     const grants = new Map([
       [
