@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ASTRA_NATIVE_DIAGNOSTIC_CASES,
+  astraNativeDiagnosticInferenceProfile,
   findAstraNativeDiagnosticCase,
   scoreAstraNativeDiagnostic,
 } from "../astra-native-diagnostics";
@@ -24,6 +25,35 @@ describe("Blackstar Astra native quality diagnostics", () => {
     ["approval-status", '{"answer":"NO"}'],
   ])("scores genuine exact matches for %s", (id, output) => {
     expect(scoreAstraNativeDiagnostic(id, output)).toEqual({ passed: true, verdict: "exact_match" });
+  });
+
+  it("keeps fast baseline and deliberate scheduling grading identical", () => {
+    const fast = astraNativeDiagnosticInferenceProfile("scheduling", "qwen3:8b-q4_K_M");
+    const deep = astraNativeDiagnosticInferenceProfile("scheduling", "qwen3:8b-q4_K_M", "deliberate");
+    const fixture = findAstraNativeDiagnosticCase("scheduling");
+    expect(fast).toMatchObject({
+      mode: "fast", prompt: fixture?.prompt, maxTokens: 240, timeoutMs: 45_000,
+      temperature: 0, reasoningEffort: "none",
+    });
+    expect(fast.prompt).toContain("/no_think");
+    expect(deep).toMatchObject({
+      mode: "deliberate", maxTokens: 1024, timeoutMs: 60_000,
+      temperature: 0.6, reasoningEffort: "low",
+    });
+    expect(deep.prompt).not.toContain("/no_think");
+    expect(deep.prompt.trim().endsWith("/think")).toBe(true);
+    expect(deep.prompt.replace(/\\s*\\/think\\s*$/, " /no_think")).toBe(fast.prompt);
+    expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":7}').passed).toBe(false);
+    expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":6}').passed).toBe(true);
+  });
+
+  it("only allows extra GPU inference for the server-owned reasoning fixture", () => {
+    expect(() => astraNativeDiagnosticInferenceProfile("ts-expression", "qwen3:8b", "deliberate"))
+      .toThrow(/only for the reasoning diagnostic/i);
+    expect(() => astraNativeDiagnosticInferenceProfile("forged", "qwen3:8b"))
+      .toThrow(/unknown server-owned/i);
+    const nonQwen = astraNativeDiagnosticInferenceProfile("scheduling", "another-model", "deliberate");
+    expect(nonQwen.reasoningEffort).toBeUndefined();
   });
 
   it("permits harmless fenced JSON and hidden Qwen thinking, without treating prose as JSON", () => {
