@@ -94,6 +94,20 @@ describe("personal task execution", () => {
     toolLayer.resolveGrantedTools.mockResolvedValue({ defs: [], grants: new Map() });
   });
 
+  it.each([
+    ["compatible", "qwen3:8b-q4_K_M", "Read the page. /no_think", "none"],
+    ["compatible", "qwen3:8b-q4_K_M", "Read the page.", undefined],
+    ["compatible", "another-model", "Read the page. /no_think", undefined],
+    ["openai", "qwen3:8b-q4_K_M", "Read the page. /no_think", undefined],
+  ])("limits explicit thinking control to the compatible Qwen3 request (%s, %s, %s)", async (provider, model, request, effort) => {
+    gateway.runChat.mockResolvedValue({ text: "Answer", toolCalls: [], provider, model, usage: { input: 1, output: 1 } });
+    await executePersonalTask({
+      sb: fakeSb() as any, userId: "user-1", task: { ...task, request },
+      agent: { ...agent, model_provider: provider!, model: model! },
+    });
+    expect(gateway.runChat.mock.calls[0]?.[0].reasoningEffort).toBe(effort);
+  });
+
   it("does not expose assigned tools when the request explicitly forbids tools", async () => {
     gateway.runChat.mockResolvedValue({
       text: "391 ASTRA_AGENT_OK", toolCalls: [], provider: "compatible",

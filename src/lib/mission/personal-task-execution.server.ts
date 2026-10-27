@@ -490,6 +490,12 @@ async function runConversation(args: {
       tools: round < MAX_TOOL_ROUNDS ? args.tools.defs : [],
       temperature: args.agent?.temperature ?? null,
       maxTokens: args.agent?.max_tokens ?? 1200,
+      // Qwen3's prompt-only /no_think switch may still leave thinking enabled
+      // on Ollama's OpenAI-compatible transport. Honour the explicit request
+      // through its supported transport setting, without changing other models.
+      ...(args.provider === "compatible" && /^qwen3(?::|-)/i.test(args.model) && /\/no_think\b/i.test(args.task.request)
+        ? { reasoningEffort: "none" as const }
+        : {}),
     });
     args.usage.input += result.usage.input;
     args.usage.output += result.usage.output;
