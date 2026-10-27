@@ -19,6 +19,9 @@ export type PersonalTaskApprovalResumeState = {
   /** Authoritative failed external tool executions (or rejected approvals).
    * Optional to preserve previously paused version-1 runs. */
   failedToolCalls?: number;
+  /** Actual tool-handler responses, not model-requested tool calls. Optional
+   * for legacy approvals where this was never measured. */
+  handledToolCalls?: number;
   /** Total model turns already used before pausing. Older paused runs omit it
    * and are safely reconstructed from existing tool-call conversation turns. */
   modelTurns?: number;
