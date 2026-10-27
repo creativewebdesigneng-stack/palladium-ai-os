@@ -42,7 +42,7 @@ describe("personal browser URL continuity", () => {
     expect(withPersonalBrowserUrl(read, navigation(success, "browser", "extract"), ["httpbingo.org"])).toBe(read);
   });
   it("does not fall back to an older URL after a failed latest navigation", () => {
-    const latest = navigation({ error: "network failed" }).map((m) => ({ ...m, ...(m.role === "assistant" ? { tool_calls: m.tool_calls?.map((c) => ({ ...c, id: "nav-2" })) } : { tool_call_id: "nav-2" }) }));
+    const latest = navigation({ error: "network failed" }).map((m): ChatMessage => ({ ...m, ...(m.role === "assistant" ? { tool_calls: (m.tool_calls ?? []).map((c) => ({ ...c, id: "nav-2" })) } : { tool_call_id: "nav-2" }) }));
     expect(withPersonalBrowserUrl(read, [...navigation(success), ...latest], ["httpbingo.org"])).toBe(read);
   });
   it("never supplies a target for write actions or unmatched tool results", () => {
