@@ -406,6 +406,38 @@ describe("personal task execution", () => {
     expect(audit?.patch["output"]).toMatchObject({ failed_tool_calls: 1 });
   });
 
+  it("preserves completed and failed tool counters when the next model call fails", async () => {
+    const grant = { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null };
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [{ name: "connected_service", description: "Read service", parameters: { type: "object", properties: {} } }],
+      grants: new Map([["connected_service", grant]]),
+    });
+    toolLayer.executeTool.mockResolvedValue({ ok: false, output: { error: "Provider not reachable" } });
+    gateway.runChat
+      .mockResolvedValueOnce({
+        provider: "openai", model: "gpt-test", text: "", usage: { input: 5, output: 4 },
+        toolCalls: [{ id: "failed-read", name: "connected_service", arguments: { action: "read" } }],
+      })
+      .mockRejectedValueOnce(new Error("Model request failed after the tool attempt"));
+    const sb = fakeSb();
+    const result = await executePersonalTask({
+      sb: sb as any,
+      userId: "user-1",
+      task,
+      agent: { ...agent, allowed_tools: ["connected_service"] },
+    });
+    expect(result.status).toBe("failed");
+    expect(toolLayer.executeTool).toHaveBeenCalledTimes(1);
+    const failedRun = sb.updates.find((item) => item.table === "agent_tasks" && item.patch["status"] === "failed");
+    expect(failedRun?.patch).toMatchObject({
+      tool_calls: 1,
+      tokens_in: 5,
+      tokens_out: 4,
+      output: { failed_tool_calls: 1, tool_execution_state: "run_failed" },
+    });
+    expect(sb.updates.some((item) => item.table === "personal_tasks" && item.patch["status"] === "completed")).toBe(false);
+  });
+
   it("runs an allowed read-only tool with the agent run as its audit task", async () => {
     const grants = new Map([
       [
