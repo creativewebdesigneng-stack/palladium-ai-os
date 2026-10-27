@@ -35,6 +35,7 @@ import { withPersonalBrowserUrl } from "./personal-browser-context";
 import { boundedPersonalToolEvidence } from "./personal-task-evidence";
 import {
   MAX_PERSONAL_TOOL_CALLS,
+  COMPLEX_PERSONAL_TOOL_ROUNDS,
   personalTaskToolRoundLimit,
   shouldPinBlackstarNativeTask,
 } from "./personal-task-intelligence-policy";
@@ -497,6 +498,8 @@ async function runConversation(args: {
   tools: { defs: ToolDef[]; grants: Map<string, ToolGrant> };
   usage: { input: number; output: number };
   toolCalls: number;
+  /** Total consumed model calls across previous approval pauses. */
+  modelTurns?: number;
 }): Promise<
   | { kind: "final"; final: ChatResult; usage: { input: number; output: number }; toolCalls: number }
   | { kind: "paused"; approvalRequestId: string; toolName: string; usage: { input: number; output: number }; toolCalls: number }
@@ -504,7 +507,7 @@ async function runConversation(args: {
   let toolCalls = args.toolCalls;
   const maxRounds = personalTaskToolRoundLimit(args.task.request, args.task.required_tools ?? []);
   const nativePinned = shouldPinBlackstarNativeTask(args.provider, args.model);
-  for (let round = 0; round <= maxRounds; round += 1) {
+  for (let round = args.modelTurns ?? 0; round <= maxRounds; round += 1) {
     // Counters survive approval/resume. Neither another approval nor a larger
     // model request can silently grant an unlimited external-action budget.
     const remainingToolCalls = Math.max(0, MAX_PERSONAL_TOOL_CALLS - toolCalls);
@@ -565,6 +568,7 @@ async function runConversation(args: {
         messages: args.messages,
         usage: { ...args.usage },
         toolCalls,
+        modelTurns: round + 1,
         pendingCall: {
           id: approvalCall.id,
           name: approvalCall.name,
@@ -699,7 +703,11 @@ function validResumeState(value: unknown): PersonalTaskApprovalResumeState | nul
     !state.usage ||
     typeof state.usage.input !== "number" ||
     typeof state.usage.output !== "number" ||
-    typeof state.toolCalls !== "number" ||
+    !Number.isSafeInteger(state.toolCalls) ||
+    state.toolCalls < 1 ||
+    state.toolCalls > MAX_PERSONAL_TOOL_CALLS ||
+    (state.modelTurns !== undefined &&
+      (!Number.isSafeInteger(state.modelTurns) || state.modelTurns < 1 || state.modelTurns > COMPLEX_PERSONAL_TOOL_ROUNDS)) ||
     !state.pendingCall ||
     typeof state.pendingCall.id !== "string" ||
     typeof state.pendingCall.name !== "string" ||
@@ -729,6 +737,15 @@ export async function resumePersonalTaskApproval(args: {
 
   const state = validResumeState(run.approval_resume_state);
   if (!state) throw new Error("Personal task approval resume state is missing or invalid.");
+  // Legacy approval states predate modelTurns. Those only persist assistant
+  // responses when a model requested tools, so count those turns and preserve
+  // the original run's bound without replaying completed work.
+  const modelTurns = state.modelTurns ?? state.messages.filter(
+    (message) => message.role === "assistant" && (message.tool_calls?.length ?? 0) > 0,
+  ).length;
+  if (modelTurns < 1 || modelTurns > COMPLEX_PERSONAL_TOOL_ROUNDS) {
+    throw new Error("Personal task approval model-turn budget is invalid.");
+  }
 
   const { data: task, error: taskError } = await args.sb
     .from("personal_tasks")
@@ -839,6 +856,7 @@ export async function resumePersonalTaskApproval(args: {
       tools,
       usage,
       toolCalls: state.toolCalls,
+      modelTurns,
     });
     if (outcome.kind === "paused") {
       return {
