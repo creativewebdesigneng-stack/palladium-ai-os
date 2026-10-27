@@ -61,12 +61,12 @@ export function astraNativeDiagnosticInferenceProfile(
   if (mode === "deliberate" && fixture.id !== "scheduling") {
     throw new Error("Deliberate comparison is available only for the reasoning diagnostic.");
   }
-  const qwen = /(?:^|[\\/:._-])qwen3(?:[\\/:._-]|$)/i.test(model.trim());
+  const qwen = /(?:^|[\/:._-])qwen3(?:[\/:._-]|$)/i.test(model.trim());
   const deliberate = mode === "deliberate";
   return {
     mode,
     prompt: deliberate
-      ? fixture.prompt.replace(/\\s*\\/no_think\\s*$/i, " /think")
+      ? fixture.prompt.replace(/\s*\/no_think\s*$/i, " /think")
       : fixture.prompt,
     // A deliberate pass has more tokens/time available; this does not
     // change any ground truth and does not guarantee the API honours think.
