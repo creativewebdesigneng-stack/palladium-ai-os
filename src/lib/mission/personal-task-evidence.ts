@@ -18,6 +18,9 @@ function provenance(value: unknown): Record<string, unknown> {
     ? (result as Record<string, unknown>)
     : null;
   const source: Record<string, unknown> = {};
+  // The executor inserts this field after external data, so its value cannot
+  // be overwritten by tool-controlled payloads. Keep it even after compaction.
+  if (typeof record["execution_ok"] === "boolean") source["execution_ok"] = record["execution_ok"];
   const provider = brief(record["provider"]);
   if (provider) source["provider"] = provider;
   if (typeof record["simulated"] === "boolean") source["simulated"] = record["simulated"];
