@@ -6,6 +6,7 @@
  * state to resume it after the owner decides the approval request.
  */
 import { getEntitlements } from "@/lib/platform/entitlements.server";
+import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
 import {
   normaliseProvider,
   ProviderError,
@@ -67,6 +68,7 @@ export type PersonalAgentRow = {
   allowed_tools?: string[] | null;
   allowed_providers?: string[] | null;
   requires_approval?: boolean | null;
+  memory_enabled?: boolean | null;
 } | null;
 
 export type PersonalTaskExecutionResult =
@@ -939,6 +941,28 @@ export async function executePersonalTask(args: {
       task,
       agent,
     });
+    // Reuse the canonical, owner-scoped memory fabric used by Workforce.
+    // Unassigned personal tasks have no agent identity and cannot inherit
+    // another agent's private memory. The fabric enforces memory preferences,
+    // document scopes, expiry, and workspace sharing; failure is no recall.
+    // Persist the exact resulting context in the approval resume conversation;
+    // resuming never re-fetches memory or changes the approved task's authority.
+    if (agent?.id && agent.memory_enabled !== false) {
+      const memory = await retrieveGovernedAgentMemory({
+        sb: sb as never,
+        userId,
+        agentId: agent.id,
+        orgId: task.org_id ?? null,
+        query: task.request,
+      }).catch((error) => {
+        console.error("[mission] governed personal memory recall unavailable", error);
+        return null;
+      });
+      const memoryPrompt = memory ? renderGovernedAgentMemoryPrompt(memory) : "";
+      if (memoryPrompt) {
+        messages.splice(1, 0, { role: "system", content: memoryPrompt });
+      }
+    }
     const outcome = await runConversation({
       sb,
       userId,
