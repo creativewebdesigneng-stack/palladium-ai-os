@@ -161,10 +161,11 @@ describe("personal task approval pause/resume", () => {
   });
 
   it.each([
-    ["legacy approval state", undefined, true, false],
-    ["approval after four model turns", 4, false, false],
-    ["failed approved tool", 4, false, true],
-  ])("resumes the existing agent_tasks row without a second run (%s)", async (_kind, modelTurns, toolsExpected, toolFails) => {
+    ["legacy approval state", undefined, true, false, false],
+    ["approval after four model turns", 4, false, false, false],
+    ["failed approved tool", 4, false, true, false],
+    ["failed approved tool then model fails", 4, false, true, true],
+  ])("resumes the existing agent_tasks row without a second run (%s)", async (_kind, modelTurns, toolsExpected, toolFails, modelFails) => {
     const grants = approvalGrant();
     toolLayer.resolveGrantedTools.mockResolvedValue({
       defs: [
@@ -179,7 +180,8 @@ describe("personal task approval pause/resume", () => {
     toolLayer.executeTool.mockResolvedValue(toolFails
       ? { ok: false, output: { error: "Provider rejected the approved read" } }
       : { ok: true, output: { connected: true } });
-    gateway.runChat.mockResolvedValue({
+    if (modelFails) gateway.runChat.mockRejectedValueOnce(new Error("Model failed after approved action"));
+    else gateway.runChat.mockResolvedValue({
       text: "Continued on the original run.",
       toolCalls: [],
       provider: "openai",
@@ -277,14 +279,23 @@ describe("personal task approval pause/resume", () => {
       decision: "approved",
     });
 
-    expect(result).toMatchObject({ status: "completed", runId: "run-1" });
+    expect(result).toMatchObject({ status: modelFails ? "failed" : "completed", runId: "run-1" });
     expect(inserts).not.toContain("agent_tasks");
     expect((gateway.runChat.mock.calls[0]?.[0].tools.length > 0)).toBe(toolsExpected);
     const personalCompletion = updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed");
-    expect(personalCompletion?.patch["result"]).toMatchObject({
-      failed_tool_calls: toolFails ? 1 : 0,
-      tool_execution_state: toolFails ? "contains_failed_actions" : "no_failed_actions_recorded",
-    });
+    if (modelFails) {
+      expect(personalCompletion).toBeUndefined();
+      const failedAudit = updates.find((u) => u.table === "agent_tasks" && u.patch["status"] === "failed");
+      expect(failedAudit?.patch).toMatchObject({
+        tool_calls: 1,
+        output: { failed_tool_calls: 1, tool_execution_state: "run_failed" },
+      });
+    } else {
+      expect(personalCompletion?.patch["result"]).toMatchObject({
+        failed_tool_calls: toolFails ? 1 : 0,
+        tool_execution_state: toolFails ? "contains_failed_actions" : "no_failed_actions_recorded",
+      });
+    }
     const toolFeedback = gateway.runChat.mock.calls[0]?.[0].messages.find((m: any) => m.role === "tool");
     expect(JSON.parse(toolFeedback.content).execution_ok).toBe(!toolFails);
     expect(toolLayer.executeTool).toHaveBeenCalledWith(
@@ -297,6 +308,6 @@ describe("personal task approval pause/resume", () => {
       updates.some(
         (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
       ),
-    ).toBe(true);
+    ).toBe(!modelFails);
   });
 });
