@@ -11,6 +11,7 @@ import {
   ProviderError,
   resolveModel,
   runChat,
+  runChatPinned,
   type ChatMessage,
   type ChatResult,
   type Provider,
@@ -31,6 +32,11 @@ import {
 
 import { requestsNoTools } from "./request-policy";
 import { withPersonalBrowserUrl } from "./personal-browser-context";
+import {
+  MAX_PERSONAL_TOOL_CALLS,
+  personalTaskToolRoundLimit,
+  shouldPinBlackstarNativeTask,
+} from "./personal-task-intelligence-policy";
 
 type Sb = { from: (table: string) => any };
 
@@ -79,8 +85,7 @@ export type PersonalTaskExecutionResult =
     }
   | { status: "failed"; error: string; runId?: string };
 
-const MAX_TOOL_ROUNDS = 4;
-const PERSONAL_BROWSER_ACTIONS = [
+ const PERSONAL_BROWSER_ACTIONS = [
   "navigate",
   "read",
   "extract",
@@ -154,6 +159,8 @@ function systemPrompt(task: PersonalTaskRow, agent: PersonalAgentRow): string {
     "Never claim to have bought, booked, sent, posted, changed, clicked, typed into, or otherwise modified an external service unless a tool result proves it happened.",
     "An approval-gated tool pauses the run before execution. Do not claim that action happened while approval is pending.",
     "Use tool results as evidence. Never invent prices, metrics, records, messages, or connected-service data.",
+    "For multi-step work, form a concise internal plan, carry out only authorised steps, and check each important result against actual tool evidence before answering. Do not report planned or failed work as completed.",
+    "If tools cannot complete a step, report what is verified and what remains blocked rather than guessing. Do not repeat a failed external action automatically.",
     "Answer in concise markdown.",
   ];
   if (agent?.purpose) lines.push(`Agent purpose: ${agent.purpose}`);
@@ -493,12 +500,18 @@ async function runConversation(args: {
   | { kind: "paused"; approvalRequestId: string; toolName: string; usage: { input: number; output: number }; toolCalls: number }
 > {
   let toolCalls = args.toolCalls;
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-    const result = await runChat({
+  const maxRounds = personalTaskToolRoundLimit(args.task.request, args.task.required_tools ?? []);
+  const nativePinned = shouldPinBlackstarNativeTask(args.provider, args.model);
+  for (let round = 0; round <= maxRounds; round += 1) {
+    // Counters survive approval/resume. Neither another approval nor a larger
+    // model request can silently grant an unlimited external-action budget.
+    const remainingToolCalls = Math.max(0, MAX_PERSONAL_TOOL_CALLS - toolCalls);
+    const toolRoundEnabled = round < maxRounds && remainingToolCalls > 0 && args.tools.defs.length > 0;
+    const result = await (nativePinned ? runChatPinned : runChat)({
       provider: args.provider,
       model: args.model,
       messages: args.messages,
-      tools: round < MAX_TOOL_ROUNDS ? args.tools.defs : [],
+      tools: toolRoundEnabled ? args.tools.defs : [],
       temperature: args.agent?.temperature ?? null,
       maxTokens: args.agent?.max_tokens ?? 1200,
       // Qwen3's prompt-only /no_think switch may still leave thinking enabled
@@ -519,6 +532,9 @@ async function runConversation(args: {
 
     if (!result.toolCalls.length) {
       return { kind: "final", final: result, usage: args.usage, toolCalls };
+    }
+    if (!toolRoundEnabled || result.toolCalls.length > remainingToolCalls) {
+      throw new ProviderError("The native agent reached its authorised tool budget. No additional external action was executed.", 502, false);
     }
 
     toolCalls += result.toolCalls.length;
@@ -602,7 +618,7 @@ async function runConversation(args: {
     }
   }
   throw new ProviderError(
-    "The agent used too many tool rounds without producing an answer.",
+    "The agent exceeded its bounded tool-round budget without producing an answer.",
     502,
     true,
   );
