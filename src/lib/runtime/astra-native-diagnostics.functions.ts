@@ -9,21 +9,24 @@ import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { runChatPinned } from "./model-gateway.server";
 import { resolveNativeVerificationTarget } from "./native-runtime-verification";
-import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, ASTRA_NATIVE_DIAGNOSTIC_VERSION } from "./astra-native-diagnostics";
+import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeDiagnosticInferenceProfile, ASTRA_NATIVE_DIAGNOSTIC_VERSION } from "./astra-native-diagnostics";
 
-const TIMEOUT_MS = 45_000;
-const MAX_TOKENS = 240;
-
-export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
+ export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
     caseId: z.string().min(1).max(40),
+    mode: z.enum(["fast", "deliberate"]).default("fast"),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
     if (!(await isPlatformAdmin(sb, context.userId))) return { forbidden: true as const };
     const fixture = findAstraNativeDiagnosticCase(data.caseId);
     if (!fixture) throw new Error("Unknown server-owned Astra diagnostic case.");
+    // Do not let an arbitrary caller enable longer, more expensive inference
+    // on unrelated cases or affect the independently attested certification.
+    if (data.mode === "deliberate" && fixture.id !== "scheduling") {
+      throw new Error("Deliberate mode is restricted to the scheduling diagnostic.");
+    }
 
     const target = resolveNativeVerificationTarget();
     if (!target.configured || !target.model) {
@@ -31,17 +34,18 @@ export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
     }
 
     const model = target.model;
+    const profile = astraNativeDiagnosticInferenceProfile(fixture.id, model, data.mode);
     const started = Date.now();
     try {
       const result = await runChatPinned({
         provider: target.provider,
         model,
-        messages: [{ role: "user", content: fixture.prompt }],
-        temperature: 0,
-        maxTokens: MAX_TOKENS,
-        timeoutMs: TIMEOUT_MS,
+        messages: [{ role: "user", content: profile.prompt }],
+        temperature: profile.temperature,
+        maxTokens: profile.maxTokens,
+        timeoutMs: profile.timeoutMs,
         maxAttempts: 1,
-        ...( /(?:^|[\\/:-])qwen3(?:[:._-]|$)/i.test(model) ? { reasoningEffort: "none" as const } : {} ),
+        ...(profile.reasoningEffort ? { reasoningEffort: profile.reasoningEffort } : {}),
       });
       const latencyMs = Math.max(0, Date.now() - started);
       if (result.provider !== target.provider || result.model !== model) {
@@ -57,6 +61,8 @@ export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
         metadata: {
           diagnostic_version: ASTRA_NATIVE_DIAGNOSTIC_VERSION,
           case_id: fixture.id,
+          inference_mode: profile.mode,
+          inference_max_tokens: profile.maxTokens,
           task_class: fixture.category,
           verdict: grade.verdict,
           passed: grade.passed,
@@ -71,6 +77,7 @@ export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
         forbidden: false as const,
         executed: true as const,
         caseId: fixture.id,
+        mode: profile.mode,
         category: fixture.category,
         passed: grade.passed,
         verdict: grade.verdict,
@@ -98,12 +105,14 @@ export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
         metadata: {
           diagnostic_version: ASTRA_NATIVE_DIAGNOSTIC_VERSION,
           case_id: fixture.id,
+          inference_mode: profile.mode,
+          inference_max_tokens: profile.maxTokens,
           failure: reason,
           latency_ms: Math.max(0, Date.now() - started),
           evidence_scope: "native_model_diagnostic_only",
           certification: false,
         },
       });
-      return { forbidden: false as const, caseId: fixture.id, executed: false as const, passed: false as const, failure: reason };
+      return { forbidden: false as const, caseId: fixture.id, mode: profile.mode, executed: false as const, passed: false as const, failure: reason };
     }
   });
