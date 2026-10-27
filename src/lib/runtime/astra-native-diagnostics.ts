@@ -44,6 +44,39 @@ export const ASTRA_NATIVE_DIAGNOSTIC_CASES = [
   },
 ] as const;
 
+
+/** Compare the same fixture and exact answer key in fast and deliberate mode.
+ * This controls inference resources only; it does not touch the signed
+ * independent Astra certification suite or change the grading criteria.
+ */
+export type AstraNativeDiagnosticMode = "fast" | "deliberate";
+
+export function astraNativeDiagnosticInferenceProfile(
+  caseId: string,
+  model: string,
+  mode: AstraNativeDiagnosticMode = "fast",
+) {
+  const fixture = findAstraNativeDiagnosticCase(caseId);
+  if (!fixture) throw new Error("Unknown server-owned diagnostic fixture.");
+  if (mode === "deliberate" && fixture.id !== "scheduling") {
+    throw new Error("Deliberate comparison is available only for the reasoning diagnostic.");
+  }
+  const qwen = /(?:^|[\\/:._-])qwen3(?:[\\/:._-]|$)/i.test(model.trim());
+  const deliberate = mode === "deliberate";
+  return {
+    mode,
+    prompt: deliberate
+      ? fixture.prompt.replace(/\\s*\\/no_think\\s*$/i, " /think")
+      : fixture.prompt,
+    // A deliberate pass has more tokens/time available; this does not
+    // change any ground truth and does not guarantee the API honours think.
+    maxTokens: deliberate ? 1024 : 240,
+    timeoutMs: deliberate ? 60_000 : 45_000,
+    temperature: deliberate && qwen ? 0.6 : 0,
+    reasoningEffort: qwen ? (deliberate ? "low" as const : "none" as const) : undefined,
+  };
+}
+
 export type AstraNativeDiagnosticCaseId = typeof ASTRA_NATIVE_DIAGNOSTIC_CASES[number]["id"];
 
 export function findAstraNativeDiagnosticCase(id: string) {
