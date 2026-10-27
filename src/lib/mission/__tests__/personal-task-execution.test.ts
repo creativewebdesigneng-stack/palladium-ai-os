@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const gateway = vi.hoisted(() => ({ runChat: vi.fn() }));
+const gateway = vi.hoisted(() => ({ runChat: vi.fn(), runChatPinned: vi.fn() }));
 const toolLayer = vi.hoisted(() => ({ resolveGrantedTools: vi.fn(), executeTool: vi.fn() }));
 const entitlements = vi.hoisted(() => ({ getEntitlements: vi.fn() }));
 
@@ -8,7 +8,7 @@ vi.mock("@/lib/runtime/model-gateway.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/runtime/model-gateway.server")>(
     "@/lib/runtime/model-gateway.server",
   );
-  return { ...actual, runChat: gateway.runChat };
+  return { ...actual, runChat: gateway.runChat, runChatPinned: gateway.runChatPinned };
 });
 
 vi.mock("@/lib/runtime/tools.server", () => ({
@@ -87,6 +87,7 @@ const agent = {
 describe("personal task execution", () => {
   beforeEach(() => {
     gateway.runChat.mockReset();
+    gateway.runChatPinned.mockReset();
     toolLayer.resolveGrantedTools.mockReset();
     toolLayer.executeTool.mockReset();
     entitlements.getEntitlements.mockReset();
@@ -106,6 +107,79 @@ describe("personal task execution", () => {
       agent: { ...agent, model_provider: provider!, model: model! },
     });
     expect(gateway.runChat.mock.calls[0]?.[0].reasoningEffort).toBe(effort);
+  });
+
+  it("runs configured Astra-native personal tasks on the pinned model without provider fallback", async () => {
+    vi.stubEnv("BLACKSTAR_NATIVE_PRIMARY", "true");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://local-gateway.example.test/v1");
+    vi.stubEnv("BLACKSTAR_NATIVE_MODEL", "qwen3:8b-q4_K_M");
+    try {
+      gateway.runChatPinned.mockResolvedValue({ text: "Native-only result", toolCalls: [], provider: "compatible", model: "qwen3:8b-q4_K_M", usage: { input: 5, output: 5 } });
+      const result = await executePersonalTask({
+        sb: fakeSb() as any, userId: "user-1", task,
+        agent: { ...agent, model_provider: "compatible", model: "qwen3:8b-q4_K_M" },
+      });
+      expect(result).toMatchObject({ status: "completed", provider: "compatible", model: "qwen3:8b-q4_K_M" });
+      expect(gateway.runChatPinned).toHaveBeenCalledTimes(1);
+      expect(gateway.runChat).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("fails closed when the home native model is unavailable, without calling other AI providers", async () => {
+    vi.stubEnv("BLACKSTAR_NATIVE_PRIMARY", "true");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://local-gateway.example.test/v1");
+    vi.stubEnv("BLACKSTAR_NATIVE_MODEL", "qwen3:8b-q4_K_M");
+    try {
+      gateway.runChatPinned.mockRejectedValue(new ProviderError("Native gateway temporarily unavailable", 503, false));
+      const result = await executePersonalTask({
+        sb: fakeSb() as any, userId: "user-1", task,
+        agent: { ...agent, model_provider: "compatible", model: "qwen3:8b-q4_K_M" },
+      });
+      expect(result.status).toBe("failed");
+      expect(gateway.runChat).not.toHaveBeenCalled();
+      expect(gateway.runChatPinned).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("allows six bounded tool rounds for a deliberate multi-step task", async () => {
+    const grant = { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null };
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [{ name: "connected_service", description: "Read a service", parameters: { type: "object", properties: {} } }],
+      grants: new Map([["connected_service", grant]]),
+    });
+    toolLayer.executeTool.mockResolvedValue({ ok: true, output: { verified: true } });
+    const response = { provider: "compatible", model: "qwen3:8b-q4_K_M", usage: { input: 1, output: 1 } };
+    for (let i = 0; i < 6; i += 1) {
+      gateway.runChat.mockResolvedValueOnce({ ...response, text: "", toolCalls: [{ id: `call-${i}`, name: "connected_service", arguments: { action: "read" } }] });
+    }
+    gateway.runChat.mockResolvedValueOnce({ ...response, text: "All six checks completed with evidence.", toolCalls: [] });
+    const result = await executePersonalTask({
+      sb: fakeSb() as any, userId: "user-1",
+      task: { ...task, request: "Research and then cross-check several sources step by step" },
+      agent: { ...agent, allowed_tools: ["connected_service"] },
+    });
+    expect(result).toMatchObject({ status: "completed", toolCalls: 6 });
+    expect(toolLayer.executeTool).toHaveBeenCalledTimes(6);
+    expect(gateway.runChat).toHaveBeenCalledTimes(7);
+    expect(gateway.runChat.mock.calls[6]?.[0].tools).toEqual([]);
+  });
+
+  it("rejects tool calls exceeding the global per-run budget before any external execution", async () => {
+    const grant = { slug: "connected_service", requiresApproval: false, allowedDomains: [], spendCap: null };
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [{ name: "connected_service", description: "Read a service", parameters: { type: "object", properties: {} } }],
+      grants: new Map([["connected_service", grant]]),
+    });
+    gateway.runChat.mockResolvedValue({
+      provider: "openai", model: "gpt-test", text: "", usage: { input: 1, output: 1 },
+      toolCalls: Array.from({ length: 13 }, (_, i) => ({ id: `call-${i}`, name: "connected_service", arguments: { action: "read" } })),
+    });
+    const result = await executePersonalTask({
+      sb: fakeSb() as any, userId: "user-1", task,
+      agent: { ...agent, allowed_tools: ["connected_service"] },
+    });
+    expect(result.status).toBe("failed");
+    expect(toolLayer.executeTool).not.toHaveBeenCalled();
   });
 
   it("does not expose assigned tools when the request explicitly forbids tools", async () => {
