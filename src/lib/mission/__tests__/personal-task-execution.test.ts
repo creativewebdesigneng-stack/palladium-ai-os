@@ -258,6 +258,23 @@ describe("personal task execution", () => {
     expect(secondMessages.some((m: any) => m.role === "tool" && m.content.includes("Live item"))).toBe(true);
   });
 
+  it("continues a successful browser navigation when the model omits the following read URL", async () => {
+    const url = "https://httpbingo.org/html";
+    const browserGrant = { slug: "browser", requiresApproval: false, allowedDomains: ["httpbingo.org"], spendCap: null };
+    toolLayer.resolveGrantedTools.mockResolvedValue({ defs: [], grants: new Map([["browser", browserGrant]]) });
+    toolLayer.executeTool.mockResolvedValueOnce({ ok: true, output: { provider: "playwright", simulated: false, result: { ok: true, url } } })
+      .mockResolvedValueOnce({ ok: true, output: { provider: "playwright", simulated: false, result: { url, text: "Actual heading" } } });
+    const response = { provider: "compatible", model: "qwen3:8b-q4_K_M", usage: { input: 1, output: 1 } };
+    gateway.runChat.mockResolvedValueOnce({ ...response, text: "", toolCalls: [{ id: "nav", name: "browser", arguments: { action: "navigate", url } }] })
+      .mockResolvedValueOnce({ ...response, text: "", toolCalls: [{ id: "read", name: "browser", arguments: { action: "read" } }] })
+      .mockResolvedValueOnce({ ...response, text: "Actual heading", toolCalls: [] });
+    const result = await executePersonalTask({ sb: fakeSb() as any, userId: "user-1", task, agent: { ...agent, allowed_tools: ["browser"] } });
+    expect(result).toMatchObject({ status: "completed", toolCalls: 2 });
+    expect(toolLayer.executeTool.mock.calls[1]?.slice(0, 2)).toEqual(["browser", { action: "read", url }]);
+    const messages = gateway.runChat.mock.calls[2]?.[0].messages;
+    expect(messages.find((m: any) => m.role === "assistant" && m.tool_calls?.[0]?.id === "read")?.tool_calls[0].arguments).toEqual({ action: "read", url });
+  });
+
   it("uses the deterministic connected-service read when AI credits are exhausted", async () => {
     const grants = new Map([
       [

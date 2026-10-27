@@ -30,6 +30,7 @@ import {
 } from "./personal-task-approval.server";
 
 import { requestsNoTools } from "./request-policy";
+import { withPersonalBrowserUrl } from "./personal-browser-context";
 
 type Sb = { from: (table: string) => any };
 
@@ -174,13 +175,15 @@ function restrictBrowserDefinition(def: ToolDef): ToolDef {
   return {
     ...def,
     description:
-      "Read-only browser research: navigate, read, extract, scroll, screenshot, go back/forward or wait. Use browser_interact for approval-gated click/type sequences.",
+      "Read-only browser research. Each call uses a fresh browser session. Include the full URL for navigate, read and extract; a prior navigate does not preserve a session. Use browser_interact for approval-gated click/type sequences.",
     parameters: {
       ...def.parameters,
       properties: {
         ...properties,
         action: { type: "string", enum: [...PERSONAL_BROWSER_ACTIONS] },
+        url: { type: "string", description: "Full allowed page URL, required for every navigate, read or extract call, including after navigation." },
       },
+      allOf: [{ if: { properties: { action: { enum: ["navigate", "read", "extract"] } }, required: ["action"] }, then: { required: ["url"] } }],
     },
   };
 }
@@ -507,6 +510,12 @@ async function runConversation(args: {
     });
     args.usage.input += result.usage.input;
     args.usage.output += result.usage.output;
+
+    // The durable conversation survives approval pauses. Resolve the missing
+    // URL before persisting the assistant call or queuing its exact approval.
+    result.toolCalls = result.toolCalls.map((call) => withPersonalBrowserUrl(
+      call, args.messages, args.tools.grants.get("browser")?.allowedDomains ?? [],
+    ));
 
     if (!result.toolCalls.length) {
       return { kind: "final", final: result, usage: args.usage, toolCalls };
