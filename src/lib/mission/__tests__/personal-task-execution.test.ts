@@ -125,6 +125,26 @@ describe("personal task execution", () => {
     } finally { vi.unstubAllEnvs(); }
   });
 
+  it("rejects a mismatched pinned-native model identity before reporting task completion", async () => {
+    vi.stubEnv("BLACKSTAR_NATIVE_PRIMARY", "true");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://local-gateway.example.test/v1");
+    vi.stubEnv("BLACKSTAR_NATIVE_MODEL", "qwen3:8b-q4_K_M");
+    try {
+      gateway.runChatPinned.mockResolvedValue({
+        text: "Looks fine", toolCalls: [], provider: "compatible", model: "unexpected-model",
+        usage: { input: 5, output: 3 },
+      });
+      const sb = fakeSb();
+      const result = await executePersonalTask({
+        sb: sb as any, userId: "user-1", task,
+        agent: { ...agent, model_provider: "compatible", model: "qwen3:8b-q4_K_M" },
+      });
+      expect(result.status).toBe("failed");
+      expect(sb.updates.some((item) => item.table === "personal_tasks" && item.patch["status"] === "completed")).toBe(false);
+      expect(gateway.runChat).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("fails closed when the home native model is unavailable, without calling other AI providers", async () => {
     vi.stubEnv("BLACKSTAR_NATIVE_PRIMARY", "true");
     vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://local-gateway.example.test/v1");
