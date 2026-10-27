@@ -410,7 +410,11 @@ async function finishAuditRun(args: {
       tokens_out: args.usage?.output ?? 0,
       tool_calls: args.toolCalls ?? 0,
       output_text: args.outputText ?? null,
-      output: args.outputText ? { summary: args.outputText, failed_tool_calls: args.failedToolCalls ?? 0 } : null,
+      output: args.outputText
+        ? { summary: args.outputText, failed_tool_calls: args.failedToolCalls ?? 0 }
+        : args.failedToolCalls === undefined
+          ? null
+          : { failed_tool_calls: args.failedToolCalls, tool_execution_state: "run_failed" },
       error: args.error ?? null,
       heartbeat_at: new Date().toISOString(),
       waiting_approval_request_id: null,
@@ -483,6 +487,9 @@ async function resolvePersonalTools(args: {
   return safeToolSet(await resolveGrantedTools(args.sb, syntheticAgent, entitlements.planCode));
 }
 
+/** Mutable audit counters survive model/tool errors instead of resetting to zero. */
+type PersonalRunToolProgress = { toolCalls: number; failedToolCalls: number };
+
 function toolMessage(call: PersonalTaskPendingToolCall, output: unknown, executionOk?: boolean): ChatMessage {
   return {
     role: "tool",
@@ -507,6 +514,7 @@ async function runConversation(args: {
   usage: { input: number; output: number };
   toolCalls: number;
   failedToolCalls?: number;
+  progress?: PersonalRunToolProgress;
   /** Total consumed model calls across previous approval pauses. */
   modelTurns?: number;
 }): Promise<
@@ -515,6 +523,10 @@ async function runConversation(args: {
 > {
   let toolCalls = args.toolCalls;
   let failedToolCalls = args.failedToolCalls ?? 0;
+  if (args.progress) {
+    args.progress.toolCalls = toolCalls;
+    args.progress.failedToolCalls = failedToolCalls;
+  }
   const maxRounds = personalTaskToolRoundLimit(args.task.request, args.task.required_tools ?? []);
   const nativePinned = shouldPinBlackstarNativeTask(args.provider, args.model);
   for (let round = args.modelTurns ?? 0; round <= maxRounds; round += 1) {
@@ -569,6 +581,7 @@ async function runConversation(args: {
     }
 
     toolCalls += result.toolCalls.length;
+    if (args.progress) args.progress.toolCalls = toolCalls;
     args.messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls });
 
     const approvalCall = result.toolCalls.find(
@@ -648,7 +661,10 @@ async function runConversation(args: {
               },
               args.tools.grants,
             );
-      if (!execution.ok) failedToolCalls += 1;
+      if (!execution.ok) {
+        failedToolCalls += 1;
+        if (args.progress) args.progress.failedToolCalls = failedToolCalls;
+      }
       args.messages.push(toolMessage(call, execution.output, execution.ok));
     }
   }
@@ -826,6 +842,7 @@ export async function resumePersonalTaskApproval(args: {
 
   const messages = [...state.messages];
   let failedToolCalls = state.failedToolCalls ?? 0;
+  const progress: PersonalRunToolProgress = { toolCalls: state.toolCalls, failedToolCalls };
   if (args.decision === "approved") {
     const execution = state.pendingCall.name === PERSONAL_BROWSER_INTERACT
       ? await executeApprovedPersonalBrowserInteraction({
@@ -856,9 +873,11 @@ export async function resumePersonalTaskApproval(args: {
           );
         })();
     if (!execution.ok) failedToolCalls += 1;
+    progress.failedToolCalls = failedToolCalls;
     messages.push(toolMessage(state.pendingCall, execution.output, execution.ok));
   } else {
     failedToolCalls += 1;
+    progress.failedToolCalls = failedToolCalls;
     messages.push(
       toolMessage(state.pendingCall, {
         error: "The operator rejected this tool action.",
@@ -893,6 +912,7 @@ export async function resumePersonalTaskApproval(args: {
       usage,
       toolCalls: state.toolCalls,
       failedToolCalls,
+      progress,
       modelTurns,
     });
     if (outcome.kind === "paused") {
@@ -925,7 +945,8 @@ export async function resumePersonalTaskApproval(args: {
       startedMs,
       status: "failed",
       usage,
-      toolCalls: state.toolCalls,
+      toolCalls: progress.toolCalls,
+      failedToolCalls: progress.failedToolCalls,
       error: providerFailureAudit(error),
     });
     await writeFailed(args.sb, args.userId, task.id, message);
@@ -956,6 +977,7 @@ export async function executePersonalTask(args: {
   let runId: string | undefined;
   const usage = { input: 0, output: 0 };
   let toolCalls = 0;
+  const progress: PersonalRunToolProgress = { toolCalls: 0, failedToolCalls: 0 };
   let tools: Awaited<ReturnType<typeof resolvePersonalTools>> | null = null;
 
   await sb
@@ -1007,6 +1029,7 @@ export async function executePersonalTask(args: {
       tools,
       usage,
       toolCalls,
+      progress,
     });
     toolCalls = outcome.toolCalls;
 
@@ -1055,7 +1078,8 @@ export async function executePersonalTask(args: {
         startedMs,
         status: "failed",
         usage,
-        toolCalls,
+        toolCalls: progress.toolCalls,
+        failedToolCalls: progress.failedToolCalls,
         error: providerFailureAudit(error),
       });
     }
