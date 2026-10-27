@@ -60,3 +60,15 @@ export function boundedPersonalToolEvidence(output: unknown): string {
   }
   return compact;
 }
+
+/** Keep the executor's authoritative outcome separate from untrusted tool data.
+ * In particular, a failed API/browser call cannot impersonate a successful
+ * response by including its own "execution_ok": true field.
+ * Preserve original object shape for browser URL provenance and approval resume.
+ */
+export function boundedPersonalToolExecutionEvidence(output: unknown, executionOk: boolean): string {
+  const data = output && typeof output === "object" && !Array.isArray(output)
+    ? { ...(output as Record<string, unknown>), execution_ok: executionOk }
+    : { result: output, execution_ok: executionOk };
+  return boundedPersonalToolEvidence(data);
+}
