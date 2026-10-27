@@ -704,7 +704,7 @@ async function completePersonalTask(args: {
     usage: args.usage,
     toolCalls: args.toolCalls,
     outputText: summary,
-    failedToolCalls: args.failedToolCalls,
+    ...(args.failedToolCalls === undefined ? {} : { failedToolCalls: args.failedToolCalls }),
   });
 
   return {
