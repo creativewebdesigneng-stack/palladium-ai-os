@@ -39,8 +39,8 @@ Write-Host "Model: $Model"
 
 $nvidia = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($nvidia) {
-  Write-Host "Detected NVIDIA GPU:"
-  & $nvidia.Source --query-gpu=name,memory.total,driver_version --format=csv,noheader
+  Write-Host "Detected NVIDIA GPU (hardware discovery is not inference proof):"
+  & $nvidia.Source --query-gpu=name,memory.total,memory.free,driver_version --format=csv,noheader
 } else {
   Write-Warning "nvidia-smi was not found. Ollama may still run, but GPU acceleration has not been verified."
 }
@@ -106,9 +106,34 @@ $text = [string]$response.choices[0].message.content
 if (-not $text.Trim()) {
   throw "The model returned an empty final response. Check the Ollama model output before treating local inference as operational."
 }
+if ($text -notmatch 'BLACKSTAR_READY') {
+  throw "The model answered, but did not satisfy the BLACKSTAR_READY smoke-test challenge. Local inference has not passed acceptance."
+}
+
+# A successful API response is not evidence of GPU execution. Ollama's live
+# /api/ps reports the residency of each loaded model after inference.
+Write-Host "Verifying real GPU offload for the active model..."
+$running = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/ps" -TimeoutSec 15
+$loaded = @($running.models | Where-Object { $_.name -eq $Model } | Select-Object -First 1)
+if ($loaded.Count -ne 1) {
+  throw "The model replied, but Ollama /api/ps did not list $Model as loaded. GPU inference cannot be certified."
+}
+$modelBytes = [double]$loaded[0].size
+$gpuBytes = [double]$loaded[0].size_vram
+if ($gpuBytes -le 0) {
+  throw "The model replied, but Ollama /api/ps reports zero GPU VRAM for $Model. Inference may have run on CPU. Check NVIDIA drivers, Ollama GPU compatibility, and nvidia-smi."
+}
+if ($modelBytes -le 0) {
+  throw "Ollama /api/ps returned invalid model-size telemetry. GPU offload percentage cannot be established."
+}
+$gpuOffloadPercent = [math]::Round(100 * $gpuBytes / $modelBytes, 1)
+Write-Host "Active model GPU residency: $gpuOffloadPercent% ($([math]::Round($gpuBytes / 1GB, 2)) GiB of $([math]::Round($modelBytes / 1GB, 2)) GiB)."
+if ($gpuOffloadPercent -lt 75) {
+  Write-Warning "Most of the model may be offloaded to CPU; performance may be slow. Consider a smaller quantized model."
+}
 
 Write-Host ""
-Write-Host "Blackstar local inference is operational." -ForegroundColor Green
+Write-Host "Blackstar local GPU inference smoke test passed." -ForegroundColor Green
 Write-Host "Provider endpoint: $OpenAiBaseUrl"
 Write-Host "Model: $Model"
 Write-Host "Smoke-test response: $($text.Trim())"

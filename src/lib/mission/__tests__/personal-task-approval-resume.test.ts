@@ -144,6 +144,10 @@ describe("personal task approval pause/resume", () => {
       runId: "run-1",
     });
     expect(toolLayer.executeTool).not.toHaveBeenCalled();
+    expect(approvals.pauseForPersonalTaskApproval.mock.calls[0]?.[0].resumeState.modelTurns).toBe(1);
+    expect(approvals.pauseForPersonalTaskApproval.mock.calls[0]?.[0].resumeState.failedToolCalls).toBe(0);
+    // Requested calls remain pending, not counted as handled before approval.
+    expect(approvals.pauseForPersonalTaskApproval.mock.calls[0]?.[0].resumeState.handledToolCalls).toBe(0);
     expect(approvals.pauseForPersonalTaskApproval).toHaveBeenCalledWith(
       expect.objectContaining({
         personalTaskId: "task-1",
@@ -158,7 +162,13 @@ describe("personal task approval pause/resume", () => {
     ).toBe(true);
   });
 
-  it("resumes the existing agent_tasks row without creating a second run", async () => {
+  it.each([
+    ["legacy approval state", undefined, true, false, false, false],
+    ["approval after four model turns", 4, false, false, false, false],
+    ["known handled count", 1, true, false, false, true],
+    ["failed approved tool", 4, false, true, false, true],
+    ["failed approved tool then model fails", 4, false, true, true, true],
+  ])("resumes the existing agent_tasks row without a second run (%s)", async (_kind, modelTurns, toolsExpected, toolFails, modelFails, knownHandled) => {
     const grants = approvalGrant();
     toolLayer.resolveGrantedTools.mockResolvedValue({
       defs: [
@@ -170,8 +180,11 @@ describe("personal task approval pause/resume", () => {
       ],
       grants,
     });
-    toolLayer.executeTool.mockResolvedValue({ ok: true, output: { connected: true } });
-    gateway.runChat.mockResolvedValue({
+    toolLayer.executeTool.mockResolvedValue(toolFails
+      ? { ok: false, output: { error: "Provider rejected the approved read" } }
+      : { ok: true, output: { connected: true } });
+    if (modelFails) gateway.runChat.mockRejectedValueOnce(new Error("Model failed after approved action"));
+    else gateway.runChat.mockResolvedValue({
       text: "Continued on the original run.",
       toolCalls: [],
       provider: "openai",
@@ -200,6 +213,8 @@ describe("personal task approval pause/resume", () => {
       ],
       usage: { input: 4, output: 2 },
       toolCalls: 1,
+      ...(modelTurns === undefined ? {} : { modelTurns }),
+      ...(knownHandled ? { handledToolCalls: 0 } : {}),
       pendingCall: {
         id: "call-1",
         name: "connected_service",
@@ -268,8 +283,31 @@ describe("personal task approval pause/resume", () => {
       decision: "approved",
     });
 
-    expect(result).toMatchObject({ status: "completed", runId: "run-1" });
+    expect(result).toMatchObject({ status: modelFails ? "failed" : "completed", runId: "run-1" });
     expect(inserts).not.toContain("agent_tasks");
+    expect((gateway.runChat.mock.calls[0]?.[0].tools.length > 0)).toBe(toolsExpected);
+    const personalCompletion = updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed");
+    if (modelFails) {
+      expect(personalCompletion).toBeUndefined();
+      const failedAudit = updates.find((u) => u.table === "agent_tasks" && u.patch["status"] === "failed");
+      expect(failedAudit?.patch).toMatchObject({
+        tool_calls: 1,
+        output: { failed_tool_calls: 1, handled_tool_calls: knownHandled ? 1 : null, tool_execution_state: "run_failed" },
+      });
+    } else {
+      expect(personalCompletion?.patch["result"]).toMatchObject({
+        failed_tool_calls: toolFails ? 1 : 0,
+        handled_tool_calls: knownHandled ? 1 : null,
+        execution_integrity_state: !knownHandled ? "legacy_count_unknown" : toolFails ? "requires_review" : "handlers_returned",
+        execution_review_required: !knownHandled || toolFails,
+        tool_execution_state: toolFails ? "contains_failed_actions" : "no_failed_actions_recorded",
+      });
+      if (result.status !== "completed") throw new Error("Unexpected incomplete approval resume");
+      if (!knownHandled || toolFails) expect(result.summary).toContain("Execution review needed");
+      else expect(result.summary).toBe("Continued on the original run.");
+    }
+    const toolFeedback = gateway.runChat.mock.calls[0]?.[0].messages.find((m: any) => m.role === "tool");
+    expect(JSON.parse(toolFeedback.content).execution_ok).toBe(!toolFails);
     expect(toolLayer.executeTool).toHaveBeenCalledWith(
       "connected_service",
       { provider: "github", action: "notifications" },
@@ -280,6 +318,6 @@ describe("personal task approval pause/resume", () => {
       updates.some(
         (u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded",
       ),
-    ).toBe(true);
+    ).toBe(!modelFails);
   });
 });

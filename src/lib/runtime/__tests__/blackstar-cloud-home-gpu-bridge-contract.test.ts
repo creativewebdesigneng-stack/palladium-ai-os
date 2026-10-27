@@ -39,11 +39,15 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(tailscaleSetup).toContain('max_tokens = 1')
   })
 
-  it('uses TLS tunnel output and verifies the remote route before printing deployment values', () => {
+  it('uses TLS tunnel output, checks DNS and verifies the remote route before printing deployment values', () => {
     expect(setup).toContain('trycloudflare.com')
-    expect(setup).toContain('Verifying authenticated remote model discovery')
+    expect(setup).toContain('Verifying tunnel registration, hostname DNS and authenticated remote model discovery')
+    expect(setup).toContain('Registered tunnel connection')
+    expect(setup).toContain('[System.Net.Dns]::GetHostAddresses($hostName)')
+    expect(setup).toContain('Resolve-DnsName -Name $hostName -Server "1.1.1.1"')
     expect(setup).toContain('OPENAI_COMPATIBLE_BASE_URL=$tunnelUrl/v1')
-    expect(setup).toContain('OPENAI_COMPATIBLE_API_KEY=$token')
+    expect(setup).not.toContain('OPENAI_COMPATIBLE_API_KEY=$token')
+    expect(setup).toContain('OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>')
     expect(setup).toContain('BLACKSTAR_NATIVE_PRIMARY=true')
   })
 
@@ -51,7 +55,30 @@ describe('Blackstar cloud-to-home GPU bridge', () => {
     expect(setup).toContain('bridge.json')
     expect(setup).not.toMatch(/token\s*=\s*\$token[\s\S]*ConvertTo-Json/)
     expect(stop).toContain('Stop-Process')
-    expect(stop).toContain('Ollama remains localhost-only')
+    expect(stop).toContain('Ollama and Tailscale Funnel were not changed')
+  })
+
+  it('preserves active bridges and only recovers explicitly requested stopped Cloudflare state', () => {
+    expect(setup).toContain('[switch]$RecoverStaleState')
+    expect(setup).toContain('$previousTransport -eq "cloudflare-quick-tunnel"')
+    expect(setup).toContain('$previousTunnelPid -gt 0')
+    expect(setup).toContain('Get-Process -Id $previousProxyPid')
+    expect(setup).toContain('Get-Process -Id $previousTunnelPid')
+    expect(setup).toContain('if (-not $RecoverStaleState)')
+    expect(setup).toContain('if (-not $isCloudflareState -or $previousProxyPid -le 0 -or $previousTunnelPid -le 0 -or $proxyLive -or $tunnelLive)')
+    expect(setup).toContain('Move-Item -LiteralPath $statePath -Destination $archivedState')
+    expect(setup).not.toContain('Stop-Process -Id $pidValue -Force')
+    expect(tailscaleSetup).toContain('if (Test-Path (Join-Path $runtimeDir "bridge.json"))')
+    expect(tailscaleSetup).not.toContain('Stop-Process -Id $pidValue -Force')
+  })
+
+  it('does not reset shared Tailscale Funnel or kill unrelated process IDs when stopping the model bridge', () => {
+    expect(stop).not.toContain('funnel reset')
+    expect(stop).toContain('if ($transport -eq "tailscale-funnel")')
+    expect(stop).toContain('Get-CimInstance Win32_Process')
+    expect(stop).toContain('blackstar-ollama-bearer-proxy')
+    expect(stop).toContain('cloudflared.exe')
+    expect(stop).toContain('does not match this Cloudflare model proxy')
   })
 
   it('documents that the quick tunnel is temporary and not certification', () => {

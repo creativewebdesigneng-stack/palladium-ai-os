@@ -353,7 +353,7 @@ export default function MissionControl() {
             loading={loading}
             agents={agents}
             submitting={dispatch.isPending || !isAuthenticated}
-            onSubmit={(value) => dispatch.mutate(value)}
+            onSubmit={(value) => dispatch.mutateAsync(value)}
           />
         </div>
         <AgentBuilder open={builder.open} initial={builder.initial} saving={agentMutation.isPending} onClose={() => setBuilder({ open: false, initial: null })} onSave={(value) => agentMutation.mutate(value)} />

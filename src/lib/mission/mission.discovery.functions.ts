@@ -384,6 +384,15 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
         .update({ status: "failed", result: { error: message } })
         .eq("id", task.id)
         .eq("user_id", userId);
+      await writeAudit({
+        userId,
+        action: "discovery_search_failed",
+        agentId: agent?.id ?? null,
+        targetType: "personal_task",
+        targetId: task.id,
+        status: "failed",
+        metadata: { shopping_task_id: shoppingTask.id },
+      });
       await activity(sb, userId, `Live Explorer failed: ${message}`, "failed", {
         agent_id: agent?.id ?? null,
         task_id: task.id,

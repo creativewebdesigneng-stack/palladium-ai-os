@@ -46,9 +46,10 @@ describe('Blackstar Tailscale Funnel bridge', () => {
     expect(setup).not.toMatch(/password\s*=/i)
   })
 
-  it('resets Funnel when the bridge is stopped', () => {
-    expect(stop).toContain('tailscale-funnel')
-    expect(stop).toContain('funnel reset')
+  it('refuses a machine-wide Funnel reset that could disable the browser worker', () => {
+    expect(stop).toContain('if ($transport -eq "tailscale-funnel")')
+    expect(stop).toContain('Refusing to reset Tailscale Funnel')
+    expect(stop).not.toContain('funnel reset')
   })
 
   it('preserves the certification boundary', () => {

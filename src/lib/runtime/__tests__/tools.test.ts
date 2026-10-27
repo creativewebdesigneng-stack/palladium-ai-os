@@ -215,6 +215,15 @@ describe("tool execution guards", () => {
 });
 
 describe("central approval enforcement", () => {
+  it("persists an unassigned personal task audit without its synthetic routing identity", async () => {
+    const db = sb();
+    const grants = new Map([["current_time", { slug: "current_time", requiresApproval: false, allowedDomains: [], spendCap: null }]]);
+    const result = await executeTool("current_time", {}, {
+      sb: db, userId: "user-1", orgId: null, agentId: "personal-task-default", auditAgentId: null, taskId: "run-1",
+    }, grants);
+    expect(result.ok).toBe(true);
+    expect(db.tables["tool_executions"][0]).toMatchObject({ agent_id: null, agent_task_id: "run-1", status: "succeeded" });
+  });
   const ctx = (db: any) =>
     ({ sb: db, userId: "user-1", orgId: null, agentId: "agent-1", taskId: "task-1", spendCap: null }) as any;
 

@@ -1,12 +1,51 @@
 param(
   [int]$ProxyPort = 12780,
-  [string]$Model = "qwen3:8b-q4_K_M"
+  [string]$Model = "qwen3:8b-q4_K_M",
+  [switch]$RecoverStaleState
 )
 
 $ErrorActionPreference = "Stop"
 $proxyScript = Join-Path $PSScriptRoot "blackstar-ollama-bearer-proxy.ps1"
 $runtimeDir = Join-Path $env:LOCALAPPDATA "Blackstar\runtime"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+$statePath = Join-Path $runtimeDir "bridge.json"
+$tokenSecretPath = Join-Path $runtimeDir "bridge-token.clixml"
+# Cloudflare and Tailscale model bridges share one state file. We may only
+# recover a Cloudflare Quick Tunnel record when BOTH recorded processes are
+# absent. Never reset Tailscale or terminate any existing process here.
+if (Test-Path $statePath) {
+  try {
+    $previous = Get-Content -LiteralPath $statePath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Existing Blackstar bridge state is unreadable. Inspect bridge.json manually; no process or token was changed."
+  }
+  $previousTransport = [string]$previous.transport
+  $previousProxyPid = [int]$previous.proxy_pid
+  $previousTunnelPid = [int]$previous.tunnel_pid
+  $isCloudflareState = ($previousTransport -eq "cloudflare-quick-tunnel" -or
+    (-not $previousTransport -and $previousTunnelPid -gt 0))
+  $proxyLive = $false
+  $tunnelLive = $false
+  if ($previousProxyPid -gt 0) {
+    $proxyLive = ($null -ne (Get-Process -Id $previousProxyPid -ErrorAction SilentlyContinue))
+  }
+  if ($previousTunnelPid -gt 0) {
+    $tunnelLive = ($null -ne (Get-Process -Id $previousTunnelPid -ErrorAction SilentlyContinue))
+  }
+  $transportLabel = if ($previousTransport) { $previousTransport } else { "legacy/unspecified" }
+  Write-Host "Existing model bridge record: transport=$transportLabel; proxy PID=$previousProxyPid live=$proxyLive; tunnel PID=$previousTunnelPid live=$tunnelLive."
+  if (-not $RecoverStaleState) {
+    throw "An existing model bridge record is present. No state, credential or process was changed. If it is a stale Cloudflare bridge (both recorded processes absent), rerun with -RecoverStaleState. Do not reset a browser-worker Funnel."
+  }
+  if (-not $isCloudflareState -or $previousProxyPid -le 0 -or $previousTunnelPid -le 0 -or $proxyLive -or $tunnelLive) {
+    throw "Refusing stale-state recovery: this is not a verified stopped Cloudflare bridge. Inspect the transport and live processes; do not remove the model state or reset Tailscale."
+  }
+  # The previous tunnel and proxy are both gone, so there is no live Quick
+  # Tunnel route to interrupt. Archive metadata rather than deleting it.
+  $archivedState = Join-Path $runtimeDir ("bridge.stale-" + [guid]::NewGuid().ToString("N") + ".json")
+  Move-Item -LiteralPath $statePath -Destination $archivedState -ErrorAction Stop
+  Write-Host "Archived stopped Cloudflare bridge metadata; starting a fresh authenticated bridge."
+}
 
 function Resolve-CloudflaredPath {
   $cmd = Get-Command cloudflared -ErrorAction SilentlyContinue
@@ -41,9 +80,7 @@ function Resolve-ProxyPort([int]$RequestedPort) {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue" -ErrorAction SilentlyContinue
     $commandLine = if ($processInfo) { [string]$processInfo.CommandLine } else { "" }
     if ($commandLine -match "blackstar-ollama-bearer-proxy\.ps1") {
-      Write-Host "Stopping stale Blackstar proxy process $pidValue from a previous failed bridge attempt..."
-      Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
-      Start-Sleep -Milliseconds 500
+      Write-Host "A Blackstar proxy already owns port $RequestedPort (PID $pidValue). It will not be stopped."
     }
   }
 
@@ -103,6 +140,8 @@ $env:BLACKSTAR_BRIDGE_TOKEN = $token
 $proxy = $null
 $tunnel = $null
 $bridgeReady = $false
+$tokenSaved = $false
+$stateSaved = $false
 try {
   Write-Host "Starting localhost-only authenticated proxy on port $ProxyPort..."
   $proxy = Start-Process -FilePath "powershell.exe" -ArgumentList @(
@@ -159,18 +198,45 @@ try {
     throw "Cloudflare tunnel did not publish a URL. $tail"
   }
 
-  Write-Host "Verifying authenticated remote model discovery..."
+  Write-Host "Verifying tunnel registration, hostname DNS and authenticated remote model discovery..."
   $remoteHeaders = @{ Authorization = "Bearer $token" }
   $remoteModels = $null
   $remoteError = $null
-  for ($i = 0; $i -lt 30; $i++) {
+  $dnsFailed = $false
+  $hostName = ([Uri]$tunnelUrl).DnsSafeHost
+  # A Quick Tunnel prints its random hostname before it is necessarily resolvable
+  # through the Windows system resolver. Do not mistake this race for a GPU error.
+  for ($i = 0; $i -lt 60; $i++) {
+    if ($tunnel.HasExited) {
+      $remoteError = "cloudflared exited before authenticated remote readiness."
+      break
+    }
+    $registered = $false
+    if (Test-Path $errLog) {
+      $registered = [bool](Select-String -Path $errLog -Pattern 'Registered tunnel connection' -Quiet -ErrorAction SilentlyContinue)
+    }
+    if (-not $registered) {
+      $remoteError = "Waiting for cloudflared to register a tunnel connection."
+      Start-Sleep -Seconds 2
+      continue
+    }
+    try {
+      $addresses = @([System.Net.Dns]::GetHostAddresses($hostName))
+      if ($addresses.Count -eq 0) { throw "No addresses returned." }
+      $dnsFailed = $false
+    } catch {
+      $dnsFailed = $true
+      $remoteError = "Windows cannot resolve the temporary tunnel hostname $hostName. Waiting for DNS readiness."
+      Start-Sleep -Seconds 2
+      continue
+    }
     try {
       $remoteModels = Invoke-RestMethod -Method Get -Uri "$tunnelUrl/v1/models" -Headers $remoteHeaders -TimeoutSec 10
       if (@($remoteModels.data | ForEach-Object { $_.id }) -contains $Model) {
         $remoteError = $null
         break
       }
-      $remoteError = "The remote endpoint responded but did not return the expected model identity."
+      $remoteError = "The remote endpoint responded but did not advertise the exact model $Model."
     } catch {
       $remoteError = $_.Exception.Message
     }
@@ -178,17 +244,51 @@ try {
   }
   if (-not $remoteModels -or @($remoteModels.data | ForEach-Object { $_.id }) -notcontains $Model) {
     $tail = ""
-    if (Test-Path $errLog) { $tail = (Get-Content $errLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n" }
-    throw "The authenticated remote bridge did not become ready. Last error: $remoteError`nCloudflared log:`n$tail"
+    if (Test-Path $errLog) { $tail = (Get-Content $errLog -Tail 12 -ErrorAction SilentlyContinue) -join "`n" }
+    if ($dnsFailed) {
+      $publicDnsResult = "Public DNS resolver probe not available."
+      $dnsTool = Get-Command Resolve-DnsName -ErrorAction SilentlyContinue
+      if ($dnsTool) {
+        try {
+          $lookup = @(Resolve-DnsName -Name $hostName -Server "1.1.1.1" -Type A -DnsOnly -ErrorAction Stop)
+          $publicDnsResult = if (@($lookup | Where-Object { $_.IPAddress }).Count -gt 0) {
+            "Cloudflare public DNS resolves the hostname; your Windows DNS resolver may have a cached negative result or be filtering the hostname."
+          } else {
+            "Cloudflare public DNS does not yet return an A record."
+          }
+        } catch {
+          $publicDnsResult = "Cloudflare public DNS did not return an A record (or direct DNS queries are blocked)."
+        }
+      }
+      throw "The temporary tunnel hostname was not resolvable after bounded retries: $hostName. $publicDnsResult Close this attempt and rerun the bridge for a fresh hostname if the problem persists. Last state: $remoteError`nCloudflared log:`n$tail"
+    }
+    throw "The authenticated remote bridge did not become ready. Last state: $remoteError`nCloudflared log:`n$tail"
   }
 
+  # Persist the secret using Windows DPAPI under this user; never display it in
+  # PowerShell output or log files. The existing copy helper retrieves it safely.
+  $secure = ConvertTo-SecureString -String $token -AsPlainText -Force
+  $secure | Export-Clixml -Path $tokenSecretPath
+  $tokenSaved = $true
+
+  # Publish state only after the authenticated remote route and encrypted token
+  # have been verified. Failed attempts must not leave a fake ready record.
   @{
+    transport = "cloudflare-quick-tunnel"
     proxy_pid = $proxy.Id
     tunnel_pid = $tunnel.Id
     proxy_port = $ProxyPort
     tunnel_url = $tunnelUrl
     started_at = (Get-Date).ToString("o")
-  } | ConvertTo-Json | Set-Content -Path (Join-Path $runtimeDir "bridge.json") -Encoding UTF8
+  } | ConvertTo-Json | Set-Content -Path $statePath -Encoding UTF8
+  $stateSaved = $true
+  $copied = $false
+  try {
+    Set-Clipboard -Value $token
+    $copied = $true
+  } catch {
+    Write-Warning "Could not copy the bridge token. Use copy-blackstar-bridge-token.ps1 to copy it securely."
+  }
 
   $bridgeReady = $true
 
@@ -197,7 +297,11 @@ try {
   Write-Host ""
   Write-Host "Use these SERVER-ONLY deployment values:"
   Write-Host "OPENAI_COMPATIBLE_BASE_URL=$tunnelUrl/v1"
-  Write-Host "OPENAI_COMPATIBLE_API_KEY=$token"
+  if ($copied) {
+    Write-Host "OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>"
+  } else {
+    Write-Host "OPENAI_COMPATIBLE_API_KEY=<stored encrypted; use copy-blackstar-bridge-token.ps1>"
+  }
   Write-Host "BLACKSTAR_NATIVE_MODEL=$Model"
   Write-Host "BLACKSTAR_NATIVE_PRIMARY=true"
   Write-Host ""
@@ -206,6 +310,8 @@ try {
   Write-Host "To stop the bridge: powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\stop-blackstar-cloud-bridge.ps1"
 } finally {
   if (-not $bridgeReady) {
+    if ($stateSaved) { Remove-Item $statePath -Force -ErrorAction SilentlyContinue }
+    if ($tokenSaved) { Remove-Item $tokenSecretPath -Force -ErrorAction SilentlyContinue }
     if ($tunnel -and -not $tunnel.HasExited) {
       Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue
     }

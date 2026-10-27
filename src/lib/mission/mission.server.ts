@@ -29,6 +29,8 @@ import {
   searchGoogleShopping,
 } from "@/lib/shopping/google-shopping.server";
 
+import { requestsNoTools } from "./request-policy";
+
 type RoutingPreferenceValue = string | number | boolean | null;
 type RoutingPreferences = Record<string, RoutingPreferenceValue>;
 
@@ -58,13 +60,14 @@ const SHOPPING_DISCOVERY_WORDS = /\b(product|item|chair|laptop|computer|pc|ink|p
 const CONNECTED_SERVICE_WORDS = /\b(nango|github|gitlab|linear|notion|slack|discord|salesforce|hubspot|posthog|shopify|stripe|airtable|jira|trello|asana|connected (?:account|app|service|integration))\b/i;
 
 const RULES: Array<{ category: string; test: RegExp; tools: string[] }> = [
+  { category: "research", test: /\b(?:browser|playwright|browse|navigate)\b/i, tools: ["browser"] },
   {
     category: "integration",
     test: CONNECTED_SERVICE_WORDS,
     tools: ["connected_service", "nango_capabilities", "nango_action"],
   },
   { category: "travel", test: /(hotel|flight|trip|travel|holiday|airbnb|train|weekend away)/i, tools: ["web_search", "browser", "booking"] },
-  { category: "shopping", test: /(buy|purchase|shop|price|cheap|cheapest|deal|product|item|chair|laptop|computer|pc|ink|printer|order|gift|t-?shirt|shirt|clothes?|clothing|shoes?|trainers?|phone|tablet|tv|television|monitor|headphones?|earbuds?|furniture|sofa|table|watch|bag|handbag|jacket|coat|dress|jeans|console|camera|appliance)/i, tools: ["web_search", "shopping_search", "browser"] },
+  { category: "shopping", test: /\b(buy|purchase|shop|shopping|prices?|cheap|cheapest|deals?|products?|items?|chairs?|laptops?|computers?|pc|ink|printers?|order|gifts?|t-?shirts?|shirts?|clothes?|clothing|shoes?|trainers?|phones?|tablets?|tv|television|monitors?|headphones?|earbuds?|furniture|sofas?|tables?|watch|bags?|handbags?|jackets?|coats?|dress|jeans|console|cameras?|appliances?)\b/i, tools: ["web_search", "shopping_search", "browser"] },
   { category: "food", test: /(meal|recipe|dinner|lunch|grocer|food|cook|menu)/i, tools: ["web_search", "documents"] },
   { category: "health", test: /(gym|workout|exercise|sleep|habit|wellness|fitness|hydrat)/i, tools: ["web_search", "reminders"] },
   { category: "finance", test: /(budget|insurance|bill|spend|saving|subscription cost)/i, tools: ["documents", "reminders"] },
@@ -104,13 +107,15 @@ export function routeRequest(
   request: string,
   agent?: { preferences?: unknown } | null,
 ): RoutingDecision {
-  const match = RULES.find((r) => r.test.test(request));
+  const noTools = requestsNoTools(request);
+  const match = noTools ? undefined : RULES.find((r) => r.test.test(request));
   let category = match?.category ?? "custom";
-  let tools = match?.tools ?? ["web_search"];
+  let tools = match?.tools ?? [];
   const budget = extractBudget(request);
   const commitmentRequested = COMMITMENT_WORDS.test(request);
 
   if (
+    !noTools &&
     category === "custom" &&
     DISCOVERY_WORDS.test(request) &&
     (SHOPPING_DISCOVERY_WORDS.test(request) || budget !== null)

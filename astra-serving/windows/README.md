@@ -19,14 +19,23 @@ The script:
 3. starts Ollama bound to `127.0.0.1:11434` when needed;
 4. pulls `qwen3:8b-q4_K_M` by default;
 5. verifies `GET /v1/models` contains the exact model identity;
-6. sends a real `POST /v1/chat/completions` smoke test;
-7. prints the Blackstar server-only environment values for local development.
+6. sends a real `POST /v1/chat/completions` smoke test and checks the model followed the challenge;
+7. queries Ollama `GET /api/ps` **after inference** and fails if the active model has zero GPU VRAM residency or invalid telemetry;
+8. prints the Blackstar server-only environment values for local development.
 
 To try another model:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-ollama.ps1 -Model "MODEL_NAME"
 ```
+
+## Prove the GTX 1080 Ti is running the model
+
+Do not confuse an installed GPU, a successful Ollama API response, and actual GPU-backed inference. The bootstrap now checks the exact loaded model in Ollama's live `/api/ps` telemetry and requires nonzero `size_vram`. It reports the proportion of loaded model memory resident in VRAM and warns if it is below 75%. This is a **local GPU smoke test**, not evidence of model quality, production routing, or agent tool execution.
+
+- If `nvidia-smi` is missing or `size_vram` is zero, inspect the NVIDIA driver and Ollama GPU support. Do not claim that the GPU test passed.
+- If the 8B quantized model runs out of memory or mostly offloads to CPU, rerun with a smaller model: `powershell -ExecutionPolicy Bypass -File .\\astra-serving\\windows\\setup-blackstar-ollama.ps1 -Model "qwen3:4b"`. Use the **same exact model ID** in Blackstar's server-only configuration.
+- The script needs a real Windows NVIDIA PC to validate GPU inference. Repository unit tests can only verify the script's contract; they cannot simulate a GPU pass.
 
 ## Blackstar local environment
 
@@ -54,16 +63,55 @@ From PowerShell at the repository root:
 powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-cloud-bridge.ps1
 ```
 
-The bridge verifies local Ollama/model discovery first, installs `cloudflared` through `winget` when needed, creates a cryptographically random bearer token, verifies the localhost proxy, creates the TLS tunnel, and finally verifies authenticated model discovery through the public tunnel before printing any deployment values.
+The bridge verifies local Ollama/model discovery first, installs `cloudflared` through `winget` when needed, creates a cryptographically random bearer token, verifies the localhost proxy, creates the TLS tunnel, waits for the tunnel to register and its temporary hostname to resolve through Windows DNS, then verifies authenticated model discovery through the public tunnel. It does **not** declare success on a registered QUIC connection alone.
 
-On success it prints four **server-only** values:
+On success it prints four **server-only** configuration entries:
 
 ```dotenv
 OPENAI_COMPATIBLE_BASE_URL=https://<temporary-host>.trycloudflare.com/v1
-OPENAI_COMPATIBLE_API_KEY=<generated-random-bearer-token>
+OPENAI_COMPATIBLE_API_KEY=<copied to clipboard; value intentionally not printed>
 BLACKSTAR_NATIVE_MODEL=qwen3:8b-q4_K_M
 BLACKSTAR_NATIVE_PRIMARY=true
 ```
+
+The real bearer token is stored encrypted with the Windows user's DPAPI and copied to the clipboard, not printed in PowerShell. Paste it directly into the **Preview** environment's server-only `OPENAI_COMPATIBLE_API_KEY` setting, not into this chat or Git. If the clipboard was missed, run `powershell -ExecutionPolicy Bypass -File .\\astra-serving\\windows\\copy-blackstar-bridge-token.ps1` to copy it again.
+
+### If another Blackstar model bridge state already exists
+
+The startup script deliberately refuses to overwrite `%LOCALAPPDATA%\Blackstar\runtime\bridge.json`, which is shared by older model-bridge transports. This file is **not** the browser worker's Tailscale Funnel configuration.
+
+First inspect the record and the recorded processes without disclosing credentials:
+
+```powershell
+$state = Get-Content "$env:LOCALAPPDATA\Blackstar\runtime\bridge.json" -Raw | ConvertFrom-Json
+$state | Select-Object transport,started_at,model,proxy_port,proxy_pid,tunnel_pid | Format-List
+@($state.proxy_pid, $state.tunnel_pid) | Where-Object { $_ } | ForEach-Object {
+  Get-Process -Id $_ -ErrorAction SilentlyContinue | Select-Object Id,ProcessName
+}
+```
+
+If the transport is `cloudflare-quick-tunnel` (or a legacy Cloudflare record with a tunnel PID), **and both recorded processes are absent**, explicitly archive that stopped session and start a new one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\setup-blackstar-cloud-bridge.ps1 -Model "qwen3:8b-q4_K_M" -RecoverStaleState
+```
+
+This recovery **will not** stop live processes, reset Tailscale, or overwrite a record for another transport. It refuses ambiguous or active sessions. For an active Cloudflare bridge, inspect the session before using the updated stop helper; for a Tailscale state, **do not** use the Cloudflare recovery flag or `tailscale funnel reset`. Find the existing model Funnel mapping and retire only that specific model route, preserving the browser worker.
+
+The stop helper refuses to modify a Tailscale record and validates that the recorded Cloudflare tunnel and proxy PIDs still belong to those processes before stopping them. Failed attempts do not change Production or expose Ollama port 11434.
+
+### If the temporary hostname cannot be resolved
+
+A successful QUIC/TCP Cloudflare tunnel connection is **not** proof that Windows can resolve the temporary `trycloudflare.com` hostname. The script now retries both tunnel registration and Windows DNS for a bounded interval, then diagnoses the hostname via Cloudflare's public DNS without changing your DNS settings. After the script stops on failure, its old Quick Tunnel hostname may cease to exist.
+
+For an unresolved hostname **while that same tunnel is still running**, compare these two diagnostic commands using the hostname printed by that running tunnel:
+
+```powershell
+Resolve-DnsName <temporary-host>.trycloudflare.com -Type A
+Resolve-DnsName <temporary-host>.trycloudflare.com -Server 1.1.1.1 -Type A
+```
+
+If public DNS resolves the name but your default DNS does not, investigate local DNS filtering or cached negative responses. If neither resolves, stop and retry the bridge for a fresh Quick Tunnel hostname. If the remote endpoint resolves but fails authentication or model discovery, do **not** bypass the bearer proxy, change localhost binding, or call it a GPU failure. Do not reset a separate browser-worker Tailscale Funnel.
 
 The bearer token must stay secret and must never be exposed through a `VITE_` variable or committed to Git. Blackstar's existing compatible-provider gateway sends `OPENAI_COMPATIBLE_API_KEY` as an `Authorization: Bearer ...` header, so no separate provider path is created for this bridge.
 

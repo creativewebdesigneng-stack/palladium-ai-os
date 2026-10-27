@@ -190,7 +190,7 @@ export default function BriefingConsole({ briefing, loading, agents = [], submit
     }
     if (optimistic) {
       list.push({ id: `${optimistic.id}-user`, role: 'user', text: optimistic.request, optimistic: true });
-      list.push({ id: `${optimistic.id}-assistant`, role: 'assistant', text: 'I’m working on that now…', optimistic: true });
+      list.push({ id: `${optimistic.id}-assistant`, role: 'assistant', text: optimistic.error || 'I’m working on that now…', optimistic: true, task: optimistic.error ? { status: 'failed' } : undefined });
     }
     return list;
   }, [tasks, optimistic]);
@@ -214,13 +214,20 @@ export default function BriefingConsole({ briefing, loading, agents = [], submit
     node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
   }, [messages, submitting]);
 
-  const send = (e) => {
+  const send = async (e) => {
     e?.preventDefault?.();
     const text = request.trim();
     if (!text || submitting) return;
     setOptimistic({ id: `local-${Date.now()}`, request: text, startedAt: Date.now() });
-    onSubmit?.({ request: text, agentId: agentId || null });
     setRequest('');
+    try {
+      await onSubmit?.({ request: text, agentId: agentId || null });
+    } catch {
+      setOptimistic((current) => current ? { ...current, error: 'The request failed. Check the task history for details before retrying.' } : null);
+    } finally {
+      // Reconcile after both success and failure; realtime may be unavailable.
+      await loadTasks();
+    }
   };
 
   const showWelcome = !historyLoading && messages.length === 0;
@@ -376,10 +383,18 @@ export default function BriefingConsole({ briefing, loading, agents = [], submit
                   <div key={message.id} className={`rounded-xl border p-3 ${isUser ? 'ml-8 border-blue-400/35 bg-blue-500/[.08]' : `mr-3 ${toneClasses(meta?.tone || 'blue')}`}`}>
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className={`flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.12em] ${isUser ? 'text-blue-300' : 'text-cyan-200'}`}>{isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}{isUser ? 'You' : 'Palladium AI'}</p>
-                      {!isUser && (message.optimistic || meta) && <span className={`font-mono text-[7px] ${meta?.tone === 'red' ? 'text-rose-300' : meta?.tone === 'yellow' ? 'text-amber-300' : meta?.tone === 'green' ? 'text-emerald-300' : 'text-cyan-300'}`}>{message.optimistic ? 'PROCESSING' : meta.label.toUpperCase()}</span>}
+                      {!isUser && (message.optimistic || meta) && <span className={`font-mono text-[7px] ${meta?.tone === 'red' ? 'text-rose-300' : meta?.tone === 'yellow' ? 'text-amber-300' : meta?.tone === 'green' ? 'text-emerald-300' : 'text-cyan-300'}`}>{meta ? meta.label.toUpperCase() : 'PROCESSING'}</span>}
                     </div>
                     <div className="text-[11px] leading-5 text-white/75">{isUser ? <div className="whitespace-pre-wrap">{message.text}</div> : <AssistantText>{message.text}</AssistantText>}</div>
-                    {!isUser && message.optimistic && <div className="mt-2 flex items-center gap-1.5 font-mono text-[7px] text-cyan-300"><Loader2 className="h-3 w-3 animate-spin" />Searching neural pathways…</div>}
+                    {!isUser && message.task?.status === 'completed' && message.task.result?.provider && (
+                      <details className="mt-2 text-[9px] text-cyan-100/60">
+                        <summary className="cursor-pointer">Execution evidence</summary>
+                        <p>{message.task.result.provider} / {message.task.result.model}</p>
+                        <p>Tokens: {message.task.result.input_tokens ?? 0} in · {message.task.result.output_tokens ?? 0} out · Tool calls: {message.task.result.tool_calls ?? 0}</p>
+                        {message.task.result.agent_run_id && <p>Run: {message.task.result.agent_run_id}</p>}
+                      </details>
+                    )}
+                    {!isUser && message.optimistic && !message.task && <div className="mt-2 flex items-center gap-1.5 font-mono text-[7px] text-cyan-300"><Loader2 className="h-3 w-3 animate-spin" />Searching neural pathways…</div>}
                   </div>
                 );
               })}
