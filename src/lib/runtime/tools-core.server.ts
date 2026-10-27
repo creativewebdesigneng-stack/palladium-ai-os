@@ -36,6 +36,8 @@ export type ToolContext = {
   userId: string;
   orgId: string | null;
   agentId: string;
+  /** Persisted agent identity; null for an unassigned personal task. */
+  auditAgentId?: string | null;
   taskId: string | null;
   /** User-scoped Supabase client (RLS applies). */
   sb: { from: (t: string) => any };
@@ -1386,6 +1388,8 @@ function isPrivateHost(url: string) {
 }
 
 export const TOOL_SLUGS = Object.keys(REGISTRY);
+/** Canonical one-step schema for runtimes with their own durable approval loop. */
+export const BROWSER_TOOL_DEF = REGISTRY.browser!.def;
 
 /** Public, client-safe description of every executable tool. */
 export const TOOL_MANIFEST = Object.entries(REGISTRY).map(([slug, impl]) => ({
@@ -1560,7 +1564,7 @@ export async function executeTool(
     await ctx.sb.from("tool_executions").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId,
-      agent_id: ctx.agentId,
+      agent_id: ctx.auditAgentId === undefined ? ctx.agentId : ctx.auditAgentId,
       agent_task_id: ctx.taskId || null,
       tool: name,
       input: inputMetadata(input),

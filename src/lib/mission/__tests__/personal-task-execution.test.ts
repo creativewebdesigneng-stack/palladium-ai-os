@@ -403,6 +403,22 @@ describe("personal task execution", () => {
     expect(interactDef.parameters.required).toEqual(["url", "steps"]);
   });
 
+  it("retains the granted browser schema when the shared registry exposes only browser_task", async () => {
+    toolLayer.resolveGrantedTools.mockResolvedValue({
+      defs: [{ name: "browser_task", description: "Durable browser", parameters: { type: "object" } }],
+      grants: new Map([
+        ["browser", { slug: "browser", requiresApproval: true, allowedDomains: ["httpbingo.org"], spendCap: null }],
+        ["browser_task", { slug: "browser_task", requiresApproval: true, allowedDomains: ["httpbingo.org"], spendCap: null }],
+      ]),
+    });
+    gateway.runChat.mockResolvedValue({ text: "Ready", toolCalls: [], provider: "compatible", model: "qwen3:8b-q4_K_M", usage: { input: 1, output: 1 } });
+    await executePersonalTask({ sb: fakeSb() as any, userId: "user-1", task, agent: { ...agent, allowed_tools: ["browser"] } });
+    const defs = gateway.runChat.mock.calls[0]?.[0].tools ?? [];
+    expect(defs.map((d: any) => d.name)).toEqual(["browser", "browser_interact"]);
+    expect(defs[0].parameters.properties.action.enum).toContain("read");
+    expect(defs[0].parameters.properties.action.enum).not.toContain("click");
+  });
+
   it("executes an allowed browser read action through the shared tool layer", async () => {
     const grants = new Map([
       ["browser", { slug: "browser", requiresApproval: false, allowedDomains: ["example.com"], spendCap: null }],

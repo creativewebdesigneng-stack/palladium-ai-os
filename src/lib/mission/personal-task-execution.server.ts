@@ -17,6 +17,7 @@ import {
   type ToolDef,
 } from "@/lib/runtime/model-gateway.server";
 import { executeTool, resolveGrantedTools, type ToolGrant } from "@/lib/runtime/tools.server";
+import { BROWSER_TOOL_DEF } from "@/lib/runtime/tools-core.server";
 import {
   executeApprovedPersonalBrowserInteraction,
   PERSONAL_BROWSER_INTERACT,
@@ -206,6 +207,12 @@ function safeToolSet(resolved: Awaited<ReturnType<typeof resolveGrantedTools>>):
   const defs = resolved.defs.filter((def) => grants.has(def.name)).map(restrictBrowserDefinition);
   const browserGrant = grants.get("browser");
   if (browserGrant) {
+    // The shared registry prefers browser_task when approval is required.
+    // Personal tasks already own a durable approval/resume loop and exclude
+    // browser_task, so retain the canonical granted one-step read tool here.
+    if (!defs.some((def) => def.name === "browser")) {
+      defs.push(restrictBrowserDefinition(BROWSER_TOOL_DEF));
+    }
     grants.set(PERSONAL_BROWSER_INTERACT, {
       ...browserGrant,
       slug: PERSONAL_BROWSER_INTERACT,
@@ -294,6 +301,7 @@ async function rescueConnectedServiceRead(args: {
       userId: args.userId,
       orgId: args.task.org_id ?? null,
       agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
+      auditAgentId: args.agent?.id ?? null,
       taskId: args.runId,
       sb: args.sb,
       ...(args.agent ? { allowedProviders: args.agent.allowed_providers ?? [] } : {}),
@@ -574,6 +582,7 @@ async function runConversation(args: {
                 userId: args.userId,
                 orgId: args.task.org_id ?? null,
                 agentId: args.agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
+                auditAgentId: args.agent?.id ?? null,
                 taskId: args.runId,
                 sb: args.sb,
                 ...(args.agent ? { allowedProviders: args.agent.allowed_providers ?? [] } : {}),
@@ -753,6 +762,7 @@ export async function resumePersonalTaskApproval(args: {
               userId: args.userId,
               orgId: task.org_id ?? null,
               agentId: agent?.id ?? DEFAULT_PERSONAL_TASK_AGENT_ID,
+              auditAgentId: agent?.id ?? null,
               taskId: String(run.id),
               sb: args.sb,
               ...(agent ? { allowedProviders: agent.allowed_providers ?? [] } : {}),

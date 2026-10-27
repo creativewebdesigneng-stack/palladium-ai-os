@@ -170,7 +170,7 @@ export async function executeTool(
     await ctx.sb.from("tool_executions").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId,
-      agent_id: ctx.agentId,
+      agent_id: ctx.auditAgentId === undefined ? ctx.agentId : ctx.auditAgentId,
       agent_task_id: ctx.taskId || null,
       tool: name,
       input: inputMetadata(input),
