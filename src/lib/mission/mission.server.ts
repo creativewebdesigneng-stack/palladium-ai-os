@@ -60,6 +60,7 @@ const SHOPPING_DISCOVERY_WORDS = /\b(product|item|chair|laptop|computer|pc|ink|p
 const CONNECTED_SERVICE_WORDS = /\b(nango|github|gitlab|linear|notion|slack|discord|salesforce|hubspot|posthog|shopify|stripe|airtable|jira|trello|asana|connected (?:account|app|service|integration))\b/i;
 
 const RULES: Array<{ category: string; test: RegExp; tools: string[] }> = [
+  { category: "research", test: /\b(?:browser|playwright|browse|navigate)\b/i, tools: ["browser"] },
   {
     category: "integration",
     test: CONNECTED_SERVICE_WORDS,

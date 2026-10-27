@@ -27,6 +27,23 @@ describe("routeRequest connected-service routing", () => {
 
 describe("Mission Control whole-word routing", () => {
   it.each([
+    "Use the browser tool to navigate to https://httpbingo.org/html and report the actual first heading. Restrict navigation to httpbingo.org. Read only, no sign-in or account changes. Do not simulate browsing. /no_think",
+    "Open https://httpbingo.org/html using Playwright and report the heading",
+    "Navigate to https://httpbingo.org/html and read it",
+  ])("provides the browser for an explicit navigation request: %s", (request) => {
+    const decision = routeRequest(request);
+    expect(decision.requiredTools).toEqual(["browser"]);
+    expect(decision.requiresApproval).toBe(false);
+  });
+
+  it("does not enable browser navigation when tools are explicitly forbidden", () => {
+    expect(routeRequest("Without tools, explain how browser navigation works").requiredTools).toEqual([]);
+  });
+
+  it("keeps commitment approval when explicit browsing is requested", () => {
+    expect(routeRequest("Use the browser to buy printer ink").requiresApproval).toBe(true);
+  });
+  it.each([
     "Native Astra acceptance test. Without tools, browsing, memory writes or external actions: calculate 17 × 23 and give one sentence explaining the calculation. End with ASTRA_AGENT_OK. /no_think",
     "Calculate 17 * 23. /no_think",
     "Think carefully about this arithmetic problem",
