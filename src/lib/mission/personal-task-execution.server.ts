@@ -703,6 +703,7 @@ function validResumeState(value: unknown): PersonalTaskApprovalResumeState | nul
     !state.usage ||
     typeof state.usage.input !== "number" ||
     typeof state.usage.output !== "number" ||
+    typeof state.toolCalls !== "number" ||
     !Number.isSafeInteger(state.toolCalls) ||
     state.toolCalls < 1 ||
     state.toolCalls > MAX_PERSONAL_TOOL_CALLS ||
