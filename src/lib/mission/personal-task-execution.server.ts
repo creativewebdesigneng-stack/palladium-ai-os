@@ -525,6 +525,13 @@ async function runConversation(args: {
     args.usage.input += result.usage.input;
     args.usage.output += result.usage.output;
 
+    // A pinned native request must return the exact bound identity. A proxy
+    // misconfiguration or unexpected provider response is not a verified Astra
+    // execution, even if the generated text looks plausible.
+    if (nativePinned && (result.provider !== args.provider || result.model !== args.model)) {
+      throw new ProviderError("The native model returned a different provider/model identity; the run was not verified.", 502, false);
+    }
+
     // The durable conversation survives approval pauses. Resolve the missing
     // URL before persisting the assistant call or queuing its exact approval.
     result.toolCalls = result.toolCalls.map((call) => withPersonalBrowserUrl(
