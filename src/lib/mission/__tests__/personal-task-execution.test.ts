@@ -401,9 +401,18 @@ describe("personal task execution", () => {
     const feedback = gateway.runChat.mock.calls[1]?.[0].messages.find((m: any) => m.role === "tool");
     expect(JSON.parse(feedback.content)).toMatchObject({ execution_ok: false, error: "GitHub connector unavailable" });
     const stored = sb.updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed");
-    expect(stored?.patch["result"]).toMatchObject({ failed_tool_calls: 1, tool_execution_state: "contains_failed_actions" });
+    expect(stored?.patch["result"]).toMatchObject({
+      failed_tool_calls: 1,
+      handled_tool_calls: 1,
+      unhandled_tool_calls: 0,
+      execution_integrity_state: "requires_review",
+      execution_review_required: true,
+      tool_execution_state: "contains_failed_actions",
+    });
+    if (result.status !== "completed") throw new Error("Expected an annotated completed summary");
+    expect(result.summary).toContain("Execution review needed");
     const audit = sb.updates.find((u) => u.table === "agent_tasks" && u.patch["status"] === "succeeded");
-    expect(audit?.patch["output"]).toMatchObject({ failed_tool_calls: 1 });
+    expect(audit?.patch["output"]).toMatchObject({ failed_tool_calls: 1, handled_tool_calls: 1 });
   });
 
   it("preserves completed and failed tool counters when the next model call fails", async () => {
@@ -433,7 +442,7 @@ describe("personal task execution", () => {
       tool_calls: 1,
       tokens_in: 5,
       tokens_out: 4,
-      output: { failed_tool_calls: 1, tool_execution_state: "run_failed" },
+      output: { failed_tool_calls: 1, handled_tool_calls: 1, tool_execution_state: "run_failed" },
     });
     expect(sb.updates.some((item) => item.table === "personal_tasks" && item.patch["status"] === "completed")).toBe(false);
   });
@@ -495,6 +504,11 @@ describe("personal task execution", () => {
     });
 
     expect(result).toMatchObject({ status: "completed", toolCalls: 1, runId: "run-1" });
+    const goodTask = sb.updates.find((u) => u.table === "personal_tasks" && u.patch["status"] === "completed");
+    expect(goodTask?.patch["result"]).toMatchObject({
+      handled_tool_calls: 1, unhandled_tool_calls: 0,
+      execution_integrity_state: "handlers_returned", execution_review_required: false,
+    });
     expect(toolLayer.executeTool).toHaveBeenCalledWith(
       "connected_service",
       { provider: "github", action: "notifications" },
