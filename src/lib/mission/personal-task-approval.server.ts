@@ -16,6 +16,9 @@ export type PersonalTaskApprovalResumeState = {
   messages: ChatMessage[];
   usage: { input: number; output: number };
   toolCalls: number;
+  /** Total model turns already used before pausing. Older paused runs omit it
+   * and are safely reconstructed from existing tool-call conversation turns. */
+  modelTurns?: number;
   pendingCall: PersonalTaskPendingToolCall;
   skippedCalls?: PersonalTaskPendingToolCall[];
 };
