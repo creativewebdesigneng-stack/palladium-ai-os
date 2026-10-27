@@ -32,7 +32,7 @@ describe("bounded personal-agent tool evidence", () => {
 
   it("does not invent evidence from unserialisable output", () => {
     const value: Record<string, unknown> = {};
-    value.self = value;
+    value["self"] = value;
     const parsed = JSON.parse(boundedPersonalToolEvidence(value));
     expect(parsed.error).toContain("not JSON-serializable");
     expect(parsed).not.toHaveProperty("result");
