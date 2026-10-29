@@ -7,7 +7,7 @@ const browserTool = { slug: 'browser', name: 'Browser', is_active: true, executa
 describe('Astra native wizard model assignment (QA)', () => {
   it('pins the server-configured local model, not an external provider or the local-model placeholder', () => {
     expect(agentWizardSettings({ ...fixture, nativeModel: 'qwen3:8b-q4_K_M' }, [browserTool])).toEqual({
-      provider: 'compatible', model: 'qwen3:8b-q4_K_M',
+      model_provider: 'compatible', model: 'qwen3:8b-q4_K_M',
       memory_enabled: true, allowed_tools: ['browser'],
     });
   });
@@ -21,7 +21,7 @@ describe('Astra native wizard model assignment (QA)', () => {
   it('does not override tool-grant restrictions or affect existing model choices', () => {
     expect(() => agentWizardSettings({ ...fixture, nativeModel: 'qwen3:8b-q4_K_M' }, [])).toThrow(/unavailable/i);
     expect(agentWizardSettings({ ...fixture, model: 'groq-oss-20b' }, [browserTool])).toMatchObject({
-      provider: 'groq', model: 'openai/gpt-oss-20b',
+      model_provider: 'groq', model: 'openai/gpt-oss-20b',
     });
   });
 });
