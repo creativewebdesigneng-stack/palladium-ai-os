@@ -107,3 +107,42 @@ Existing Marketplace `marketplace_listings` and seller Stripe Connect payments r
 - A proposal-outline control generates a nonbinding, buyer-editable SOW draft with pricing, proof requirements and no-payment disclaimers.
 - No direct Stripe card payment, no false order, no Supabase data/Production changes.
 - This is a **commercial catalogue MVP**, not completed delivery of the underlying enterprise projects.
+
+
+## Buyer-led value screening implemented (29 October follow-on)
+
+The catalogue now includes a client-side structural productivity value modeller at
+`src/lib/enterprise/value-case.ts`, rendered by `EnterpriseValueCase.jsx`.
+It selects an existing proposed offer and asks for *buyer-supplied* workflow volume,
+minutes saved, loaded cost, adoption, the realisable proportion of saved time and
+incremental annual running costs. No default customer numbers, PII submission,
+automated quote, deal/CRM write, payment or execution is permitted.
+
+- Annual gross productivity value = monthly volume × 12 × minutes / 60 ×
+  loaded hourly cost × adoption fraction × realisation fraction.
+- Annual operating value = gross annual productivity value − incremental annual
+  running cost.
+- Indicative three-year net value = 3 × annual operating value − programme fee.
+- Three-year benefit/cost = 3 × annual gross benefit ÷ (programme fee +
+  3 × annual running cost). Simple payback uses the programme fee divided
+  by monthly annual net operating value, if positive.
+- A *conservative screening heuristic* requires at least 1.5× three-year
+  benefit/cost and simple payback no more than 24 months, plus buyer-specified
+  evidence. This **does not** validate pricing, certify the model or approve a sale.
+- Six independent-diligence items: measured baseline, pilot savings, buyer/budget,
+  data/integration feasibility, security/privacy and delivery capacity. The
+  checklist is explicitly self-reported, not persistent or authoritative.
+- Tests under `src/lib/enterprise/__tests__/value-case.test.ts` cover arithmetic,
+  £1m feasibility rejection, empty inputs, unsupported economics, evidence
+  omissions, invalid bounds and negative net operating benefits.
+
+**Limits:** A saved hour is not automatically an avoided payroll cost. This model
+is a narrow productivity case, not a risk-reduction, revenue uplift, defensive
+security or private-infrastructure valuation. Such cases need separate customer
+baselines and a credible causal impact model, not arbitrary added benefits.
+Figures exclude inflation, discounting, the adoption ramp, taxes and some indirect
+transformation costs unless explicitly included by the buyer. Independent
+financial validation, performance evidence, contract pricing and legal sign-off
+remain release gates. The catalogue is still a draft; security issue #1031 blocks
+full CI and Preview certification until patched dependencies and the genuine Bun
+lockfile are reconciled.
