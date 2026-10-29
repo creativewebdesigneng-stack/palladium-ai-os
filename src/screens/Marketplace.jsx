@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Sparkles, Wrench, Store } from 'lucide-react';
+import { Sparkles, Wrench, Store, Building2 } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ListingBrowser from '@/components/marketplace/ListingBrowser';
 import MarketplaceWorld from '@/components/marketplace/MarketplaceWorld';
@@ -7,6 +7,9 @@ import MarketplaceWorld from '@/components/marketplace/MarketplaceWorld';
 export default function Marketplace() {
   const headerActions = (
     <div className="flex flex-wrap gap-2">
+      <Link to="/enterprise-solutions" className="flex items-center gap-1.5 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3.5 py-2 text-sm font-medium text-amber-100 hover:bg-amber-300/15">
+        <Building2 className="h-4 w-4" />Enterprise solutions
+      </Link>
       <Link to="/creator-hub" className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-lg shadow-violet-900/30">
         <Sparkles className="h-4 w-4" />Creator Hub
       </Link>
