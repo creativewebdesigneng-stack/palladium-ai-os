@@ -26,7 +26,7 @@ export function verifiedApprovedBrowserRead(
   if (evidence['ok'] !== true || evidence['completed_steps'] !== plan.length || !Array.isArray(evidence['outputs']) ||
       evidence['outputs'].length !== plan.length) return null;
   const nav = plan[0] as Json | undefined;
-  if (nav?.action !== 'navigate' || typeof nav['url'] !== 'string') return null;
+  if (nav?.['action'] !== 'navigate' || typeof nav['url'] !== 'string') return null;
   let approvedUrl: URL;
   try {
     approvedUrl = new URL(nav['url']);
