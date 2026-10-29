@@ -4,6 +4,15 @@ import TaskStatusBadge from './TaskStatusBadge';
 
 const STATUS_UI = { succeeded: 'completed', queued: 'pending' };
 const outputOf = (t) => t.output_text || (typeof t.output === 'string' ? t.output : t.output?.text) || '';
+// Display only the bounded, server-verified public read field as plain text.
+// This is authoritative source material, not a model-generated quote.
+const verifiedBrowserSource = (t) => {
+  const data = t.output?.verified_browser_source;
+  return t.status === 'succeeded' && data?.provider === 'playwright' && data?.simulated === false &&
+    data?.kind === 'approved_public_read' && typeof data.text === 'string' &&
+    data.text.length > 0 && data.text.length <= 8000 &&
+    typeof data.url === 'string' && data.url.startsWith('https://') ? data : null;
+};
 
 // Collapsible list of past runs for this agent. Each row expands to show the
 // input, output (rendered as markdown), model/provider and token usage.
@@ -35,6 +44,13 @@ export default function TaskHistory({ tasks }) {
                     <div className="text-sm leading-relaxed text-zinc-300">
                       <ReactMarkdown>{outputOf(t) || 'No output'}</ReactMarkdown>
                     </div>
+                  )}
+                  {verifiedBrowserSource(t) && (
+                    <section className="mt-3 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3" aria-label="Verified browser source">
+                      <p className="text-xs font-semibold text-sky-200">Verified browser text · exact Playwright source</p>
+                      <p className="mt-1 break-all text-[10px] text-zinc-400">{verifiedBrowserSource(t).url} · Ephemeral session · Not model-transcribed</p>
+                      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-xs text-zinc-200">{verifiedBrowserSource(t).text}</pre>
+                    </section>
                   )}
                   <p className="mt-2 text-[10px] text-zinc-600">{[t.provider, t.model, tokens ? `${tokens} tokens` : ''].filter(Boolean).join(' · ')}</p>
                 </div>

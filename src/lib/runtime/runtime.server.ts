@@ -450,6 +450,10 @@ export async function completeRun(args: {
     .from("agent_tasks")
     .update({
       status: "succeeded",
+      // Approval history remains in approval_requests and tool audit; a
+      // terminal task must never appear to still be awaiting approval.
+      waiting_approval_request_id: null,
+      approval_resume_state: null,
       provider: result.provider,
       model: result.model,
       output,
