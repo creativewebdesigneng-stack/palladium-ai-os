@@ -42,7 +42,7 @@ jobs:
           const lockText = fs.readFileSync('bun.lock', 'utf8')
           for (const packageName of ['undici', 'undici8', 'body-parser']) {
             const matching = lockText.split('\\n').filter(line => line.trimStart().startsWith('"' + packageName + '": ['));
-            console.log(packageName + ' resolved: ' + matching.map(line => line.match(/^\\s*"[^\"]+": \\["([^\"]+)/)?.[1] || 'unknown').join(', '));
+            console.log(packageName + ' resolved: ' + matching.map(line => line.split('"')[3] || 'unknown').join(', '));
           }
           const pins = [
             ['undici', '7.30.1', 'undici@7.30.1'],
