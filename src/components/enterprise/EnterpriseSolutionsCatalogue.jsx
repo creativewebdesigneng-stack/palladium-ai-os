@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import EnterpriseValueCase from './EnterpriseValueCase';
 import { ArrowRight, Building2, CheckCircle2, ClipboardCopy, Search, ShieldCheck, Target, TriangleAlert } from 'lucide-react';
 import {
   BLACKSTAR_ENTERPRISE_OFFERS,
@@ -119,6 +120,7 @@ export default function EnterpriseSolutionsCatalogue() {
       </div>
       {!offers.length&&<p className="rounded-xl border border-dashed border-white/10 p-7 text-sm text-zinc-400">No programmes match your search. Clear filters to see all fourteen offers.</p>}
       {copyState&&<p role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-3 text-xs text-amber-200">{copyState}</p>}
+      <EnterpriseValueCase />
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Target className="h-4 w-4 text-amber-300"/>Commercial scenario modeller</h3>
