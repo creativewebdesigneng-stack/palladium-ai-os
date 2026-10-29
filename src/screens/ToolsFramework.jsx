@@ -57,6 +57,7 @@ export default function ToolsFramework() {
   const [framework, setFramework] = useState({ tools: [], executions: [], agents: [], browser: null, plan: 'explorer' });
   const [integrationCatalogue, setIntegrationCatalogue] = useState([]);
   const [agentId, setAgentId] = useState('');
+  const [policyScope, setPolicyScope] = useState('account');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +85,15 @@ export default function ToolsFramework() {
   useEffect(() => { load(); }, [load]);
 
   const tools = framework.tools.map(toCard);
+  const policyAgentId = policyScope === 'agent' && agentId ? agentId : null;
+  // Never show an account-wide permission as though it were a per-agent grant.
+  // A selected agent starts with an empty domain allow-list until explicitly saved.
+  const policyTools = policyAgentId
+    ? framework.tools.map(tool => ({
+        ...tool,
+        permission: (framework.permissions ?? []).find(p => p.agent_id === policyAgentId && p.tool === tool.slug) ?? null,
+      }))
+    : framework.tools;
 
   const runTool = async (tool, inputStr) => {
     const planGate = tool.required_plan === 'free' ? true : tool.required_plan === 'pro' ? gate('runTasks') : gate('advancedTools');
@@ -160,7 +170,17 @@ export default function ToolsFramework() {
         <ToolEvidencePanel rows={framework.toolEvidence ?? []} scope={framework.toolEvidenceScope} />
         <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />
       </>}
-      {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
+      {tab === 'policy' && <>
+        <div className="mb-3 rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-zinc-300">
+          <p className="mb-2 font-semibold">Permission scope</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={policyScope === 'account'} onClick={() => setPolicyScope('account')} className={`rounded-lg border px-3 py-1.5 ${policyScope === 'account' ? 'border-violet-400 text-violet-100' : 'border-white/10 text-zinc-400'}`}>Account defaults</button>
+            <button type="button" aria-pressed={policyScope === 'agent'} disabled={!agentId} onClick={() => setPolicyScope('agent')} className={`rounded-lg border px-3 py-1.5 disabled:opacity-40 ${policyScope === 'agent' ? 'border-violet-400 text-violet-100' : 'border-white/10 text-zinc-400'}`}>Selected agent only</button>
+          </div>
+          <p className="mt-2 text-zinc-400">{policyAgentId ? `Changes apply only to ${framework.agents.find(a => a.id === policyAgentId)?.name ?? 'the selected agent'} and do not change account-wide grants.` : 'Changes apply to account-wide defaults. Select an agent-specific scope for isolated QA.'}</p>
+        </div>
+        <BrowserPolicyPanel key={`${policyScope}:${agentId}`} tools={policyTools} browser={framework.browser} saving={saving} onSave={(p) => persist(policyAgentId ? { ...p, agentId: policyAgentId } : p, 'Policy updated')} />
+      </>}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}
       {tab === 'integrations' && <IntegrationsTab catalogue={integrationCatalogue} loading={loading} isAdmin={isAdmin} onConnect={connectIntegration} onDisconnect={disconnectIntegration} />}
       {tab === 'app-studio' && <AppStudioPanel toast={toast} />}
