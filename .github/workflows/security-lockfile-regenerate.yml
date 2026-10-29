@@ -1,0 +1,70 @@
+name: One-time security lockfile regeneration
+
+on:
+  push:
+    branches: [security/dependency-audit-20261029]
+    paths:
+      - package.json
+      - .github/workflows/security-lockfile-regenerate.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: security-lockfile-regenerate
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    if: github.repository == 'creativewebdesigneng-stack/palladium-ai-os' && github.ref == 'refs/heads/security/dependency-audit-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated security branch
+        uses: actions/checkout@v7
+        with:
+          ref: security/dependency-audit-20261029
+          persist-credentials: true
+
+      - name: Setup pinned Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Generate verified lockfile without running dependency scripts
+        run: bun install --lockfile-only --ignore-scripts
+
+      - name: Verify resolved security patch versions
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          const lock = JSON.parse(fs.readFileSync('bun.lock', 'utf8'))
+          const pins = [
+            ['undici', '7.30.1', 'undici@7.30.1'],
+            ['undici8', 'npm:undici@8.12.2', 'undici@8.12.2'],
+            ['body-parser', '2.4.0', 'body-parser@2.4.0'],
+          ]
+          for (const [name, declared, resolved] of pins) {
+            if (manifest.overrides?.[name] !== declared) throw new Error('Override mismatch: ' + name)
+            if (lock.packages?.[name]?.[0] !== resolved) throw new Error('Lockfile resolution mismatch: ' + name)
+          }
+          if (lock.overrides?.undici !== '7.30.1') throw new Error('Override lock metadata mismatch: undici')
+          console.log('All three patched dependency versions resolved in regenerated Bun lockfile.')
+          NODE
+
+      - name: Full high-severity dependency audit
+        run: bun audit --audit-level high
+
+      - name: Commit lockfile only to security branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- package.json
+          git diff --check
+          git add -- bun.lock
+          git diff --cached --quiet && { echo 'No lockfile change to commit'; exit 1; }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(security): regenerate audited Bun lockfile for patched dependencies'
+          git push origin HEAD:refs/heads/security/dependency-audit-20261029
