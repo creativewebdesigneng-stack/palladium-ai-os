@@ -5,6 +5,7 @@ export const CATEGORIES = ['All', 'Research', 'Support', 'Engineering', 'Marketi
 export const DEPARTMENTS = ['Research', 'Support', 'Engineering', 'Marketing', 'Finance', 'Operations', 'Design', 'HR', 'Product'];
 
 export const WIZARD_MODELS = [
+  { id: 'astra-native', name: 'Blackstar Astra · Local GPU', provider: 'compatible', letter: 'A', grad: 'from-cyan-400 to-violet-600', desc: 'Native local model · Uses configured BLACKSTAR_NATIVE_MODEL and approved tools' },
   { id: 'gpt', name: 'GPT-5 mini', provider: 'openai', letter: 'G', grad: 'from-emerald-400 to-teal-500', desc: 'OpenAI · gpt-5-mini' },
   { id: 'claude', provider: 'anthropic', name: 'Claude Sonnet 4.5', letter: 'C', grad: 'from-orange-400 to-amber-500', desc: 'Anthropic · claude-sonnet-4-5-20250929' },
   { id: 'gemini', provider: 'gemini', name: 'Gemini 3.6 Flash', letter: 'G', grad: 'from-blue-400 to-indigo-500', desc: 'Google · gemini-3.6-flash' },

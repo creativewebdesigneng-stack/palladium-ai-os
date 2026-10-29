@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 import type { ToolContext } from './tools-core.server';
+import { verifiedApprovedBrowserRead } from './verified-approved-browser-read';
 
 const publicUrl = z.string().url().max(2000).refine(value => {
   const url = new URL(value);
@@ -220,7 +221,10 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
       (name === 'shopping_search' && !grant.allowedDomains.length)
     ) throw new Error('Current tool permissions no longer allow the approved task.');
     await writeAuditRequired({ userId: args.userId, agentId: agent.id, action: browser ? 'agent.browser_approval_execution' : 'agent.tool_approval_execution', targetType: 'agent_task', targetId: taskId, metadata: { approval_request_id: approval.id } });
-    const claim = await db.from('agent_tasks').update({ status: 'running', heartbeat_at: new Date().toISOString() })
+    // Record one resume attempt under the same single-use claim, never as an
+    // unguarded increment. The immutable approval ledger retains provenance.
+    const priorResumes = Number.isSafeInteger(task.resume_count) && task.resume_count >= 0 ? task.resume_count : 0;
+    const claim = await db.from('agent_tasks').update({ status: 'running', resume_count: priorResumes + 1, heartbeat_at: new Date().toISOString() })
       .eq('id', taskId).eq('user_id', args.userId).eq('status', 'waiting_for_approval').eq('waiting_approval_request_id', approval.id).eq('cancel_requested', false).select('id').maybeSingle();
     if (claim.error || !claim.data) throw new Error('This browser task has already resumed or was cancelled.');
     claimedTask = taskId;
@@ -257,6 +261,31 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
         initialUsage: { input: Number(task.tokens_in ?? 0), output: Number(task.tokens_out ?? 0) },
         initialToolCallCount: Number(task.tool_calls ?? 1) });
     }
+    // The generative answer may accidentally alter a verbatim quotation.
+    // Preserve a separate, source-owned public read excerpt (never cookies,
+    // state, credentials, screenshots or model-rewritten prose) for the UI.
+    // This is best-effort evidence annotation AFTER genuine agent completion;
+    // failure to annotate cannot relabel an executed tool as a failure.
+    if (browser && resumed.status === 'succeeded') {
+      const verifiedRead = verifiedApprovedBrowserRead(input, output);
+      if (verifiedRead) {
+        try {
+          const { data: finished, error: readError } = await db.from('agent_tasks')
+            .select('output').eq('id', taskId).eq('user_id', args.userId).eq('agent_id', agent.id)
+            .eq('status', 'succeeded').maybeSingle();
+          if (readError || !finished || typeof finished.output !== 'object' || !finished.output || Array.isArray(finished.output)) {
+            throw new Error('Completed output was not available to annotate.');
+          }
+          const update = await db.from('agent_tasks').update({
+            output: { ...finished.output, verified_browser_source: verifiedRead },
+          }).eq('id', taskId).eq('user_id', args.userId).eq('agent_id', agent.id)
+            .eq('status', 'succeeded').select('id').maybeSingle();
+          if (update.error || !update.data) throw new Error('Could not persist verified read evidence.');
+        } catch (annotationError) {
+          console.error('[runtime.browser-approval] verified source annotation unavailable', annotationError);
+        }
+      }
+    }
     return { ok: true, provider: browser ? String(output['provider']) : 'local', result: { agent_task_id: taskId, simulated: false, task_status: resumed.status, ...(browser ? { browser_evidence: browserApprovalEvidence(output) } : { tool_evidence: browserApprovalEvidence(output) }) } };
   } catch (error) {
     if (claimedTask) await db.from('agent_tasks').update({ status: 'failed', error: 'Approved browser execution failed. Inspect approval and tool evidence.', completed_at: new Date().toISOString() }).eq('id', claimedTask).eq('user_id', args.userId).in('status', ['running', 'waiting_for_approval']).eq('waiting_approval_request_id', args.approvalRequestId).eq('cancel_requested', false);
@@ -265,7 +294,7 @@ export async function executeApprovedBrowserTask(args: { sb: Sb; userId: string;
 }
 
 export async function rejectBrowserApproval(args: { sb: Sb; userId: string; approvalRequestId: string; agentId: string; taskId: string }) {
-  const result = await args.sb.from('agent_tasks').update({ status: 'cancelled', completed_at: new Date().toISOString() })
+  const result = await args.sb.from('agent_tasks').update({ status: 'cancelled', waiting_approval_request_id: null, approval_resume_state: null, completed_at: new Date().toISOString() })
     .eq('id', args.taskId).eq('user_id', args.userId).eq('agent_id', args.agentId)
     .eq('waiting_approval_request_id', args.approvalRequestId).eq('status', 'waiting_for_approval').select('id').maybeSingle();
   if (result.error || !result.data) throw new Error('Could not confirm cancellation of the rejected browser task.');

@@ -72,7 +72,14 @@ export default function AgentWizard() {
   const modelState = useQuery({ queryKey: ['model-runtime-overview'], queryFn: () => modelsFn({ data: {} }), retry: false });
   const configuredProviders = new Set((modelState.data?.providers ?? []).filter(provider => provider.configured).map(provider => provider.id));
   const selectedModel = WIZARD_MODELS.find(model => model.id === d.model);
-  const modelReady = Boolean(selectedModel && configuredProviders.has(selectedModel.provider) && !modelState.error);
+  // The actual native model comes from the server's branch-specific runtime
+  // configuration, not from a hard-coded UI alias or an external provider.
+  const nativeCandidate = (modelState.data?.providers ?? []).find(p => p.id === 'compatible' && p.configured);
+  const nativeModel = nativeCandidate?.defaultModel?.trim() !== 'local-model'
+    ? nativeCandidate?.defaultModel?.trim() || null
+    : null;
+  const modelReady = Boolean(selectedModel && configuredProviders.has(selectedModel.provider) &&
+    (selectedModel.id !== 'astra-native' || nativeModel) && !modelState.error);
   const navigate = useNavigate();
   const { gate } = useUpgrade();
   const { toast } = useToast();
@@ -106,7 +113,7 @@ export default function AgentWizard() {
     submitRef.current = true;
     setCreating(true);
     try {
-      const settings = agentWizardSettings(d, availableTools);
+      const settings = agentWizardSettings({ ...d, nativeModel: nativeModel || undefined }, availableTools);
       const modelName = settings.model;
       const skills = splitList(d.skills);
       const connectors = splitList(d.connectors);
@@ -233,9 +240,9 @@ export default function AgentWizard() {
                 {modelState.error && <p role="alert" className="mb-3 text-xs text-rose-300">Could not check provider connections. Refresh before selecting a model.</p>}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {WIZARD_MODELS.map(m => (
-                    <button key={m.id} type="button" aria-pressed={d.model === m.id} disabled={!configuredProviders.has(m.provider) || Boolean(modelState.error)} onClick={() => set({ model: m.id })} className={`flex items-start gap-3 rounded-xl border p-3 text-left transition disabled:opacity-50 ${d.model === m.id ? 'border-violet-400/50 bg-violet-500/10' : 'border-white/10 hover:bg-white/5'}`}>
+                    <button key={m.id} type="button" aria-pressed={d.model === m.id} disabled={!configuredProviders.has(m.provider) || (m.id === 'astra-native' && !nativeModel) || Boolean(modelState.error)} onClick={() => set({ model: m.id })} className={`flex items-start gap-3 rounded-xl border p-3 text-left transition disabled:opacity-50 ${d.model === m.id ? 'border-violet-400/50 bg-violet-500/10' : 'border-white/10 hover:bg-white/5'}`}>
                       <span className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br ${m.grad} text-sm font-semibold text-white`}>{m.letter}</span>
-                      <div className="min-w-0"><p className="text-sm font-medium text-white">{m.name}</p><p className="text-[11px] text-zinc-500">{m.desc}</p><p className="mt-1 text-[10px] text-zinc-400">{configuredProviders.has(m.provider) ? 'Provider connected' : 'Connection required in Runtime Models'}</p></div>
+                      <div className="min-w-0"><p className="text-sm font-medium text-white">{m.name}</p><p className="text-[11px] text-zinc-500">{m.desc}</p><p className="mt-1 text-[10px] text-zinc-400">{m.id === 'astra-native' ? (nativeModel ? `Native model: ${nativeModel}` : 'Local native model not configured') : configuredProviders.has(m.provider) ? 'Provider connected' : 'Connection required in Runtime Models'}</p></div>
                       {d.model === m.id && <Check className="ml-auto h-4 w-4 text-violet-400" />}
                     </button>
                   ))}

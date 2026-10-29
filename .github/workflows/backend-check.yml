@@ -2,7 +2,8 @@ name: Backend Check
 
 on:
   push:
-    branches: [main]
+    # Temporary QA-only trigger; remove before merging this QA branch.
+    branches: [main, qa/astra-guided-reasoning-20261029]
   pull_request:
     branches: [main]
 
