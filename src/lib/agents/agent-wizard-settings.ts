@@ -1,7 +1,7 @@
 import {AGENT_MODEL_CHOICES} from './agent-model-selection';
 export type AgentToolChoice = {slug:string;name:string;description?:string;is_active:boolean;executable:boolean;min_plan?:string};
 /** Translate UI choices without granting tool permission or connector access. */
-export function agentWizardSettings(input:{model:string;mem:Record<string,boolean>;tools:string[];nativeModel?:string},catalogue:AgentToolChoice[]) {
+export function agentWizardSettings(input:{model:string;mem:Record<string,boolean>;tools:string[];nativeModel?:string|undefined},catalogue:AgentToolChoice[]) {
   let selected = AGENT_MODEL_CHOICES[input.model];
   if (input.model === 'astra-native') {
     // Never persist the placeholder "local-model" or guess the model ID.
