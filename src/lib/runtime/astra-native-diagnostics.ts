@@ -49,7 +49,7 @@ export const ASTRA_NATIVE_DIAGNOSTIC_CASES = [
  * This controls inference resources only; it does not touch the signed
  * independent Astra certification suite or change the grading criteria.
  */
-export type AstraNativeDiagnosticMode = "fast" | "deliberate";
+export type AstraNativeDiagnosticMode = "fast" | "deliberate" | "guided";
 
 export function astraNativeDiagnosticInferenceProfile(
   caseId: string,
@@ -58,23 +58,35 @@ export function astraNativeDiagnosticInferenceProfile(
 ) {
   const fixture = findAstraNativeDiagnosticCase(caseId);
   if (!fixture) throw new Error("Unknown server-owned diagnostic fixture.");
-  if (mode === "deliberate" && fixture.id !== "scheduling") {
-    throw new Error("Deliberate comparison is available only for the reasoning diagnostic.");
+  if (mode !== "fast" && fixture.id !== "scheduling") {
+    throw new Error("Extra reasoning modes are available only for the reasoning diagnostic.");
   }
   const qwen = /(?:^|[\/:._-])qwen3(?:[\/:._-]|$)/i.test(model.trim());
   const deliberate = mode === "deliberate";
+  const guided = mode === "guided";
   return {
     mode,
     prompt: deliberate
       ? fixture.prompt.replace(/\s*\/no_think\s*$/i, " /think")
-      : fixture.prompt,
-    // A deliberate pass has more tokens/time available; this does not
-    // change any ground truth and does not guarantee the API honours think.
-    maxTokens: deliberate ? 1024 : 240,
+      : guided
+        // A separate bounded, no-think experiment: the baseline fixture and its
+        // answer key are unchanged, while the model gets a generic planning method.
+        ? fixture.prompt.replace(/\s*\/no_think\s*$/i,
+          " First calculate earliest dependency-safe start and finish times for each job; check that no more than two workers overlap; then return only the requested JSON object. /no_think")
+        : fixture.prompt,
+    // Keep the original fast/deep comparison intact. Guided is separately
+    // identified so a prompt-assisted answer cannot count as a baseline pass.
+    maxTokens: deliberate ? 1024 : guided ? 320 : 240,
     timeoutMs: deliberate ? 60_000 : 45_000,
     temperature: deliberate && qwen ? 0.6 : 0,
     reasoningEffort: qwen ? (deliberate ? "low" as const : "none" as const) : undefined,
   };
+}
+
+/** A malformed response that reaches the cap is budget-limited evidence, not
+ * proof of a correct answer or proof that the model could not reason. */
+export function astraNativeDiagnosticOutputBudgetReached(verdict: string, outputTokens: number, maxTokens: number): boolean {
+  return verdict === "format_invalid" && maxTokens > 0 && outputTokens >= maxTokens;
 }
 
 export type AstraNativeDiagnosticCaseId = typeof ASTRA_NATIVE_DIAGNOSTIC_CASES[number]["id"];

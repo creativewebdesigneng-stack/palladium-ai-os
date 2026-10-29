@@ -9,13 +9,13 @@ import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { runChatPinned } from "./model-gateway.server";
 import { resolveNativeVerificationTarget } from "./native-runtime-verification";
-import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeDiagnosticInferenceProfile, ASTRA_NATIVE_DIAGNOSTIC_VERSION } from "./astra-native-diagnostics";
+import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeDiagnosticInferenceProfile, astraNativeDiagnosticOutputBudgetReached, ASTRA_NATIVE_DIAGNOSTIC_VERSION } from "./astra-native-diagnostics";
 
  export const runBlackstarNativeDiagnostic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({
     caseId: z.string().min(1).max(40),
-    mode: z.enum(["fast", "deliberate"]).default("fast"),
+    mode: z.enum(["fast", "deliberate", "guided"]).default("fast"),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
@@ -24,7 +24,7 @@ import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeD
     if (!fixture) throw new Error("Unknown server-owned Astra diagnostic case.");
     // Do not let an arbitrary caller enable longer, more expensive inference
     // on unrelated cases or affect the independently attested certification.
-    if (data.mode === "deliberate" && fixture.id !== "scheduling") {
+    if (data.mode !== "fast" && fixture.id !== "scheduling") {
       throw new Error("Deliberate mode is restricted to the scheduling diagnostic.");
     }
 
@@ -52,6 +52,7 @@ import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeD
         throw new Error("pinned_identity_mismatch");
       }
       const grade = scoreAstraNativeDiagnostic(fixture.id, result.text);
+      const outputBudgetReached = astraNativeDiagnosticOutputBudgetReached(grade.verdict, result.usage.output, profile.maxTokens);
       await writeAudit({
         userId: context.userId,
         action: "blackstar.native_runtime.diagnostic",
@@ -66,6 +67,7 @@ import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeD
           task_class: fixture.category,
           verdict: grade.verdict,
           passed: grade.passed,
+          output_budget_reached: outputBudgetReached,
           latency_ms: latencyMs,
           input_tokens: result.usage.input,
           output_tokens: result.usage.output,
@@ -81,6 +83,7 @@ import { findAstraNativeDiagnosticCase, scoreAstraNativeDiagnostic, astraNativeD
         category: fixture.category,
         passed: grade.passed,
         verdict: grade.verdict,
+        outputBudgetReached,
         provider: result.provider,
         model: result.model,
         latencyMs,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ASTRA_NATIVE_DIAGNOSTIC_CASES,
   astraNativeDiagnosticInferenceProfile,
+  astraNativeDiagnosticOutputBudgetReached,
   findAstraNativeDiagnosticCase,
   scoreAstraNativeDiagnostic,
 } from "../astra-native-diagnostics";
@@ -47,8 +48,30 @@ describe("Blackstar Astra native quality diagnostics", () => {
     expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":6}').passed).toBe(true);
   });
 
+  it("keeps the baseline unchanged and isolates generic guided reasoning as a separate experiment", () => {
+    const baseline = astraNativeDiagnosticInferenceProfile("scheduling", "qwen3:8b-q4_K_M", "fast");
+    const guided = astraNativeDiagnosticInferenceProfile("scheduling", "qwen3:8b-q4_K_M", "guided");
+    expect(guided).toMatchObject({ mode: "guided", maxTokens: 320, timeoutMs: 45_000, temperature: 0, reasoningEffort: "none" });
+    expect(guided.prompt).toContain("earliest dependency-safe start");
+    expect(guided.prompt).toContain("/no_think");
+    expect(guided.prompt).not.toContain("/think");
+    expect(guided.prompt).not.toContain('{"answer":6}');
+    expect(baseline.prompt).toBe(findAstraNativeDiagnosticCase("scheduling")?.prompt);
+    expect(scoreAstraNativeDiagnostic("scheduling", '{"answer":7}').passed).toBe(false);
+  });
+
+  it("distinguishes invalid output at the budget ceiling without converting it into a pass", () => {
+    expect(astraNativeDiagnosticOutputBudgetReached("format_invalid", 1024, 1024)).toBe(true);
+    expect(astraNativeDiagnosticOutputBudgetReached("format_invalid", 500, 1024)).toBe(false);
+    expect(astraNativeDiagnosticOutputBudgetReached("incorrect_answer", 1024, 1024)).toBe(false);
+    expect(astraNativeDiagnosticOutputBudgetReached("exact_match", 1024, 1024)).toBe(false);
+    expect(scoreAstraNativeDiagnostic("scheduling", "").passed).toBe(false);
+  });
+
   it("only allows extra GPU inference for the server-owned reasoning fixture", () => {
     expect(() => astraNativeDiagnosticInferenceProfile("ts-expression", "qwen3:8b", "deliberate"))
+      .toThrow(/only for the reasoning diagnostic/i);
+    expect(() => astraNativeDiagnosticInferenceProfile("approval-status", "qwen3:8b", "guided"))
       .toThrow(/only for the reasoning diagnostic/i);
     expect(() => astraNativeDiagnosticInferenceProfile("forged", "qwen3:8b"))
       .toThrow(/unknown server-owned/i);

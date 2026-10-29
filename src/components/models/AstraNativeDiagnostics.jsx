@@ -23,7 +23,7 @@ export default function AstraNativeDiagnostics() {
     mutationFn: ({ caseId, mode = 'fast' }) => runFn({ data: { caseId, mode } }),
     onMutate: ({ caseId, mode = 'fast' }) => setActive(`${caseId}:${mode}`),
     onSuccess: (data, { caseId, mode = 'fast' }) =>
-      setResults((old) => ({ ...old, [mode === 'deliberate' ? `${caseId}:deliberate` : caseId]: data })),
+      setResults((old) => ({ ...old, [mode === 'fast' ? caseId : `${caseId}:${mode}`]: data })),
     onSettled: () => setActive(null),
   });
   if (session !== 'yes') return null;
@@ -50,6 +50,7 @@ export default function AstraNativeDiagnostics() {
         {CASES.map((item) => {
           const result = results[item.id];
           const deepResult = item.id === 'scheduling' ? results['scheduling:deliberate'] : null;
+          const guidedResult = item.id === 'scheduling' ? results['scheduling:guided'] : null;
           return (
             <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="min-w-0 flex-1">
@@ -57,7 +58,7 @@ export default function AstraNativeDiagnostics() {
                 <p className="mt-1 text-[10px] text-zinc-400">
                   {result?.forbidden ? 'Admin permission required'
                     : !result ? 'Not yet executed'
-                    : result.executed ? `${result.passed ? 'PASS' : 'FAIL'} · ${result.verdict} · ${result.latencyMs} ms · ${result.provider}/${result.model}`
+                    : result.executed ? `${result.passed ? 'PASS' : 'FAIL'} · ${result.verdict}${result.outputBudgetReached ? ' (output budget reached)' : ''} · ${result.latencyMs} ms · ${result.provider}/${result.model}`
                     : `BLOCKED · ${result.failure ?? 'No native response'}`}
                 </p>
                 {result?.executed && <p className="mt-1 break-words text-[10px] text-zinc-500">Fast model excerpt: {result.responseExcerpt || '(empty)'}</p>}
@@ -67,10 +68,12 @@ export default function AstraNativeDiagnostics() {
                 {item.id === 'scheduling' && <p className="mt-1 text-[10px] text-zinc-400">
                   {deepResult?.forbidden ? 'Deliberate: admin permission required'
                     : !deepResult ? 'Deliberate mode not yet tested'
-                    : deepResult.executed ? `Deliberate: ${deepResult.passed ? 'PASS' : 'FAIL'} · ${deepResult.verdict} · ${deepResult.latencyMs} ms · ${deepResult.outputTokens} output tokens`
+                    : deepResult.executed ? `Deliberate: ${deepResult.passed ? 'PASS' : 'FAIL'} · ${deepResult.verdict}${deepResult.outputBudgetReached ? ' (output budget reached)' : ''} · ${deepResult.latencyMs} ms · ${deepResult.outputTokens} output tokens`
                     : `Deliberate: BLOCKED · ${deepResult.failure ?? 'No native response'}`}
                 </p>}
                 {deepResult?.executed && <p className="mt-1 break-words text-[10px] text-zinc-500">Deliberate model excerpt: {deepResult.responseExcerpt || '(empty)'}</p>}
+                {item.id === 'scheduling' && <p className="mt-1 text-[10px] text-zinc-400">{!guidedResult ? 'Guided no-think reasoning not tested (separate prompt-assisted result)' : guidedResult.executed ? `Guided: ${guidedResult.passed ? 'PASS' : 'FAIL'} · ${guidedResult.verdict} · ${guidedResult.latencyMs} ms` : `Guided: BLOCKED · ${guidedResult.failure ?? 'No native response'}`}</p>}
+                {guidedResult?.executed && <p className="mt-1 break-words text-[10px] text-zinc-500">Guided model excerpt: {guidedResult.responseExcerpt || '(empty)'}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -82,6 +85,14 @@ export default function AstraNativeDiagnostics() {
                   {active === `${item.id}:fast` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cpu className="h-3.5 w-3.5" />}
                   {active === `${item.id}:fast` ? 'Testing…' : item.id === 'scheduling' ? 'Run fast' : result ? 'Rerun' : 'Run check'}
                 </button>
+                {item.id === 'scheduling' && <button
+                  type="button"
+                  disabled={runCase.isPending}
+                  onClick={() => runCase.mutate({ caseId: item.id, mode: 'guided' })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-[11px] font-medium text-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {active === 'scheduling:guided' ? 'Testing…' : 'Run guided'}
+                </button>}
                 {item.id === 'scheduling' && <button
                   type="button"
                   disabled={runCase.isPending}
@@ -98,7 +109,7 @@ export default function AstraNativeDiagnostics() {
       </div>
       {runCase.error && <p className="mt-3 text-xs text-rose-200">{friendlyMessage(runCase.error)}</p>}
       <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">
-        A passing fixture means the specified answer matched a deterministic key. Coding checks do not execute generated code;
+        Guided is a separately tagged no-think, prompt-assisted experiment and never changes the five-case baseline. An output-budget flag does not prove the answer would have been correct. A passing fixture means the specified answer matched a deterministic key. Coding checks do not execute generated code;
         source-grounding checks use supplied records, not a live internet search. This is not independent model-quality certification,
         browser-tool certification, or proof of parity with other AI models. Deliberate reasoning uses more local-GPU time
         and may still fail if your Ollama OpenAI-compatible endpoint ignores thinking controls. Keep your home bridge running while testing.
