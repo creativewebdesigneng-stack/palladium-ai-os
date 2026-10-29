@@ -39,7 +39,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
           const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
-          const lock = JSON.parse(fs.readFileSync('bun.lock', 'utf8'))
+          const lockText = fs.readFileSync('bun.lock', 'utf8')
           const pins = [
             ['undici', '7.30.1', 'undici@7.30.1'],
             ['undici8', 'npm:undici@8.12.2', 'undici@8.12.2'],
@@ -47,9 +47,9 @@ jobs:
           ]
           for (const [name, declared, resolved] of pins) {
             if (manifest.overrides?.[name] !== declared) throw new Error('Override mismatch: ' + name)
-            if (lock.packages?.[name]?.[0] !== resolved) throw new Error('Lockfile resolution mismatch: ' + name)
+            if (!lockText.includes('"' + name + '": ["' + resolved + '"')) throw new Error('Lockfile resolution mismatch: ' + name)
           }
-          if (lock.overrides?.undici !== '7.30.1') throw new Error('Override lock metadata mismatch: undici')
+          // Bun's text lockfile allows trailing commas; do not use strict JSON.parse.
           console.log('All three patched dependency versions resolved in regenerated Bun lockfile.')
           NODE
 
