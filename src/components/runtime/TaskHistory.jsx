@@ -49,7 +49,18 @@ export default function TaskHistory({ tasks }) {
                     <section className="mt-3 rounded-xl border border-sky-400/20 bg-sky-400/5 p-3" aria-label="Verified browser source">
                       <p className="text-xs font-semibold text-sky-200">Verified browser text · exact Playwright source</p>
                       <p className="mt-1 break-all text-[10px] text-zinc-400">{verifiedBrowserSource(t).url} · Ephemeral session · Not model-transcribed</p>
-                      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-xs text-zinc-200">{verifiedBrowserSource(t).text}</pre>
+                      {Array.isArray(verifiedBrowserSource(t).fields) && verifiedBrowserSource(t).fields.length > 0 ? (
+                        <div className="mt-2 space-y-3">
+                          {verifiedBrowserSource(t).fields.map((field, index) => (
+                            <div key={field.name + '-' + index}>
+                              <p className="mb-1 text-[11px] font-semibold text-sky-200">{field.name}</p>
+                              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-xs text-zinc-200">{field.text}</pre>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-xs text-zinc-200">{verifiedBrowserSource(t).text}</pre>
+                      )}
                     </section>
                   )}
                   <p className="mt-2 text-[10px] text-zinc-600">{[t.provider, t.model, tokens ? `${tokens} tokens` : ''].filter(Boolean).join(' · ')}</p>
