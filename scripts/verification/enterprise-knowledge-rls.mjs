@@ -53,6 +53,8 @@ await db.exec(`
     using(user_id=(select auth.uid()) or
       (org_id is not null and scope in ('shared','organisation') and private.is_org_member(org_id)));
   grant select on agent_memories to authenticated;
+  create function storage.foldername(_name text) returns text[]
+    language sql immutable as $folder$ select string_to_array(_name, '/') $folder$;
   create table storage.objects (id uuid primary key, bucket_id text not null, name text not null, payload text);
   alter table storage.objects enable row level security;
   create policy blackstar_knowledge_owner_read on storage.objects
@@ -62,8 +64,20 @@ await db.exec(`
     with check(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
   create policy blackstar_knowledge_owner_delete on storage.objects
     for delete to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
+  -- Recreate the broad permissive production trusted-media compatibility
+  -- policies. Without new RESTRICTIVE owner policies these expose other
+  -- users knowledge objects despite the narrow owner policies above.
+  create policy trusted_media_read_scope on storage.objects
+    for select to authenticated using(bucket_id <> 'trusted-media');
+  create policy trusted_media_upload_scope on storage.objects
+    for insert to authenticated with check(bucket_id <> 'trusted-media');
+  create policy trusted_media_no_client_replace on storage.objects
+    for update to authenticated using(bucket_id <> 'trusted-media')
+    with check(bucket_id <> 'trusted-media');
+  create policy trusted_media_no_client_delete on storage.objects
+    for delete to authenticated using(bucket_id <> 'trusted-media');
   grant usage on schema storage to anon,authenticated;
-  grant select,update,delete on storage.objects to authenticated;
+  grant select,insert,update,delete on storage.objects to authenticated;
   alter table memory_documents enable row level security;
   alter table memory_chunks enable row level security;
   create policy memory_documents_owner_only on memory_documents for all to authenticated
@@ -126,6 +140,14 @@ verify((await selectAs(bob,"select id from storage.objects where name='${alice}/
   'org membership does not grant a different authors source file');
 verify((await rows("select id from storage.objects where name='${bob}/bob.pdf'")).length===1,
   'member can read own original file');
+verify((await rows("update storage.objects set payload='tampered' where name='${alice}/org-shared.pdf' returning id")).length===0,
+  'other member cannot overwrite an original file despite globally permissive update policy');
+verify((await rows("delete from storage.objects where name='${alice}/org-private.pdf' returning id")).length===0,
+  'other member cannot delete original file despite globally permissive delete policy');
+await assert.rejects(() => db.query(`insert into storage.objects(id,bucket_id,name,payload)
+  values('${id(406)}','knowledge','${alice}/forged.pdf','forged')`)); passed++;
+verify((await rows("select id from storage.objects where name='${alice}/personal.pdf'")).length===0,
+  'other member cannot read unrelated personal file despite broad read policy');
 verify((await selectAs(bob,'select id from memory_documents')).length===1,'member sees only explicit shared ready docs');
 verify((await rows('select id from memory_chunks')).length===1,'member sees only matching parent chunk');
 verify((await rows('select id from agent_memories')).length===1,
