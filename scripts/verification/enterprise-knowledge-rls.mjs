@@ -124,8 +124,10 @@ await assert.rejects(() => db.query(`insert into memory_documents (id,user_id,or
 
 verify((await selectAs(stranger,'select id from memory_documents')).length===0,'other organisation cannot read document');
 verify((await rows('select id from memory_chunks')).length===0,'other organisation cannot read chunk');
-verify((await selectAs(alice,'select id from memory_documents')).length===6,'owner still reads own documents');
-verify((await rows('select id from memory_chunks')).length===5,'owner still reads own chunks');
+verify((await selectAs(alice,'select id from memory_documents')).length===5,'owner reads documents in organisations they still belong to');
+verify((await rows(`select id from memory_documents where id='${foreign}'`)).length===0,'owner cannot read org-labelled document from an org they never joined');
+verify((await rows('select id from memory_chunks')).length===4,'owner reads chunks in organisations they still belong to');
+verify((await rows(`select id from memory_chunks where id='${mismatchedChunk}'`)).length===0,'owner cannot read mismatched org-labelled chunk');
 
 await db.exec('reset role;');
 await db.query(`update memory_documents set metadata='{}'::jsonb where id='${shared}'`);
