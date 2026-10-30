@@ -93,6 +93,16 @@ the uploader exits. It does not rewrite or delete existing customer data.
 
 **Offboarding caveat:** This restricts database reads after the policy is
 applied; it is not a promise to revoke an already downloaded copy, direct
-storage-bucket file ownership access, or the separate `agent_memories` policy.
+storage-bucket file ownership access, or custom search RPCs that bypass the current caller's RLS.
 Those additional surfaces still need audit before enterprise certification.
 No migration was run against Production.
+
+### Derived memory summary offboarding
+The candidate now also installs a RESTRICTIVE SELECT policy for existing
+`agent_memories` rows with a non-null `org_id`. Without this, the original
+uploader could lose direct document/chunk access but retain a searchable
+organisation policy summary. The isolated test suite covers previously shared
+memory, private organisation memory, and unrelated personal memory for both
+revoked contributors and remaining members. The policy does not revoke
+direct raw storage access to files the original uploader controls, nor prove
+that every elevated search RPC has correct authority checks.
