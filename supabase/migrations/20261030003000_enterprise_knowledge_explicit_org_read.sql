@@ -99,8 +99,15 @@ create policy agent_memories_enterprise_current_member_read
 on public.agent_memories as restrictive for select to authenticated
 using (
   org_id is null
-  or private.is_org_member(org_id)
+  or (
+    private.is_org_member(org_id)
+    and exists (
+      select 1 from public.organisation_members author
+      where author.org_id = agent_memories.org_id
+        and author.user_id = agent_memories.user_id
+    )
+  )
 );
 
 comment on policy agent_memories_enterprise_current_member_read
-on public.agent_memories is 'Require live organisation membership for all org-labelled memory including derived document summaries, even when the caller is original owner.';
+on public.agent_memories is 'Require live reader and uploader organisation membership for org-labelled memory and derived document summaries, including original-owner reads.';
