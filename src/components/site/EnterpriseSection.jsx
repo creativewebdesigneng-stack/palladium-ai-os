@@ -39,8 +39,8 @@ export default function EnterpriseSection() {
               <Link to="/pricing" className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90">
                 Review plans <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
-              <Link to="/business" className="rounded-xl border border-white/15 bg-white/[.03] px-6 py-3 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10">
-                Explore business
+              <Link to="/enterprise-solutions" className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-6 py-3 text-sm font-medium text-amber-100 backdrop-blur transition hover:bg-amber-300/15">
+                View enterprise solutions <ArrowRight className="inline h-4 w-4" />
               </Link>
             </div>
           </div>

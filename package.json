@@ -28,7 +28,8 @@
     "test:developer-api-recovery": "node scripts/verification/developer-api-recovery.mjs",
     "test:provider-job-recovery": "node scripts/verification/provider-job-recovery.mjs",
     "test:builder-authority-recovery": "node scripts/verification/builder-authority-recovery.mjs",
-    "test:marketplace-compatibility": "node scripts/verification/marketplace-compatibility.mjs"
+    "test:marketplace-compatibility": "node scripts/verification/marketplace-compatibility.mjs",
+    "test:enterprise-knowledge-rls": "node scripts/verification/enterprise-knowledge-rls.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -100,7 +101,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
@@ -120,7 +121,7 @@
     "prettier": "^3.9.9",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.1",
+    "vite": "^8.3.3",
     "vitest": "^5.0.2"
   },
   "overrides": {
@@ -130,13 +131,16 @@
     "follow-redirects": "1.16.1",
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
-    "undici": "7.29.1",
-    "undici8": "npm:undici@8.10.2",
+    "undici": "7.30.1",
+    "undici8": "npm:undici@8.12.2",
     "source-map-js": "1.2.2",
     "shell-quote": "1.12.0",
     "proxy-addr": "2.0.8",
     "@modelcontextprotocol/sdk": "1.32.1",
-    "seroval": "1.6.7",
-    "seroval-plugins": "1.6.7"
+    "seroval": "1.6.8",
+    "seroval-plugins": "1.6.7",
+    "body-parser": "2.4.0",
+    "launch-editor": "2.14.2",
+    "zod": "4.6.7"
   }
 }
