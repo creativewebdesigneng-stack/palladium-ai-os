@@ -17,7 +17,7 @@ const sharedChunk = id(201), mismatchedChunk = id(202);
 
 await db.exec(`
   create role anon; create role authenticated; create role service_role bypassrls;
-  create schema auth; create schema private;
+  create schema auth; create schema private; create schema storage;
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
   create table organisation_members (org_id uuid, user_id uuid, role text);
@@ -39,7 +39,7 @@ await db.exec(`
   grant select on organisation_members to authenticated;
   create table memory_documents (
     id uuid primary key, user_id uuid not null, org_id uuid,
-    agent_id uuid, title text, status text not null, metadata jsonb not null default '{}'::jsonb
+    agent_id uuid, title text, status text not null, storage_path text, metadata jsonb not null default '{}'::jsonb
   );
   create table memory_chunks (
     id uuid primary key, document_id uuid not null references memory_documents(id),
@@ -53,6 +53,17 @@ await db.exec(`
     using(user_id=(select auth.uid()) or
       (org_id is not null and scope in ('shared','organisation') and private.is_org_member(org_id)));
   grant select on agent_memories to authenticated;
+  create table storage.objects (id uuid primary key, bucket_id text not null, name text not null, payload text);
+  alter table storage.objects enable row level security;
+  create policy blackstar_knowledge_owner_read on storage.objects
+    for select to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
+  create policy blackstar_knowledge_owner_update on storage.objects
+    for update to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text)
+    with check(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
+  create policy blackstar_knowledge_owner_delete on storage.objects
+    for delete to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
+  grant usage on schema storage to anon,authenticated;
+  grant select,update,delete on storage.objects to authenticated;
   alter table memory_documents enable row level security;
   alter table memory_chunks enable row level security;
   create policy memory_documents_owner_only on memory_documents for all to authenticated
@@ -79,6 +90,14 @@ await db.exec(`
     ('${agentDoc}','${alice}','${org}','${id(999)}','Agent only','ready','{"enterprise_shared":true}'),
     ('${foreign}','${alice}','${otherOrg}',null,'Other tenant','ready','{"enterprise_shared":true}'),
     ('${falseFlag}','${alice}','${org}',null,'String opt in','ready','{"enterprise_shared":"true"}');
+  update memory_documents set storage_path='${alice}/org-shared.pdf' where id='${shared}';
+  update memory_documents set storage_path='${alice}/org-private.pdf' where id='${privateDoc}';
+  insert into storage.objects(id,bucket_id,name,payload) values
+    ('00000000-0000-4000-8000-000000000401','knowledge','${alice}/org-shared.pdf','Shared file'),
+    ('00000000-0000-4000-8000-000000000402','knowledge','${alice}/org-private.pdf','Org private file'),
+    ('00000000-0000-4000-8000-000000000403','knowledge','${alice}/personal.pdf','Personal file'),
+    ('00000000-0000-4000-8000-000000000404','knowledge','${alice}/orphan.pdf','Orphan file'),
+    ('00000000-0000-4000-8000-000000000405','knowledge','${bob}/bob.pdf','Member file');
   insert into agent_memories(id,user_id,org_id,scope,content) values
     ('${id(301)}','${alice}','${org}','shared','Shared derived summary'),
     ('${id(302)}','${alice}','${org}','private','Private organisation summary'),
@@ -99,6 +118,14 @@ const selectAs = async (user, query) => {
   return rows(query);
 };
 
+verify((await selectAs(alice,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===1,
+  'current author can access their indexed organisation file');
+verify((await rows("select id from storage.objects where name='${alice}/org-private.pdf'")).length===1,
+  'current author can access private organisation file');
+verify((await selectAs(bob,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===0,
+  'org membership does not grant a different authors source file');
+verify((await rows("select id from storage.objects where name='${bob}/bob.pdf'")).length===1,
+  'member can read own original file');
 verify((await selectAs(bob,'select id from memory_documents')).length===1,'member sees only explicit shared ready docs');
 verify((await rows('select id from memory_chunks')).length===1,'member sees only matching parent chunk');
 verify((await rows('select id from agent_memories')).length===1,
@@ -149,8 +176,21 @@ await db.query(`insert into memory_documents (id,user_id,org_id,title,status,met
   values('${id(109)}','${alice}',null,'Personal note','ready','{}')`);
 await db.query(`insert into memory_chunks (id,document_id,user_id,org_id,agent_id,content)
   values('${id(209)}','${id(109)}','${alice}',null,null,'Private personal note')`);
+await db.query(`update memory_documents set storage_path='${alice}/personal.pdf' where id='${id(109)}'`);
 await db.query(`insert into organisation_members (org_id,user_id,role) values('${org}','${bob}','member')`);
 await db.query(`delete from organisation_members where org_id='${org}' and user_id='${alice}'`);
+verify((await selectAs(alice,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===0,
+  'revoked original uploader cannot read formerly indexed shared source file');
+verify((await rows("select id from storage.objects where name='${alice}/org-private.pdf'")).length===0,
+  'revoked original uploader cannot read formerly indexed private org file');
+verify((await rows("update storage.objects set payload='changed' where name='${alice}/org-shared.pdf' returning id")).length===0,
+  'revoked uploader cannot overwrite old org object');
+verify((await rows("delete from storage.objects where name='${alice}/org-shared.pdf' returning id")).length===0,
+  'revoked uploader cannot delete old org object');
+verify((await rows("select id from storage.objects where name='${alice}/personal.pdf'")).length===1,
+  'revoked uploader still reads truly private original file');
+verify((await rows("select id from storage.objects where name='${alice}/orphan.pdf'")).length===1,
+  'pre-ingest orphan original file remains owner only');
 verify((await selectAs(alice,`select id from memory_documents where id='${shared}'`)).length===0,
   'removed original uploader cannot read own formerly shared org document');
 verify((await rows(`select id from memory_chunks where id='${sharedChunk}'`)).length===0,
