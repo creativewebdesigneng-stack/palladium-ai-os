@@ -88,3 +88,19 @@ on public.memory_documents is 'Prevent stale owner RLS reads after org membershi
 
 comment on policy memory_chunks_enterprise_current_member_read
 on public.memory_chunks is 'Prevent stale owner RLS chunk reads after org membership revocation; personal chunks remain unchanged.';
+
+
+-- Document ingestion also writes a summary into agent_memories. Existing
+-- legacy memory RLS can return an org-tagged summary to its former owner,
+-- even when its source document is no longer readable. Restrict all current
+-- agent-memory SELECT policies for org-tagged rows to live membership. This
+-- never grants additional access; personal memories remain owner-scoped.
+create policy agent_memories_enterprise_current_member_read
+on public.agent_memories as restrictive for select to authenticated
+using (
+  org_id is null
+  or private.is_org_member(org_id)
+);
+
+comment on policy agent_memories_enterprise_current_member_read
+on public.agent_memories is 'Require live organisation membership for all org-labelled memory including derived document summaries, even when the caller is original owner.';
