@@ -718,14 +718,18 @@ export async function ingestDocument(args: {
 export async function deleteDocument(args: { sb: Sb; userId: string; documentId: string }) {
   const { data: doc } = await args.sb
     .from("memory_documents")
-    .select("id,storage_path")
+    .select("id,user_id,storage_path")
     .eq("id", args.documentId)
+    .eq("user_id", args.userId)
     .maybeSingle();
+
+  if (!doc || doc.user_id !== args.userId) throw new MemoryError("Document not found, or you do not own it.");
 
   const { data: chunks } = await args.sb
     .from("memory_chunks")
     .select("id,org_id,agent_id,vector_provider")
-    .eq("document_id", args.documentId);
+    .eq("document_id", args.documentId)
+    .eq("user_id", args.userId);
   const ids = (chunks ?? []).map((c: any) => c.id);
   if (ids.length) {
     try {
@@ -739,8 +743,10 @@ export async function deleteDocument(args: { sb: Sb; userId: string; documentId:
       console.error("[memory] chunk vector delete failed", error);
     }
   }
-  const { error } = await args.sb.from("memory_documents").delete().eq("id", args.documentId);
+  const { data: deletedRows, error } = await args.sb.from("memory_documents")
+    .delete().eq("id", args.documentId).eq("user_id", args.userId).select("id");
   if (error) throw new MemoryError(error.message);
+  if (!deletedRows?.length) throw new MemoryError("Document was not deleted.");
 
   // The uploaded file goes with the document; nothing is left in the private bucket.
   if (doc?.storage_path) {
