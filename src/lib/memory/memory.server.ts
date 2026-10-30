@@ -182,6 +182,10 @@ export async function indexMemory(args: {
   memory: any;
   provider?: string | null;
 }) {
+  // Shared organisation memories may be RLS-readable by colleagues, but a
+  // read grant must never authorise owner-only vector reindexing.
+  if (!args.userId || args.memory?.user_id !== args.userId)
+    throw new MemoryError("Memory not found, or you do not own it.");
   const text = [args.memory.title, args.memory.content].filter(Boolean).join("\n");
   const store = getVectorStore(args.sb, args.provider);
   const filter: VectorFilter = {
@@ -273,7 +277,8 @@ export async function updateMemory(args: {
     .select("*")
     .maybeSingle();
   if (error) throw new MemoryError(error.message);
-  if (!data) throw new MemoryError("Memory not found, or you do not have permission to edit it.");
+  if (!data || data.user_id !== args.userId)
+    throw new MemoryError("Memory not found, or you do not own it.");
 
   if (patch["vector_status"] === "pending") {
     await indexMemory({ sb: args.sb, userId: args.userId, memory: data }).catch((e) =>
