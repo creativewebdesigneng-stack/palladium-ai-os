@@ -111,3 +111,63 @@ using (
 
 comment on policy agent_memories_enterprise_current_member_read
 on public.agent_memories is 'Require live reader and uploader organisation membership for org-labelled memory and derived document summaries, including original-owner reads.';
+
+
+-- Private object offboarding: existing knowledge bucket storage policies are
+-- owner-prefix-only. Without a restrictive policy, a removed uploader can
+-- still read, overwrite or delete their organisation's indexed source file
+-- using the Storage API even after document/chunk RLS blocks access.
+--
+-- The helper must read ownership/membership in the *actual* documents table
+-- while the caller's document SELECT may now be blocked. Restrict the
+-- SECURITY DEFINER scope to this boolean, put it in non-API private schema
+-- and use the currently authenticated uid. No stored file names are returned.
+create function private.knowledge_storage_owner_authorised(_object_name text)
+returns boolean
+language sql stable security definer
+set search_path = 'pg_catalog', 'public', 'storage'
+as $knowledge_storage_policy$
+  select (select auth.uid()) is not null
+    and not exists (
+      select 1 from public.memory_documents doc
+      where doc.storage_path = _object_name
+        and doc.user_id = (select auth.uid())
+        and doc.org_id is not null
+        and not private.is_org_member(doc.org_id)
+    );
+$knowledge_storage_policy$;
+
+revoke all on function private.knowledge_storage_owner_authorised(text) from public;
+grant execute on function private.knowledge_storage_owner_authorised(text) to authenticated;
+
+-- The original knowledge bucket owner-prefix policies still do the positive
+-- authorization; these RESTRICTIVE policies *only* narrow existing rights.
+-- Unlinked pre-ingest objects and genuinely personal documents remain readable
+-- by the owner. No Storage API read grant is added for other org members.
+create policy knowledge_org_offboarding_read
+on storage.objects as restrictive for select to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or private.knowledge_storage_owner_authorised(name)
+);
+
+create policy knowledge_org_offboarding_update
+on storage.objects as restrictive for update to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or private.knowledge_storage_owner_authorised(name)
+)
+with check (
+  bucket_id <> 'knowledge'
+  or private.knowledge_storage_owner_authorised(name)
+);
+
+create policy knowledge_org_offboarding_delete
+on storage.objects as restrictive for delete to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or private.knowledge_storage_owner_authorised(name)
+);
+
+comment on function private.knowledge_storage_owner_authorised(text) is
+'Fail-closed for original-uploader Storage read, update and delete after organisation offboarding; does not override owner-prefix storage policy, grant shared file reads or revoke pre-existing signed URLs.';
