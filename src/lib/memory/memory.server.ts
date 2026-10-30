@@ -220,6 +220,7 @@ export async function indexMemory(args: {
         vector_external_id: externalIds[args.memory.id] ?? null,
       })
       .eq("id", args.memory.id)
+      .eq("user_id", args.userId)
       .select("*")
       .maybeSingle();
     return data ?? args.memory;
@@ -227,7 +228,8 @@ export async function indexMemory(args: {
     await args.sb
       .from("agent_memories")
       .update({ vector_status: "failed" })
-      .eq("id", args.memory.id);
+      .eq("id", args.memory.id)
+      .eq("user_id", args.userId);
     throw error instanceof EmbeddingError
       ? new MemoryError(
           error.message,
@@ -267,6 +269,7 @@ export async function updateMemory(args: {
     .from("agent_memories")
     .update(patch)
     .eq("id", args.id)
+    .eq("user_id", args.userId)
     .select("*")
     .maybeSingle();
   if (error) throw new MemoryError(error.message);
@@ -285,10 +288,11 @@ export async function updateMemory(args: {
 export async function deleteMemory(args: { sb: Sb; userId: string; id: string }) {
   const { data: row } = await args.sb
     .from("agent_memories")
-    .select("id,org_id,agent_id,vector_provider")
+    .select("id,user_id,org_id,agent_id,vector_provider")
     .eq("id", args.id)
+    .eq("user_id", args.userId)
     .maybeSingle();
-  if (!row) throw new MemoryError("Memory not found, or you do not have permission to delete it.");
+  if (!row || row.user_id !== args.userId) throw new MemoryError("Memory not found, or you do not own it.");
 
   // Remove the vector first so an external index never keeps orphaned content.
   try {
@@ -302,8 +306,10 @@ export async function deleteMemory(args: { sb: Sb; userId: string; id: string })
     console.error("[memory] vector delete failed", error);
   }
 
-  const { error } = await args.sb.from("agent_memories").delete().eq("id", args.id);
+  const { data: removed, error } = await args.sb.from("agent_memories")
+    .delete().eq("id", args.id).eq("user_id", args.userId).select("id");
   if (error) throw new MemoryError(error.message);
+  if (!removed?.length) throw new MemoryError("Memory was not deleted.");
   return { deleted: true, id: args.id };
 }
 
