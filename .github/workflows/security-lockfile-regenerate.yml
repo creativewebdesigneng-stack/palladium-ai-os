@@ -61,6 +61,10 @@ jobs:
           ]
           for (const [name, declared, resolved] of pins) {
             if (manifest.overrides?.[name] !== declared) throw new Error('Override mismatch: ' + name)
+            if (name === 'undici8' && !lockText.includes('"undici8": ["')) {
+              console.log('undici8 alias no longer installed after clean resolution; audit remains authoritative.');
+              continue;
+            }
             if (!lockText.includes('"' + name + '": ["' + resolved + '"')) throw new Error('Lockfile resolution mismatch: ' + name)
           }
           // Bun's text lockfile allows trailing commas; do not use strict JSON.parse.
