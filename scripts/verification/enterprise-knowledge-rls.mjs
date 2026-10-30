@@ -45,6 +45,14 @@ await db.exec(`
     id uuid primary key, document_id uuid not null references memory_documents(id),
     user_id uuid not null, org_id uuid, agent_id uuid, content text
   );
+  create table agent_memories (
+    id uuid primary key, user_id uuid not null, org_id uuid, scope text not null, content text
+  );
+  alter table agent_memories enable row level security;
+  create policy agent_memories_owner_or_explicit_org_share on agent_memories for select to authenticated
+    using(user_id=(select auth.uid()) or
+      (org_id is not null and scope in ('shared','organisation') and private.is_org_member(org_id)));
+  grant select on agent_memories to authenticated;
   alter table memory_documents enable row level security;
   alter table memory_chunks enable row level security;
   create policy memory_documents_owner_only on memory_documents for all to authenticated
@@ -71,6 +79,10 @@ await db.exec(`
     ('${agentDoc}','${alice}','${org}','${id(999)}','Agent only','ready','{"enterprise_shared":true}'),
     ('${foreign}','${alice}','${otherOrg}',null,'Other tenant','ready','{"enterprise_shared":true}'),
     ('${falseFlag}','${alice}','${org}',null,'String opt in','ready','{"enterprise_shared":"true"}');
+  insert into agent_memories(id,user_id,org_id,scope,content) values
+    ('${id(301)}','${alice}','${org}','shared','Shared derived summary'),
+    ('${id(302)}','${alice}','${org}','private','Private organisation summary'),
+    ('${id(303)}','${alice}',null,'private','Personal memory');
   insert into memory_chunks(id,document_id,user_id,org_id,agent_id,content) values
     ('${sharedChunk}','${shared}','${alice}','${org}',null,'Approved procedure'),
     ('${mismatchedChunk}','${shared}','${alice}','${otherOrg}',null,'Mismatched tenancy'),
@@ -89,6 +101,8 @@ const selectAs = async (user, query) => {
 
 verify((await selectAs(bob,'select id from memory_documents')).length===1,'member sees only explicit shared ready docs');
 verify((await rows('select id from memory_chunks')).length===1,'member sees only matching parent chunk');
+verify((await rows('select id from agent_memories')).length===1,
+  'member sees only allowed shared org memory while uploader is a member');
 verify((await rows(`select id from memory_documents where id='${privateDoc}'`)).length===0,'private document not exposed');
 verify((await rows(`select id from memory_documents where id='${unready}'`)).length===0,'processing document not exposed');
 verify((await rows(`select id from memory_documents where id='${agentDoc}'`)).length===0,'agent document not exposed');
@@ -139,6 +153,12 @@ verify((await selectAs(alice,`select id from memory_documents where id='${shared
   'removed original uploader cannot read own formerly shared org document');
 verify((await rows(`select id from memory_chunks where id='${sharedChunk}'`)).length===0,
   'removed original uploader cannot read own org chunk');
+verify((await rows(`select id from agent_memories where id='${id(301)}'`)).length===0,
+  'removed original uploader cannot read formerly shared org memory');
+verify((await rows(`select id from agent_memories where id='${id(302)}'`)).length===0,
+  'removed uploader cannot read organisation-scoped private summary');
+verify((await rows(`select id from agent_memories where id='${id(303)}'`)).length===1,
+  'removed uploader retains separate private personal memory');
 verify((await rows(`select id from memory_documents where id='${privateDoc}'`)).length===0,
   'removed original uploader cannot read even private org-labelled document');
 verify((await rows(`select id from memory_documents where id='${id(109)}'`)).length===1,
@@ -147,6 +167,8 @@ verify((await rows(`select id from memory_chunks where id='${id(209)}'`)).length
   'removed org uploader retains independently private personal chunk');
 verify((await selectAs(bob,`select id from memory_documents where id='${shared}'`)).length===0,
   'remaining member cannot read former contributor organisation document');
+verify((await rows(`select id from agent_memories where id='${id(301)}'`)).length===0,
+  'remaining member cannot read memory shared by a former organisation contributor');
 
 await db.close();
 console.log(`Enterprise Knowledge: ${passed} isolated PostgreSQL policy checks passed.`);
