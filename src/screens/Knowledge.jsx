@@ -24,7 +24,7 @@ function formatBytes(value) {
 }
 
 export default function Knowledge() {
-  const { session } = useWorkspace();
+  const { session, profile } = useWorkspace();
   const { toast } = useToast();
   const qc = useQueryClient();
   const listFn = useServerFn(listMemories);
@@ -135,7 +135,7 @@ export default function Knowledge() {
                       <p className="truncate text-sm font-semibold text-white">{doc.title || 'Untitled document'}</p>
                       <p className="mt-0.5 truncate text-[11px] text-zinc-500">{doc.source || doc.mime_type || 'Pasted text'}</p>
                     </div>
-                    <button onClick={() => remove.mutate(doc.id)} disabled={remove.isPending} title="Remove document" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-zinc-500 hover:border-rose-400/30 hover:text-rose-300 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                    {doc.user_id === profile?.id ? <button onClick={() => remove.mutate(doc.id)} disabled={remove.isPending} title="Remove your document" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-zinc-500 hover:border-rose-400/30 hover:text-rose-300 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button> : <span className="text-[10px] text-zinc-500">Shared read-only</span>}
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                     <Mini label="Chunks" value={String(doc.chunk_count ?? 0)} />
