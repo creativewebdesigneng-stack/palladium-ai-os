@@ -241,8 +241,10 @@ export const reindexMemory = createServerFn({ method: "POST" })
       .from("agent_memories")
       .select("*")
       .eq("id", data.id)
+      .eq("user_id", context.userId)
       .maybeSingle();
-    if (!memory) surface(new MemoryError("Memory not found, or you do not have access to it."));
+    if (!memory || memory.user_id !== context.userId)
+      surface(new MemoryError("Memory not found, or you do not own it."));
     try {
       const updated = await indexMemory({
         sb,
