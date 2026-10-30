@@ -132,21 +132,21 @@ const selectAs = async (user, query) => {
   return rows(query);
 };
 
-verify((await selectAs(alice,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===1,
+verify((await selectAs(alice,`select id from storage.objects where name='${alice}/org-shared.pdf'`)).length===1,
   'current author can access their indexed organisation file');
-verify((await rows("select id from storage.objects where name='${alice}/org-private.pdf'")).length===1,
+verify((await rows(`select id from storage.objects where name='${alice}/org-private.pdf'`)).length===1,
   'current author can access private organisation file');
-verify((await selectAs(bob,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===0,
+verify((await selectAs(bob,`select id from storage.objects where name='${alice}/org-shared.pdf'`)).length===0,
   'org membership does not grant a different authors source file');
-verify((await rows("select id from storage.objects where name='${bob}/bob.pdf'")).length===1,
+verify((await rows(`select id from storage.objects where name='${bob}/bob.pdf'`)).length===1,
   'member can read own original file');
-verify((await rows("update storage.objects set payload='tampered' where name='${alice}/org-shared.pdf' returning id")).length===0,
+verify((await rows(`update storage.objects set payload='tampered' where name='${alice}/org-shared.pdf' returning id`)).length===0,
   'other member cannot overwrite an original file despite globally permissive update policy');
-verify((await rows("delete from storage.objects where name='${alice}/org-private.pdf' returning id")).length===0,
+verify((await rows(`delete from storage.objects where name='${alice}/org-private.pdf' returning id`)).length===0,
   'other member cannot delete original file despite globally permissive delete policy');
 await assert.rejects(() => db.query(`insert into storage.objects(id,bucket_id,name,payload)
   values('${id(406)}','knowledge','${alice}/forged.pdf','forged')`)); passed++;
-verify((await rows("select id from storage.objects where name='${alice}/personal.pdf'")).length===0,
+verify((await rows(`select id from storage.objects where name='${alice}/personal.pdf'`)).length===0,
   'other member cannot read unrelated personal file despite broad read policy');
 verify((await selectAs(bob,'select id from memory_documents')).length===1,'member sees only explicit shared ready docs');
 verify((await rows('select id from memory_chunks')).length===1,'member sees only matching parent chunk');
@@ -201,17 +201,17 @@ await db.query(`insert into memory_chunks (id,document_id,user_id,org_id,agent_i
 await db.query(`update memory_documents set storage_path='${alice}/personal.pdf' where id='${id(109)}'`);
 await db.query(`insert into organisation_members (org_id,user_id,role) values('${org}','${bob}','member')`);
 await db.query(`delete from organisation_members where org_id='${org}' and user_id='${alice}'`);
-verify((await selectAs(alice,"select id from storage.objects where name='${alice}/org-shared.pdf'")).length===0,
+verify((await selectAs(alice,`select id from storage.objects where name='${alice}/org-shared.pdf'`)).length===0,
   'revoked original uploader cannot read formerly indexed shared source file');
-verify((await rows("select id from storage.objects where name='${alice}/org-private.pdf'")).length===0,
+verify((await rows(`select id from storage.objects where name='${alice}/org-private.pdf'`)).length===0,
   'revoked original uploader cannot read formerly indexed private org file');
-verify((await rows("update storage.objects set payload='changed' where name='${alice}/org-shared.pdf' returning id")).length===0,
+verify((await rows(`update storage.objects set payload='changed' where name='${alice}/org-shared.pdf' returning id`)).length===0,
   'revoked uploader cannot overwrite old org object');
-verify((await rows("delete from storage.objects where name='${alice}/org-shared.pdf' returning id")).length===0,
+verify((await rows(`delete from storage.objects where name='${alice}/org-shared.pdf' returning id`)).length===0,
   'revoked uploader cannot delete old org object');
-verify((await rows("select id from storage.objects where name='${alice}/personal.pdf'")).length===1,
+verify((await rows(`select id from storage.objects where name='${alice}/personal.pdf'`)).length===1,
   'revoked uploader still reads truly private original file');
-verify((await rows("select id from storage.objects where name='${alice}/orphan.pdf'")).length===1,
+verify((await rows(`select id from storage.objects where name='${alice}/orphan.pdf'`)).length===1,
   'pre-ingest orphan original file remains owner only');
 verify((await selectAs(alice,`select id from memory_documents where id='${shared}'`)).length===0,
   'removed original uploader cannot read own formerly shared org document');
