@@ -62,3 +62,29 @@ with check (
   or not (metadata @> '{"enterprise_shared":true}'::jsonb)
   or private.is_org_admin(org_id)
 );
+
+
+-- Offboarding boundary. A permissive pre-existing owner policy otherwise
+-- allows the uploader to read org-labelled documents and chunks after
+-- membership removal. RESTRICTIVE SELECT intersects every applicable read
+-- policy, including that owner's original policy. Personal (org_id NULL)
+-- knowledge keeps its original private-owner semantics.
+create policy memory_documents_enterprise_current_member_read
+on public.memory_documents as restrictive for select to authenticated
+using (
+  org_id is null
+  or private.is_org_member(org_id)
+);
+
+create policy memory_chunks_enterprise_current_member_read
+on public.memory_chunks as restrictive for select to authenticated
+using (
+  org_id is null
+  or private.is_org_member(org_id)
+);
+
+comment on policy memory_documents_enterprise_current_member_read
+on public.memory_documents is 'Prevent stale owner RLS reads after org membership revocation; personal documents remain unchanged.';
+
+comment on policy memory_chunks_enterprise_current_member_read
+on public.memory_chunks is 'Prevent stale owner RLS chunk reads after org membership revocation; personal chunks remain unchanged.';
