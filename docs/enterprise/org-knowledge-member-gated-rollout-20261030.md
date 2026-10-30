@@ -44,8 +44,7 @@ text are not written to the audit trail.
   document, **all indexed chunks may be accessible to current members through
   RLS-authorised Data API queries**, and should be treated as organisation
   documents; storage bucket file URLs remain owner-restricted.
-- Revocation prevents **future** authorised database reads; it cannot retract
-  copied/downloaded content or cancel requests that were already authorised.
+- Revocation prevents future member reads of **other owners’ explicitly shared** documents; it cannot retract copied/downloaded content or cancel requests that were already authorised. The pre-existing owner-only policy may still let a removed member read **their own** organisation-labelled documents and private organisation-memory summaries. Full post-removal ownership revocation needs a separate reviewed RLS hardening tranche before enterprise certification.
 - No SSO enforcement, per-document ACL groups beyond full-org membership,
   named SLO, DPA, connector accreditation, automated export or residency guarantee.
 - The active production database remains unchanged; no migration applied.
