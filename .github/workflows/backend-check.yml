@@ -144,6 +144,12 @@ jobs:
       - name: Marketplace compatibility isolated Postgres access-control tests
         run: bun run test:marketplace-compatibility
 
+      - name: Knowledge Storage offboarding isolated PostgreSQL policy tests
+        run: bun run test:knowledge-storage-offboarding
+
+      - name: Enterprise knowledge owner/member/revocation isolated PostgreSQL RLS tests
+        run: bun run test:enterprise-knowledge-rls
+
       - name: Free Open3D worker Python syntax and safety tests
         run: |
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
