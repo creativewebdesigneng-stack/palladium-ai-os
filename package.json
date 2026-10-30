@@ -29,7 +29,8 @@
     "test:provider-job-recovery": "node scripts/verification/provider-job-recovery.mjs",
     "test:builder-authority-recovery": "node scripts/verification/builder-authority-recovery.mjs",
     "test:marketplace-compatibility": "node scripts/verification/marketplace-compatibility.mjs",
-    "test:enterprise-knowledge-rls": "node scripts/verification/enterprise-knowledge-rls.mjs"
+    "test:enterprise-knowledge-rls": "node scripts/verification/enterprise-knowledge-rls.mjs",
+    "test:knowledge-storage-offboarding": "node scripts/verification/knowledge-storage-offboarding.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
