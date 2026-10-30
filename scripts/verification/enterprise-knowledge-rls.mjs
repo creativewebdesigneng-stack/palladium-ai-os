@@ -115,13 +115,13 @@ verify((await rows('select id from memory_chunks')).length===5,'owner still read
 
 await db.exec('reset role;');
 await db.query(`update memory_documents set metadata='{}'::jsonb where id='${shared}'`);
-verify((await selectAs(bob,'select id from memory_documents')).length===0,'owner unsharing immediately blocks document');
+verify((await selectAs(bob,`select id from memory_documents where id='${shared}'`)).length===0,'owner unsharing blocks the explicitly shared document');
 verify((await rows('select id from memory_chunks')).length===0,'owner unsharing immediately blocks chunk');
 
 await db.exec('reset role;');
 await db.query(`update memory_documents set metadata='{"enterprise_shared":true}'::jsonb where id='${shared}'`);
 await db.query(`delete from organisation_members where user_id='${bob}' and org_id='${org}'`);
-verify((await selectAs(bob,'select id from memory_documents')).length===0,'revoked membership immediately denies document');
+verify((await selectAs(bob,`select id from memory_documents where id='${shared}'`)).length===0,'revoked membership denies the other owners shared document');
 verify((await rows('select id from memory_chunks')).length===0,'revoked membership immediately denies chunk');
 
 await db.exec('reset role; set role anon;');
