@@ -36,6 +36,7 @@ jobs:
           bun install --lockfile-only --ignore-scripts
           bun update undici8 --lockfile-only --ignore-scripts
           bun update undici --lockfile-only --ignore-scripts
+          bun update zod e2b --lockfile-only --ignore-scripts
 
       - name: Verify resolved security patch versions
         run: |
@@ -46,6 +47,10 @@ jobs:
           for (const packageName of ['undici', 'undici8', 'body-parser']) {
             const matching = lockText.split(String.fromCharCode(10)).filter(line => line.trimStart().startsWith('"' + packageName + '": ['));
             console.log(packageName + ' resolved: ' + matching.map(line => line.split('"')[3] || 'unknown').join(', '));
+          }
+          for (const line of lockText.split(String.fromCharCode(10))) {
+            const record = line.match(/^\s*"([^"]+)": \["([^"]+)"/);
+            if (record && /(^|[^a-z])(undici|zod)/i.test(record[1] + ' ' + record[2])) console.log('Resolved package ' + record[1] + ': ' + record[2]);
           }
           const pins = [
             ['undici', '7.30.1', 'undici@7.30.1'],
