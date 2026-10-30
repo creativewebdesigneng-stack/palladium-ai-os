@@ -37,6 +37,8 @@ jobs:
           bun update undici8 --lockfile-only --ignore-scripts
           bun update undici --lockfile-only --ignore-scripts
           bun update zod e2b --lockfile-only --ignore-scripts
+          git restore -- package.json
+          bun install --lockfile-only --ignore-scripts
 
       - name: Verify resolved security patch versions
         run: |
