@@ -12,6 +12,9 @@ using (
   and status = 'ready'
   and metadata @> '{"enterprise_shared":true}'::jsonb
   and private.is_org_member(org_id)
+  and exists (select 1 from public.organisation_members author
+    where author.org_id = memory_documents.org_id
+      and author.user_id = memory_documents.user_id)
 );
 
 create policy memory_chunks_enterprise_explicit_org_read
@@ -29,6 +32,8 @@ using (
       and d.agent_id is null
       and d.status = 'ready'
       and d.metadata @> '{"enterprise_shared":true}'::jsonb
+      and exists (select 1 from public.organisation_members author
+        where author.org_id = d.org_id and author.user_id = d.user_id)
   )
 );
 
@@ -37,3 +42,23 @@ on public.memory_documents is 'Read for current members only when owner explicit
 
 comment on policy memory_chunks_enterprise_explicit_org_read
 on public.memory_chunks is 'Read for current members only when parent owner explicitly shared the matching, ready organisation document; forbids orphan, cross-owner, cross-org and agent chunks. Existing owner write policy unchanged.';
+
+-- The existing owner-only write policy is permissive. A separate restrictive
+-- policy is needed so a non-admin contributor cannot bypass the audited
+-- sharing action by writing JSON metadata directly via PostgREST.
+create policy memory_documents_enterprise_admin_share_insert
+on public.memory_documents as restrictive for insert to authenticated
+with check (
+  org_id is null
+  or not (metadata @> '{"enterprise_shared":true}'::jsonb)
+  or private.is_org_admin(org_id)
+);
+
+create policy memory_documents_enterprise_admin_share_update
+on public.memory_documents as restrictive for update to authenticated
+using (true)
+with check (
+  org_id is null
+  or not (metadata @> '{"enterprise_shared":true}'::jsonb)
+  or private.is_org_admin(org_id)
+);
