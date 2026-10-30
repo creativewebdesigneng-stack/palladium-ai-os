@@ -6,6 +6,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useToast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
+import EnterpriseKnowledgePilot from '@/components/enterprise/EnterpriseKnowledgePilot';
 import {
   listMemories,
   removeKnowledgeDocument,
@@ -173,6 +174,7 @@ export default function Knowledge() {
               </div>
             ) : semantic.isSuccess ? <p className="mt-4 text-xs text-zinc-500">No matching knowledge was found.</p> : null}
           </section>
+          <EnterpriseKnowledgePilot documents={documents} />
         </>
       )}
 
