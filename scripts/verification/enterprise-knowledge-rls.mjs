@@ -27,6 +27,12 @@ await db.exec(`
       select 1 from public.organisation_members
       where org_id = _org and user_id = (select auth.uid())
     ) $$;
+  create function private.is_org_admin(_org uuid) returns boolean
+    language sql stable security definer set search_path=''
+    as $ select _org is not null and exists (
+      select 1 from public.organisation_members
+      where org_id = _org and user_id = (select auth.uid()) and role in ('owner','admin')
+    ) $;
   create table memory_documents (
     id uuid primary key, user_id uuid not null, org_id uuid,
     agent_id uuid, title text, status text not null, metadata jsonb not null default '{}'::jsonb
@@ -49,6 +55,7 @@ await db.exec(`
   grant usage on schema public,private,auth to authenticated,anon;
   grant execute on function auth.uid() to authenticated,anon;
   grant execute on function private.is_org_member(uuid) to authenticated;
+  grant execute on function private.is_org_admin(uuid) to authenticated;
   grant select,insert,update,delete on memory_documents,memory_chunks to authenticated;
   insert into organisation_members values
     ('${org}','${alice}','owner'),('${org}','${bob}','member'),
@@ -86,6 +93,17 @@ verify((await rows(`select id from memory_chunks where id='${mismatchedChunk}'`)
 verify((await rows(`update memory_documents set title='tampered' where id='${shared}' returning id`)).length===0,'members cannot edit owner documents');
 verify((await rows(`delete from memory_documents where id='${shared}' returning id`)).length===0,'members cannot delete owner documents');
 
+// An organisation member may contribute a private doc but cannot toggle
+// shared metadata directly through PostgREST, even if they own the row.
+await db.exec('reset role;');
+await db.query(`insert into memory_documents (id,user_id,org_id,title,status,metadata)
+  values('${id(107)}','${bob}','${org}','Contributor private','ready','{}')`);
+await selectAs(bob,'select id from memory_documents');
+await assert.rejects(() => db.query(`update memory_documents set metadata='{"enterprise_shared":true}'::jsonb
+  where id='${id(107)}' returning id`)); passed++;
+await assert.rejects(() => db.query(`insert into memory_documents (id,user_id,org_id,title,status,metadata)
+  values('${id(108)}','${bob}','${org}','Forged shared','ready','{"enterprise_shared":true}')`)); passed++;
+
 verify((await selectAs(stranger,'select id from memory_documents')).length===0,'other organisation cannot read document');
 verify((await rows('select id from memory_chunks')).length===0,'other organisation cannot read chunk');
 verify((await selectAs(alice,'select id from memory_documents')).length===6,'owner still reads own documents');
@@ -103,7 +121,7 @@ verify((await selectAs(bob,'select id from memory_documents')).length===0,'revok
 verify((await rows('select id from memory_chunks')).length===0,'revoked membership immediately denies chunk');
 
 await db.exec('reset role; set role anon;');
-verify((await rows('select id from memory_documents')).length===0,'anonymous cannot read documents');
-verify((await rows('select id from memory_chunks')).length===0,'anonymous cannot read chunks');
+await assert.rejects(() => rows('select id from memory_documents')); passed++;
+await assert.rejects(() => rows('select id from memory_chunks')); passed++;
 await db.close();
 console.log(`Enterprise Knowledge: ${passed} isolated PostgreSQL policy checks passed.`);
