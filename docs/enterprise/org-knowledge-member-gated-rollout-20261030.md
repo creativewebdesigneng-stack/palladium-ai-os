@@ -106,3 +106,42 @@ memory, private organisation memory, and unrelated personal memory for both
 revoked contributors and remaining members. The policy does not revoke
 direct raw storage access to files the original uploader controls, nor prove
 that every elevated search RPC has correct authority checks.
+
+
+## 30 October storage and mutation hardening addendum (draft only)
+
+Live connected Supabase policy metadata (read-only) exposed another important
+gap: an existing permissive `trusted_media_read_scope` policy grants SELECT on
+all buckets other than `trusted-media`. Parallel permissive policies exist for
+INSERT, UPDATE and DELETE. Under PostgreSQL OR composition, these conditions can
+override historical Knowledge owner-prefix RLS even though the separate
+`blackstar_knowledge_owner_*` policies look correct. No actual customer file
+was accessed or altered to test exploitability. **This is a security review
+finding, not a completed Production remediation.**
+
+The candidate migration now adds explicit **RESTRICTIVE owner-prefix**
+SELECT/INSERT/UPDATE/DELETE policies on `storage.objects` scoped to the
+`knowledge` bucket. A narrowly scoped non-API `private` security-definer
+predicate also blocks read/update/delete of indexed organisation source objects
+once their original owner loses live membership. Its boolean response never
+returns object contents. Unlinked pre-indexing uploads and genuine personal
+files remain owner-only. Existing authorised signed URLs may remain valid for
+their 120-second lifetime after offboarding; RLS cannot retract existing copies.
+
+The PGlite harness now recreates the conflicting broad permissive Storage
+policies, asserts that they cannot enable cross-owner read/write/delete/upload
+when intersected with the restrictive policies, and checks removed owners
+cannot read, modify or delete previously indexed org files.
+
+Legacy memory maintenance paths are also narrowed: reindex, update, delete
+and vector-index entry points enforce `user_id` equality, and owner mutation
+endpoints no longer report successful deletion after zero affected rows.
+Unit tests explicitly check denied cross-owner operations have no vector
+side effects.
+
+**Important:** these changes are still only GitHub draft source. The
+`knowledge` bucket and `private` helpers in the connected live Supabase
+database have not been changed. Security review of the broad cross-bucket
+compatibility policies for other buckets remains a separate requirement.
+Do not certify Storage isolation against actual users until direct authenticated
+Storage API tests have been completed on an isolated preview database.
