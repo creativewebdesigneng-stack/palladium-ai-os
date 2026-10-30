@@ -1,8 +1,5 @@
 import { rankHybridMemoryHits } from '@/lib/memory/hybrid-memory-ranking';
-import {
-  buildPrivateKnowledgeEvidencePacket,
-  type KnowledgeEvidencePacket,
-} from './private-knowledge-evidence';
+import type { KnowledgeEvidencePacket, KnowledgeEvidenceExcerpt } from './private-knowledge-evidence';
 
 export type OrgKnowledgeDocument = {
   id: string;
@@ -52,7 +49,7 @@ export function authorisedOrgKnowledgeDocuments(args: {
 const STOP = new Set(['about','after','which','their','that','with','what','where','when','from','these','those','this','there','have','does','would','could','should','please','your','into','and','the','for','are','how','who','our','can']);
 
 /**
- * Bounded, lexical-only source evaluation. Reuses the existing Memory Fabric
+ * Bounded, lexical-only source evaluation. Reuses the existing hybrid-memory
  * ranked-hit fusion policy, but does not issue external embedding/model calls.
  * The server must retrieve chunks with RLS and enforce org, owner and parent IDs.
  */
@@ -79,23 +76,30 @@ export function buildOrgKnowledgeEvidencePacket(args: {
     content: chunk.content,
     title: documents.get(chunk.document_id)?.title ?? null,
     similarity: 0,
-    org_id: null,
-    agent_id: null,
-    layer: 'knowledge' as const,
-    source: null,
-    scope: 'private',
-    memory_type: 'knowledge',
-    provenance: {id: chunk.id, kind: 'document' as const, documentId: chunk.document_id},
   }));
-  const ranked = rankHybridMemoryHits({semantic: [], keyword: filtered, query: question, limit: 8});
-  // The private packet composer is the existing citation and excerpt budget
-  // implementation. Scope has already been verified against parent+chunk.
-  const privateShape = new Map([...documents].map(([id,doc]) => [id, {
-    id, title: doc.title, user_id: doc.user_id, org_id: null, agent_id: null, status: doc.status,
-  }]));
-  const packet = buildPrivateKnowledgeEvidencePacket(privateShape, ranked, 8);
+  const ranked = rankHybridMemoryHits({ semantic: [], keyword: filtered, query: question, limit: 8 });
+  const seen = new Set<string>();
+  const excerpts: KnowledgeEvidenceExcerpt[] = [];
+  for (const hit of ranked) {
+    const parent = documents.get(hit.document_id);
+    if (!parent || seen.has(hit.id)) continue;
+    seen.add(hit.id);
+    excerpts.push({
+      citation: `document:${parent.id}#chunk:${hit.id}`,
+      documentId: parent.id,
+      chunkId: hit.id,
+      documentTitle: (parent.title || 'Untitled document').slice(0, 160),
+      excerpt: hit.content.trim().slice(0, 900),
+      similarity: null, // lexical ranking is not semantic similarity or truth.
+    });
+  }
   return {
-    ...packet,
+    status: excerpts.length ? 'retrieved_excerpts' : 'no_authorised_excerpts',
+    evidenceOnly: true,
+    answerGenerated: false,
+    requestedDocumentCount: documents.size,
+    matchedDocumentCount: new Set(excerpts.map(x => x.documentId)).size,
+    excerpts,
     limitation: 'Bounded lexical retrieval only: this is not semantic completeness, a generated answer, customer approval, accuracy certification or full-document disclosure. A lack of matches does not mean there is no relevant passage.',
   };
 }
