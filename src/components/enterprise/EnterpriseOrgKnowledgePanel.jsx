@@ -10,10 +10,10 @@ import {
 } from '@/lib/enterprise/org-knowledge-evidence.functions';
 
 export default function EnterpriseOrgKnowledgePanel({ documents = [] }) {
-  const { session, organisations, activeOrgId } = useWorkspace();
+  const { session, organisations, activeOrgId, profile } = useWorkspace();
   const qc = useQueryClient();
   const [chosenOrg, setChosenOrg] = useState('');
-  const orgId = chosenOrg || activeOrgId || '';
+  const orgId = chosenOrg || (organisations.some(o => o.id === activeOrgId) ? activeOrgId : organisations[0]?.id) || '';
   const org = organisations.find(o => o.id === orgId);
   const admin = org?.role === 'owner' || org?.role === 'admin';
   const [title, setTitle] = useState('');
@@ -31,8 +31,8 @@ export default function EnterpriseOrgKnowledgePanel({ documents = [] }) {
     retry: false,
   });
   const owned = useMemo(() => documents.filter(doc =>
-    doc?.org_id === orgId && doc?.agent_id == null && doc?.status === 'ready',
-  ),[documents,orgId]);
+    doc?.user_id === profile?.id && doc?.org_id === orgId && doc?.agent_id == null && doc?.status === 'ready',
+  ),[documents,orgId,profile?.id]);
   const upload = useMutation({
     // Deliberately scope the *memory summary* private even for organisation
     // documents: only the separately audited share action enables chunk read.
@@ -87,6 +87,7 @@ export default function EnterpriseOrgKnowledgePanel({ documents = [] }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
           <span className="inline-flex items-center gap-1"><Users className="h-4 w-4"/>Current role: {org?.role||'none'}</span>
           <span className="inline-flex items-center gap-1"><LockKeyhole className="h-4 w-4"/>Sharing is off by default</span>
+          <a href="/memory" className="text-cyan-200 underline underline-offset-2">Configure document and organisation memory preferences</a>
         </div>
         {admin && <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
           <h3 className="text-sm font-semibold text-white">Contribute source text — initially private</h3>
