@@ -127,5 +127,26 @@ verify((await rows('select id from memory_chunks')).length===0,'revoked membersh
 await db.exec('reset role; set role anon;');
 await assert.rejects(() => rows('select id from memory_documents')); passed++;
 await assert.rejects(() => rows('select id from memory_chunks')); passed++;
+// Offboarding the ORIGINAL UPLOADER must deny legacy owner-only reads too.
+await db.exec('reset role;');
+await db.query(`insert into memory_documents (id,user_id,org_id,title,status,metadata)
+  values('${id(109)}','${alice}',null,'Personal note','ready','{}')`);
+await db.query(`insert into memory_chunks (id,document_id,user_id,org_id,agent_id,content)
+  values('${id(209)}','${id(109)}','${alice}',null,null,'Private personal note')`);
+await db.query(`insert into organisation_members (org_id,user_id,role) values('${org}','${bob}','member')`);
+await db.query(`delete from organisation_members where org_id='${org}' and user_id='${alice}'`);
+verify((await selectAs(alice,`select id from memory_documents where id='${shared}'`)).length===0,
+  'removed original uploader cannot read own formerly shared org document');
+verify((await rows(`select id from memory_chunks where id='${sharedChunk}'`)).length===0,
+  'removed original uploader cannot read own org chunk');
+verify((await rows(`select id from memory_documents where id='${privateDoc}'`)).length===0,
+  'removed original uploader cannot read even private org-labelled document');
+verify((await rows(`select id from memory_documents where id='${id(109)}'`)).length===1,
+  'removed org uploader retains independently private personal document');
+verify((await rows(`select id from memory_chunks where id='${id(209)}'`)).length===1,
+  'removed org uploader retains independently private personal chunk');
+verify((await selectAs(bob,`select id from memory_documents where id='${shared}'`)).length===0,
+  'remaining member cannot read former contributor organisation document');
+
 await db.close();
 console.log(`Enterprise Knowledge: ${passed} isolated PostgreSQL policy checks passed.`);
