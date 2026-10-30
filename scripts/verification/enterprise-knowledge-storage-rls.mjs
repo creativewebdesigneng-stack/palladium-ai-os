@@ -91,7 +91,7 @@ check((await sql(`select id from storage.objects where name='${alice}/private.pd
   'a logged-in different user cannot read unrelated personal file despite broad legacy policy');
 check((await sql(`select id from storage.objects where name='${bob}/org.pdf'`)).length===1,
   'current uploader can read own organisation file');
-await mustFail(`delete from storage.objects where id='${id(200)}' returning id`,
+check((await sql(`delete from storage.objects where id='${id(200)}' returning id`)).length===0,
   'member cannot delete uploader original file');
 await mustFail(`insert into storage.objects(id,bucket_id,name) values
   ('${id(300)}','knowledge','${alice}/injected.pdf')`, 'forged owner prefix insert blocked');
