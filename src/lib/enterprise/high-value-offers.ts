@@ -240,7 +240,7 @@ export const ENTERPRISE_OFFER_TERMS = {
   currency: "GBP" as const,
   priceBasis: "Indicative programme fee, excluding VAT and third-party costs; not a binding quote",
   offerStatus: "Proposed solution blueprint; delivery subject to discovery, capability verification and signed agreement",
-  procurement: "Buyer diligence, scoped SOW, security/data review, commercial approval, milestones, change control and acceptance required",
+  procurement: "Buyer diligence, signed SOW, security/data review, commercial approval, milestones, change control and acceptance required",
   payment: "Contract and invoicing only; no one-click Stripe Marketplace checkout, no immediate access or automated fulfilment",
   intellectualProperty: "Source/IP ownership and license terms must be negotiated in the statement of work",
 } as const;
