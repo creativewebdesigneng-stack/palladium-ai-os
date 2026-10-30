@@ -79,3 +79,20 @@ text are not written to the audit trail.
 
 No merge, Production migration, payment, or live customer-data ingestion has
 been authorised by this branch.
+
+## Added original-uploader offboarding guard (30 October)
+The earlier candidate read policy was insufficient for an uploader who left
+their organisation: the pre-existing permissive `memory_documents_owner_only`
+and `memory_chunks_owner_select` would still authorise that owner's records.
+The migration now adds **RESTRICTIVE SELECT policies** on both tables. Any
+organisation-labelled row requires current membership, regardless of whether
+the caller uploaded it; ordinary personal `org_id IS NULL` knowledge is unaffected.
+The isolated PostgreSQL harness now checks former-uploader document and chunk
+denial, unaffected personal records, and denial to remaining members after
+the uploader exits. It does not rewrite or delete existing customer data.
+
+**Offboarding caveat:** This restricts database reads after the policy is
+applied; it is not a promise to revoke an already downloaded copy, direct
+storage-bucket file ownership access, or the separate `agent_memories` policy.
+Those additional surfaces still need audit before enterprise certification.
+No migration was run against Production.
