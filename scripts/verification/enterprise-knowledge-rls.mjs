@@ -33,6 +33,10 @@ await db.exec(`
       select 1 from public.organisation_members
       where org_id = _org and user_id = (select auth.uid()) and role in ('owner','admin')
     ) $admin$;
+  alter table organisation_members enable row level security;
+  create policy om_select on organisation_members for select to authenticated
+    using(user_id=(select auth.uid()) or private.is_org_member(org_id));
+  grant select on organisation_members to authenticated;
   create table memory_documents (
     id uuid primary key, user_id uuid not null, org_id uuid,
     agent_id uuid, title text, status text not null, metadata jsonb not null default '{}'::jsonb
