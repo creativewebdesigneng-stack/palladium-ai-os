@@ -41,7 +41,7 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
           const lockText = fs.readFileSync('bun.lock', 'utf8')
           for (const packageName of ['undici', 'undici8', 'body-parser']) {
-            const matching = lockText.split('\\n').filter(line => line.trimStart().startsWith('"' + packageName + '": ['));
+            const matching = lockText.split(String.fromCharCode(10)).filter(line => line.trimStart().startsWith('"' + packageName + '": ['));
             console.log(packageName + ' resolved: ' + matching.map(line => line.split('"')[3] || 'unknown').join(', '));
           }
           const pins = [
