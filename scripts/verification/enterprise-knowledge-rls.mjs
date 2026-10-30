@@ -29,10 +29,10 @@ await db.exec(`
     ) $$;
   create function private.is_org_admin(_org uuid) returns boolean
     language sql stable security definer set search_path=''
-    as $ select _org is not null and exists (
+    as $admin$ select _org is not null and exists (
       select 1 from public.organisation_members
       where org_id = _org and user_id = (select auth.uid()) and role in ('owner','admin')
-    ) $;
+    ) $admin$;
   create table memory_documents (
     id uuid primary key, user_id uuid not null, org_id uuid,
     agent_id uuid, title text, status text not null, metadata jsonb not null default '{}'::jsonb
