@@ -113,6 +113,46 @@ comment on policy agent_memories_enterprise_current_member_read
 on public.agent_memories is 'Require live reader and uploader organisation membership for org-labelled memory and derived document summaries, including original-owner reads.';
 
 
+
+-- Existing production storage policies contain a broad permissive
+-- trusted_media_* scope condition of (bucket_id <> 'trusted-media').
+-- PostgreSQL OR-combines permissive policies, so the narrow historical
+-- knowledge owner-prefix policies alone do NOT enforce owner isolation.
+-- These RESTRICTIVE policies intersect *all* permissive policies and restore
+-- exact uploader prefix ownership for every Storage API operation. Apply only
+-- after isolated acceptance; no live Supabase DDL from this draft branch.
+create policy knowledge_strict_owner_read
+on storage.objects as restrictive for select to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
+create policy knowledge_strict_owner_insert
+on storage.objects as restrictive for insert to authenticated
+with check (
+  bucket_id <> 'knowledge'
+  or (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
+create policy knowledge_strict_owner_update
+on storage.objects as restrictive for update to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or (storage.foldername(name))[1] = (select auth.uid())::text
+)
+with check (
+  bucket_id <> 'knowledge'
+  or (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
+create policy knowledge_strict_owner_delete
+on storage.objects as restrictive for delete to authenticated
+using (
+  bucket_id <> 'knowledge'
+  or (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
 -- Private object offboarding: existing knowledge bucket storage policies are
 -- owner-prefix-only. Without a restrictive policy, a removed uploader can
 -- still read, overwrite or delete their organisation's indexed source file
