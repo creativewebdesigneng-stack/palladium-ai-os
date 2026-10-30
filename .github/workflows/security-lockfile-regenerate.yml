@@ -32,7 +32,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Generate verified lockfile without running dependency scripts
-        run: bun install --lockfile-only --ignore-scripts
+        run: |\n          bun install --lockfile-only --ignore-scripts\n          bun update undici8 --lockfile-only --ignore-scripts
 
       - name: Verify resolved security patch versions
         run: |
