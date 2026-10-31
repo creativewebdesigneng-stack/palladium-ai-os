@@ -147,6 +147,9 @@ jobs:
       - name: Enterprise knowledge owner/member/revocation isolated PostgreSQL RLS tests
         run: bun run test:enterprise-knowledge-rls
 
+      - name: Isolated Supabase test-session JWT guard self-test (no network)
+        run: bun run test:isolated-uat-jwt
+
       - name: Enterprise Knowledge non-production API UAT harness self-test (no network)
         run: bun run test:enterprise-knowledge-api-uat
 
