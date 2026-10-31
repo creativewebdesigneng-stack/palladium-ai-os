@@ -5,18 +5,12 @@
  */
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { validateIsolatedUatCredentials } from './isolated-uat-jwt-guard.mjs';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const productionRef = 'piwhiuangitqvwvwwcga';
 const required = 'I_CONFIRM_ISOLATED_TEST_DATABASE';
-function identity(jwt) {
-  assert.ok(typeof jwt === 'string' && jwt.split('.').length === 3, 'Test-user access JWT is required');
-  let payload;
-  try {payload=JSON.parse(Buffer.from(jwt.split('.')[1],'base64url').toString('utf8'));}
-  catch {throw Error('Invalid access JWT payload');}
-  assert.match(String(payload.sub||''),uuid,'Test-user identity must be UUID');
-  return payload.sub.toLowerCase();
-}
+
 export function prepareUat(e) {
   if(e.BLACKSTAR_UAT_NONPROD!==required) throw Error('Isolated test-database confirmation required');
   const ref=String(e.BLACKSTAR_UAT_PROJECT_REF||'').toLowerCase();
@@ -37,7 +31,7 @@ export function prepareUat(e) {
     'I_CONFIRM_MEMBERSHIP_ALREADY_REVOKED',
     'Revocation phase requires explicit confirmation of pre-existing test-fixture state');
   const ownerJWT=e.BLACKSTAR_UAT_OWNER_JWT,memberJWT=e.BLACKSTAR_UAT_MEMBER_JWT;
-  const owner=identity(ownerJWT),member=identity(memberJWT);
+  const {owner,member}=validateIsolatedUatCredentials(e);
   assert.notEqual(owner,member,'Distinct test-user JWTs required');
   for(const name of ['BLACKSTAR_UAT_ORG_ID','BLACKSTAR_UAT_SHARED_DOC_ID','BLACKSTAR_UAT_PRIVATE_DOC_ID'])
     assert.match(String(e[name]||''),uuid,name+' UUID required');
@@ -122,10 +116,16 @@ async function selfTest() {
   const owner='00000000-0000-4000-8000-000000000001',member='00000000-0000-4000-8000-000000000002';
   const org='00000000-0000-4000-8000-000000000011';
   const shared='00000000-0000-4000-8000-000000000101',privateDoc='00000000-0000-4000-8000-000000000102';
-  const jwt=id=>'header.'+Buffer.from(JSON.stringify({sub:id})).toString('base64url')+'.signature';
+  const ref='abcdefghijklmnopqrst';
+  const now=Math.floor(Date.now()/1000);
+  const jwt=id=>'header.'+Buffer.from(JSON.stringify({
+    sub:id,iss:'https://'+ref+'.supabase.co/auth/v1',
+    aud:'authenticated',role:'authenticated',session_id:id,
+    is_anonymous:false,iat:now-60,exp:now+3600,
+  })).toString('base64url')+'.signature';
   const e={BLACKSTAR_UAT_NONPROD:required,BLACKSTAR_UAT_PROJECT_REF:'abcdefghijklmnopqrst',
     BLACKSTAR_UAT_URL:'https://abcdefghijklmnopqrst.supabase.co',
-    BLACKSTAR_UAT_ANON_KEY:'mock-key-not-a-real-secret-only-for-self-tests',
+    BLACKSTAR_UAT_ANON_KEY:'sb_publishable_synthetic-public-key-placeholder',
     BLACKSTAR_UAT_OWNER_JWT:jwt(owner),BLACKSTAR_UAT_MEMBER_JWT:jwt(member),
     BLACKSTAR_UAT_ORG_ID:org,BLACKSTAR_UAT_SHARED_DOC_ID:shared,
     BLACKSTAR_UAT_PRIVATE_DOC_ID:privateDoc,BLACKSTAR_UAT_SHARED_OBJECT_PATH:owner+'/synthetic.txt'};
