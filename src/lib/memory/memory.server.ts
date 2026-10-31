@@ -182,6 +182,10 @@ export async function indexMemory(args: {
   memory: any;
   provider?: string | null;
 }) {
+  // Shared organisation memories may be RLS-readable by colleagues, but a
+  // read grant must never authorise owner-only vector reindexing.
+  if (!args.userId || args.memory?.user_id !== args.userId)
+    throw new MemoryError("Memory not found, or you do not own it.");
   const text = [args.memory.title, args.memory.content].filter(Boolean).join("\n");
   const store = getVectorStore(args.sb, args.provider);
   const filter: VectorFilter = {
@@ -220,6 +224,7 @@ export async function indexMemory(args: {
         vector_external_id: externalIds[args.memory.id] ?? null,
       })
       .eq("id", args.memory.id)
+      .eq("user_id", args.userId)
       .select("*")
       .maybeSingle();
     return data ?? args.memory;
@@ -227,7 +232,8 @@ export async function indexMemory(args: {
     await args.sb
       .from("agent_memories")
       .update({ vector_status: "failed" })
-      .eq("id", args.memory.id);
+      .eq("id", args.memory.id)
+      .eq("user_id", args.userId);
     throw error instanceof EmbeddingError
       ? new MemoryError(
           error.message,
@@ -267,10 +273,12 @@ export async function updateMemory(args: {
     .from("agent_memories")
     .update(patch)
     .eq("id", args.id)
+    .eq("user_id", args.userId)
     .select("*")
     .maybeSingle();
   if (error) throw new MemoryError(error.message);
-  if (!data) throw new MemoryError("Memory not found, or you do not have permission to edit it.");
+  if (!data || data.user_id !== args.userId)
+    throw new MemoryError("Memory not found, or you do not own it.");
 
   if (patch["vector_status"] === "pending") {
     await indexMemory({ sb: args.sb, userId: args.userId, memory: data }).catch((e) =>
@@ -285,10 +293,11 @@ export async function updateMemory(args: {
 export async function deleteMemory(args: { sb: Sb; userId: string; id: string }) {
   const { data: row } = await args.sb
     .from("agent_memories")
-    .select("id,org_id,agent_id,vector_provider")
+    .select("id,user_id,org_id,agent_id,vector_provider")
     .eq("id", args.id)
+    .eq("user_id", args.userId)
     .maybeSingle();
-  if (!row) throw new MemoryError("Memory not found, or you do not have permission to delete it.");
+  if (!row || row.user_id !== args.userId) throw new MemoryError("Memory not found, or you do not own it.");
 
   // Remove the vector first so an external index never keeps orphaned content.
   try {
@@ -302,8 +311,10 @@ export async function deleteMemory(args: { sb: Sb; userId: string; id: string })
     console.error("[memory] vector delete failed", error);
   }
 
-  const { error } = await args.sb.from("agent_memories").delete().eq("id", args.id);
+  const { data: removed, error } = await args.sb.from("agent_memories")
+    .delete().eq("id", args.id).eq("user_id", args.userId).select("id");
   if (error) throw new MemoryError(error.message);
+  if (!removed?.length) throw new MemoryError("Memory was not deleted.");
   return { deleted: true, id: args.id };
 }
 
@@ -718,14 +729,18 @@ export async function ingestDocument(args: {
 export async function deleteDocument(args: { sb: Sb; userId: string; documentId: string }) {
   const { data: doc } = await args.sb
     .from("memory_documents")
-    .select("id,storage_path")
+    .select("id,user_id,storage_path")
     .eq("id", args.documentId)
+    .eq("user_id", args.userId)
     .maybeSingle();
+
+  if (!doc || doc.user_id !== args.userId) throw new MemoryError("Document not found, or you do not own it.");
 
   const { data: chunks } = await args.sb
     .from("memory_chunks")
     .select("id,org_id,agent_id,vector_provider")
-    .eq("document_id", args.documentId);
+    .eq("document_id", args.documentId)
+    .eq("user_id", args.userId);
   const ids = (chunks ?? []).map((c: any) => c.id);
   if (ids.length) {
     try {
@@ -739,8 +754,10 @@ export async function deleteDocument(args: { sb: Sb; userId: string; documentId:
       console.error("[memory] chunk vector delete failed", error);
     }
   }
-  const { error } = await args.sb.from("memory_documents").delete().eq("id", args.documentId);
+  const { data: deletedRows, error } = await args.sb.from("memory_documents")
+    .delete().eq("id", args.documentId).eq("user_id", args.userId).select("id");
   if (error) throw new MemoryError(error.message);
+  if (!deletedRows?.length) throw new MemoryError("Document was not deleted.");
 
   // The uploaded file goes with the document; nothing is left in the private bucket.
   if (doc?.storage_path) {
