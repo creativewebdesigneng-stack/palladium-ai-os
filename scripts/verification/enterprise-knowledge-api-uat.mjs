@@ -20,13 +20,14 @@ function identity(jwt) {
 export function prepareUat(e) {
   if(e.BLACKSTAR_UAT_NONPROD!==required) throw Error('Isolated test-database confirmation required');
   const ref=String(e.BLACKSTAR_UAT_PROJECT_REF||'').toLowerCase();
-  assert.match(ref,/^[a-z]{20}$/,'Isolated Supabase reference required');
+  assert.match(ref,/^[a-z0-9]{20}$/,'Isolated Supabase reference required');
   assert.notEqual(ref,productionRef,'Production project forbidden');
   const url=new URL(String(e.BLACKSTAR_UAT_URL||''));
   assert.equal(url.protocol,'https:','HTTPS required');
   assert.equal(url.hostname,ref+'.supabase.co','Isolated project host mismatch');
   assert.equal(url.pathname,'/','Use project root URL');
   assert.equal(url.search,'','Project URL must not contain query');
+  assert.equal(url.hash,'','Project URL must not contain fragment');
   assert.ok(typeof e.BLACKSTAR_UAT_ANON_KEY==='string'&&e.BLACKSTAR_UAT_ANON_KEY.length>20,
     'Isolated project publishable key required');
   const phase=String(e.BLACKSTAR_UAT_PHASE||'active');
