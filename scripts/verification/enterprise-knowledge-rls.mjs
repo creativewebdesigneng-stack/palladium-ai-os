@@ -59,22 +59,25 @@ await db.exec(`
   alter table storage.objects enable row level security;
   create policy blackstar_knowledge_owner_read on storage.objects
     for select to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
+  create policy blackstar_knowledge_owner_insert on storage.objects
+    for insert to authenticated with check(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
   create policy blackstar_knowledge_owner_update on storage.objects
     for update to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text)
     with check(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
   create policy blackstar_knowledge_owner_delete on storage.objects
     for delete to authenticated using(bucket_id='knowledge' and split_part(name,'/',1)=(select auth.uid())::text);
-  -- Recreate the broad permissive production trusted-media compatibility
-  -- policies. Without new RESTRICTIVE owner policies these expose other
-  -- users knowledge objects despite the narrow owner policies above.
-  create policy trusted_media_read_scope on storage.objects
+  -- The 31 October read-only live policy inventory confirms these cross-bucket
+  -- compatibility policies are RESTRICTIVE, not PERMISSIVE. Reproduce that
+  -- actual composition here and separately simulate permissive-policy drift
+  -- after the draft migration for defence-in-depth regression testing.
+  create policy trusted_media_read_scope on storage.objects as restrictive
     for select to authenticated using(bucket_id <> 'trusted-media');
-  create policy trusted_media_upload_scope on storage.objects
+  create policy trusted_media_upload_scope on storage.objects as restrictive
     for insert to authenticated with check(bucket_id <> 'trusted-media');
-  create policy trusted_media_no_client_replace on storage.objects
+  create policy trusted_media_no_client_replace on storage.objects as restrictive
     for update to authenticated using(bucket_id <> 'trusted-media')
     with check(bucket_id <> 'trusted-media');
-  create policy trusted_media_no_client_delete on storage.objects
+  create policy trusted_media_no_client_delete on storage.objects as restrictive
     for delete to authenticated using(bucket_id <> 'trusted-media');
   grant usage on schema storage to anon,authenticated;
   grant select,insert,update,delete on storage.objects to authenticated;
@@ -123,6 +126,26 @@ await db.exec(`
     ('${id(204)}','${unready}','${alice}','${org}',null,'Processing'),
     ('${id(205)}','${agentDoc}','${alice}','${org}',null,'Agent only');
 `);
+
+// Verify the existing live-shape restrictive policy composition before adding
+// any proposed enterprise changes. These checks are against synthetic data only.
+await db.exec('set role authenticated;');
+await db.query('select set_config($1,$2,false)', ['request.jwt.claim.sub',bob]);
+verify((await rows(`select id from storage.objects where name='${alice}/org-shared.pdf'`)).length===0,
+  'live-shape restrictive policies already deny foreign-owner Knowledge reads');
+verify((await rows(`select id from storage.objects where name='${bob}/bob.pdf'`)).length===1,
+  'live-shape restrictive policies preserve owner Knowledge reads');
+verify((await rows(`update storage.objects set payload='unauthorised' where name='${alice}/org-shared.pdf' returning id`)).length===0,
+  'live-shape policies deny foreign-owner Knowledge update');
+verify((await rows(`delete from storage.objects where name='${alice}/org-shared.pdf' returning id`)).length===0,
+  'live-shape policies deny foreign-owner Knowledge deletion');
+await assert.rejects(() => rows(`insert into storage.objects(id,bucket_id,name,payload)
+  values('${id(409)}','knowledge','${alice}/foreign-insert.pdf','denied')`)); passed++;
+await rows(`insert into storage.objects(id,bucket_id,name,payload)
+  values('${id(410)}','knowledge','${bob}/allowed-before-migration.pdf','owner')`);
+verify((await rows(`select id from storage.objects where name='${bob}/allowed-before-migration.pdf'`)).length===1,
+  'live-shape policies preserve owner Knowledge upload');
+await db.exec('reset role;');
 
 const migration = readFileSync('supabase/migrations/20261030003000_enterprise_knowledge_explicit_org_read.sql','utf8');
 await db.exec(migration);
@@ -303,6 +326,36 @@ await db.query('select set_config($1,$2,false)',['request.jwt.claim.sub','']);
 await assert.rejects(()=>rows("update memory_documents set metadata='{\"enterprise_shared\":false}' where id='"+id(120)+"'")); passed++;
 verify((await selectAs(alice,"select metadata->>'enterprise_shared' as shared from memory_documents where id='"+id(120)+"'"))[0].shared==='true',
  'unattributed privileged mutation is blocked');
+
+// Hypothetical policy drift: prove draft RESTRICTIVE Knowledge owner checks
+// would still block another user's files if compatibility policies were ever
+// accidentally changed from their CURRENT restrictive shape to permissive.
+// This is an adversarial scenario, NOT a claim about the live database.
+await db.exec('reset role;');
+for (const name of [
+  'trusted_media_read_scope','trusted_media_upload_scope',
+  'trusted_media_no_client_replace','trusted_media_no_client_delete'
+]) await db.exec(`drop policy ${name} on storage.objects;`);
+await db.exec(`
+  create policy trusted_media_read_scope on storage.objects for select to authenticated
+    using(bucket_id <> 'trusted-media');
+  create policy trusted_media_upload_scope on storage.objects for insert to authenticated
+    with check(bucket_id <> 'trusted-media');
+  create policy trusted_media_no_client_replace on storage.objects for update to authenticated
+    using(bucket_id <> 'trusted-media') with check(bucket_id <> 'trusted-media');
+  create policy trusted_media_no_client_delete on storage.objects for delete to authenticated
+    using(bucket_id <> 'trusted-media');
+`);
+verify((await selectAs(bob,`select id from storage.objects where name='${alice}/org-shared.pdf'`)).length===0,
+  'hypothetical permissive drift cannot expose original owner document');
+verify((await rows(`update storage.objects set payload='cross-tenant' where name='${alice}/org-private.pdf' returning id`)).length===0,
+  'hypothetical permissive drift cannot overwrite original owner file');
+verify((await rows(`delete from storage.objects where name='${alice}/org-private.pdf' returning id`)).length===0,
+  'hypothetical permissive drift cannot delete original owner file');
+await assert.rejects(() => rows(`insert into storage.objects(id,bucket_id,name,payload)
+  values('${id(411)}','knowledge','${alice}/unauthorised-permissive.pdf','denied')`)); passed++;
+verify((await rows(`select id from storage.objects where name='${bob}/bob.pdf'`)).length===1,
+  'hypothetical permissive drift preserves legitimate owner access');
 
 await db.close();
 console.log(`Enterprise Knowledge: ${passed} isolated PostgreSQL policy checks passed.`);
