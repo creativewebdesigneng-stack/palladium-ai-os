@@ -234,5 +234,75 @@ verify((await selectAs(bob,`select id from memory_documents where id='${shared}'
 verify((await rows(`select id from agent_memories where id='${id(301)}'`)).length===0,
   'remaining member cannot read memory shared by a former organisation contributor');
 
+
+// Atomic sharing audit regression: same candidate migration; isolated PG only.
+// The existing fixture's two user identities and owner/member policies are reused.
+await db.exec('reset role;');
+await db.query('insert into organisation_members(org_id,user_id,role) values($1,$2,$3)',[org,alice,'owner']);
+await db.query('insert into memory_documents(id,user_id,org_id,title,status,metadata) values($1,$2,$3,$4,$5,$6)',[id(120),alice,org,'Audited sharing candidate','ready',{}]);
+await db.exec(`
+  create table mission_audit_logs (
+    id uuid primary key default gen_random_uuid(), user_id uuid not null,
+    org_id uuid, action text not null, target_type text, target_id text,
+    status text not null default 'success', metadata jsonb not null default '{}'::jsonb,
+    created_at timestamptz default now()
+  );
+  alter table mission_audit_logs enable row level security;
+  create policy audit_owner_read on mission_audit_logs for select to authenticated
+    using(user_id=(select auth.uid()));
+  grant select on mission_audit_logs to authenticated;
+`);
+await db.exec(readFileSync('supabase/migrations/20261031002000_enterprise_knowledge_atomic_share_audit.sql','utf8'));
+
+await selectAs(alice,'select id from memory_documents');
+verify((await rows("select id from mission_audit_logs")).length===0,'private baseline has no manufactured audit');
+verify((await rows("update memory_documents set metadata='{\"enterprise_shared\":true}' where id='"+id(120)+"' returning id")).length===1,
+ 'direct authenticated sharing permitted for original admin-owner');
+let auditRows=await rows('select action,metadata,user_id,org_id,target_id from mission_audit_logs');
+verify(auditRows.length===1 && auditRows[0].action==='enterprise_knowledge_share_changed',
+ 'direct Data API-style share has durable database-trigger audit');
+verify(auditRows[0].user_id===alice && auditRows[0].org_id===org && auditRows[0].target_id===id(120),
+ 'actor/org/document identifiers match');
+verify(auditRows[0].metadata.shared===true && auditRows[0].metadata.origin==='database_trigger',
+ 'audit stores redacted share state and database origin');
+await rows("update memory_documents set metadata='{\"enterprise_shared\":true,\"safe_extra\":1}' where id='"+id(120)+"'");
+verify((await rows('select id from mission_audit_logs')).length===1,
+ 'unrelated metadata update does not duplicate share event');
+await assert.rejects(()=>db.query('insert into mission_audit_logs(user_id,action) values($1,$2)',[alice,'forgery'])); passed++;
+
+await selectAs(bob,'select id from memory_documents');
+verify((await rows('select id from mission_audit_logs')).length===0,
+ 'organisation member cannot read another owners audit events');
+await assert.rejects(()=>rows("update memory_documents set metadata='{\"enterprise_shared\":true}' where id='"+id(107)+"' returning id")); passed++;
+
+await db.exec('reset role;');
+await db.exec("alter table mission_audit_logs add constraint audit_sink_block check ((metadata->>'origin') is distinct from 'database_trigger') not valid;");
+await selectAs(alice,'select id from memory_documents');
+await assert.rejects(()=>rows("update memory_documents set metadata='{\"enterprise_shared\":false}' where id='"+id(120)+"' returning id")); passed++;
+verify((await rows("select metadata->>'enterprise_shared' as shared from memory_documents where id='"+id(120)+"'"))[0].shared==='true',
+ 'failed audit insert rolls back document-sharing update');
+verify((await rows('select id from mission_audit_logs')).length===1,
+ 'rejected mutation adds no fictitious successful audit');
+await db.exec('reset role; alter table mission_audit_logs drop constraint audit_sink_block;');
+await selectAs(alice,'select id from memory_documents');
+await rows("update memory_documents set metadata='{\"enterprise_shared\":false}' where id='"+id(120)+"'");
+auditRows=await rows('select metadata from mission_audit_logs');
+verify(auditRows.length===2 && auditRows.some(x=>x.metadata.shared===false),
+ 'direct revocation is atomically audited');
+
+await rows("update memory_documents set metadata='{\"enterprise_shared\":true}' where id='"+id(120)+"'");
+await assert.rejects(()=>rows("update memory_documents set org_id='"+otherOrg+"' where id='"+id(120)+"' returning id")); passed++;
+verify((await rows("select org_id from memory_documents where id='"+id(120)+"'"))[0].org_id===org,
+ 'shared document cannot move to another org without revoking first');
+await rows("update memory_documents set status='processing' where id='"+id(120)+"'");
+await rows("update memory_documents set status='ready' where id='"+id(120)+"'");
+verify((await rows('select id from mission_audit_logs')).length===5,
+ 'shared-document readiness transitions are also audited');
+await db.exec('reset role;');
+await db.query('select set_config($1,$2,false)',['request.jwt.claim.sub','']);
+await assert.rejects(()=>rows("update memory_documents set metadata='{\"enterprise_shared\":false}' where id='"+id(120)+"'")); passed++;
+verify((await selectAs(alice,"select metadata->>'enterprise_shared' as shared from memory_documents where id='"+id(120)+"'"))[0].shared==='true',
+ 'unattributed privileged mutation is blocked');
+
 await db.close();
 console.log(`Enterprise Knowledge: ${passed} isolated PostgreSQL policy checks passed.`);
