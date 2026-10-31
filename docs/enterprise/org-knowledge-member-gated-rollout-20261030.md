@@ -154,3 +154,18 @@ Storage API tests have been completed on an isolated preview database.
 - Read-only connected `pg_policies`: trusted-media compatibility scopes are RESTRICTIVE for all four operations; existing Knowledge owner guards are PERMISSIVE. Do not claim a verified live OR-bypass. No customer object access was attempted.
 - `storage.buckets` confirms five private buckets: `cinema-hf-outputs`, `game-foundry`, `knowledge`, `trusted-media`, `website-studio-assets`. This is configuration metadata only; it does not prove end-to-end Storage API isolation.
 - A separate future permission and direct Storage API test is required for all buckets, with attention to privileged service-role calls and signed-URL lifetime.
+
+
+## Gated real two-user Supabase API/Storage acceptance harness
+
+Candidate QA script: `scripts/verification/enterprise-knowledge-api-uat.mjs`.
+Running `node scripts/verification/enterprise-knowledge-api-uat.mjs --self-test` requires no credentials or network, and verifies that the guard refuses the known Production project, malformed/identical user identities, malformed Storage paths and an intentionally leaked private document response.
+
+**Real UAT is still BLOCKED:** no separate non-production Supabase project/branch or approved fixture identities currently exist. Real requests are only enabled by `BLACKSTAR_UAT_NONPROD=I_CONFIRM_ISOLATED_TEST_DATABASE`, a distinct 20-character non-Production Supabase project ref and matching HTTPS host. The real test is **read-only** and uses designated synthetic data; no service-role key or customer content is needed.
+
+Operator supplies these environmental values **only in a local secure runner / isolated job, never in the repository or logs**:
+- `BLACKSTAR_UAT_NONPROD`, `BLACKSTAR_UAT_PROJECT_REF`, `BLACKSTAR_UAT_URL`, `BLACKSTAR_UAT_ANON_KEY` (isolated project only)
+- `BLACKSTAR_UAT_OWNER_JWT`, `BLACKSTAR_UAT_MEMBER_JWT` (genuine distinct signed-in test identities)
+- `BLACKSTAR_UAT_ORG_ID`, `BLACKSTAR_UAT_SHARED_DOC_ID`, `BLACKSTAR_UAT_PRIVATE_DOC_ID`, `BLACKSTAR_UAT_SHARED_OBJECT_PATH` (synthetic indexed fixtures, final path owner-prefixed)
+
+Run `node scripts/verification/enterprise-knowledge-api-uat.mjs` only **after** candidate migration is approved and applied to that isolated project and test documents/chunks/source file are indexed, while the test owner and member both belong to the fixture organisation. It checks authenticated document/chunk RLS, member private-denial, successful owner Storage read and member source-file denial; no content is printed or saved. It does **not** yet prove offboarding, user-browser UAT, signed URL expiry or mutation/audit transactions over the network. Those require a separate, explicitly approved disposable fixture execution.
