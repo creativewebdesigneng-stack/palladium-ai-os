@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Inspect patched redirect dependency integrity (temporary QA)
+        run: npm view follow-redirects@1.16.2 dist.integrity
+
       - name: High severity dependency audit
         shell: bash
         run: |
