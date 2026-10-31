@@ -110,14 +110,15 @@ that every elevated search RPC has correct authority checks.
 
 ## 30 October storage and mutation hardening addendum (draft only)
 
-Live connected Supabase policy metadata (read-only) exposed another important
-gap: an existing permissive `trusted_media_read_scope` policy grants SELECT on
-all buckets other than `trusted-media`. Parallel permissive policies exist for
-INSERT, UPDATE and DELETE. Under PostgreSQL OR composition, these conditions can
-override historical Knowledge owner-prefix RLS even though the separate
-`blackstar_knowledge_owner_*` policies look correct. No actual customer file
-was accessed or altered to test exploitability. **This is a security review
-finding, not a completed Production remediation.**
+**Correction based on fresh 31 October 2026 read-only live inspection:** the
+existing `trusted_media_read_scope`, `trusted_media_upload_scope`,
+`trusted_media_no_client_replace`, and
+`trusted_media_no_client_delete` policies are all **RESTRICTIVE**, not
+permissive. PostgreSQL intersects these policies with the Knowledge bucket's
+permissive owner-only conditions; the previously claimed cross-bucket OR-bypass
+is **not established by the current production policy definitions**. Five
+Storage buckets are private. This correction does not replace real signed-in
+Storage API testing or broader review of the supported service-role paths.
 
 The candidate migration now adds explicit **RESTRICTIVE owner-prefix**
 SELECT/INSERT/UPDATE/DELETE policies on `storage.objects` scoped to the
@@ -128,10 +129,12 @@ returns object contents. Unlinked pre-indexing uploads and genuine personal
 files remain owner-only. Existing authorised signed URLs may remain valid for
 their 120-second lifetime after offboarding; RLS cannot retract existing copies.
 
-The PGlite harness now recreates the conflicting broad permissive Storage
-policies, asserts that they cannot enable cross-owner read/write/delete/upload
-when intersected with the restrictive policies, and checks removed owners
-cannot read, modify or delete previously indexed org files.
+The isolated PostgreSQL harness first reproduces the LIVE-SHAPE restrictive
+Storage policy combination and demonstrates baseline owner isolation before
+the candidate migration. It then applies the draft policies and checks
+offboarded-owner denials. A **separate hypothetical drift scenario** makes
+the compatibility rules permissive to verify the new Knowledge owner-prefix
+guards are defence in depth. That hypothetical does not describe live state.
 
 Legacy memory maintenance paths are also narrowed: reindex, update, delete
 and vector-index entry points enforce `user_id` equality, and owner mutation
@@ -145,3 +148,9 @@ database have not been changed. Security review of the broad cross-bucket
 compatibility policies for other buckets remains a separate requirement.
 Do not certify Storage isolation against actual users until direct authenticated
 Storage API tests have been completed on an isolated preview database.
+
+
+## 31 October correction/acceptance record
+- Read-only connected `pg_policies`: trusted-media compatibility scopes are RESTRICTIVE for all four operations; existing Knowledge owner guards are PERMISSIVE. Do not claim a verified live OR-bypass. No customer object access was attempted.
+- `storage.buckets` confirms five private buckets: `cinema-hf-outputs`, `game-foundry`, `knowledge`, `trusted-media`, `website-studio-assets`. This is configuration metadata only; it does not prove end-to-end Storage API isolation.
+- A separate future permission and direct Storage API test is required for all buckets, with attention to privileged service-role calls and signed-URL lifetime.
