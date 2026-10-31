@@ -114,13 +114,13 @@ on public.agent_memories is 'Require live reader and uploader organisation membe
 
 
 
--- Existing production storage policies contain a broad permissive
--- trusted_media_* scope condition of (bucket_id <> 'trusted-media').
--- PostgreSQL OR-combines permissive policies, so the narrow historical
--- knowledge owner-prefix policies alone do NOT enforce owner isolation.
--- These RESTRICTIVE policies intersect *all* permissive policies and restore
--- exact uploader prefix ownership for every Storage API operation. Apply only
--- after isolated acceptance; no live Supabase DDL from this draft branch.
+-- 31 October read-only connected database inspection confirms the existing
+-- trusted_media_* broad cross-bucket compatibility policies are RESTRICTIVE.
+-- They do not OR-bypass the owner-only Knowledge policies in the present schema.
+-- This draft adds additional Knowledge-specific RESTRICTIVE owner-prefix
+-- defence in depth, including protection if that policy configuration drifts.
+-- These do NOT establish a live current cross-user vulnerability.
+-- Apply only after isolated acceptance; no Production DDL from this draft.
 create policy knowledge_strict_owner_read
 on storage.objects as restrictive for select to authenticated
 using (
