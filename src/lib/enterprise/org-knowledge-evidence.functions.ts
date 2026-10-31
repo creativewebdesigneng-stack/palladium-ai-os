@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { loadMemoryPreferences } from '@/lib/memory/preferences.server';
-import { writeAuditRequired } from '@/lib/platform/audit.server';
+import { writeAudit, writeAuditRequired } from '@/lib/platform/audit.server';
 import {
   authorisedOrgKnowledgeDocuments,
   buildOrgKnowledgeEvidencePacket,
@@ -75,7 +75,11 @@ export const setOrgKnowledgeSharing = createServerFn({ method: 'POST' })
       .eq('org_id',data.orgId).is('agent_id',null).eq('status','ready')
       .select('id').maybeSingle();
     if (updateError || !changed) throw new Error('Organisation sharing could not be changed.');
-    // A database trigger records the committed change atomically with this UPDATE.
+    // Compatibility audit until the gated database trigger is installed; the
+    // trigger will additionally record the committed change transactionally.
+    await writeAudit({ userId: context.userId, orgId: data.orgId,
+      action: 'enterprise_knowledge_share_changed', targetType: 'memory_document',
+      targetId: data.documentId, metadata: { shared: data.shared } });
     return { documentId: data.documentId, shared: data.shared };
   });
 
