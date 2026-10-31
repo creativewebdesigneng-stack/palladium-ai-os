@@ -147,6 +147,9 @@ jobs:
       - name: Enterprise knowledge owner/member/revocation isolated PostgreSQL RLS tests
         run: bun run test:enterprise-knowledge-rls
 
+      - name: Enterprise Knowledge non-production API UAT harness self-test (no network)
+        run: bun run test:enterprise-knowledge-api-uat
+
       - name: Free Open3D worker Python syntax and safety tests
         run: |
           python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
