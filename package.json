@@ -30,7 +30,8 @@
     "test:builder-authority-recovery": "node scripts/verification/builder-authority-recovery.mjs",
     "test:marketplace-compatibility": "node scripts/verification/marketplace-compatibility.mjs",
     "test:enterprise-knowledge-rls": "node scripts/verification/enterprise-knowledge-rls.mjs",
-    "test:enterprise-knowledge-api-uat": "node scripts/verification/enterprise-knowledge-api-uat.mjs --self-test"
+    "test:enterprise-knowledge-api-uat": "node scripts/verification/enterprise-knowledge-api-uat.mjs --self-test",
+    "test:isolated-uat-jwt": "node scripts/verification/isolated-uat-jwt-guard.mjs --self-test"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
