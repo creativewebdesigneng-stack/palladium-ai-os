@@ -169,3 +169,13 @@ Operator supplies these environmental values **only in a local secure runner / i
 - `BLACKSTAR_UAT_ORG_ID`, `BLACKSTAR_UAT_SHARED_DOC_ID`, `BLACKSTAR_UAT_PRIVATE_DOC_ID`, `BLACKSTAR_UAT_SHARED_OBJECT_PATH` (synthetic indexed fixtures, final path owner-prefixed)
 
 Run `node scripts/verification/enterprise-knowledge-api-uat.mjs` only **after** candidate migration is approved and applied to that isolated project and test documents/chunks/source file are indexed, while the test owner and member both belong to the fixture organisation. It checks authenticated document/chunk RLS, member private-denial, successful owner Storage read and member source-file denial; no content is printed or saved. It does **not** yet prove offboarding, user-browser UAT, signed URL expiry or mutation/audit transactions over the network. Those require a separate, explicitly approved disposable fixture execution.
+
+
+### Staged revocation acceptance phases — QA-only
+
+The read-only two-user API harness additionally supports `BLACKSTAR_UAT_PHASE`:
+- `active` (default): current owner can read their own ready shared/private organisation documents and source file; a current member can read only explicitly shared document/chunk rows, not the owner's private document or Storage file.
+- `member_revoked`: after a separate authorised operator has removed the member from the synthetic organisation, the original owner retains access but the former member must no longer read shared document or chunk rows.
+- `owner_revoked`: after a separate authorised operator removes the original uploader from the synthetic organisation while the test member remains, **both** must lose access to that uploader's organisation documents/chunks, and the original uploader must lose direct authenticated Storage download access to the indexed organisation source.
+
+The two revocation phases refuse to run unless `BLACKSTAR_UAT_REVOKED_CONFIRM=I_CONFIRM_MEMBERSHIP_ALREADY_REVOKED` is supplied. The harness **does not** change organisation membership, upload objects, call privileged RPCs, mint signed URLs or inspect response bodies. Test phases should be run only against individually prepared disposable fixtures in an approved isolated project; don't run a revoked phase with unreconciled identities. The mock-only CI self-test exercises all three phases and injects deliberate Data API and Storage visibility failures to verify denial assertions, but **does not count as real authenticated UAT**. Any later live approval must also cover signed URL expiry and service-role privileged access separately.
