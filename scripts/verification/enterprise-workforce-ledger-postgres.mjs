@@ -119,7 +119,8 @@ try {
     'second authenticated user sees no owner tool executions (synthetic RLS fixture)');
   verify((await rows('select id from mission_audit_logs')).length===0,
     'second authenticated user sees no owner audit records (synthetic RLS fixture)');
-  await rejects("update approval_requests set status='rejected' where id=$1", [approval]); // trigger/RLS or no row
+  verify((await rows("update approval_requests set status='rejected' where id=$1 returning id", [approval])).length === 0,
+    "foreign authenticated owner cannot mutate an approval belonging to another user");
   await current('authenticated', owner);
   verify((await rows("select status,execution_status,execution_result from approval_requests where id=$1",[approval]))[0]?.execution_status==='succeeded',
     'owner can read trusted backend success evidence');
