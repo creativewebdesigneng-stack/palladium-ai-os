@@ -1,0 +1,23 @@
+name: Enterprise Workforce Authenticated API UAT (Mock Only)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workforce-api-uat-mock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact QA commit
+        uses: actions/checkout@v7
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated mock transport and fail-closed behaviours
+        run: node scripts/verification/enterprise-workforce-api-uat.mjs --self-test

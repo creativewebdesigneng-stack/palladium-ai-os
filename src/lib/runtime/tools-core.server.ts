@@ -6,6 +6,7 @@
  * in `tool_permissions`. The frontend is never trusted for any of this.
  */
 import type { ToolDef } from "./model-gateway.server";
+import { normaliseToolEvidenceExtra, writeRequiredToolPolicyDenial } from "./tool-denial-evidence.server";
 import { isIP } from "node:net";
 import { searchMemory, storeMemory } from "@/lib/memory/memory.server";
 import { readConnectedService, CONNECTED_SERVICE_ACTIONS } from "@/lib/integrations/connected-service.server";
@@ -1557,7 +1558,7 @@ export async function executeTool(
     status: "succeeded" | "failed" | "cancelled",
     extra: Record<string, unknown>,
   ) => {
-    await ctx.sb.from("tool_executions").insert({
+    const persisted = await ctx.sb.from("tool_executions").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId,
       agent_id: ctx.agentId,
@@ -1566,8 +1567,9 @@ export async function executeTool(
       input: inputMetadata(input),
       status,
       duration_ms: Date.now() - started,
-      ...extra,
+      ...normaliseToolEvidenceExtra(extra),
     });
+    if (persisted?.error) throw new Error("Tool execution evidence could not be persisted.");
   };
 
   if (!tool || !grant) {
@@ -1578,6 +1580,7 @@ export async function executeTool(
   const harnessInputPolicy = assertHarnessToolInput(name, input, grant.allowedDomains);
   if (harnessInputPolicy.decision === "deny") {
     await log("failed", { error: harnessInputPolicy.reason, policy_code: harnessInputPolicy.code, input: { redacted: true } });
+    await writeRequiredToolPolicyDenial(ctx, name, harnessInputPolicy.code);
     return {
       ok: false,
       output: {
@@ -1592,6 +1595,7 @@ export async function executeTool(
     const sandboxPolicy = evaluateHarnessPolicy({ tool: name, input, sandboxProfile });
     if (sandboxPolicy.decision === "deny") {
       await log("failed", { error: sandboxPolicy.reason, policy_code: sandboxPolicy.code });
+      await writeRequiredToolPolicyDenial(ctx, name, sandboxPolicy.code);
       return {
         ok: false,
         output: {
