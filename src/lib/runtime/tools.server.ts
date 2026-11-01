@@ -1,4 +1,5 @@
 import type { ToolDef } from "./model-gateway.server";
+import { normaliseToolEvidenceExtra, writeRequiredToolPolicyDenial } from "./tool-denial-evidence.server";
 import {
   TOOL_MANIFEST as CORE_TOOL_MANIFEST,
   TOOL_SLUGS as CORE_TOOL_SLUGS,
@@ -167,7 +168,7 @@ export async function executeTool(
   const grant = grants.get(name);
   const started = Date.now();
   const log = async (status: "succeeded" | "failed" | "cancelled", extra: Record<string, unknown>) => {
-    await ctx.sb.from("tool_executions").insert({
+    const persisted = await ctx.sb.from("tool_executions").insert({
       user_id: ctx.userId,
       org_id: ctx.orgId,
       agent_id: ctx.agentId,
@@ -176,8 +177,9 @@ export async function executeTool(
       input: inputMetadata(input),
       status,
       duration_ms: Date.now() - started,
-      ...extra,
+      ...normaliseToolEvidenceExtra(extra),
     });
+    if (persisted?.error) throw new Error("Tool execution evidence could not be persisted.");
   };
 
   if (!grant) {
@@ -188,6 +190,7 @@ export async function executeTool(
   const harness = assertHarnessToolInput(name, input, grant.allowedDomains);
   if (harness.decision === "deny") {
     await log("failed", { error: harness.reason, policy_code: harness.code, input: { redacted: true } });
+    await writeRequiredToolPolicyDenial(ctx, name, harness.code);
     return { ok: false, output: { error: harness.reason, policy_code: harness.code } };
   }
 
