@@ -3,7 +3,7 @@ name: Backend Check
 on:
   push:
     # Temporary QA-only trigger; remove before merging this QA branch.
-    branches: [main, qa/astra-guided-reasoning-20261029]
+    branches: [main, qa/astra-guided-reasoning-20261029, qa/mission-1033-empty-output-telemetry-20261101]
   pull_request:
     branches: [main]
 

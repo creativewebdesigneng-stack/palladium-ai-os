@@ -74,6 +74,14 @@ export class RuntimeError extends Error {
     message: string,
     readonly code: string,
     readonly status = 400,
+    readonly inferenceReceipt?: {
+      provider: ChatResult["provider"];
+      model: string;
+      tokens_in: number;
+      tokens_out: number;
+      tool_calls: number;
+      finish_reason?: ChatResult["finishReason"];
+    },
   ) {
     super(message);
   }
@@ -439,13 +447,22 @@ export async function completeRun(args: {
 }) {
   const { run, result } = args;
   if (!result.text?.trim()) {
-    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502);
+    // Retain only observed counters and routing identity, never hidden reasoning
+    // or raw upstream payloads. Failure remains failure and is not billed here.
+    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502, {
+      provider: result.provider,
+      model: result.model,
+      tokens_in: result.usage.input,
+      tokens_out: result.usage.output,
+      tool_calls: args.toolCallCount,
+      ...(result.finishReason ? { finish_reason: result.finishReason } : {}),
+    });
   }
   const duration = Date.now() - run.startedAt;
   const db = await admin();
 
   await writeAuditRequired({userId: args.userId, orgId: run.orgId, action: "agent.run_result", targetType: "agent_task", targetId: run.taskId, agentId: run.agent.id, metadata: {provider: result.provider, model: result.model, duration_ms: duration}});
-  const output = { text: result.text, tool_calls: args.toolCallCount };
+  const output = { text: result.text, tool_calls: args.toolCallCount, ...(result.finishReason ? { finish_reason: result.finishReason } : {}) };
   const completionReceipt = await db
     .from("agent_tasks")
     .update({
@@ -594,10 +611,14 @@ export async function failRun(args: {
         ? args.error.message
         : "The run failed unexpectedly. Please try again.";
   const db = args.sb ?? await admin();
+  const inferenceReceipt = args.error instanceof RuntimeError ? args.error.inferenceReceipt : undefined;
+  // finish_reason is audit metadata, not a column on agent_tasks.
+  const { finish_reason: _finishReason, ...inferenceCounters } = inferenceReceipt ?? {};
   const failureReceipt = await db
     .from("agent_tasks")
     .update({
       status: cancelled ? "cancelled" : "failed",
+      ...inferenceCounters,
       error: message.slice(0, 1000),
       duration_ms: Date.now() - args.run.startedAt,
       heartbeat_at: new Date().toISOString(),
@@ -626,7 +647,7 @@ export async function failRun(args: {
     targetType: "agent_task",
     targetId: args.run.taskId,
     agentId: args.run.agent.id,
-    metadata: { error: message },
+    metadata: { error: message, ...(inferenceReceipt ?? {}) },
   });
 
   const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
