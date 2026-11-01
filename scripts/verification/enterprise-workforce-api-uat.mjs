@@ -223,6 +223,17 @@ async function selfTest() {
     assert.equal(opts.redirect,'error');
     const owner = opts.headers.Authorization === 'Bearer '+c.ownerJWT;
     const table = url.pathname.split('/').pop();
+    // Fail any mock that requests an unknown canonical tool-execution column.
+    // This caught the former policy_code top-level field mismatch.
+    if (table === 'tool_executions') {
+      const allowedColumns = new Set([
+        'id','user_id','agent_id','agent_task_id','tool','status','input','created_at',
+      ]);
+      const selected = (url.searchParams.get('select') || '').split(',');
+      if (!selected.every(column => allowedColumns.has(column))) {
+        return new Response('{}', { status: 400 });
+      }
+    }
     const key = table === 'tool_executions' ? 'agent_task_id' : table === 'mission_audit_logs' ? 'target_id' : 'id';
     const run = url.searchParams.get(key)?.slice(3);
     const item = c.cases.find(x=>x.runId===run || x.approvalId===run);
@@ -276,6 +287,21 @@ async function selfTest() {
   },{mockTransport:true});
   assert.equal(lostAudit.status,'blocked_or_failed');
   assert.ok(lostAudit.failures.missing_final_approval_audit>0);
+  const lostDenialCode = await verifyWorkforceUat(c,(url,opts)=>{
+    if (url.pathname.endsWith('/tool_executions') &&
+        url.searchParams.get('agent_task_id')?.startsWith('eq.') &&
+        c.cases.some(x=>x.kind==='denied_tool' &&
+          'eq.'+x.runId===url.searchParams.get('agent_task_id')) &&
+        opts.headers.Authorization==='Bearer '+c.ownerJWT) {
+      const item=c.cases.find(x=>'eq.'+x.runId===url.searchParams.get('agent_task_id'));
+      return Promise.resolve(Response.json([{id:item.runId,user_id:c.owner,agent_id:item.agentId,
+        agent_task_id:item.runId,tool:item.tool,status:'failed',input:{redacted:true},
+        created_at:'2026-10-30T12:00:01.000Z'}]));
+    }
+    return mocked(url,opts);
+  },{mockTransport:true});
+  assert.equal(lostDenialCode.status,'blocked_or_failed');
+  assert.ok(lostDenialCode.failures.missing_policy_denial>0);
   process.stdout.write('Enterprise Workforce isolated API UAT MOCK self-test PASS: 12 synthetic cases + fail-closed negative checks; no network\n');
 }
 
