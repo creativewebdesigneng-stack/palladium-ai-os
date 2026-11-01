@@ -149,6 +149,16 @@ export async function verifyWorkforceUat(c, transport = fetch, options = {}) {
           'missing_operator_decision');
         const laterActions = toolOwner.filter(row =>
           row.tool === item.tool && Date.parse(row.created_at || '') >= decisionTime);
+        const matchingActions = toolOwner.filter(row => row.tool === item.tool);
+        verify(matchingActions.every(row =>
+          Number.isFinite(Date.parse(row.created_at || '')) &&
+          Date.parse(row.created_at) >= decisionTime),
+          'tool_evidence_before_decision_or_invalid_time');
+        if (item.kind !== 'rejected_approval') {
+          const completedTime = Date.parse(approval?.executed_at || '');
+          verify(Number.isFinite(completedTime) && completedTime >= decisionTime,
+            'completion_before_decision_or_invalid_time');
+        }
         const executionAudit = auditTask.filter(row =>
           (row.action === 'agent.browser_approval_execution' ||
            row.action === 'agent.tool_approval_execution' ||
@@ -273,6 +283,25 @@ async function selfTest() {
   assert.equal(pass.status,'api_evidence_consistent');
   assert.equal(pass.casesPassed,12);
   assert.equal(pass.customerAcceptanceCertified,false);
+  // A later legitimate receipt must not hide an earlier unauthorised action.
+  const premature = await verifyWorkforceUat(c,async (url,opts)=>{
+    const response=await mocked(url,opts);
+    const rows=await response.json();
+    if(url.pathname.endsWith('/tool_executions') && rows.length &&
+       opts.headers.Authorization==='Bearer '+c.ownerJWT) {
+      rows.push({...rows[0],created_at:'2026-10-30T11:59:59.000Z'});
+    }
+    return Response.json(rows);
+  },{mockTransport:true});
+  assert.equal(premature.status,'blocked_or_failed');
+  const reversedCompletion = await verifyWorkforceUat(c,async (url,opts)=>{
+    const response=await mocked(url,opts);
+    const rows=await response.json();
+    if(url.pathname.endsWith('/approval_requests') && rows[0]?.executed_at)
+      rows[0].executed_at='2026-10-30T11:59:59.000Z';
+    return Response.json(rows);
+  },{mockTransport:true});
+  assert.equal(reversedCompletion.status,'blocked_or_failed');
   const leak = await verifyWorkforceUat(c,(url,opts)=>{
     if(opts.headers.Authorization==='Bearer '+c.memberJWT && url.pathname.endsWith('/agent_tasks'))
       return Promise.resolve(Response.json([{id:c.cases[0].runId}]));
@@ -321,3 +350,4 @@ if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
     process.exitCode=1;
   }
 }
+
