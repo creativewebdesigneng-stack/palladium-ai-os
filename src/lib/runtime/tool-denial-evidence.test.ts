@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normaliseToolEvidenceExtra } from "../tool-denial-evidence.server";
+import { normaliseToolEvidenceExtra } from "./tool-denial-evidence.server";
 
-const core = readFileSync(new URL("../tools-core.server.ts", import.meta.url), "utf8");
-const extensions = readFileSync(new URL("../tools.server.ts", import.meta.url), "utf8");
-const types = readFileSync(new URL("../../../integrations/supabase/types.ts", import.meta.url), "utf8");
-const api = readFileSync(new URL("../../../../scripts/verification/enterprise-workforce-api-uat.mjs", import.meta.url), "utf8");
+const core = readFileSync(new URL("./tools-core.server.ts", import.meta.url), "utf8");
+const extensions = readFileSync(new URL("./tools.server.ts", import.meta.url), "utf8");
+const types = readFileSync(new URL("../../integrations/supabase/types.ts", import.meta.url), "utf8");
+const api = readFileSync(new URL("../../../scripts/verification/enterprise-workforce-api-uat.mjs", import.meta.url), "utf8");
 
 describe("Blackstar canonical denied-tool evidence (QA)", () => {
   it("redacts policy details and moves discriminator into schema-backed JSON input", () => {
