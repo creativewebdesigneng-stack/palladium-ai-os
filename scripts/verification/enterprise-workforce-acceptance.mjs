@@ -214,14 +214,16 @@ function selfTest() {
     .status, 'review_required');
   assert.throws(() => test(x => x.scenarios[0].trials.pop()));
   assert.throws(() => test(x => x.scenarios[0].requiresApproval = false));
-  assert.throws(() => test(x => x.scenarios[0].trials[0].events.push({type:'audit',at:'invalid'})), 
-    /offline workforce evidence/);
+  assert.equal(test(x => x.scenarios[0].trials[0].events.push({type:'audit',at:'invalid'}))
+    .status, 'review_required');
   process.stdout.write('Enterprise Workforce acceptance self-test PASS (12 synthetic paths and negative controls; no network)\n');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     if (process.argv.length === 3 && process.argv[2] === '--self-test') selfTest();
+    else if (process.argv.length === 3 && process.argv[2] === '--sample')
+      process.stdout.write(JSON.stringify(syntheticFixture(), null, 2) + '\n');
     else if (process.argv.length === 4 && process.argv[2] === '--input') {
       const input = JSON.parse(await readFile(process.argv[3], 'utf8'));
       const report = evaluateEnterpriseWorkforceAcceptance(input);
