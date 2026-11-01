@@ -948,15 +948,16 @@ describe("honest completion after blocked tools", () => {
   });
   it("does not complete a stream when its model returns no deliverable", async () => {
     const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
-    gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: textResult("") }; });
+    gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: { ...textResult(""), finishReason: "length" } }; });
     const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
     expect(events.some(event => event.type === "complete")).toBe(false);
     expect(sb.tables.agent_tasks[0]).toMatchObject({ status: "failed", tokens_in: 10, tokens_out: 5, tool_calls: 0, provider: "openai", model: "gpt-5-mini" });
     expect(entitlements.recordUsage).not.toHaveBeenCalled();
     expect(audit.writeAudit).toHaveBeenCalledWith(expect.objectContaining({
       action: "agent.run", status: "failed",
-      metadata: expect.objectContaining({ tokens_in: 10, tokens_out: 5, tool_calls: 0, provider: "openai", model: "gpt-5-mini" }),
+      metadata: expect.objectContaining({ tokens_in: 10, tokens_out: 5, tool_calls: 0, provider: "openai", model: "gpt-5-mini", finish_reason: "length" }),
     }));
+    expect(sb.tables.agent_tasks[0]).not.toHaveProperty("finish_reason");
   });
   it("retains only bounded inference counters when closing an empty completion", async () => {
     const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });

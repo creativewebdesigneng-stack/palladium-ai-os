@@ -52,7 +52,19 @@ export type ToolDef = {
   parameters: Record<string, unknown>;
 };
 
+const MODEL_FINISH_REASONS = [
+  "stop", "length", "tool_calls", "content_filter", "function_call",
+  "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal",
+] as const;
+export type ModelFinishReason = typeof MODEL_FINISH_REASONS[number];
+
+/** Keep protocol enums only; never persist arbitrary upstream strings. */
+function modelFinishReason(value: unknown): ModelFinishReason | undefined {
+  return MODEL_FINISH_REASONS.find((reason) => reason === value);
+}
+
 export type ChatResult = {
+  finishReason?: ModelFinishReason;
   geminiContinuation?: GeminiContinuation;
   text: string;
   toolCalls: ToolCall[];
@@ -484,7 +496,9 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
 
   if (args.provider === "anthropic") {
     const blocks: any[] = json.content ?? [];
+    const finishReason = modelFinishReason(json.stop_reason);
     return {
+      ...(finishReason ? { finishReason } : {}),
       text: blocks
         .filter((b) => b.type === "text")
         .map((b) => b.text)
@@ -504,7 +518,9 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
   }
 
   const msg = json.choices?.[0]?.message ?? {};
+  const finishReason = modelFinishReason(json.choices?.[0]?.finish_reason);
   return {
+    ...(finishReason ? { finishReason } : {}),
     text: (msg.content ?? "").trim(),
     toolCalls: (msg.tool_calls ?? []).map((t: any) => ({
       id: t.id,
@@ -549,6 +565,7 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
+  let finishReason: ModelFinishReason | undefined;
   const usage = { input: 0, output: 0 };
   const partialTools = new Map<number, { id: string; name: string; args: string }>();
   const anthropicTools = new Map<number, { id: string; name: string; args: string }>();
@@ -592,11 +609,13 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
           usage.input += evt.message?.usage?.input_tokens ?? 0;
         } else if (evt.type === "message_delta") {
           usage.output += evt.usage?.output_tokens ?? 0;
+          finishReason = modelFinishReason(evt.delta?.stop_reason) ?? finishReason;
         }
         continue;
       }
 
       const delta = evt.choices?.[0]?.delta;
+      finishReason = modelFinishReason(evt.choices?.[0]?.finish_reason) ?? finishReason;
       if (delta?.content) {
         text += delta.content;
         yield { type: "text", delta: delta.content };
@@ -624,6 +643,6 @@ export async function* streamChat(args: RunArgs): AsyncGenerator<StreamEvent> {
   if (toolCalls.length) yield { type: "tool_calls", toolCalls };
   yield {
     type: "done",
-    result: { text: text.trim(), toolCalls, usage, provider: args.provider, model: args.model },
+    result: { text: text.trim(), toolCalls, usage, provider: args.provider, model: args.model, ...(finishReason ? { finishReason } : {}) },
   };
 }
