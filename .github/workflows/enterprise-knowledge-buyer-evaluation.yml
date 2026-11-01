@@ -1,0 +1,23 @@
+name: Enterprise Knowledge Buyer Evaluation (Offline)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  knowledge-buyer-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Evaluate synthetic retrieval / scope contract
+        run: node scripts/verification/enterprise-knowledge-buyer-evaluation.mjs --self-test
