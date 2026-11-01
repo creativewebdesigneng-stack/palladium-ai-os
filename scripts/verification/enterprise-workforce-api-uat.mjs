@@ -93,7 +93,7 @@ export async function verifyWorkforceUat(c, transport = fetch, options = {}) {
       const taskMember = await readRows(c,transport,'agent_tasks','id',item.runId,c.memberJWT);
       verify(taskMember.length === 0,'member_can_read_run');
       const task = taskOwner[0];
-      verify(taskOwner.length === 1 && task?.user_id === c.owner &&
+      verify(taskOwner.length === 1 && task?.id === item.runId && task?.user_id === c.owner &&
         task?.agent_id === item.agentId, 'owner_run_missing_or_mismatch');
       const desired = item.kind === 'approved_execution' ? ['completed'] :
         item.kind === 'rejected_approval' ? ['cancelled'] : ['failed','blocked','cancelled'];
@@ -129,7 +129,7 @@ export async function verifyWorkforceUat(c, transport = fetch, options = {}) {
         const memberApprovals = await readRows(c,transport,'approval_requests','id',item.approvalId,c.memberJWT);
         verify(memberApprovals.length === 0,'member_can_read_approval');
         const approval = approvals[0];
-        verify(approvals.length === 1 && approval?.user_id === c.owner &&
+        verify(approvals.length === 1 && approval?.id === item.approvalId && approval?.user_id === c.owner &&
           approval?.agent_id === item.agentId && approval?.details?.agent_task_id === item.runId &&
           (approval?.action_type === 'agent_browser_task' && item.tool === 'browser_task' ||
            approval?.action_type === 'agent_tool_task' && approval?.details?.tool === item.tool),
@@ -182,6 +182,7 @@ export async function verifyWorkforceUat(c, transport = fetch, options = {}) {
           verify(approval?.status === 'approved' && approval?.execution_status === 'failed' &&
             Number.isFinite(Date.parse(approval?.executed_at||'')), 'failed_action_not_recorded');
           verify(!laterActions.some(row => row.status === 'succeeded'), 'failed_action_has_success_receipt');
+          verify(laterActions.some(row => row.status === 'failed'), 'missing_failed_tool_receipt');
           verify(auditApproval.some(row => row.action === 'external_action_failed' &&
             row.status === 'failed'),'missing_failure_audit');
         }
@@ -283,6 +284,24 @@ async function selfTest() {
   assert.equal(pass.status,'api_evidence_consistent');
   assert.equal(pass.casesPassed,12);
   assert.equal(pass.customerAcceptanceCertified,false);
+  const wrongIds = await verifyWorkforceUat(c,async (url,opts)=>{
+    const response=await mocked(url,opts);
+    const rows=await response.json();
+    if(url.pathname.endsWith('/agent_tasks') || url.pathname.endsWith('/approval_requests'))
+      for(const row of rows)row.id='00000000-0000-4000-8000-999999999999';
+    return Response.json(rows);
+  },{mockTransport:true});
+  assert.equal(wrongIds.status,'blocked_or_failed');
+  assert.equal(wrongIds.failures.owner_run_missing_or_mismatch,12);
+  assert.equal(wrongIds.failures.approval_run_tool_association_invalid,9);
+  const missingFailureLedger = await verifyWorkforceUat(c,async (url,opts)=>{
+    const response=await mocked(url,opts);
+    const item=c.cases.find(x=>'eq.'+x.runId===url.searchParams.get('agent_task_id'));
+    return url.pathname.endsWith('/tool_executions') && item?.kind==='tool_failure'
+      ? Response.json([]) : response;
+  },{mockTransport:true});
+  assert.equal(missingFailureLedger.status,'blocked_or_failed');
+  assert.equal(missingFailureLedger.failures.missing_failed_tool_receipt,3);
   // A later legitimate receipt must not hide an earlier unauthorised action.
   const premature = await verifyWorkforceUat(c,async (url,opts)=>{
     const response=await mocked(url,opts);
