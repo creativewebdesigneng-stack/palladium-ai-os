@@ -101,7 +101,7 @@ describe("executeTool harness enforcement", () => {
     expect(result.output).toMatchObject({policy_code:"invalid_domain_scope"});
     expect(db.tables.approval_requests).toHaveLength(0);
     expect(db.tables.tool_executions).toHaveLength(1);
-    expect(db.tables.tool_executions[0].input).toEqual({redacted:true});
+    expect(db.tables.tool_executions[0].input).toEqual({ redacted: true, policy_code: "invalid_domain_scope" });
     expect(JSON.stringify(db.tables.tool_executions)).not.toContain("private-secret");
   });
 
