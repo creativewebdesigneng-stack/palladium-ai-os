@@ -951,7 +951,24 @@ describe("honest completion after blocked tools", () => {
     gateway.streamChat.mockImplementationOnce(async function* () { yield { type: "done", result: textResult("") }; });
     const events = []; for await (const event of streamRun({ sb, userId: USER, run })) events.push(event);
     expect(events.some(event => event.type === "complete")).toBe(false);
-    expect(sb.tables.agent_tasks[0].status).toBe("failed");
+    expect(sb.tables.agent_tasks[0]).toMatchObject({ status: "failed", tokens_in: 10, tokens_out: 5, tool_calls: 0, provider: "openai", model: "gpt-5-mini" });
+    expect(entitlements.recordUsage).not.toHaveBeenCalled();
+    expect(audit.writeAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "agent.run", status: "failed",
+      metadata: expect.objectContaining({ tokens_in: 10, tokens_out: 5, tool_calls: 0, provider: "openai", model: "gpt-5-mini" }),
+    }));
+  });
+  it("retains only bounded inference counters when closing an empty completion", async () => {
+    const sb = db(); const run = await prepareRun({ sb, userId: USER, agentId: AGENT.id, input: "go" });
+    const result = { ...textResult(""), reasoning: "PRIVATE_REASONING_SENTINEL", raw: { secret: "PRIVATE_UPSTREAM_SENTINEL" } };
+    let failure: unknown;
+    try { await completeRun({ sb, userId: USER, run, result, toolCallCount: 2 }); } catch (error) { failure = error; }
+    await failRun({ sb, userId: USER, run, error: failure });
+    expect(sb.tables.agent_tasks[0]).toMatchObject({ status: "failed", tokens_in: 10, tokens_out: 5, tool_calls: 2 });
+    const persisted = JSON.stringify([sb.tables.agent_tasks, vi.mocked(audit.writeAudit).mock.calls]);
+    expect(persisted).not.toContain("PRIVATE_REASONING_SENTINEL");
+    expect(persisted).not.toContain("PRIVATE_UPSTREAM_SENTINEL");
+    expect(entitlements.recordUsage).not.toHaveBeenCalled();
   });
   it.each([false, true])("does not label approval-blocked browser work complete (stream=%s)", async (stream) => {
     const sb = db([{ ...AGENT, allowed_tools: ["browser"], requires_approval: true }]);

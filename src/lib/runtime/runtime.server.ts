@@ -74,6 +74,13 @@ export class RuntimeError extends Error {
     message: string,
     readonly code: string,
     readonly status = 400,
+    readonly inferenceReceipt?: {
+      provider: ChatResult["provider"];
+      model: string;
+      tokens_in: number;
+      tokens_out: number;
+      tool_calls: number;
+    },
   ) {
     super(message);
   }
@@ -439,7 +446,15 @@ export async function completeRun(args: {
 }) {
   const { run, result } = args;
   if (!result.text?.trim()) {
-    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502);
+    // Retain only observed counters and routing identity, never hidden reasoning
+    // or raw upstream payloads. Failure remains failure and is not billed here.
+    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502, {
+      provider: result.provider,
+      model: result.model,
+      tokens_in: result.usage.input,
+      tokens_out: result.usage.output,
+      tool_calls: args.toolCallCount,
+    });
   }
   const duration = Date.now() - run.startedAt;
   const db = await admin();
@@ -594,10 +609,12 @@ export async function failRun(args: {
         ? args.error.message
         : "The run failed unexpectedly. Please try again.";
   const db = args.sb ?? await admin();
+  const inferenceReceipt = args.error instanceof RuntimeError ? args.error.inferenceReceipt : undefined;
   const failureReceipt = await db
     .from("agent_tasks")
     .update({
       status: cancelled ? "cancelled" : "failed",
+      ...(inferenceReceipt ?? {}),
       error: message.slice(0, 1000),
       duration_ms: Date.now() - args.run.startedAt,
       heartbeat_at: new Date().toISOString(),
@@ -626,7 +643,7 @@ export async function failRun(args: {
     targetType: "agent_task",
     targetId: args.run.taskId,
     agentId: args.run.agent.id,
-    metadata: { error: message },
+    metadata: { error: message, ...(inferenceReceipt ?? {}) },
   });
 
   const { dispatchWebhookEvent } = await import("@/lib/devapi/webhooks.server");
