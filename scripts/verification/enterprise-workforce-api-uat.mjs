@@ -219,7 +219,7 @@ async function selfTest() {
     assert.equal(opts.redirect,'error');
     const owner = opts.headers.Authorization === 'Bearer '+c.ownerJWT;
     const table = url.pathname.split('/').pop();
-    const key = table === 'tool_executions'?'agent_task_id':'id';
+    const key = table === 'tool_executions' ? 'agent_task_id' : table === 'mission_audit_logs' ? 'target_id' : 'id';
     const run = url.searchParams.get(key)?.slice(3);
     const item = c.cases.find(x=>x.runId===run || x.approvalId===run);
     if(!owner || !item)return Response.json([]);
