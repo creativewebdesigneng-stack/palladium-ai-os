@@ -57,7 +57,7 @@ export function prepareWorkforceUat(e, manifest) {
 const fields = {
   agent_tasks:'id,user_id,agent_id,status',
   approval_requests:'id,user_id,agent_id,status,action_type,details,decided_by,decided_at,execution_status,executed_at,execution_result',
-  tool_executions:'id,user_id,agent_id,agent_task_id,tool,status,policy_code,created_at',
+  tool_executions:'id,user_id,agent_id,agent_task_id,tool,status,input,created_at',
   mission_audit_logs:'id,user_id,agent_id,action,status,target_type,target_id,created_at,metadata',
 };
 async function readRows(c, transport, table, column, id, jwt) {
@@ -116,9 +116,13 @@ export async function verifyWorkforceUat(c, transport = fetch, options = {}) {
         verify(taskOwner.length === 1 && !['completed','running'].includes(task.status),
           'unauthorised_run_was_not_blocked');
         verify(toolOwner.some(row => row.tool === item.tool && row.status === 'failed' &&
-          typeof row.policy_code === 'string' && row.policy_code.length > 0), 'missing_policy_denial');
+          typeof row.input?.policy_code === 'string' && row.input.policy_code.length > 0 &&
+          row.input.redacted === true), 'missing_policy_denial');
         verify(!toolOwner.some(row => row.tool === item.tool && row.status === 'succeeded'), 'unauthorised_tool_succeeded');
-        verify(auditTask.some(row => row.status === 'denied' && row.agent_id === item.agentId),
+        verify(auditTask.some(row => row.status === 'denied' &&
+          row.action === 'agent.tool_policy_denied' && row.agent_id === item.agentId &&
+          row.metadata?.tool === item.tool &&
+          typeof row.metadata?.policy_code === 'string'),
           'missing_denial_audit');
       } else {
         const approvals = await readRows(c,transport,'approval_requests','id',item.approvalId,c.ownerJWT);
@@ -235,7 +239,9 @@ async function selfTest() {
       execution_result:item.kind==='approved_execution'?{simulated:false}:null}]);
     if(table==='tool_executions')return Response.json(item.kind==='rejected_approval'?[]:[{
       id:item.runId,...base,agent_task_id:item.runId,tool:item.tool,
-      status:item.kind==='approved_execution'?'succeeded':'failed',policy_code:item.kind==='denied_tool'?'TOOL_DENIED':null,created_at:later}]);
+      status:item.kind==='approved_execution'?'succeeded':'failed',
+      input:item.kind==='denied_tool'?{redacted:true,policy_code:'TOOL_DENIED'}:{redacted:true},
+      created_at:later}]);
     if(table==='mission_audit_logs') {
       const isApproval=run===item.approvalId;
       if(isApproval)return Response.json([{id:item.approvalId,...base,target_type:'approval_request',
@@ -246,7 +252,8 @@ async function selfTest() {
         target_type:'agent_task',target_id:item.runId,action:'agent.browser_approval_result',
         status:'success',metadata:{approval_request_id:item.approvalId,simulated:false},created_at:later}]:
         item.kind==='denied_tool'?[{id:item.runId,...base,target_type:'agent_task',target_id:item.runId,
-          action:'tool_policy_denied',status:'denied',created_at:later}]:[];
+          action:'agent.tool_policy_denied',status:'denied',
+          metadata:{tool:item.tool,policy_code:'TOOL_DENIED'},created_at:later}]:[];
       return Response.json(result);
     }
     throw Error('Unexpected table');
