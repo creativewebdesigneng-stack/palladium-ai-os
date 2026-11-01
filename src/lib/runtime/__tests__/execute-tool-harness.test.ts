@@ -101,9 +101,37 @@ describe("executeTool harness enforcement", () => {
     expect(result.output).toMatchObject({policy_code:"invalid_domain_scope"});
     expect(db.tables.approval_requests).toHaveLength(0);
     expect(db.tables.tool_executions).toHaveLength(1);
-    expect(db.tables.tool_executions[0].input).toEqual({redacted:true});
+    expect(db.tables.tool_executions[0].input).toEqual({ redacted: true, policy_code: "invalid_domain_scope" });
     expect(JSON.stringify(db.tables.tool_executions)).not.toContain("private-secret");
   });
+
+  it.each(["web_fetch", "html_studio"])(
+    "%s fails closed when the canonical tool ledger rejects a denied-action insert",
+    async tool => {
+      const db = sb();
+      const originalFrom = db.from.bind(db);
+      const failingDb = {
+        ...db,
+        from(table: string) {
+          if (table === "tool_executions") {
+            return {
+              insert: (_payload: unknown) =>
+                Promise.resolve({ data: null, error: { message: "Synthetic ledger failure" } }),
+            };
+          }
+          return originalFrom(table);
+        },
+      };
+      await expect(executeTool(
+        tool,
+        { url: "https://user:secret@example.com/private" },
+        ctx(failingDb),
+        grants([tool, { allowedDomains: ["example.com"] }]),
+      )).rejects.toThrow("Tool execution evidence could not be persisted.");
+      expect(db.tables.approval_requests).toHaveLength(0);
+      expect(db.tables.tool_executions).toHaveLength(0);
+    },
+  );
 
   it("leaves ordinary safe reads unchanged", async () => {
     const db = sb();

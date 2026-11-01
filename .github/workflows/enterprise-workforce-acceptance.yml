@@ -1,0 +1,23 @@
+name: Enterprise Workforce Acceptance (Offline)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workforce-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Node for offline acceptance
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test synthetic approved/rejected/denied/failed paths
+        run: node scripts/verification/enterprise-workforce-acceptance.mjs --self-test
