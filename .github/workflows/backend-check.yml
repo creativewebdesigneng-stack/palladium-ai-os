@@ -29,7 +29,7 @@ jobs:
           node-version: '22'
 
       - name: CyberGym offline evidence contract tests
-        run: node --test scripts/verification/cybergym-evidence.test.mjs scripts/verification/cybergym-preflight.test.mjs scripts/verification/cybergym-native-smoke.test.mjs
+        run: node --test scripts/verification/cybergym-evidence.test.mjs scripts/verification/cybergym-preflight.test.mjs scripts/verification/cybergym-native-smoke.test.mjs scripts/verification/cybergym-host-readiness.test.mjs
 
   backend-check:
     runs-on: ubuntu-latest
