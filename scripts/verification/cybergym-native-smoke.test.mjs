@@ -1,0 +1,109 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { probeLocalAstraForCyberGym } from './cybergym-native-smoke.mjs'
+
+const MODEL = 'qwen3:8b-q4_K_M'
+function plan(port) {
+  return {
+    schema: 'blackstar.cybergym.preflight.v1',
+    datasetCommit: 'a'.repeat(40),
+    harnessCommit: 'b'.repeat(40),
+    taskIds: ['arvo:47101'],
+    nativeModel: { provider: 'compatible', model: MODEL, baseUrl: 'http://127.0.0.1:' + port + '/v1' },
+    network: { name: 'cybergym-internal', serverBindHost: '172.21.0.1', serverPort: 8666, allowPublicIngress: false, allowDirectEgress: false },
+    limits: { maxTaskDurationSeconds: 300, maxMemoryMiB: 2048, maxCpus: 2 },
+  }
+}
+function respond(res, data, status = 200) {
+  res.writeHead(status, { 'content-type': 'application/json' })
+  res.end(JSON.stringify(data))
+}
+async function withFakeLoopbackServer(handler, run) {
+  const server = createServer(handler)
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = server.address().port
+  try { return await run(port) }
+  finally { await new Promise((resolve) => server.close(resolve)) }
+}
+function endpoint({ advertised = MODEL, reported = MODEL, content = 'READY', finish = 'stop', modelsStatus = 200, completionStatus = 200, onRequest } = {}) {
+  return (req, res) => {
+    onRequest?.(req)
+    if (req.url === '/v1/models') {
+      return respond(res, { data: [{ id: advertised }] }, modelsStatus)
+    }
+    if (req.url === '/v1/chat/completions') {
+      return respond(res, { model: reported, choices: [{ message: { content }, finish_reason: finish }] }, completionStatus)
+    }
+    res.writeHead(404); res.end()
+  }
+}
+test('loopback-only test transport and no-tool completion stay explicitly non-certified', async () => {
+  const seen = []
+  const result = await withFakeLoopbackServer(endpoint({ onRequest: (req) => seen.push({ path: req.url, method: req.method, authorization: req.headers.authorization }) }),
+    (port) => probeLocalAstraForCyberGym(plan(port)))
+  assert.deepEqual(seen.map((e) => [e.path, e.method]), [['/v1/models', 'GET'], ['/v1/chat/completions', 'POST']])
+  assert.ok(seen.every((r) => r.authorization === undefined))
+  assert.equal(result.status, 'LOCAL_MODEL_SMOKE_PASSED_BENCHMARK_BLOCKED')
+  assert.equal(result.benchmarkExecuted, false)
+  assert.equal(result.gpuExecutionVerified, false)
+  assert.equal(result.independentlyAttested, false)
+  assert.equal(result.executableApprovalGranted, false)
+  assert.equal(result.officialBenchmarkScore, null)
+  assert.equal(result.model, MODEL)
+})
+test('fails closed when pinned model is not advertised', async () => {
+  await withFakeLoopbackServer(endpoint({ advertised: 'some-other-model' }), async (port) => {
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port)), /not advertised/)
+  })
+})
+test('rejects an inference response from a different routed model', async () => {
+  await withFakeLoopbackServer(endpoint({ reported: 'paid-fallback-model' }), async (port) => {
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port)), /identity did not match/)
+  })
+})
+test('rejects empty or incorrect completion and an incomplete finish reason', async () => {
+  for (const settings of [{ content: '' }, { content: 'NOT READY' }, { finish: 'length' }]) {
+    await withFakeLoopbackServer(endpoint(settings), async (port) => {
+      await assert.rejects(probeLocalAstraForCyberGym(plan(port)), /invalid or incomplete/)
+    })
+  }
+})
+test('rejects remote, public, tunneled and credential-bearing endpoints before any HTTP call', async () => {
+  for (const url of ['https://example.com/v1', 'https://foo.trycloudflare.com/v1', 'http://localhost:11434/v1', 'http://192.168.0.8:11434/v1', 'http://key:secret@127.0.0.1:11434/v1']) {
+    const config = plan(11434); config.nativeModel.baseUrl = url
+    await assert.rejects(probeLocalAstraForCyberGym(config), /localhost-only/)
+  }
+})
+test('does not follow redirects, even when Location points to a remote host', async () => {
+  let seen = 0
+  await withFakeLoopbackServer((req,res) => {
+    seen += 1
+    res.writeHead(302, { location: 'https://example.org/v1/models' }); res.end()
+  }, async (port) => assert.rejects(probeLocalAstraForCyberGym(plan(port)), /not 200/))
+  assert.equal(seen, 1)
+})
+test('does not accept error HTTP statuses as successful inference', async () => {
+  await withFakeLoopbackServer(endpoint({ completionStatus: 503 }), async (port) => {
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port)), /not 200/)
+  })
+})
+test('rejects oversized HTTP responses and does not expose their content', async () => {
+  await withFakeLoopbackServer((req,res) => {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ data: [{ id: 'x'.repeat(70_000) }] }))
+  }, async (port) => assert.rejects(probeLocalAstraForCyberGym(plan(port)), /64 KiB cap/))
+})
+test('does not accept extra authority, proxy or fallback options', async () => {
+  await withFakeLoopbackServer(endpoint(), async (port) => {
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port), { apiKey: 'secret' }), /Unsupported local smoke options/)
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port), { fallbackProvider: 'groq' }), /Unsupported local smoke options/)
+  })
+})
+test('times out rather than waiting indefinitely for an unreachable or stalled local endpoint', async () => {
+  await withFakeLoopbackServer((req, res) => {
+    setTimeout(() => { if (!res.destroyed) respond(res, { data: [{ id: MODEL }] }) }, 350)
+  }, async (port) => {
+    await assert.rejects(probeLocalAstraForCyberGym(plan(port), { requestTimeoutMs: 250 }), /timed out/)
+  })
+})
