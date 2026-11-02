@@ -163,6 +163,9 @@ jobs:
             }
           }
 
+      - name: CyberGym offline evidence contract safety tests
+        run: node --test scripts/verification/cybergym-evidence.test.mjs
+
       - name: Browser worker syntax and policy tests
         working-directory: browser-worker
         run: |
