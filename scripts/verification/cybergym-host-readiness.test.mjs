@@ -13,6 +13,7 @@ const observed = () => ({
   gpuCsv: 'NVIDIA GeForce GTX 1080 Ti, 11264\n',
   ramBytes: 16 * GiB,
   diskFreeBytes: 100 * GiB,
+  storageDriveType: 3,
   dockerOverridesPresent: false,
   dockerEndpoint: 'npipe:////./pipe/dockerDesktopLinuxEngine',
   dockerServer: { Version: '28.0.1' },
@@ -111,6 +112,17 @@ test('unknown disk space or device resources remain unknown, never fabricated as
   assert.equal(result.status, 'HOST_PREREQUISITES_BLOCKED')
 })
 
+test('mapped network drives never pass the local scratch check', () => {
+  for (const kind of [null, 4, 5, 6]) {
+    const x = observed()
+    x.storageDriveType = kind
+    const result = evaluateCyberGymHostReadiness(x)
+    assert.equal(result.checks.scratchDriveLocalOrRemovable, false)
+    assert.equal(result.status, 'HOST_PREREQUISITES_BLOCKED')
+  }
+  const removable = observed(); removable.storageDriveType = 2
+  assert.equal(evaluateCyberGymHostReadiness(removable).checks.scratchDriveLocalOrRemovable, true)
+})
 test('prevents UNC, relative or nested paths from becoming storage/probe inputs', () => {
   for (const path of ['\\\\server\\share\\', '../', 'C:\\Users\\Admin\\secret', '/tmp', 'M:\\..\\', 'M:/']) {
     assert.throws(() => collectLocalCyberGymHostReadiness(path), /local Windows drive root/)
