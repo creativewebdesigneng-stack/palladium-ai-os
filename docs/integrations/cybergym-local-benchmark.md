@@ -64,3 +64,88 @@ The output is sanitised, normalized, deterministic JSON containing task IDs, exi
 5. **G5: CyberGym-E2E.** Design a separately identified E2E suite for discovery-and-patch testing, not falsely labelled as the original reproduction benchmark.
 
 Measure scoped subset performance, coverage, blocked cases, evidence validity, inference time, resource use and cost; do not call this model retraining, a cybersecurity certification or a demonstration of model superiority.
+
+
+## Phase 2 read-only local safety preflight (QA branch)
+
+The preflight verifier is available at \`scripts/verification/cybergym-preflight.mjs\`.
+It does **not** download, build or execute vulnerable workloads; does not
+launch Docker, invoke Astra, contact Supabase or grant any approval.
+Its purpose is to catch obviously unsafe plans before any benchmark runner exists.
+
+The official upstream project documents a ten-task sample, and warns **never**
+to expose the vulnerable PoC server to the public Internet. A server listening
+on \`0.0.0.0\`, or via Blackstar's existing external bridge, is forbidden.
+The server bind address must equal the *observed* Docker internal network
+gateway (not a guessed static address). This supports the upstream container
+networking model while still requiring a separate host-firewall audit.
+
+**Operator-only, read-only steps on Windows/PowerShell:**
+
+1. Check that local Docker Desktop is operational, and inspect an existing
+   \`cybergym-internal\` isolated network:
+
+   \`\`\`powershell
+   docker network inspect cybergym-internal
+   \`\`\`
+
+   If it does not exist, the preflight is **BLOCKED**. Creating the isolated
+   network is a separate reviewed setup step; the preflight never does so.
+
+2. Create a private local JSON file outside the repository (no API key):
+   \`\`\`json
+   {
+     "schema": "blackstar.cybergym.preflight.v1",
+     "datasetCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "harnessCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "taskIds": ["arvo:47101"],
+     "nativeModel": {
+       "provider": "compatible",
+       "model": "qwen3:8b-q4_K_M",
+       "baseUrl": "http://127.0.0.1:11434/v1"
+     },
+     "network": {
+       "name": "cybergym-internal",
+       "serverBindHost": "172.21.0.1",
+       "serverPort": 8666,
+       "allowPublicIngress": false,
+       "allowDirectEgress": false
+     },
+     "limits": {
+       "maxTaskDurationSeconds": 300,
+       "maxMemoryMiB": 2048,
+       "maxCpus": 2
+     }
+   }
+   \`\`\`
+
+   The Git SHA values and the Docker gateway above are **placeholders**, not
+   discovered facts. Replace them only with real checked-out full revision
+   hashes and the gateway reported by the local Docker network inspection.
+   No full dataset download is implied or approved.
+
+3. Run the preflight against the local JSON file:
+
+   \`\`\`powershell
+   node scripts/verification/cybergym-preflight.mjs M:\Blackstar\cybergym\preflight.json
+   node --test scripts/verification/cybergym-preflight.test.mjs
+   \`\`\`
+
+A structurally safe configuration with a genuinely isolated, empty Docker
+network reports \`PLAN_VALIDATED_EXECUTION_BLOCKED\`, not PASS for execution.
+A missing Docker daemon/network, an unsafe bind, an unapproved remote model,
+unknown task, excessive requested limit, public ingress, or non-isolated network
+is rejected. This check does not attest that the manifest's proposed limits
+are enforced on any future container.
+
+**Outstanding operator/worker gates:** explicit authorisation; real
+firewall/listener check from outside the host; Docker container mounts,
+privileges, egress and cgroup limit verification; a model bridge that remains
+private while reachable from isolated agent containers; actual native model
+response identity; official upstream scoring; independent evidence attestation.
+The host-local Ollama endpoint is **not automatically reachable** from an
+isolated Docker container. Do not solve that by opening a public tunnel.
+
+The read-only preflight and its tests can run in GitHub CI with mocked Docker
+inspection objects. **That CI result is a unit-test result only**, not evidence
+of a real isolated CyberGym deployment on the owner's Windows workstation.
