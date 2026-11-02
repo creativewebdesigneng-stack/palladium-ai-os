@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  CYBERGYM_HOST_READINESS_SCHEMA, parseNvidiaGpuCsv,
+  CYBERGYM_HOST_READINESS_SCHEMA, parseNvidiaGpuCsv, isLocalDockerPipeEndpoint,
   validateObservedCyberGymNetwork, evaluateCyberGymHostReadiness,
   collectLocalCyberGymHostReadiness,
 } from './cybergym-host-readiness.mjs'
@@ -13,6 +13,8 @@ const observed = () => ({
   gpuCsv: 'NVIDIA GeForce GTX 1080 Ti, 11264\n',
   ramBytes: 16 * GiB,
   diskFreeBytes: 100 * GiB,
+  dockerOverridesPresent: false,
+  dockerEndpoint: 'npipe:////./pipe/dockerDesktopLinuxEngine',
   dockerServer: { Version: '28.0.1' },
   dockerNetwork: [{
     Name: 'cybergym-internal', Driver: 'bridge', Internal: true, Attachable: false,
@@ -53,6 +55,20 @@ test('GPU parser excludes malformed, fake, serial-laden and uncontrolled output'
   })
 })
 
+test('remote Docker transport or environment overrides block readiness even with a plausible network', () => {
+  assert.equal(isLocalDockerPipeEndpoint('npipe:////./pipe/dockerDesktopLinuxEngine'), true)
+  for (const target of ['tcp://127.0.0.1:2375','tcp://10.0.0.7:2376',
+    'ssh://runner@remote','https://example.com','npipe:////remote/pipe/name',
+    'npipe:////./pipe/../../bad', null]) {
+    assert.equal(isLocalDockerPipeEndpoint(target), false)
+    const x = observed(); x.dockerEndpoint = target
+    const r = evaluateCyberGymHostReadiness(x)
+    assert.equal(r.status, 'HOST_PREREQUISITES_BLOCKED')
+    assert.equal(r.checks.dockerTransportLocal, false)
+  }
+  const y = observed(); y.dockerOverridesPresent = true
+  assert.equal(evaluateCyberGymHostReadiness(y).checks.dockerTransportLocal, false)
+})
 test('rejects public, wildcard and non-internal Docker networks', () => {
   const invalid = ['0.0.0.0', '127.0.0.1', '8.8.8.8', '169.254.0.1', '172.32.0.1']
   for (const ip of invalid) {
