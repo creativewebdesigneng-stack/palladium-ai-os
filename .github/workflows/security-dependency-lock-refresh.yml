@@ -41,9 +41,6 @@ jobs:
           if-no-files-found: error
           retention-days: 2
 
-      - name: High severity audit (do not suppress advisories)
-        run: bun audit --audit-level high
-
   # The first job has no write credentials while running dependency installation.
   # This second job receives only the resolved lockfile, not node_modules or scripts.
   # No other branch may be updated, and no force-push or merge is performed.
@@ -91,3 +88,42 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore(security): regenerate Bun lock with patched dependencies"
           git push origin HEAD:refs/heads/security/dependency-audit-repair-20261102
+
+  # Security audit runs after the generated lock has been committed to the
+  # named QA branch, so a failing audit never silently discards the lockfile.
+  # A high-severity advisory is a hard failure, not a warning.
+  audit-generated-lockfile:
+    needs: commit-qa-lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout generated QA branch
+        uses: actions/checkout@v7
+        with:
+          ref: security/dependency-audit-repair-20261102
+          persist-credentials: false
+
+      - name: Pin Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Verify frozen lockfile and install
+        run: bun install --frozen-lockfile
+
+      - name: High severity dependency audit (blocking)
+        run: bun audit --audit-level high
+
+      - name: Production build for compatibility
+        run: bun run build
+
+      - name: TypeScript typecheck
+        run: bun run typecheck
+
+      - name: Unit tests
+        env:
+          OPENAI_API_KEY: ci-test-provider-placeholder
+        run: bun run test
+
