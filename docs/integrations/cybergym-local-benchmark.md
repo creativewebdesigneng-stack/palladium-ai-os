@@ -208,7 +208,12 @@ memory, approximate available disk/RAM and internal network readiness.
 It does not output usernames, device serials, Docker container contents,
 environment variables, or credentials. It does not make a model call.
 The drive argument defaults to M:\; UNC shares, relative paths and
-arbitrary file targets are rejected. If M: is absent, status is BLOCKED.
+arbitrary file targets are rejected. The diagnostic checks Windows drive type
+before querying free space, so even mapped network drives with a local-looking
+letter are blocked. Docker daemon calls are also refused unless the current
+Windows Docker context uses a local named pipe; remote SSH/TCP contexts and
+Docker endpoint override variables are blocked. If M: is absent or remote,
+status is BLOCKED.
 
 Output states:
 - HOST_PREREQUISITES_BLOCKED: one or more preliminary machine checks fail.
