@@ -187,3 +187,47 @@ compute, but never execute a vulnerability challenge or request security
 tool permissions. A model smoke success **does not** grant CyberGym
 execution approval. Keep actual sample evaluation blocked until every
 isolation, authority and resource gate is verified.
+
+
+## Phase 2: read-only Windows machine readiness inventory
+
+An operator can now produce a small local diagnostics report without copying
+secrets to ChatGPT, running unpatched code, installing anything, creating
+Docker containers, starting the benchmark server, or contacting a remote host.
+
+Run on the **owner's Windows workstation**, from the existing Blackstar checkout:
+
+~~~powershell
+cd C:\Users\Admin\palladium-ai-os
+node scripts/verification/cybergym-host-readiness.mjs M:\
+~~~
+
+The command reads free space on the requested **local drive root**, uses
+bounded local nvidia-smi and Docker inspection, and reports only GPU
+memory, approximate available disk/RAM and internal network readiness.
+It does not output usernames, device serials, Docker container contents,
+environment variables, or credentials. It does not make a model call.
+The drive argument defaults to M:\; UNC shares, relative paths and
+arbitrary file targets are rejected. If M: is absent, status is BLOCKED.
+
+Output states:
+- HOST_PREREQUISITES_BLOCKED: one or more preliminary machine checks fail.
+- HOST_PREREQUISITES_OBSERVED_EXECUTION_BLOCKED: all preliminary checks
+  are observed locally, but benchmark execution is STILL NOT AUTHORISED.
+
+The 20 GiB free-space threshold is only an initial diagnostic floor.
+It does not prove an official CyberGym subset will fit. Full upstream
+dataset is roughly 240 GB plus much larger runner images; calculate
+actual sample needs before any approved downloads. Observing Docker's
+internal bridge does not establish that host ports are protected or that
+running container mounts/permissions would be safe. A GPU listing does
+not establish actual GPU inference. The Node 22.19+ check aligns with
+the separately updated E2B SDK's minimum and makes no paid service call.
+
+If the network does not already exist, do not start a firewall proxy or
+Docker network just to force a green report; consult official upstream
+instructions and obtain operator review. The next gates are a separate
+read-only native inference smoke, actual inbound listener and runtime
+isolation verification, explicit approval for execution, official
+final-submission scoring, and independent attestation. CI's synthetic
+host observations do not satisfy real-device verification.
