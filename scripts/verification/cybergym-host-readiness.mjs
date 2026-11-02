@@ -86,6 +86,7 @@ export function evaluateCyberGymHostReadiness(observed) {
     nvidiaGpuDetected: Boolean(gpu),
     gpuHasAtLeast8GiBVram: Boolean(gpu && gpu.maxVramMiB >= 8192),
     hostRamAtLeast12GiB: Number.isFinite(ramBytes) && ramBytes >= 12 * GiB,
+    scratchDriveLocalOrRemovable: observed.storageDriveType === 2 || observed.storageDriveType === 3,
     scratchDriveAtLeast20GiBFree: Number.isFinite(diskFreeBytes) && diskFreeBytes >= 20 * GiB,
   }
   const missing = Object.entries(checks).filter(([, ok]) => !ok).map(([key]) => key)
@@ -140,8 +141,20 @@ export function collectLocalCyberGymHostReadiness(storageRoot = 'M:\\') {
   if (typeof storageRoot !== 'string' || !/^[A-Za-z]:\\$/.test(storageRoot)) {
     throw new Error('Storage must be a local Windows drive root, for example M:\\')
   }
+  // Query the local Windows device type before touching the drive. A syntactically
+  // valid drive letter can still be a mapped remote share (DriveType 4).
+  const driveLetter = storageRoot[0].toUpperCase()
+  const driveOutput = process.platform === 'win32'
+    ? command('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "(Get-CimInstance Win32_LogicalDisk -Filter \"DeviceID='" + driveLetter +
+        ":'\").DriveType",
+    ]) : null
+  const storageDriveType = driveOutput && /^\s*[234]\s*$/.test(driveOutput)
+    ? Number(driveOutput.trim()) : null
   let freeBytes = null
   try {
+    if (storageDriveType !== 2 && storageDriveType !== 3) throw new Error('Drive is remote or unverified')
     const stats = statfsSync(storageRoot)
     if (stats && Number.isFinite(stats.bavail) && Number.isFinite(stats.bsize)) {
       freeBytes = stats.bavail * stats.bsize
@@ -163,6 +176,7 @@ export function collectLocalCyberGymHostReadiness(storageRoot = 'M:\\') {
     nodeVersion: process.versions.node,
     ramBytes: totalmem(),
     diskFreeBytes: freeBytes,
+    storageDriveType,
     gpuCsv: command('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits']),
     dockerServer: dockerLocal
       ? parseJson(command('docker', ['version', '--format', '{{json .Server}}'])) : null,
