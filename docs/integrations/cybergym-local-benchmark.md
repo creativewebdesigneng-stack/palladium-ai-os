@@ -149,3 +149,41 @@ isolated Docker container. Do not solve that by opening a public tunnel.
 The read-only preflight and its tests can run in GitHub CI with mocked Docker
 inspection objects. **That CI result is a unit-test result only**, not evidence
 of a real isolated CyberGym deployment on the owner's Windows workstation.
+
+
+## Phase 2: explicit localhost Astra model smoke (not CyberGym execution)
+
+An additional opt-in local script checks **actual model readiness** without
+touching any vulnerable target, remote provider, private reasoning, approval
+workflow, production database or Blackstar application endpoint:
+
+```powershell
+# On the Windows PC hosting local Ollama/Astra, from the Blackstar repo root:
+node scripts/verification/cybergym-native-smoke.mjs M:\Blackstar\cybergym\preflight.json
+```
+
+The JSON file is the same preflight plan described above. Use the **real** source
+SHAs and actual selected local model endpoint. This script makes exactly two
+bounded requests to `127.0.0.1` on the specified explicit port:
+`GET /v1/models` and `POST /v1/chat/completions`. The POST sends a
+small fixed no-tool/no-memory `/no_think` prompt and expects the literal
+response `READY` from `qwen3:8b-q4_K_M`, finished normally. It does not
+send credentials, use network proxies, follow redirects, fetch any web page or
+try another model. If any response, identity or route is invalid, the check
+**fails**, and no benchmark starts.
+
+A real successful local result reports
+`LOCAL_MODEL_SMOKE_PASSED_BENCHMARK_BLOCKED` with elapsed times;
+`gpuExecutionVerified`, `benchmarkExecuted` and
+`independentlyAttested` remain false. Confirm hardware separately using a
+local GPU utilisation check; a localhost model response alone cannot prove it
+ran on the GTX 1080 Ti.
+
+**Important:** The GitHub CI tests exercise the same client against a synthetic
+loopback HTTP fixture (including refusal/redirect/fallback cases). Passing
+those tests is **not** evidence of real Astra inference on the owner's PC.
+The command above is operator-initiated and will consume local inference
+compute, but never execute a vulnerability challenge or request security
+tool permissions. A model smoke success **does not** grant CyberGym
+execution approval. Keep actual sample evaluation blocked until every
+isolation, authority and resource gate is verified.
