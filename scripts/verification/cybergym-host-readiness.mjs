@@ -52,6 +52,12 @@ export function validateObservedCyberGymNetwork(value) {
   }
   return { internalBridge: true, gateway: network.IPAM.Config[0].Gateway, attachedContainers: 0 }
 }
+export function isLocalDockerPipeEndpoint(value) {
+  // Docker Desktop on Windows: named-pipe transport only. TCP, SSH,
+  // HTTP(S), Unix sockets and unknown endpoints are always blocked here.
+  return typeof value === 'string' &&
+    /^npipe:\/\/\/\/\.\/pipe\/[A-Za-z0-9_.-]{1,80}$/.test(value)
+}
 function nodeAtLeast2219(version) {
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) return false
   const [major, minor] = version.split('.').map(Number)
@@ -73,6 +79,8 @@ export function evaluateCyberGymHostReadiness(observed) {
   const checks = {
     windowsHost: observed.platform === 'win32',
     nodeVersionSupported: nodeAtLeast2219(nodeVersion),
+    dockerTransportLocal: observed.dockerOverridesPresent === false &&
+      isLocalDockerPipeEndpoint(observed.dockerEndpoint),
     dockerEngineResponding: isRecord(docker) && typeof docker.Version === 'string' && /^\d+\.\d+/.test(docker.Version),
     dockerInternalNetworkObserved: Boolean(network),
     nvidiaGpuDetected: Boolean(gpu),
@@ -139,14 +147,27 @@ export function collectLocalCyberGymHostReadiness(storageRoot = 'M:\\') {
       freeBytes = stats.bavail * stats.bsize
     }
   } catch { /* absent drive -> blocked, not fabricated zero */ }
+  const dockerOverridesPresent = [
+    'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH',
+  ].some((key) => Boolean(process.env[key]))
+  // Docker context inspection only reads local CLI configuration. Never run
+  // daemon-connected commands before confirming a local named-pipe target.
+  const dockerEndpoint = process.platform === 'win32' && !dockerOverridesPresent
+    ? parseJson(command('docker', ['context', 'inspect', '--format', '{{json .Endpoints.docker.Host}}']))
+    : null
+  const dockerLocal = !dockerOverridesPresent && isLocalDockerPipeEndpoint(dockerEndpoint)
   return evaluateCyberGymHostReadiness({
     platform: process.platform,
+    dockerOverridesPresent,
+    dockerEndpoint,
     nodeVersion: process.versions.node,
     ramBytes: totalmem(),
     diskFreeBytes: freeBytes,
     gpuCsv: command('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits']),
-    dockerServer: parseJson(command('docker', ['version', '--format', '{{json .Server}}'])),
-    dockerNetwork: parseJson(command('docker', ['network', 'inspect', 'cybergym-internal'])),
+    dockerServer: dockerLocal
+      ? parseJson(command('docker', ['version', '--format', '{{json .Server}}'])) : null,
+    dockerNetwork: dockerLocal
+      ? parseJson(command('docker', ['network', 'inspect', 'cybergym-internal'])) : null,
   })
 }
 
