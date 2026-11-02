@@ -68,14 +68,14 @@ Measure scoped subset performance, coverage, blocked cases, evidence validity, i
 
 ## Phase 2 read-only local safety preflight (QA branch)
 
-The preflight verifier is available at \`scripts/verification/cybergym-preflight.mjs\`.
+The preflight verifier is available at `scripts/verification/cybergym-preflight.mjs`.
 It does **not** download, build or execute vulnerable workloads; does not
 launch Docker, invoke Astra, contact Supabase or grant any approval.
 Its purpose is to catch obviously unsafe plans before any benchmark runner exists.
 
 The official upstream project documents a ten-task sample, and warns **never**
 to expose the vulnerable PoC server to the public Internet. A server listening
-on \`0.0.0.0\`, or via Blackstar's existing external bridge, is forbidden.
+on `0.0.0.0`, or via Blackstar's existing external bridge, is forbidden.
 The server bind address must equal the *observed* Docker internal network
 gateway (not a guessed static address). This supports the upstream container
 networking model while still requiring a separate host-firewall audit.
@@ -83,17 +83,17 @@ networking model while still requiring a separate host-firewall audit.
 **Operator-only, read-only steps on Windows/PowerShell:**
 
 1. Check that local Docker Desktop is operational, and inspect an existing
-   \`cybergym-internal\` isolated network:
+   `cybergym-internal` isolated network:
 
-   \`\`\`powershell
+   ```powershell
    docker network inspect cybergym-internal
-   \`\`\`
+   ```
 
    If it does not exist, the preflight is **BLOCKED**. Creating the isolated
    network is a separate reviewed setup step; the preflight never does so.
 
 2. Create a private local JSON file outside the repository (no API key):
-   \`\`\`json
+   ```json
    {
      "schema": "blackstar.cybergym.preflight.v1",
      "datasetCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -117,7 +117,7 @@ networking model while still requiring a separate host-firewall audit.
        "maxCpus": 2
      }
    }
-   \`\`\`
+   ```
 
    The Git SHA values and the Docker gateway above are **placeholders**, not
    discovered facts. Replace them only with real checked-out full revision
@@ -126,13 +126,13 @@ networking model while still requiring a separate host-firewall audit.
 
 3. Run the preflight against the local JSON file:
 
-   \`\`\`powershell
+   ```powershell
    node scripts/verification/cybergym-preflight.mjs M:\Blackstar\cybergym\preflight.json
    node --test scripts/verification/cybergym-preflight.test.mjs
-   \`\`\`
+   ```
 
 A structurally safe configuration with a genuinely isolated, empty Docker
-network reports \`PLAN_VALIDATED_EXECUTION_BLOCKED\`, not PASS for execution.
+network reports `PLAN_VALIDATED_EXECUTION_BLOCKED`, not PASS for execution.
 A missing Docker daemon/network, an unsafe bind, an unapproved remote model,
 unknown task, excessive requested limit, public ingress, or non-isolated network
 is rejected. This check does not attest that the manifest's proposed limits
