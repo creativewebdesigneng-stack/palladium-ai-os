@@ -50,6 +50,7 @@ function modelPassed(report) {
     report.transport === '127.0.0.1-only' &&
     report.model === 'qwen3:8b-q4_K_M' && report.provider === 'compatible' &&
     report.modelsEndpoint === 'PASS' && report.noToolCompletion === 'PASS' &&
+    Number.isFinite(report.completionLatencyMs) && report.completionLatencyMs >= 0 &&
     report.benchmarkExecuted === false && report.executableApprovalGranted === false
 }
 function confinementPassed(report) {
