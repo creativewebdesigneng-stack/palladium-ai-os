@@ -91,13 +91,26 @@ async function localJson(port, path, method, body, timeoutMs = REQUEST_TIMEOUT_M
  */
 export async function probeLocalAstraForCyberGym(config, options = {}) {
   validateCyberGymPreflightPlan(config)
-  // Do not accept endpoint override, token, proxy, provider or fallback props.
+  // Reject provider, proxy, credential and fallback overrides before any network call.
   if (!object(options) || Object.keys(options).some((key) => key !== 'requestTimeoutMs')) {
     throw new Error('Unsupported local smoke options')
   }
   const timeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS
-  const parsedUrl = new URL(config.nativeModel.baseUrl)
-  const port = Number(parsedUrl.port)
+  const port = Number(new URL(config.nativeModel.baseUrl).port)
+  return probeBoundedLoopbackAstra(port, timeoutMs)
+}
+
+/**
+ * Fixed host-side no-tool smoke: reuses the same safe transport as the existing
+ * CyberGym preflight, but requires no fake dataset/source SHAs for this purely
+ * benign local path. No agent/container is given network access to Ollama.
+ */
+export async function probeOwnerLocalAstraNoTool() {
+  if (process.platform !== 'win32') throw new Error('Local Windows controller required')
+  return probeBoundedLoopbackAstra(11434, REQUEST_TIMEOUT_MS)
+}
+
+async function probeBoundedLoopbackAstra(port, timeoutMs) {
   const startedAt = Date.now()
   const models = await localJson(port, '/v1/models', 'GET', undefined, timeoutMs)
   if (!Array.isArray(models.data) || !models.data.some(
