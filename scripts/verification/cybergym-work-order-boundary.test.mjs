@@ -131,6 +131,8 @@ test('bounded local non-symlink JSON ticket can be inspected offline', () => {
     const file=path.join(dir,'request.json')
     writeFileSync(file,JSON.stringify(ticket()),'utf8')
     assert.deepEqual(readCyberGymWorkOrderFile(file),ticket())
+    writeFileSync(file,'\ufeff'+JSON.stringify(ticket()),'utf8')
+    assert.deepEqual(readCyberGymWorkOrderFile(file),ticket())
     const link=path.join(dir,'link.json')
     symlinkSync(file,link)
     assert.throws(()=>readCyberGymWorkOrderFile(link),/bounded regular non-link/)
