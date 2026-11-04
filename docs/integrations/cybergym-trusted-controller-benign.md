@@ -35,3 +35,29 @@ Run offline CI tests:
 node --test scripts/verification/cybergym-trusted-controller-benign.test.mjs scripts/verification/cybergym-native-smoke.test.mjs
 ```
 The CI model server is a synthetic loopback fixture. Its PASS cannot count as owner GPU/device evidence. No CI test may invoke real Docker or Ollama.
+
+## Failure classification (QA hardening after real owner BLOCKED report)
+
+On the first integrated owner-device run, the CLI printed
+`CyberGym trusted benign controller BLOCKED: local stage failed; no approval granted`.
+This output is **not evidence of which step failed**. It is a diagnosis-quality defect in
+the CLI, not evidence that Astra, Docker or the official benchmark is broken.
+
+The controller now wraps each stage with a small, safe, static failure reason.
+Examples (illustrative, **not observed owner-device results**):
+
+```text
+CyberGym trusted benign controller BLOCKED: stage=topology reason=stage_observation_failed; no approval granted
+CyberGym trusted benign controller BLOCKED: stage=astra_model reason=model_completion_rejected; no approval granted
+CyberGym trusted benign controller BLOCKED: stage=benign_docker reason=validation_failed; no approval granted
+```
+
+Only fixed categories are permitted; any other model or runtime exception
+becomes `model_unclassified_failure` or `stage_observation_failed`.
+Raw HTTP bodies, completions, thinking text, errors from host commands,
+file paths, credentials and token values are **never echoed**. The exact
+model-completion rule remains unchanged: `READY.` still fails where
+`READY` is expected. A model-stage failure prevents any Docker launch;
+a topology-stage failure prevents model inference and Docker launch.
+
+Even when all harmless stages pass, **benchmark execution remains BLOCKED**.
