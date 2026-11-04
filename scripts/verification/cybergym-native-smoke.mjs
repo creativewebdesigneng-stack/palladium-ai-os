@@ -110,6 +110,36 @@ export async function probeOwnerLocalAstraNoTool() {
   return probeBoundedLoopbackAstra(11434, REQUEST_TIMEOUT_MS)
 }
 
+/**
+ * Categorise only visible, final message acceptance. Never persist, echo,
+ * log or inspect private reasoning, prompt bodies, hidden fields or text.
+ * The content is compared locally against a fixed literal and discarded.
+ */
+export function classifyAstraSmokeCompletion(response) {
+  const first = Array.isArray(response?.choices) ? response.choices[0] : null
+  if (!object(first) || !object(first.message)) return 'missing_message'
+  if (first.finish_reason !== 'stop') return 'non_stop_finish'
+  const content = first.message.content
+  if (typeof content !== 'string' || content.trim() === '') return 'empty_content'
+  const visible = content.trim()
+  if (visible === 'READY') return null
+  if (/^READY[.!?]+$/.test(visible)) return 'punctuation_after_ready'
+  if (visible.toUpperCase() === 'READY') return 'case_mismatch'
+  return 'content_mismatch'
+}
+
+export class AstraSmokeCompletionError extends Error {
+  constructor(reason) {
+    // Static generic message preserves earlier consumers, without raw output.
+    super('Local Astra generated an invalid or incomplete smoke response')
+    this.name = 'AstraSmokeCompletionError'
+    this.reason = [
+      'missing_message', 'non_stop_finish', 'empty_content',
+      'punctuation_after_ready', 'case_mismatch', 'content_mismatch',
+    ].includes(reason) ? reason : 'content_mismatch'
+  }
+}
+
 async function probeBoundedLoopbackAstra(port, timeoutMs) {
   const startedAt = Date.now()
   const models = await localJson(port, '/v1/models', 'GET', undefined, timeoutMs)
@@ -134,10 +164,9 @@ async function probeBoundedLoopbackAstra(port, timeoutMs) {
   if (response.model !== EXPECTED_MODEL) {
     throw new Error('Local inference model identity did not match pinned Astra model')
   }
-  const first = Array.isArray(response.choices) ? response.choices[0] : null
-  if (!object(first) || !object(first.message) || first.message.content?.trim() !== 'READY' ||
-      first.finish_reason !== 'stop') {
-    throw new Error('Local Astra generated an invalid or incomplete smoke response')
+  const completionFailure = classifyAstraSmokeCompletion(response)
+  if (completionFailure !== null) {
+    throw new AstraSmokeCompletionError(completionFailure)
   }
   return {
     schema: ASTRA_CYBERGYM_SMOKE_SCHEMA,
