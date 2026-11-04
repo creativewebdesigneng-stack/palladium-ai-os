@@ -120,7 +120,10 @@ test('strict smoke acceptance classifies only allowed final-message categories',
     [frame(''), 'empty_content'],
     [frame(null), 'empty_content'],
     [frame('OTHER'), 'content_mismatch'],
-    [frame('READY','length'), 'non_stop_finish'],
+    [frame('READY','length'), 'finish_length'],
+    [frame('READY','content_filter'), 'finish_content_filter'],
+    [frame('READY',null), 'finish_missing'],
+    [frame('READY','unexpected'), 'non_stop_finish'],
     [{ choices: [] }, 'missing_message'],
     [{ choices: [{ finish_reason: 'stop' }] }, 'missing_message'],
   ]
@@ -135,7 +138,8 @@ test('real fixture rejects punctuation but error exposes no response content', a
     ['READY.','stop','punctuation_after_ready'],
     ['', 'stop','empty_content'],
     [privateData,'stop','content_mismatch'],
-    ['READY','length','non_stop_finish'],
+    ['READY','length','finish_length'],
+    ['READY','content_filter','finish_content_filter'],
   ]) {
     await withFakeLoopbackServer(endpoint({content,finish}), async port => {
       let caught
@@ -154,4 +158,41 @@ test('private reasoning field is ignored and not used to force acceptance', () =
     content:'',reasoning:'READY',reasoning_content:'READY',tool_calls:[],
   }}] }
   assert.equal(classifyAstraSmokeCompletion(result),'empty_content')
+})
+
+
+test('strict Ollama Qwen3 no-thinking control is sent on the existing loopback route', async () => {
+  const seen=[]
+  await withFakeLoopbackServer((req,res) => {
+    const chunks=[]
+    req.on('data', chunk => chunks.push(chunk))
+    req.on('end', () => {
+      if(req.url==='/v1/models'){
+        seen.push({path:req.url,method:req.method})
+        return respond(res,{data:[{id:MODEL}]})
+      }
+      if(req.url==='/v1/chat/completions'){
+        const data=JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        seen.push({
+          path:req.url,method:req.method,
+          reasoning_effort:data.reasoning_effort,
+          model:data.model,stream:data.stream,
+          max_tokens:data.max_tokens,
+          temperature:data.temperature,
+          tools:data.tools,
+        })
+        return respond(res,{model:MODEL,choices:[{message:{content:'READY'},finish_reason:'stop'}]})
+      }
+      res.writeHead(404);res.end()
+    })
+  }, async port => {
+    const result=await probeLocalAstraForCyberGym(plan(port))
+    assert.equal(result.noToolCompletion,'PASS')
+  })
+  assert.deepEqual(seen[0],{path:'/v1/models',method:'GET'})
+  assert.deepEqual(seen[1],{
+    path:'/v1/chat/completions',method:'POST',
+    reasoning_effort:'none',model:MODEL,
+    stream:false,max_tokens:64,temperature:0,tools:undefined,
+  })
 })
