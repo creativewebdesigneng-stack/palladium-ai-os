@@ -63,6 +63,53 @@ function confinementPassed(report) {
 }
 
 /**
+ * These allowlisted diagnostics contain no provider responses, paths, tokens,
+ * prompts, stack traces or environment values. The reason is a category,
+ * not a copy of an underlying exception.
+ */
+export class BenignControllerStageError extends Error {
+  constructor(stage, reason) {
+    super(`${stage} check blocked (${reason}); no execution approval granted`)
+    this.name = 'BenignControllerStageError'
+    this.stage = stage
+    this.reason = reason
+  }
+}
+
+const MODEL_SAFE_ERROR_CODES = new Map([
+  ['Pinned native Astra model not advertised by localhost endpoint', 'model_not_advertised'],
+  ['Local inference model identity did not match pinned Astra model', 'model_identity_mismatch'],
+  ['Local Astra generated an invalid or incomplete smoke response', 'model_completion_rejected'],
+  ['Local model request timed out', 'model_timeout'],
+  ['Local model request failed (no provider fallback attempted)', 'model_transport_failed'],
+  ['Local model HTTP status was not 200 (redirects prohibited)', 'model_http_status_rejected'],
+  ['Local model response was not valid bounded JSON', 'model_invalid_json'],
+  ['Local model response exceeded the 64 KiB cap', 'model_response_oversize'],
+])
+
+async function guardedStage(stage, callback) {
+  try {
+    return await callback()
+  } catch (error) {
+    const reason = stage === 'astra_model' && error instanceof Error
+      ? (MODEL_SAFE_ERROR_CODES.get(error.message) ?? 'model_unclassified_failure')
+      : 'stage_observation_failed'
+    throw new BenignControllerStageError(stage, reason)
+  }
+}
+
+/** No raw exception text is ever emitted by the user-invoked CLI. */
+export function sanitizedBenignControllerFailure(error) {
+  const stage = error instanceof BenignControllerStageError ? error.stage : 'setup'
+  const reason = error instanceof BenignControllerStageError ? error.reason : 'unclassified_failure'
+  // Only this module can produce these constant tokens in normal operation.
+  const allowedStage = ['topology', 'astra_model', 'benign_docker', 'setup'].includes(stage)
+    ? stage : 'setup'
+  const allowedReason = /^[a-z_]{1,48}$/.test(reason) ? reason : 'unclassified_failure'
+  return `CyberGym trusted benign controller BLOCKED: stage=${allowedStage} reason=${allowedReason}; no approval granted`
+}
+
+/**
  * This sequence runs on the trusted owner host ONLY. Injection exists for
  * synthetic unit tests; the CLI always calls its real fixed implementation.
  *
@@ -77,23 +124,23 @@ export async function runOwnerTrustedControllerBenign(
   },
 ) {
   if (process.platform !== 'win32' && stages.topology === collectLocalCyberGymControllerTopology) {
-    throw new Error('Windows owner host required')
+    throw new BenignControllerStageError('setup', 'windows_host_required')
   }
   if (!stages || typeof stages.topology !== 'function' ||
       typeof stages.model !== 'function' || typeof stages.confinement !== 'function') {
-    throw new Error('Missing fixed controller verification stage')
+    throw new BenignControllerStageError('setup', 'missing_stage')
   }
-  const topology = await stages.topology()
+  const topology = await guardedStage('topology', stages.topology)
   if (!topologyPassed(topology)) {
-    throw new Error('Topology check blocked; model and Docker probes not started')
+    throw new BenignControllerStageError('topology', 'validation_failed')
   }
-  const model = await stages.model()
+  const model = await guardedStage('astra_model', stages.model)
   if (!modelPassed(model)) {
-    throw new Error('Local native model check blocked; Docker probe not started')
+    throw new BenignControllerStageError('astra_model', 'validation_failed')
   }
-  const confinement = await stages.confinement()
+  const confinement = await guardedStage('benign_docker', stages.confinement)
   if (!confinementPassed(confinement)) {
-    throw new Error('Benign container confinement or cleanup check blocked')
+    throw new BenignControllerStageError('benign_docker', 'validation_failed')
   }
   return {
     schema: BENIGN_CONTROLLER_SCHEMA,
@@ -128,10 +175,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     runOwnerTrustedControllerBenign().then((result) => {
       process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     }).catch((error) => {
-      // Do not dump local HTTP response text, secrets, host paths or PoCs.
-      const known = error instanceof Error && /^((Topology check blocked)|(Local native model check blocked)|(Benign container confinement)|(Windows owner host required)|(Missing fixed controller))/.test(error.message)
-      process.stderr.write('CyberGym trusted benign controller BLOCKED: ' +
-        (known ? error.message : 'local stage failed; no approval granted') + '\n')
+      // No raw model response, private reasoning, host path or arbitrary error text.
+      process.stderr.write(sanitizedBenignControllerFailure(error) + '\n')
       process.exitCode = 2
     })
   }
