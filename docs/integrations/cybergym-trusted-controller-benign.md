@@ -94,3 +94,43 @@ unchanged, as do one POST, one GET, pinned model and local-only transport.
 Re-run after fetching the latest QA branch to determine the actual category;
 do not change `OLLAMA_HOST`, publish a port, weaken the acceptance criteria,
 or use a cloud provider to force a pass.
+
+## Model exit diagnosis: real `non_stop_finish` observation
+
+The owner re-ran the previous CLI and obtained this real result:
+
+```text
+CyberGym trusted benign controller BLOCKED: stage=astra_model reason=model_non_stop_finish; no approval granted
+```
+
+This **proves only** that the native model completion had a finish reason
+different from `stop`. It does **not** independently prove `length`,
+missing output, an Ollama bug, or another finish condition. No Docker test
+ran in this combined attempt.
+
+Source review found that `cybergym-native-smoke.mjs` sent
+`max_tokens:64` with a soft prompt `/no_think` and no explicit Ollama
+OpenAI-compatible reasoning control. Ollama documents
+`reasoning_effort:'none'` for no-thinking requests; public maintainer
+discussion reports `/no_think` alone may be ignored by Qwen3 OpenAI
+compatibility, allowing reasoning to consume a short token budget.
+Relevant upstream:
+https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx
+https://github.com/ollama/ollama/issues/17969
+
+**Minimal QA correction:** include `reasoning_effort:'none'` on the same
+existing localhost-only, no-tool, single-completion request. Keep
+`max_tokens:64`, the fixed model and strict visible `READY` plus
+`finish_reason:'stop'`. **No fallback**, extra completion attempt or
+provider substitution. If the local version ignores this setting, fail
+closed and classify `length` as `model_finish_length`; if the backend
+reports another non-stop reason use `model_finish_missing`,
+`model_finish_content_filter`, or `model_non_stop_finish`.
+This changes only the **benign acceptance smoke request**, not the Blackstar
+production gateway, and does not prove official CyberGym or general
+model reliability.
+
+No raw response, private reasoning, token outputs, credentials or host
+paths are logged. The operator must rerun against their real local Ollama
+installation to establish whether this is effective; synthetic GitHub CI
+cannot prove it.
