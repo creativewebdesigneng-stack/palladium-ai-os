@@ -83,7 +83,9 @@ export function readCyberGymWorkOrderFile(filename) {
   }
   const raw = readFileSync(file)
   if (raw.length > MAX_BYTES) throw new Error('Work order too large')
-  const input = JSON.parse(raw.toString('utf8'))
+  // Windows PowerShell 5.1 Set-Content -Encoding UTF8 emits a UTF-8 BOM.
+  const decoded = raw.toString('utf8')
+  const input = JSON.parse(decoded.charCodeAt(0) === 0xfeff ? decoded.slice(1) : decoded)
   evaluateCyberGymWorkOrder(input)
   return input
 }
