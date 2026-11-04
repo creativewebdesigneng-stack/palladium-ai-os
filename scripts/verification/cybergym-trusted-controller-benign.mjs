@@ -13,6 +13,7 @@ import {
 import {
   probeOwnerLocalAstraNoTool,
   ASTRA_CYBERGYM_SMOKE_SCHEMA,
+  AstraSmokeCompletionError,
 } from './cybergym-native-smoke.mjs'
 import {
   runOwnerBenignConfinement,
@@ -91,9 +92,11 @@ async function guardedStage(stage, callback) {
   try {
     return await callback()
   } catch (error) {
-    const reason = stage === 'astra_model' && error instanceof Error
-      ? (MODEL_SAFE_ERROR_CODES.get(error.message) ?? 'model_unclassified_failure')
-      : 'stage_observation_failed'
+    const reason = stage === 'astra_model' && error instanceof AstraSmokeCompletionError
+      ? ('model_' + error.reason)
+      : stage === 'astra_model' && error instanceof Error
+        ? (MODEL_SAFE_ERROR_CODES.get(error.message) ?? 'model_unclassified_failure')
+        : 'stage_observation_failed'
     throw new BenignControllerStageError(stage, reason)
   }
 }
