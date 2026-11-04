@@ -61,3 +61,36 @@ model-completion rule remains unchanged: `READY.` still fails where
 a topology-stage failure prevents model inference and Docker launch.
 
 Even when all harmless stages pass, **benchmark execution remains BLOCKED**.
+
+## Real owner model acceptance failure and safe classification
+
+The operator later reran the improved combined script and reported:
+
+```text
+CyberGym trusted benign controller BLOCKED: stage=astra_model reason=model_completion_rejected; no approval granted
+```
+
+This is real evidence that the model-stage acceptance rejected the response and
+the combined script did not proceed to its Docker phase. It does **not**
+identify the exact response content or finish reason. An earlier unrelated
+manual local model test returned `READY.`, but the combined run could have
+failed for several reasons; do not equate these observations.
+
+The local smoke check now maps *only the final visible completion* to a static,
+non-sensitive reason, with no raw text, reasoning, generation trace, private
+paths, token values or arbitrary exception strings printed. It rejects:
+- `model_punctuation_after_ready` — visible content is precisely `READY` followed only by punctuation
+- `model_empty_content` — empty/missing final text
+- `model_non_stop_finish` — finish reason other than `stop`
+- `model_missing_message` — missing or invalid completion message
+- `model_case_mismatch` — response differs only in letter case
+- `model_content_mismatch` — some other non-empty response
+
+These are failure *classifications*, not successful output; all fail closed,
+skip the benign Docker stage, and leave benchmark execution unapproved. The
+strict exact-match requirement `content.trim() === 'READY'` remains
+unchanged, as do one POST, one GET, pinned model and local-only transport.
+
+Re-run after fetching the latest QA branch to determine the actual category;
+do not change `OLLAMA_HOST`, publish a port, weaken the acceptance criteria,
+or use a cloud provider to force a pass.
