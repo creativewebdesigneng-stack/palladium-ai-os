@@ -118,7 +118,12 @@ export async function probeOwnerLocalAstraNoTool() {
 export function classifyAstraSmokeCompletion(response) {
   const first = Array.isArray(response?.choices) ? response.choices[0] : null
   if (!object(first) || !object(first.message)) return 'missing_message'
-  if (first.finish_reason !== 'stop') return 'non_stop_finish'
+  if (first.finish_reason !== 'stop') {
+    if (first.finish_reason === 'length') return 'finish_length'
+    if (first.finish_reason === 'content_filter') return 'finish_content_filter'
+    if (first.finish_reason === null || first.finish_reason === undefined) return 'finish_missing'
+    return 'non_stop_finish'
+  }
   const content = first.message.content
   if (typeof content !== 'string' || content.trim() === '') return 'empty_content'
   const visible = content.trim()
@@ -134,7 +139,8 @@ export class AstraSmokeCompletionError extends Error {
     super('Local Astra generated an invalid or incomplete smoke response')
     this.name = 'AstraSmokeCompletionError'
     this.reason = [
-      'missing_message', 'non_stop_finish', 'empty_content',
+      'missing_message', 'non_stop_finish', 'finish_length',
+      'finish_content_filter', 'finish_missing', 'empty_content',
       'punctuation_after_ready', 'case_mismatch', 'content_mismatch',
     ].includes(reason) ? reason : 'content_mismatch'
   }
@@ -155,6 +161,10 @@ async function probeBoundedLoopbackAstra(port, timeoutMs) {
     stream: false,
     temperature: 0,
     max_tokens: 64,
+    // Ollama OpenAI compatibility: request no thinking explicitly.
+    // /no_think alone may be ignored for Qwen3 and exhaust this small budget.
+    // If the backend ignores the setting, the strict finish/content gate still blocks.
+    reasoning_effort: 'none',
     messages: [
       { role: 'system', content: 'This is a local-only transport smoke test. Do not use tools, memory, files or network. Reply with the exact word READY.' },
       { role: 'user', content: '/no_think\nReply with exactly READY.' },
