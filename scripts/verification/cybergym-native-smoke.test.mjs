@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { probeLocalAstraForCyberGym } from './cybergym-native-smoke.mjs'
+import { probeLocalAstraForCyberGym, classifyAstraSmokeCompletion, AstraSmokeCompletionError } from './cybergym-native-smoke.mjs'
 
 const MODEL = 'qwen3:8b-q4_K_M'
 function plan(port) {
@@ -106,4 +106,52 @@ test('times out rather than waiting indefinitely for an unreachable or stalled l
   }, async (port) => {
     await assert.rejects(probeLocalAstraForCyberGym(plan(port), { requestTimeoutMs: 250 }), /timed out/)
   })
+})
+
+
+test('strict smoke acceptance classifies only allowed final-message categories', () => {
+  const frame=(content,finish='stop')=>({choices:[{message:{content},finish_reason:finish}]})
+  const cases=[
+    [frame('READY'),null],
+    [frame(' READY  \n'),null],
+    [frame('READY.'),'punctuation_after_ready'],
+    [frame('READY!!'),'punctuation_after_ready'],
+    [frame('ready'),'case_mismatch'],
+    [frame(''), 'empty_content'],
+    [frame(null), 'empty_content'],
+    [frame('OTHER'), 'content_mismatch'],
+    [frame('READY','length'), 'non_stop_finish'],
+    [{ choices: [] }, 'missing_message'],
+    [{ choices: [{ finish_reason: 'stop' }] }, 'missing_message'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(classifyAstraSmokeCompletion(input),expected)
+  }
+})
+
+test('real fixture rejects punctuation but error exposes no response content', async () => {
+  const privateData='SECRET_PAYLOAD_DO_NOT_ECHO'
+  for (const [content,finish,expected] of [
+    ['READY.','stop','punctuation_after_ready'],
+    ['', 'stop','empty_content'],
+    [privateData,'stop','content_mismatch'],
+    ['READY','length','non_stop_finish'],
+  ]) {
+    await withFakeLoopbackServer(endpoint({content,finish}), async port => {
+      let caught
+      try { await probeLocalAstraForCyberGym(plan(port)) } catch(e) { caught=e }
+      assert.ok(caught instanceof AstraSmokeCompletionError)
+      assert.equal(caught.reason,expected)
+      assert.match(caught.message,/invalid or incomplete smoke response/)
+      assert.ok(!caught.message.includes(privateData))
+      assert.ok(!JSON.stringify({name:caught.name,message:caught.message,reason:caught.reason}).includes(privateData))
+    })
+  }
+})
+
+test('private reasoning field is ignored and not used to force acceptance', () => {
+  const result={ choices:[{finish_reason:'stop',message:{
+    content:'',reasoning:'READY',reasoning_content:'READY',tool_calls:[],
+  }}] }
+  assert.equal(classifyAstraSmokeCompletion(result),'empty_content')
 })
