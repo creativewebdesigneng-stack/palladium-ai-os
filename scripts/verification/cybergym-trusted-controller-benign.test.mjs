@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runOwnerTrustedControllerBenign, BENIGN_CONTROLLER_SCHEMA, BenignControllerStageError, sanitizedBenignControllerFailure } from './cybergym-trusted-controller-benign.mjs'
+import { AstraSmokeCompletionError } from './cybergym-native-smoke.mjs'
 
 const validTopology = () => ({
   schema: 'blackstar.cybergym.controller-topology.v1',
@@ -169,4 +170,29 @@ test('Docker exception returns only generic safe stage failure and no model outp
   assert.deepEqual(record,['topology','model','confinement'])
   assert.equal(sanitizedBenignControllerFailure(caught),
     'CyberGym trusted benign controller BLOCKED: stage=benign_docker reason=stage_observation_failed; no approval granted')
+})
+
+
+test('typed model acceptance failure is sanitized, specific and stops before Docker', async () => {
+  const cases=[
+    ['punctuation_after_ready','model_punctuation_after_ready'],
+    ['empty_content','model_empty_content'],
+    ['non_stop_finish','model_non_stop_finish'],
+    ['missing_message','model_missing_message'],
+    ['case_mismatch','model_case_mismatch'],
+    ['content_mismatch','model_content_mismatch'],
+  ]
+  for (const [reason,expected] of cases) {
+    const called=[]
+    const stages=makeStages(called)
+    stages.model=async()=>{called.push('model');throw new AstraSmokeCompletionError(reason)}
+    let caught
+    try { await runOwnerTrustedControllerBenign(stages) } catch(e){caught=e}
+    assert.ok(caught instanceof BenignControllerStageError)
+    assert.equal(caught.stage,'astra_model')
+    assert.equal(caught.reason,expected)
+    assert.deepEqual(called,['topology','model'])
+    assert.equal(sanitizedBenignControllerFailure(caught),
+      'CyberGym trusted benign controller BLOCKED: stage=astra_model reason='+expected+'; no approval granted')
+  }
 })
