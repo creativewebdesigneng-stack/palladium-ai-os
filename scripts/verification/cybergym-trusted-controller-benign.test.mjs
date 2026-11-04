@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runOwnerTrustedControllerBenign, BENIGN_CONTROLLER_SCHEMA } from './cybergym-trusted-controller-benign.mjs'
+import { runOwnerTrustedControllerBenign, BENIGN_CONTROLLER_SCHEMA, BenignControllerStageError, sanitizedBenignControllerFailure } from './cybergym-trusted-controller-benign.mjs'
 
 const validTopology = () => ({
   schema: 'blackstar.cybergym.controller-topology.v1',
@@ -65,7 +65,7 @@ test('unsafe Windows topology blocks all subsequent effects', async () => {
   ]) {
     const record=[],topology=validTopology();makeUnsafe(topology)
     await assert.rejects(runOwnerTrustedControllerBenign(
-      makeStages(record,topology)),/Topology check blocked/)
+      makeStages(record,topology)),/topology check blocked \(validation_failed\)/)
     assert.deepEqual(record,['topology'])
   }
 })
@@ -80,7 +80,7 @@ test('local model incorrect identity, provider or response blocks Docker phase',
   ]) {
     const record=[],m=validModel();makeUnsafe(m)
     await assert.rejects(runOwnerTrustedControllerBenign(
-      makeStages(record,validTopology(),m)),/Local native model check blocked/)
+      makeStages(record,validTopology(),m)),/astra_model check blocked \(validation_failed\)/)
     assert.deepEqual(record,['topology','model'])
   }
 })
@@ -94,27 +94,79 @@ test('benign Docker fixture missing safety control never becomes an official pas
   ]) {
     const record=[],c=validConfinement();makeUnsafe(c)
     await assert.rejects(runOwnerTrustedControllerBenign(
-      makeStages(record,validTopology(),validModel(),c)),/confinement or cleanup check blocked/)
+      makeStages(record,validTopology(),validModel(),c)),/benign_docker check blocked \(validation_failed\)/)
     assert.deepEqual(record,['topology','model','confinement'])
   }
 })
 
 test('unexpected missing stage functions refuse any execution', async () => {
   await assert.rejects(runOwnerTrustedControllerBenign({ topology: ()=>validTopology() }),
-    /Missing fixed controller verification stage/)
+    /setup check blocked \(missing_stage\)/)
 })
 
 test('exceptions in model phase prevent any Docker launch', async () => {
   const record=[]
   const stages=makeStages(record)
   stages.model=async()=>{record.push('model');throw new Error('Local exact-match failed')}
-  await assert.rejects(runOwnerTrustedControllerBenign(stages),/Local exact-match failed/)
+  await assert.rejects(runOwnerTrustedControllerBenign(stages),/astra_model check blocked \(model_unclassified_failure\)/)
   assert.deepEqual(record,['topology','model'])
 })
 
 test('untrusted-looking fabricated completed benchmark state is never accepted', async () => {
   const t=validTopology();t.vulnerableBenchmarkExecuted=true
   const record=[]
-  await assert.rejects(runOwnerTrustedControllerBenign(makeStages(record,t)),/Topology check blocked/)
+  await assert.rejects(runOwnerTrustedControllerBenign(makeStages(record,t)),/topology check blocked \(validation_failed\)/)
   assert.deepEqual(record,['topology'])
+})
+
+test('known local model failure maps to precise safe reason while preventing Docker', async () => {
+  const cases = [
+    ['Local Astra generated an invalid or incomplete smoke response', 'model_completion_rejected'],
+    ['Pinned native Astra model not advertised by localhost endpoint', 'model_not_advertised'],
+    ['Local inference model identity did not match pinned Astra model', 'model_identity_mismatch'],
+    ['Local model request timed out', 'model_timeout'],
+    ['Local model request failed (no provider fallback attempted)', 'model_transport_failed'],
+    ['Local model HTTP status was not 200 (redirects prohibited)', 'model_http_status_rejected'],
+    ['Local model response was not valid bounded JSON', 'model_invalid_json'],
+    ['Local model response exceeded the 64 KiB cap', 'model_response_oversize'],
+  ]
+  for (const [message, reason] of cases) {
+    const called = []
+    const stages = makeStages(called)
+    stages.model = async () => { called.push('model'); throw new Error(message) }
+    let caught
+    try { await runOwnerTrustedControllerBenign(stages) } catch (e) { caught = e }
+    assert.ok(caught instanceof BenignControllerStageError)
+    assert.equal(caught.stage, 'astra_model')
+    assert.equal(caught.reason, reason)
+    assert.deepEqual(called, ['topology', 'model'])
+    assert.match(sanitizedBenignControllerFailure(caught), /no approval granted/)
+  }
+})
+
+test('untrusted exception body and model response are never echoed in diagnostics', async () => {
+  const token = 'sensitive-local-model-response-with-token'
+  const stages = makeStages([])
+  stages.model = () => { throw new Error(token) }
+  let caught
+  try { await runOwnerTrustedControllerBenign(stages) } catch (e) { caught = e }
+  const message = sanitizedBenignControllerFailure(caught)
+  assert.equal(message, 'CyberGym trusted benign controller BLOCKED: stage=astra_model reason=model_unclassified_failure; no approval granted')
+  assert.ok(!message.includes(token))
+  assert.ok(!caught.message.includes(token))
+  assert.equal(sanitizedBenignControllerFailure(new Error(token)),
+    'CyberGym trusted benign controller BLOCKED: stage=setup reason=unclassified_failure; no approval granted')
+})
+
+test('Docker exception returns only generic safe stage failure and no model output', async () => {
+  const record=[]
+  const stages=makeStages(record)
+  stages.confinement=async()=>{ record.push('confinement'); throw new Error('private-hostpath-and-docker-details') }
+  let caught
+  try { await runOwnerTrustedControllerBenign(stages) } catch (e) { caught=e }
+  assert.equal(caught.stage,'benign_docker')
+  assert.equal(caught.reason,'stage_observation_failed')
+  assert.deepEqual(record,['topology','model','confinement'])
+  assert.equal(sanitizedBenignControllerFailure(caught),
+    'CyberGym trusted benign controller BLOCKED: stage=benign_docker reason=stage_observation_failed; no approval granted')
 })
