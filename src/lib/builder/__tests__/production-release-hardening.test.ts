@@ -11,9 +11,10 @@ describe('production release hardening', () => {
     expect(migration.toLowerCase()).not.toContain('update public.browser_sessions');
   });
 
-  it('keeps high severity dependency audit in the release gate', () => {
+  it('keeps the dependency audit gate, including high severity', () => {
     const workflow = readRepo('.github/workflows/backend-check.yml');
-    expect(workflow).toContain('bun audit --audit-level high');
+    expect(workflow).toContain('bun audit --audit-level low');
+    expect(workflow).toContain('Low, moderate and high advisories all fail');
     expect(workflow).toContain('bun install --frozen-lockfile');
   });
 });
