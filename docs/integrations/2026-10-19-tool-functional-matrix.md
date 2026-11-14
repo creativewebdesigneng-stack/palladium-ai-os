@@ -118,3 +118,38 @@ This evidence applies to the tested commit, not automatically to later branch
 changes or to other tools. It does not certify complete business capabilities.
 The generic paused-task interface label was subsequently corrected to avoid
 calling calculator, clock and analysis approvals “browser” tasks.
+
+## 20 October follow-up: web-fetch acceptance remains unverified
+
+On checked Preview commit 3ceb935, the existing QA editor persisted web_fetch and
+http_request assignments and policies restricted to httpbingo.org with approval
+required. Both assignments appeared in Enabled tools and Universal Skills Registry
+after reload. No database tool or external connector permission was added.
+
+Task 6a8fd5b1-d583-4989-b4a1-b8a75adfd22f returned a prose approval request but made
+zero tool calls, queued no approval, and has zero tool execution rows. Its stored
+status is succeeded, which proves only model-response completion, not the requested
+web operation. This is NOT a web-fetch acceptance pass. The browser session was
+subsequently lost; an authenticated retry remains outstanding.
+
+The live Agents overview also counted old waiting_for_approval tasks as executing.
+The follow-up separates running IDs from queued/approval states, keeps waiting work
+visible in the operations list, shows the real state in the table/mesh, and labels
+configured active agents Enabled rather than Running. No stored task status or
+audit evidence is rewritten.
+
+The subsequent runtime follow-up clarifies that invoking an enabled tool queues
+any required approval, whereas prose alone does not. Command centre now labels
+completed responses whose persisted tool_calls is exactly zero as having no
+verified external action. Missing counters are not treated as zero. Ordinary
+text-only responses remain valid completions; no approval or execution receipt is
+fabricated. This is a prompt and evidence-display correction, not a live web-fetch
+pass. The existing runtime regression checks the instructions and zero-call
+persistence; a genuine approved web-fetch retry remains required.
+
+A read-only QA configuration check also found legacy instructions explicitly
+forbidding tools and external actions despite the six saved tool assignments.
+These instructions still need correction through the existing editor. Browser
+and execution-environment access became unavailable before that edit or a live
+retry. Local build, strict TypeScript and all 3,458 tests passed for the runtime
+and interface changes before environment loss; CI must verify the published SHA.

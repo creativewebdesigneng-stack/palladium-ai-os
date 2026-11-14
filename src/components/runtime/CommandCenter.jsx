@@ -147,6 +147,12 @@ export default function CommandCenter({ agent, onFinished }) {
             </span>
           </div>
 
+          {status === 'completed' && task?.tool_calls === 0 && (
+            <p className="mt-3 text-xs text-amber-300" role="status">
+              Response completed without tool execution. No external action is verified by this run.
+            </p>
+          )}
+
           {toolTrace.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {toolTrace.map((t, i) => (

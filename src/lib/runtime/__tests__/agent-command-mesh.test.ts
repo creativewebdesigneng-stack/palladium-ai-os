@@ -7,7 +7,7 @@ const mesh=readFileSync(new URL('../../../components/agents/AgentCommandMesh.jsx
 describe('Agents live command mesh',()=>{
   it('uses the existing live agent and workflow telemetry',()=>{
     expect(screen).toContain("import AgentCommandMesh from '@/components/agents/AgentCommandMesh'");
-    expect(screen).toContain('agents={agents}');
+    expect(screen).toContain('status:runtimeStates.get(a.id)||a.status');
     expect(screen).toContain('executingIds={actuallyRunningIds}');
     expect(screen).toContain('liveWorkflows={runningWorkflowRuns.length}');
   });

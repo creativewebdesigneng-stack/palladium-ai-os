@@ -6,7 +6,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { getModelRuntimeOverview } from '@/lib/runtime/model-management.functions';
 import AgentToolEditor from './AgentToolEditor';
 import AgentConnectorEditor from './AgentConnectorEditor';
-import { updateAgentModel } from '@/lib/agents/agents.functions';
+import { updateAgentModel, updateAgentInstructions } from '@/lib/agents/agents.functions';
 import { WIZARD_MODELS } from '@/components/agents/agentsData';
 import { AGENT_MODEL_CHOICES } from '@/lib/agents/agent-model-selection';
 
@@ -50,6 +50,45 @@ function ModelChoice({ agent, onAgentUpdated }) {
   </div>;
 }
 
+
+function InstructionEditor({ agent, onAgentUpdated }) {
+  const saveFn = useServerFn(updateAgentInstructions);
+  const [editing, setEditing] = useState(false);
+  const [instructions, setInstructions] = useState('');
+  const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const save = async () => {
+    if (saving) return;
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      const updated = await saveFn({ data: { id: agent.id, instructions, expectedUpdatedAt } });
+      onAgentUpdated?.(updated);
+      setEditing(false); setSaved(true);
+    } catch (failure) { setError(failure?.message || 'Could not save instructions.'); }
+    finally { setSaving(false); }
+  };
+  return <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+    <p className="text-xs font-medium text-white">Standing instructions</p>
+    <p className="mt-2 text-[11px] text-zinc-400">Instructions guide future runs. Tool assignments, domain restrictions and approval controls still apply.</p>
+    {editing ? <div className="mt-3 space-y-2">
+      <label className="block text-xs text-zinc-300">Instructions
+        <textarea aria-label="Standing instructions" rows={8} maxLength={8000} disabled={saving} value={instructions} onChange={event => setInstructions(event.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 p-2 text-xs text-white" />
+      </label>
+      {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={saving || !expectedUpdatedAt} onClick={save} className="rounded-lg bg-violet-600 px-3 py-2 text-xs text-white disabled:opacity-50">{saving ? 'Saving instructions…' : 'Save instructions'}</button>
+        <button type="button" disabled={saving} onClick={() => setEditing(false)} className="px-3 py-2 text-xs text-zinc-300">Cancel</button>
+      </div>
+    </div> : <>
+      <p className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-xs text-zinc-300">{agent.instructions || 'No standing instructions configured.'}</p>
+      <button type="button" onClick={() => { setInstructions(agent.instructions ?? ''); setExpectedUpdatedAt(agent.updated_at); setError(''); setSaved(false); setEditing(true); }} className="mt-3 rounded-lg border border-violet-400/25 px-3 py-2 text-xs text-violet-200">Edit instructions</button>
+      {saved && <p role="status" className="mt-2 text-xs text-emerald-300">Instructions saved.</p>}
+    </>}
+  </div>;
+}
+
 function Row({ k, v }) {
   return <div className="flex justify-between"><dt className="text-zinc-500">{k}</dt><dd className="text-zinc-200">{String(v)}</dd></div>;
 }
@@ -61,6 +100,7 @@ export default function AgentConfigPanel({ agent, onAgentUpdated }) {
   return (
     <div className="space-y-3">
       <AgentSkillsRegistryPanel agent={agent} onAgentUpdated={onAgentUpdated} />
+      <InstructionEditor key={agent.id} agent={agent} onAgentUpdated={onAgentUpdated} />
       <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <p className="flex items-center gap-2 text-xs font-medium text-white"><Cpu className="h-3.5 w-3.5 text-violet-400" />Model</p>
         <dl className="mt-3 space-y-1.5 text-xs">
