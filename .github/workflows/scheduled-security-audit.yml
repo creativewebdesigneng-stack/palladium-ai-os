@@ -28,11 +28,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: High severity dependency audit
+      - name: Dependency audit
         shell: bash
         run: |
           set -o pipefail
-          bun audit --audit-level high 2>&1 | tee dependency-audit.log
+          bun audit --audit-level low 2>&1 | tee dependency-audit.log
 
       - name: Publish audit summary
         if: always()
