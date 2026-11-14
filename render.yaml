@@ -12,3 +12,23 @@ services:
         sync: false
       - key: BROWSER_WORKER_HEADLESS
         value: "true"
+  - type: web
+    name: blackstar-image-to-mesh
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./workers/image-to-mesh/Dockerfile
+    dockerContext: ./workers/image-to-mesh
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: MESH_WORKER_TOKEN
+        sync: false
+      - key: MESH_PUBLIC_URL
+        sync: false
+      - key: THREE_D_HF_ENDPOINT_URL
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: MESH_ALLOWED_IMAGE_HOSTS
+        sync: false

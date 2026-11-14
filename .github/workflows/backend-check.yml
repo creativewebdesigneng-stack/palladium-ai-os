@@ -146,8 +146,9 @@ jobs:
 
       - name: Free Open3D worker Python syntax and safety tests
         run: |
-          python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py
+          python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py workers/image-to-mesh/server.py workers/image-to-mesh/run_triposr.py
           python3 -m unittest discover -s workers/open3d-free -p 'test_*.py'
+          python3 -m unittest discover -s workers/image-to-mesh -p 'test_*.py'
 
       - name: Windows browser worker PowerShell syntax
         shell: pwsh

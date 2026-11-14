@@ -14,6 +14,8 @@ lerna-debug.log*
 
 node_modules
 node_modules.pre-bun-repair
+__pycache__/
+*.pyc
 .bun-tmp
 dist
 dist-ssr

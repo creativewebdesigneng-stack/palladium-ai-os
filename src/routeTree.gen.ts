@@ -48,6 +48,7 @@ import { Route as ShellAppAiHubRouteImport } from './routes/_shell/_app/ai-hub'
 import { Route as ShellAppAiMarketplaceRouteImport } from './routes/_shell/_app/ai-marketplace'
 import { Route as ShellAppAiModelHubRouteImport } from './routes/_shell/_app/ai-model-hub'
 import { Route as ShellAppAiToolsRouteImport } from './routes/_shell/_app/ai-tools'
+import { Route as ShellAppAiWorkbenchRouteImport } from './routes/_shell/_app/ai-workbench'
 import { Route as ShellAppAnalyticsRouteImport } from './routes/_shell/_app/analytics'
 import { Route as ShellAppAutomationRouteImport } from './routes/_shell/_app/automation'
 import { Route as ShellAppAutomationsRouteImport } from './routes/_shell/_app/automations'
@@ -87,6 +88,7 @@ import { Route as ShellAppFitnessStudioRouteImport } from './routes/_shell/_app/
 import { Route as ShellAppGameFoundryRouteImport } from './routes/_shell/_app/game-foundry'
 import { Route as ShellAppHealthFitnessRouteImport } from './routes/_shell/_app/health-fitness'
 import { Route as ShellAppHtmlStudioRouteImport } from './routes/_shell/_app/html-studio'
+import { Route as ShellAppHumanFrontierRouteImport } from './routes/_shell/_app/human-frontier'
 import { Route as ShellAppIndustryHubRouteImport } from './routes/_shell/_app/industry-hub'
 import { Route as ShellAppIntegrationsRouteImport } from './routes/_shell/_app/integrations'
 import { Route as ShellAppKnowledgeRouteImport } from './routes/_shell/_app/knowledge'
@@ -101,6 +103,7 @@ import { Route as ShellAppModelsRouteImport } from './routes/_shell/_app/models'
 import { Route as ShellAppNewsResearchRouteImport } from './routes/_shell/_app/news-research'
 import { Route as ShellAppNotificationsRouteImport } from './routes/_shell/_app/notifications'
 import { Route as ShellAppOrganisationRouteImport } from './routes/_shell/_app/organisation'
+import { Route as ShellAppOutcomesRouteImport } from './routes/_shell/_app/outcomes'
 import { Route as ShellAppPhoneCommunicationsRouteImport } from './routes/_shell/_app/phone-communications'
 import { Route as ShellAppProductAnalyticsRouteImport } from './routes/_shell/_app/product-analytics'
 import { Route as ShellAppProjectsRouteImport } from './routes/_shell/_app/projects'
@@ -141,9 +144,11 @@ import { Route as ShellAppWorkforceRouteImport } from './routes/_shell/_app/work
 import { Route as ApiAgentsRunRouteImport } from './routes/api/agents/run'
 import { Route as ApiAgentsSteerRouteImport } from './routes/api/agents/steer'
 import { Route as ApiInternalDropshippingOpportunityMonitorRouteImport } from './routes/api/internal/dropshipping-opportunity-monitor'
+import { Route as ApiInternalRetailBookingReminderEmailRouteImport } from './routes/api/internal/retail-booking-reminder-email'
 import { Route as ApiInternalWebhookRetriesRouteImport } from './routes/api/internal/webhook-retries'
 import { Route as ApiInternalWorkflowRunsRouteImport } from './routes/api/internal/workflow-runs'
 import { Route as ShellAppAdminIndexRouteImport } from './routes/_shell/_app/admin.index'
+import { Route as ShellAppAdminAcceptanceRouteImport } from './routes/_shell/_app/admin.acceptance'
 import { Route as ShellAppAdminAuditLogsRouteImport } from './routes/_shell/_app/admin.audit-logs'
 import { Route as ShellAppAdminIntegrationsRouteImport } from './routes/_shell/_app/admin.integrations'
 import { Route as ShellAppAdminMarketplaceRouteImport } from './routes/_shell/_app/admin.marketplace'
@@ -380,6 +385,11 @@ const ShellAppAiToolsRoute = ShellAppAiToolsRouteImport.update({
   path: '/ai-tools',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppAiWorkbenchRoute = ShellAppAiWorkbenchRouteImport.update({
+  id: '/ai-workbench',
+  path: '/ai-workbench',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppAnalyticsRoute = ShellAppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -581,6 +591,11 @@ const ShellAppHtmlStudioRoute = ShellAppHtmlStudioRouteImport.update({
   path: '/html-studio',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppHumanFrontierRoute = ShellAppHumanFrontierRouteImport.update({
+  id: '/human-frontier',
+  path: '/human-frontier',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppIndustryHubRoute = ShellAppIndustryHubRouteImport.update({
   id: '/industry-hub',
   path: '/industry-hub',
@@ -649,6 +664,11 @@ const ShellAppNotificationsRoute = ShellAppNotificationsRouteImport.update({
 const ShellAppOrganisationRoute = ShellAppOrganisationRouteImport.update({
   id: '/organisation',
   path: '/organisation',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppOutcomesRoute = ShellAppOutcomesRouteImport.update({
+  id: '/outcomes',
+  path: '/outcomes',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppPhoneCommunicationsRoute =
@@ -857,6 +877,12 @@ const ApiInternalDropshippingOpportunityMonitorRoute =
     path: '/api/internal/dropshipping-opportunity-monitor',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalRetailBookingReminderEmailRoute =
+  ApiInternalRetailBookingReminderEmailRouteImport.update({
+    id: '/api/internal/retail-booking-reminder-email',
+    path: '/api/internal/retail-booking-reminder-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalWebhookRetriesRoute =
   ApiInternalWebhookRetriesRouteImport.update({
     id: '/api/internal/webhook-retries',
@@ -871,6 +897,11 @@ const ApiInternalWorkflowRunsRoute = ApiInternalWorkflowRunsRouteImport.update({
 const ShellAppAdminIndexRoute = ShellAppAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppAdminAcceptanceRoute = ShellAppAdminAcceptanceRouteImport.update({
+  id: '/admin/acceptance',
+  path: '/admin/acceptance',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppAdminAuditLogsRoute = ShellAppAdminAuditLogsRouteImport.update({
@@ -1123,6 +1154,7 @@ export interface FileRoutesByFullPath {
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
+  '/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/analytics': typeof ShellAppAnalyticsRoute
   '/automation': typeof ShellAppAutomationRoute
   '/automations': typeof ShellAppAutomationsRoute
@@ -1162,6 +1194,7 @@ export interface FileRoutesByFullPath {
   '/game-foundry': typeof ShellAppGameFoundryRoute
   '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
+  '/human-frontier': typeof ShellAppHumanFrontierRoute
   '/industry-hub': typeof ShellAppIndustryHubRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
@@ -1176,6 +1209,7 @@ export interface FileRoutesByFullPath {
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
+  '/outcomes': typeof ShellAppOutcomesRoute
   '/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/projects': typeof ShellAppProjectsRouteWithChildren
@@ -1216,8 +1250,10 @@ export interface FileRoutesByFullPath {
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
   '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
+  '/api/internal/retail-booking-reminder-email': typeof ApiInternalRetailBookingReminderEmailRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
+  '/admin/acceptance': typeof ShellAppAdminAcceptanceRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1296,6 +1332,7 @@ export interface FileRoutesByTo {
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
+  '/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/analytics': typeof ShellAppAnalyticsRoute
   '/automation': typeof ShellAppAutomationRoute
   '/automations': typeof ShellAppAutomationsRoute
@@ -1335,6 +1372,7 @@ export interface FileRoutesByTo {
   '/game-foundry': typeof ShellAppGameFoundryRoute
   '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
+  '/human-frontier': typeof ShellAppHumanFrontierRoute
   '/industry-hub': typeof ShellAppIndustryHubRoute
   '/integrations': typeof ShellAppIntegrationsRoute
   '/knowledge': typeof ShellAppKnowledgeRoute
@@ -1349,6 +1387,7 @@ export interface FileRoutesByTo {
   '/news-research': typeof ShellAppNewsResearchRoute
   '/notifications': typeof ShellAppNotificationsRoute
   '/organisation': typeof ShellAppOrganisationRoute
+  '/outcomes': typeof ShellAppOutcomesRoute
   '/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/projects': typeof ShellAppProjectsRouteWithChildren
@@ -1389,8 +1428,10 @@ export interface FileRoutesByTo {
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
   '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
+  '/api/internal/retail-booking-reminder-email': typeof ApiInternalRetailBookingReminderEmailRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
+  '/admin/acceptance': typeof ShellAppAdminAcceptanceRoute
   '/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1472,6 +1513,7 @@ export interface FileRoutesById {
   '/_shell/_app/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/_shell/_app/ai-model-hub': typeof ShellAppAiModelHubRoute
   '/_shell/_app/ai-tools': typeof ShellAppAiToolsRoute
+  '/_shell/_app/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/_shell/_app/analytics': typeof ShellAppAnalyticsRoute
   '/_shell/_app/automation': typeof ShellAppAutomationRoute
   '/_shell/_app/automations': typeof ShellAppAutomationsRoute
@@ -1511,6 +1553,7 @@ export interface FileRoutesById {
   '/_shell/_app/game-foundry': typeof ShellAppGameFoundryRoute
   '/_shell/_app/health-fitness': typeof ShellAppHealthFitnessRoute
   '/_shell/_app/html-studio': typeof ShellAppHtmlStudioRoute
+  '/_shell/_app/human-frontier': typeof ShellAppHumanFrontierRoute
   '/_shell/_app/industry-hub': typeof ShellAppIndustryHubRoute
   '/_shell/_app/integrations': typeof ShellAppIntegrationsRoute
   '/_shell/_app/knowledge': typeof ShellAppKnowledgeRoute
@@ -1525,6 +1568,7 @@ export interface FileRoutesById {
   '/_shell/_app/news-research': typeof ShellAppNewsResearchRoute
   '/_shell/_app/notifications': typeof ShellAppNotificationsRoute
   '/_shell/_app/organisation': typeof ShellAppOrganisationRoute
+  '/_shell/_app/outcomes': typeof ShellAppOutcomesRoute
   '/_shell/_app/phone-communications': typeof ShellAppPhoneCommunicationsRoute
   '/_shell/_app/product-analytics': typeof ShellAppProductAnalyticsRoute
   '/_shell/_app/projects': typeof ShellAppProjectsRouteWithChildren
@@ -1565,8 +1609,10 @@ export interface FileRoutesById {
   '/api/agents/run': typeof ApiAgentsRunRoute
   '/api/agents/steer': typeof ApiAgentsSteerRoute
   '/api/internal/dropshipping-opportunity-monitor': typeof ApiInternalDropshippingOpportunityMonitorRoute
+  '/api/internal/retail-booking-reminder-email': typeof ApiInternalRetailBookingReminderEmailRoute
   '/api/internal/webhook-retries': typeof ApiInternalWebhookRetriesRoute
   '/api/internal/workflow-runs': typeof ApiInternalWorkflowRunsRoute
+  '/_shell/_app/admin/acceptance': typeof ShellAppAdminAcceptanceRoute
   '/_shell/_app/admin/audit-logs': typeof ShellAppAdminAuditLogsRoute
   '/_shell/_app/admin/integrations': typeof ShellAppAdminIntegrationsRoute
   '/_shell/_app/admin/marketplace': typeof ShellAppAdminMarketplaceRoute
@@ -1647,6 +1693,7 @@ export interface FileRouteTypes {
     | '/ai-marketplace'
     | '/ai-model-hub'
     | '/ai-tools'
+    | '/ai-workbench'
     | '/analytics'
     | '/automation'
     | '/automations'
@@ -1686,6 +1733,7 @@ export interface FileRouteTypes {
     | '/game-foundry'
     | '/health-fitness'
     | '/html-studio'
+    | '/human-frontier'
     | '/industry-hub'
     | '/integrations'
     | '/knowledge'
@@ -1700,6 +1748,7 @@ export interface FileRouteTypes {
     | '/news-research'
     | '/notifications'
     | '/organisation'
+    | '/outcomes'
     | '/phone-communications'
     | '/product-analytics'
     | '/projects'
@@ -1740,8 +1789,10 @@ export interface FileRouteTypes {
     | '/api/agents/run'
     | '/api/agents/steer'
     | '/api/internal/dropshipping-opportunity-monitor'
+    | '/api/internal/retail-booking-reminder-email'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
+    | '/admin/acceptance'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1820,6 +1871,7 @@ export interface FileRouteTypes {
     | '/ai-marketplace'
     | '/ai-model-hub'
     | '/ai-tools'
+    | '/ai-workbench'
     | '/analytics'
     | '/automation'
     | '/automations'
@@ -1859,6 +1911,7 @@ export interface FileRouteTypes {
     | '/game-foundry'
     | '/health-fitness'
     | '/html-studio'
+    | '/human-frontier'
     | '/industry-hub'
     | '/integrations'
     | '/knowledge'
@@ -1873,6 +1926,7 @@ export interface FileRouteTypes {
     | '/news-research'
     | '/notifications'
     | '/organisation'
+    | '/outcomes'
     | '/phone-communications'
     | '/product-analytics'
     | '/projects'
@@ -1913,8 +1967,10 @@ export interface FileRouteTypes {
     | '/api/agents/run'
     | '/api/agents/steer'
     | '/api/internal/dropshipping-opportunity-monitor'
+    | '/api/internal/retail-booking-reminder-email'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
+    | '/admin/acceptance'
     | '/admin/audit-logs'
     | '/admin/integrations'
     | '/admin/marketplace'
@@ -1995,6 +2051,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/ai-marketplace'
     | '/_shell/_app/ai-model-hub'
     | '/_shell/_app/ai-tools'
+    | '/_shell/_app/ai-workbench'
     | '/_shell/_app/analytics'
     | '/_shell/_app/automation'
     | '/_shell/_app/automations'
@@ -2034,6 +2091,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/game-foundry'
     | '/_shell/_app/health-fitness'
     | '/_shell/_app/html-studio'
+    | '/_shell/_app/human-frontier'
     | '/_shell/_app/industry-hub'
     | '/_shell/_app/integrations'
     | '/_shell/_app/knowledge'
@@ -2048,6 +2106,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/news-research'
     | '/_shell/_app/notifications'
     | '/_shell/_app/organisation'
+    | '/_shell/_app/outcomes'
     | '/_shell/_app/phone-communications'
     | '/_shell/_app/product-analytics'
     | '/_shell/_app/projects'
@@ -2088,8 +2147,10 @@ export interface FileRouteTypes {
     | '/api/agents/run'
     | '/api/agents/steer'
     | '/api/internal/dropshipping-opportunity-monitor'
+    | '/api/internal/retail-booking-reminder-email'
     | '/api/internal/webhook-retries'
     | '/api/internal/workflow-runs'
+    | '/_shell/_app/admin/acceptance'
     | '/_shell/_app/admin/audit-logs'
     | '/_shell/_app/admin/integrations'
     | '/_shell/_app/admin/marketplace'
@@ -2164,6 +2225,7 @@ export interface RootRouteChildren {
   ApiAgentsRunRoute: typeof ApiAgentsRunRoute
   ApiAgentsSteerRoute: typeof ApiAgentsSteerRoute
   ApiInternalDropshippingOpportunityMonitorRoute: typeof ApiInternalDropshippingOpportunityMonitorRoute
+  ApiInternalRetailBookingReminderEmailRoute: typeof ApiInternalRetailBookingReminderEmailRoute
   ApiInternalWebhookRetriesRoute: typeof ApiInternalWebhookRetriesRoute
   ApiInternalWorkflowRunsRoute: typeof ApiInternalWorkflowRunsRoute
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
@@ -2462,6 +2524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppAiToolsRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/ai-workbench': {
+      id: '/_shell/_app/ai-workbench'
+      path: '/ai-workbench'
+      fullPath: '/ai-workbench'
+      preLoaderRoute: typeof ShellAppAiWorkbenchRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/analytics': {
       id: '/_shell/_app/analytics'
       path: '/analytics'
@@ -2735,6 +2804,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppHtmlStudioRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/human-frontier': {
+      id: '/_shell/_app/human-frontier'
+      path: '/human-frontier'
+      fullPath: '/human-frontier'
+      preLoaderRoute: typeof ShellAppHumanFrontierRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/industry-hub': {
       id: '/_shell/_app/industry-hub'
       path: '/industry-hub'
@@ -2831,6 +2907,13 @@ declare module '@tanstack/react-router' {
       path: '/organisation'
       fullPath: '/organisation'
       preLoaderRoute: typeof ShellAppOrganisationRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/outcomes': {
+      id: '/_shell/_app/outcomes'
+      path: '/outcomes'
+      fullPath: '/outcomes'
+      preLoaderRoute: typeof ShellAppOutcomesRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/phone-communications': {
@@ -3113,6 +3196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalDropshippingOpportunityMonitorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/retail-booking-reminder-email': {
+      id: '/api/internal/retail-booking-reminder-email'
+      path: '/api/internal/retail-booking-reminder-email'
+      fullPath: '/api/internal/retail-booking-reminder-email'
+      preLoaderRoute: typeof ApiInternalRetailBookingReminderEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/internal/webhook-retries': {
       id: '/api/internal/webhook-retries'
       path: '/api/internal/webhook-retries'
@@ -3132,6 +3222,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof ShellAppAdminIndexRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/admin/acceptance': {
+      id: '/_shell/_app/admin/acceptance'
+      path: '/admin/acceptance'
+      fullPath: '/admin/acceptance'
+      preLoaderRoute: typeof ShellAppAdminAcceptanceRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/admin/audit-logs': {
@@ -3424,6 +3521,7 @@ interface ShellAppRouteChildren {
   ShellAppAiMarketplaceRoute: typeof ShellAppAiMarketplaceRoute
   ShellAppAiModelHubRoute: typeof ShellAppAiModelHubRoute
   ShellAppAiToolsRoute: typeof ShellAppAiToolsRoute
+  ShellAppAiWorkbenchRoute: typeof ShellAppAiWorkbenchRoute
   ShellAppAnalyticsRoute: typeof ShellAppAnalyticsRoute
   ShellAppAutomationRoute: typeof ShellAppAutomationRoute
   ShellAppAutomationsRoute: typeof ShellAppAutomationsRoute
@@ -3463,6 +3561,7 @@ interface ShellAppRouteChildren {
   ShellAppGameFoundryRoute: typeof ShellAppGameFoundryRoute
   ShellAppHealthFitnessRoute: typeof ShellAppHealthFitnessRoute
   ShellAppHtmlStudioRoute: typeof ShellAppHtmlStudioRoute
+  ShellAppHumanFrontierRoute: typeof ShellAppHumanFrontierRoute
   ShellAppIndustryHubRoute: typeof ShellAppIndustryHubRoute
   ShellAppIntegrationsRoute: typeof ShellAppIntegrationsRoute
   ShellAppKnowledgeRoute: typeof ShellAppKnowledgeRoute
@@ -3477,6 +3576,7 @@ interface ShellAppRouteChildren {
   ShellAppNewsResearchRoute: typeof ShellAppNewsResearchRoute
   ShellAppNotificationsRoute: typeof ShellAppNotificationsRoute
   ShellAppOrganisationRoute: typeof ShellAppOrganisationRoute
+  ShellAppOutcomesRoute: typeof ShellAppOutcomesRoute
   ShellAppPhoneCommunicationsRoute: typeof ShellAppPhoneCommunicationsRoute
   ShellAppProductAnalyticsRoute: typeof ShellAppProductAnalyticsRoute
   ShellAppProjectsRoute: typeof ShellAppProjectsRouteWithChildren
@@ -3514,6 +3614,7 @@ interface ShellAppRouteChildren {
   ShellAppWorkOsRoute: typeof ShellAppWorkOsRoute
   ShellAppWorkflowsRoute: typeof ShellAppWorkflowsRoute
   ShellAppWorkforceRoute: typeof ShellAppWorkforceRoute
+  ShellAppAdminAcceptanceRoute: typeof ShellAppAdminAcceptanceRoute
   ShellAppAdminAuditLogsRoute: typeof ShellAppAdminAuditLogsRoute
   ShellAppAdminIntegrationsRoute: typeof ShellAppAdminIntegrationsRoute
   ShellAppAdminMarketplaceRoute: typeof ShellAppAdminMarketplaceRoute
@@ -3542,6 +3643,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppAiMarketplaceRoute: ShellAppAiMarketplaceRoute,
   ShellAppAiModelHubRoute: ShellAppAiModelHubRoute,
   ShellAppAiToolsRoute: ShellAppAiToolsRoute,
+  ShellAppAiWorkbenchRoute: ShellAppAiWorkbenchRoute,
   ShellAppAnalyticsRoute: ShellAppAnalyticsRoute,
   ShellAppAutomationRoute: ShellAppAutomationRoute,
   ShellAppAutomationsRoute: ShellAppAutomationsRoute,
@@ -3582,6 +3684,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppGameFoundryRoute: ShellAppGameFoundryRoute,
   ShellAppHealthFitnessRoute: ShellAppHealthFitnessRoute,
   ShellAppHtmlStudioRoute: ShellAppHtmlStudioRoute,
+  ShellAppHumanFrontierRoute: ShellAppHumanFrontierRoute,
   ShellAppIndustryHubRoute: ShellAppIndustryHubRoute,
   ShellAppIntegrationsRoute: ShellAppIntegrationsRoute,
   ShellAppKnowledgeRoute: ShellAppKnowledgeRoute,
@@ -3596,6 +3699,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppNewsResearchRoute: ShellAppNewsResearchRoute,
   ShellAppNotificationsRoute: ShellAppNotificationsRoute,
   ShellAppOrganisationRoute: ShellAppOrganisationRoute,
+  ShellAppOutcomesRoute: ShellAppOutcomesRoute,
   ShellAppPhoneCommunicationsRoute: ShellAppPhoneCommunicationsRoute,
   ShellAppProductAnalyticsRoute: ShellAppProductAnalyticsRoute,
   ShellAppProjectsRoute: ShellAppProjectsRouteWithChildren,
@@ -3633,6 +3737,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppWorkOsRoute: ShellAppWorkOsRoute,
   ShellAppWorkflowsRoute: ShellAppWorkflowsRoute,
   ShellAppWorkforceRoute: ShellAppWorkforceRoute,
+  ShellAppAdminAcceptanceRoute: ShellAppAdminAcceptanceRoute,
   ShellAppAdminAuditLogsRoute: ShellAppAdminAuditLogsRoute,
   ShellAppAdminIntegrationsRoute: ShellAppAdminIntegrationsRoute,
   ShellAppAdminMarketplaceRoute: ShellAppAdminMarketplaceRoute,
@@ -3733,6 +3838,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentsSteerRoute: ApiAgentsSteerRoute,
   ApiInternalDropshippingOpportunityMonitorRoute:
     ApiInternalDropshippingOpportunityMonitorRoute,
+  ApiInternalRetailBookingReminderEmailRoute:
+    ApiInternalRetailBookingReminderEmailRoute,
   ApiInternalWebhookRetriesRoute: ApiInternalWebhookRetriesRoute,
   ApiInternalWorkflowRunsRoute: ApiInternalWorkflowRunsRoute,
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
