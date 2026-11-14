@@ -93,11 +93,22 @@ function OrbitNode({ icon: Icon, label, value, className, delay = 0, tone = 'cya
   );
 }
 
+function shownCount(value) {
+  return value == null || Number.isNaN(Number(value)) ? null : Number(value);
+}
+
+function countText(value, suffix) {
+  const count = shownCount(value);
+  return count == null ? 'unverified' : `${count} ${suffix}`;
+}
+
 function HolographicCore({ metrics = {}, markState = 'ready', connectedIntegrations = 0, pendingApprovals = 0, unreadSignals = 0 }) {
   const reduced = useReducedMotion();
-  const activeAgents = Number(metrics.activeAgents || 0);
-  const running = Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
-  const activeWorkforces = Number(metrics.activeWorkforces || 0);
+  const activeAgents = shownCount(metrics.activeAgents);
+  const runningTasks = shownCount(metrics.runningTasks);
+  const workforceRuns = shownCount(metrics.runningWorkforceRuns);
+  const running = runningTasks == null && workforceRuns == null ? null : (runningTasks ?? 0) + (workforceRuns ?? 0);
+  const activeWorkforces = shownCount(metrics.activeWorkforces);
   return (
     <div className="relative min-h-[430px] overflow-hidden rounded-xl border border-violet-300/15 bg-[#020712]">
       <motion.div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(123,92,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(123,92,255,.05)_1px,transparent_1px)] [background-size:32px_32px]" animate={reduced ? undefined : { backgroundPosition: ['0px 0px', '32px 32px'] }} transition={reduced ? undefined : { duration: 9, repeat: Infinity, ease: 'linear' }} />
@@ -109,12 +120,12 @@ function HolographicCore({ metrics = {}, markState = 'ready', connectedIntegrati
       <motion.div className="absolute left-1/2 top-[52%] h-[205px] w-[205px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-violet-100/15" animate={reduced ? undefined : { rotate: 360 }} transition={reduced ? undefined : { duration: 11, repeat: Infinity, ease: 'linear' }} />
       <div className="absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2"><AstraMark size={108} state={markState} title="Blackstar Astra operational core" /></div>
       <motion.div className="absolute inset-x-[18%] bottom-[10%] h-12 rounded-[50%] border border-violet-300/25" animate={reduced ? undefined : { scaleX: [0.92, 1.04, 0.92], opacity: [0.35, 0.9, 0.35] }} transition={reduced ? undefined : { duration: 2.4, repeat: Infinity }} />
-      <OrbitNode icon={Bot} label="Agents" value={`${activeAgents} active`} className="left-[8%] top-[16%]" delay={0} />
+      <OrbitNode icon={Bot} label="Agents" value={countText(activeAgents, 'active')} className="left-[8%] top-[16%]" delay={0} />
       <OrbitNode icon={ServerCog} label="Provider links" value={`${connectedIntegrations} connected`} className="right-[8%] top-[16%]" tone="emerald" delay={0.5} />
       <OrbitNode icon={ShieldAlert} label="Approval gates" value={`${pendingApprovals} pending`} className="left-[6%] top-[48%]" tone="amber" delay={1} />
-      <OrbitNode icon={Workflow} label="Executions" value={`${running} in flight`} className="right-[6%] top-[48%]" tone="violet" delay={1.5} />
+      <OrbitNode icon={Workflow} label="Executions" value={countText(running, 'in flight')} className="right-[6%] top-[48%]" tone="violet" delay={1.5} />
       <OrbitNode icon={Bell} label="Signals" value={`${unreadSignals} unread`} className="left-[15%] bottom-[8%]" delay={2} />
-      <OrbitNode icon={Network} label="Workforces" value={`${activeWorkforces} active`} className="right-[15%] bottom-[8%]" tone="emerald" delay={2.5} />
+      <OrbitNode icon={Network} label="Workforces" value={countText(activeWorkforces, 'active')} className="right-[15%] bottom-[8%]" tone="emerald" delay={2.5} />
     </div>
   );
 }
@@ -148,31 +159,31 @@ function AlertPanel({ approvals = [], notifications = [], tasks = [], onNavigate
 function Telemetry({ metrics = {} }) {
   const reduced = useReducedMotion();
   const items = [
-    ['Agent mesh', metrics.activeAgents ?? 0, Bot],
-    ['Executions', metrics.runningTasks ?? 0, Zap],
-    ['Networks', metrics.activeWorkforces ?? 0, Network],
-    ['Workflow runs', metrics.runningWorkforceRuns ?? 0, Workflow],
-    ['Pending approvals', metrics.pendingApprovals ?? 0, ShieldAlert],
-    ['Exceptions', metrics.failedTasks ?? 0, AlertTriangle],
+    ['Agent mesh', shownCount(metrics.activeAgents), Bot],
+    ['Executions', shownCount(metrics.runningTasks), Zap],
+    ['Networks', shownCount(metrics.activeWorkforces), Network],
+    ['Workflow runs', shownCount(metrics.runningWorkforceRuns), Workflow],
+    ['Pending approvals', shownCount(metrics.awaitingApproval), ShieldAlert],
+    ['Exceptions', shownCount(metrics.failedTasks), AlertTriangle],
   ];
   return (
     <section className="rounded-xl border border-white/8 bg-[#030812] p-3">
       <h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">System telemetry</h3>
       <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3">
-        {items.map(([label, value, Icon], index) => <motion.div key={label} className="rounded-lg border border-white/7 bg-white/[.02] p-3" animate={reduced ? undefined : { borderColor: ['rgba(255,255,255,.06)', 'rgba(123,92,255,.18)', 'rgba(255,255,255,.06)'] }} transition={reduced ? undefined : { duration: 3.2, repeat: Infinity, delay: index * 0.35 }}><div className="flex items-center gap-2 text-[8px] uppercase tracking-[.13em] text-zinc-500"><Icon className="h-3 w-3 text-violet-300" />{label}</div><div className="mt-2 font-mono text-xl text-white">{value}</div></motion.div>)}
+        {items.map(([label, value, Icon], index) => <motion.div key={label} className="rounded-lg border border-white/7 bg-white/[.02] p-3" animate={reduced ? undefined : { borderColor: ['rgba(255,255,255,.06)', 'rgba(123,92,255,.18)', 'rgba(255,255,255,.06)'] }} transition={reduced ? undefined : { duration: 3.2, repeat: Infinity, delay: index * 0.35 }}><div className="flex items-center gap-2 text-[8px] uppercase tracking-[.13em] text-zinc-500"><Icon className="h-3 w-3 text-violet-300" />{label}</div><div className="mt-2 font-mono text-xl text-white">{value == null ? '—' : value}</div></motion.div>)}
       </div>
     </section>
   );
 }
 
-function MissionQueue({ tasks = [], onNavigate }) {
+function MissionQueue({ tasks = [], onNavigate, unverified = false }) {
   const reduced = useReducedMotion();
   const rows = tasks.filter((task) => ['running', 'in_progress', 'pending', 'queued', 'waiting_for_approval'].includes(task.status)).slice(0, 6);
   return (
     <section className="rounded-xl border border-white/8 bg-[#030812] p-3">
       <div className="flex items-center justify-between"><h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">Mission execution queue</h3><button type="button" onClick={() => onNavigate?.('tasks')} className="text-[8px] text-zinc-500 hover:text-white">OPEN TASKS</button></div>
       <div className="mt-3 space-y-2">
-        {rows.length ? rows.map((task) => {
+        {unverified ? <div className="rounded-lg border border-amber-300/15 bg-amber-300/[.04] px-3 py-4 text-center text-[9px] text-amber-100">Task ledger could not be verified.</div> : rows.length ? rows.map((task) => {
           const running = ['running', 'in_progress'].includes(task.status);
           return <div key={task.id} className="rounded-lg border border-white/7 bg-black/30 p-3"><div className="flex items-center justify-between gap-3"><span className="truncate text-[10px] text-zinc-200">{task.title || task.request || 'Mission task'}</span><span className="font-mono text-[8px] uppercase text-violet-300">{task.status}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">{running ? (reduced ? <div className="h-full w-1/3 rounded-full bg-violet-300" /> : <motion.div className="h-full w-1/3 rounded-full bg-violet-300" animate={{ x: ['-100%', '300%'] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} />) : <div className="h-full w-1/5 rounded-full bg-violet-300/70" />}</div></div>;
         }) : <div className="rounded-lg border border-white/7 bg-black/30 px-3 py-4 text-center text-[9px] text-zinc-500">No missions currently in flight.</div>}
@@ -198,24 +209,28 @@ function RailButton({ icon: Icon, label, count, onClick }) {
   return <button type="button" onClick={onClick} className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left text-[9px] uppercase tracking-[.08em] text-zinc-500 transition hover:border-white/8 hover:bg-white/[.025] hover:text-zinc-200"><Icon className="h-3.5 w-3.5" /><span className="flex-1">{label}</span>{count ? <span className="rounded-full bg-amber-400/15 px-1.5 text-amber-200">{count}</span> : <ChevronRight className="h-3 w-3 opacity-40" />}</button>;
 }
 
-export default function BlackstarCommandDeck({ metrics = {}, approvals = [], notifications = [], tasks = [], activities = [], connectedIntegrations = [], lastSync, loading = false, onNavigate }) {
+export default function BlackstarCommandDeck({ metrics = {}, approvals = [], notifications = [], tasks = [], activities = [], connectedIntegrations = [], sources = null, lastSync, loading = false, onNavigate }) {
   const reduced = useReducedMotion();
   const now = useMissionClock();
+  const tasksUnverified = sources?.tasks?.available === false;
   const pendingApprovals = approvals.filter((approval) => approval.status === 'pending').length;
-  const failedTasks = tasks.filter((task) => task.status === 'failed').length;
+  const failedTasks = tasksUnverified ? null : tasks.filter((task) => task.status === 'failed').length;
   const unreadSignals = notifications.filter((notification) => !notification.read_at).length;
-  const runningWork =
-    Number(metrics.runningTasks || 0) + Number(metrics.runningWorkforceRuns || 0);
+  const runningTasks = shownCount(metrics.runningTasks);
+  const workforceRuns = shownCount(metrics.runningWorkforceRuns);
+  const runningWork = (runningTasks ?? 0) + (workforceRuns ?? 0);
   const markState = loading
     ? 'syncing'
-    : failedTasks
+    : tasksUnverified
+      ? 'attention'
+      : failedTasks
       ? 'alert'
       : runningWork > 0
         ? 'executing'
         : pendingApprovals
           ? 'attention'
           : 'ready';
-  const health = failedTasks ? 'Attention required' : pendingApprovals ? 'Decisions pending' : 'Operational';
+  const health = loading ? 'Synchronizing' : tasksUnverified ? 'Task ledger unverified' : failedTasks ? 'Attention required' : pendingApprovals ? 'Decisions pending' : 'Operational';
 
   return (
     <div className="overflow-hidden rounded-2xl border border-violet-300/12 bg-[#01050d] shadow-[0_30px_80px_rgba(0,0,0,.45)]">
@@ -236,13 +251,13 @@ export default function BlackstarCommandDeck({ metrics = {}, approvals = [], not
             activities={activities}
             connectedIntegrations={connectedIntegrations}
           />
-          <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} /></div>
+          <div className="grid gap-3 lg:grid-cols-2"><Telemetry metrics={metrics} /><MissionQueue tasks={tasks} onNavigate={onNavigate} unverified={tasksUnverified} /></div>
           <MissionFeed activities={activities} />
         </main>
         <aside className="space-y-3 border-l border-white/7 p-3">
           <AlertPanel approvals={approvals} notifications={notifications} tasks={tasks} onNavigate={onNavigate} />
           <section className="rounded-xl border border-white/8 bg-[#030812] p-3"><h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">Pending approvals</h3><div className="mt-3 flex items-center justify-between"><div className="font-mono text-3xl text-amber-200">{pendingApprovals}</div><ShieldAlert className="h-6 w-6 text-amber-300/60" /></div><button type="button" onClick={() => onNavigate?.('approvals')} className="mt-3 w-full rounded-lg border border-amber-300/15 bg-amber-300/[.04] py-2 text-[9px] uppercase tracking-[.1em] text-amber-200">Open decision queue</button></section>
-          <section className="rounded-xl border border-white/8 bg-[#030812] p-3"><h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">System health monitor</h3><div className="mt-3 flex items-center gap-3"><HeartPulse className={failedTasks ? 'h-6 w-6 text-rose-300' : 'h-6 w-6 text-emerald-300'} /><div><p className="text-[10px] text-white">{health}</p><p className="text-[8px] text-zinc-600">{failedTasks} visible exceptions</p></div></div><div className="mt-3"><Heartbeat /></div></section>
+          <section className="rounded-xl border border-white/8 bg-[#030812] p-3"><h3 className="text-[10px] font-semibold uppercase tracking-[.12em] text-white">System health monitor</h3><div className="mt-3 flex items-center gap-3"><HeartPulse className={failedTasks || tasksUnverified ? 'h-6 w-6 text-rose-300' : 'h-6 w-6 text-emerald-300'} /><div><p className="text-[10px] text-white">{health}</p><p className="text-[8px] text-zinc-600">{tasksUnverified ? 'Exceptions unverified' : `${failedTasks} visible exceptions`}</p></div></div><div className="mt-3"><Heartbeat /></div></section>
           <section className="rounded-xl border border-white/8 bg-[#030812] p-3"><div className="flex items-center gap-2 text-[9px] uppercase tracking-[.1em] text-zinc-400"><Clock3 className="h-3.5 w-3.5 text-violet-300" />Last synchronization</div><p className="mt-2 font-mono text-[10px] text-white">{lastSync ? new Date(lastSync).toLocaleTimeString('en-GB') : loading ? 'Synchronizing…' : 'Awaiting sync'}</p></section>
         </aside>
       </div>

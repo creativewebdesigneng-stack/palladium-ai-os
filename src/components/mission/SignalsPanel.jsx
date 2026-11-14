@@ -8,11 +8,11 @@ const METRIC_LABEL = {
   browser_session: 'Browser sessions',
 };
 
-const fmt = (n) => new Intl.NumberFormat('en-GB').format(Number(n ?? 0));
+const fmt = (n) => (n == null ? 'Unverified' : new Intl.NumberFormat('en-GB').format(Number(n)));
 
 export default function SignalsPanel({ notifications = [], usage, loading, onRead, onReadAll }) {
   const unread = notifications.filter((n) => !n.read_at).length;
-  const metrics = Object.entries(usage?.byMetric ?? {});
+  const metrics = usage?.byMetric == null ? null : Object.entries(usage.byMetric);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -63,14 +63,15 @@ export default function SignalsPanel({ notifications = [], usage, loading, onRea
 
         <div className="grid grid-cols-2 gap-3">
           <Stat icon={Cpu} label="Agent runs" value={fmt(usage?.agentRuns)} sub={`${fmt(usage?.succeededRuns)} succeeded · ${fmt(usage?.failedRuns)} failed`} />
-          <Stat icon={Coins} label="Model spend" value={`£${((Number(usage?.costPence ?? 0)) / 100).toFixed(2)}`} sub="metered by the runtime" />
+          <Stat icon={Coins} label="Model spend" value={usage?.costPence == null ? 'Unverified' : `£${(Number(usage.costPence) / 100).toFixed(2)}`} sub="metered by the runtime" />
           <Stat icon={Activity} label="Tokens in" value={fmt(usage?.tokensIn)} />
           <Stat icon={Activity} label="Tokens out" value={fmt(usage?.tokensOut)} />
         </div>
 
         <div className="mt-4 space-y-1.5">
-          {metrics.length === 0 && <p className="text-[11px] text-zinc-600">No metered usage recorded yet this month.</p>}
-          {metrics.map(([metric, qty]) => (
+          {metrics == null && <p className="text-[11px] text-amber-200/80">Usage records could not be verified.</p>}
+          {metrics?.length === 0 && <p className="text-[11px] text-zinc-600">No metered usage recorded yet this month.</p>}
+          {metrics?.map(([metric, qty]) => (
             <div key={metric} className="flex items-center justify-between rounded-lg border border-white/5 bg-black/20 px-3 py-2 text-[11px]">
               <span className="text-zinc-400">{METRIC_LABEL[metric] ?? metric.replace(/_/g, ' ')}</span>
               <span className="font-medium text-white">{fmt(qty)}</span>

@@ -76,6 +76,10 @@ function Stat({ label, value, icon: Icon }) {
   );
 }
 
+function Empty({ children }) {
+  return <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-xs text-zinc-500">{children}</p>;
+}
+
 function Overview({ agent }) {
   const o = agent.overview;
   return (
@@ -84,16 +88,17 @@ function Overview({ agent }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Stat label="Type" value={o.type} icon={Bot} />
         <Stat label="Created" value={o.created} icon={Clock} />
-        <Stat label="Success rate" value={`${o.successRate}%`} icon={CheckCircle2} />
-        <Stat label="Avg duration" value={o.avgDuration} icon={Clock} />
+        <Stat label="Success rate" value={o.successRate == null ? 'No finished runs' : `${o.successRate}%`} icon={CheckCircle2} />
+        <Stat label="Avg duration" value={o.avgDuration || 'No durations recorded'} icon={Clock} />
         <Stat label="Tasks done" value={String(o.tasksDone)} icon={Activity} />
-        <Stat label="Cost / run" value={o.cost} icon={TrendingUp} />
+        <Stat label="Cost / run" value={o.cost || 'Not recorded'} icon={TrendingUp} />
       </div>
     </div>
   );
 }
 
 function Tasks({ agent }) {
+  if (!agent.tasks.length) return <Empty>No tasks are recorded for this agent.</Empty>;
   return (
     <div className="space-y-2">
       {agent.tasks.map((t, i) => (
@@ -112,18 +117,13 @@ function Tasks({ agent }) {
 }
 
 function Projects({ agent }) {
+  if (!agent.projects.length) return <Empty>No projects are linked to this agent.</Empty>;
   return (
     <div className="space-y-2">
-      {agent.projects.map((p, i) => (
-        <div key={i} className="rounded-xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-white">{p}</p>
-            <span className="text-[10px] text-zinc-500">{agent.department}</span>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${60 + i * 12}%` }} /></div>
-            <span className="text-[10px] text-zinc-400">{60 + i * 12}%</span>
-          </div>
+      {agent.projects.map((project, index) => (
+        <div key={project.id || project.name || index} className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <p className="text-xs font-medium text-white">{project.name || project}</p>
+          {agent.department ? <p className="mt-1 text-[10px] text-zinc-500">{agent.department}</p> : null}
         </div>
       ))}
     </div>
@@ -131,6 +131,7 @@ function Projects({ agent }) {
 }
 
 function Memory({ agent }) {
+  if (!agent.memory.length) return <Empty>No memory records are attached to this workforce profile.</Empty>;
   return (
     <div className="space-y-2">
       {agent.memory.map((m, i) => (
@@ -144,6 +145,7 @@ function Memory({ agent }) {
 }
 
 function Knowledge({ agent }) {
+  if (!agent.knowledge.length) return <Empty>No knowledge collections are recorded for this agent.</Empty>;
   return (
     <div className="space-y-2">
       {agent.knowledge.map((k, i) => (
@@ -157,6 +159,7 @@ function Knowledge({ agent }) {
 }
 
 function Tools({ agent }) {
+  if (!agent.tools.length) return <Empty>This agent has no enabled tools.</Empty>;
   return (
     <div className="grid grid-cols-2 gap-2">
       {agent.tools.map((t) => {
@@ -173,6 +176,7 @@ function Tools({ agent }) {
 }
 
 function Integrations({ agent }) {
+  if (!agent.integrations.length) return <Empty>No integration connections are recorded on this profile.</Empty>;
   return (
     <div className="space-y-2">
       {agent.integrations.map((it, i) => (
@@ -187,31 +191,34 @@ function Integrations({ agent }) {
 }
 
 function Performance({ agent }) {
-  const data = agent.perfSeries.map((v, i) => ({ d: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i], v }));
+  const data = Array.isArray(agent.perfSeries) ? agent.perfSeries.filter((point) => point?.day) : [];
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Success" value={`${agent.performance}%`} icon={CheckCircle2} />
+        <Stat label="Success" value={agent.overview.successRate == null ? '—' : `${agent.performance}%`} icon={CheckCircle2} />
         <Stat label="Tasks" value={String(agent.overview.tasksDone)} icon={Activity} />
-        <Stat label="Avg time" value={agent.overview.avgDuration} icon={Clock} />
+        <Stat label="Avg time" value={agent.overview.avgDuration || '—'} icon={Clock} />
       </div>
-      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-        <p className="mb-2 text-[10px] uppercase tracking-wider text-zinc-600">7-day trend</p>
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <XAxis dataKey="d" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#101119', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} labelStyle={{ color: '#a1a1aa' }} />
-              <Line type="monotone" dataKey="v" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 2, fill: '#8b5cf6' }} />
-            </LineChart>
-          </ResponsiveContainer>
+      {data.length ? (
+        <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <p className="mb-2 text-[10px] uppercase tracking-wider text-zinc-600">Dated completion rate</p>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <XAxis dataKey="day" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: '#101119', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} labelStyle={{ color: '#a1a1aa' }} />
+                <Line type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 2, fill: '#8b5cf6' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      ) : <Empty>No dated completed or failed runs are available for a trend.</Empty>}
     </div>
   );
 }
 
 function ActivityTab({ agent }) {
+  if (!agent.activity.length) return <Empty>No activity events are recorded on this profile.</Empty>;
   return (
     <div className="space-y-3">
       {agent.activity.map((a, i) => (
@@ -225,6 +232,7 @@ function ActivityTab({ agent }) {
 }
 
 function Permissions({ agent }) {
+  if (!agent.permissions.length) return <Empty>No permission rows are recorded on this profile.</Empty>;
   return (
     <div className="space-y-2">
       {agent.permissions.map((p, i) => (

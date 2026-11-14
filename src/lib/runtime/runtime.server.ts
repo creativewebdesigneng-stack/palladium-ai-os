@@ -11,9 +11,15 @@
  */
 import { normaliseAgentModelSelection } from "@/lib/agents/agent-model-selection";
 import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
-import { agentIdentityFromPreferences, identityPromptInstruction } from "@/lib/agents/agent-identity";
+import {
+  agentIdentityFromPreferences,
+  identityPromptInstruction,
+} from "@/lib/agents/agent-identity";
 import { captureCompletedAgentRunMemory } from "./agent-run-memory.server";
-import { retrieveGovernedAgentMemory, renderGovernedAgentMemoryPrompt } from "@/lib/memory/agent-memory-context.server";
+import {
+  retrieveGovernedAgentMemory,
+  renderGovernedAgentMemoryPrompt,
+} from "@/lib/memory/agent-memory-context.server";
 import { notify, notifyUsageThreshold } from "@/lib/notifications/notify.server";
 import {
   assertWithinLimit,
@@ -160,7 +166,9 @@ export type PreparedRun = {
   startedAt: number;
 };
 
-export function runtimeConnectedServiceReadSpec(run: Pick<PreparedRun, "agent" | "messages" | "tools">): {
+export function runtimeConnectedServiceReadSpec(
+  run: Pick<PreparedRun, "agent" | "messages" | "tools">,
+): {
   provider: "github";
   action: "repositories_list";
   limit: number;
@@ -181,7 +189,7 @@ export function runtimeConnectedServiceReadSpec(run: Pick<PreparedRun, "agent" |
   return {
     provider: "github",
     action: "repositories_list",
-    limit: numeric ? Number(numeric) : words[word ?? ""] ?? 3,
+    limit: numeric ? Number(numeric) : (words[word ?? ""] ?? 3),
   };
 }
 
@@ -265,11 +273,15 @@ export async function prepareRun(args: {
   // Do not invoke the retired reap_stale_agent_tasks RPC on each user request.
 
   const agent = await loadAgent(args.sb, args.agentId);
-  const unsupportedTools = (agent.allowed_tools ?? []).filter((slug: string) => !TOOL_SLUGS.includes(slug));
-  if (unsupportedTools.length) throw new RuntimeError(
-    `This agent has unsupported tool assignments: ${unsupportedTools.join(', ')}. Open Edit tools & permissions and select supported tools before running it.`,
-    'INVALID_TOOL_ASSIGNMENTS', 400,
+  const unsupportedTools = (agent.allowed_tools ?? []).filter(
+    (slug: string) => !TOOL_SLUGS.includes(slug),
   );
+  if (unsupportedTools.length)
+    throw new RuntimeError(
+      `This agent has unsupported tool assignments: ${unsupportedTools.join(", ")}. Open Edit tools & permissions and select supported tools before running it.`,
+      "INVALID_TOOL_ASSIGNMENTS",
+      400,
+    );
   const orgId = agent.org_id_fk ?? agent.org_id ?? null;
 
   const ent = await getEntitlements(args.sb as never, args.userId, orgId);
@@ -277,8 +289,18 @@ export async function prepareRun(args: {
 
   const tools = await resolveGrantedTools(args.sb, agent, ent.planCode);
   let selection;
-  try { selection = normaliseAgentModelSelection(agent.model_provider || normaliseProvider(agent.model_provider), agent.model); }
-  catch { throw new RuntimeError("The saved provider/model selection is invalid. Edit this agent and select a matching provider and model.", "INVALID_MODEL_SELECTION", 400); }
+  try {
+    selection = normaliseAgentModelSelection(
+      agent.model_provider || normaliseProvider(agent.model_provider),
+      agent.model,
+    );
+  } catch {
+    throw new RuntimeError(
+      "The saved provider/model selection is invalid. Edit this agent and select a matching provider and model.",
+      "INVALID_MODEL_SELECTION",
+      400,
+    );
+  }
   const provider = normaliseProvider(selection.provider);
   if (!(await isProviderAvailableForUser({ userId: args.userId, provider }))) {
     throw new RuntimeError(
@@ -291,14 +313,27 @@ export async function prepareRun(args: {
   // before the task ID/model are recorded. A personal NVIDIA API Catalog key
   // must never inherit the different model ID of an operator-hosted Dell NIM.
   // This retrieves no key into task storage, notifications or audit metadata.
-  const personalNvidiaAccess = provider === 'nvidia'
-    ? await resolveUserModelProviderAccess({ userId: args.userId, provider })
-    : null;
+  const personalNvidiaAccess =
+    provider === "nvidia"
+      ? await resolveUserModelProviderAccess({ userId: args.userId, provider })
+      : null;
   const model = resolveModel(provider, selection.model, personalNvidiaAccess);
   try {
-    await writeAuditRequired({userId: args.userId, orgId, action: "agent.run_requested", targetType: "personal_agent", targetId: agent.id, agentId: agent.id, metadata: {provider, model}});
+    await writeAuditRequired({
+      userId: args.userId,
+      orgId,
+      action: "agent.run_requested",
+      targetType: "personal_agent",
+      targetId: agent.id,
+      agentId: agent.id,
+      metadata: { provider, model },
+    });
   } catch {
-    throw new RuntimeError("Required run audit could not be saved. Repair the deployed Supabase server credential before retrying.", "AUDIT_UNAVAILABLE", 503);
+    throw new RuntimeError(
+      "Required run audit could not be saved. Repair the deployed Supabase server credential before retrying.",
+      "AUDIT_UNAVAILABLE",
+      503,
+    );
   }
   const messages = await buildContext(args.sb, agent, input);
 
@@ -439,13 +474,40 @@ export async function completeRun(args: {
 }) {
   const { run, result } = args;
   if (!result.text?.trim()) {
-    throw new RuntimeError("The model returned no deliverable. The task cannot be marked complete.", "EMPTY_RUN_OUTPUT", 502);
+    throw new RuntimeError(
+      "The model returned no deliverable. The task cannot be marked complete.",
+      "EMPTY_RUN_OUTPUT",
+      502,
+    );
   }
   const duration = Date.now() - run.startedAt;
   const db = await admin();
 
-  await writeAuditRequired({userId: args.userId, orgId: run.orgId, action: "agent.run_result", targetType: "agent_task", targetId: run.taskId, agentId: run.agent.id, metadata: {provider: result.provider, model: result.model, duration_ms: duration}});
-  const output = { text: result.text, tool_calls: args.toolCallCount };
+  const executionReceipt = {
+    version: 1 as const,
+    task_id: run.taskId,
+    agent_id: run.agent.id,
+    provider: result.provider,
+    model: result.model,
+    tokens_in: result.usage.input,
+    tokens_out: result.usage.output,
+    tool_calls: args.toolCallCount,
+    duration_ms: duration,
+  };
+  await writeAuditRequired({
+    userId: args.userId,
+    orgId: run.orgId,
+    action: "agent.run_result",
+    targetType: "agent_task",
+    targetId: run.taskId,
+    agentId: run.agent.id,
+    metadata: executionReceipt,
+  });
+  const output = {
+    text: result.text,
+    tool_calls: args.toolCallCount,
+    execution_receipt: executionReceipt,
+  };
   const completionReceipt = await db
     .from("agent_tasks")
     .update({
@@ -461,14 +523,21 @@ export async function completeRun(args: {
       heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
-    .eq("id", run.taskId).eq("user_id", args.userId)
+    .eq("id", run.taskId)
+    .eq("user_id", args.userId)
     .in("status", [...ACTIVE_TASK_STATES, "waiting_for_approval"])
-    .eq("cancel_requested", false).select("id").maybeSingle();
+    .eq("cancel_requested", false)
+    .select("id")
+    .maybeSingle();
   if (completionReceipt.error || !completionReceipt.data) {
-    if (!completionReceipt.error && await isCancelled(args.sb, run.taskId)) {
+    if (!completionReceipt.error && (await isCancelled(args.sb, run.taskId))) {
       throw new RuntimeError("Run cancelled by the operator.", "CANCELLED", 499);
     }
-    throw new RuntimeError("Model response received, but the run result could not be saved. Check Supabase server access.", "RUN_PERSISTENCE_FAILED", 503);
+    throw new RuntimeError(
+      "Model response received, but the run result could not be saved. Check Supabase server access.",
+      "RUN_PERSISTENCE_FAILED",
+      503,
+    );
   }
 
   await db
@@ -488,7 +557,9 @@ export async function completeRun(args: {
     outcome: result.text,
     provider: result.provider,
     model: result.model,
-  }).catch((error: unknown) => console.error("[runtime] authorised run memory capture unavailable", error));
+  }).catch((error: unknown) =>
+    console.error("[runtime] authorised run memory capture unavailable", error),
+  );
 
   await Promise.all([
     recordUsage({
@@ -589,7 +660,7 @@ export async function failRun(args: {
       : args.error instanceof ProviderError || args.error instanceof RuntimeError
         ? args.error.message
         : "The run failed unexpectedly. Please try again.";
-  const db = args.sb ?? await admin();
+  const db = args.sb ?? (await admin());
   const failureReceipt = await db
     .from("agent_tasks")
     .update({
@@ -599,9 +670,12 @@ export async function failRun(args: {
       heartbeat_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
     })
-    .eq("id", args.run.taskId).eq("user_id", args.userId).select("id").maybeSingle();
+    .eq("id", args.run.taskId)
+    .eq("user_id", args.userId)
+    .select("id")
+    .maybeSingle();
   if (failureReceipt.error || !failureReceipt.data) {
-    console.error("[runtime] failure state was not persisted", {taskId: args.run.taskId});
+    console.error("[runtime] failure state was not persisted", { taskId: args.run.taskId });
     return `${message} Run status could not be saved; check Supabase access before retrying.`;
   }
 
@@ -645,7 +719,15 @@ export async function failRun(args: {
     });
   }
 
-  console.error("[runtime] run failed", {taskId: args.run.taskId, code: args.error instanceof RuntimeError ? args.error.code : args.error instanceof ProviderError ? "MODEL_PROVIDER_ERROR" : "RUN_FAILED"});
+  console.error("[runtime] run failed", {
+    taskId: args.run.taskId,
+    code:
+      args.error instanceof RuntimeError
+        ? args.error.code
+        : args.error instanceof ProviderError
+          ? "MODEL_PROVIDER_ERROR"
+          : "RUN_FAILED",
+  });
   return message;
 }
 
@@ -704,14 +786,19 @@ function awaitsApproval(output: unknown): boolean {
   const value = output as Record<string, unknown> | null;
   return Boolean(
     value &&
-      (value["approval_request_id"] ||
-        value["status"] === "awaiting_approval" ||
-        value["requires_approval"] === true),
+    (value["approval_request_id"] ||
+      value["status"] === "awaiting_approval" ||
+      value["requires_approval"] === true),
   );
 }
 
 async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: ChatMessage[]) {
-  messages.push({ role: "assistant", content: result.text, tool_calls: result.toolCalls, ...(result.geminiContinuation ? { geminiContinuation: result.geminiContinuation } : {}) });
+  messages.push({
+    role: "assistant",
+    content: result.text,
+    tool_calls: result.toolCalls,
+    ...(result.geminiContinuation ? { geminiContinuation: result.geminiContinuation } : {}),
+  });
   await setRunState(deps.sb, deps.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   let processedCalls = 0;
@@ -731,7 +818,8 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
         if (!receipt["approval_request_id"]) {
           throw new RuntimeError(
             `Tool "${call.name}" requires operator approval, but no executable approval request was queued. The action did not run.`,
-            "APPROVAL_NOT_QUEUED", 409,
+            "APPROVAL_NOT_QUEUED",
+            409,
           );
         }
         awaitingApproval = true;
@@ -744,7 +832,14 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
         content: outcome.notice ? RunLoopGuard.withNotice(content, outcome.notice) : content,
       });
       if (awaitingApproval) {
-        for (const skipped of result.toolCalls.slice(index + 1)) messages.push({ role: 'tool', tool_call_id: skipped.id, name: skipped.name, content: 'Not executed: the run paused for operator approval. Request this action again after reviewing the approved result if it is still needed.' });
+        for (const skipped of result.toolCalls.slice(index + 1))
+          messages.push({
+            role: "tool",
+            tool_call_id: skipped.id,
+            name: skipped.name,
+            content:
+              "Not executed: the run paused for operator approval. Request this action again after reviewing the approved result if it is still needed.",
+          });
         break;
       }
     }
@@ -759,10 +854,48 @@ async function runToolCalls(deps: ToolLoopDeps, result: ChatResult, messages: Ch
   return { awaitingApproval, processedCalls };
 }
 
-export async function pausedRunReceipt(sb: Sb, userId: string, taskId: string, usage: { input: number; output: number }, toolCalls: number, resume?: { run: PreparedRun; messages: ChatMessage[]; planner?: Record<string, unknown> }) {
-  const { data, error } = await sb.from('agent_tasks').update({ tokens_in: usage.input, tokens_out: usage.output, tool_calls: toolCalls, ...(resume ? { approval_resume_state: { version: 1, kind: 'agent_browser_task', messages: resume.messages, provider: resume.run.provider, model: resume.run.model, startedAt: resume.run.startedAt, usage, toolCalls, ...(resume.planner ? { planner: resume.planner } : {}) } } : {}) })
-    .eq('id', taskId).eq('user_id', userId).eq('status', 'waiting_for_approval').eq('cancel_requested', false).select('*').maybeSingle();
-  if (error || !data) throw new RuntimeError('Could not confirm the paused approval task.', 'APPROVAL_PAUSE_FAILED', 503);
+export async function pausedRunReceipt(
+  sb: Sb,
+  userId: string,
+  taskId: string,
+  usage: { input: number; output: number },
+  toolCalls: number,
+  resume?: { run: PreparedRun; messages: ChatMessage[]; planner?: Record<string, unknown> },
+) {
+  const { data, error } = await sb
+    .from("agent_tasks")
+    .update({
+      tokens_in: usage.input,
+      tokens_out: usage.output,
+      tool_calls: toolCalls,
+      ...(resume
+        ? {
+            approval_resume_state: {
+              version: 1,
+              kind: "agent_browser_task",
+              messages: resume.messages,
+              provider: resume.run.provider,
+              model: resume.run.model,
+              startedAt: resume.run.startedAt,
+              usage,
+              toolCalls,
+              ...(resume.planner ? { planner: resume.planner } : {}),
+            },
+          }
+        : {}),
+    })
+    .eq("id", taskId)
+    .eq("user_id", userId)
+    .eq("status", "waiting_for_approval")
+    .eq("cancel_requested", false)
+    .select("*")
+    .maybeSingle();
+  if (error || !data)
+    throw new RuntimeError(
+      "Could not confirm the paused approval task.",
+      "APPROVAL_PAUSE_FAILED",
+      503,
+    );
   return data;
 }
 
@@ -817,8 +950,12 @@ export async function executeRun(args: {
   const steeringCursor = createSteeringCursor();
 
   try {
-    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
+    const providerAccess = await resolveUserModelProviderAccess({
+      userId: args.userId,
+      provider: args.run.provider,
+    });
+    if (providerAccess)
+      await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (externalFailure) throw externalFailure;
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
@@ -843,7 +980,21 @@ export async function executeRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
-          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","nvidia","compatible"].includes(p))],
+          allowedProviders: [
+            args.run.provider,
+            ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider =>
+              [
+                "lovable",
+                "gemini",
+                "openai",
+                "anthropic",
+                "groq",
+                "deepseek",
+                "nvidia",
+                "compatible",
+              ].includes(p),
+            ),
+          ],
         });
       } catch (error) {
         if (externalFailure) throw externalFailure;
@@ -880,7 +1031,11 @@ export async function executeRun(args: {
         messages,
       );
       toolCallCount -= result.toolCalls.length - processedCalls;
-      if (awaitingApproval) return await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages });
+      if (awaitingApproval)
+        return await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, {
+          run: args.run,
+          messages,
+        });
     }
     throw new RuntimeError(
       "The agent used too many tool rounds without answering.",
@@ -914,8 +1069,12 @@ export async function* streamRun(args: {
   yield { type: "status", status: "running", task_id: args.run.taskId };
 
   try {
-    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
+    const providerAccess = await resolveUserModelProviderAccess({
+      userId: args.userId,
+      provider: args.run.provider,
+    });
+    if (providerAccess)
+      await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       if (timedOut) throw new RuntimeError("The run exceeded its time budget.", "RUN_TIMEOUT", 504);
       if (await isCancelled(args.sb, args.run.taskId)) {
@@ -940,7 +1099,21 @@ export async function* streamRun(args: {
           maxTokens: args.run.agent.max_tokens,
           signal: controller.signal,
           providerAccess,
-          allowedProviders: [args.run.provider, ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider => ["lovable","gemini","openai","anthropic","groq","deepseek","nvidia","compatible"].includes(p))],
+          allowedProviders: [
+            args.run.provider,
+            ...(args.run.agent.allowed_providers ?? []).filter((p): p is typeof args.run.provider =>
+              [
+                "lovable",
+                "gemini",
+                "openai",
+                "anthropic",
+                "groq",
+                "deepseek",
+                "nvidia",
+                "compatible",
+              ].includes(p),
+            ),
+          ],
         })) {
           if (event.type === "text") yield { type: "delta", text: event.delta };
           if (event.type === "done") final = event.result;
@@ -989,8 +1162,15 @@ export async function* streamRun(args: {
         task_id: args.run.taskId,
       };
       if (awaitingApproval) {
-        const task = await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages });
-        yield { type: 'paused', task };
+        const task = await pausedRunReceipt(
+          args.sb,
+          args.userId,
+          args.run.taskId,
+          usage,
+          toolCallCount,
+          { run: args.run, messages },
+        );
+        yield { type: "paused", task };
         return;
       }
     }

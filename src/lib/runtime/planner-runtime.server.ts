@@ -47,6 +47,7 @@ import {
   combineBlackstarAstraVerificationDecisions,
   resolveBlackstarAstraPlannerPolicy,
 } from "./blackstar-astra-planner-policy";
+import { runModelRoundWithBoundedRetry } from "./transient-model-retry";
 
 type Sb = { from: (t: string) => any };
 
@@ -60,7 +61,9 @@ const MAX_RUNTIME_MS = 120_000;
 
 function taskObjective(run: PreparedRun): string {
   const user = [...run.messages].reverse().find((message) => message.role === "user");
-  return String(user?.content ?? "").trim().slice(0, 12_000);
+  return String(user?.content ?? "")
+    .trim()
+    .slice(0, 12_000);
 }
 
 function extractJsonObject(text: string): Record<string, unknown> | null {
@@ -108,7 +111,10 @@ function verifierInstruction(plan: AgentPlan, candidate: string) {
   ].join("\n");
 }
 
-async function buildPlan(run: PreparedRun, providerAccess: ProviderAccess | null): Promise<AgentPlan> {
+async function buildPlan(
+  run: PreparedRun,
+  providerAccess: ProviderAccess | null,
+): Promise<AgentPlan> {
   const agent = run.agent as PlannerAgent;
   const profile = agent.operating_profile ?? null;
   const objective = taskObjective(run);
@@ -148,7 +154,11 @@ async function buildPlan(run: PreparedRun, providerAccess: ProviderAccess | null
 async function persistPlan(sb: Sb, taskId: string, plan: AgentPlan) {
   const { error } = await sb
     .from("agent_tasks")
-    .update({ planner_state: plan, replan_count: plan.replan_count, heartbeat_at: new Date().toISOString() })
+    .update({
+      planner_state: plan,
+      replan_count: plan.replan_count,
+      heartbeat_at: new Date().toISOString(),
+    })
     .eq("id", taskId);
   if (error) console.error("[planner] could not persist planner state", error);
 }
@@ -161,11 +171,25 @@ async function persistVerification(sb: Sb, taskId: string, decision: Verificatio
   if (error) console.error("[planner] could not persist verification state", error);
 }
 
+function abortableDelay(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(
+        signal.reason instanceof Error ? signal.reason : new Error("The model retry was aborted."),
+      );
+    };
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 async function heartbeat(sb: Sb, taskId: string) {
-  await sb
-    .from("agent_tasks")
-    .update({ heartbeat_at: new Date().toISOString() })
-    .eq("id", taskId);
+  await sb.from("agent_tasks").update({ heartbeat_at: new Date().toISOString() }).eq("id", taskId);
 }
 
 async function cancelled(sb: Sb, taskId: string) {
@@ -201,7 +225,13 @@ async function saveCheckpoint(args: {
   });
 }
 
-async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: string, signal: AbortSignal, providerAccess: ProviderAccess | null) {
+async function verifyCandidate(
+  run: PreparedRun,
+  plan: AgentPlan,
+  candidate: string,
+  signal: AbortSignal,
+  providerAccess: ProviderAccess | null,
+) {
   if (!plan.verification_required) {
     return normaliseVerificationDecision({ passed: true, score: 1, next_action: "complete" });
   }
@@ -221,7 +251,14 @@ async function verifyCandidate(run: PreparedRun, plan: AgentPlan, candidate: str
       allowedProviders: [run.provider],
     });
     const parsed = extractJsonObject(result.text);
-    return normaliseVerificationDecision(parsed ?? { passed: false, score: 0, issues: ["Verifier returned invalid structured output"], next_action: "replan" });
+    return normaliseVerificationDecision(
+      parsed ?? {
+        passed: false,
+        score: 0,
+        issues: ["Verifier returned invalid structured output"],
+        next_action: "replan",
+      },
+    );
   } catch (error) {
     if (signal.aborted) throw error;
     console.error("[planner] verification pass failed", error);
@@ -301,7 +338,14 @@ async function runToolCalls(args: {
   signal: AbortSignal;
   guard: RunLoopGuard;
 }) {
-  args.messages.push({ role: "assistant", content: args.result.text, tool_calls: args.result.toolCalls, ...(args.result.geminiContinuation ? { geminiContinuation: args.result.geminiContinuation } : {}) });
+  args.messages.push({
+    role: "assistant",
+    content: args.result.text,
+    tool_calls: args.result.toolCalls,
+    ...(args.result.geminiContinuation
+      ? { geminiContinuation: args.result.geminiContinuation }
+      : {}),
+  });
   await setRunState(args.sb, args.run.taskId, "waiting_for_tool");
   let awaitingApproval = false;
   let processedCalls = 0;
@@ -340,9 +384,16 @@ async function runToolCalls(args: {
       const output = outcome.output as Record<string, unknown> | null;
       const approvalWait = Boolean(
         output &&
-          (output["approval_request_id"] || output["status"] === "awaiting_approval" || output["requires_approval"] === true),
+        (output["approval_request_id"] ||
+          output["status"] === "awaiting_approval" ||
+          output["requires_approval"] === true),
       );
-      if (approvalWait && !output?.['approval_request_id']) throw new RuntimeError('Tool requires approval but no executable approval request was queued.', 'APPROVAL_NOT_QUEUED', 409);
+      if (approvalWait && !output?.["approval_request_id"])
+        throw new RuntimeError(
+          "Tool requires approval but no executable approval request was queued.",
+          "APPROVAL_NOT_QUEUED",
+          409,
+        );
       awaitingApproval = awaitingApproval || approvalWait;
       const content = compactToolResultForModel(outcome.output);
       args.messages.push({
@@ -353,7 +404,14 @@ async function runToolCalls(args: {
       });
 
       if (approvalWait) {
-        for (const skipped of args.result.toolCalls.slice(index + 1)) args.messages.push({ role: 'tool', tool_call_id: skipped.id, name: skipped.name, content: 'Not executed: paused for operator approval. Request this action again if it is still needed after the approved result.' });
+        for (const skipped of args.result.toolCalls.slice(index + 1))
+          args.messages.push({
+            role: "tool",
+            tool_call_id: skipped.id,
+            name: skipped.name,
+            content:
+              "Not executed: paused for operator approval. Request this action again if it is still needed after the approved result.",
+          });
         break;
       }
       const recovery: PlannedToolRecovery | null = recoveryReason
@@ -389,7 +447,11 @@ async function runToolCalls(args: {
     }
     await persistPlan(args.sb, args.run.taskId, plan);
   } finally {
-    await setRunState(args.sb, args.run.taskId, awaitingApproval ? "waiting_for_approval" : "running");
+    await setRunState(
+      args.sb,
+      args.run.taskId,
+      awaitingApproval ? "waiting_for_approval" : "running",
+    );
   }
   if (awaitingApproval) {
     await notify({
@@ -429,15 +491,22 @@ export async function executePlannedRun(args: {
   else args.signal?.addEventListener("abort", abortFromOwner, { once: true });
 
   let timedOut = false;
-  const budget = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS));
+  const budget = setTimeout(
+    () => {
+      timedOut = true;
+      controller.abort();
+    },
+    Math.min(Math.max(args.timeoutMs ?? MAX_RUNTIME_MS, 1_000), MAX_RUNTIME_MS),
+  );
 
   try {
     const astraPolicy = resolveBlackstarAstraPlannerPolicy(args.reasoningControl);
-    const providerAccess = await resolveUserModelProviderAccess({ userId: args.userId, provider: args.run.provider });
-    if (providerAccess) await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
+    const providerAccess = await resolveUserModelProviderAccess({
+      userId: args.userId,
+      provider: args.run.provider,
+    });
+    if (providerAccess)
+      await markUserModelProviderUsed({ userId: args.userId, provider: args.run.provider });
     const resumed = args.resumeCheckpoint ?? null;
     let plan = resumed ? resumed.plan : await buildPlan(args.run, providerAccess);
     await persistPlan(args.sb, args.run.taskId, plan);
@@ -480,17 +549,24 @@ export async function executePlannedRun(args: {
         usage,
       });
 
-      const result = await runChat({
-        provider: args.run.provider,
-        model: args.run.model,
-        messages,
-        tools: toolRounds < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
-        temperature: args.run.agent.temperature,
-        maxTokens: args.run.agent.max_tokens,
-        signal: controller.signal,
-        providerAccess,
-        allowedProviders: [args.run.provider],
-      });
+      const result = (
+        await runModelRoundWithBoundedRetry({
+          isAborted: () => Boolean(ownerAbort || timedOut || controller.signal.aborted),
+          delay: (ms) => abortableDelay(ms, controller.signal),
+          run: () =>
+            runChat({
+              provider: args.run.provider,
+              model: args.run.model,
+              messages,
+              tools: toolRounds < MAX_TOOL_ROUNDS ? args.run.tools.defs : [],
+              temperature: args.run.agent.temperature,
+              maxTokens: args.run.agent.max_tokens,
+              signal: controller.signal,
+              providerAccess,
+              allowedProviders: [args.run.provider],
+            }),
+        })
+      ).value;
       usage.input += result.usage.input;
       usage.output += result.usage.output;
 
@@ -498,7 +574,11 @@ export async function executePlannedRun(args: {
         toolRounds += 1;
         toolCallCount += result.toolCalls.length;
         if (toolRounds > MAX_TOOL_ROUNDS) {
-          throw new RuntimeError("The agent used too many tool rounds without producing a verifiable answer.", "TOOL_LOOP_EXHAUSTED", 500);
+          throw new RuntimeError(
+            "The agent used too many tool rounds without producing a verifiable answer.",
+            "TOOL_LOOP_EXHAUSTED",
+            500,
+          );
         }
         await invalidateDurableRunCheckpoint({ sb: args.sb, taskId: args.run.taskId });
         const observed = await runToolCalls({
@@ -513,7 +593,19 @@ export async function executePlannedRun(args: {
         });
         plan = observed.plan;
         toolCallCount -= result.toolCalls.length - observed.processedCalls;
-        if (observed.awaitingApproval) return await pausedRunReceipt(args.sb, args.userId, args.run.taskId, usage, toolCallCount, { run: args.run, messages, planner: { plan, toolRounds, reasoningControl: args.reasoningControl ?? null } });
+        if (observed.awaitingApproval)
+          return await pausedRunReceipt(
+            args.sb,
+            args.userId,
+            args.run.taskId,
+            usage,
+            toolCallCount,
+            {
+              run: args.run,
+              messages,
+              planner: { plan, toolRounds, reasoningControl: args.reasoningControl ?? null },
+            },
+          );
         if (!observed.awaitingApproval) {
           await saveCheckpoint({
             sb: args.sb,
@@ -581,7 +673,9 @@ export async function executePlannedRun(args: {
         content: [
           "VERIFIER FEEDBACK — RE-PLAN REQUIRED",
           `Score: ${decision.score}`,
-          decision.issues.length ? `Issues: ${decision.issues.join(" | ")}` : "Issues: verification threshold not met",
+          decision.issues.length
+            ? `Issues: ${decision.issues.join(" | ")}`
+            : "Issues: verification threshold not met",
           renderPlannerPrompt(plan),
           "Continue execution from the revised plan. Use additional tools only when needed to resolve the verifier issues.",
         ].join("\n"),
