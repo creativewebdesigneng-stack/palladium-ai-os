@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { AstraMark } from '@/components/blackstar/AstraMark'
 import { findNavigationItem } from '@/components/palladium/navigationData'
 
-export default function Topbar({ collapsed, toggleSidebar, openMobile, openCommand, openAssistant, unread = 0 }) {
+export default function Topbar({ collapsed, toggleSidebar, mobileOpen = false, openMobile, openCommand, openAssistant, unread = 0 }) {
   const toggleTheme = () => document.documentElement.classList.toggle('palladium-dim')
   const { user } = useAuth()
   const { pathname } = useLocation()
@@ -14,10 +14,10 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
   return (
     <header className="blackstar-topbar sticky top-0 z-30 flex h-[68px] items-center gap-2 px-4 lg:px-6">
       <div aria-hidden className="blackstar-topbar-sheen" />
-      <button onClick={openMobile} aria-label="Open navigation" className="rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 md:hidden">
+      <button type="button" onClick={openMobile} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="blackstar-primary-navigation" className="rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 md:hidden">
         <Menu className="h-5 w-5" />
       </button>
-      <button onClick={toggleSidebar} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="hidden rounded-lg p-2 text-zinc-600 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 md:block">
+      <button type="button" onClick={toggleSidebar} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="hidden rounded-lg p-2 text-zinc-600 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 md:block">
         {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
       </button>
 
@@ -27,6 +27,7 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
       </div>
 
       <button
+        type="button"
         onClick={openCommand}
         aria-label="Search and command Blackstar"
         className="blackstar-command group relative z-10 flex h-10 max-w-2xl flex-1 items-center gap-2.5 rounded-2xl px-3.5 text-sm text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
@@ -39,6 +40,7 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
 
       <div className="ml-auto flex items-center gap-1">
         <button
+          type="button"
           onClick={openAssistant}
           aria-label="Open Astra assistant"
           className="group hidden items-center gap-2 rounded-xl border border-violet-300/10 bg-violet-500/[.035] px-2.5 py-2 text-zinc-500 transition hover:border-violet-300/20 hover:bg-violet-500/[.07] hover:text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:flex"
@@ -50,7 +52,7 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
         <Link to="/help" aria-label="Help" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 lg:block">
           <HelpCircle className="h-5 w-5" />
         </Link>
-        <button onClick={toggleTheme} aria-label="Toggle dim theme" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:block">
+        <button type="button" onClick={toggleTheme} aria-label="Toggle dim theme" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:block">
           <SunMoon className="h-5 w-5" />
         </button>
         <Link to="/notifications" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">

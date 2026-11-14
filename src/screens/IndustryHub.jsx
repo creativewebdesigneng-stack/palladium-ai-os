@@ -1,4 +1,6 @@
+import { useCallback, useState } from 'react';
 import IndustryOperatingSystem from '@/components/industry/IndustryOperatingSystem';
+import IndustryOperatingPictureBar from '@/components/industry/IndustryOperatingPictureBar';
 import IndustryCommandWorld from '@/components/industry/IndustryCommandWorld';
 import IndustrySourceGateway from '@/components/industry/IndustrySourceGateway';
 import IndustryGrowthLab from '@/components/industry/IndustryGrowthLab';
@@ -45,6 +47,15 @@ const capabilities = [
 ];
 
 export default function IndustryHub() {
+  const [picture, setPicture] = useState({});
+  const remember = useCallback((key) => (value) => {
+    setPicture((current) => ({ ...current, [key]: value }));
+  }, []);
+  const rememberGrowth = useCallback((value) => remember('growth')(value), [remember]);
+  const rememberMaturity = useCallback((value) => remember('maturity')(value), [remember]);
+  const rememberSuppliers = useCallback((value) => remember('suppliers')(value), [remember]);
+  const rememberOpportunities = useCallback((value) => remember('opportunities')(value), [remember]);
+
   return (
     <div className="space-y-6 pb-12">
       <IndustryCommandWorld industries={industries} capabilities={capabilities} />
@@ -65,13 +76,14 @@ export default function IndustryHub() {
 
       <IndustryOperatingSystem />
       <IndustrySourceGateway />
-      <IndustryGrowthLab />
-      <IndustryMaturityAssessment />
+      <IndustryOperatingPictureBar picture={picture} />
+      <IndustryGrowthLab onPicture={rememberGrowth} />
+      <IndustryMaturityAssessment onPicture={rememberMaturity} />
       <IndustryValueChain />
       <IndustryWorkflows />
       <IndustryBenchmarking />
-      <SupplierIntelligence />
-      <OpportunityPortfolio />
+      <SupplierIntelligence onPicture={rememberSuppliers} />
+      <OpportunityPortfolio onPicture={rememberOpportunities} />
       <IndustryDisruptionRadar />
       <SpecialistSectorPacks />
       <TransformationRoadmap />

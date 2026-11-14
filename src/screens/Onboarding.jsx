@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, BrainCircuit, Orbit, Users, Clapperboard, Blocks, Mic, Workflow, Database, LayoutDashboard } from 'lucide-react';
+import { ArrowRight, Bot, BrainCircuit, Orbit, Users, Clapperboard, Blocks, Mic, Workflow, Database, LayoutDashboard, Factory } from 'lucide-react';
 import PublicExperienceBackdrop from '@/components/site/PublicExperienceBackdrop';
 
 const steps = [
@@ -12,6 +12,7 @@ const steps = [
   { number: '07', title: 'Create videos', description: 'Plan and render films through Cinema Studio when its generation workers are connected.', to: '/cinema-studio', icon: Clapperboard, action: 'Open Cinema Studio' },
   { number: '08', title: 'Automate work', description: 'Set up governed workflows and review approval requirements for external actions.', to: '/workflows', icon: Workflow, action: 'Open workflows' },
   { number: '09', title: 'Use voice tools', description: 'Explore voice capabilities; availability depends on connected speech providers.', to: '/voice-studio', icon: Mic, action: 'Open voice studio' },
+  { number: '10', title: 'Open an operating hub', description: 'Trading, retail, receptionist, delivery, company, finance, legal, compliance and industrial workspaces are available. Live orders, trades and calls stay closed until their providers are explicitly authorised.', to: '/industry-hub', icon: Factory, action: 'Open industry hub' },
 ];
 
 export default function Onboarding() {

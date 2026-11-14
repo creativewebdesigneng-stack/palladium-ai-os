@@ -13,7 +13,7 @@ const ROUTE_ROOMS = [
   [['/knowledge', '/research', '/news-research', '/search'], 'astra-room-knowledge'],
   [['/company-hub', '/organisation', '/team'], 'astra-room-company'],
   [['/industry-hub', '/construction-industrial-hub'], 'astra-room-industry'],
-  [['/retail-hub', '/commerce-studio', '/dropshipping-hub'], 'astra-room-commerce'],
+  [['/retail-hub', '/commerce-studio', '/dropshipping-hub', '/food-delivery', '/ai-receptionist'], 'astra-room-commerce'],
   [['/website-studio', '/builder', '/ai-builder', '/html-studio'], 'astra-room-builder'],
   [['/admin'], 'astra-room-admin'],
 ]
@@ -49,7 +49,7 @@ const VISUAL_STYLE_ROUTES = [
     'blackstar-style-ai-nexus',
   ],
   [
-    ['/industry-hub', '/construction-industrial-hub', '/retail-hub', '/commerce-studio', '/dropshipping-hub', '/shopify-connect', '/business-automation', '/marketplace', '/agent-marketplace', '/ai-marketplace', '/tool-marketplace'],
+    ['/industry-hub', '/construction-industrial-hub', '/retail-hub', '/commerce-studio', '/dropshipping-hub', '/food-delivery', '/ai-receptionist', '/shopify-connect', '/business-automation', '/marketplace', '/agent-marketplace', '/ai-marketplace', '/tool-marketplace'],
     'blackstar-style-industry-realism',
   ],
   [

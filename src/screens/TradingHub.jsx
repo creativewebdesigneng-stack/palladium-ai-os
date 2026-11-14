@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import FinanceEconomicData from '@/components/finance/FinanceEconomicData';
 import FinancePortfolio from '@/components/finance/FinancePortfolio';
+import BrokerExecutionGate from '@/components/trading/BrokerExecutionGate';
 import PaperTradingDesk from '@/components/trading/PaperTradingDesk';
 import TradingAIDesk from '@/components/trading/TradingAIDesk';
 import TradingMarketTerminal from '@/components/trading/TradingMarketTerminal';
@@ -103,6 +104,7 @@ export default function TradingHub() {
       <TradingMarketTerminal />
       <TradingAIDesk />
       <PaperTradingDesk />
+      <BrokerExecutionGate />
       <TradingWorkspace />
 
       <section className="rounded-[24px] border border-white/[.08] bg-white/[.02] p-5 md:p-6">
@@ -134,7 +136,7 @@ export default function TradingHub() {
           </div>
         </div>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <label className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><Search className="h-3.5 w-3.5 text-zinc-600" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search official sources" className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-zinc-700" /></label>
+          <label className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><Search className="h-3.5 w-3.5 text-zinc-600" /><input aria-label="Search official sources" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search official sources" className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-zinc-700" /></label>
           <select value={region} onChange={(event) => setRegion(event.target.value)} className="rounded-xl border border-white/10 bg-[#101116] px-3 py-2 text-xs text-zinc-300">{regions.map((item) => <option key={item}>{item}</option>)}</select>
         </div>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">

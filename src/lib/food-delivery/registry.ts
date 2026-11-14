@@ -64,8 +64,8 @@ export function providersForRegion(
   const countryCode = region.countryCode.trim().toUpperCase();
   if (!countryCode) return [];
 
-  return manifests.filter(
-    (provider) => provider.countryCodes.length === 0 || provider.countryCodes.includes(countryCode),
+  return manifests.filter((provider) =>
+    provider.countryCodes.some((code) => code.toUpperCase() === countryCode),
   );
 }
 

@@ -96,6 +96,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile, openComman
   return (
     <aside
       className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full'} blackstar-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 md:translate-x-0 ${collapsed ? 'md:w-20' : 'md:w-[17.5rem]'} w-[17.5rem]`}
+      id="blackstar-primary-navigation"
       aria-label="Primary navigation"
     >
       <div className="relative flex h-[68px] items-center px-5">

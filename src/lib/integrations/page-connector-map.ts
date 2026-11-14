@@ -395,11 +395,11 @@ const ROUTE_RULES: RouteConnectorRule[] = [
     connectors: ["meta", "youtube", "linkedin", "pinterest", "tiktok", "x", "threads", "canva", "semrush", "ahrefs", "supermetrics", "metricool", "amplitude", "posthog", "heygen", "klaviyo", "vidiq"],
   },
   {
-    routes: ["/crm", "/crm-studio", "/whatsapp-crm", "/phone-communications", "/support", "/notifications"],
+    routes: ["/crm", "/crm-studio", "/whatsapp-crm", "/phone-communications", "/ai-receptionist", "/support", "/notifications"],
     connectors: ["hubspot", "salesforce", "slack", "google", "microsoft", "ringcentral"],
   },
   {
-    routes: ["/commerce-studio", "/dropshipping-hub", "/retail-hub", "/shopify-connect", "/marketplace", "/agent-marketplace", "/ai-marketplace", "/tool-marketplace", "/admin/marketplace"],
+    routes: ["/commerce-studio", "/dropshipping-hub", "/retail-hub", "/food-delivery", "/shopify-connect", "/marketplace", "/agent-marketplace", "/ai-marketplace", "/tool-marketplace", "/admin/marketplace"],
     connectors: ["shopify", "stripe", "hubspot", "google", "meta", "supermetrics", "klaviyo"],
   },
   {
