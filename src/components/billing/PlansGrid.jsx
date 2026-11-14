@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star, Loader2 } from 'lucide-react';
+import { pricePenceForPlan } from '@/lib/billing/catalog';
 import { listPlans } from '@/lib/platform/platform.functions';
 import { useAuth } from '@/lib/AuthContext';
 import { getPlanKey } from '@/lib/permissions';
@@ -8,7 +9,7 @@ import { getPlanKey } from '@/lib/permissions';
 const GRAD = { explorer: 'from-zinc-400 to-zinc-600', builder: 'from-violet-500 to-indigo-500', business: 'from-emerald-500 to-teal-500', enterprise: 'from-fuchsia-500 to-purple-500' };
 const CODE_TO_KEY = { explorer: 'free', builder: 'pro', business: 'business', enterprise: 'enterprise' };
 
-export default function PlansGrid({ onSelect }) {
+export default function PlansGrid({ onSelect, interval = 'monthly' }) {
   const { user } = useAuth();
   const currentKey = getPlanKey(user);
   const [plans, setPlans] = useState([]);
@@ -31,9 +32,9 @@ export default function PlansGrid({ onSelect }) {
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {plans.map((p, i) => {
         const isCurrent = CODE_TO_KEY[p.code] === currentKey;
-        const isContact = p.code === 'enterprise';
-        const isFree = p.code === 'explorer';
-        const price = (p.price_pence ?? 0) / 100;
+        const isLegacy = p.code === 'explorer';
+        const catalogPence = pricePenceForPlan(p.code, interval);
+        const price = catalogPence != null ? catalogPence / 100 : (p.price_pence ?? 0) / 100;
         const limits = p.limits ?? {};
         return (
           <motion.div key={p.code} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
@@ -50,8 +51,8 @@ export default function PlansGrid({ onSelect }) {
               <h3 className="text-sm font-semibold text-white">{p.name}</h3>
             </div>
             <div className="mt-3">
-              <span className="text-2xl font-semibold text-white">{isContact ? 'Custom' : `£${price}`}</span>
-              {!isContact && <span className="text-[11px] text-zinc-500"> / {p.billing_interval ?? 'month'}</span>}
+              <span className="text-2xl font-semibold text-white">{`£${price.toLocaleString()}`}</span>
+              <span className="text-[11px] text-zinc-500"> / {interval === 'yearly' ? 'year' : 'month'}</span>
             </div>
             {p.description && <p className="mt-2 text-[11px] text-zinc-500">{p.description}</p>}
             <div className="mt-4 space-y-2 text-[11px]">
@@ -63,9 +64,9 @@ export default function PlansGrid({ onSelect }) {
               ))}
             </div>
             <button onClick={() => onSelect?.(CODE_TO_KEY[p.code] ?? p.code)}
-              disabled={isCurrent}
-              className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-medium ${isCurrent ? 'cursor-default border border-white/10 text-zinc-500' : isContact ? 'border border-fuchsia-400/30 text-fuchsia-300 hover:bg-fuchsia-500/10' : isFree ? 'border border-white/10 text-zinc-300 hover:bg-white/5' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:opacity-90'}`}>
-              {isCurrent ? 'Current Plan' : isContact ? 'Contact Sales' : isFree ? 'Downgrade' : `Choose ${p.name}`}
+              disabled={isCurrent || isLegacy}
+              className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-medium ${isCurrent || isLegacy ? 'cursor-default border border-white/10 text-zinc-500' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:opacity-90'}`}>
+              {isCurrent ? 'Current Plan' : isLegacy ? 'Not offered' : `Choose ${p.name}`}
             </button>
           </motion.div>
         );

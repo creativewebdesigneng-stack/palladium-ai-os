@@ -1,4 +1,4 @@
-import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
+import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';import {checkoutIntegrationIdentifier} from '@/lib/billing/catalog';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
 import {requireUnpaidListingFee,quoteRecordedPurchase,requireRecordedStripeSession} from './checkout-safety';import {marketplaceBaseUrl,marketplaceStripe} from './stripe.server';type Sb={from:(t:string)=>any};
 export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
   .middleware([requireSupabaseAuth])
@@ -24,6 +24,7 @@ export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
         success_url:`${base}/creator-marketplace?listing_fee=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:`${base}/creator-marketplace?listing_fee=cancelled`,
         metadata:{kind:'marketplace_listing_fee',listing_id:l.id,seller_id:context.userId},
+        integration_identifier:checkoutIntegrationIdentifier('marketplace_listing_fee'),
       }),
       record:async(created)=>{
         const {error:ledgerError}=await admin.from('marketplace_listing_fee_payments').insert({
@@ -87,6 +88,7 @@ export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
           success_url:`${base}/creator-marketplace?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url:`${base}/creator-marketplace?purchase=cancelled`,
           metadata:{kind:'marketplace_purchase',order_id:order.id,listing_id:l.id,buyer_id:context.userId,seller_id:l.seller_id},
+          integration_identifier:checkoutIntegrationIdentifier('marketplace_purchase'),
         }),
         record:async(created)=>{
           const {data:linked,error:linkError}=await admin.from('marketplace_orders')

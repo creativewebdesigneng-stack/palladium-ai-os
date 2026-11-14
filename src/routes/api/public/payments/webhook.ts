@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "@/lib/stripe.server";
-import { planForPriceKey } from "@/lib/billing/catalog";
+import { resolveSubscriptionWebhookPlan } from "@/lib/billing/catalog";
+import { earlyFraudCustomer, subscriptionRefundSignal } from "@/lib/billing/subscription-charge-signals";
 import { claimPaymentEvent, completePaymentEvent, releasePaymentEvent } from "@/lib/billing/payment-event-ledger.server";
 import { preparePaidMarketplaceDelivery, verifyMarketplacePaidListingFee, verifyMarketplacePaidPurchase } from "@/lib/marketplace/fulfilment-evidence";
 import { verifyMarketplaceChargeRefund } from "@/lib/marketplace/refund-evidence";
@@ -55,7 +56,14 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
 
   const item = subscription.items?.data?.[0];
   const priceKey = resolvePriceKey(item);
-  const planCode = planForPriceKey(priceKey) ?? "builder";
+  const resolution = resolveSubscriptionWebhookPlan({
+    priceKey,
+    unitAmount: item?.price?.unit_amount ?? null,
+    currency: item?.price?.currency ?? null,
+    metadataPlan: subscription.metadata?.planCode ?? subscription.metadata?.plan,
+  });
+  if (!resolution.ok) throw new Error(resolution.reason);
+  const planCode = resolution.planCode;
   const productId =
     typeof item?.price?.product === "string" ? item.price.product : item?.price?.product?.id;
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
@@ -193,6 +201,48 @@ async function recordUsage(invoice: any, env: StripeEnv) {
     }
     throw new Error("Failed to record the paid invoice usage.");
   }
+}
+
+async function recordSubscriptionSignal(
+  env: StripeEnv,
+  metric: "billing.subscription_refunded" | "billing.early_fraud_warning",
+  customerId: string,
+  quantity: number,
+  unit: string,
+  metadata: Record<string, unknown>,
+) {
+  const { data: sub, error: lookupError } = await getSupabase()
+    .from("subscriptions")
+    .select("user_id, org_id")
+    .eq("stripe_customer_id", customerId)
+    .eq("environment", env)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lookupError) throw new Error("Could not load the subscription for a billing signal.");
+  if (!sub?.user_id) return;
+
+  const { data: recorded, error: priorError } = await getSupabase()
+    .from("usage_records")
+    .select("id")
+    .eq("user_id", sub.user_id)
+    .eq("metric", metric)
+    .contains("metadata", metadata)
+    .limit(1)
+    .maybeSingle();
+  if (priorError) throw new Error("Could not inspect the billing signal ledger.");
+  if (recorded) return;
+
+  const { error } = await getSupabase().from("usage_records").insert({
+    user_id: sub.user_id,
+    org_id: sub.org_id ?? null,
+    metric,
+    quantity,
+    unit,
+    period_start: new Date().toISOString().slice(0, 8) + "01",
+    metadata: { ...metadata, environment: env },
+  });
+  if (error && error.code !== "23505") throw new Error("Failed to record the billing signal.");
 }
 
 async function markPaymentFailed(invoice: any, env: StripeEnv) {
@@ -546,6 +596,21 @@ async function handleWebhook(req: Request, env: StripeEnv) {
       }
       break;
     }
+    case "radar.early_fraud_warning.created": {
+      const warning = event.data.object as any;
+      const chargeId = typeof warning.charge === "string" ? warning.charge : warning.charge?.id;
+      if (typeof chargeId !== "string" || !chargeId.startsWith("ch_")) break;
+      const stripe = createStripeClient(env);
+      const charge = await stripe.charges.retrieve(chargeId);
+      const customerId = earlyFraudCustomer(charge);
+      if (!customerId) break;
+      await recordSubscriptionSignal(env, "billing.early_fraud_warning", customerId, 1, "count", {
+        warning_id: typeof warning.id === "string" ? warning.id : null,
+        charge_id: chargeId,
+        event_id: event.id,
+      });
+      break;
+    }
     case "charge.refunded": {
       const charge = event.data.object as any;
       const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
@@ -556,7 +621,16 @@ async function handleWebhook(req: Request, env: StripeEnv) {
         .eq("stripe_payment_intent_id", paymentIntentId)
         .maybeSingle();
       if (lookupError) throw new Error("Could not inspect the Marketplace order for a refunded charge.");
-      if (!order) break; // Subscription or another provider-owned charge.
+      if (!order) {
+        const signal = subscriptionRefundSignal(charge, false);
+        if (signal.record) {
+          await recordSubscriptionSignal(env, signal.metric, signal.customerId, signal.quantity, signal.unit, {
+            charge_id: typeof charge.id === "string" ? charge.id : null,
+            event_id: event.id,
+          });
+        }
+        break;
+      }
       if (order.payment_provider !== "stripe") throw new Error("Refund provider does not match the Marketplace order.");
       const refund = verifyMarketplaceChargeRefund(charge, order, env);
       const plan = planMarketplaceRefundReconciliation(charge, order, env);

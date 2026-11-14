@@ -3,11 +3,15 @@
  * plan <-> price mapping the frontend is never allowed to influence.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
+  assertPurchasableStripePrice,
+  checkoutIntegrationIdentifier,
   normalizePlanCode,
   planForPriceKey,
   priceKeyForPlan,
   pricePenceForPlan,
+  resolveSubscriptionWebhookPlan,
 } from "../catalog";
 import { verifyWebhook } from "@/lib/stripe.server";
 
@@ -77,6 +81,123 @@ describe("plan catalog", () => {
     expect(planForPriceKey("pro_yearly")).toBe("builder");
     expect(planForPriceKey("business_yearly")).toBe("business");
     expect(planForPriceKey("enterprise_monthly")).toBe("enterprise");
+  });
+
+  it("keeps the leftover free Explorer webhook mapping and never sells it", () => {
+    for (const key of [
+      "explorer",
+      "explorer_monthly",
+      "explorer_yearly",
+      "free",
+      "free_monthly",
+      "free_yearly",
+    ]) {
+      expect(planForPriceKey(key)).toBe("explorer");
+      expect(priceKeyForPlan(key, "monthly")).toBeNull();
+    }
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: "explorer_monthly",
+        unitAmount: 0,
+        currency: "gbp",
+      }),
+    ).toEqual({ ok: true, planCode: "explorer", legacyFreeExplorer: true });
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: null,
+        unitAmount: 0,
+        currency: "gbp",
+        metadataPlan: "free",
+      }),
+    ).toMatchObject({ ok: true, planCode: "explorer", legacyFreeExplorer: true });
+  });
+
+  it("does not promote a missing or unknown price to Builder", () => {
+    expect(resolveSubscriptionWebhookPlan({ priceKey: null, metadataPlan: "builder" }).ok).toBe(
+      false,
+    );
+    expect(
+      resolveSubscriptionWebhookPlan({ priceKey: "price_1AttackerControlled", unitAmount: 15_000 })
+        .ok,
+    ).toBe(false);
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: "builder_monthly_150_gbp",
+        unitAmount: 2_000,
+        currency: "gbp",
+      }).ok,
+    ).toBe(false);
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: "explorer",
+        unitAmount: 15_000,
+        currency: "gbp",
+      }).ok,
+    ).toBe(false);
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: "builder_monthly_150_gbp",
+        unitAmount: 15_000,
+        currency: "gbp",
+        metadataPlan: "enterprise",
+      }),
+    ).toMatchObject({ ok: true, planCode: "builder", legacyFreeExplorer: false });
+    expect(
+      resolveSubscriptionWebhookPlan({
+        priceKey: "pro_monthly",
+        unitAmount: 2_000,
+        currency: "gbp",
+      }),
+    ).toMatchObject({ ok: true, planCode: "builder", legacyFreeExplorer: false });
+  });
+
+  it("accepts only a Stripe price that matches the approved amount", () => {
+    expect(
+      assertPurchasableStripePrice("business", "monthly", {
+        id: "price_business",
+        lookup_key: "business_monthly_1500_gbp",
+        unit_amount: 150_000,
+        currency: "gbp",
+        active: true,
+      }),
+    ).toEqual({
+      priceId: "price_business",
+      lookupKey: "business_monthly_1500_gbp",
+      amountPence: 150_000,
+    });
+    expect(() =>
+      assertPurchasableStripePrice("enterprise", "yearly", {
+        id: "price_old",
+        lookup_key: "enterprise_yearly_35700_gbp",
+        unit_amount: 300_000,
+        currency: "gbp",
+        active: true,
+      }),
+    ).toThrow(/approved catalog/);
+    expect(() =>
+      assertPurchasableStripePrice("explorer", "monthly", {
+        id: "price_free",
+        lookup_key: "explorer",
+        unit_amount: 0,
+        currency: "gbp",
+        active: true,
+      }),
+    ).toThrow(/cannot be purchased/);
+  });
+
+  it("tags checkout with an 8-letter suffix and does not default webhooks to Builder", () => {
+    expect(checkoutIntegrationIdentifier("subscription checkout")).toMatch(
+      /^blackstar_subscription_checkout_[a-z]{8}$/,
+    );
+    const webhook = readFileSync(
+      new URL("../../../routes/api/public/payments/webhook.ts", import.meta.url),
+      "utf8",
+    );
+    const catalog = readFileSync(new URL("../catalog.ts", import.meta.url), "utf8");
+    expect(webhook).toContain("resolveSubscriptionWebhookPlan");
+    expect(webhook).not.toContain('?? "builder"');
+    expect(catalog).toContain("LEGACY_FREE_EXPLORER_PRICE_KEYS");
+    expect(catalog).toContain('explorer_monthly: "explorer"');
   });
 });
 

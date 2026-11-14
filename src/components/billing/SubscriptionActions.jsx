@@ -75,7 +75,7 @@ export default function SubscriptionActions({ onChangePlan }) {
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Verified subscription
           </p>
           <h3 className="mt-1 text-sm font-semibold text-white">
-            {sub ? `${planLabel} · ${sub.status}` : 'Explorer (free) — no paid subscription'}
+            {sub ? `${planLabel} · ${sub.status}` : 'No paid subscription'}
           </h3>
           <p className="mt-1 text-[11px] text-zinc-500">
             {sub

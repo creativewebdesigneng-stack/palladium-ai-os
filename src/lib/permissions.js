@@ -2,12 +2,10 @@ import { FREEMIUM_PLANS, PLANS } from "@/components/site/pricingPlans";
 
 // Subscription-based feature access for PalladiumAI.
 //
-// Four plans: Free "Explorer" (£0), Pro "Builder" (£20), Business (£1500),
-// Enterprise (£3000). Every authenticated user starts on Free; upgrading
-// unlocks creation/deployment and advanced capabilities. This map is the
-// single source of truth used by the frontend (gating + upgrade modal) and
-// mirrors the backend User.subscription_plan. Swap getPlanKey to read purely
-// from the backend once billing is live.
+// Paid plans: Pro "Builder" (£150), Business (£1,500), Enterprise (£3,500).
+// Explorer remains the legacy unpaid code for accounts with no subscription.
+// It is not sold. Feature gates here mirror server entitlements; every gated
+// action is checked again on the server.
 
 export const PLAN_TIER_ORDER = ["free", "pro", "business", "enterprise"];
 
@@ -79,7 +77,7 @@ const BUSINESS_FEATURES = {
 };
 
 // Enterprise — full AI workforce, unlimited teams, advanced security,
-// custom integrations, priority infrastructure. £3,000/mo unlocks the
+// custom integrations, priority infrastructure. £3,500/mo unlocks the
 // advanced security suite and priority features.
 const ENTERPRISE_FEATURES = {
   ...BUSINESS_FEATURES,
@@ -137,7 +135,7 @@ export const FEATURE_LABELS = {
 
 // Hard capacity limits per plan. Higher plans unlock more agents, users,
 // usage, teams, departments and advanced controls. `null` = unlimited.
-// Business (£1,500) and Enterprise (£3,000) are the enterprise tiers.
+// Business (£1,500) and Enterprise (£3,500) are the enterprise tiers.
 export const PLAN_LIMITS = {
   free: {
     agents: 0,
@@ -223,32 +221,32 @@ const ALL_PLANS = [...FREEMIUM_PLANS, ...PLANS];
 export function planDisplay(key) {
   const p = ALL_PLANS.find((pl) => pl.id === key);
   if (p) return { name: p.name, subtitle: p.subtitle || "", price: p.monthly };
-  return { name: "Free", subtitle: "", price: 0 };
+  return { name: "Explorer", subtitle: "Legacy", price: 0 };
 }
 
-// Usage limits surfaced on the billing page. `max: null` means unlimited.
+// Display ceilings only. Consumption is read from usage records, never invented here.
 export function getUsageLimits(user) {
   const key = getPlanKey(user);
   const map = {
     free: {
       activeAgents: { used: 0, max: 0 },
       monthlyRuns: { used: 0, max: 0 },
-      storage: { used: 0.2, max: 1, unit: "GB" },
+      storage: { used: 0, max: 1, unit: "GB" },
     },
     pro: {
-      activeAgents: { used: 3, max: 5 },
-      monthlyRuns: { used: 210, max: 500 },
-      storage: { used: 1.8, max: 5, unit: "GB" },
+      activeAgents: { used: 0, max: 5 },
+      monthlyRuns: { used: 0, max: 500 },
+      storage: { used: 0, max: 5, unit: "GB" },
     },
     business: {
-      activeAgents: { used: 38, max: 50 },
-      monthlyRuns: { used: 41000, max: 50000 },
-      storage: { used: 78, max: 100, unit: "GB" },
+      activeAgents: { used: 0, max: 50 },
+      monthlyRuns: { used: 0, max: 50000 },
+      storage: { used: 0, max: 100, unit: "GB" },
     },
     enterprise: {
-      activeAgents: { used: 86, max: 200 },
-      monthlyRuns: { used: 45000, max: 250000 },
-      storage: { used: 120, max: 500, unit: "GB" },
+      activeAgents: { used: 0, max: 200 },
+      monthlyRuns: { used: 0, max: 250000 },
+      storage: { used: 0, max: 500, unit: "GB" },
     },
   };
   return map[key] || map.free;

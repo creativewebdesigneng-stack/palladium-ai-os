@@ -9,6 +9,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { monthlyRecurringPence } from "@/lib/billing/commercial-report";
 import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
 
 type Sb = { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
@@ -206,7 +207,7 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
       admin
         .from("subscriptions")
         .select(
-          "id,org_id,user_id,plan_code,status,seats,current_period_end,cancel_at_period_end,created_at",
+          "id,org_id,user_id,plan_code,status,seats,stripe_price_id,current_period_end,cancel_at_period_end,created_at",
         )
         .order("created_at", { ascending: false })
         .limit(300),
@@ -228,15 +229,10 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
     const profileById = new Map<string, any>(
       (profiles ?? []).map((p: any) => [p.id, p] as [string, any]),
     );
-    const planByCode = new Map<string, any>(
-      (plans ?? []).map((p: any) => [p.code, p] as [string, any]),
-    );
-
     return {
       forbidden: false as const,
       plans: plans ?? [],
       subscriptions: (subs ?? []).map((s: any) => {
-        const plan = planByCode.get(s.plan_code);
         const customer = s.org_id
           ? (orgById.get(s.org_id)?.name ?? "Unknown organisation")
           : (profileById.get(s.user_id)?.full_name ??
@@ -248,7 +244,12 @@ export const listAllSubscriptions = createServerFn({ method: "POST" })
           plan: s.plan_code,
           status: s.status,
           seats: s.seats,
-          mrr: Math.round(Number(plan?.price_pence ?? 0) / 100),
+          mrr:
+            monthlyRecurringPence({
+              plan_code: s.plan_code,
+              status: s.status,
+              stripe_price_id: s.stripe_price_id,
+            }) / 100,
           currentPeriodEnd: s.current_period_end,
           cancelAtPeriodEnd: s.cancel_at_period_end,
           createdAt: s.created_at,

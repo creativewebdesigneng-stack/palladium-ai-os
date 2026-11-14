@@ -47,7 +47,7 @@ export default function UpgradeModal() {
         </div>
 
         <p className="mt-4 text-sm text-zinc-400">
-          This feature requires PalladiumAI Pro (£20/month). Upgrade to unlock the full builder experience.
+          This feature requires PalladiumAI Pro (Builder, £{pro?.monthly ?? 150}/month). Upgrade to unlock the full builder experience.
         </p>
 
         <div className="mt-4 flex items-end gap-1.5">

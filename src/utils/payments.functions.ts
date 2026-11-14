@@ -3,6 +3,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { type StripeEnv, createStripeClient, getStripeErrorMessage } from "@/lib/stripe.server";
 import {
   type BillingInterval,
+  assertPurchasableStripePrice,
+  checkoutIntegrationIdentifier,
   normalizeInterval,
   normalizePlanCode,
   priceKeyForPlan,
@@ -59,7 +61,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       const planCode = normalizePlanCode(data.planCode);
       if (!planCode) throw new Error("Unknown plan");
       if (planCode === "explorer")
-        throw new Error("The Explorer plan is free — no checkout required");
+        throw new Error("Explorer is a legacy plan and cannot be purchased.");
       if (data.orgId && !UUID_RE.test(data.orgId)) throw new Error("Invalid organisation");
       if (!/^https?:\/\//.test(data.returnUrl)) throw new Error("Invalid return URL");
       return { ...data, planCode, interval: normalizeInterval(data.interval) };
@@ -92,8 +94,11 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 
       const stripe = createStripeClient(data.environment);
       const prices = await stripe.prices.list({ lookup_keys: [priceKey], active: true });
-      const stripePrice = prices.data[0];
-      if (!stripePrice) throw new Error("Price not configured for this plan");
+      const approved = assertPurchasableStripePrice(
+        data.planCode,
+        data.interval,
+        prices.data.find((price) => price.lookup_key === priceKey) ?? prices.data[0],
+      );
 
       const customerId = await resolveOrCreateCustomer(stripe, {
         ...(user?.email ? { email: user.email } : {}),
@@ -104,7 +109,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       if (data.orgId) metadata["orgId"] = data.orgId;
 
       const session = await stripe.checkout.sessions.create({
-        line_items: [{ price: stripePrice.id, quantity: 1 }],
+        line_items: [{ price: approved.priceId, quantity: 1 }],
         mode: "subscription",
         ui_mode: "embedded_page",
         return_url: data.returnUrl,
@@ -112,6 +117,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         metadata,
         subscription_data: { metadata },
         managed_payments: { enabled: true },
+        integration_identifier: checkoutIntegrationIdentifier("subscription_checkout"),
       } as any);
 
       return { clientSecret: session.client_secret ?? "" };
@@ -201,15 +207,25 @@ export const changeSubscriptionPlan = createServerFn({ method: "POST" })
     try {
       const stripe = createStripeClient(data.environment);
       const prices = await stripe.prices.list({ lookup_keys: [priceKey], active: true });
-      const price = prices.data[0];
-      if (!price) return { error: "Price not configured for this plan" };
+      let approved: ReturnType<typeof assertPurchasableStripePrice>;
+      try {
+        approved = assertPurchasableStripePrice(
+          data.planCode,
+          data.interval,
+          prices.data.find((price) => price.lookup_key === priceKey) ?? prices.data[0],
+        );
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Price not configured for this plan",
+        };
+      }
 
       const current = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
       const itemId = current.items.data[0]?.id;
       if (!itemId) return { error: "Subscription has no billable item" };
 
       await stripe.subscriptions.update(sub.stripe_subscription_id, {
-        items: [{ id: itemId, price: price.id, quantity: 1 }],
+        items: [{ id: itemId, price: approved.priceId, quantity: 1 }],
         cancel_at_period_end: false,
         proration_behavior: "create_prorations",
         metadata: { ...(current.metadata ?? {}), userId: context.userId, planCode: data.planCode },
@@ -223,7 +239,11 @@ export const changeSubscriptionPlan = createServerFn({ method: "POST" })
 
 export const createPortalSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { returnUrl?: string; environment: StripeEnv }) => data)
+  .inputValidator((data: { returnUrl?: string; environment: StripeEnv }) => {
+    if (data.returnUrl && !/^https?:\/\//.test(data.returnUrl))
+      throw new Error("Invalid return URL");
+    return data;
+  })
   .handler(async ({ data, context }): Promise<PortalSessionResult> => {
     const { supabase, userId } = context;
 
