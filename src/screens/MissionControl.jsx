@@ -7,6 +7,7 @@ import PageHeader from '@/components/palladium/PageHeader';
 import TableSurface, { TableEmptyRow } from '@/components/palladium/TableSurface';
 import { toast } from '@/components/ui/use-toast';
 import BlackstarCommandDeck from '@/components/mission/BlackstarCommandDeck';
+import MissionOperationsBoard from '@/components/mission/MissionOperationsBoard';
 import BriefingConsole from '@/components/mission/BriefingConsole';
 import OrchestratorConsole from '@/components/mission/OrchestratorConsole';
 import ProfessionalPanel from '@/components/mission/ProfessionalPanel';
@@ -39,6 +40,7 @@ import { decideEmailApproval } from '@/lib/mission/email-approval.functions';
 import { decideExternalActionApproval, retryExternalApprovedAction } from '@/lib/mission/external-action-approval.functions';
 import { decideWorkflowApprovalRequest } from '@/lib/runtime/workforce.functions';
 import { runOrchestrator } from '@/lib/runtime/orchestrator.functions';
+import { cancelAgentTask, runAgentTask } from '@/lib/runtime/runtime.functions';
 
 const TABS = [
   ['overview', 'Overview', Gauge],
@@ -103,6 +105,8 @@ export default function MissionControl() {
   const retryExternalFn = useServerFn(retryExternalApprovedAction);
   const decideWorkflowFn = useServerFn(decideWorkflowApprovalRequest);
   const orchestratorFn = useServerFn(runOrchestrator);
+  const cancelRunFn = useServerFn(cancelAgentTask);
+  const runAgainFn = useServerFn(runAgentTask);
   const altFn = useServerFn(chooseAlternative);
   const confirmFn = useServerFn(confirmPurchase);
   const saveMemoryFn = useServerFn(saveMemory);
@@ -306,6 +310,24 @@ export default function MissionControl() {
   const notificationsMutation = useMutation({ mutationFn: (v) => markNotificationsFn({ data: v }), onSuccess: refresh, onError: fail });
   const clearCategory = useMutation({ mutationFn: (category) => clearCategoryFn({ data: { category } }), onSuccess: () => { toast({ title: 'Category cleared' }); refresh(); }, onError: fail });
   const completeTask = useMutation({ mutationFn: (id) => taskStatusFn({ data: { id, status: 'completed' } }), onSuccess: refresh, onError: fail });
+  const cancelRun = useMutation({
+    mutationFn: (taskId) => cancelRunFn({ data: { task_id: taskId } }),
+    onSuccess: (result) => {
+      toast({ title: result?.task?.status === 'cancelled' ? 'Run cancelled' : 'Run already finished', description: 'The task ledger shows the persisted status.' });
+      refresh();
+    },
+    onError: fail,
+    onSettled: () => setBusyId(null),
+  });
+  const runAgain = useMutation({
+    mutationFn: ({ agentId, input }) => runAgainFn({ data: { agent_id: agentId, input } }),
+    onSuccess: () => {
+      toast({ title: 'New run started', description: 'This is a new owned task. It does not replay the previous tool calls.' });
+      refresh();
+    },
+    onError: fail,
+    onSettled: () => setBusyId(null),
+  });
 
   const agents = data?.agents ?? [];
   const approvals = data?.approvals ?? [];
@@ -343,9 +365,16 @@ export default function MissionControl() {
           tasks={data?.tasks ?? []}
           activities={data?.activities ?? []}
           connectedIntegrations={data?.connectedIntegrations ?? []}
+          sources={data?.sources ?? null}
           lastSync={lastSync}
           loading={loading}
           onNavigate={setTab}
+        />
+        <MissionOperationsBoard
+          operations={data?.operations}
+          busyId={busyId}
+          onCancel={(taskId) => { setBusyId(taskId); cancelRun.mutate(taskId); }}
+          onRunAgain={(run) => { setBusyId(run.id); runAgain.mutate(run); }}
         />
         <div className="mt-3 rounded-xl border border-cyan-300/10 bg-black/45 p-2">
           <BriefingConsole
@@ -392,7 +421,7 @@ export default function MissionControl() {
             <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><ScrollText className="h-4 w-4 text-cyan-300" />Audit trail</h2>
             <p className="mt-1 text-[11px] text-zinc-500">Every sensitive action is recorded server-side.</p>
             <div className="mt-3"><TableSurface label="Mission Control audit trail" minWidth={620} maxHeight={520} className="rounded-xl">
-              <table className="text-left text-[11px]"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="pb-2 pr-3 font-medium">Action</th><th className="pb-2 pr-3 font-medium">Target</th><th className="pb-2 pr-3 font-medium">Status</th><th className="pb-2 font-medium">When</th></tr></thead><tbody>{(data?.audit ?? []).map((entry) => <tr key={entry.id} className="border-t border-white/5 text-zinc-400"><td className="py-2 pr-3 text-zinc-200">{entry.action}</td><td className="py-2 pr-3">{entry.target_type}{entry.target_id ? ` · ${String(entry.target_id).slice(0, 8)}` : ''}</td><td className="py-2 pr-3">{entry.status}</td><td className="py-2">{new Date(entry.created_at).toLocaleString('en-GB')}</td></tr>)}{(data?.audit ?? []).length === 0 && <TableEmptyRow colSpan={4} title="No audit events" description="Sensitive Mission Control actions will appear here." />}</tbody></table>
+              <table className="text-left text-[11px]"><thead className="text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="pb-2 pr-3 font-medium">Action</th><th className="pb-2 pr-3 font-medium">Target</th><th className="pb-2 pr-3 font-medium">Proof</th><th className="pb-2 pr-3 font-medium">Status</th><th className="pb-2 font-medium">When</th></tr></thead><tbody>{(data?.audit ?? []).map((entry) => <tr key={entry.id} className="border-t border-white/5 text-zinc-400"><td className="py-2 pr-3 text-zinc-200">{entry.action}</td><td className="py-2 pr-3">{entry.target_type}{entry.target_id ? ` · ${String(entry.target_id).slice(0, 8)}` : ''}</td><td className="py-2 pr-3">{entry.metadata?.provider ? `${entry.metadata.provider}${entry.metadata.model ? ` · ${entry.metadata.model}` : ''}` : '—'}</td><td className="py-2 pr-3">{entry.status}</td><td className="py-2">{new Date(entry.created_at).toLocaleString('en-GB')}</td></tr>)}{(data?.audit ?? []).length === 0 && <TableEmptyRow colSpan={5} title="No audit events" description="Sensitive Mission Control actions will appear here." />}</tbody></table>
               </TableSurface></div>
           </div>
         )}

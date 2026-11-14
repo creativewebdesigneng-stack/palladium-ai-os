@@ -17,7 +17,11 @@ vi.mock("../tools.server", () => ({ executeTool: toolsMod.executeTool }));
 const runtime = vi.hoisted(() => ({
   completeRun: vi.fn(async ({ run }: any) => ({ id: run.taskId, status: "succeeded" })),
   setRunState: vi.fn(async () => {}),
-  pausedRunReceipt: vi.fn(async () => ({ id: 'task-1', status: 'waiting_for_approval', waiting_approval_request_id: 'approval' })),
+  pausedRunReceipt: vi.fn(async () => ({
+    id: "task-1",
+    status: "waiting_for_approval",
+    waiting_approval_request_id: "approval",
+  })),
 }));
 vi.mock("../runtime.server", () => ({
   completeRun: runtime.completeRun,
@@ -40,7 +44,16 @@ vi.mock("@/lib/agents/agent-planner", () => ({
   createInitialPlan: ({ objective }: any) => ({
     objective,
     assumptions: [],
-    steps: [{ id: "step-1", title: "Execute", objective, status: "active", success_criteria: ["done"], evidence: [] }],
+    steps: [
+      {
+        id: "step-1",
+        title: "Execute",
+        objective,
+        status: "active",
+        success_criteria: ["done"],
+        evidence: [],
+      },
+    ],
     current_step_id: "step-1",
     quality_threshold: 0.8,
     verification_required: false,
@@ -67,7 +80,9 @@ import { executePlannedRun } from "../planner-runtime.server";
 const planningResult = {
   text: JSON.stringify({
     assumptions: [],
-    steps: [{ id: "step-1", title: "Execute", objective: "finish task", success_criteria: ["done"] }],
+    steps: [
+      { id: "step-1", title: "Execute", objective: "finish task", success_criteria: ["done"] },
+    ],
   }),
   toolCalls: [],
   usage: { input: 1, output: 1 },
@@ -75,11 +90,16 @@ const planningResult = {
   model: "gpt-5-mini",
 };
 
-function toolResult(calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>) {
+function toolResult(
+  calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>,
+) {
   return {
     text: "",
     toolCalls: calls,
-    geminiContinuation: { model: "gemini-3.6-flash", parts: [{ text: "public", thoughtSignature: "opaque-fixture" }] },
+    geminiContinuation: {
+      model: "gemini-3.6-flash",
+      parts: [{ text: "public", thoughtSignature: "opaque-fixture" }],
+    },
     usage: { input: 2, output: 2 },
     provider: "openai" as const,
     model: "gpt-5-mini",
@@ -129,7 +149,10 @@ function run(sb: any, grants = new Map([grant("web_search"), grant("current_time
       { role: "system", content: "You are Atlas." },
       { role: "user", content: "finish task" },
     ],
-    tools: { defs: [...grants.keys()].map((name) => ({ name, description: name, parameters: {} })), grants },
+    tools: {
+      defs: [...grants.keys()].map((name) => ({ name, description: name, parameters: {} })),
+      grants,
+    },
     provider: "openai" as const,
     model: "gpt-5-mini",
     startedAt: Date.now(),
@@ -179,7 +202,10 @@ describe("planned runtime parity", () => {
 
     expect(peak).toBe(2);
     const completion = runtime.completeRun.mock.calls[0]?.[0];
-    expect(completion.run.messages.find((m: any) => m.role === "assistant").geminiContinuation.parts[0].thoughtSignature).toBe("opaque-fixture");
+    expect(
+      completion.run.messages.find((m: any) => m.role === "assistant").geminiContinuation.parts[0]
+        .thoughtSignature,
+    ).toBe("opaque-fixture");
     const toolMessages = completion.run.messages.filter((message: any) => message.role === "tool");
     expect(toolMessages.map((message: any) => message.tool_call_id)).toEqual(["a", "b"]);
   });
@@ -218,7 +244,9 @@ describe("planned runtime parity", () => {
     gateway.runChat.mockImplementation(async (args: any) => {
       if (isPlanningCall(args)) return planningResult;
       return executionRound++ < 4
-        ? toolResult([{ id: `call-${executionRound}`, name: "web_search", arguments: { q: "same" } }])
+        ? toolResult([
+            { id: `call-${executionRound}`, name: "web_search", arguments: { q: "same" } },
+          ])
         : finalResult;
     });
     toolsMod.executeTool.mockResolvedValue({ ok: true, output: { results: [] } });
@@ -278,8 +306,12 @@ describe("planned runtime parity", () => {
 
     await executePlannedRun({ sb, userId: "user-1", run: run(sb) });
 
-    const firstSteering = executionTurns[0]?.find((message: any) => String(message.content).includes("OPERATOR STEERING"));
-    const secondSteering = executionTurns[1]?.find((message: any) => String(message.content).includes("OPERATOR STEERING"));
+    const firstSteering = executionTurns[0]?.find((message: any) =>
+      String(message.content).includes("OPERATOR STEERING"),
+    );
+    const secondSteering = executionTurns[1]?.find((message: any) =>
+      String(message.content).includes("OPERATOR STEERING"),
+    );
     expect(firstSteering).toBeUndefined();
     expect(secondSteering?.content).toContain("verified UK suppliers");
   });
@@ -310,7 +342,16 @@ describe("planned runtime parity", () => {
     const resumePlan = {
       objective: "finish task",
       assumptions: ["already planned"],
-      steps: [{ id: "step-1", title: "Execute", objective: "finish task", status: "active", success_criteria: ["done"], evidence: ["saved"] }],
+      steps: [
+        {
+          id: "step-1",
+          title: "Execute",
+          objective: "finish task",
+          status: "active",
+          success_criteria: ["done"],
+          evidence: ["saved"],
+        },
+      ],
       current_step_id: "step-1",
       quality_threshold: 0.8,
       verification_required: false,
@@ -343,23 +384,72 @@ describe("planned runtime parity", () => {
 
     expect(gateway.runChat).toHaveBeenCalledTimes(1);
     expect(isPlanningCall(gateway.runChat.mock.calls[0]?.[0])).toBe(false);
-    expect(gateway.runChat.mock.calls[0]?.[0].messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({ content: "RESUMED EVIDENCE" }),
-    ]));
+    expect(gateway.runChat.mock.calls[0]?.[0].messages).toEqual(
+      expect.arrayContaining([expect.objectContaining({ content: "RESUMED EVIDENCE" })]),
+    );
     const completion = runtime.completeRun.mock.calls[0]?.[0];
     expect(completion.result.usage).toEqual({ input: 102, output: 27 });
     expect(completion.toolCallCount).toBe(3);
   });
+
+  it("retries one transient model failure before any tool dispatch", async () => {
+    const sb = db();
+    let executionCalls = 0;
+    gateway.runChat.mockImplementation(async (args: any) => {
+      if (isPlanningCall(args)) return planningResult;
+      executionCalls += 1;
+      if (executionCalls === 1) {
+        const error = new Error("provider rate limited");
+        Object.assign(error, { retryable: true, status: 429 });
+        throw error;
+      }
+      return finalResult;
+    });
+
+    await executePlannedRun({ sb, userId: "user-1", run: run(sb) });
+
+    expect(executionCalls).toBe(2);
+    expect(toolsMod.executeTool).not.toHaveBeenCalled();
+    expect(runtime.completeRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a non-transient model failure", async () => {
+    const sb = db();
+    gateway.runChat.mockImplementation(async (args: any) => {
+      if (isPlanningCall(args)) return planningResult;
+      const error = new Error("provider rejected the request");
+      Object.assign(error, { retryable: false, status: 400 });
+      throw error;
+    });
+
+    await expect(executePlannedRun({ sb, userId: "user-1", run: run(sb) })).rejects.toThrow(
+      "provider rejected the request",
+    );
+    expect(gateway.runChat).toHaveBeenCalledTimes(2);
+    expect(runtime.completeRun).not.toHaveBeenCalled();
+  });
 });
 
-
-describe('planned browser approval pause', () => {
-  it('stops execution and verification on a durable approval receipt', async () => {
+describe("planned browser approval pause", () => {
+  it("stops execution and verification on a durable approval receipt", async () => {
     const sb = db();
-    gateway.runChat.mockImplementation(async (args: any) => isPlanningCall(args) ? planningResult : toolResult([{ id: 'browser', name: 'browser_task', arguments: {} }]));
-    toolsMod.executeTool.mockResolvedValueOnce({ ok: true, output: { approval_request_id: 'approval', status: 'awaiting_approval' } });
-    const task = await executePlannedRun({ sb, userId: 'user-1', run: run(sb, new Map([grant('browser_task', true)])) });
-    expect(task.status).toBe('waiting_for_approval'); expect(runtime.pausedRunReceipt).toHaveBeenCalledTimes(1);
-    expect(runtime.completeRun).not.toHaveBeenCalled(); expect(toolsMod.executeTool).toHaveBeenCalledTimes(1);
+    gateway.runChat.mockImplementation(async (args: any) =>
+      isPlanningCall(args)
+        ? planningResult
+        : toolResult([{ id: "browser", name: "browser_task", arguments: {} }]),
+    );
+    toolsMod.executeTool.mockResolvedValueOnce({
+      ok: true,
+      output: { approval_request_id: "approval", status: "awaiting_approval" },
+    });
+    const task = await executePlannedRun({
+      sb,
+      userId: "user-1",
+      run: run(sb, new Map([grant("browser_task", true)])),
+    });
+    expect(task.status).toBe("waiting_for_approval");
+    expect(runtime.pausedRunReceipt).toHaveBeenCalledTimes(1);
+    expect(runtime.completeRun).not.toHaveBeenCalled();
+    expect(toolsMod.executeTool).toHaveBeenCalledTimes(1);
   });
 });

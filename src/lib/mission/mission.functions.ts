@@ -15,6 +15,7 @@ import { executePersonalTask } from "./personal-task-execution.server";
 import { decidePersonalTaskToolApproval } from "./personal-task-approval-decision.server";
 import { assertGenericApprovalCanDecide } from "./approval-route-guard";
 import { resolveAgentShoppingDomains } from "./shopping-domain-policy.server";
+import { buildMissionOperations, type MissionOperationsInput } from "./mission-operations";
 
 import { notify } from "@/lib/notifications/notify.server";
 
@@ -94,6 +95,9 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       agentRuns,
       workforces,
       workforceRuns,
+      workflows,
+      goals,
+      runAudit,
     ] = await Promise.all([
       sb.from("personal_agents").select("*").order("created_at", { ascending: false }),
       sb
@@ -116,15 +120,37 @@ export const getMissionOverview = createServerFn({ method: "POST" })
         .limit(500),
       sb
         .from("agent_tasks")
-        .select("id, title, status, provider, model, tokens_in, tokens_out, cost_pence, created_at")
+        .select(
+          "id, user_id, agent_id, title, input, status, provider, model, tokens_in, tokens_out, cost_pence, tool_calls, duration_ms, output_text, error, heartbeat_at, started_at, completed_at, cancel_requested, replan_count, resume_count, checkpoint_state, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(200),
       sb.from("workforces").select("*").order("created_at", { ascending: false }).limit(40),
       sb
         .from("workflow_runs")
-        .select("id, workflow_id, workforce_id, status, input, output, started_at, completed_at")
+        .select(
+          "id, workflow_id, workforce_id, status, input, output, error, worker_heartbeat_at, started_at, completed_at, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(30),
+      sb
+        .from("workflows")
+        .select("id, name, status, schedule, trigger_type, workforce_id")
+        .order("created_at", { ascending: false })
+        .limit(40),
+      sb
+        .from("autonomous_goals")
+        .select(
+          "id, name, status, trigger_type, schedule_cron, timezone, next_run_at, last_run_at, workforce_id",
+        )
+        .order("updated_at", { ascending: false })
+        .limit(40),
+      sb
+        .from("mission_audit_logs")
+        .select("id, action, target_id, target_type, status, metadata, created_at")
+        .in("action", ["agent.run_result", "agent.run"])
+        .order("created_at", { ascending: false })
+        .limit(120),
     ]);
 
     const agentRows = agents.data ?? [];
@@ -151,9 +177,8 @@ export const getMissionOverview = createServerFn({ method: "POST" })
         provider,
         name:
           integration.name ||
-          provider.replace(
-            /(^|[-_])([a-z])/g,
-            (_match: string, _prefix: string, char: string) => char.toUpperCase(),
+          provider.replace(/(^|[-_])([a-z])/g, (_match: string, _prefix: string, char: string) =>
+            char.toUpperCase(),
           ),
         accountLabel: integration.account_label ?? null,
         integrationType: integration.integration_type ?? null,
@@ -179,7 +204,47 @@ export const getMissionOverview = createServerFn({ method: "POST" })
 
     const notificationRows = notifications.data ?? [];
     const usageRows = usage.data ?? [];
-    const runRows = agentRuns.data ?? [];
+    const rawRunRows = (agentRuns.data ?? []) as any[];
+    const runRows = rawRunRows.map((row: any) => {
+      const copy = { ...row };
+      delete copy.checkpoint_state;
+      return copy;
+    });
+    const source = (result: { error?: unknown }) => ({ available: !result?.error });
+    const sources = {
+      agents: source(agents),
+      tasks: source(tasks),
+      approvals: source(approvals),
+      activities: source(activities),
+      agentRuns: source(agentRuns),
+      workforces: source(workforces),
+      workflowRuns: source(workforceRuns),
+      workflows: source(workflows),
+      goals: source(goals),
+      audit: source(audit),
+      runAudit: source(runAudit),
+    };
+    const operations = buildMissionOperations({
+      sources: {
+        agents: sources.agents,
+        agentRuns: sources.agentRuns,
+        workforces: sources.workforces,
+        workflowRuns: sources.workflowRuns,
+        workflows: sources.workflows,
+        goals: sources.goals,
+        audit: sources.runAudit,
+      },
+      agents: agentRows,
+      agentRuns: rawRunRows.map((row) => {
+        const { checkpoint_state: checkpoint, ...rest } = row;
+        return { ...rest, has_checkpoint: Boolean(checkpoint) };
+      }) as MissionOperationsInput["agentRuns"],
+      workforces: workforceRows,
+      workflowRuns: workforceRunRows,
+      workflows: workflows.data ?? [],
+      goals: goals.data ?? [],
+      audit: runAudit.data ?? [],
+    });
 
     const line = (label: string, items: string[]) =>
       `${label}: ${items.length ? items.join("; ") : "none"}`;
@@ -274,35 +339,50 @@ export const getMissionOverview = createServerFn({ method: "POST" })
       workforces: workforceRows,
       workforceRuns: workforceRunRows,
       agentRuns: runRows,
+      sources,
+      operations,
       usage: {
-        byMetric: usageByMetric,
-        agentRuns: runRows.length,
-        succeededRuns: runRows.filter(
-          (r: any) => r.status === "succeeded" || r.status === "completed",
-        ).length,
-        failedRuns: runRows.filter((r: any) => r.status === "failed").length,
-        tokensIn,
-        tokensOut,
-        costPence,
+        byMetric: source(usage).available ? usageByMetric : null,
+        agentRuns: sources.agentRuns.available ? runRows.length : null,
+        succeededRuns: sources.agentRuns.available
+          ? runRows.filter((r: any) => r.status === "succeeded" || r.status === "completed").length
+          : null,
+        failedRuns: sources.agentRuns.available
+          ? runRows.filter((r: any) => r.status === "failed").length
+          : null,
+        tokensIn: sources.agentRuns.available ? tokensIn : null,
+        tokensOut: sources.agentRuns.available ? tokensOut : null,
+        costPence: sources.agentRuns.available ? costPence : null,
       },
       metrics: {
-        activeAgents: counts.agents,
-        totalAgents: agentRows.length,
-        runningTasks: running.length,
-        upcomingTasks: upcoming.length,
-        awaitingApproval: pendingApprovals.length,
-        completedTasks: completed.length,
-        personalTasks: taskRows.filter((t: any) => t.scope === "personal").length,
-        professionalTasks: taskRows.filter((t: any) => t.scope === "professional").length,
-        failedTasks: taskRows.filter((t: any) => t.status === "failed").length,
-        unreadNotifications: notificationRows.filter((n: any) => !n.read_at).length,
-        personalAgents: personalAgents.length,
-        professionalAgents: professionalAgents.length,
-        workforces: workforceRows.length,
-        activeWorkforces: workforceRows.filter((w: any) => w.status === "active").length,
-        runningWorkforceRuns: workforceRunRows.filter(
-          (r: any) => r.status === "running" || r.status === "queued",
-        ).length,
+        activeAgents: sources.agents.available ? counts.agents : null,
+        totalAgents: sources.agents.available ? agentRows.length : null,
+        runningTasks: sources.tasks.available ? running.length : null,
+        upcomingTasks: sources.tasks.available ? upcoming.length : null,
+        awaitingApproval: sources.approvals.available ? pendingApprovals.length : null,
+        completedTasks: sources.tasks.available ? completed.length : null,
+        personalTasks: sources.tasks.available
+          ? taskRows.filter((t: any) => t.scope === "personal").length
+          : null,
+        professionalTasks: sources.tasks.available
+          ? taskRows.filter((t: any) => t.scope === "professional").length
+          : null,
+        failedTasks: sources.tasks.available
+          ? taskRows.filter((t: any) => t.status === "failed").length
+          : null,
+        unreadNotifications: source(notifications).available
+          ? notificationRows.filter((n: any) => !n.read_at).length
+          : null,
+        personalAgents: sources.agents.available ? personalAgents.length : null,
+        professionalAgents: sources.agents.available ? professionalAgents.length : null,
+        workforces: sources.workforces.available ? workforceRows.length : null,
+        activeWorkforces: sources.workforces.available
+          ? workforceRows.filter((w: any) => w.status === "active").length
+          : null,
+        runningWorkforceRuns: sources.workflowRuns.available
+          ? workforceRunRows.filter((r: any) => r.status === "running" || r.status === "queued")
+              .length
+          : null,
       },
     };
   });
@@ -355,14 +435,17 @@ export const savePersonalAgent = createServerFn({ method: "POST" })
         .eq("status", "connected");
       const connectedProviders = new Set(
         (connected ?? []).map((integration: any) =>
-          String(integration.provider ?? "").replace(/^nango_/, "").toLowerCase(),
+          String(integration.provider ?? "")
+            .replace(/^nango_/, "")
+            .toLowerCase(),
         ),
       );
       allowedProviders = requestedProviders.filter((provider) => connectedProviders.has(provider));
     }
-    const rawPreferences = data.preferences && typeof data.preferences === "object" && !Array.isArray(data.preferences)
-      ? data.preferences
-      : {};
+    const rawPreferences =
+      data.preferences && typeof data.preferences === "object" && !Array.isArray(data.preferences)
+        ? data.preferences
+        : {};
     const preferences = {
       ...rawPreferences,
       identity: normaliseAgentIdentity((rawPreferences as Record<string, unknown>)["identity"]),
@@ -509,7 +592,8 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
       })
       .select()
       .maybeSingle();
-    if (taskRes.error || !taskRes.data) throw new Error(taskRes.error?.message ?? "Could not create task");
+    if (taskRes.error || !taskRes.data)
+      throw new Error(taskRes.error?.message ?? "Could not create task");
     const task = taskRes.data;
 
     await activity(sb, userId, `Request received: ${decision.title}`, "task_started", {
@@ -606,7 +690,13 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
         });
 
         try {
-          await assertWithinLimits(sb, userId, agent?.id ?? null, Number(draft.total), String(draft.currency ?? ''));
+          await assertWithinLimits(
+            sb,
+            userId,
+            agent?.id ?? null,
+            Number(draft.total),
+            String(draft.currency ?? ""),
+          );
         } catch (error) {
           const reason = (error as Error).message;
           await sb
@@ -786,7 +876,6 @@ export const submitPersonalTask = createServerFn({ method: "POST" })
     return { taskId: task.id, decision, execution };
   });
 
-
 export const updateTaskStatus = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; status: string }) => input)
   .middleware([requireSupabaseAuth])
@@ -848,23 +937,34 @@ export const decideApproval = createServerFn({ method: "POST" })
         data.decision === "approve" ? "approved" : "rejected",
         { agent_id: approval.agent_id, task_id: approval.task_id },
       );
-      await log(sb, userId, data.decision === "approve" ? "personal_tool_approved" : "personal_tool_rejected", {
-        agent_id: approval.agent_id,
-        target_type: "approval_request",
-        target_id: approval.id,
-        status: toolDecision,
-        metadata: {
-          action_type: approval.action_type,
-          execution_status: result.execution.status,
-          run_id: "runId" in result.execution ? result.execution.runId : null,
+      await log(
+        sb,
+        userId,
+        data.decision === "approve" ? "personal_tool_approved" : "personal_tool_rejected",
+        {
+          agent_id: approval.agent_id,
+          target_type: "approval_request",
+          target_id: approval.id,
+          status: toolDecision,
+          metadata: {
+            action_type: approval.action_type,
+            execution_status: result.execution.status,
+            run_id: "runId" in result.execution ? result.execution.runId : null,
+          },
         },
-      });
+      );
       return { status: result.status, purchase: null, execution: result.execution };
     }
 
     if (data.decision === "approve" && approval.estimated_cost != null) {
       try {
-        await assertWithinLimits(sb, userId, approval.agent_id, Number(approval.estimated_cost), String(approval.currency ?? ''));
+        await assertWithinLimits(
+          sb,
+          userId,
+          approval.agent_id,
+          Number(approval.estimated_cost),
+          String(approval.currency ?? ""),
+        );
       } catch (error) {
         await log(sb, userId, "purchase_blocked_by_limit", {
           agent_id: approval.agent_id,
@@ -977,7 +1077,6 @@ export const decideApproval = createServerFn({ method: "POST" })
     }
 
     return { status, purchase: purchase.data ?? null, execution };
-
   });
 
 export const chooseAlternative = createServerFn({ method: "POST" })
@@ -1122,7 +1221,13 @@ export const confirmPurchase = createServerFn({ method: "POST" })
     if (!approval.data || approval.data.status !== "approved")
       throw new Error("Approval is required before checkout");
 
-    await assertWithinLimits(sb, userId, approval.data.agent_id, Number(purchase.total), String(purchase.currency ?? ''));
+    await assertWithinLimits(
+      sb,
+      userId,
+      approval.data.agent_id,
+      Number(purchase.total),
+      String(purchase.currency ?? ""),
+    );
 
     await sb
       .from("purchase_requests")
