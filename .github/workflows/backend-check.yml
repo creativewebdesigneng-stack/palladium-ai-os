@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: High severity dependency audit
+      - name: Dependency audit
         shell: bash
         run: |
           set +e
@@ -37,7 +37,7 @@ jobs:
           for attempt in 1 2; do
             echo "Dependency audit attempt ${attempt}/2"
             : > audit-output.log
-            timeout --signal=TERM --kill-after=5s 30s bun audit --audit-level high 2>&1 | tee audit-output.log
+            timeout --signal=TERM --kill-after=5s 30s bun audit --audit-level low 2>&1 | tee audit-output.log
             rc=${PIPESTATUS[0]}
             if [ "$rc" -eq 0 ]; then
               exit 0
@@ -58,8 +58,8 @@ jobs:
               exit 0
             fi
 
-            # A non-transient nonzero result is a real audit failure (for example,
-            # a high-severity advisory) and must continue to block CI.
+            # A non-transient nonzero result is a real audit failure and must
+            # continue to block CI. Low, moderate and high advisories all fail.
             exit "$rc"
           done
 
@@ -128,6 +128,12 @@ jobs:
 
       - name: Agent governance isolated Postgres access-control tests
         run: bun run test:governance-recovery
+
+      - name: Agent economy idempotent restore access-control tests
+        run: bun run test:agent-economy-apply
+
+      - name: Knowledge storage restrictive owner tests
+        run: bun run test:knowledge-storage
 
       - name: Trusted media isolated Postgres access-control tests
         run: bun run test:trusted-media-recovery

@@ -24,10 +24,11 @@ server-side via `stripe.prices.list({ lookup_keys })`.
 
 ## Environments
 
-- Sandbox/test: `.env.development` holds `VITE_PAYMENTS_CLIENT_TOKEN` (`pk_test_…`);
-  server calls use `STRIPE_SANDBOX_API_KEY` + `PAYMENTS_SANDBOX_WEBHOOK_SECRET`.
-- Live: `.env.production` holds the `pk_live_…` token; server calls use
-  `STRIPE_LIVE_API_KEY` + `PAYMENTS_LIVE_WEBHOOK_SECRET` (provisioned at go-live).
+- Sandbox/test: put `VITE_PAYMENTS_CLIENT_TOKEN` (`pk_test_…`) in an untracked
+  local env file such as `.env.local`. Do not commit a real publishable key.
+  Server calls use `STRIPE_SANDBOX_API_KEY` + `PAYMENTS_SANDBOX_WEBHOOK_SECRET`.
+- Live: the `pk_live_…` token and `STRIPE_LIVE_API_KEY` +
+  `PAYMENTS_LIVE_WEBHOOK_SECRET` stay in the deployment secret manager.
 
 The environment is derived from the client token prefix — never defaulted to live.
 Every `subscriptions` read and write is filtered by the `environment` column, so

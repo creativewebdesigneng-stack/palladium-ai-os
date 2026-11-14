@@ -1,0 +1,18 @@
+title = "Blackstar secret scan allowlist"
+
+# Current-tree scanning stays on. These paths contain documented fixtures:
+# publishable-key placeholders, the public RFC 6238 TOTP vector, and docs
+# that show a truncated bearer example. Real .env files are not allowlisted.
+[[allowlists]]
+description = "Test fixtures and public documentation examples"
+paths = [
+  '''src/lib/website-studio/website-.*\.test\.ts''',
+  '''src/lib/devapi/__tests__/api-auth\.test\.ts''',
+  '''src/lib/runtime/__tests__/browser-credentials\.test\.ts''',
+  '''src/components/dev-portal/devPortalData\.jsx''',
+]
+
+[[allowlists]]
+description = "PEM header checks in the GitHub App parser, not key material"
+paths = ['''src/lib/integrations/github-app\.server\.ts''']
+regexes = ['''-----BEGIN (RSA )?PRIVATE KEY-----''']
