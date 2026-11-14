@@ -1,17 +1,19 @@
-// Nitro's cloudflare-module build writes .output/server/index.mjs.
-// `vite preview` still loads dist/server/server.js, which this build does not emit.
+// Nitro's cloudflare-module build writes .output/server/index.mjs and a
+// Wrangler config next to it. `vite preview` still loads dist/server/server.js,
+// which this build does not emit.
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 
 const entry = ".output/server/index.mjs";
+const config = ".output/server/wrangler.json";
 const assets = ".output/public";
 
-if (!existsSync(entry) || !existsSync(assets)) {
+if (!existsSync(entry) || !existsSync(config) || !existsSync(assets)) {
   console.error(
     [
       "Cloudflare preview did not start.",
       "`vite preview` looks for dist/server/server.js.",
-      "This build emits .output/server/index.mjs and static files in .output/public.",
+      "This build emits .output/server/index.mjs and .output/server/wrangler.json.",
       "Run `bun run build`, then `bun run preview`.",
     ].join("\n"),
   );
@@ -20,7 +22,7 @@ if (!existsSync(entry) || !existsSync(assets)) {
 
 const child = spawn(
   "bun",
-  ["x", "wrangler", "dev", "--config", "wrangler.jsonc", "--local", "--port", "4173"],
-  { stdio: "inherit" },
+  ["x", "wrangler", "dev", "--config", "wrangler.json", "--local", "--port", "4173"],
+  { cwd: ".output/server", stdio: "inherit" },
 );
 child.on("exit", (code) => process.exit(code ?? 1));
