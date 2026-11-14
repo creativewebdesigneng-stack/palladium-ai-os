@@ -25,7 +25,7 @@ const DEFAULT_MODEL: Record<EmbeddingProvider, string> = {
   compatible: "text-embedding-3-small",
 };
 
-export type EmbeddingErrorCode = "configuration" | "input" | "provider" | "quota" | "rate_limit" | "authentication";
+export type EmbeddingErrorCode = "configuration" | "input" | "provider" | "quota" | "rate_limit" | "authentication" | "connection";
 
 export class EmbeddingError extends Error {
   constructor(
@@ -38,14 +38,35 @@ export class EmbeddingError extends Error {
   }
 }
 
+const QUOTA_CODES = new Set([
+  "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
+  "organization_usage_limit_exceeded", "billing_hard_limit_reached",
+]);
+
+function providerErrorFields(payload: unknown): { codes: string[]; message: string } {
+  const error = payload && typeof payload === "object" && "error" in payload
+    ? (payload as { error?: unknown }).error
+    : null;
+  const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const raw = [record["code"], record["type"], record["status"]];
+  return {
+    codes: raw.filter((value): value is string => typeof value === "string").map((value) => value.toLowerCase()),
+    message: typeof record["message"] === "string" ? record["message"].toLowerCase() : "",
+  };
+}
+
+function isQuotaFailure(status: number, fields: { codes: string[]; message: string }): boolean {
+  if (status === 402 || fields.codes.some((code) => QUOTA_CODES.has(code))) return true;
+  // Gemini reports many billing blocks as RESOURCE_EXHAUSTED plus a quota sentence.
+  // The sentence is used only for classification and is never returned to callers.
+  return fields.codes.includes("resource_exhausted") && /quota|billing|credit|plan/.test(fields.message);
+}
+
 async function responseError(res: Response): Promise<EmbeddingError> {
   // Use structured classifications only. Provider messages can echo private input.
   const payload = await res.json().catch(() => null);
-  const codes = [payload?.error?.code, payload?.error?.type];
-  if (res.status === 402 || codes.some(code => [
-    "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
-    "organization_usage_limit_exceeded", "billing_hard_limit_reached",
-  ].includes(code))) {
+  const fields = providerErrorFields(payload);
+  if (isQuotaFailure(res.status, fields)) {
     return new EmbeddingError("Embedding quota or billing limit reached. Review the embedding provider account; keyword memory search remains available.", false, "quota");
   }
   if (res.status === 401 || res.status === 403) {
@@ -78,6 +99,48 @@ function providerConfigured(provider: EmbeddingProvider): boolean {
   if (provider === "lovable") return Boolean(process.env["LOVABLE_API_KEY"]);
   if (provider === "openai") return Boolean(process.env["OPENAI_API_KEY"]);
   return Boolean(process.env["OPENAI_COMPATIBLE_BASE_URL"]);
+}
+
+function compatibleFallbackEnabled(): boolean {
+  const value = process.env["EMBEDDING_COMPATIBLE_FALLBACK"]?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+/**
+ * Automatic mode tries each configured hosted lane. A compatible endpoint is
+ * included only with EMBEDDING_COMPATIBLE_FALLBACK, because a chat server is
+ * not assumed to emit 1536-dimensional vectors. An explicit provider stays
+ * single-homed so a chosen lane cannot silently change identity.
+ */
+export function embeddingProviderChain(preferred?: string | null): EmbeddingProvider[] {
+  const requested = (preferred ?? process.env["EMBEDDING_PROVIDER"] ?? "auto").trim().toLowerCase();
+  if (requested && requested !== "auto") return [resolveEmbeddingProvider(requested)];
+  const chain: EmbeddingProvider[] = [];
+  if (providerConfigured("lovable")) chain.push("lovable");
+  if (providerConfigured("openai")) chain.push("openai");
+  if (compatibleFallbackEnabled() && providerConfigured("compatible")) chain.push("compatible");
+  if (!chain.length) {
+    throw new EmbeddingError(
+      "No embedding provider is configured. Keyword memory search remains available.",
+      false,
+      "configuration",
+    );
+  }
+  return chain;
+}
+
+function connectionError(error: unknown): EmbeddingError | null {
+  if (!(error instanceof Error) || error.name === "AbortError") return null;
+  const cause = (error as { cause?: { code?: unknown } }).cause;
+  const code = typeof cause?.code === "string" ? cause.code : "";
+  const networked = ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "ECONNRESET"].includes(code)
+    || /fetch failed|network|socket/i.test(error.message);
+  if (!networked) return null;
+  return new EmbeddingError(
+    "The embedding provider could not be reached. Keyword memory search remains available.",
+    true,
+    "connection",
+  );
 }
 
 /**
@@ -155,17 +218,11 @@ function endpoint(provider: EmbeddingProvider): { url: string; headers: Record<s
   };
 }
 
-/** Embeds one or more texts. Empty inputs are rejected before any network call. */
-export async function embedTexts(
-  texts: string[],
-  options: { provider?: EmbeddingProvider; model?: string; signal?: AbortSignal } = {},
+async function embedWithProvider(
+  provider: EmbeddingProvider,
+  input: string[],
+  options: { model?: string; signal?: AbortSignal },
 ): Promise<EmbeddingResult> {
-  const input = texts
-    .map((t) => (t ?? "").replace(/\s+/g, " ").trim().slice(0, 8000))
-    .filter(Boolean);
-  if (!input.length) throw new EmbeddingError("Nothing to embed.", false, "input");
-
-  const provider = resolveEmbeddingProvider(options.provider);
   const model = options.model ?? process.env["EMBEDDING_MODEL"] ?? DEFAULT_MODEL[provider];
   const { url, headers } = endpoint(provider);
   // One budget covers every attempt and backoff, including caller cancellation.
@@ -203,14 +260,46 @@ export async function embedTexts(
       return { vectors, model, provider };
     } catch (error) {
       signal.throwIfAborted();
+      const connected = connectionError(error);
       if (error instanceof EmbeddingError && !error.retryable) throw error;
-      lastError = error instanceof EmbeddingError ? error : new EmbeddingError("The embedding provider could not be reached.", true, "provider");
+      lastError = connected
+        ?? (error instanceof EmbeddingError ? error : new EmbeddingError("The embedding provider could not be reached.", true, "provider"));
     }
     if (attempt === 2) break;
     const delay = retryDelay(response, attempt);
     // Never retry before Retry-After or wait past the request budget.
     if (delay >= deadline - Date.now()) break;
     await waitForRetry(delay, signal);
+  }
+  throw lastError instanceof Error ? lastError : new EmbeddingError("Embedding failed.");
+}
+
+function canFailOver(error: unknown): error is EmbeddingError {
+  return error instanceof EmbeddingError
+    && error.code !== "input"
+    && error.code !== "configuration";
+}
+
+/** Embeds one or more texts. Empty inputs are rejected before any network call. */
+export async function embedTexts(
+  texts: string[],
+  options: { provider?: EmbeddingProvider; model?: string; signal?: AbortSignal } = {},
+): Promise<EmbeddingResult> {
+  const input = texts
+    .map((t) => (t ?? "").replace(/\s+/g, " ").trim().slice(0, 8000))
+    .filter(Boolean);
+  if (!input.length) throw new EmbeddingError("Nothing to embed.", false, "input");
+
+  const providers = embeddingProviderChain(options.provider);
+  let lastError: unknown;
+  for (let index = 0; index < providers.length; index += 1) {
+    const provider = providers[index]!;
+    try {
+      return await embedWithProvider(provider, input, options);
+    } catch (error) {
+      lastError = error;
+      if (index === providers.length - 1 || !canFailOver(error)) throw error;
+    }
   }
   throw lastError instanceof Error ? lastError : new EmbeddingError("Embedding failed.");
 }

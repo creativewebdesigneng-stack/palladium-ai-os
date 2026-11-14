@@ -20,9 +20,13 @@ It does **not** contain OpenAI model weights, does not call GPT-6 Astra, and doe
 
 The proxy allowlist is intentional. vLLM documents that its built-in API-key option does not protect every server endpoint, so Blackstar does not expose the raw vLLM listener to the internet.
 
+## GTX 1080 Ti
+
+A GTX 1080 Ti (Pascal, compute capability 6.1, 11 GB) cannot run the vLLM image in this directory. Serve `qwen3:8b-q4_K_M` with Ollama instead. Owner steps and the localhost verification scripts are in [docs/astra/gtx-1080ti-qwen3-native-lane.md](../docs/astra/gtx-1080ti-qwen3-native-lane.md).
+
 ## GPU host prerequisites
 
-Use a Linux host with a working NVIDIA container runtime and enough aggregate GPU memory for the checkpoint you select. Large MoE/frontier-class open weights can require multi-GPU or multi-node infrastructure; this Compose baseline does not pretend one GPU is sufficient.
+Use a Linux host with a working NVIDIA container runtime and enough aggregate GPU memory for the checkpoint you select. Large MoE/frontier-class open weights can require multi-GPU or multi-node infrastructure; this Compose baseline does not pretend one GPU is sufficient. The pinned vLLM image expects compute capability 7.0 or newer.
 
 Docker Compose must support GPU reservations and the host must make `--gpus all` available to containers.
 

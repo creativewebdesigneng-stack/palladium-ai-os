@@ -61,17 +61,28 @@ function result(
   }
 }
 
-function parseModelIds(value: unknown): string[] | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const data = (value as Record<string, unknown>)['data']
-  if (!Array.isArray(data)) return null
-  const ids = data
+function stringIds(items: unknown[], field: string): string[] {
+  return items
     .map((item) => item && typeof item === 'object' && !Array.isArray(item)
-      ? (item as Record<string, unknown>)['id']
+      ? (item as Record<string, unknown>)[field]
       : null)
     .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()))
     .map((id) => id.trim())
-  return ids
+}
+
+/**
+ * Accepts the OpenAI `/v1/models` list and Ollama's object list
+ * (`models[].name` or `models[].model`). A list of bare strings is not a
+ * recognised catalogue and stays invalid.
+ */
+function parseModelIds(value: unknown): string[] | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  if (Array.isArray(record['data'])) return stringIds(record['data'], 'id')
+  if (!Array.isArray(record['models'])) return null
+  if (record['models'].some((item) => !item || typeof item !== 'object' || Array.isArray(item))) return null
+  const names = stringIds(record['models'], 'name')
+  return names.length ? names : stringIds(record['models'], 'model')
 }
 
 /**

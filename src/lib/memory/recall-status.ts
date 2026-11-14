@@ -1,7 +1,7 @@
 export type MemorySearchStatus = {
   semantic: 'available' | 'partial' | 'unavailable';
   keyword: 'available' | 'partial' | 'unavailable';
-  reason: 'configuration' | 'input' | 'provider' | 'quota' | 'rate_limit' | 'authentication' | null;
+  reason: 'configuration' | 'input' | 'provider' | 'quota' | 'rate_limit' | 'authentication' | 'connection' | null;
 };
 
 /** Describe the retrieval paths that actually completed, including zero hits. */
@@ -12,6 +12,7 @@ export function describeMemoryRecall(status: MemorySearchStatus | null, count: n
     : status.reason === 'rate_limit' ? 'Embedding rate limit reached.'
     : status.reason === 'configuration' ? 'Embeddings are not configured.'
     : status.reason === 'authentication' ? 'Embedding provider access was rejected.'
+    : status.reason === 'connection' ? 'The embedding provider could not be reached.'
     : 'Semantic recall is unavailable.';
   if (status.semantic === 'unavailable') {
     if (status.keyword === 'unavailable') return 'Memory search is unavailable. Try again later; no complete search result is available.';
