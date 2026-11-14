@@ -32,3 +32,19 @@ services:
         sync: false
       - key: MESH_ALLOWED_IMAGE_HOSTS
         sync: false
+  - type: web
+    name: blackstar-cinema-render
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./workers/cinema-render/Dockerfile
+    dockerContext: ./workers/cinema-render
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: CINEMA_WORKER_TOKEN
+        sync: false
+      - key: CINEMA_PUBLIC_URL
+        sync: false
+      - key: CINEMA_ALLOWED_MEDIA_HOSTS
+        sync: false

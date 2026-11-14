@@ -13,6 +13,8 @@ import { generateGameFoundryContent } from "./game-foundry-content.server";
 import { auditGameFoundryReadiness } from "./game-foundry-readiness.server";
 import { getGameFoundryIntegrations, probeGameFoundryConnections } from "./game-foundry-integrations.server";
 import { buildGameFoundryExportManifest, gameFoundryBridgeBase, getGameFoundryBridgeHandoff, submitGameFoundryBridgeHandoff } from "./game-foundry-package.server";
+import { buildGameFoundryEngineArchive } from "./game-foundry-engine-bundle.server";
+import { storeMeshBytes } from "@/lib/three-d/three-d-storage.server";
 import { compileGameFoundrySourceManifest } from "./game-foundry-source.server";
 import { buildGameFoundryProjectPackage, gameFoundryPackageFilename } from "./game-foundry-project-package.server";
 import {
@@ -151,7 +153,7 @@ const assetQuality = z.enum(["draft","game_ready","cinematic"]);
 const projectType = z.enum(["game","environment","character","prop","vehicle","asset_pack"]);
 const sourceKind = z.enum(["prompt","image","model"]);
 const outputFormat = z.enum(["glb","gltf","fbx","obj","usd","ply","stl","vox"]);
-const generationModel = z.enum(["auto","shap-e","triposr","trellis","fal"]).default("auto");
+const generationModel = z.enum(["auto","shap-e","triposr","trellis","fal","image-to-mesh"]).default("auto");
 
 export const getGameFoundryOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -364,7 +366,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
     }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     try {
-      const worker = await submitGameFoundryAsset({
+      const submitted = await submitGameFoundryAsset({
         sourceKind: data.sourceKind,
         prompt: data.prompt ?? null,
         sourceUrl: resolvedSourceUrl,
@@ -373,6 +375,18 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
         targetEngine: data.targetEngine,
         generationModel: data.generationModel,
       });
+      const inlineGlb = "inlineGlbBase64" in submitted && typeof submitted.inlineGlbBase64 === "string" ? submitted.inlineGlbBase64 : null;
+      let outputUrl = submitted.outputUrl;
+      let status = submitted.status;
+      let errorMessage = submitted.errorMessage;
+      if (status === "completed" && !outputUrl && inlineGlb) {
+        const stored = await storeMeshBytes(context.userId, created.data.id, inlineGlb);
+        outputUrl = stored.url;
+      } else if (status === "completed" && !outputUrl) {
+        status = "failed";
+        errorMessage = "The mesh worker reported completion without a mesh file.";
+      }
+      const worker = { ...submitted, status, outputUrl, errorMessage };
       const terminal = ["completed","failed","cancelled"].includes(worker.status);
       const updated = await sb.from("three_d_jobs").update({
         worker_job_id:worker.workerJobId,
@@ -386,7 +400,16 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
       }).eq("id",created.data.id).eq("user_id",context.userId);
       if (updated.error) throw new Error(updated.error.message);
       await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.asset_submitted", targetType:"three_d_job", targetId:created.data.id, status:"success", metadata:{ sourceKind:data.sourceKind, format:data.outputFormat, targetEngine:data.targetEngine, qualityProfile:data.qualityProfile } });
-      return { id:created.data.id, ...worker };
+      return {
+        id:created.data.id,
+        workerJobId:worker.workerJobId,
+        status:worker.status,
+        outputUrl:worker.outputUrl,
+        previewUrl:worker.previewUrl,
+        errorMessage:worker.errorMessage,
+        metadata:worker.metadata,
+        provider:worker.provider,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Asset generation failed";
       await sb.from("three_d_jobs").update({status:"failed",error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",created.data.id).eq("user_id",context.userId);
@@ -583,6 +606,54 @@ export const prepareGameFoundryEngineHandoff = createServerFn({ method:"POST" })
     if (!saved.data) throw new Error("Engine handoff could not be prepared.");
     await writeAudit({ userId:context.userId, orgId:null, action:"game_foundry.handoff_prepared", targetType:"game_foundry_project", targetId:data.id, status:"success", metadata:{ targetEngine:project.data.target_engine, assetCount:manifest.assets.length, bridgeConfigured } });
     return { ...saved.data, bridgeConfigured };
+  });
+
+export const exportGameFoundryEngineProject = createServerFn({ method:"POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const [project, assets] = await Promise.all([
+      sb.from("game_foundry_projects")
+        .select("id,name,prompt,target_engine,source_manifest")
+        .eq("id", data.id).eq("user_id", context.userId).maybeSingle(),
+      sb.from("three_d_jobs")
+        .select("input_name,output_url,processed_output_url,status")
+        .eq("project_id", data.id).eq("user_id", context.userId).eq("status", "completed")
+        .order("created_at", { ascending: true }),
+    ]);
+    if (project.error) throw new Error(project.error.message);
+    if (assets.error) throw new Error(assets.error.message);
+    if (!project.data) throw new Error("Game Foundry project not found.");
+    const sourceFiles = Array.isArray(project.data.source_manifest?.files)
+      ? project.data.source_manifest.files
+        .filter((file: { path?: unknown; content?: unknown }) => typeof file?.path === "string" && typeof file?.content === "string")
+        .map((file: { path: string; content: string }) => ({ path: file.path, content: file.content }))
+      : [];
+    const archive = await buildGameFoundryEngineArchive({
+      engine: project.data.target_engine,
+      projectName: project.data.name,
+      prompt: project.data.prompt ?? "",
+      assets: assets.data ?? [],
+      sourceFiles,
+    });
+    if (archive.zip.byteLength > 25_000_000) throw new Error("The engine project is larger than 25 MB. Export the mesh files individually.");
+    await writeAudit({
+      userId: context.userId,
+      orgId: null,
+      action: "game_foundry.engine_project_exported",
+      targetType: "game_foundry_project",
+      targetId: data.id,
+      status: "success",
+      metadata: { embeddedAssetCount: archive.embeddedAssetCount, formats: archive.formats },
+    });
+    return {
+      filename: archive.filename,
+      zipBase64: Buffer.from(archive.zip).toString("base64"),
+      embeddedAssetCount: archive.embeddedAssetCount,
+      formats: archive.formats,
+      omitted: archive.omitted,
+    };
   });
 
 export const sendGameFoundryEngineHandoff = createServerFn({ method:"POST" })

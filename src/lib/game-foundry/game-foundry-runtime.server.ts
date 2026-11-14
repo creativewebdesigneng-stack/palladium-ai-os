@@ -1,6 +1,7 @@
 import { getFalThreeDAssetJob, isFal3dReady, submitFalThreeDAsset, type FalThreeDProvider } from './game-foundry-fal-3d.server';
 import { getOpen3dAssetJob, isOpen3dConfigured, open3dHealth, submitOpen3dAsset, modelSupportsSource,
   type Open3dModel, type Open3dProvider, type AssetModelChoice } from './game-foundry-open3d.server';
+import { getHuggingFaceMeshFallback } from '../three-d/three-d-runtime.server';
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -43,20 +44,32 @@ export function preferredGameFoundryAssetFormat(targetEngine:GameFoundryEngine) 
   return custom && ["unity","unreal"].includes(targetEngine) ? "fbx" : "glb";
 }
 
+function meshWorkerConfigured() {
+  return Boolean(cleanBase(process.env["MESH_WORKER_URL"]) || getHuggingFaceMeshFallback().configured);
+}
+
 export function getGameFoundryCapabilities() {
   const configuredAssetWorker = cleanBase(process.env["GAME_FOUNDRY_3D_API_URL"]);
   const falReady = isFal3dReady();
   const freeConfigured = isOpen3dConfigured();
+  const meshConfigured = meshWorkerConfigured();
   const gameWorker = cleanBase(process.env["GAME_FOUNDRY_GAME_API_URL"]);
+  const formats = [
+    ...(freeConfigured ? ["glb","obj"] : []),
+    ...(meshConfigured ? ["glb","obj","gltf"] : []),
+    ...(configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : []),
+    ...(falReady ? ["glb","obj","fbx"] : []),
+  ];
   return {
     assetGeneration: {
       promptTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady),
-      imageTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady),
+      imageTo3d: Boolean(freeConfigured || configuredAssetWorker || falReady || meshConfigured),
       modelEnhancement: Boolean(configuredAssetWorker),
       freeWorkerConfigured: freeConfigured,
       falConfigured: falReady,
-      configuredProvider: freeConfigured ? "blackstar-open3d" : configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
-      formats: freeConfigured ? ["glb","obj"] : configuredAssetWorker ? ["glb","gltf","fbx","obj","usd","ply","stl","vox"] : falReady ? ["glb","obj","fbx"] : [],
+      meshWorkerConfigured: meshConfigured,
+      configuredProvider: freeConfigured ? "blackstar-open3d" : meshConfigured ? "blackstar-image-to-mesh" : configuredAssetWorker ? "game-foundry-3d" : falReady ? "fal-3d" : "unavailable",
+      formats: [...new Set(formats)],
     },
     gameGeneration: {
       configured: true,
@@ -73,7 +86,7 @@ export function getGameFoundryCapabilities() {
         "export-or-plugin",
     })),
     qualityProfiles: ["prototype","game_ready","cinematic"] as GameFoundryQuality[],
-    note: "Auto generation uses only a verified self-hosted Shap-E, TripoSR or TRELLIS worker; FAL is opt-in and may incur charges. Only OBJ/GLB exports are supported by the free engines. A GPU/CPU host and worker URL must be supplied; the AppDeploy frontend is not a usable POST worker. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation. Game-ready processing and GTA .yft/.ytd still require separate specialist tools.",
+    note: "Prompt auto uses a verified self-hosted Shap-E, TripoSR or TRELLIS worker. Image auto uses the image-to-mesh worker when MESH_WORKER_URL or the Hugging Face mesh lane is set, otherwise TripoSR. FAL is opt-in and may incur charges. The image-to-mesh worker exports GLB, glTF and OBJ. Open3D exports OBJ and GLB. ZModeler3 uses OBJ/FBX interchange and does not claim native .z3d generation. Game-ready processing and GTA .yft/.ytd still require separate specialist tools.",
   };
 }
 
@@ -121,6 +134,35 @@ async function request(base: string, token: string | undefined, path: string, in
   try { return JSON.parse(text); } catch { throw new Error("Game Foundry worker returned invalid JSON."); }
 }
 
+async function submitImageToMeshAsset(input: {
+  sourceUrl?: string | null;
+  outputFormat: string;
+}) {
+  if (!meshWorkerConfigured()) {
+    throw new Error("Image-to-mesh is off until MESH_WORKER_URL and MESH_WORKER_TOKEN are set, or THREE_D_HF_ENDPOINT_URL and HF_TOKEN are set.");
+  }
+  const format = input.outputFormat.toLowerCase();
+  if (!["glb", "obj", "gltf"].includes(format)) throw new Error("The image-to-mesh worker exports GLB, glTF and OBJ.");
+  if (!input.sourceUrl) throw new Error("Image-to-mesh requires an image URL.");
+  const { submitThreeDJob } = await import("../three-d/three-d-runtime.server");
+  const result = await submitThreeDJob({
+    sourceUrl: publicHttpUrl(input.sourceUrl),
+    outputFormat: format,
+    allowHostedDefault: false,
+  });
+  const completedWithoutFile = result.status === "completed" && !result.outputUrl && !result.inlineGlbBase64;
+  return {
+    workerJobId: result.workerJobId,
+    status: completedWithoutFile ? "failed" as const : result.status,
+    outputUrl: result.outputUrl,
+    previewUrl: result.previewUrl,
+    errorMessage: completedWithoutFile ? "The mesh worker reported completion without a mesh file." : result.errorMessage,
+    metadata: result.metadata,
+    provider: "modly-compatible" as const,
+    ...(result.inlineGlbBase64 ? { inlineGlbBase64: result.inlineGlbBase64 } : {}),
+  };
+}
+
 export async function submitGameFoundryAsset(input: {
   sourceKind: AssetSourceKind;
   prompt?: string | null;
@@ -131,6 +173,12 @@ export async function submitGameFoundryAsset(input: {
   generationModel?: AssetModelChoice;
 }) {
   const choice = input.generationModel ?? "auto";
+  if (choice === "image-to-mesh" && input.sourceKind !== "image") {
+    throw new Error("The image-to-mesh worker accepts an image, not a text prompt.");
+  }
+  if (input.sourceKind === "image" && (choice === "image-to-mesh" || (choice === "auto" && meshWorkerConfigured()))) {
+    return submitImageToMeshAsset(input);
+  }
   if (input.sourceKind === "prompt" || input.sourceKind === "image") {
     if (choice === "fal") return submitFalThreeDAsset({
       sourceKind: input.sourceKind, prompt: input.prompt ?? null,

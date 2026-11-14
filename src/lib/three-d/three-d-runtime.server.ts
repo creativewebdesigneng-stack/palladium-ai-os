@@ -19,10 +19,10 @@ function hostedWorkerPath(base: string, path: string) {
   return base === DEFAULT_MODLY_API_URL ? `/api${path}` : path;
 }
 
-function workerConfig() {
+function workerConfig(allowHostedDefault = true) {
   const mesh = (process.env["MESH_WORKER_URL"] || "").trim().replace(/\/+$/, "");
   const modly = (process.env["MODLY_API_URL"] || "").trim().replace(/\/+$/, "");
-  const base = mesh || modly || DEFAULT_MODLY_API_URL;
+  const base = mesh || modly || (allowHostedDefault ? DEFAULT_MODLY_API_URL : "");
   const token = (mesh ? (process.env["MESH_WORKER_TOKEN"] || process.env["MODLY_API_TOKEN"] || "") : (process.env["MODLY_API_TOKEN"] || "")).trim();
   return { base, token };
 }
@@ -176,8 +176,8 @@ function asJson(value: unknown, depth = 0): Json {
   return String(value);
 }
 
-async function request(path: string, init?: RequestInit): Promise<any> {
-  const { base, token } = workerConfig();
+async function request(path: string, init: RequestInit | undefined, allowHostedDefault = true): Promise<any> {
+  const { base, token } = workerConfig(allowHostedDefault);
   if (!base) throw new Error("3D Studio execution worker is unavailable.");
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
@@ -240,12 +240,13 @@ async function submitHuggingFaceMesh(input: { sourceUrl: string; outputFormat: s
   };
 }
 
-export async function submitThreeDJob(input: { sourceUrl: string; outputFormat: string }): Promise<ThreeDWorkerResult> {
+export async function submitThreeDJob(input: { sourceUrl: string; outputFormat: string; allowHostedDefault?: boolean }): Promise<ThreeDWorkerResult> {
   const source = publicHttpUrl(input.sourceUrl).toString();
   const format = input.outputFormat.toLowerCase();
+  const allowHostedDefault = input.allowHostedDefault !== false;
   if (!ALLOWED_FORMATS.has(format)) throw new Error("Unsupported 3D output format.");
   try {
-    const json = await request("/workflow-runs/from-image", { method: "POST", body: JSON.stringify({ image_url: source, output_format: format }) });
+    const json = await request("/workflow-runs/from-image", { method: "POST", body: JSON.stringify({ image_url: source, output_format: format }) }, allowHostedDefault);
     const workerJobId = String(json.id ?? json.run_id ?? json.workflow_run_id ?? "").trim();
     if (!workerJobId) throw new Error("3D worker did not return a workflow run id.");
     return workerResult(workerJobId, json);

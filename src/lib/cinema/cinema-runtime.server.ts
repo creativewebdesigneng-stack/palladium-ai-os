@@ -3,12 +3,13 @@ export type CinemaQuality = 'preview' | 'production' | 'cinema'
 export type CinemaAspect = '16:9' | '2.39:1' | '1.85:1' | '9:16' | '1:1'
 
 export const CINEMA_MAX_DURATION_MINUTES = 180
+// Legacy AppDeploy host. It is not selected unless the owner sets it as CINEMA_STUDIO_MASTER_WORKER_URL.
 export const BLACKSTAR_CINEMA_MASTER_WORKER_URL = 'https://blackstar-auto-editor-worker-0kjxvk.v2.appdeploy.ai'
 
 export function getCinemaCapabilities() {
   const renderUrl = (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim()
   const configuredMasterUrl = (process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim()
-  const masterUrl = configuredMasterUrl || renderUrl || BLACKSTAR_CINEMA_MASTER_WORKER_URL
+  const masterUrl = configuredMasterUrl || renderUrl
   return {
     configured: Boolean(masterUrl),
     renderConfigured: Boolean(renderUrl),
@@ -17,17 +18,19 @@ export function getCinemaCapabilities() {
       ? 'configured-master-worker'
       : renderUrl
         ? 'configured-cinema-worker'
-        : 'blackstar-hosted-master',
+        : 'unconfigured',
     maxDurationMinutes: CINEMA_MAX_DURATION_MINUTES,
     workflow: 'blackstar-cinema-studio',
     stages: ['treatment','screenplay','shot-plan','visual-generation','voice','music','assembly','master'],
     aspects: ['16:9','2.39:1','1.85:1','9:16','1:1'] as CinemaAspect[],
     qualities: ['preview','production','cinema'] as CinemaQuality[],
     continuity: ['character','wardrobe','location','prop','camera','colour'],
-    outputs: ['mp4','mov'],
-    note: renderUrl
-      ? 'Long-form cinema jobs may use the configured Cinema renderer; completed shot segments can be assembled by the configured or Blackstar-hosted master worker.'
-      : 'Planning, shot rendering through the configured image/video providers, and final assembly of completed shot segments are available. Direct one-shot text-to-film rendering remains disabled until CINEMA_STUDIO_WORKER_URL is configured.',
+    outputs: ['mp4'],
+    note: !renderUrl && !masterUrl
+      ? 'Planning and shot lists are available. Keyframes and video segments run only when FAL_KEY or a Seedream/LTX worker URL is set. Final assembly stays off until CINEMA_STUDIO_MASTER_WORKER_URL points at the ffmpeg cinema worker. Direct one-shot text-to-film rendering remains disabled until CINEMA_STUDIO_WORKER_URL is configured.'
+      : renderUrl
+        ? 'The configured cinema worker receives direct render jobs. Final assembly uses CINEMA_STUDIO_MASTER_WORKER_URL when set, otherwise the same worker.'
+        : 'Completed shot segments can be assembled by the configured cinema worker. Direct one-shot text-to-film rendering remains disabled until CINEMA_STUDIO_WORKER_URL is configured.',
   }
 }
 
@@ -40,7 +43,7 @@ function publicUrl(value: string) {
 }
 
 function base() { return (process.env['CINEMA_STUDIO_WORKER_URL'] ?? '').trim().replace(/\/+$/,'') }
-function masterBase() { return ((process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim() || base() || BLACKSTAR_CINEMA_MASTER_WORKER_URL).replace(/\/+$/,'') }
+function masterBase() { return ((process.env['CINEMA_STUDIO_MASTER_WORKER_URL'] ?? '').trim() || base()).replace(/\/+$/,'') }
 function token() { return (process.env['CINEMA_STUDIO_WORKER_TOKEN'] ?? '').trim() }
 function headers() { return token() ? {'content-type':'application/json',authorization:`Bearer ${token()}`} : {'content-type':'application/json'} }
 
@@ -50,6 +53,23 @@ export async function probeCinemaMasterConnection() {
   const url=masterBase()
   const provider=getCinemaCapabilities().masterProvider
   const started=Date.now()
+  if(!url){
+    return {
+      id:'master-worker',
+      name:'Cinema Master Worker',
+      provider,
+      configured:false,
+      reachable:false,
+      healthy:false,
+      readySignal:null,
+      httpStatus:null,
+      latencyMs:0,
+      checkedAt:new Date().toISOString(),
+      gpuReport:null,
+      capabilities:{ffmpeg:null,cinema:null},
+      error:'Set CINEMA_STUDIO_MASTER_WORKER_URL to the ffmpeg assembly worker, or CINEMA_STUDIO_WORKER_URL when that worker also assembles films.',
+    }
+  }
   try{
     const response=await fetch(`${url}/health`,{
       method:'GET',
@@ -58,12 +78,13 @@ export async function probeCinemaMasterConnection() {
       signal:AbortSignal.timeout(8000),
     })
     const raw=await response.text()
+    const looksLikeHtml=/^\s*</.test(raw)
     let payload:any=null
-    try{payload=raw?JSON.parse(raw):null}catch{}
+    try{payload=raw&&!looksLikeHtml?JSON.parse(raw):null}catch{}
     const readySignal=payload&&typeof payload==='object'&&'ready' in payload
       ? payload.ready===true
       : null
-    const healthy=response.ok&&readySignal!==false
+    const healthy=response.ok&&readySignal===true&&!looksLikeHtml
     return {
       id:'master-worker',
       name:'Cinema Master Worker',
@@ -84,9 +105,13 @@ export async function probeCinemaMasterConnection() {
       },
       error:healthy
         ? null
-        : readySignal===false
-          ? 'Health endpoint reported ready=false.'
-          : `Health endpoint returned HTTP ${response.status}.`,
+        : looksLikeHtml
+          ? 'Health endpoint returned HTML instead of a ready JSON report.'
+          : readySignal===false
+            ? 'Health endpoint reported ready=false.'
+            : response.ok
+              ? 'Health endpoint did not return explicit ready=true JSON.'
+              : `Health endpoint returned HTTP ${response.status}.`,
     }
   }catch(error){
     return {
@@ -141,6 +166,7 @@ export async function getCinemaRender(id:string) {
 export async function getCinemaMasterAssembly(id:string) {
   if(!/^[a-zA-Z0-9._:-]{1,180}$/.test(id)) throw new Error('Invalid cinema master worker job id.')
   const url=masterBase()
+  if(!url) throw new Error('Cinema mastering requires CINEMA_STUDIO_MASTER_WORKER_URL or CINEMA_STUDIO_WORKER_URL.')
   const response=await fetch(`${url}/v1/films/${encodeURIComponent(id)}`,{headers:headers(),redirect:'manual',signal:AbortSignal.timeout(60_000)})
   const raw=await response.text()
   if(!response.ok) throw new Error(`Cinema master worker status failed (${response.status}): ${raw.slice(0,400)}`)
@@ -162,6 +188,7 @@ export async function submitCinemaMasterAssembly(input:{
   manifest:unknown;
 }) {
   const url=masterBase()
+  if(!url) throw new Error('Cinema mastering requires CINEMA_STUDIO_MASTER_WORKER_URL or CINEMA_STUDIO_WORKER_URL.')
   const response=await fetch(`${url}/v1/films/assemble`,{
     method:'POST',
     headers:headers(),

@@ -144,11 +144,16 @@ jobs:
       - name: Marketplace compatibility isolated Postgres access-control tests
         run: bun run test:marketplace-compatibility
 
-      - name: Free Open3D worker Python syntax and safety tests
+      - name: Free Open3D, mesh and cinema worker tests
         run: |
-          python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py workers/image-to-mesh/server.py workers/image-to-mesh/run_triposr.py
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          python3 -m py_compile workers/open3d-free/server.py workers/open3d-free/run_model.py workers/image-to-mesh/server.py workers/image-to-mesh/run_triposr.py workers/cinema-render/server.py
           python3 -m unittest discover -s workers/open3d-free -p 'test_*.py'
           python3 -m unittest discover -s workers/image-to-mesh -p 'test_*.py'
+          python3 -m unittest discover -s workers/cinema-render -p 'test_*.py'
 
       - name: Windows browser worker PowerShell syntax
         shell: pwsh

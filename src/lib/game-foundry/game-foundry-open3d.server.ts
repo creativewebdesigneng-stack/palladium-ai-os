@@ -2,7 +2,7 @@
 // but never calls FAL or charges another inference provider.
 export const OPEN3D_MODELS = ['shap-e', 'triposr', 'trellis'] as const;
 export type Open3dModel = (typeof OPEN3D_MODELS)[number];
-export type AssetModelChoice = 'auto' | Open3dModel | 'fal';
+export type AssetModelChoice = 'auto' | Open3dModel | 'fal' | 'image-to-mesh';
 export type Open3dProvider = 'open3d-shap-e' | 'open3d-triposr' | 'open3d-trellis';
 type Kind = 'prompt' | 'image' | 'model';
 const host = () => (process.env['GAME_FOUNDRY_OPEN3D_URL'] || '').trim().replace(/\/+$/, '');

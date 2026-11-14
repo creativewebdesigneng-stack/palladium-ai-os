@@ -4,7 +4,7 @@ Speaks the 3D Studio contract:
   GET  /health
   POST /workflow-runs/from-image
   GET  /workflow-runs/<id>
-  GET  /outputs/<id>/model.glb|model.obj
+  GET  /outputs/<id>/model.glb|model.gltf|model.bin|model.obj
 
 A job runs TripoSR when that repo and interpreter are installed. Otherwise it
 calls a configured Hugging Face endpoint. Health is ready only when one of
@@ -39,7 +39,7 @@ ALLOWED_HOSTS = {host.strip().lower() for host in os.environ.get("MESH_ALLOWED_I
 JOB_TIMEOUT = int(os.environ.get("MESH_JOB_TIMEOUT", "900"))
 MAX_IMAGE = 16 * 1024 * 1024
 MAX_MODEL = 40 * 1024 * 1024
-FORMATS = ("glb", "obj")
+FORMATS = ("glb", "obj", "gltf")
 DB_LOCK = threading.Lock()
 SEMAPHORE = threading.Semaphore(1)
 
@@ -195,28 +195,96 @@ def run_huggingface(image_url, output_format, destination):
     return None
 
 
+def split_glb(payload):
+    if len(payload) < 20 or payload[:4] != b"glTF":
+        raise ValueError("Mesh is not a GLB file, so it cannot be exported as glTF.")
+    version = int.from_bytes(payload[4:8], "little")
+    length = int.from_bytes(payload[8:12], "little")
+    if version != 2 or length != len(payload):
+        raise ValueError("GLB header does not match the file.")
+    offset = 12
+    json_chunk = None
+    bin_chunk = b""
+    while offset + 8 <= len(payload):
+        chunk_len = int.from_bytes(payload[offset:offset + 4], "little")
+        chunk_type = payload[offset + 4:offset + 8]
+        offset += 8
+        chunk = payload[offset:offset + chunk_len]
+        offset += chunk_len
+        if chunk_type == b"JSON":
+            json_chunk = chunk.rstrip(b" \x00")
+        elif chunk_type == b"BIN\x00":
+            bin_chunk = chunk
+    if json_chunk is None:
+        raise ValueError("GLB did not contain a JSON chunk.")
+    document = json.loads(json_chunk)
+    buffers = document.get("buffers")
+    if isinstance(buffers, list) and buffers:
+        buffers[0]["uri"] = "model.bin"
+        buffers[0]["byteLength"] = len(bin_chunk)
+    return json.dumps(document, separators=(",", ":")).encode(), bin_chunk
+
+
+def publish_mesh(folder, output_format, raw):
+    if len(raw) < 128:
+        raise RuntimeError("The model lane did not write a usable mesh.")
+    if output_format == "obj":
+        if b"\nv " not in raw[:4000] and not raw.lstrip().startswith(b"v "):
+            raise RuntimeError("OBJ export was not a Wavefront mesh.")
+        (folder / "model.obj").write_bytes(raw)
+        return "model.obj"
+    if raw[:4] == b"glTF":
+        if output_format == "gltf":
+            gltf, bin_bytes = split_glb(raw)
+            (folder / "model.gltf").write_bytes(gltf)
+            (folder / "model.bin").write_bytes(bin_bytes)
+            (folder / "model.glb").write_bytes(raw)
+            return "model.gltf"
+        (folder / "model.glb").write_bytes(raw)
+        return "model.glb"
+    if raw[:1] in (b"{", b"["):
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict) or "asset" not in parsed:
+            raise RuntimeError("JSON export was not a glTF document.")
+        (folder / "model.gltf").write_bytes(raw)
+        return "model.gltf"
+    raise RuntimeError("The model lane did not return a GLB, glTF or OBJ mesh.")
+
+
+def download_public_bytes(url):
+    public_image_url(url)
+    opener = urllib.request.build_opener(NoRedirect())
+    request = urllib.request.Request(url, headers={"User-Agent": "BlackstarImageToMesh/1.0"})
+    with opener.open(request, timeout=60) as response:
+        payload = response.read(MAX_MODEL + 1)
+    if len(payload) > MAX_MODEL or len(payload) < 128:
+        raise RuntimeError("Remote mesh was an unusable size.")
+    return payload
+
+
 def execute(job_id, image_url, output_format):
     with SEMAPHORE:
         folder = OUTPUTS / job_id
         folder.mkdir(parents=True, exist_ok=True)
         update_job(job_id, status="running")
-        output = folder / f"model.{output_format}"
+        engine_format = "glb" if output_format == "gltf" else output_format
+        output = folder / f"model.{engine_format}"
         try:
             remote_url = None
             if triposr_ready():
                 image = folder / "source.png"
                 download_image(image_url, image)
-                run_triposr(image, output, output_format)
+                run_triposr(image, output, engine_format)
             else:
-                remote_url = run_huggingface(image_url, output_format, output)
-            if remote_url:
+                remote_url = run_huggingface(image_url, engine_format, output)
+            if remote_url and output_format != "gltf":
                 update_job(job_id, status="completed", output_url=remote_url, error=None)
                 return
-            if not output.is_file() or output.stat().st_size < 128:
-                raise RuntimeError("The model lane did not write a usable mesh.")
+            raw = download_public_bytes(remote_url) if remote_url else (output.read_bytes() if output.is_file() else b"")
+            filename = publish_mesh(folder, output_format, raw)
             if not PUBLIC_URL.startswith("https://"):
                 raise RuntimeError("MESH_PUBLIC_URL must be https before a mesh can be published.")
-            update_job(job_id, status="completed", output_url=f"{PUBLIC_URL}/outputs/{job_id}/{output.name}", error=None)
+            update_job(job_id, status="completed", output_url=f"{PUBLIC_URL}/outputs/{job_id}/{filename}", error=None)
         except subprocess.TimeoutExpired:
             update_job(job_id, status="failed", error="Image-to-mesh exceeded the configured runtime limit.")
         except (ValueError, RuntimeError, urllib.error.URLError, json.JSONDecodeError) as exc:
@@ -260,14 +328,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, health_payload())
         if path.startswith("/outputs/"):
             parts = path.strip("/").split("/")
-            if len(parts) != 3 or parts[0] != "outputs" or not _uuid(parts[1]) or parts[2] not in ("model.glb", "model.obj"):
+            if len(parts) != 3 or parts[0] != "outputs" or not _uuid(parts[1]) or parts[2] not in ("model.glb", "model.obj", "model.gltf", "model.bin"):
                 return self.reply(404, {"error": "Output not found."})
             job = get_job(parts[1])
             file = OUTPUTS / parts[1] / parts[2]
-            if not job or job["status"] != "completed" or not file.is_file():
+            if not job or job["status"] != "completed" or not file.is_file() or file.stat().st_size < 12:
                 return self.reply(404, {"error": "Output not found."})
+            media = {
+                "model.glb": "model/gltf-binary",
+                "model.gltf": "model/gltf+json",
+                "model.bin": "application/octet-stream",
+                "model.obj": "model/obj",
+            }[parts[2]]
             self.send_response(200)
-            self.send_header("Content-Type", "model/gltf-binary" if parts[2].endswith(".glb") else "model/obj")
+            self.send_header("Content-Type", media)
             self.send_header("Content-Length", str(file.stat().st_size))
             self.send_header("Access-Control-Allow-Origin", os.environ.get("MESH_ASSET_CORS_ORIGIN", "https://palladium-ai-os.vercel.app"))
             self.send_header("X-Content-Type-Options", "nosniff")
@@ -301,7 +375,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(image_url, str):
                 return self.reply(422, {"error": "image_url is required."})
             if output_format not in FORMATS:
-                return self.reply(422, {"error": "Only glb and obj output are supported by this worker."})
+                return self.reply(422, {"error": "Only glb, gltf and obj output are supported by this worker."})
             public_image_url(image_url)
             with DB_LOCK, sqlite3.connect(DB) as connection:
                 active = connection.execute("SELECT COUNT(*) FROM jobs WHERE status IN ('queued','running')").fetchone()[0]

@@ -5,7 +5,7 @@ This service is the worker 3D Studio already calls:
 - `GET /health` returns JSON. `ready` is true only when a real lane can run.
 - `POST /workflow-runs/from-image` with `{ "image_url", "output_format" }` queues a job.
 - `GET /workflow-runs/<id>` returns `status`, `output_url`, `preview_url` and `error`.
-- Finished files are served at `/outputs/<id>/model.glb` or `model.obj`.
+- Finished files are served at `/outputs/<id>/model.glb`, `model.obj`, or `model.gltf` plus `model.bin`. A glTF export is a split of the GLB the model lane actually wrote.
 
 There are two lanes. Neither one invents a mesh.
 

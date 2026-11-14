@@ -7,12 +7,19 @@ const previous = {
   fal: process.env['FAL_API_KEY'],
   custom: process.env['GAME_FOUNDRY_3D_API_URL'],
 };
+const meshKeys = ['MESH_WORKER_URL','MESH_WORKER_TOKEN','THREE_D_HF_ENDPOINT_URL','HF_TOKEN','HUGGINGFACE_TOKEN'] as const;
+const previousMesh = Object.fromEntries(meshKeys.map((key)=>[key, process.env[key]]));
 afterEach(()=>{
   vi.restoreAllMocks();
   for (const [name,key] of [['url','GAME_FOUNDRY_OPEN3D_URL'],['token','GAME_FOUNDRY_OPEN3D_TOKEN'],
     ['fal','FAL_API_KEY'],['custom','GAME_FOUNDRY_3D_API_URL']] as const) {
     const value=previous[name];
     if(value===undefined) delete process.env[key]; else process.env[key]=value;
+  }
+  for (const key of meshKeys) {
+    const value = previousMesh[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
   }
 });
 function enableWorker() {
@@ -54,6 +61,9 @@ describe('no-credit triple open-source Game Foundry generator lane',()=>{
 
   it('selects TripoSR for image sources in free auto mode',async()=>{
     enableWorker();
+    delete process.env['MESH_WORKER_URL'];
+    delete process.env['THREE_D_HF_ENDPOINT_URL'];
+    delete process.env['HF_TOKEN'];
     const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(health(['triposr']))
       .mockResolvedValueOnce(health(['triposr'])).mockResolvedValueOnce(submitted());
     const result=await submitGameFoundryAsset({sourceKind:'image',
@@ -94,6 +104,36 @@ describe('no-credit triple open-source Game Foundry generator lane',()=>{
     expect(result.status).toBe('completed');
     expect(result.outputUrl).toContain('model.obj');
     expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes image auto through the image-to-mesh worker when that worker is configured',async()=>{
+    delete process.env['GAME_FOUNDRY_OPEN3D_URL'];
+    delete process.env['GAME_FOUNDRY_OPEN3D_TOKEN'];
+    delete process.env['FAL_API_KEY'];
+    process.env['MESH_WORKER_URL']='https://mesh.example.org';
+    process.env['MESH_WORKER_TOKEN']='mesh-token-mesh-token-mesh';
+    const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({
+      id:'mesh-job-1', status:'queued',
+    }),{status:202,headers:{'content-type':'application/json'}}));
+    const result=await submitGameFoundryAsset({
+      sourceKind:'image', sourceUrl:'https://assets.example.org/sports-car.png',
+      outputFormat:'gltf', qualityProfile:'game_ready', targetEngine:'godot', generationModel:'auto',
+    });
+    expect(result.provider).toBe('modly-compatible');
+    expect(result.workerJobId).toBe('mesh-job-1');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://mesh.example.org/workflow-runs/from-image');
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).output_format).toBe('gltf');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send a text prompt to the image-to-mesh worker',async()=>{
+    process.env['MESH_WORKER_URL']='https://mesh.example.org';
+    const fetchMock=vi.spyOn(globalThis,'fetch');
+    await expect(submitGameFoundryAsset({
+      sourceKind:'prompt', prompt:'A chair', outputFormat:'glb',
+      qualityProfile:'draft', targetEngine:'generic', generationModel:'image-to-mesh',
+    })).rejects.toThrow(/image/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('advertises free model gateway separately from paid FAL readiness',()=>{

@@ -25,7 +25,8 @@ describe('Cinema shot rendering integration',()=>{
   it('surfaces actual provider lanes and render evidence rather than stale credential blockers',()=>{
     expect(screen).toContain("seedreamCaps?.provider")
     expect(screen).toContain("ltxCaps?.provider")
-    expect(screen).toContain('Blackstar-hosted fallbacks remain available')
+    expect(screen).toContain('Buttons stay off until that lane has FAL_KEY or its worker URL.')
+    expect(screen).toContain('disabledReason')
     expect(screen).not.toContain('Blackstar server cannot see a fal credential')
     expect(screen).toContain('Generate keyframes')
     expect(screen).toContain('Generate video')

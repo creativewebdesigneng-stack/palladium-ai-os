@@ -96,5 +96,45 @@ class ImageToMeshWorkerTest(unittest.TestCase):
             os.environ.pop("HF_TOKEN", None)
 
 
+    def test_gltf_export_splits_a_real_glb_and_does_not_invent_one(self):
+        os.environ["THREE_D_HF_ENDPOINT_URL"] = "https://example.endpoints.huggingface.cloud/models/triposr"
+        os.environ["HF_TOKEN"] = "hf_test_token"
+        server.init_db()
+        job_id = "33333333-3333-4333-8333-333333333333"
+        with server.DB_LOCK, server.sqlite3.connect(server.DB) as connection:
+            connection.execute(
+                "INSERT INTO jobs (id,status,format,created_at,updated_at) VALUES (?,?,?,?,?)",
+                (job_id, "queued", "gltf", 1, 1),
+            )
+        document = {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 36}], "extras": {"note": "x" * 96}}
+        raw_json = json.dumps(document).encode()
+        pad = (4 - (len(raw_json) % 4)) % 4
+        bin_bytes = b"\x00" * 36
+        total = 12 + 8 + len(raw_json) + pad + 8 + len(bin_bytes)
+        payload = b"glTF" + (2).to_bytes(4, "little") + total.to_bytes(4, "little")
+        payload += (len(raw_json) + pad).to_bytes(4, "little") + b"JSON" + raw_json + (b" " * pad)
+        payload += len(bin_bytes).to_bytes(4, "little") + b"BIN\x00" + bin_bytes
+        self.assertGreaterEqual(len(payload), 128)
+
+        def fake(_url, _fmt, destination):
+            destination.write_bytes(payload)
+            return None
+
+        original = server.run_huggingface
+        server.run_huggingface = fake
+        try:
+            server.execute(job_id, "https://assets.example.com/reference.png", "gltf")
+            job = server.get_job(job_id)
+            self.assertEqual(job["status"], "completed")
+            self.assertTrue(job["output_url"].endswith("/model.gltf"))
+            written = json.loads((server.OUTPUTS / job_id / "model.gltf").read_text())
+            self.assertEqual(written["buffers"][0]["uri"], "model.bin")
+            self.assertEqual((server.OUTPUTS / job_id / "model.bin").read_bytes(), bin_bytes)
+        finally:
+            server.run_huggingface = original
+            os.environ.pop("THREE_D_HF_ENDPOINT_URL", None)
+            os.environ.pop("HF_TOKEN", None)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,17 +10,18 @@ afterEach(()=>{
 })
 
 describe('Blackstar Cinema Studio',()=>{
- it('supports feature-length targets with hosted mastering without claiming a direct renderer',()=>{
+ it('keeps assembly and direct rendering disabled until their worker URLs are set',()=>{
   delete process.env['CINEMA_STUDIO_WORKER_URL']
   delete process.env['CINEMA_STUDIO_MASTER_WORKER_URL']
   const c=getCinemaCapabilities()
   expect(CINEMA_MAX_DURATION_MINUTES).toBeGreaterThanOrEqual(120)
   expect(c.maxDurationMinutes).toBe(180)
-  expect(c.configured).toBe(true)
+  expect(c.configured).toBe(false)
   expect(c.renderConfigured).toBe(false)
-  expect(c.masterConfigured).toBe(true)
-  expect(c.masterProvider).toBe('blackstar-hosted-master')
+  expect(c.masterConfigured).toBe(false)
+  expect(c.masterProvider).toBe('unconfigured')
   expect(c.note).toContain('Direct one-shot text-to-film rendering remains disabled')
+  expect(c.note).toContain('CINEMA_STUDIO_MASTER_WORKER_URL')
   expect(c.continuity).toContain('character')
  })
  it('reports a dedicated mastering override without claiming direct text-to-film rendering',()=>{
@@ -40,14 +41,29 @@ describe('Blackstar Cinema Studio',()=>{
   expect(c.masterConfigured).toBe(true)
   expect(c.masterProvider).toBe('configured-cinema-worker')
  })
- it('refreshes hosted master jobs through the master worker even without a direct Cinema renderer',async()=>{
+ it('does not call the legacy hosted master when no worker URL is configured',async()=>{
   delete process.env['CINEMA_STUDIO_WORKER_URL']
   delete process.env['CINEMA_STUDIO_MASTER_WORKER_URL']
+  const fetchMock=vi.spyOn(globalThis,'fetch')
+  await expect(getCinemaMasterAssembly('master-1')).rejects.toThrow(/CINEMA_STUDIO_MASTER_WORKER_URL/)
+  expect(fetchMock).not.toHaveBeenCalled()
+ })
+ it('refreshes an explicitly configured master worker without claiming a direct renderer',async()=>{
+  delete process.env['CINEMA_STUDIO_WORKER_URL']
+  process.env['CINEMA_STUDIO_MASTER_WORKER_URL']=BLACKSTAR_CINEMA_MASTER_WORKER_URL
   const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({id:'master-1',status:'completed',output_url:'https://media.example/master.mp4'}),{status:200}))
   const result=await getCinemaMasterAssembly('master-1')
   expect(result.status).toBe('completed')
   expect(result.outputUrl).toBe('https://media.example/master.mp4')
   expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${BLACKSTAR_CINEMA_MASTER_WORKER_URL}/v1/films/master-1`)
+ })
+ it('treats an HTML health page as an unhealthy master worker',async()=>{
+  process.env['CINEMA_STUDIO_MASTER_WORKER_URL']='https://cinema.example.com'
+  vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response('<!DOCTYPE html>Access restricted',{status:200,headers:{'content-type':'text/html'}}))
+  const report=await probeCinemaMasterConnection()
+  expect(report.healthy).toBe(false)
+  expect(report.readySignal).toBeNull()
+  expect(report.error).toMatch(/HTML/)
  })
 
  it('reads optional NVIDIA GPU inventory from existing master health without claiming a render',async()=>{

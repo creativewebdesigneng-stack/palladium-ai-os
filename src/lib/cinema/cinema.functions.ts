@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server'
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server'
-import { getCinemaCapabilities, submitCinemaRender } from './cinema-runtime.server'
+import { getCinemaCapabilities, getCinemaRender, submitCinemaRender } from './cinema-runtime.server'
 import { generateCinemaProductionManifest, generateCinemaShotPlan } from './cinema-production.server'
 
 type Sb={from:(table:string)=>any}
@@ -60,6 +60,27 @@ export const createCinemaFilm=createServerFn({method:'POST'}).middleware([requir
   await sb.from('media_generation_jobs').update({status:'failed',error_message:message.slice(0,1000),completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',inserted.data.id).eq('user_id',context.userId)
   throw error
  }
+})
+
+export const refreshCinemaFilm=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>z.object({
+  jobId:z.string().uuid(),
+}).parse(v)).handler(async({data,context})=>{
+  const sb=context.supabase as unknown as Sb
+  const job=await sb.from('media_generation_jobs').select('id,worker_job_id,metadata').eq('id',data.jobId).eq('user_id',context.userId).eq('provider','cinema').maybeSingle()
+  if(job.error) throw new Error(job.error.message)
+  if(!job.data) throw new Error('Cinema job not found.')
+  if(job.data.metadata?.stage==='master') throw new Error('Refresh feature-film master jobs from the master panel.')
+  if(!job.data.worker_job_id) throw new Error('Cinema render job has no worker id.')
+  const result=await getCinemaRender(String(job.data.worker_job_id))
+  const missingOutput=result.status==='completed'&&!result.outputUrl
+  const status=missingOutput?'failed':result.status
+  const errorMessage=missingOutput?'Cinema worker reported completed without an output URL.':result.errorMessage
+  const terminal=['completed','failed','cancelled'].includes(status)
+  const update=await sb.from('media_generation_jobs').update({
+    status,output_url:result.outputUrl,error_message:errorMessage,completed_at:terminal?new Date().toISOString():null,updated_at:new Date().toISOString(),
+  }).eq('id',data.jobId).eq('user_id',context.userId)
+  if(update.error) throw new Error(update.error.message)
+  return {jobId:data.jobId,status,outputUrl:result.outputUrl,errorMessage}
 })
 
 

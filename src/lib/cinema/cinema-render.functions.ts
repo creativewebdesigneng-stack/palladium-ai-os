@@ -1,7 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
-import { getGenerativeMediaCapabilities, getGenerativeMediaJob, submitGenerativeMediaJob } from '@/lib/media/generative-media.server'
+import { getGenerativeMediaJob, submitGenerativeMediaJob } from '@/lib/media/generative-media.server'
+import { assertCinemaGenerationLane, getCinemaGenerationLanes } from './cinema-providers.server'
 
 type Sb={from:(table:string)=>any}
 
@@ -79,12 +80,13 @@ export const getCinemaRenderOverview=createServerFn({method:'POST'}).middleware(
       .eq('cinema_project_id',data.projectId).eq('user_id',context.userId)
       .order('scene_id',{ascending:true}).order('shot_id',{ascending:true}).order('segment_index',{ascending:true})
     if(result.error) throw new Error(result.error.message)
-    return {capabilities:getGenerativeMediaCapabilities(),renders:result.data??[]}
+    return {capabilities:getCinemaGenerationLanes(),renders:result.data??[]}
   })
 
 export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid(),sceneId:z.string().trim().min(1).max(60),limit:z.number().int().min(1).max(8).default(6)}).parse(v))
   .handler(async({data,context})=>{
+    assertCinemaGenerationLane('seedream')
     const sb=context.supabase as unknown as Sb
     const project=await sb.from('cinema_projects').select('id,aspect_ratio,production_manifest,status').eq('id',data.projectId).eq('user_id',context.userId).maybeSingle()
     if(project.error) throw new Error(project.error.message)
@@ -144,6 +146,7 @@ export const submitCinemaSceneKeyframes=createServerFn({method:'POST'}).middlewa
 export const submitCinemaSceneVideoSegments=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid(),sceneId:z.string().trim().min(1).max(60),limitShots:z.number().int().min(1).max(6).default(3)}).parse(v))
   .handler(async({data,context})=>{
+    assertCinemaGenerationLane('ltx')
     const sb=context.supabase as unknown as Sb
     const project=await sb.from('cinema_projects').select('id,aspect_ratio,production_manifest,status').eq('id',data.projectId).eq('user_id',context.userId).maybeSingle()
     if(project.error) throw new Error(project.error.message)
