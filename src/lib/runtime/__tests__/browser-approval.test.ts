@@ -9,7 +9,7 @@ vi.mock('../tools.server', () => ({ executeTool: calls.execute, resolveGrantedTo
 vi.mock('../runtime.server', () => ({ executeRun: calls.complete }));
 vi.mock('../planner-runtime.server', () => ({ executePlannedRun: calls.planned }));
 vi.mock('../run-checkpoint.server', () => ({ createDurableRunCheckpoint: (value: unknown) => value }));
-import { approvedLocalToolInput, queueLocalToolApproval, approvedBrowserInput, browserApprovalEvidence, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
+import { approvedLocalToolInput, queueLocalToolApproval, approvedExecutionRoute, approvedBrowserInput, browserApprovalEvidence, queueBrowserApproval, executeApprovedBrowserTask, rejectBrowserApproval } from '../browser-approval.server';
 const input = { steps: [{ action: 'navigate', url: 'https://httpbingo.org/html' }, { action: 'extract', selector: 'body' }] };
 const args = () => ({ sb: db, userId: 'owner', approvalRequestId: 'approval' });
 beforeEach(() => {
@@ -19,6 +19,20 @@ beforeEach(() => {
   calls.resolve.mockResolvedValue({ defs: [], grants: new Map([['browser_task', { slug: 'browser_task', requiresApproval: true, allowedDomains: ['httpbingo.org'], spendCap: 0 }]]) });
   calls.execute.mockResolvedValue({ ok: true, output: { provider: 'playwright', simulated: false, result: { ok: true, completed_steps: 2, outputs: [{ action: 'navigate', result: { ok: true } }, { action: 'extract', result: { text: 'Real extracted content' } }] } } });
 });
+describe('approved execution transport provenance', () => {
+  it('distinguishes local tools, real public-network handlers and connected reads without claiming provider certification', () => {
+    expect(approvedExecutionRoute('browser_task')).toBe('playwright');
+    expect(approvedExecutionRoute('calculator')).toBe('local');
+    expect(approvedExecutionRoute('current_time')).toBe('local');
+    expect(approvedExecutionRoute('data_analysis')).toBe('local');
+    expect(approvedExecutionRoute('web_search')).toBe('web_search_http');
+    expect(approvedExecutionRoute('web_fetch')).toBe('public_https_fetch');
+    expect(approvedExecutionRoute('http_request')).toBe('public_https_get');
+    expect(approvedExecutionRoute('connected_service')).toBe('tool_runtime');
+    expect(approvedExecutionRoute('database_query')).toBe('tool_runtime');
+  });
+});
+
 describe('bounded browser approval input and queueing', () => {
   const startingUrl = 'https://httpbingo.org/html';
 
@@ -381,13 +395,36 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ]) });
     calls.execute.mockResolvedValueOnce({ ok: true, output });
     const receipt = await executeApprovedBrowserTask(args());
-    expect(receipt).toMatchObject({ ok: true, provider: 'local', result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(receipt).toMatchObject({ ok: true, provider: 'tool_runtime', result: { agent_task_id: 'task', task_status: 'succeeded' } });
     expect(calls.execute).toHaveBeenCalledTimes(1);
     const call = calls.execute.mock.calls[0]!;
     expect(call[0]).toBe(name);
     expect(call[1]).toEqual(input);
     expect(call[2].allowedProviders).toEqual(['google']);
     expect(call[3].get(name).requiresApproval).toBe(false);
+    expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
+  });
+
+  it.each([
+    ['web_search', { query: 'Blackstar tools', limit: 8 }, { query: 'Blackstar tools', results: [{ title: 'Example', url: 'https://example.org', snippet: 'Test' }] }, 'web_search_http'],
+    ['web_fetch', { url: 'https://httpbingo.org/html' }, { url: 'https://httpbingo.org/html', text: 'Page body' }, 'public_https_fetch'],
+    ['http_request', { url: 'https://httpbingo.org/html', method: 'GET' }, { status: 200, ok: true, body: 'Page body' }, 'public_https_get'],
+  ] as const)('records a bounded %s approval as a network route, not local execution', async (name, input, output, route) => {
+    db.tables['approval_requests']![0]!['action_type'] = 'agent_tool_task';
+    db.tables['approval_requests']![0]!['details'] = { agent_task_id: 'task', tool: name, input };
+    db.tables['agent_tasks']![0]!['approval_resume_state']['messages'][0]['name'] = name;
+    calls.resolve.mockResolvedValueOnce({ defs: [], grants: new Map([
+      [name, { slug: name, requiresApproval: true, allowedDomains: ['httpbingo.org'], spendCap: 0 }],
+    ]) });
+    // Fixture output tests receipt integrity only, not live provider certification.
+    calls.execute.mockResolvedValueOnce({ ok: true, output });
+    const receipt = await executeApprovedBrowserTask(args());
+    expect(receipt).toMatchObject({ ok: true, provider: route, result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(calls.execute).toHaveBeenCalledTimes(1);
+    expect(calls.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'agent.tool_approval_result', metadata: expect.objectContaining({ provider: route, tool: name, simulated: false }),
+    }));
+    expect(calls.execute.mock.calls[0]![3].get(name).requiresApproval).toBe(false);
     expect(db.tables['personal_agents']![0]!['requires_approval']).toBe(true);
   });
 
@@ -487,7 +524,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     calls.execute.mockResolvedValueOnce({ ok: true, output });
     const result = await executeApprovedBrowserTask(args());
     expect(result).toMatchObject({
-      ok: true, provider: 'local',
+      ok: true, provider: 'tool_runtime',
       result: { agent_task_id: 'task', task_status: 'succeeded', tool_evidence: { truncated: false } },
     });
     const call = calls.execute.mock.calls[0]!;
@@ -508,7 +545,7 @@ describe('bounded local tool approvals share the existing continuation', () => {
     ]) });
     calls.execute.mockResolvedValueOnce({ ok: true, output: { table: 'personal_agents', rows: [{ id: 'owned', name: 'QA Agent' }] } });
     const output = await executeApprovedBrowserTask(args());
-    expect(output).toMatchObject({ ok: true, provider: 'local', result: { agent_task_id: 'task', task_status: 'succeeded' } });
+    expect(output).toMatchObject({ ok: true, provider: 'tool_runtime', result: { agent_task_id: 'task', task_status: 'succeeded' } });
     expect(calls.execute).toHaveBeenCalledTimes(1);
     expect(calls.execute.mock.calls[0]![0]).toBe('database_query');
     expect(calls.execute.mock.calls[0]![1]).toEqual(payload);

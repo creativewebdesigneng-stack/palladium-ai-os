@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Blocks, Globe, ScrollText, Plug } from 'lucide-react';
 import { listIntegrations, startIntegrationOAuth, disconnectIntegration as disconnectIntegrationFn } from '@/lib/integrations/integrations.functions';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +11,9 @@ import ToolEvidencePanel from '@/components/tools-framework/ToolEvidencePanel';
 import IntegrationsTab from '@/components/tools-framework/IntegrationsTab';
 import BrowserPolicyPanel, { ExecutionLog } from '@/components/tools-framework/BrowserPolicyPanel';
 import AppStudioPanel from '@/components/tools-framework/AppStudioPanel';
-import { getToolFramework, saveToolPermission, runToolManually } from '@/lib/tools/tools.functions';
+import { getToolFramework, saveToolPermission, runToolManually, getGovernedReadEvidence } from '@/lib/tools/tools.functions';
+import { runAgentTask } from '@/lib/runtime/runtime.functions';
+import { networkCertificationTask } from '@/lib/tools/network-certification-task';
 
 const TABS = [
   { id: 'tools', label: 'Tools', icon: Blocks },
@@ -53,6 +56,7 @@ export default function ToolsFramework() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { gate } = useUpgrade();
+  const [qaParams, setQaParams] = useSearchParams();
   const [tab, setTab] = useState('tools');
   const [framework, setFramework] = useState({ tools: [], executions: [], agents: [], browser: null, plan: 'explorer' });
   const [integrationCatalogue, setIntegrationCatalogue] = useState([]);
@@ -84,6 +88,7 @@ export default function ToolsFramework() {
   useEffect(() => { load(); }, [load]);
 
   const tools = framework.tools.map(toCard);
+  const selectedAgent = framework.agents.find(a => a.id === agentId) ?? null;
 
   const runTool = async (tool, inputStr) => {
     const planGate = tool.required_plan === 'free' ? true : tool.required_plan === 'pro' ? gate('runTasks') : gate('advancedTools');
@@ -97,6 +102,41 @@ export default function ToolsFramework() {
     const output = res.outputJson ? JSON.parse(res.outputJson) : null;
     if (res.status === 'failed') throw new Error(output?.error || 'Tool run failed');
     return output;
+  };
+
+  // This explicit operator action uses Blackstar's existing authenticated agent
+  // task runtime, not the manual tester's unresumable approval path. It may
+  // incur model usage; no approval, grant or domain restriction is bypassed.
+  const launchGovernedReadTest = async (tool) => {
+    if (!gate('runTasks')) throw new Error('Agent-task access is required.');
+    const prepared = networkCertificationTask(tool, selectedAgent, framework.permissions ?? []);
+    if (!prepared.eligible || !prepared.input) throw new Error(prepared.reason);
+    const result = await runAgentTask({ data: { agent_id: selectedAgent.id, input: prepared.input } });
+    const task = result?.task ?? result;
+    if (task?.id) {
+      setQaParams(previous => {
+        const next = new URLSearchParams(previous);
+        next.set('qaTool', tool.slug);
+        next.set('qaTask', task.id);
+        next.set('qaAgent', selectedAgent.id);
+        return next;
+      }, { replace: true });
+    }
+    await load();
+    return {
+      id: task?.id ?? null,
+      status: task?.status ?? 'unconfirmed',
+      // A returned task is not evidence of a tool call or its completion.
+      verification: 'unverified_until_execution_receipt',
+    };
+  };
+
+  // The user requests each recheck explicitly. No background polls, external
+  // action, credential exposure or approval bypass is performed by this read.
+  const checkGovernedReadTest = async (tool, taskId) => {
+    const result = await getGovernedReadEvidence({ data: { taskId, tool: tool.slug } });
+    await load();
+    return result;
   };
 
   const persist = async (payload, successTitle) => {
@@ -158,7 +198,13 @@ export default function ToolsFramework() {
 
       {tab === 'tools' && <>
         <ToolEvidencePanel rows={framework.toolEvidence ?? []} scope={framework.toolEvidenceScope} />
-        <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool} />
+        <ToolsTab tools={tools} loading={loading} isAdmin={isAdmin} onRunTool={runTool} onToggleTool={toggleTool}
+          selectedAgent={selectedAgent} toolPermissions={framework.permissions ?? []} onGovernedReadTest={launchGovernedReadTest}
+          onCheckGovernedReadTest={checkGovernedReadTest} resumedQa={{
+            tool: qaParams.get('qaTool'),
+            taskId: qaParams.get('qaTask'),
+            agentId: qaParams.get('qaAgent'),
+          }} />
       </>}
       {tab === 'policy' && <BrowserPolicyPanel tools={framework.tools} browser={framework.browser} saving={saving} onSave={(p) => persist(p, 'Policy updated')} />}
       {tab === 'executions' && <ExecutionLog executions={framework.executions} loading={loading} />}

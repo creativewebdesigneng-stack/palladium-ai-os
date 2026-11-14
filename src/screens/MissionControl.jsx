@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Gauge, User, ShieldAlert, ShoppingBag, Brain, ListChecks, ScrollText, Bell, Briefcase, Network } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
@@ -84,7 +85,12 @@ const isExternalActionApproval = (approval) => EXTERNAL_ACTION_TYPES.has(approva
 export default function MissionControl() {
   const qc = useQueryClient();
   const { isAuthenticated, isLoadingAuth } = useAuth();
-  const [tab, setTab] = useState('overview');
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState(() => TABS.some(([id]) => id === requestedTab) ? requestedTab : 'overview');
+  useEffect(() => {
+    if (TABS.some(([id]) => id === requestedTab)) setTab(requestedTab);
+  }, [requestedTab]);
   const [builder, setBuilder] = useState({ open: false, initial: null });
   const [busyId, setBusyId] = useState(null);
   const [orchestration, setOrchestration] = useState(null);

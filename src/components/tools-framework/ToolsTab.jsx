@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Loader2, Power } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import ToolCard from './ToolCard';
 import ToolDetailDrawer from './ToolDetailDrawer';
 import { TOOL_CATEGORIES } from './toolsData';
 
-export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleTool }) {
+export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleTool, selectedAgent,
+  toolPermissions, onGovernedReadTest, onCheckGovernedReadTest, resumedQa }) {
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(null);
+  useEffect(() => {
+    if (!resumedQa?.tool || !resumedQa?.taskId || resumedQa.agentId !== selectedAgent?.id) return;
+    const matching = tools.find(item => item.slug === resumedQa.tool);
+    if (matching) setOpen(matching);
+  }, [resumedQa?.tool, resumedQa?.taskId, resumedQa?.agentId, selectedAgent?.id, tools.length]);
 
   const filtered = tools.filter((t) => {
     if (category !== 'all' && t.category !== category) return false;
@@ -49,7 +55,10 @@ export default function ToolsTab({ tools, loading, isAdmin, onRunTool, onToggleT
         </div>
       )}
 
-      <ToolDetailDrawer tool={open} isAdmin={isAdmin} onClose={() => setOpen(null)} onToggle={onToggleTool} onRun={onRunTool} />
+      <ToolDetailDrawer tool={open} isAdmin={isAdmin} onClose={() => setOpen(null)} onToggle={onToggleTool}
+        onRun={onRunTool} selectedAgent={selectedAgent} toolPermissions={toolPermissions}
+        onGovernedReadTest={onGovernedReadTest} onCheckGovernedReadTest={onCheckGovernedReadTest}
+        resumedTaskId={resumedQa?.tool === open?.slug && resumedQa?.agentId === selectedAgent?.id ? resumedQa?.taskId : null} />
     </>
   );
 }
