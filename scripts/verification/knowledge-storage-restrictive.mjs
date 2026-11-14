@@ -76,6 +76,21 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(migration);
 
+const functionConfig = await rows(`
+  select procedure.proconfig
+  from pg_proc as procedure
+  join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+  where namespace.nspname = 'private'
+    and procedure.proname = 'knowledge_object_owner_read'
+`);
+check(
+  functionConfig.length === 1 &&
+    String(functionConfig[0].proconfig).includes('search_path=pg_catalog') &&
+    !String(functionConfig[0].proconfig).includes('public') &&
+    !String(functionConfig[0].proconfig).includes('storage'),
+  "SECURITY DEFINER predicate uses only the pg_catalog search_path",
+);
+
 await db.query(
   `insert into storage.objects(id, bucket_id, name) values ($1, 'knowledge', $2), ($3, 'cinema-hf-outputs', $4)`,
   [ownObject, `${owner}/notes.txt`, otherBucket, `${other}/clip.mp4`],
@@ -125,6 +140,27 @@ check(
   (await rows("select id from storage.objects where bucket_id = 'knowledge'")).length === 1,
   "current organisation member can read a linked knowledge object",
 );
+
+const directPredicate = await rows(
+  "select private.knowledge_object_owner_read($1) as allowed",
+  [ownObject],
+);
+check(
+  directPredicate.length === 1 && directPredicate[0].allowed === true,
+  "authenticated callers can execute the predicate for an owned object",
+);
+await db.exec("reset role;");
+await db.query(
+  `insert into memory_documents(id, user_id, org_id, storage_path, title) values ($1, $2, $3, $4, 'Conflicting owner')`,
+  [id(52), other, org, `${owner}/notes.txt`],
+);
+await db.exec(`set role authenticated; set request.jwt.claim.sub = '${owner}';`);
+check(
+  (await rows("select id from storage.objects where bucket_id = 'knowledge'")).length === 0,
+  "a conflicting duplicate document row denies access to the shared storage path",
+);
+await db.exec("reset role;");
+await db.query("delete from memory_documents where id = $1", [id(52)]);
 await db.exec(`reset role; delete from organisation_members where user_id = '${owner}';`);
 await db.exec(`set role authenticated; set request.jwt.claim.sub = '${owner}';`);
 check(
@@ -134,6 +170,7 @@ check(
 
 await db.exec("reset role; set role anon;");
 await denied("select * from storage.objects");
+await denied("select private.knowledge_object_owner_read($1)", [ownObject]);
 
 await db.close();
 console.log(`Knowledge storage: ${passed} isolated checks passed.`);
