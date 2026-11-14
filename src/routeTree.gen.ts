@@ -47,6 +47,7 @@ import { Route as ShellAppAiBuilderRouteImport } from './routes/_shell/_app/ai-b
 import { Route as ShellAppAiHubRouteImport } from './routes/_shell/_app/ai-hub'
 import { Route as ShellAppAiMarketplaceRouteImport } from './routes/_shell/_app/ai-marketplace'
 import { Route as ShellAppAiModelHubRouteImport } from './routes/_shell/_app/ai-model-hub'
+import { Route as ShellAppAiReceptionistRouteImport } from './routes/_shell/_app/ai-receptionist'
 import { Route as ShellAppAiToolsRouteImport } from './routes/_shell/_app/ai-tools'
 import { Route as ShellAppAiWorkbenchRouteImport } from './routes/_shell/_app/ai-workbench'
 import { Route as ShellAppAnalyticsRouteImport } from './routes/_shell/_app/analytics'
@@ -85,6 +86,7 @@ import { Route as ShellAppFilesRouteImport } from './routes/_shell/_app/files'
 import { Route as ShellAppFilesAnalysisRouteImport } from './routes/_shell/_app/files-analysis'
 import { Route as ShellAppFinanceRouteImport } from './routes/_shell/_app/finance'
 import { Route as ShellAppFitnessStudioRouteImport } from './routes/_shell/_app/fitness-studio'
+import { Route as ShellAppFoodDeliveryRouteImport } from './routes/_shell/_app/food-delivery'
 import { Route as ShellAppGameFoundryRouteImport } from './routes/_shell/_app/game-foundry'
 import { Route as ShellAppHealthFitnessRouteImport } from './routes/_shell/_app/health-fitness'
 import { Route as ShellAppHtmlStudioRouteImport } from './routes/_shell/_app/html-studio'
@@ -380,6 +382,11 @@ const ShellAppAiModelHubRoute = ShellAppAiModelHubRouteImport.update({
   path: '/ai-model-hub',
   getParentRoute: () => ShellAppRoute,
 } as any)
+const ShellAppAiReceptionistRoute = ShellAppAiReceptionistRouteImport.update({
+  id: '/ai-receptionist',
+  path: '/ai-receptionist',
+  getParentRoute: () => ShellAppRoute,
+} as any)
 const ShellAppAiToolsRoute = ShellAppAiToolsRouteImport.update({
   id: '/ai-tools',
   path: '/ai-tools',
@@ -574,6 +581,11 @@ const ShellAppFinanceRoute = ShellAppFinanceRouteImport.update({
 const ShellAppFitnessStudioRoute = ShellAppFitnessStudioRouteImport.update({
   id: '/fitness-studio',
   path: '/fitness-studio',
+  getParentRoute: () => ShellAppRoute,
+} as any)
+const ShellAppFoodDeliveryRoute = ShellAppFoodDeliveryRouteImport.update({
+  id: '/food-delivery',
+  path: '/food-delivery',
   getParentRoute: () => ShellAppRoute,
 } as any)
 const ShellAppGameFoundryRoute = ShellAppGameFoundryRouteImport.update({
@@ -1153,6 +1165,7 @@ export interface FileRoutesByFullPath {
   '/ai-hub': typeof ShellAppAiHubRoute
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/ai-receptionist': typeof ShellAppAiReceptionistRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
   '/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/analytics': typeof ShellAppAnalyticsRoute
@@ -1191,6 +1204,7 @@ export interface FileRoutesByFullPath {
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/food-delivery': typeof ShellAppFoodDeliveryRoute
   '/game-foundry': typeof ShellAppGameFoundryRoute
   '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
@@ -1331,6 +1345,7 @@ export interface FileRoutesByTo {
   '/ai-hub': typeof ShellAppAiHubRoute
   '/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/ai-receptionist': typeof ShellAppAiReceptionistRoute
   '/ai-tools': typeof ShellAppAiToolsRoute
   '/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/analytics': typeof ShellAppAnalyticsRoute
@@ -1369,6 +1384,7 @@ export interface FileRoutesByTo {
   '/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/finance': typeof ShellAppFinanceRoute
   '/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/food-delivery': typeof ShellAppFoodDeliveryRoute
   '/game-foundry': typeof ShellAppGameFoundryRoute
   '/health-fitness': typeof ShellAppHealthFitnessRoute
   '/html-studio': typeof ShellAppHtmlStudioRoute
@@ -1512,6 +1528,7 @@ export interface FileRoutesById {
   '/_shell/_app/ai-hub': typeof ShellAppAiHubRoute
   '/_shell/_app/ai-marketplace': typeof ShellAppAiMarketplaceRoute
   '/_shell/_app/ai-model-hub': typeof ShellAppAiModelHubRoute
+  '/_shell/_app/ai-receptionist': typeof ShellAppAiReceptionistRoute
   '/_shell/_app/ai-tools': typeof ShellAppAiToolsRoute
   '/_shell/_app/ai-workbench': typeof ShellAppAiWorkbenchRoute
   '/_shell/_app/analytics': typeof ShellAppAnalyticsRoute
@@ -1550,6 +1567,7 @@ export interface FileRoutesById {
   '/_shell/_app/files-analysis': typeof ShellAppFilesAnalysisRoute
   '/_shell/_app/finance': typeof ShellAppFinanceRoute
   '/_shell/_app/fitness-studio': typeof ShellAppFitnessStudioRoute
+  '/_shell/_app/food-delivery': typeof ShellAppFoodDeliveryRoute
   '/_shell/_app/game-foundry': typeof ShellAppGameFoundryRoute
   '/_shell/_app/health-fitness': typeof ShellAppHealthFitnessRoute
   '/_shell/_app/html-studio': typeof ShellAppHtmlStudioRoute
@@ -1692,6 +1710,7 @@ export interface FileRouteTypes {
     | '/ai-hub'
     | '/ai-marketplace'
     | '/ai-model-hub'
+    | '/ai-receptionist'
     | '/ai-tools'
     | '/ai-workbench'
     | '/analytics'
@@ -1730,6 +1749,7 @@ export interface FileRouteTypes {
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
+    | '/food-delivery'
     | '/game-foundry'
     | '/health-fitness'
     | '/html-studio'
@@ -1870,6 +1890,7 @@ export interface FileRouteTypes {
     | '/ai-hub'
     | '/ai-marketplace'
     | '/ai-model-hub'
+    | '/ai-receptionist'
     | '/ai-tools'
     | '/ai-workbench'
     | '/analytics'
@@ -1908,6 +1929,7 @@ export interface FileRouteTypes {
     | '/files-analysis'
     | '/finance'
     | '/fitness-studio'
+    | '/food-delivery'
     | '/game-foundry'
     | '/health-fitness'
     | '/html-studio'
@@ -2050,6 +2072,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/ai-hub'
     | '/_shell/_app/ai-marketplace'
     | '/_shell/_app/ai-model-hub'
+    | '/_shell/_app/ai-receptionist'
     | '/_shell/_app/ai-tools'
     | '/_shell/_app/ai-workbench'
     | '/_shell/_app/analytics'
@@ -2088,6 +2111,7 @@ export interface FileRouteTypes {
     | '/_shell/_app/files-analysis'
     | '/_shell/_app/finance'
     | '/_shell/_app/fitness-studio'
+    | '/_shell/_app/food-delivery'
     | '/_shell/_app/game-foundry'
     | '/_shell/_app/health-fitness'
     | '/_shell/_app/html-studio'
@@ -2517,6 +2541,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppAiModelHubRouteImport
       parentRoute: typeof ShellAppRoute
     }
+    '/_shell/_app/ai-receptionist': {
+      id: '/_shell/_app/ai-receptionist'
+      path: '/ai-receptionist'
+      fullPath: '/ai-receptionist'
+      preLoaderRoute: typeof ShellAppAiReceptionistRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
     '/_shell/_app/ai-tools': {
       id: '/_shell/_app/ai-tools'
       path: '/ai-tools'
@@ -2781,6 +2812,13 @@ declare module '@tanstack/react-router' {
       path: '/fitness-studio'
       fullPath: '/fitness-studio'
       preLoaderRoute: typeof ShellAppFitnessStudioRouteImport
+      parentRoute: typeof ShellAppRoute
+    }
+    '/_shell/_app/food-delivery': {
+      id: '/_shell/_app/food-delivery'
+      path: '/food-delivery'
+      fullPath: '/food-delivery'
+      preLoaderRoute: typeof ShellAppFoodDeliveryRouteImport
       parentRoute: typeof ShellAppRoute
     }
     '/_shell/_app/game-foundry': {
@@ -3520,6 +3558,7 @@ interface ShellAppRouteChildren {
   ShellAppAiHubRoute: typeof ShellAppAiHubRoute
   ShellAppAiMarketplaceRoute: typeof ShellAppAiMarketplaceRoute
   ShellAppAiModelHubRoute: typeof ShellAppAiModelHubRoute
+  ShellAppAiReceptionistRoute: typeof ShellAppAiReceptionistRoute
   ShellAppAiToolsRoute: typeof ShellAppAiToolsRoute
   ShellAppAiWorkbenchRoute: typeof ShellAppAiWorkbenchRoute
   ShellAppAnalyticsRoute: typeof ShellAppAnalyticsRoute
@@ -3558,6 +3597,7 @@ interface ShellAppRouteChildren {
   ShellAppFilesAnalysisRoute: typeof ShellAppFilesAnalysisRoute
   ShellAppFinanceRoute: typeof ShellAppFinanceRoute
   ShellAppFitnessStudioRoute: typeof ShellAppFitnessStudioRoute
+  ShellAppFoodDeliveryRoute: typeof ShellAppFoodDeliveryRoute
   ShellAppGameFoundryRoute: typeof ShellAppGameFoundryRoute
   ShellAppHealthFitnessRoute: typeof ShellAppHealthFitnessRoute
   ShellAppHtmlStudioRoute: typeof ShellAppHtmlStudioRoute
@@ -3642,6 +3682,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppAiHubRoute: ShellAppAiHubRoute,
   ShellAppAiMarketplaceRoute: ShellAppAiMarketplaceRoute,
   ShellAppAiModelHubRoute: ShellAppAiModelHubRoute,
+  ShellAppAiReceptionistRoute: ShellAppAiReceptionistRoute,
   ShellAppAiToolsRoute: ShellAppAiToolsRoute,
   ShellAppAiWorkbenchRoute: ShellAppAiWorkbenchRoute,
   ShellAppAnalyticsRoute: ShellAppAnalyticsRoute,
@@ -3681,6 +3722,7 @@ const ShellAppRouteChildren: ShellAppRouteChildren = {
   ShellAppFilesAnalysisRoute: ShellAppFilesAnalysisRoute,
   ShellAppFinanceRoute: ShellAppFinanceRoute,
   ShellAppFitnessStudioRoute: ShellAppFitnessStudioRoute,
+  ShellAppFoodDeliveryRoute: ShellAppFoodDeliveryRoute,
   ShellAppGameFoundryRoute: ShellAppGameFoundryRoute,
   ShellAppHealthFitnessRoute: ShellAppHealthFitnessRoute,
   ShellAppHtmlStudioRoute: ShellAppHtmlStudioRoute,
@@ -3873,13 +3915,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

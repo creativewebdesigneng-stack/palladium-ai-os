@@ -32,7 +32,7 @@ export default function AppShell() {
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCommand(true) }
-      if (e.key === 'Escape') { setCommand(false) }
+      if (e.key === 'Escape') { setCommand(false); setMobileOpen(false) }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -75,6 +75,7 @@ export default function AppShell() {
           <Topbar
             collapsed={collapsed}
             toggleSidebar={() => setCollapsed((c) => !c)}
+            mobileOpen={mobileOpen}
             openMobile={() => setMobileOpen(true)}
             openCommand={() => setCommand(true)}
             openAssistant={() => setAssistantPanel(true)}

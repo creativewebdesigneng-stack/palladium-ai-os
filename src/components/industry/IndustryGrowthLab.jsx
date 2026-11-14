@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Calculator, Gauge, TrendingUp, ShieldAlert } from 'lucide-react';
+import { growthMetrics } from '@/lib/industry/industry-calculations';
 
 const n=(v)=>Number.isFinite(Number(v))?Number(v):0;
-const pct=(a,b)=>b>0?(a/b)*100:0;
 
-export default function IndustryGrowthLab(){
+export default function IndustryGrowthLab({ onPicture }){
  const [revenue,setRevenue]=useState('1000000'),[cost,setCost]=useState('700000'),[market,setMarket]=useState('20000000'),[investment,setInvestment]=useState('100000'),[benefit,setBenefit]=useState('160000');
- const m=useMemo(()=>{const r=n(revenue),c=n(cost),mk=n(market),inv=n(investment),ben=n(benefit);return {margin:r-c,marginPct:pct(r-c,r),share:pct(r,mk),roi:inv>0?((ben-inv)/inv)*100:0,payback:ben>0?(inv/ben)*12:0}},[revenue,cost,market,investment,benefit]);
+ const m=useMemo(()=>{const metrics=growthMetrics(n(revenue),n(cost),n(market),n(investment),n(benefit));return {...metrics,share:metrics.marketShare,payback:metrics.paybackMonths}},[revenue,cost,market,investment,benefit]);
+ useEffect(()=>{onPicture?.({inputs:{revenue:n(revenue),cost:n(cost),market:n(market),investment:n(investment),benefit:n(benefit)},metrics:m})},[m,revenue,cost,market,investment,benefit,onPicture]);
  return <section className="rounded-[26px] border border-white/[.08] bg-black/25 p-5 lg:p-6"><div className="flex items-center gap-2 text-fuchsia-300"><Calculator className="h-4 w-4"/><span className="text-xs font-semibold uppercase tracking-[.16em]">Industry growth lab</span></div><h2 className="mt-2 text-xl font-semibold text-white">Deterministic commercial scenario planning</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Test simple operating and growth assumptions without presenting estimates as forecasts. Use Finance Hub for deeper financial modelling and verified company data.</p>
  <div className="mt-5 grid gap-3 md:grid-cols-5"><Field label="Revenue" value={revenue} set={setRevenue}/><Field label="Operating cost" value={cost} set={setCost}/><Field label="Addressable market" value={market} set={setMarket}/><Field label="Investment" value={investment} set={setInvestment}/><Field label="Annual benefit" value={benefit} set={setBenefit}/></div>
  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Metric icon={Gauge} label="Operating margin" value={m.marginPct.toFixed(1)+'%'} sub={'Value '+m.margin.toLocaleString()}/><Metric icon={TrendingUp} label="Illustrative market share" value={m.share.toFixed(2)+'%'} sub="Revenue ÷ addressable market"/><Metric icon={TrendingUp} label="Illustrative ROI" value={m.roi.toFixed(1)+'%'} sub="(Benefit − investment) ÷ investment"/><Metric icon={ShieldAlert} label="Simple payback" value={m.payback.toFixed(1)+' months'} sub="Investment ÷ annual benefit"/></div>

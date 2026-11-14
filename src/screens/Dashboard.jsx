@@ -19,6 +19,21 @@ const quick = [
   ['Analyse a file', '/files-analysis', Files],
 ];
 
+const hubs = [
+  ['Trading', '/trading-hub'],
+  ['Retail', '/retail-hub'],
+  ['AI Receptionist', '/ai-receptionist'],
+  ['Food delivery', '/food-delivery'],
+  ['Dropshipping', '/dropshipping-hub'],
+  ['Website Studio', '/website-studio'],
+  ['Company', '/company-hub'],
+  ['Finance', '/finance'],
+  ['Legal', '/legal-hub'],
+  ['Compliance', '/compliance-sentinel'],
+  ['Construction', '/construction-industrial-hub'],
+  ['Industry', '/industry-hub'],
+];
+
 function timeAgo(iso) {
   const timestamp = new Date(iso).getTime();
   if (!Number.isFinite(timestamp)) return 'recently';
@@ -166,6 +181,20 @@ export default function Dashboard() {
           </div>
         </Panel>
       </div>
+
+      <section className="mt-4" aria-label="Operating hubs">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-sm font-medium text-white">Operating hubs</h2>
+          <p className="text-[11px] text-zinc-500">Industry and business workspaces</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {hubs.map(([label, path]) => (
+            <Link key={path} to={path} className="flex min-h-11 items-center rounded-xl border border-violet-300/10 bg-[#0b0910]/60 px-3 py-2 text-sm text-zinc-300 transition hover:border-violet-300/25 hover:bg-violet-400/[.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
+              {label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Panel title="Live activity" subtitle="Recent intelligence and execution events">

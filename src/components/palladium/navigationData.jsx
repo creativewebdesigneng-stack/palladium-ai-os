@@ -3,9 +3,9 @@ import {
   BriefcaseBusiness, Building2, CalendarClock, Clapperboard, ClipboardCheck, Code2,
   Contact, Cpu, CreditCard, Database, Dumbbell, Factory, FileText, Files, FlaskConical,
   FolderKanban, Gamepad2, Globe, Hammer, Hand, HardHat, Home, Layers3, LifeBuoy,
-  LineChart, Link2, ListChecks, Lock, Megaphone, MessageCircle, Mic2, Orbit, PhoneCall,
+  Headset, LineChart, Link2, ListChecks, Lock, Megaphone, MessageCircle, Mic2, Orbit, PhoneCall,
   Plug, Popcorn, Radar, Rocket, Scale, ScrollText, Search, Settings, Settings2, ShieldCheck,
-  ShoppingBag, Sparkles, SquareTerminal, Store, Table2, Users, WandSparkles, Workflow,
+  ShoppingBag, Sparkles, SquareTerminal, Store, Table2, Users, UtensilsCrossed, WandSparkles, Workflow,
   Wrench, Zap,
 } from 'lucide-react'
 
@@ -116,6 +116,8 @@ export const SYSTEM_GROUPS = [
       { label: 'Industry Hub', path: '/industry-hub', icon: Factory },
       { label: 'Construction & Industrial', path: '/construction-industrial-hub', icon: HardHat },
       { label: 'Retail Hub', path: '/retail-hub', icon: Store },
+      { label: 'AI Receptionist', path: '/ai-receptionist', icon: Headset },
+      { label: 'Food Delivery', path: '/food-delivery', icon: UtensilsCrossed },
       { label: 'Commerce Studio', path: '/commerce-studio', icon: Store },
       { label: 'Dropshipping Hub', path: '/dropshipping-hub', icon: Rocket },
       { label: 'Shopify Connect', path: '/shopify-connect', icon: ShoppingBag },
