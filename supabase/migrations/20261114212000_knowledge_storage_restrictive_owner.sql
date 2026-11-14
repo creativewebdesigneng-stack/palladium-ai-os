@@ -28,7 +28,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = pg_catalog, public, storage
+set search_path = pg_catalog
 as $knowledge_read$
   select (select auth.uid()) is not null
     and exists (
