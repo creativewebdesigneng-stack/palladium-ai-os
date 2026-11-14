@@ -1,0 +1,4523 @@
+{
+  "schemaVersion": 1,
+  "programme": "Blackstar completion",
+  "worker": "W12",
+  "generatedAt": "2026-11-14T19:30:00Z",
+  "baselineSha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+  "baselineCommit": "Make 3D Studio save real scenes and fail closed when the mesh worker is down (#1061)",
+  "repository": "creativewebdesigneng-stack/palladium-ai-os",
+  "statusLegend": {
+    "NOT STARTED": "No implementation on this SHA, or the check has no artefact yet.",
+    "IN PROGRESS": "Open issue or PR, or code that is only on an unmerged branch.",
+    "IMPLEMENTED": "Present on this SHA. Unit coverage may have passed inside the CI-env suite. Live acceptance was not run.",
+    "TESTING": "A dedicated test is in progress. Not used for a finished result.",
+    "QA PASSED": "This worker executed the cited check on this SHA, or confirmed the named GitHub run, and it passed.",
+    "BLOCKED": "A named gate stops completion. The gate is external, a failing check, or a conflict.",
+    "COMPLETE": "Verified on this SHA including the item's acceptance evidence. No item earned this status."
+  },
+  "counts": {
+    "QA PASSED": 11,
+    "BLOCKED": 19,
+    "NOT STARTED": 3,
+    "IMPLEMENTED": 113,
+    "IN PROGRESS": 61
+  },
+  "pullRequestRecommendations": {
+    "rebase": 25,
+    "close-as-superseded": 21
+  },
+  "openIssues": 18,
+  "openPullRequests": 46,
+  "executionPlan": {
+    "rule": "One writer per path. package.json, bun.lock and supabase/migrations have a single owner (W1). Existing migrations are never edited. W12 owns docs/completion and e2e only.",
+    "doNotParallelize": [
+      "Any two missions that touch package.json, bun.lock, or .github/workflows/backend-check.yml. W1 goes first.",
+      "W4 src/lib/runtime/** with W2 Astra PRs #1025/#1026/#1027, which also patch runtime and the lockfile.",
+      "W7 src/screens/MissionControl.jsx and W6 src/components/mission/AgentBuilder.jsx until PR #944 is rebased or closed. That PR touches both.",
+      "W1 storage migrations (#1037 or #1038) with W3 src/lib/memory/memory.functions.ts, because #1048 already combines both and the forks diverge.",
+      "W8 workers/gta-obj-inspector with a second editor while #918/#919/#920 are rebased."
+    ],
+    "parallelGroups": [
+      {
+        "name": "Group A — disjoint from the lockfile",
+        "workers": [
+          "W8",
+          "W10",
+          "W11",
+          "W12"
+        ],
+        "note": "Safe together only if W8 does not edit package.json and W11 does not edit the public shell files W12's smoke manifest names. W12's files are docs/completion/** and e2e/**."
+      },
+      {
+        "name": "Group B — after W1 rebases or closes the lockfile PRs",
+        "workers": [
+          "W4",
+          "W5",
+          "W6",
+          "W7"
+        ],
+        "note": "Split files as listed below. W5 may test browser-worker/** without waiting. W5 must not edit src/lib/runtime while W4 does."
+      },
+      {
+        "name": "Group C — single decision, not parallel",
+        "workers": [
+          "W1",
+          "W2",
+          "W3",
+          "W9",
+          "W12"
+        ],
+        "note": "Pick one enterprise/knowledge tip (#1048, with #1037 or #1038 cherry-picked only if their SQL is still missing) and one Astra tip (#1025 or #1047, not both blindly). CyberGym stays draft until issue #1050 has a real sandbox run."
+      }
+    ],
+    "ownership": [
+      {
+        "worker": "W1",
+        "paths": [
+          "package.json",
+          "bun.lock",
+          "supabase/migrations/**",
+          ".github/workflows/backend-check.yml",
+          ".github/workflows/scheduled-security-audit.yml",
+          "src/lib/security/**",
+          "src/lib/auth/**",
+          "src/lib/admin/**",
+          "src/lib/devapi/**",
+          "src/lib/platform/**"
+        ]
+      },
+      {
+        "worker": "W2",
+        "paths": [
+          "src/lib/evals/**",
+          "src/lib/ai/**",
+          "src/lib/ai-hub/**",
+          "astra-serving/**",
+          "src/lib/human-frontier/**",
+          "src/lib/collective/**"
+        ]
+      },
+      {
+        "worker": "W3",
+        "paths": [
+          "src/lib/memory/**",
+          "src/lib/documents/**",
+          "src/lib/data/**",
+          "src/lib/notes/**",
+          "src/routes/_shell/_app/knowledge.tsx"
+        ]
+      },
+      {
+        "worker": "W4",
+        "paths": [
+          "src/lib/runtime/**",
+          "src/lib/agents/**",
+          "src/lib/workflows/**",
+          "src/lib/workspaces/**",
+          "src/lib/evolution/**",
+          "src/lib/simulation/**",
+          "src/routes/api/agents/**",
+          "src/components/runtime/**"
+        ]
+      },
+      {
+        "worker": "W5",
+        "paths": [
+          "browser-worker/**",
+          "src/lib/browser/**",
+          "src/lib/terminal/**",
+          "src/lib/web/**",
+          "src/lib/search/**",
+          "src/lib/projects/**",
+          "src/routes/_shell/_app/browser-preview.tsx",
+          "src/routes/_shell/_app/code-explorer.tsx",
+          "src/routes/_shell/_app/terminal.tsx"
+        ]
+      },
+      {
+        "worker": "W6",
+        "paths": [
+          "src/lib/integrations/**",
+          "src/lib/mcp/**",
+          "src/lib/builder/**",
+          "src/lib/tools/**",
+          "src/lib/ai-workbench/**",
+          "src/lib/prompts/**",
+          "src/lib/social/**",
+          "src/lib/whatsapp/**",
+          "src/components/mission/AgentBuilder.jsx"
+        ]
+      },
+      {
+        "worker": "W7",
+        "paths": [
+          "src/lib/mission/**",
+          "src/lib/workforce/**",
+          "src/lib/tasks/**",
+          "src/screens/MissionControl.jsx",
+          "src/components/workforce/**",
+          "src/components/mission/**",
+          "src/lib/notifications/**",
+          "src/lib/personal-os/**"
+        ]
+      },
+      {
+        "worker": "W8",
+        "paths": [
+          "src/lib/cinema/**",
+          "src/lib/media/**",
+          "src/lib/three-d/**",
+          "src/lib/game-foundry/**",
+          "src/lib/voxel/**",
+          "src/lib/voice/**",
+          "src/lib/html-studio/**",
+          "src/lib/huggingface/**",
+          "workers/open3d-free/**",
+          "workers/gta-obj-inspector/**"
+        ]
+      },
+      {
+        "worker": "W9",
+        "paths": [
+          "src/lib/billing/**",
+          "src/lib/marketplace/**",
+          "src/lib/shopping/**",
+          "src/lib/economy/**",
+          "src/lib/enterprise/**",
+          "src/lib/stripe.ts",
+          "src/lib/stripe.server.ts",
+          "src/lib/usage/**"
+        ]
+      },
+      {
+        "worker": "W10",
+        "paths": [
+          "src/lib/industry/**",
+          "src/lib/construction/**",
+          "src/lib/retail/**",
+          "src/lib/dropshipping/**",
+          "src/lib/food-delivery/**",
+          "src/lib/company/**",
+          "src/lib/legal/**",
+          "src/lib/compliance/**",
+          "src/lib/trading/**",
+          "src/lib/health/**",
+          "src/lib/fitness/**",
+          "src/lib/quant/**",
+          "src/lib/communications/**"
+        ]
+      },
+      {
+        "worker": "W11",
+        "paths": [
+          "src/lib/mobile-intelligence/**",
+          "native/**",
+          "src/lib/visual/**",
+          "src/lib/website-studio/**",
+          "src/lib/app-studio/**",
+          "src/lib/seo/**",
+          "src/routes/index.tsx",
+          "src/routes/help.tsx",
+          "src/routes/pricing.tsx",
+          "src/styles.css"
+        ]
+      },
+      {
+        "worker": "W12",
+        "paths": [
+          "docs/completion/**",
+          "e2e/**"
+        ]
+      }
+    ]
+  },
+  "harnessDependenciesNotAdded": [
+    "@playwright/test — click-level signed-in and signed-out browser e2e. Not added because Worker 1 owns package.json.",
+    "wrangler — required to preview the Cloudflare Nitro build. vite preview currently fails looking for dist/server/server.js."
+  ],
+  "items": [
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun run typecheck"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Local bun 1.3.14, exit 0, SHA 169c05ffc32770d735b9edee6c8b83d87236403b. Output was only the tsc script banner.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-TYPECHECK",
+      "kind": "baseline",
+      "title": "Strict TypeScript (tsc --noEmit) on main",
+      "status": "QA PASSED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun run build"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Local exit 0 at 2026-11-14T19:16:34Z. Nitro preset cloudflare-module wrote .output/server/index.mjs. Client bundle reported built in 2.41s. This does not deploy.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-BUILD",
+      "kind": "baseline",
+      "title": "Production build (vite/nitro cloudflare-module)",
+      "status": "QA PASSED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "OPENAI_API_KEY=ci-test-provider-placeholder bun run test"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "688 files, 3549 tests, 0 failed, exit 0, 29.00s. The placeholder is the non-secret value Backend Check sets so mocked provider paths run. No live model was called.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-UNIT-CI-ENV",
+      "kind": "baseline",
+      "title": "Vitest unit suite with the CI provider placeholder",
+      "status": "QA PASSED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun run test"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "33 runtime tests stop in prepareRun with PROVIDER_NOT_CONFIGURED when OPENAI_API_KEY is unset."
+      ],
+      "evidence": "Exit 1. 3 files failed (runtime.test.ts, atomic-runtime-loop.test.ts, run-steering-runtime.test.ts), 33 tests failed, 3516 passed, 688 files. This is fail-closed behaviour, and it is not the CI command.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-UNIT-NO-KEY",
+      "kind": "baseline",
+      "title": "Vitest unit suite with no provider key",
+      "status": "BLOCKED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun run lint"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "56800 errors and 108 warnings across 1479 files. 56562 are prettier/prettier. Backend Check does not run eslint."
+      ],
+      "evidence": "Exit 1. Non-prettier errors include 130 @typescript-eslint/no-explicit-any, 73 no-useless-escape, 19 no-control-regex, 8 no-empty, 4 prefer-const, 3 require-yield. 107 warnings are react-refresh/only-export-components. The new e2e script is eslint-clean. Product files were not reformatted.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-LINT",
+      "kind": "baseline",
+      "title": "eslint .",
+      "status": "BLOCKED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun audit --audit-level high"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Exit 0 on 169c05ffc32770d735b9edee6c8b83d87236403b. No high findings printed. #1061 changed overrides to body-parser 2.4.0, follow-redirects 1.16.3, launch-editor 2.14.2, undici 8.12.4, zod 4.6.7, seroval 1.8.1 / seroval-plugins 1.8.0. Parent SHA 39663d6c failed the scheduled audit the same day with 16 high findings.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-AUDIT-HIGH",
+      "kind": "security",
+      "title": "High-severity dependency audit on current main",
+      "status": "QA PASSED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun audit"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "30 advisories remain: 26 moderate, 4 low. Packages: qs, glob, @hono/node-server, ip-address, @vitest/mocker, minimatch, fast-uri, hono, esbuild."
+      ],
+      "evidence": "Exit 1. High gate is clean. Moderate/low were not patched in this QA change because package.json is owned by W1.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-AUDIT-ALL",
+      "kind": "security",
+      "title": "Full dependency audit (moderate and low remain)",
+      "status": "BLOCKED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "node --test test/*.test.mjs",
+        "npm run check"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "26/26 tests passed. node --check passed for the worker entry modules. Playwright browsers were not launched. App-level @playwright/test is not installed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-BROWSER-WORKER",
+      "kind": "baseline",
+      "title": "browser-worker node tests and syntax check",
+      "status": "QA PASSED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "python3 -m unittest discover -s workers/open3d-free -p test_*.py"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 tests, OK. py_compile of server.py and run_model.py succeeded. This does not run a mesh worker.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-OPEN3D",
+      "kind": "baseline",
+      "title": "Open3D free worker unit tests",
+      "status": "QA PASSED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "python3 -m unittest discover -s workers/gta-obj-inspector -p test_*.py"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 tests, OK, on 169c05ffc327. Open PRs #918, #919 and #920 still conflict with this file.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-GTA",
+      "kind": "baseline",
+      "title": "GTA OBJ inspector unit tests on main",
+      "status": "QA PASSED",
+      "worker": "W8"
+    },
+    {
+      "branch": "cursor/qa-completion-register-6c1f",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "node e2e/signed-out-route-smoke.mjs"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "31/31 HTTP 200 against vite dev at http://127.0.0.1:5173 with CI=1. Public pages contained their route titles and were not noindex, except /legal/terms-of-service which is noindex by source. Auth pages and 15 protected shells returned 200 with noindex. /mission-control HTML contained the loading spinner from ProtectedRoute and did not contain a workspace session. No service_role, SUPABASE_SECRET, sk_live_ or private-key marker was present. This is not a signed-in browser session.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-E2E-SIGNED-OUT",
+      "kind": "acceptance_test",
+      "title": "Signed-out HTTP route smoke (31 routes)",
+      "status": "QA PASSED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "bun run preview -- --host 127.0.0.1 --port 4173"
+      ],
+      "externalDependencies": [
+        "wrangler, if a Cloudflare-shaped local preview is required. Not added; package.json is owned by W1."
+      ],
+      "blockers": [
+        "Preview looks for dist/server/server.js. The build emits a Cloudflare worker at .output/server/index.mjs. Nitro's own preview command is npx wrangler --cwd .output dev, and wrangler is not a project dependency."
+      ],
+      "evidence": "Preview process logged ERR_MODULE_NOT_FOUND for dist/server/server.js. Sampled routes returned HTTP 500. Signed-out smoke used vite dev instead.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-VITE-PREVIEW",
+      "kind": "deployment",
+      "title": "vite preview of the production build",
+      "status": "BLOCKED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "@playwright/test for click-level signed-out and signed-in flows. browser-worker already depends on playwright 1.63.0 for the worker, which is a different package."
+      ],
+      "blockers": [
+        "@playwright/test is not in package.json. W12 did not add it."
+      ],
+      "evidence": "No Playwright config or e2e project existed. e2e/signed-out-route-smoke.mjs covers HTTP render with node:fetch.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-PLAYWRIGHT-APP",
+      "kind": "acceptance_test",
+      "title": "App Playwright e2e",
+      "status": "NOT STARTED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "GitHub Backend Check 43630757500"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "Not re-executed in this VM. The workflow conclusion was read with gh; that is not a local rerun of the pglite scripts."
+      ],
+      "evidence": "Backend Check on push of 169c05ffc32770d735b9edee6c8b83d87236403b completed success: https://github.com/creativewebdesigneng-stack/palladium-ai-os/actions/runs/43630757500 . The workflow includes the trust-fabric, connector, browser, customer, personal, content, studio, private, project-team, governance, trusted-media, developer-api, provider-job, builder-authority and marketplace compatibility scripts plus Open3D.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "BASE-PGLITE-CI",
+      "kind": "baseline",
+      "title": "Isolated Postgres recovery scripts inside Backend Check",
+      "status": "IMPLEMENTED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 185,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Live provider, on-prem and enterprise certification were not run."
+      ],
+      "evidence": "Foundation code is on main (src/lib/ai-hub, 49 unit files in the passing suite). Issue #185 remains open. Operational enterprise/on-prem evidence was not produced.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-185",
+      "kind": "issue",
+      "title": "PalladiumAI: Universal AI Hub master programme",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": 668,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Owner, provider, device and professional acceptance gates in the issue are still open."
+      ],
+      "evidence": "This register supersedes the October ledger for tracking, against SHA 169c05ffc327. The unchecked acceptance gates in #668 remain open. Historical reconciliation notes were not re-certified against production.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-668",
+      "kind": "issue",
+      "title": "Blackstar 100% completion register",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 966,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "PR #974 conflicts and is draft. Production schema was not queried."
+      ],
+      "evidence": "Draft PR #974 adds an ownership migration and conflicts with package.json and backend-check.yml. The migration is not on main. Economy and evolution modules exist and their unit files passed inside the CI-env suite.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-966",
+      "kind": "issue",
+      "title": "Restore agent economy, simulation and evolution with database ownership",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": 975,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No launch sign-off exists for current SHA."
+      ],
+      "evidence": "Open coordination issue. This register and execution plan are the W12 artefact. No workstream was signed off.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-975",
+      "kind": "issue",
+      "title": "Coordinate 12 specialist workstreams and an evidence-based completion gate",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 976,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Read-only production SQL was intentionally not run."
+      ],
+      "evidence": "314 SQL migrations are in the tree. Production application of the current head was not inspected.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-976",
+      "kind": "issue",
+      "title": "Workforce launch assignment: Database Recovery",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": 977,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Open runtime PRs conflict or are far behind #1061."
+      ],
+      "evidence": "PRs #944, #945, #1001 and #1009 are still open. Runtime unit tests pass with the CI placeholder and fail closed without it.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-977",
+      "kind": "issue",
+      "title": "Workforce launch assignment: Agent Runtime",
+      "status": "IN PROGRESS",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": 978,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Moderate advisories and unresolved storage RLS drafts."
+      ],
+      "evidence": "High audit is clean on current main. Moderate/low advisories, storage RLS forks (#1037, #1038, #1048) and issue #1039 remain.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-978",
+      "kind": "issue",
+      "title": "Workforce launch assignment: Security & Permissions",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": 979,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Signed-in, provider and production acceptance of 169c05ffc327 were not run."
+      ],
+      "evidence": "This branch records the baseline and register. It does not certify the product for launch.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-979",
+      "kind": "issue",
+      "title": "Workforce launch assignment: QA & Release Certification",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 980,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Live connection status for GitHub, tests, Supabase, Vercel, logs and workforce tools was not exercised."
+      ],
+      "evidence": "Issue remains open. No merged PR closes it. Builder module has 9 unit files in the passing suite.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-980",
+      "kind": "issue",
+      "title": "Agent Builder capability catalogue with live connection status",
+      "status": "IN PROGRESS",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": 981,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Real OAuth and per-agent grant acceptance were not run."
+      ],
+      "evidence": "Connector code and 56 integration unit files exist. The issue's picker/grant acceptance is still open. No OAuth flow was started.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-981",
+      "kind": "issue",
+      "title": "Agent Builder native connector picker and scoped grants",
+      "status": "IN PROGRESS",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": 982,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Hosted browser worker, embedding provider and Gemini quota are external."
+      ],
+      "evidence": "The issue text records prior Groq checks and a read-only Railway finding that no browser worker is hosted. This VM did not call Groq, Gemini or a hosted browser worker.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-982",
+      "kind": "issue",
+      "title": "Groq verified earlier; embedding, Gemini quota and browser host remain",
+      "status": "BLOCKED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": 1029,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Authenticated preview session and the owner's GPU/tunnel were not available."
+      ],
+      "evidence": "No local Qwen/GPU endpoint was available. No model-arena verification click was performed. Draft PRs #1027, #1032 and #1047 hold related code and conflict with main.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1029",
+      "kind": "issue",
+      "title": "Astra native GPU diagnostics and real agent acceptance",
+      "status": "BLOCKED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": 1031,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "On 169c05ffc32770d735b9edee6c8b83d87236403b, bun audit --audit-level high exits 0 after the #1061 override bump. Backend Check 43630757500 succeeded. Enterprise PR #1030 is still an unmerged draft.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1031",
+      "kind": "issue",
+      "title": "Patch undici/body-parser advisories and restore CI",
+      "status": "QA PASSED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": 1033,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Owner sign-in and preview GPU/browser worker were not available. No passwords or tokens were requested."
+      ],
+      "evidence": "Not executed. The issue forbids production and forbids merging #1032. No signed-in preview session was available.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1033",
+      "kind": "issue",
+      "title": "Astra-backed browser/approval QA in isolated Preview",
+      "status": "BLOCKED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 1039,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Live storage API isolation was not tested. Production was not queried."
+      ],
+      "evidence": "Competing drafts #1037 and #1038 are not contained in #1048. Their migrations are absent from main. Production policies were not read.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1039",
+      "kind": "issue",
+      "title": "Storage RLS verification and API isolation",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": 1044,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Authenticated two-user preview, browser worker and provider model were not available."
+      ],
+      "evidence": "Draft stack tip #1048 has isolated-test code and a green historical Backend Check, and it conflicts with main's lockfile. No real tenant, browser or approval run was performed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1044",
+      "kind": "issue",
+      "title": "Enterprise Workforce £100k pilot acceptance",
+      "status": "BLOCKED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": 1050,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Local GPU/Docker workstation and operator work-order approval were not available. Official benchmark remains blocked by the PR titles themselves."
+      ],
+      "evidence": "CyberGym scripts are not on main. Draft tip #1059 contains #1049 and #1052–#1058 and conflicts on the lockfile. No Docker benchmark was run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1050",
+      "kind": "issue",
+      "title": "Astra x CyberGym local benchmark, phase 2",
+      "status": "BLOCKED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": 1051,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Reproduced as a historical failure: scheduled audit run 43595137829 failed on parent 39663d6c with 16 high findings (body-parser, zod, follow-redirects, launch-editor, undici, seroval). Current main passes the same high audit.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ISSUE-1051",
+      "kind": "issue",
+      "title": "Backend Check reported 16 high advisories on 2026-11-02",
+      "status": "QA PASSED",
+      "worker": "W1"
+    },
+    {
+      "branch": "dependabot/bun/types/node-26.6.4",
+      "pr": 863,
+      "sha": "359930f848a90eb9374aab772a070c68031499fd",
+      "tests": [
+        "backend-check: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock"
+      ],
+      "evidence": "Base main. Ahead 1, behind 391. Files 2. Merge state reported by GitHub: DIRTY. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/863",
+      "recommendation": "rebase",
+      "recommendationReason": "391 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in bun.lock). 2 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-863",
+      "kind": "pull_request",
+      "title": "Bump @types/node from 22.20.1 to 26.6.5",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "dependabot/bun/lovable.dev/mcp-js-3.0.4",
+      "pr": 864,
+      "sha": "7e90173bd7b9bbd5de9433e821ac41f12cf924ca",
+      "tests": [
+        "backend-check: FAILURE"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock",
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 1, behind 462. Files 2. Merge state reported by GitHub: DIRTY. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/864",
+      "recommendation": "rebase",
+      "recommendationReason": "462 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in bun.lock). 2 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-864",
+      "kind": "pull_request",
+      "title": "Bump @lovable.dev/mcp-js from 0.26.3 to 3.0.4",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "dependabot/bun/stripe/stripe-js-10.0.0",
+      "pr": 865,
+      "sha": "bfad89d348f3d410cb02c4c6f3d3e0919f72e537",
+      "tests": [
+        "backend-check: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Base main. Ahead 1, behind 474. Files 2. Merge state reported by GitHub: CLEAN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/865",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree against 169c05ffc327 is clean, but the head is 474 commit(s) behind main. Update the branch so Backend Check runs on a head that contains #1061 before any merge.",
+      "id": "PR-865",
+      "kind": "pull_request",
+      "title": "Bump @stripe/stripe-js from 9.17.0 to 10.0.0",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "blackstar/gtav-obj-index-validation-20261011",
+      "pr": 918,
+      "sha": "01f0349d0917f491372350cd1d0691e61b796aa5",
+      "tests": [
+        "inspector: FAILURE",
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py; CONFLICT (content): Merge conflict in workers/gta-obj-inspector/test_server.py",
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 2, behind 425. Files 2. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/918",
+      "recommendation": "rebase",
+      "recommendationReason": "425 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py; CONFLICT (content): Merge conflict in workers/gta-obj-inspector/test_server.py). 2 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-918",
+      "kind": "pull_request",
+      "title": "Correct OBJ geometry inspection for relative and forward face indices",
+      "status": "IN PROGRESS",
+      "worker": "W8"
+    },
+    {
+      "branch": "blackstar/gtav-obj-inspection-accuracy-20261011",
+      "pr": 919,
+      "sha": "5d66c8adcc499dd572bd5bad371975f966dc7681",
+      "tests": [
+        "inspector: FAILURE",
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py; CONFLICT (content): Merge conflict in workers/gta-obj-inspector/test_server.py",
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 2, behind 425. Files 2. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/919",
+      "recommendation": "rebase",
+      "recommendationReason": "425 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py; CONFLICT (content): Merge conflict in workers/gta-obj-inspector/test_server.py). 2 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-919",
+      "kind": "pull_request",
+      "title": "Harden GTA OBJ inspector geometry index and URL validation",
+      "status": "IN PROGRESS",
+      "worker": "W8"
+    },
+    {
+      "branch": "blackstar/gtav-inspector-security-tests-20261011",
+      "pr": 920,
+      "sha": "4f412ded0c1a475cbc6145a068dc4cddcd1e50a9",
+      "tests": [
+        "backend-check: SUCCESS",
+        "inspector: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py"
+      ],
+      "evidence": "Base main. Ahead 4, behind 425. Files 2. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/920",
+      "recommendation": "rebase",
+      "recommendationReason": "425 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in workers/gta-obj-inspector/server.py). 2 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-920",
+      "kind": "pull_request",
+      "title": "Harden GTA OBJ inspector against DNS rebinding",
+      "status": "IN PROGRESS",
+      "worker": "W8"
+    },
+    {
+      "branch": "dependabot/npm_and_yarn/browser-worker/browser-worker-dependencies-6d4e572f3b",
+      "pr": 929,
+      "sha": "65dd161c7029861b5b0a3f06bb510095ceb14cc7",
+      "tests": [
+        "backend-check: FAILURE"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 1, behind 1. Files 1. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/929",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree is clean and the branch is 1 commit(s) behind main, but a recorded check failed. Recreate the change on 169c05ffc327 only if it is still required, and require a green Backend Check before merge.",
+      "id": "PR-929",
+      "kind": "pull_request",
+      "title": "build(deps): bump playwright from 1.63.0 to 1.64.1 in /browser-worker in the browser-worker-dependencies group across 1 directory",
+      "status": "IN PROGRESS",
+      "worker": "W5"
+    },
+    {
+      "branch": "dependabot/github_actions/github-actions-e91bde37dc",
+      "pr": 930,
+      "sha": "9cb001bacd4a6c25f1113f367425e69a20dbe810",
+      "tests": [
+        "backend-check: FAILURE",
+        "inspector: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 1, behind 1. Files 1. Merge state reported by GitHub: UNSTABLE. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/930",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree is clean and the branch is 1 commit(s) behind main, but a recorded check failed. Recreate the change on 169c05ffc327 only if it is still required, and require a green Backend Check before merge.",
+      "id": "PR-930",
+      "kind": "pull_request",
+      "title": "build(deps): bump the github-actions group across 1 directory with 2 updates",
+      "status": "IN PROGRESS",
+      "worker": "W8"
+    },
+    {
+      "branch": "feat/seven-archives-source-aware-skill-catalog-20261013",
+      "pr": 935,
+      "sha": "46e7978980a3a6b8a9052ca30bcaa1d86cbef8da",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in src/screens/Skills.jsx"
+      ],
+      "evidence": "Base main. Ahead 12, behind 415. Files 6. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/935",
+      "recommendation": "rebase",
+      "recommendationReason": "415 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in src/screens/Skills.jsx). 6 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-935",
+      "kind": "pull_request",
+      "title": "Catalogue seven audited archives and route 178 third-party skill references through existing Skills Registry",
+      "status": "IN PROGRESS",
+      "worker": "W6"
+    },
+    {
+      "branch": "fix/agent-builder-overlay-portal-20261013",
+      "pr": 944,
+      "sha": "c12db84dcc497d198df0ba179fafa695849444cb",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Base main. Ahead 5, behind 407. Files 3. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/944",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree against 169c05ffc327 is clean, but the head is 407 commit(s) behind main. Update the branch so Backend Check runs on a head that contains #1061 before any merge.",
+      "id": "PR-944",
+      "kind": "pull_request",
+      "title": "Fix unclickable Mission Control agent editor inside animated theatre",
+      "status": "IN PROGRESS",
+      "worker": "W7"
+    },
+    {
+      "branch": "fix/agent-run-stream-no-silent-success-20261014",
+      "pr": 945,
+      "sha": "81e200f620e96b79d9919492e001c133e0e666a3",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in src/lib/runtime/run-client.js"
+      ],
+      "evidence": "Base main. Ahead 6, behind 407. Files 4. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/945",
+      "recommendation": "rebase",
+      "recommendationReason": "407 commit(s) behind 169c05ffc327 with merge-tree conflicts (CONFLICT (content): Merge conflict in src/lib/runtime/run-client.js). 4 files differ from main. Rebase and re-run Backend Check. Do not merge this head.",
+      "id": "PR-945",
+      "kind": "pull_request",
+      "title": "Show agent runtime failures instead of silently accepting tool-only runs",
+      "status": "IN PROGRESS",
+      "worker": "W4"
+    },
+    {
+      "branch": "repair/agent-economy-additive-ownership",
+      "pr": 974,
+      "sha": "65f811c09b766bc9b1a31f0e6d4040dcc254019d",
+      "tests": [
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in .github/workflows/backend-check.yml; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 6, behind 371. Files 4. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/974",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 371 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in .github/workflows/backend-check.yml; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-974",
+      "kind": "pull_request",
+      "title": "Draft: add ownership foreign keys to existing agent economy tables",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "repair/agent-browser-configuration",
+      "pr": 1001,
+      "sha": "9284b00915f186e86e25089661a452d93c3ba2cf",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in src/components/workforce/WorkforceOrchestrator.jsx; CONFLICT (content): Merge conflict in src/components/workforce/normalize.jsx; CONFLICT (add/add): Merge conflict in src/lib/agents/agent-tools-update.server.ts; CONFLICT (add/add): Merge conflict in src/lib/agents/agent-tools-update.test.ts; CONFLICT (content): Merge conflict in src/lib/runtime/__tests__/run-client.test.ts; CONFLICT (content): Merge conflict in src/lib/runtime/agent-task-execution.server.ts; CONFLICT (add/add): Merge conflict in src/lib/runtime/browser-approval.server.ts; CONFLICT (content): Merge conflict in src/lib/runtime/runtime.server.ts",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 11, behind 317. Files 37. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1001",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 317 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in src/components/workforce/WorkforceOrchestrator.jsx; CONFLICT (content): Merge conflict in src/components/workforce/normalize.jsx; CONFLICT (add/add): Merge conflict in src/lib/agents/agent-tools-update.server.ts; CONFLICT (add/add): Merge conflict in src/lib/agents/agent-tools-update.test.ts; CONFLICT (content): Merge conflict in src/lib/runtime/__tests__/run-client.test.ts; CONFLICT (content): Merge conflict in src/lib/runtime/agent-task-execution.server.ts; CONFLICT (add/add): Merge conflict in src/lib/runtime/browser-approval.server.ts; CONFLICT (content): Merge conflict in src/lib/runtime/runtime.server.ts. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1001",
+      "kind": "pull_request",
+      "title": "Repair existing agent browser tool settings, approval resume and Workforce evidence",
+      "status": "IN PROGRESS",
+      "worker": "W5"
+    },
+    {
+      "branch": "dependabot/bun/development-dependencies-21731a489f",
+      "pr": 1003,
+      "sha": "f26ea79caa0c75177e18dec52f28148d756afd8f",
+      "tests": [
+        "backend-check: FAILURE"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 1, behind 1. Files 2. Merge state reported by GitHub: DIRTY. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1003",
+      "recommendation": "rebase",
+      "recommendationReason": "1 unique commit(s); the only merge-tree conflict with 169c05ffc327 is the #1061 package.json/bun.lock update (CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json). A recorded check on this head already failed. Rebase onto 169c05ffc327 and require a new green Backend Check. Do not merge this head.",
+      "id": "PR-1003",
+      "kind": "pull_request",
+      "title": "build(deps-dev): bump the development-dependencies group across 1 directory with 8 updates",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "repair/agent-tool-verification",
+      "pr": 1005,
+      "sha": "3a92ceed6d85c34f2a1c72d448290087a18d835c",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 23, behind 167. Files 13. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1005",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree against 169c05ffc327 is clean, but the head is 167 commit(s) behind main and the PR is draft. Update the branch so Backend Check runs on a head that contains #1061 before any merge.",
+      "id": "PR-1005",
+      "kind": "pull_request",
+      "title": "Harden live agent tool certification with owner-scoped approval receipts",
+      "status": "IN PROGRESS",
+      "worker": "W6"
+    },
+    {
+      "branch": "repair/agent-execution-counters-20261020",
+      "pr": 1009,
+      "sha": "b69551be3bf4a2d120e7dde8c4172ac1cf074b15",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Base main. Ahead 3, behind 140. Files 12. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1009",
+      "recommendation": "rebase",
+      "recommendationReason": "Merge-tree against 169c05ffc327 is clean, but the head is 140 commit(s) behind main. Update the branch so Backend Check runs on a head that contains #1061 before any merge.",
+      "id": "PR-1009",
+      "kind": "pull_request",
+      "title": "Fix agent execution counters for queued and approval-waiting work",
+      "status": "IN PROGRESS",
+      "worker": "W4"
+    },
+    {
+      "branch": "feat/six-agent-business-operations",
+      "pr": 1019,
+      "sha": "978a515375c1dbedda5ef4413aebc0bc94f51c0f",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json"
+      ],
+      "evidence": "Base main. Ahead 85, behind 1. Files 22. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1019",
+      "recommendation": "rebase",
+      "recommendationReason": "85 unique commit(s); the only merge-tree conflict with 169c05ffc327 is the #1061 package.json/bun.lock update (CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json). Rebase onto 169c05ffc327 and require a new green Backend Check. Do not merge this head.",
+      "id": "PR-1019",
+      "kind": "pull_request",
+      "title": "Autonomous OS: governed six-agent business operations blueprint",
+      "status": "IN PROGRESS",
+      "worker": "W7"
+    },
+    {
+      "branch": "repair/ai-hub-runtime-outcome-evidence-20261020",
+      "pr": 1022,
+      "sha": "9259cf2f1782ca0d2fa47a232b688bc8fc686c8e",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json"
+      ],
+      "evidence": "Base main. Ahead 19, behind 1. Files 10. Merge state reported by GitHub: UNKNOWN. Draft: false. Contained in: 1025, 1026. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1022",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 9259cf2f17 is an ancestor of #1025, #1026. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1022",
+      "kind": "pull_request",
+      "title": "AI Hub: record real agent/workflow outcomes instead of treating approval pauses as success",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "feat/astra-core-verified-coordination-20261022",
+      "pr": 1025,
+      "sha": "1632f3973ec3103f8ef45975fca6b9eb9515f5a8",
+      "tests": [
+        "Astra native-route policy (dependency-free): SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 132, behind 1. Files 92. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1025",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1025",
+      "kind": "pull_request",
+      "title": "Astra Core: verify General Intelligence agent outcomes before delegation",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "repair/agent-browser-evidence-20261023",
+      "pr": 1026,
+      "sha": "e5630709e9d613907d73e8945e7cf3c9862aab9c",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 27, behind 1. Files 33. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1026",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1026",
+      "kind": "pull_request",
+      "title": "Runtime: enforce native-only inference and verified agent execution",
+      "status": "IN PROGRESS",
+      "worker": "W4"
+    },
+    {
+      "branch": "feature/blackstar-local-gpu-verification-20261025",
+      "pr": 1027,
+      "sha": "bfa0e7f79b6189ba02c2245d2a23c3feb35115ae",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 90, behind 1. Files 39. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1032, 1047. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1027",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head bfa0e7f79b is an ancestor of #1047. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1027",
+      "kind": "pull_request",
+      "title": "Verify Blackstar native GPU inference and repair agent browser execution",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "feature/enterprise-high-value-offers-20261029",
+      "pr": 1030,
+      "sha": "20e1e1101ace5e70b04824f7cb080cb53f90a896",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 15, behind 1. Files 12. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1035, 1036, 1037, 1038, 1040, 1041, 1042, 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1030",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 20e1e1101a is an ancestor of #1037, #1038, #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1030",
+      "kind": "pull_request",
+      "title": "Build Blackstar high-value enterprise catalogue: 10 × £100k + 4 × £1m solutions",
+      "status": "IN PROGRESS",
+      "worker": "W9"
+    },
+    {
+      "branch": "qa/astra-guided-reasoning-20261029",
+      "pr": 1032,
+      "sha": "985d321d8af408d70afd27bfb19929aec7ef6f90",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base feature/blackstar-local-gpu-verification-20261025. Ahead 101, behind 1. Files 49. Merge state reported by GitHub: CLEAN. Draft: true. Contained in: 1047. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1032",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 985d321d8a is an ancestor of #1047. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1032",
+      "kind": "pull_request",
+      "title": "QA: isolate guided Astra scheduling and report output-budget limits",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "security/dependency-audit-20261029",
+      "pr": 1034,
+      "sha": "db363a7077a4852693a91d52b938b2a1c2871425",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 16, behind 1. Files 2. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1034",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Lockfile-only security refresh. Main 169c05ffc327 already overrides body-parser 2.4.0, follow-redirects 1.16.3, launch-editor 2.14.2, undici 8.12.4, zod 4.6.7 and seroval 1.8.x. bun audit --audit-level high exits 0 on that SHA. This head conflicts on package.json and bun.lock.",
+      "id": "PR-1034",
+      "kind": "pull_request",
+      "title": "Security: regenerate audited Bun lockfile for enterprise release gate",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "feature/enterprise-private-knowledge-pilot-20261030",
+      "pr": 1035,
+      "sha": "d492400a37d09d9c7fcf6bdb57d696854779d4ce",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 21, behind 1. Files 18. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1036, 1037, 1038, 1040, 1041, 1042, 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1035",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head d492400a37 is an ancestor of #1037, #1038, #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1035",
+      "kind": "pull_request",
+      "title": "Enterprise pilot: owner-scoped private knowledge source evidence",
+      "status": "IN PROGRESS",
+      "worker": "W3"
+    },
+    {
+      "branch": "feature/enterprise-org-knowledge-rls-20261030",
+      "pr": 1036,
+      "sha": "5eb647640013ff7c6c00e139c325d35e52c225e3",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 59, behind 1. Files 29. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1040, 1041, 1042, 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1036",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 5eb6476400 is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1036",
+      "kind": "pull_request",
+      "title": "Enterprise Knowledge: explicit org sharing, live-member RLS and source audit",
+      "status": "IN PROGRESS",
+      "worker": "W3"
+    },
+    {
+      "branch": "security/knowledge-storage-offboarding-20261030",
+      "pr": 1037,
+      "sha": "79882e7eab21bcf41654bcdb56507e60758f5010",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 54, behind 1. Files 30. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1037",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1037",
+      "kind": "pull_request",
+      "title": "Security: gate Knowledge Storage access on live organisation membership",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "security/enterprise-knowledge-storage-isolation-20261030",
+      "pr": 1038,
+      "sha": "14e3c3ccf1803e5863c6c16b829e4f4bd8a6108a",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 55, behind 1. Files 30. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1038",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1038",
+      "kind": "pull_request",
+      "title": "Security: Knowledge bucket restrictive RLS & live-member original-file isolation",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "security/enterprise-knowledge-atomic-audit-20261031",
+      "pr": 1040,
+      "sha": "31a8f23b194face4099106196bd3fdaa02389cb3",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 83, behind 1. Files 32. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1041, 1042, 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1040",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 31a8f23b19 is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1040",
+      "kind": "pull_request",
+      "title": "Security QA: atomic database audit for enterprise knowledge sharing (staged)",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "feature/enterprise-knowledge-buyer-evaluation-20261101",
+      "pr": 1041,
+      "sha": "e48991c0574c543e2e1631b61ebdab9a3088ebac",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "Supabase Preview: SKIPPED"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 86, behind 1. Files 35. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1042, 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1041",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head e48991c057 is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1041",
+      "kind": "pull_request",
+      "title": "Enterprise Knowledge: offline buyer-labelled retrieval acceptance metrics (QA only)",
+      "status": "IN PROGRESS",
+      "worker": "W3"
+    },
+    {
+      "branch": "feature/enterprise-workforce-acceptance-20261101",
+      "pr": 1042,
+      "sha": "918a31d028fe5530f4337269b0686eabb98da75b",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "workforce-acceptance: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 94, behind 1. Files 41. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1043, 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1042",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 918a31d028 is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1042",
+      "kind": "pull_request",
+      "title": "Enterprise Workforce: supervised three-workflow acceptance gate (draft QA)",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "feature/enterprise-workforce-authenticated-uat-20261101",
+      "pr": 1043,
+      "sha": "d54e1d930b6445039c83eaf967d353f2fdc0857c",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "workforce-acceptance: SUCCESS",
+        "workforce-api-uat-mock: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 98, behind 1. Files 44. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1045, 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1043",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head d54e1d930b is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1043",
+      "kind": "pull_request",
+      "title": "Enterprise Workforce: isolated two-user read-only API UAT harness (QA only)",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "repair/enterprise-tool-denial-evidence-20261101",
+      "pr": 1045,
+      "sha": "1d71245ceb34837e52a13b3d7c325616e106ae92",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "workforce-acceptance: SUCCESS",
+        "workforce-api-uat-mock: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 108, behind 1. Files 50. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1046, 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1045",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 1d71245ceb is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1045",
+      "kind": "pull_request",
+      "title": "QA: repair policy-denial tool ledger and audit evidence (no migration)",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "feature/workforce-isolated-postgres-evidence-20261101",
+      "pr": 1046,
+      "sha": "d474a665c712e26b0a65773464473a4338b13844",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "workforce-acceptance: SUCCESS",
+        "workforce-postgres: SUCCESS",
+        "workforce-api-uat-mock: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 112, behind 1. Files 53. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1048. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1046",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head d474a665c7 is an ancestor of #1048. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1046",
+      "kind": "pull_request",
+      "title": "Enterprise Workforce: real isolated PostgreSQL approval/audit verification",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "qa/mission-1033-empty-output-telemetry-20261101",
+      "pr": 1047,
+      "sha": "c2533d90f69dbb3afc4bbce1c225edc2e4ba686b",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base qa/astra-guided-reasoning-20261029. Ahead 104, behind 1. Files 52. Merge state reported by GitHub: CLEAN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1047",
+      "recommendation": "rebase",
+      "recommendationReason": "Base is `qa/astra-guided-reasoning-20261029`, not main, and merge-tree against main conflicts on the #1061 lockfile. Rebase the unique commits onto 169c05ffc327, keep the PR draft, and do not merge it into main from the current base.",
+      "id": "PR-1047",
+      "kind": "pull_request",
+      "title": "QA: preserve empty-response telemetry and repair dependency audit pin",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "qa/1044-approval-evidence-ordering-20261101",
+      "pr": 1048,
+      "sha": "ccbaf13ce54682fa1ee4b0156270f5c23f5e9692",
+      "tests": [
+        "backend-check: SUCCESS",
+        "knowledge-buyer-evaluation: SUCCESS",
+        "workforce-acceptance: SUCCESS",
+        "workforce-postgres: SUCCESS",
+        "workforce-api-uat-mock: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 114, behind 1. Files 53. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1048",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1048",
+      "kind": "pull_request",
+      "title": "QA: verify Workforce receipt identity, approval order and failed-tool evidence",
+      "status": "IN PROGRESS",
+      "worker": "W12"
+    },
+    {
+      "branch": "feature/astra-cybergym-offline-eval-20261102",
+      "pr": 1049,
+      "sha": "16720a77c6c42a2daf51b0a98582986fab54826d",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: FAILURE",
+        "Supabase Preview: SKIPPED"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "a recorded GitHub check failed on this head",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 5, behind 1. Files 4. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1052, 1054, 1055, 1056, 1057, 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1049",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 16720a77c6 is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1049",
+      "kind": "pull_request",
+      "title": "feat(evals): CyberGym local-only evidence bridge for Astra (phase 1)",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-local-sandbox-preflight-20261102",
+      "pr": 1052,
+      "sha": "9e85cbb7712e1f332e86bfd0d14efb4f6a929557",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: FAILURE",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "a recorded GitHub check failed on this head",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 14, behind 1. Files 8. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1054, 1055, 1056, 1057, 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1052",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 9e85cbb771 is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1052",
+      "kind": "pull_request",
+      "title": "qa(cybergym): local-only sandbox preflight and fail-closed network checks",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "security/dependency-audit-repair-20261102",
+      "pr": 1053,
+      "sha": "235a244640615db35de2f76bf923a4af8b0534aa",
+      "tests": [
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 10, behind 1. Files 2. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1053",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Lockfile-only security refresh. Main 169c05ffc327 already overrides body-parser 2.4.0, follow-redirects 1.16.3, launch-editor 2.14.2, undici 8.12.4, zod 4.6.7 and seroval 1.8.x. bun audit --audit-level high exits 0 on that SHA. This head conflicts on package.json and bun.lock.",
+      "id": "PR-1053",
+      "kind": "pull_request",
+      "title": "fix(security): remediate 2026 high-severity dependency audit (Bun lockfile)",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": "qa/cybergym-security-combined-20261102",
+      "pr": 1054,
+      "sha": "e8d807e9af60878630cfb926cb6f73973794c62b",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 16, behind 1. Files 10. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1055, 1056, 1057, 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1054",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head e8d807e9af is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1054",
+      "kind": "pull_request",
+      "title": "qa: end-to-end CyberGym test suite with security-patched dependency lock",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-host-readiness-20261102",
+      "pr": 1055,
+      "sha": "ce5c4a18e76b4b0c31469b0aad9e6db1b4c72e11",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 25, behind 1. Files 12. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1056, 1057, 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1055",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head ce5c4a18e7 is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1055",
+      "kind": "pull_request",
+      "title": "qa(cybergym): read-only Windows GPU and Docker host readiness probe",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-benign-confinement-20261103",
+      "pr": 1056,
+      "sha": "5cc9a2079d278ba5d8e12efc8c4d4a7f025b2591",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 29, behind 1. Files 15. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1057, 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1056",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 5cc9a2079d is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1056",
+      "kind": "pull_request",
+      "title": "qa(cybergym): repeatable benign Docker confinement evidence, benchmark still blocked",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-controller-topology-20261103",
+      "pr": 1057,
+      "sha": "2bd18d678ae96bf81665cbdafd6f42bb0e9ad99a",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 34, behind 1. Files 19. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1058, 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1057",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 2bd18d678a is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1057",
+      "kind": "pull_request",
+      "title": "qa(cybergym): audit trusted Windows controller and private listener boundaries",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-trusted-controller-benign-20261103",
+      "pr": 1058,
+      "sha": "3fcca239f40928698fe285430e08e95f8f2c5785",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 52, behind 1. Files 22. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: 1059. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1058",
+      "recommendation": "close-as-superseded",
+      "recommendationReason": "Head 3fcca239f4 is an ancestor of #1059. Close this intermediate after the surviving tip is rebased. Merging it would duplicate that stack.",
+      "id": "PR-1058",
+      "kind": "pull_request",
+      "title": "qa(cybergym): compose trusted Windows Astra + benign Docker acceptance only",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "qa/cybergym-work-order-boundary-20261104",
+      "pr": 1059,
+      "sha": "968dd4cf91a637aa42151f65cf4fe483766f1db2",
+      "tests": [
+        "cybergym-evidence-contract: SUCCESS",
+        "backend-check: SUCCESS",
+        "Supabase Preview: SKIPPED",
+        "Vercel: SUCCESS",
+        "Vercel Preview Comments: SUCCESS"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json",
+        "draft"
+      ],
+      "evidence": "Base main. Ahead 58, behind 1. Files 25. Merge state reported by GitHub: UNKNOWN. Draft: true. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1059",
+      "recommendation": "rebase",
+      "recommendationReason": "Draft and 1 commit(s) behind main. merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock; CONFLICT (content): Merge conflict in package.json. Rebase onto 169c05ffc327 and keep it draft.",
+      "id": "PR-1059",
+      "kind": "pull_request",
+      "title": "qa(cybergym): deny untrusted work orders and permit operator-only benign controller smoke",
+      "status": "IN PROGRESS",
+      "worker": "W2"
+    },
+    {
+      "branch": "dependabot/bun/production-dependencies-23b487ac82",
+      "pr": 1060,
+      "sha": "472fa36922b2c90dbb8a61bfc4d480f6f3acd586",
+      "tests": [
+        "backend-check: FAILURE"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "merge-tree conflict: CONFLICT (content): Merge conflict in bun.lock",
+        "a recorded GitHub check failed on this head"
+      ],
+      "evidence": "Base main. Ahead 1, behind 1. Files 2. Merge state reported by GitHub: DIRTY. Draft: false. Contained in: none. URL https://github.com/creativewebdesigneng-stack/palladium-ai-os/pull/1060",
+      "recommendation": "rebase",
+      "recommendationReason": "1 unique commit(s); the only merge-tree conflict with 169c05ffc327 is the #1061 package.json/bun.lock update (CONFLICT (content): Merge conflict in bun.lock). A recorded check on this head already failed. Rebase onto 169c05ffc327 and require a new green Backend Check. Do not merge this head.",
+      "id": "PR-1060",
+      "kind": "pull_request",
+      "title": "build(deps): bump the production-dependencies group across 1 directory with 44 updates",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/__tests__/adaptive-visual-performance.test.ts",
+        "lib/__tests__/auth-email-verification-flow.test.ts",
+        "lib/__tests__/auth-rls-initplan-optimization.test.ts",
+        "lib/__tests__/auth-session-hydration.test.ts",
+        "lib/__tests__/blackstar-route-branding.test.ts",
+        "lib/__tests__/distinct-visual-rooms.test.ts",
+        "lib/__tests__/heavy-route-lazy-loading.test.ts",
+        "lib/__tests__/offscreen-visual-suspension.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "0 non-test files, 17 unit files under src/lib/__tests__. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-__tests__",
+      "kind": "module",
+      "title": "src/lib/__tests__",
+      "status": "IMPLEMENTED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/admin/__tests__/acceptance-catalog.test.ts",
+        "lib/admin/__tests__/acceptance-evidence.test.ts",
+        "lib/admin/__tests__/acceptance-preflight-contract.test.ts",
+        "lib/admin/__tests__/acceptance-preflight.test.ts",
+        "lib/admin/__tests__/acceptance-results.test.ts",
+        "lib/admin/__tests__/admin-integrations-overview.test.ts",
+        "lib/admin/__tests__/admin-organisations-contract.test.ts",
+        "lib/admin/__tests__/system-settings-announcement.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "11 non-test files, 8 unit files under src/lib/admin. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-admin",
+      "kind": "module",
+      "title": "src/lib/admin",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/agents/__tests__/a2a-network.test.ts",
+        "lib/agents/__tests__/agent-autonomy.test.ts",
+        "lib/agents/__tests__/agent-business-benchmarks.test.ts",
+        "lib/agents/__tests__/agent-business-certification-ui.test.ts",
+        "lib/agents/__tests__/agent-business-certification.test.ts",
+        "lib/agents/__tests__/agent-business-safety-contract.test.ts",
+        "lib/agents/__tests__/agent-create-submit.test.ts",
+        "lib/agents/__tests__/agent-display-state.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "30 non-test files, 36 unit files under src/lib/agents. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-agents",
+      "kind": "module",
+      "title": "src/lib/agents",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/ai/__tests__/ai-preferences-live.test.ts",
+        "lib/ai/__tests__/assistant-agent-discovery.test.ts",
+        "lib/ai/__tests__/assistant-connection-inspection.test.ts",
+        "lib/ai/__tests__/assistant-workspace-context-v3.test.ts",
+        "lib/ai/__tests__/browser-qa-evidence.test.ts",
+        "lib/ai/__tests__/chat-live-only.test.ts",
+        "lib/ai/__tests__/native-intelligence-evaluation-evidence.test.ts",
+        "lib/ai/__tests__/native-intelligence-model-platform.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "17 non-test files, 15 unit files under src/lib/ai. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-ai",
+      "kind": "module",
+      "title": "src/lib/ai",
+      "status": "IMPLEMENTED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/ai-hub/__tests__/app-resources.test.ts",
+        "lib/ai-hub/__tests__/approval.test.ts",
+        "lib/ai-hub/__tests__/commercial.test.ts",
+        "lib/ai-hub/__tests__/compute-resources.test.ts",
+        "lib/ai-hub/__tests__/computer-use.test.ts",
+        "lib/ai-hub/__tests__/counterfactual.functions.test.ts",
+        "lib/ai-hub/__tests__/counterfactual.test.ts",
+        "lib/ai-hub/__tests__/dataset-resources.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "47 non-test files, 49 unit files under src/lib/ai-hub. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-ai-hub",
+      "kind": "module",
+      "title": "src/lib/ai-hub",
+      "status": "IMPLEMENTED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/ai-workbench/catalogue.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/ai-workbench. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-ai-workbench",
+      "kind": "module",
+      "title": "src/lib/ai-workbench",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "2 non-test files, 0 unit files under src/lib/analytics.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-analytics",
+      "kind": "module",
+      "title": "src/lib/analytics",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/app-studio/__tests__/app-studio-agent-tool.test.ts",
+        "lib/app-studio/__tests__/app-studio-bindings.test.ts",
+        "lib/app-studio/__tests__/app-studio-clone-wiring.test.ts",
+        "lib/app-studio/__tests__/app-studio-connected-ui.test.ts",
+        "lib/app-studio/__tests__/app-studio-contract.test.ts",
+        "lib/app-studio/__tests__/app-studio-public-runtime.test.ts",
+        "lib/app-studio/__tests__/app-studio-query-security.test.ts",
+        "lib/app-studio/__tests__/app-studio-release-activation.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 non-test files, 11 unit files under src/lib/app-studio. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-app-studio",
+      "kind": "module",
+      "title": "src/lib/app-studio",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/auth.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-auth",
+      "kind": "module",
+      "title": "src/lib/auth",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/billing/__tests__/billing.test.ts",
+        "lib/billing/__tests__/payments-environment.test.ts",
+        "lib/billing/__tests__/server-billing-mode-contract.test.ts",
+        "lib/billing/__tests__/stripe-client-environment.test.ts",
+        "lib/billing/paid-invoice-usage-idempotency.test.ts",
+        "lib/billing/payment-event-lease.server.test.ts",
+        "lib/billing/payment-event-ledger.server.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 7 unit files under src/lib/billing. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-billing",
+      "kind": "module",
+      "title": "src/lib/billing",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/browser/browser-control.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/browser. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-browser",
+      "kind": "module",
+      "title": "src/lib/browser",
+      "status": "IMPLEMENTED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/builder/__tests__/builder-authority.test.ts",
+        "lib/builder/__tests__/builder-live-jobs.test.ts",
+        "lib/builder/__tests__/builder-plan.test.ts",
+        "lib/builder/__tests__/builder-production-publish.test.ts",
+        "lib/builder/__tests__/builder-repair-loop.test.ts",
+        "lib/builder/__tests__/builder-sandbox-live.test.ts",
+        "lib/builder/__tests__/builder-source.test.ts",
+        "lib/builder/__tests__/builder-vercel-preview.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "9 non-test files, 9 unit files under src/lib/builder. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-builder",
+      "kind": "module",
+      "title": "src/lib/builder",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "11 non-test files, 0 unit files under src/lib/business.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-business",
+      "kind": "module",
+      "title": "src/lib/business",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/cinema/cinema-master-integration.test.ts",
+        "lib/cinema/cinema-master.test.ts",
+        "lib/cinema/cinema-platform-integration.test.ts",
+        "lib/cinema/cinema-production.test.ts",
+        "lib/cinema/cinema-project-integration.test.ts",
+        "lib/cinema/cinema-render-integration.test.ts",
+        "lib/cinema/cinema-render.test.ts",
+        "lib/cinema/cinema-runtime.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "6 non-test files, 8 unit files under src/lib/cinema. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-cinema",
+      "kind": "module",
+      "title": "src/lib/cinema",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/collective/__tests__/collective-intelligence.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/collective. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-collective",
+      "kind": "module",
+      "title": "src/lib/collective",
+      "status": "IMPLEMENTED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/communications/automation-policy.test.ts",
+        "lib/communications/call-context.test.ts",
+        "lib/communications/contracts.test.ts",
+        "lib/communications/delivery-timeout-reconciliation.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 non-test files, 4 unit files under src/lib/communications. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-communications",
+      "kind": "module",
+      "title": "src/lib/communications",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/company/company-metrics.test.ts",
+        "lib/company/company-workspaces-ownership.test.ts",
+        "lib/company/company-workspaces.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 3 unit files under src/lib/company. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-company",
+      "kind": "module",
+      "title": "src/lib/company",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/compliance/version-store.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 1 unit files under src/lib/compliance. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-compliance",
+      "kind": "module",
+      "title": "src/lib/compliance",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/construction/construction-composite-index-cover.test.ts",
+        "lib/construction/construction-relational-owner-hardening.test.ts",
+        "lib/construction/construction-schema-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "7 non-test files, 3 unit files under src/lib/construction. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-construction",
+      "kind": "module",
+      "title": "src/lib/construction",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "2 non-test files, 0 unit files under src/lib/dashboard.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-dashboard",
+      "kind": "module",
+      "title": "src/lib/dashboard",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/data/content-workspace-errors.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/data. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-data",
+      "kind": "module",
+      "title": "src/lib/data",
+      "status": "IMPLEMENTED",
+      "worker": "W3"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/deployments.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-deployments",
+      "kind": "module",
+      "title": "src/lib/deployments",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/devapi/__tests__/api-auth.test.ts",
+        "lib/devapi/__tests__/key-authority.test.ts",
+        "lib/devapi/__tests__/webhook-retry.test.ts",
+        "lib/devapi/__tests__/webhook-schema-reconciliation.test.ts",
+        "lib/devapi/__tests__/webhook-url.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "7 non-test files, 5 unit files under src/lib/devapi. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-devapi",
+      "kind": "module",
+      "title": "src/lib/devapi",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/documents/__tests__/documents-production-contract.test.ts",
+        "lib/documents/markdoc-lite.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 2 unit files under src/lib/documents. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-documents",
+      "kind": "module",
+      "title": "src/lib/documents",
+      "status": "IMPLEMENTED",
+      "worker": "W3"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/dropshipping/dropshipping-approval-expiry.test.ts",
+        "lib/dropshipping/dropshipping-automations.test.ts",
+        "lib/dropshipping/dropshipping-catalog.test.ts",
+        "lib/dropshipping/dropshipping-control-tower.test.ts",
+        "lib/dropshipping/dropshipping-db-advisors.test.ts",
+        "lib/dropshipping/dropshipping-fulfilment.test.ts",
+        "lib/dropshipping/dropshipping-growth.test.ts",
+        "lib/dropshipping/dropshipping-listings.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "18 non-test files, 16 unit files under src/lib/dropshipping. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-dropshipping",
+      "kind": "module",
+      "title": "src/lib/dropshipping",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/economy/__tests__/agent-economy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/economy. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-economy",
+      "kind": "module",
+      "title": "src/lib/economy",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/enterprise/__tests__/autonomy-policy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/enterprise. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-enterprise",
+      "kind": "module",
+      "title": "src/lib/enterprise",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/evals/__tests__/astra-candidate-route-probe-failure.test.ts",
+        "lib/evals/__tests__/astra-certification-benchmark-suite.test.ts",
+        "lib/evals/__tests__/astra-certification-freellm-judge.test.ts",
+        "lib/evals/__tests__/astra-certification-judge-policy.test.ts",
+        "lib/evals/__tests__/astra-certification-stage-diagnostics.test.ts",
+        "lib/evals/__tests__/astra-evaluation-handoff.test.ts",
+        "lib/evals/__tests__/astra-vision-benchmark-media.test.ts",
+        "lib/evals/__tests__/freellm-runtime-verification.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "25 non-test files, 16 unit files under src/lib/evals. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-evals",
+      "kind": "module",
+      "title": "src/lib/evals",
+      "status": "IMPLEMENTED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/evolution/__tests__/evolution.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/evolution. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-evolution",
+      "kind": "module",
+      "title": "src/lib/evolution",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/fast-track/fast-tracks.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/fast-track. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-fast-track",
+      "kind": "module",
+      "title": "src/lib/fast-track",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/fitness.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-fitness",
+      "kind": "module",
+      "title": "src/lib/fitness",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/food-delivery/__tests__/location.test.ts",
+        "lib/food-delivery/__tests__/registry-policy.test.ts",
+        "lib/food-delivery/approval-bridge.test.ts",
+        "lib/food-delivery/availability.test.ts",
+        "lib/food-delivery/execution-evidence.test.ts",
+        "lib/food-delivery/provider-certification.test.ts",
+        "lib/food-delivery/runtime-gate.test.ts",
+        "lib/food-delivery/webhook-reconciliation.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "15 non-test files, 8 unit files under src/lib/food-delivery. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-food-delivery",
+      "kind": "module",
+      "title": "src/lib/food-delivery",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/game-foundry/game-foundry-asset-errors.test.ts",
+        "lib/game-foundry/game-foundry-connector-health-integration.test.ts",
+        "lib/game-foundry/game-foundry-connector-health.test.ts",
+        "lib/game-foundry/game-foundry-content-assets.test.ts",
+        "lib/game-foundry/game-foundry-content-integration.test.ts",
+        "lib/game-foundry/game-foundry-content.test.ts",
+        "lib/game-foundry/game-foundry-design-lifecycle.test.ts",
+        "lib/game-foundry/game-foundry-fal-errors.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "19 non-test files, 38 unit files under src/lib/game-foundry. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-game-foundry",
+      "kind": "module",
+      "title": "src/lib/game-foundry",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/health/health-ai.functions.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 non-test files, 1 unit files under src/lib/health. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-health",
+      "kind": "module",
+      "title": "src/lib/health",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/html-studio/__tests__/html-studio-zennotes-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/html-studio. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-html-studio",
+      "kind": "module",
+      "title": "src/lib/html-studio",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/huggingface/__tests__/huggingface-cinema-execution.test.ts",
+        "lib/huggingface/__tests__/huggingface-studio-discovery.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "4 non-test files, 2 unit files under src/lib/huggingface. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-huggingface",
+      "kind": "module",
+      "title": "src/lib/huggingface",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/human-frontier/registry.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "6 non-test files, 1 unit files under src/lib/human-frontier. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-human-frontier",
+      "kind": "module",
+      "title": "src/lib/human-frontier",
+      "status": "IMPLEMENTED",
+      "worker": "W2"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/industry/industry-calculations.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/industry. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-industry",
+      "kind": "module",
+      "title": "src/lib/industry",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/integrations/__tests__/agent-integration-runtime.test.ts",
+        "lib/integrations/__tests__/approved-email-action.test.ts",
+        "lib/integrations/__tests__/approved-integration-action.test.ts",
+        "lib/integrations/__tests__/creative-capability-catalog.test.ts",
+        "lib/integrations/__tests__/execution-fabric.test.ts",
+        "lib/integrations/__tests__/external-automation-status.test.ts",
+        "lib/integrations/__tests__/github-approved-action.test.ts",
+        "lib/integrations/__tests__/github-write-approval.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "70 non-test files, 56 unit files under src/lib/integrations. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-integrations",
+      "kind": "module",
+      "title": "src/lib/integrations",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/legal/jurisdictions.test.ts",
+        "lib/legal/legal-automation.test.ts",
+        "lib/legal/legal-case-law.test.ts",
+        "lib/legal/legal-document-analysis.test.ts",
+        "lib/legal/legal-professional-handoff.test.ts",
+        "lib/legal/legal-regulatory-watch.test.ts",
+        "lib/legal/legal-research-pack.test.ts",
+        "lib/legal/legal-research.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "15 non-test files, 11 unit files under src/lib/legal. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-legal",
+      "kind": "module",
+      "title": "src/lib/legal",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/marketplace/__tests__/canonical-compatibility.test.ts",
+        "lib/marketplace/__tests__/marketplace-anon-access.test.ts",
+        "lib/marketplace/checkout-safety.test.ts",
+        "lib/marketplace/fees.boundary.test.ts",
+        "lib/marketplace/fees.test.ts",
+        "lib/marketplace/fulfilment-evidence.test.ts",
+        "lib/marketplace/provider-dispute-evidence.test.ts",
+        "lib/marketplace/refund-evidence.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "21 non-test files, 12 unit files under src/lib/marketplace. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-marketplace",
+      "kind": "module",
+      "title": "src/lib/marketplace",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/mcp/__tests__/agent-mcp-integration-bridge.test.ts",
+        "lib/mcp/__tests__/agent-mcp-runtime.test.ts",
+        "lib/mcp/__tests__/approved-agent-mcp-action.test.ts",
+        "lib/mcp/__tests__/catalog-manifest-parity.test.ts",
+        "lib/mcp/__tests__/external-mcp.test.ts",
+        "lib/mcp/__tests__/external-registration.test.ts",
+        "lib/mcp/__tests__/external-registry-overview.test.ts",
+        "lib/mcp/__tests__/mcp-readiness.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "19 non-test files, 10 unit files under src/lib/mcp. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-mcp",
+      "kind": "module",
+      "title": "src/lib/mcp",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/media/__tests__/media-runtime-authority.test.ts",
+        "lib/media/__tests__/provider-ledger-authority.test.ts",
+        "lib/media/__tests__/trusted-media-authority.test.ts",
+        "lib/media/__tests__/trusted-media-container.test.ts",
+        "lib/media/__tests__/trusted-media-contract.test.ts",
+        "lib/media/__tests__/trusted-social-video-ui.test.ts",
+        "lib/media/generative-media.test.ts",
+        "lib/media/ltx23-provider.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "14 non-test files, 12 unit files under src/lib/media. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-media",
+      "kind": "module",
+      "title": "src/lib/media",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/memory/__tests__/embeddings-provider-selection.test.ts",
+        "lib/memory/__tests__/embeddings-recovery.test.ts",
+        "lib/memory/__tests__/hybrid-memory-ranking.test.ts",
+        "lib/memory/__tests__/hybrid-memory-search.test.ts",
+        "lib/memory/__tests__/memory-fabric-recall.test.ts",
+        "lib/memory/__tests__/memory-fabric.test.ts",
+        "lib/memory/__tests__/recall-status.test.ts",
+        "lib/memory/agent-context-policy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "16 non-test files, 13 unit files under src/lib/memory. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-memory",
+      "kind": "module",
+      "title": "src/lib/memory",
+      "status": "IMPLEMENTED",
+      "worker": "W3"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/mission/__tests__/agent-builder-input-persistence.test.ts",
+        "lib/mission/__tests__/agent-provider-catalog.test.ts",
+        "lib/mission/__tests__/browser-agent.test.ts",
+        "lib/mission/__tests__/browser-provider-budgets.test.ts",
+        "lib/mission/__tests__/browser-provider-readiness.test.ts",
+        "lib/mission/__tests__/document-output.test.ts",
+        "lib/mission/__tests__/explorer-verified-live.test.ts",
+        "lib/mission/__tests__/external-mcp-approval-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "20 non-test files, 26 unit files under src/lib/mission. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-mission",
+      "kind": "module",
+      "title": "src/lib/mission",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/mobile-intelligence/approval.test.ts",
+        "lib/mobile-intelligence/audit.test.ts",
+        "lib/mobile-intelligence/capability-manifest.test.ts",
+        "lib/mobile-intelligence/compatibility.test.ts",
+        "lib/mobile-intelligence/device-auth.test.ts",
+        "lib/mobile-intelligence/device-store.test.ts",
+        "lib/mobile-intelligence/envelope.test.ts",
+        "lib/mobile-intelligence/execution.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "27 non-test files, 23 unit files under src/lib/mobile-intelligence. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-mobile-intelligence",
+      "kind": "module",
+      "title": "src/lib/mobile-intelligence",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/notes.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-notes",
+      "kind": "module",
+      "title": "src/lib/notes",
+      "status": "IMPLEMENTED",
+      "worker": "W3"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "4 non-test files, 0 unit files under src/lib/notifications.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-notifications",
+      "kind": "module",
+      "title": "src/lib/notifications",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/outcomes/__tests__/outcome-packs.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/outcomes. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-outcomes",
+      "kind": "module",
+      "title": "src/lib/outcomes",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/personal-os/__tests__/personal-policy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/personal-os. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-personal-os",
+      "kind": "module",
+      "title": "src/lib/personal-os",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/platform/__tests__/audit.server.test.ts",
+        "lib/platform/__tests__/entitlements.test.ts",
+        "lib/platform/__tests__/integrated-capabilities-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "6 non-test files, 3 unit files under src/lib/platform. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-platform",
+      "kind": "module",
+      "title": "src/lib/platform",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/productivity.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-productivity",
+      "kind": "module",
+      "title": "src/lib/productivity",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "3 non-test files, 0 unit files under src/lib/projects.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-projects",
+      "kind": "module",
+      "title": "src/lib/projects",
+      "status": "IMPLEMENTED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/prompts/__tests__/prompt-workspace-contract.test.ts",
+        "lib/prompts/builtin-seedream-prompts.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 2 unit files under src/lib/prompts. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-prompts",
+      "kind": "module",
+      "title": "src/lib/prompts",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/quant/__tests__/quant-studio-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/quant. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-quant",
+      "kind": "module",
+      "title": "src/lib/quant",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/retail/retail-booking-reminder-email.test.ts",
+        "lib/retail/retail-connected-delivery.test.ts",
+        "lib/retail/retail-inbound-pairing.test.ts",
+        "lib/retail/retail-return-restock.test.ts",
+        "lib/retail/retail-twilio-carrier.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "18 non-test files, 5 unit files under src/lib/retail. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-retail",
+      "kind": "module",
+      "title": "src/lib/retail",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/runtime/__tests__/agent-builder-tool-contract.test.ts",
+        "lib/runtime/__tests__/agent-cancellation.test.ts",
+        "lib/runtime/__tests__/agent-command-mesh.test.ts",
+        "lib/runtime/__tests__/agent-connected-service-contract.test.ts",
+        "lib/runtime/__tests__/agent-deliverable-contract.test.ts",
+        "lib/runtime/__tests__/agent-harness.test.ts",
+        "lib/runtime/__tests__/agent-preview-event-contract.test.ts",
+        "lib/runtime/__tests__/agent-skill-confidence-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "118 non-test files, 160 unit files under src/lib/runtime. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run. Without OPENAI_API_KEY, 33 tests in this area fail closed with PROVIDER_NOT_CONFIGURED.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-runtime",
+      "kind": "module",
+      "title": "src/lib/runtime",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/search/__tests__/search.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/search. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-search",
+      "kind": "module",
+      "title": "src/lib/search",
+      "status": "IMPLEMENTED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/security/__tests__/provider-http.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 1 unit files under src/lib/security. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-security",
+      "kind": "module",
+      "title": "src/lib/security",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/seo/__tests__/productivity-seo-workflow-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/seo. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-seo",
+      "kind": "module",
+      "title": "src/lib/seo",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/shopping/__tests__/google-shopping.test.ts",
+        "lib/shopping/__tests__/limits.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "4 non-test files, 2 unit files under src/lib/shopping. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-shopping",
+      "kind": "module",
+      "title": "src/lib/shopping",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/simulation/__tests__/agent-simulation.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/simulation. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-simulation",
+      "kind": "module",
+      "title": "src/lib/simulation",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/social/__tests__/social-agent-wiring.test.ts",
+        "lib/social/__tests__/social-operations-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 2 unit files under src/lib/social. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-social",
+      "kind": "module",
+      "title": "src/lib/social",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/tasks.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-tasks",
+      "kind": "module",
+      "title": "src/lib/tasks",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/terminal/__tests__/terminal-contract.test.ts",
+        "lib/terminal/__tests__/terminal-policy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 2 unit files under src/lib/terminal. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-terminal",
+      "kind": "module",
+      "title": "src/lib/terminal",
+      "status": "IMPLEMENTED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/three-d/three-d-certification-integration.test.ts",
+        "lib/three-d/three-d-runtime.test.ts",
+        "lib/three-d/three-d-scene.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "Live mesh worker fail-closed path was not executed against a running worker."
+      ],
+      "evidence": "6 non-test files, 3 unit files under src/lib/three-d. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run. PR #1061 is merged. Open3D unit tests passed. A live mesh worker was not called.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-three-d",
+      "kind": "module",
+      "title": "src/lib/three-d",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/tools/agent-tool-choices.test.ts",
+        "lib/tools/manual-tool-approval.test.ts",
+        "lib/tools/tool-execution-evidence.test.ts",
+        "lib/tools/tool-permission-edit.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 4 unit files under src/lib/tools. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-tools",
+      "kind": "module",
+      "title": "src/lib/tools",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/trading/indicators.test.ts",
+        "lib/trading/market-data.test.ts",
+        "lib/trading/paper-trading.test.ts",
+        "lib/trading/trading-alerts.test.ts",
+        "lib/trading/trading-risk.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "11 non-test files, 5 unit files under src/lib/trading. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-trading",
+      "kind": "module",
+      "title": "src/lib/trading",
+      "status": "IMPLEMENTED",
+      "worker": "W10"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No unit test file in this directory."
+      ],
+      "evidence": "1 non-test files, 0 unit files under src/lib/usage.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-usage",
+      "kind": "module",
+      "title": "src/lib/usage",
+      "status": "IMPLEMENTED",
+      "worker": "W9"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/visual/__tests__/creative-worlds.test.ts",
+        "lib/visual/__tests__/remaining-flagship-worlds.test.ts",
+        "lib/visual/__tests__/trading-finance-worlds.test.ts",
+        "lib/visual/__tests__/universal-table-system.test.ts",
+        "lib/visual/astra-depth-field-contract.test.ts",
+        "lib/visual/astra-motion-identity.test.ts",
+        "lib/visual/blackstar-visual-worlds.test.ts",
+        "lib/visual/cinema-route-metadata.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "0 non-test files, 15 unit files under src/lib/visual. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-visual",
+      "kind": "module",
+      "title": "src/lib/visual",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/voice/assistant-activity.test.ts",
+        "lib/voice/lux-tts.test.ts",
+        "lib/voice/voice-assistant.test.ts",
+        "lib/voice/voice-navigation.test.ts",
+        "lib/voice/voice-runtime.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "8 non-test files, 5 unit files under src/lib/voice. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-voice",
+      "kind": "module",
+      "title": "src/lib/voice",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/voxel/vox-codec.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 1 unit files under src/lib/voxel. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-voxel",
+      "kind": "module",
+      "title": "src/lib/voxel",
+      "status": "IMPLEMENTED",
+      "worker": "W8"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/web/__tests__/web-network-policy.test.ts",
+        "lib/web/__tests__/web-snapshots-contract.test.ts",
+        "lib/web/url-policy.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "4 non-test files, 3 unit files under src/lib/web. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-web",
+      "kind": "module",
+      "title": "src/lib/web",
+      "status": "IMPLEMENTED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/website-studio/website-assets.test.ts",
+        "lib/website-studio/website-auth-runtime.server.test.ts",
+        "lib/website-studio/website-backend.test.ts",
+        "lib/website-studio/website-block-instances.test.ts",
+        "lib/website-studio/website-blocks.test.ts",
+        "lib/website-studio/website-cms-runtime.server.test.ts",
+        "lib/website-studio/website-design.test.ts",
+        "lib/website-studio/website-diagnostics.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "28 non-test files, 22 unit files under src/lib/website-studio. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-website-studio",
+      "kind": "module",
+      "title": "src/lib/website-studio",
+      "status": "IMPLEMENTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/whatsapp/__tests__/whatsapp-crm-contract.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "1 non-test files, 1 unit files under src/lib/whatsapp. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-whatsapp",
+      "kind": "module",
+      "title": "src/lib/whatsapp",
+      "status": "IMPLEMENTED",
+      "worker": "W6"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/workflows/langflow-interoperability.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 1 unit files under src/lib/workflows. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-workflows",
+      "kind": "module",
+      "title": "src/lib/workflows",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/workforce/departments-authorization.test.ts",
+        "lib/workforce/output-text.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "2 non-test files, 2 unit files under src/lib/workforce. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-workforce",
+      "kind": "module",
+      "title": "src/lib/workforce",
+      "status": "IMPLEMENTED",
+      "worker": "W7"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "lib/workspaces/__tests__/agent-workspaces-contract.test.ts",
+        "lib/workspaces/__tests__/shared-intelligence.functions.test.ts",
+        "lib/workspaces/agent-workspace-schema-reconciliation.test.ts"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "3 non-test files, 3 unit files under src/lib/workspaces. Those unit files are part of the CI-env vitest run that passed 3549/3549. Live acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "MODULE-workspaces",
+      "kind": "module",
+      "title": "src/lib/workspaces",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": "src/lib/evals",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Issue #1029 is blocked on a real native model."
+      ],
+      "evidence": "16 eval unit files passed inside the suite. Independent evaluator and GPU diagnostics were not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-ASTRA-EVALS",
+      "kind": "subsystem",
+      "title": "Astra bounded certification and evals",
+      "worker": "W2",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/ai-hub",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Enterprise/on-prem execution was not verified."
+      ],
+      "evidence": "49 unit files passed inside the suite. Issue #185 operational pillars remain open. PR #1022 is unmerged and is an ancestor of #1025 and #1026.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-HUB",
+      "kind": "subsystem",
+      "title": "Universal AI Hub",
+      "worker": "W2",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/ai-workbench",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Live model responses were not requested."
+      ],
+      "evidence": "1 unit file passed inside the suite. Ledger E05 still requires signed-in model acceptance.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-WORKBENCH",
+      "kind": "subsystem",
+      "title": "AI Workbench catalogue routing",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/runtime",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No live provider call was made."
+      ],
+      "evidence": "Gateway availability fails closed without OPENAI_API_KEY. CI-env suite passed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-GATEWAY",
+      "kind": "subsystem",
+      "title": "Runtime model gateway",
+      "worker": "W4",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/memory",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No owner session and no embedding provider call."
+      ],
+      "evidence": "13 memory unit files passed inside the suite. Owner recall acceptance was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-MEMORY",
+      "kind": "subsystem",
+      "title": "Governed memory and embeddings",
+      "worker": "W3",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/mcp",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No external MCP server session was opened."
+      ],
+      "evidence": "10 MCP unit files passed inside the suite.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-MCP",
+      "kind": "subsystem",
+      "title": "MCP hub and tool scope",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "src/lib/runtime/agent-skills",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "PR #935 is 415 commits behind and conflicts."
+      ],
+      "evidence": "Skill code is on main. PR #935 adds seven-archive catalogue behaviour and conflicts in src/screens/Skills.jsx.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-SKILLS",
+      "kind": "subsystem",
+      "title": "Skills registry and external archive catalogue",
+      "worker": "W6",
+      "status": "IN PROGRESS"
+    },
+    {
+      "branch": "src/lib/cinema",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No render worker or media provider was called."
+      ],
+      "evidence": "Cinema and Hugging Face unit files passed inside the suite.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-MEDIA",
+      "kind": "subsystem",
+      "title": "Cinema and Hugging Face media jobs",
+      "worker": "W8",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "astra-serving",
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No local GPU runtime in this environment."
+      ],
+      "evidence": "Windows/native serving docs and scripts exist. They were not executed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-NATIVE",
+      "kind": "subsystem",
+      "title": "Astra native serving scripts",
+      "worker": "W2",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": "scripts/verification (absent on main)",
+      "pr": null,
+      "sha": null,
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Phase 2 benchmark is blocked by issue #1050."
+      ],
+      "evidence": "No cybergym script is on main. The work lives in draft PRs #1049–#1059.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "AI-CYBERGYM",
+      "kind": "subsystem",
+      "title": "CyberGym local benchmark bridge",
+      "worker": "W2",
+      "status": "NOT STARTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (nango*.ts, oauth.server.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-NANGO",
+      "kind": "integration",
+      "title": "Nango multi-provider connection fabric",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (github*.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-GITHUB",
+      "kind": "integration",
+      "title": "GitHub connected service and approved writes",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (slack.server.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-SLACK",
+      "kind": "integration",
+      "title": "Slack",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (microsoft365.server.ts, google-workspace.server.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-M365",
+      "kind": "integration",
+      "title": "Microsoft 365 and Google Workspace",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (salesforce, hubspot, notion, asana, linear). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-CRM",
+      "kind": "integration",
+      "title": "Salesforce, HubSpot, Notion, Asana, Linear",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (shopify, ebay, etsy, woocommerce). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-COMMERCE",
+      "kind": "integration",
+      "title": "Shopify, eBay, Etsy, WooCommerce",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (*-social*.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-SOCIAL",
+      "kind": "integration",
+      "title": "Instagram, LinkedIn, Meta, Pinterest, Threads, TikTok, X, YouTube",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "src/lib/integrations unit files included in the passing 3549-test run"
+      ],
+      "externalDependencies": [
+        "Provider OAuth or official partner credentials"
+      ],
+      "blockers": [
+        "No live provider consent, webhook or write was performed."
+      ],
+      "evidence": "Implementation files in src/lib/integrations (approved-action.server.ts, execution-fabric.server.ts). 56 integration unit files passed inside the CI-env suite. A text connector is not treated as a live integration.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "INT-APPROVALS",
+      "kind": "integration",
+      "title": "Approved integration action fabric",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Production migration history was not read in this run."
+      ],
+      "evidence": "314 SQL files in supabase/migrations. Oldest 20260810101444_9fc56d32-8ad2-4720-8309-d0891a284ad6.sql. Newest 20261114193000_three_d_scene_uploads.sql. Presence in git is not proof they are applied to production. Production was not queried.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DB-MIGRATIONS",
+      "kind": "database",
+      "title": "Supabase migration tree",
+      "status": "IMPLEMENTED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Production cron.job and net._http_response were not inspected."
+      ],
+      "evidence": "Documented in .github/RUNTIME_WORKERS.md and migration 20260913024500_runtime_worker_scheduler.sql. Cron health was not observed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DB-RUNTIME-SCHEDULER",
+      "kind": "database",
+      "title": "Runtime worker scheduler (pg_cron + pg_net)",
+      "status": "IMPLEMENTED",
+      "worker": "W4"
+    },
+    {
+      "branch": "repair/agent-economy-additive-ownership",
+      "pr": 974,
+      "sha": "65f811c09b766bc9b1a31f0e6d4040dcc254019d",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "PR #974 conflicts with package.json and backend-check.yml."
+      ],
+      "evidence": "Draft migration exists only on PR #974. It is not on main.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DB-ECONOMY-OWNERSHIP",
+      "kind": "database",
+      "title": "Agent economy ownership foreign keys",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Two divergent drafts. W1 must choose one and rebase it. Do not merge both."
+      ],
+      "evidence": "PR #1037 adds 20261030195000_knowledge_storage_offboarding_guard.sql. PR #1038 adds 20261030004500_knowledge_storage_strict_current_owner.sql. Neither file is on main, and neither PR is an ancestor of #1048.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DB-KNOWLEDGE-STORAGE",
+      "kind": "database",
+      "title": "Knowledge storage RLS migrations",
+      "status": "IN PROGRESS",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "https://github.com/creativewebdesigneng-stack/palladium-ai-os/actions/runs/43630757500"
+      ],
+      "externalDependencies": [],
+      "blockers": [],
+      "evidence": "Push run for #1061 completed success on 169c05ffc32770d735b9edee6c8b83d87236403b. Local typecheck, build, CI-env unit tests and high audit agree. Pglite scripts were not rerun locally.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DEP-BACKEND-CHECK",
+      "kind": "deployment",
+      "title": "GitHub Backend Check on current main",
+      "status": "QA PASSED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [
+        "scripts/production-smoke.mjs"
+      ],
+      "externalDependencies": [],
+      "blockers": [
+        "Last success is run 43600170660 on parent 39663d6c, before #1061. This worker did not call the production host."
+      ],
+      "evidence": "Production smoke workflow exists. It has not been observed against 169c05ffc327.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DEP-PROD-SMOKE",
+      "kind": "deployment",
+      "title": "Scheduled production smoke of current main",
+      "status": "BLOCKED",
+      "worker": "W12"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "Last scheduled run 43595137829 failed on parent 39663d6c with 16 high advisories. It has not run on 169c05ffc327. Local high audit of the new SHA passes; moderate/low remain."
+      ],
+      "evidence": "https://github.com/creativewebdesigneng-stack/palladium-ai-os/actions/runs/43595137829",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DEP-SCHEDULED-AUDIT",
+      "kind": "deployment",
+      "title": "Scheduled security audit of current main",
+      "status": "BLOCKED",
+      "worker": "W1"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [],
+      "blockers": [
+        "No production deployment id was read for 169c05ffc327. Production was not modified."
+      ],
+      "evidence": "vercel.json and the Nitro Cloudflare preset are both present. Which host is canonical for this SHA was not verified.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DEP-VERCEL",
+      "kind": "deployment",
+      "title": "Vercel production deployment of current main",
+      "status": "NOT STARTED",
+      "worker": "W11"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Approved Render/Railway (or equivalent) service and matching worker credentials"
+      ],
+      "blockers": [
+        "Issue #982 records that no browser worker service exists on the inspected Railway project. This run did not create one."
+      ],
+      "evidence": "browser-worker unit tests passed locally. Hosting was not provisioned.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "DEP-BROWSER-HOST",
+      "kind": "deployment",
+      "title": "Hosted Playwright browser worker",
+      "status": "BLOCKED",
+      "worker": "W5"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Signed-in owner data"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Memory engineering is on main and unit-tested. Real owner recall was not run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E01",
+      "kind": "acceptance_test",
+      "title": "Owner memory recall",
+      "worker": "W3",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "None for code; a real task is still required for acceptance"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Recovery code and runtime unit tests exist. A real persisted crash was not induced.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E02",
+      "kind": "acceptance_test",
+      "title": "Persisted run crash/resume",
+      "worker": "W4",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Native model or qualified evaluator"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Certification framework is on main. Issue #1029 was not executed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E03",
+      "kind": "acceptance_test",
+      "title": "Astra independent qualification",
+      "worker": "W2",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Owner workspace"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Catalogue code is on main. No owner workspace install was performed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E04",
+      "kind": "acceptance_test",
+      "title": "160 skill installation and governed execution",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Model provider quota"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Routing code is on main. No signed-in model call was made.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E05",
+      "kind": "acceptance_test",
+      "title": "160 Workbench live model acceptance",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Provider consent"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Approval fabric unit tests passed inside the suite. No provider write was sent.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E06",
+      "kind": "acceptance_test",
+      "title": "Provider, MCP and approval certification",
+      "worker": "W6",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Render worker and provider credentials"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Cinema code and unit tests are on main. No shot was rendered.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E07",
+      "kind": "acceptance_test",
+      "title": "Cinema operational render",
+      "worker": "W8",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Mesh worker and licensed engines where required"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "PR #1061 is on main. Open3D and 3D unit tests passed. No mesh worker HTTP call was made.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E08",
+      "kind": "acceptance_test",
+      "title": "Game Foundry / 3D live output",
+      "worker": "W8",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Chosen market-data provider"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Paper-trading boundary code is on main. No live feed was queried.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E09",
+      "kind": "acceptance_test",
+      "title": "Trading live data",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Stripe live onboarding. Explicitly out of scope for this worker."
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Payment lifecycle code is on main. No Stripe charge, payout or refund was made.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E10",
+      "kind": "acceptance_test",
+      "title": "Marketplace live settlement",
+      "worker": "W9",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Vercel credentials and a real project"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Publishing code is on main. No project was published.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E11",
+      "kind": "acceptance_test",
+      "title": "Website Studio live publish",
+      "worker": "W11",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Signed-in workspace"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Schema evidence in docs is historical. Production was not re-queried. No owner CRUD was run.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E12",
+      "kind": "acceptance_test",
+      "title": "Construction signed-in workflow",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Merchant provider consent"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Retail code is on main. No merchant message or booking was sent.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E13",
+      "kind": "acceptance_test",
+      "title": "Retail connected operations",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Twilio or carrier number and a consented test call"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Real carrier call remains an external gate.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E14",
+      "kind": "acceptance_test",
+      "title": "Inbound retail phone call",
+      "worker": "W10",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Merchant and supplier accounts"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Safety gates are on main. No supplier OAuth write was sent.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E15",
+      "kind": "acceptance_test",
+      "title": "Dropshipping provider writes",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Official partner access"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Provider-neutral gates are on main. Restricted APIs are not certified.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E16",
+      "kind": "acceptance_test",
+      "title": "Food delivery restricted APIs",
+      "worker": "W10",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Physical iOS/Android device"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Server bridge and Swift/Kotlin sources exist. No device build was installed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E17",
+      "kind": "acceptance_test",
+      "title": "Mobile device bridge",
+      "worker": "W11",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Owner-entered source data"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Company surfaces are on main. No business records were created.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E18",
+      "kind": "acceptance_test",
+      "title": "Company Hub real business data",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Qualified reviewer where required"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Bounded-claim code is on main. No specialist review was obtained.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E19",
+      "kind": "acceptance_test",
+      "title": "Legal, finance and compliance specialist acceptance",
+      "worker": "W10",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Second real collaborator"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Authorization code is on main. Two live users were not tested.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E20",
+      "kind": "acceptance_test",
+      "title": "Two-identity repository collaboration",
+      "worker": "W5",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Voice provider and a consented call"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Server context code is on main. No call was placed.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E21",
+      "kind": "acceptance_test",
+      "title": "Consented phone-call grounding",
+      "worker": "W10",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Owner device"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Visual unit files passed inside the suite. No device walkthrough was done.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E22",
+      "kind": "acceptance_test",
+      "title": "Device visual sign-off",
+      "worker": "W11",
+      "status": "IMPLEMENTED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Owner-controlled Auth and provider settings"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "High dependency audit passes. Leaked-password protection and provider business verification were not opened in a dashboard.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E23",
+      "kind": "acceptance_test",
+      "title": "Owner auth and provider security settings",
+      "worker": "W1",
+      "status": "BLOCKED"
+    },
+    {
+      "branch": null,
+      "pr": null,
+      "sha": "169c05ffc32770d735b9edee6c8b83d87236403b",
+      "tests": [],
+      "externalDependencies": [
+        "Paid or on-prem accounts, plus a rebased single stack"
+      ],
+      "blockers": [
+        "Acceptance evidence was not produced on 169c05ffc327."
+      ],
+      "evidence": "Hub foundation is on main. Draft enterprise stack #1030–#1048 is unmerged.",
+      "recommendation": null,
+      "recommendationReason": null,
+      "id": "ACC-E24",
+      "kind": "acceptance_test",
+      "title": "Enterprise ten-pillar operational certification",
+      "worker": "W2",
+      "status": "IN PROGRESS"
+    }
+  ]
+}
