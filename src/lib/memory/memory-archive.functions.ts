@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
 import { buildMemoryArchiveOverview, type ArchiveMemoryRow, type ArchiveDocumentRow } from './memory-archive'
+import { externalMemoryServiceStates } from './external-memory-adapters'
 
 type Sb={from:(table:string)=>any}
 const INPUT=z.object({lens:z.enum(['all','short_term','long_term','organisation','knowledge']).default('all')})
@@ -43,9 +44,6 @@ export const getMemoryArchive = createServerFn({method:'POST'})
     })
     return {
       ...overview,authority:'blackstar-memory-fabric' as const,
-      externalServices:{
-        agentmemory:{mode:'not-connected' as const,reason:'External sidecar requires a reviewed per-tenant adapter.'},
-        openviking:{mode:'not-connected' as const,reason:'AGPL and tenant authorization review required before enabling an external server.'},
-      },
+      externalServices: externalMemoryServiceStates(),
     }
   })

@@ -4,7 +4,8 @@ import * as base from "./model-gateway.base";
 import type { ChatMessage, ChatResult, Provider, ProviderAccess, RunArgs, StreamEvent } from "./model-gateway.base";
 import { blackstarAstraContextCompactionOptions } from "./blackstar-astra-context-policy";
 import { compactRunContextInPlace } from "./run-context-journal.server";
-import { nvidiaNimConfigured, nvidiaNimFallbackEnabled } from './nvidia-dell-infrastructure.server';
+import { nvidiaNimConfigured, nvidiaNimFallbackEnabled } from './nvidia-dell-infrastructure.server'
+import { executeAstraNativeLane, shouldUseAstraNativeLane } from './blackstar-astra-native-lane.server';
 
 export * from "./model-gateway.base";
 
@@ -234,6 +235,18 @@ export async function runChat(args: RunArgs): Promise<ChatResult> {
     args.messages,
     blackstarAstraContextCompactionOptions(args.provider, args.model),
   );
+  if (shouldUseAstraNativeLane(args)) {
+    const result = await executeAstraNativeLane({
+      ...args,
+      invoke: (call) => tryProviderModels(call, call.provider, call.model),
+      fallbackProviders: fallbackOrder(args.provider).filter((provider) => provider !== 'compatible'),
+    });
+    activeProviderByConversation.set(args.messages, {
+      provider: result.provider,
+      model: result.model,
+    });
+    return result;
+  }
   const cached = activeProviderByConversation.get(args.messages);
   const remembered = cached && (!args.allowedProviders || args.allowedProviders.includes(cached.provider)) ? cached : undefined;
   const primaryProvider = remembered?.provider ?? args.provider;

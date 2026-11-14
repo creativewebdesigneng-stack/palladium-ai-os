@@ -287,6 +287,7 @@ export async function deleteMemory(args: { sb: Sb; userId: string; id: string })
     .from("agent_memories")
     .select("id,org_id,agent_id,vector_provider")
     .eq("id", args.id)
+    .eq("user_id", args.userId)
     .maybeSingle();
   if (!row) throw new MemoryError("Memory not found, or you do not have permission to delete it.");
 
@@ -302,7 +303,7 @@ export async function deleteMemory(args: { sb: Sb; userId: string; id: string })
     console.error("[memory] vector delete failed", error);
   }
 
-  const { error } = await args.sb.from("agent_memories").delete().eq("id", args.id);
+  const { error } = await args.sb.from("agent_memories").delete().eq("id", args.id).eq("user_id", args.userId);
   if (error) throw new MemoryError(error.message);
   return { deleted: true, id: args.id };
 }
@@ -709,7 +710,10 @@ export async function ingestDocument(args: {
       memory: summary,
     };
   } catch (error) {
-    await args.sb.from("memory_documents").update({ status: "failed" }).eq("id", doc.id);
+    await args.sb.from("memory_documents").update({ status: "failed" }).eq("id", doc.id).eq("user_id", args.userId);
+    if (error instanceof EmbeddingError) {
+      throw new MemoryError(error.message, error.code === "configuration" ? "embedding_configuration" : undefined);
+    }
     throw error instanceof MemoryError ? error : new MemoryError("Could not index that document.");
   }
 }
@@ -720,12 +724,15 @@ export async function deleteDocument(args: { sb: Sb; userId: string; documentId:
     .from("memory_documents")
     .select("id,storage_path")
     .eq("id", args.documentId)
+    .eq("user_id", args.userId)
     .maybeSingle();
+  if (!doc) throw new MemoryError("Document not found, or you do not have permission to delete it.");
 
   const { data: chunks } = await args.sb
     .from("memory_chunks")
     .select("id,org_id,agent_id,vector_provider")
-    .eq("document_id", args.documentId);
+    .eq("document_id", args.documentId)
+    .eq("user_id", args.userId);
   const ids = (chunks ?? []).map((c: any) => c.id);
   if (ids.length) {
     try {
@@ -739,7 +746,7 @@ export async function deleteDocument(args: { sb: Sb; userId: string; documentId:
       console.error("[memory] chunk vector delete failed", error);
     }
   }
-  const { error } = await args.sb.from("memory_documents").delete().eq("id", args.documentId);
+  const { error } = await args.sb.from("memory_documents").delete().eq("id", args.documentId).eq("user_id", args.userId);
   if (error) throw new MemoryError(error.message);
 
   // The uploaded file goes with the document; nothing is left in the private bucket.

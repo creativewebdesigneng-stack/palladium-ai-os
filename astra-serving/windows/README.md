@@ -79,6 +79,16 @@ A `trycloudflare.com` Quick Tunnel is a development bridge, not the final produc
 
 A separate 8B-class Qwen vision model may fit the same card when loaded independently, but vision should be treated as an experiment until measured on the actual GTX 1080 Ti. Do not bind Blackstar's Astra vision identity to a checkpoint merely because it loads. The existing trusted multimodal certification remains the promotion gate.
 
+## Verify the GPU after setup
+
+The setup script can install Ollama and pull weights. This check does not:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-serving\windows\verify-qwen3-gtx1080ti.ps1
+```
+
+It must be run on the GPU machine. It reads `nvidia-smi`, requires localhost Ollama, requires the exact model id, and requires a real completion containing `BLACKSTAR_GPU_OK`. Full notes: `docs/astra/gtx-1080ti-qwen3-native-lane.md`.
+
 ## Certification boundary
 
 A successful bootstrap or cloud bridge proves only that the model is reachable and can produce inference. It does not create Model Arena runs, attestations or verified evidence. After the local endpoint is operational, use Blackstar's existing evaluation and certification flow to earn task-class routing authority.

@@ -96,6 +96,14 @@ describe('Blackstar Astra serving readiness', () => {
     })
     expect(malformed).toMatchObject({ ready: false, reason: 'invalid_response', health: 'unavailable' })
 
+    const ollama = await probeBlackstarAstraServingReadiness({
+      model: 'qwen3:8b-q4_K_M',
+      fetchImpl: vi.fn(async () => response({ models: [{ name: 'qwen3:8b-q4_K_M' }] })) as typeof fetch,
+      force: true,
+      clock: clock(3, 4),
+    })
+    expect(ollama).toMatchObject({ ready: true, reason: 'ready', model: 'qwen3:8b-q4_K_M' })
+
     const failed = await probeBlackstarAstraServingReadiness({
       model: 'blackstar-astra-v0.1',
       fetchImpl: vi.fn(async () => response({ error: 'unavailable' }, 503)) as typeof fetch,
