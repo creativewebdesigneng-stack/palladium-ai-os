@@ -51,10 +51,11 @@ export async function probeThreeDWorker() {
       signal: AbortSignal.timeout(8000),
     });
     const text = await response.text();
+    const looksLikeHtml = /^\s*</.test(text);
     let payload: any = null;
-    try { payload = text ? JSON.parse(text) : null; } catch {}
+    try { payload = text && !looksLikeHtml ? JSON.parse(text) : null; } catch {}
     const readySignal = payload && typeof payload === "object" && "ready" in payload ? payload.ready === true : null;
-    const healthy = response.ok && readySignal === true;
+    const healthy = response.ok && readySignal === true && !looksLikeHtml;
     return {
       provider: typeof payload?.provider === "string" ? payload.provider : "modly-compatible",
       configured: true,
@@ -69,11 +70,13 @@ export async function probeThreeDWorker() {
       formats: Array.isArray(payload?.formats) ? payload.formats.filter((item: unknown) => typeof item === "string").slice(0, 20) : [],
       error: healthy
         ? null
-        : readySignal === false
-          ? "3D worker health endpoint reported ready=false."
-          : response.ok
-            ? "3D worker health endpoint did not return explicit ready=true JSON."
-            : `3D worker health endpoint returned HTTP ${response.status}.`,
+        : looksLikeHtml
+          ? "3D worker health endpoint returned HTML instead of a ready JSON report."
+          : readySignal === false
+            ? "3D worker health endpoint reported ready=false."
+            : response.ok
+              ? "3D worker health endpoint did not return explicit ready=true JSON."
+              : `3D worker health endpoint returned HTTP ${response.status}.`,
     };
   } catch (error) {
     return {
@@ -163,6 +166,7 @@ async function request(path: string, init?: RequestInit): Promise<any> {
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`3D worker error (${response.status}): ${text.slice(0, 300)}`);
+  if (/^\s*</.test(text)) throw new Error("3D worker returned HTML instead of a job response. The configured route is not a live mesh worker.");
   try { return JSON.parse(text); } catch { throw new Error("3D worker returned invalid JSON."); }
 }
 

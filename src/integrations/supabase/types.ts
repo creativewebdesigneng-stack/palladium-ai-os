@@ -6790,6 +6790,36 @@ export type Database = {
           },
         ]
       }
+      three_d_scenes: {
+        Row: {
+          created_at: string
+          description: string
+          document: Json
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          document?: Json
+          id?: string
+          name: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          document?: Json
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       three_d_jobs: {
         Row: {
           completed_at: string | null

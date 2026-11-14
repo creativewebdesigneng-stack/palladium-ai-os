@@ -54,6 +54,19 @@ describe('3D Studio runtime', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://blackstar-3d-worker-v7iyno.v2.appdeploy.ai/api/workflow-runs/from-image');
   });
 
+  it('does not treat an HTML 200 as a healthy worker or a completed job', async () => {
+    process.env['MODLY_API_URL'] = 'https://modly-worker.example';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('<!DOCTYPE html><html></html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    }));
+    const probe = await probeThreeDWorker();
+    expect(probe.healthy).toBe(false);
+    expect(probe.error).toMatch(/HTML/);
+    await expect(submitThreeDJob({ sourceUrl: 'https://assets.example.com/reference.png', outputFormat: 'glb' }))
+      .rejects.toThrow(/HTML/);
+  });
+
   it('blocks local/private image sources before contacting a worker', async () => {
     process.env['MODLY_API_URL'] = 'https://modly-worker.example';
     await expect(submitThreeDJob({ sourceUrl: 'http://127.0.0.1/private.png', outputFormat: 'glb' }))

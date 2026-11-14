@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
+import { assertOwnedModelReferences, parseSceneDocument } from "./three-d-scene";
 import { getThreeDJob, getThreeDRuntimeCapabilities, probeThreeDWorker, submitThreeDJob } from "./three-d-runtime.server";
 
 type Sb = { from: (table: string) => any };
@@ -105,4 +106,85 @@ export const refreshThreeDJob = createServerFn({ method: "POST" })
     const updated = await sb.from("three_d_jobs").update({ status: worker.status, output_url: worker.outputUrl, preview_url: worker.previewUrl, error_message: worker.errorMessage, metadata: worker.metadata, completed_at: completedAt, updated_at: new Date().toISOString() }).eq("id", data.id);
     if (updated.error) throw new Error(updated.error.message);
     return { id: data.id, ...worker };
+  });
+
+const sceneInput = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(2000).default(""),
+  document: z.unknown(),
+});
+
+function sceneDto(row: any) {
+  const parsed = parseSceneDocumentSafe(row?.document);
+  return {
+    id: String(row.id),
+    name: String(row.name ?? "Untitled scene"),
+    description: String(row.description ?? ""),
+    document: parsed,
+    readable: parsed !== null,
+    created_at: row.created_at ? String(row.created_at) : null,
+    updated_at: row.updated_at ? String(row.updated_at) : null,
+  };
+}
+
+function parseSceneDocumentSafe(input: unknown) {
+  try { return parseSceneDocument(input); } catch { return null; }
+}
+
+async function ownedJobsFor(sb: Sb, userId: string, ids: string[]) {
+  if (!ids.length) return [];
+  const result = await sb.from("three_d_jobs").select("id,status,output_url,input_name").eq("user_id", userId).in("id", ids);
+  if (result.error) throw new Error(result.error.message);
+  return result.data ?? [];
+}
+
+export const listThreeDScenes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const result = await sb.from("three_d_scenes").select("id,name,description,document,created_at,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(40);
+    if (result.error) throw new Error(result.error.message);
+    return { scenes: (result.data ?? []).map(sceneDto) };
+  });
+
+export const saveThreeDScene = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => sceneInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const document = parseSceneDocument(data.document);
+    const modelIds = [...new Set(document.objects.flatMap((object) => object.kind === "model" && object.sourceJobId ? [object.sourceJobId] : []))];
+    assertOwnedModelReferences(document, await ownedJobsFor(sb, context.userId, modelIds));
+    const row = { name: data.name, description: data.description, document, updated_at: new Date().toISOString() };
+    const result = data.id
+      ? await sb.from("three_d_scenes").update(row).eq("id", data.id).eq("user_id", context.userId).select("id,name,description,document,created_at,updated_at").single()
+      : await sb.from("three_d_scenes").insert({ ...row, user_id: context.userId }).select("id,name,description,document,created_at,updated_at").single();
+    if (result.error || !result.data) throw new Error(result.error?.message ?? "3D scene could not be saved.");
+    await writeAudit({ userId: context.userId, orgId: null, action: "three_d.scene_saved", targetType: "three_d_scene", targetId: result.data.id, status: "success", metadata: { objects: document.objects.length } });
+    return { scene: sceneDto(result.data) };
+  });
+
+export const deleteThreeDScene = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const result = await sb.from("three_d_scenes").delete().eq("id", data.id).eq("user_id", context.userId).select("id").maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data) throw new Error("3D scene not found or access denied.");
+    await writeAudit({ userId: context.userId, orgId: null, action: "three_d.scene_deleted", targetType: "three_d_scene", targetId: data.id, status: "success", metadata: {} });
+    return { id: data.id };
+  });
+
+export const renameThreeDJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), inputName: z.string().trim().min(1).max(240) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as Sb;
+    const result = await sb.from("three_d_jobs").update({ input_name: data.inputName, updated_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", context.userId).select("id,input_name").maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data) throw new Error("3D job not found or access denied.");
+    await writeAudit({ userId: context.userId, orgId: null, action: "three_d.renamed", targetType: "three_d_job", targetId: data.id, status: "success", metadata: {} });
+    return { id: result.data.id, inputName: result.data.input_name };
   });
