@@ -67,6 +67,28 @@ describe('3D Studio runtime', () => {
       .rejects.toThrow(/HTML/);
   });
 
+  it('uses a configured Hugging Face endpoint only after the mesh worker fails', async () => {
+    process.env['MODLY_API_URL'] = 'https://modly-worker.example';
+    process.env['THREE_D_HF_ENDPOINT_URL'] = 'https://example.endpoints.huggingface.cloud/triposr';
+    process.env['HF_TOKEN'] = 'hf_test';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const target = String(url);
+      if (target.includes('modly-worker')) {
+        return new Response('<!DOCTYPE html><html></html>', { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+      return new Response(JSON.stringify({ id: 'hf-job', status: 'completed', output_url: 'https://cdn.example.com/model.glb' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    try {
+      const result = await submitThreeDJob({ sourceUrl: 'https://assets.example.com/reference.png', outputFormat: 'glb' });
+      expect(result.workerJobId).toBe('hf:hf-job');
+      expect(result.outputUrl).toBe('https://cdn.example.com/model.glb');
+      expect(getThreeDRuntimeCapabilities().huggingface.configured).toBe(true);
+    } finally {
+      delete process.env['THREE_D_HF_ENDPOINT_URL'];
+      delete process.env['HF_TOKEN'];
+    }
+  });
+
   it('blocks local/private image sources before contacting a worker', async () => {
     process.env['MODLY_API_URL'] = 'https://modly-worker.example';
     await expect(submitThreeDJob({ sourceUrl: 'http://127.0.0.1/private.png', outputFormat: 'glb' }))

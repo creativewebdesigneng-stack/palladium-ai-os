@@ -6,17 +6,32 @@ import {
   assertOwnedModelReferences,
   createModelReference,
   createPrimitive,
+  duplicateSceneObject,
   emptySceneDocument,
   isPreviewableModelUrl,
   parseSceneDocument,
   removeSceneObject,
   updateSceneObject,
 } from "./three-d-scene";
+import { exportSceneGlb } from "./three-d-scene-export";
 
 const id = "11111111-1111-4111-8111-111111111111";
 const jobId = "22222222-2222-4222-8222-222222222222";
 
 describe("3D scene documents", () => {
+  it("exports a primitive scene to a GLB and keeps material edits", async () => {
+    const box = createPrimitive("box", 0, id);
+    expect(box.metalness).toBe(0.08);
+    const edited = updateSceneObject({ objects: [box] }, id, { metalness: 0.6, roughness: 0.2 });
+    const duplicated = duplicateSceneObject(edited, id, "33333333-3333-4333-8333-333333333333");
+    expect(duplicated.objects).toHaveLength(2);
+    expect(duplicated.objects[1]?.metalness).toBe(0.6);
+    const exported = await exportSceneGlb(edited);
+    expect(exported.omitted).toEqual([]);
+    expect(exported.bytes.byteLength).toBeGreaterThan(80);
+    expect(Buffer.from(exported.bytes.subarray(0, 4)).toString("utf8")).toBe("glTF");
+  });
+
   it("creates an empty scene and a bounded primitive the user can edit", () => {
     const box = createPrimitive("box", 0, id);
     const document = addSceneObject(emptySceneDocument(), box);

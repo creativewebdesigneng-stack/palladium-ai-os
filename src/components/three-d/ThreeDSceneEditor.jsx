@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Eye, EyeOff, Loader2, Save, Trash2 } from 'lucide-react';
+import { Copy, Download, Eye, EyeOff, Loader2, Redo2, RotateCcw, Save, Trash2, Undo2, Upload } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
-import { SCENE_PRIMITIVES, addSceneObject, createPrimitive, emptySceneDocument, removeSceneObject, updateSceneObject } from '@/lib/three-d/three-d-scene';
-import { deleteThreeDScene, saveThreeDScene } from '@/lib/three-d/three-d-studio.functions';
+import { SCENE_PRIMITIVES, addSceneObject, createPrimitive, createUploadReference, duplicateSceneObject, emptySceneDocument, removeSceneObject, updateSceneObject } from '@/lib/three-d/three-d-scene';
+import { exportSceneGlb } from '@/lib/three-d/three-d-scene-export';
+import { createThreeDModelUpload, deleteThreeDScene, finalizeThreeDModelUpload, saveThreeDScene } from '@/lib/three-d/three-d-studio.functions';
 import ThreeDSceneViewport from '@/components/three-d/ThreeDSceneViewport';
 
 const control = 'w-full rounded-xl border border-white/10 bg-[#11131a] px-3 py-2 text-xs text-white outline-none focus:border-violet-400/40';
@@ -55,19 +56,45 @@ export default function ThreeDSceneEditor({ scene, placement, onPlacementApplied
   const { toast } = useToast();
   const saveFn = useServerFn(saveThreeDScene);
   const deleteFn = useServerFn(deleteThreeDScene);
+  const uploadFn = useServerFn(createThreeDModelUpload);
+  const finalizeFn = useServerFn(finalizeThreeDModelUpload);
   const [draft, setDraft] = useState(scene);
   const [selectedId, setSelectedId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [resetSignal, setResetSignal] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const appliedPlacement = useRef(null);
+  const history = useRef([]);
+  const future = useRef([]);
+  const thumbnailRef = useRef(null);
+  const fileRef = useRef(null);
   const document = draft?.document ?? emptySceneDocument();
   const selected = document.objects.find((object) => object.id === selectedId) ?? null;
   const dirty = scene.readable && (draft.name !== scene.name || draft.description !== scene.description || JSON.stringify(draft.document) !== JSON.stringify(scene.document));
 
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (event) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  useEffect(() => {
+    if (!dirty || !scene.readable || !draft?.name?.trim() || draft.name.trim().length > 160) return undefined;
+    const timer = setTimeout(() => {
+      saveFn({ data: { id: draft.id, name: draft.name.trim(), description: draft.description.trim(), document: draft.document, thumbnail: thumbnail() } })
+        .then((result) => onSaved?.(result.scene))
+        .catch((error) => toast({ variant: 'destructive', title: 'Autosave failed', description: friendlyMessage(error) }));
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [dirty, draft, scene.readable, saveFn, onSaved, toast]);
+  useEffect(() => {
     setDraft(scene);
     setSelectedId(null);
     setConfirmDelete(false);
+    history.current = [];
+    future.current = [];
   }, [scene.id, scene.updated_at, scene.readable]);
 
   useEffect(() => {
@@ -89,8 +116,12 @@ export default function ThreeDSceneEditor({ scene, placement, onPlacementApplied
     onPlacementApplied?.();
   }, [placement, scene.readable, onPlacementApplied, toast]);
 
+  function thumbnail() {
+    const value = thumbnailRef.current?.();
+    return typeof value === 'string' && value.startsWith('data:image/jpeg;base64,') && value.length <= 80000 ? value : null;
+  }
   const save = useMutation({
-    mutationFn: () => saveFn({ data: { id: draft.id, name: draft.name.trim(), description: draft.description.trim(), document: draft.document } }),
+    mutationFn: () => saveFn({ data: { id: draft.id, name: draft.name.trim(), description: draft.description.trim(), document: draft.document, thumbnail: thumbnail() } }),
     onSuccess: async (result) => {
       toast({ title: 'Scene saved' });
       await onSaved?.(result.scene);
@@ -107,7 +138,27 @@ export default function ThreeDSceneEditor({ scene, placement, onPlacementApplied
   });
 
   function changeDocument(next) {
-    setDraft((current) => ({ ...current, document: next }));
+    setDraft((current) => {
+      history.current = [...history.current, current].slice(-40);
+      future.current = [];
+      return { ...current, document: next };
+    });
+  }
+  function undo() {
+    setDraft((current) => {
+      const previous = history.current.pop();
+      if (!previous) return current;
+      future.current.push(current);
+      return previous;
+    });
+  }
+  function redo() {
+    setDraft((current) => {
+      const next = future.current.pop();
+      if (!next) return current;
+      history.current.push(current);
+      return next;
+    });
   }
 
   function addKind(kind) {
@@ -131,10 +182,16 @@ export default function ThreeDSceneEditor({ scene, placement, onPlacementApplied
 
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
     <div>
-      <ThreeDSceneViewport objects={document.objects} selectedId={selectedId} onSelect={setSelectedId} />
-      <p className="mt-2 text-[11px] text-zinc-500">Only the objects you add are saved. The grid and lights are editor guides, not scene assets. Imported models are fitted into a one-unit box, and scale is relative to that fit.</p>
+      <ThreeDSceneViewport objects={document.objects} selectedId={selectedId} onSelect={setSelectedId} resetSignal={resetSignal} thumbnailRef={thumbnailRef} />
+      <p className="mt-2 text-[11px] text-zinc-500">Only the objects you add are saved. The grid and lights are editor guides, not scene assets. Imported models are fitted into a one-unit box, and scale is relative to that fit. Changes save automatically after a short pause, and leaving this page warns you if a save is still pending.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {SCENE_PRIMITIVES.map((kind) => <button key={kind} onClick={() => addKind(kind)} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs capitalize text-zinc-200 hover:border-violet-300/40">{kind}</button>)}
+        <button onClick={undo} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200"><Undo2 className="h-3.5 w-3.5" />Undo</button>
+        <button onClick={redo} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200"><Redo2 className="h-3.5 w-3.5" />Redo</button>
+        <button onClick={() => setResetSignal((value) => value + 1)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200"><RotateCcw className="h-3.5 w-3.5" />Reset camera</button>
+        <button disabled={exporting} onClick={async () => { setExporting(true); try { const result = await exportSceneGlb(document); const blob = new Blob([result.bytes], { type: 'model/gltf-binary' }); const url = URL.createObjectURL(blob); const link = window.document.createElement('a'); link.href = url; link.download = `${draft.name || 'scene'}.glb`; link.click(); URL.revokeObjectURL(url); if (result.omitted.length) toast({ title: 'Some models were left out of the GLB', description: result.omitted.join(', ') }); } catch (error) { toast({ variant: 'destructive', title: 'Could not export the scene', description: friendlyMessage(error) }); } finally { setExporting(false); } }} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200">{exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Export GLB</button>
+        <button disabled={uploading} onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200">{uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}Import GLB</button>
+        <input ref={fileRef} type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; setUploading(true); try { const prepared = await uploadFn({ data: { filename: file.name } }); const { supabase } = await import('@/integrations/supabase/client'); const uploaded = await supabase.storage.from('three-d-studio').uploadToSignedUrl(prepared.objectPath, prepared.token, file); if (uploaded.error) throw new Error(uploaded.error.message); const finalized = await finalizeFn({ data: { id: prepared.id } }); const object = createUploadReference({ id: finalized.id, filename: finalized.filename, signedUrl: finalized.signedUrl }, document.objects.length); changeDocument(addSceneObject(document, object)); setSelectedId(object.id); } catch (error) { toast({ variant: 'destructive', title: 'Model upload failed', description: friendlyMessage(error) }); } finally { setUploading(false); } }} />
       </div>
     </div>
     <div className="space-y-3">
@@ -153,7 +210,12 @@ export default function ThreeDSceneEditor({ scene, placement, onPlacementApplied
         <VectorFields label="Position" value={selected.position} onCommit={(position) => patchSelected({ position })} />
         <VectorFields label="Rotation" value={selected.rotation} step={1} onCommit={(rotation) => patchSelected({ rotation })} />
         <VectorFields label="Scale" value={selected.scale} onCommit={(scale) => patchSelected({ scale })} />
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField label="Metal" value={selected.metalness ?? 0.08} step={0.05} onCommit={(metalness) => patchSelected({ metalness })} />
+          <NumberField label="Rough" value={selected.roughness ?? 0.45} step={0.05} onCommit={(roughness) => patchSelected({ roughness })} />
+        </div>
         <div className="flex gap-2">
+          <button onClick={() => { changeDocument(duplicateSceneObject(document, selected.id)); }} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-zinc-300"><Copy className="h-3.5 w-3.5" />Duplicate</button>
           <button onClick={() => patchSelected({ visible: !selected.visible })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-zinc-300">{selected.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}{selected.visible ? 'Visible' : 'Hidden'}</button>
           <button onClick={() => { changeDocument(removeSceneObject(document, selected.id)); setSelectedId(null); }} className="rounded-lg border border-rose-400/20 px-2 py-1.5 text-xs text-rose-200">Remove</button>
         </div>

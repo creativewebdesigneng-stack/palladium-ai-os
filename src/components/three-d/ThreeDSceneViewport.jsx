@@ -48,7 +48,7 @@ function objectIdFrom(object) {
   return null;
 }
 
-export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect }) {
+export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect, resetSignal = 0, thumbnailRef }) {
   const mountRef = useRef(null);
   const engineRef = useRef(null);
   const [engineReady, setEngineReady] = useState(false);
@@ -134,7 +134,8 @@ export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect
           frame = requestAnimationFrame(animate);
         };
         animate();
-        engineRef.current = { THREE, group, onPointerDown, onPointerUp };
+        engineRef.current = { THREE, group, camera, controls, renderer, onPointerDown, onPointerUp };
+        if (thumbnailRef) thumbnailRef.current = () => renderer.domElement.toDataURL('image/jpeg', 0.62);
         if (!disposed) setEngineReady(true);
       } catch {
         if (!disposed) setViewportError('The 3D viewport could not start in this browser.');
@@ -158,9 +159,10 @@ export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect
         if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
       }
       engineRef.current = null;
+      if (thumbnailRef) thumbnailRef.current = null;
       setEngineReady(false);
     };
-  }, [onSelect]);
+  }, [onSelect, thumbnailRef]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -221,8 +223,8 @@ export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect
           primitiveGeometry(THREE, object.kind),
           new THREE.MeshStandardMaterial({
             color: object.color || '#8b5cf6',
-            roughness: 0.45,
-            metalness: 0.08,
+            roughness: Number.isFinite(object.roughness) ? object.roughness : 0.45,
+            metalness: Number.isFinite(object.metalness) ? object.metalness : 0.08,
             emissive: selectedObject ? object.color || '#8b5cf6' : '#000000',
             emissiveIntensity: selectedObject ? 0.28 : 0,
             side: object.kind === 'plane' ? THREE.DoubleSide : THREE.FrontSide,
@@ -245,6 +247,14 @@ export default function ThreeDSceneViewport({ objects = [], selectedId, onSelect
       clearGroup(group);
     };
   }, [engineReady, objectsKey, selectedId]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engineReady || !engine || !resetSignal) return;
+    engine.camera.position.set(4.2, 3.1, 5.4);
+    engine.controls.target.set(0, 0.4, 0);
+    engine.controls.update();
+  }, [engineReady, resetSignal]);
 
   const selectedMissing = selected && missingIds.includes(selected.id);
 

@@ -61,11 +61,23 @@ export const sceneObjectSchema = z
     rotation: z.tuple([rotationAxis, rotationAxis, rotationAxis]),
     scale: z.tuple([scaleAxis, scaleAxis, scaleAxis]),
     visible: z.boolean(),
+    metalness: z.number().finite().min(0).max(1).default(0.08),
+    roughness: z.number().finite().min(0).max(1).default(0.45),
     sourceJobId: z.string().uuid().nullable(),
     sourceUrl: z.string().max(4000).nullable(),
+    uploadId: z.string().uuid().nullable().default(null),
   })
   .superRefine((object, ctx) => {
     if (object.kind === "model") {
+      if (object.uploadId) {
+        if (object.sourceJobId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A scene model cannot be both a worker job and an upload.",
+          });
+        }
+        return;
+      }
       if (!object.sourceJobId || !object.sourceUrl) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -83,7 +95,7 @@ export const sceneObjectSchema = z
       }
       return;
     }
-    if (object.sourceJobId || object.sourceUrl) {
+    if (object.sourceJobId || object.sourceUrl || object.uploadId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Primitive scene objects cannot carry worker output.",
@@ -112,6 +124,7 @@ export type OwnedJobRef = {
   output_url: string | null;
   input_name?: string | null;
 };
+export type OwnedUploadRef = { id: string; object_path: string };
 
 export function parseSceneDocument(input: unknown): SceneDocument {
   const result = sceneDocumentSchema.safeParse(input);
@@ -178,7 +191,10 @@ export function updateSceneObject(
   document: SceneDocument,
   id: string,
   patch: Partial<
-    Pick<SceneObject, "name" | "color" | "position" | "rotation" | "scale" | "visible">
+    Pick<
+      SceneObject,
+      "name" | "color" | "position" | "rotation" | "scale" | "visible" | "metalness" | "roughness"
+    >
   >,
 ): SceneDocument {
   const current = document.objects.find((object) => object.id === id);
@@ -190,9 +206,51 @@ export function updateSceneObject(
     kind: current.kind,
     sourceJobId: current.sourceJobId,
     sourceUrl: current.sourceUrl,
+    uploadId: current.uploadId,
   });
   return parseSceneDocument({
     objects: document.objects.map((object) => (object.id === id ? next : object)),
+  });
+}
+
+export function duplicateSceneObject(
+  document: SceneDocument,
+  id: string,
+  newId = crypto.randomUUID(),
+): SceneDocument {
+  const current = document.objects.find((object) => object.id === id);
+  if (!current) throw new Error("Scene object not found.");
+  const copy = sceneObjectSchema.parse({
+    ...current,
+    id: newId,
+    name: `${current.name} copy`.slice(0, 80),
+    position: [Math.min(current.position[0] + 1.2, 480), current.position[1], current.position[2]],
+  });
+  return addSceneObject(document, copy);
+}
+
+export function createUploadReference(
+  upload: { id: string; filename?: string | null; signedUrl?: string | null },
+  index: number,
+  id = crypto.randomUUID(),
+): SceneObject {
+  const name =
+    (upload.filename ?? "Upload")
+      .replace(/\.(glb|gltf)$/i, "")
+      .trim()
+      .slice(0, 80) || "Upload";
+  return sceneObjectSchema.parse({
+    id,
+    name,
+    kind: "model",
+    color: "#e4e4e7",
+    position: [Math.min(index * 1.6, 480), 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+    visible: true,
+    sourceJobId: null,
+    sourceUrl: upload.signedUrl ?? null,
+    uploadId: upload.id,
   });
 }
 
@@ -202,12 +260,30 @@ export function removeSceneObject(document: SceneDocument, id: string): SceneDoc
   return { objects: document.objects.filter((object) => object.id !== id) };
 }
 
-export function assertOwnedModelReferences(document: SceneDocument, jobs: OwnedJobRef[]) {
-  const byId = new Map(jobs.map((job) => [job.id, job]));
+export function assertOwnedModelReferences(
+  document: SceneDocument,
+  jobs: OwnedJobRef[],
+  uploads: OwnedUploadRef[] = [],
+) {
+  const jobsById = new Map(jobs.map((job) => [job.id, job]));
+  const uploadsById = new Map(uploads.map((upload) => [upload.id, upload]));
   for (const object of document.objects) {
-    if (object.kind !== "model" || !object.sourceJobId || !object.sourceUrl) continue;
-    const job = byId.get(object.sourceJobId);
-    if (!job || job.status !== "completed" || job.output_url !== object.sourceUrl) {
+    if (object.kind !== "model") continue;
+    if (object.uploadId) {
+      if (object.sourceJobId)
+        throw new Error("A scene model cannot be both a worker job and an upload.");
+      if (!uploadsById.has(object.uploadId)) {
+        throw new Error("A scene upload must be one of your 3D Studio files.");
+      }
+      continue;
+    }
+    const job = object.sourceJobId ? jobsById.get(object.sourceJobId) : undefined;
+    if (
+      !job ||
+      job.status !== "completed" ||
+      !object.sourceUrl ||
+      job.output_url !== object.sourceUrl
+    ) {
       throw new Error("A scene model must reference one of your completed 3D jobs.");
     }
   }

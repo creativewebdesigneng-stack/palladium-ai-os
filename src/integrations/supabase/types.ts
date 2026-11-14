@@ -6797,6 +6797,7 @@ export type Database = {
           document: Json
           id: string
           name: string
+          thumbnail: string | null
           updated_at: string
           user_id: string
         }
@@ -6806,6 +6807,7 @@ export type Database = {
           document?: Json
           id?: string
           name: string
+          thumbnail?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -6815,7 +6817,35 @@ export type Database = {
           document?: Json
           id?: string
           name?: string
+          thumbnail?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      three_d_uploads: {
+        Row: {
+          byte_size: number | null
+          created_at: string
+          filename: string
+          id: string
+          object_path: string
+          user_id: string
+        }
+        Insert: {
+          byte_size?: number | null
+          created_at?: string
+          filename: string
+          id?: string
+          object_path: string
+          user_id?: string
+        }
+        Update: {
+          byte_size?: number | null
+          created_at?: string
+          filename?: string
+          id?: string
+          object_path?: string
           user_id?: string
         }
         Relationships: []
