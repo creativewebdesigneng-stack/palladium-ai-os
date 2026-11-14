@@ -7,6 +7,7 @@ import Panel from '@/components/palladium/Panel';
 import SubscriptionList, { SubscriptionDetail } from '@/components/admin-subs/SubscriptionList';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { listAllSubscriptions } from '@/lib/admin/admin.functions';
+import { getCommercialReport } from '@/lib/billing/billing.functions';
 import { friendlyMessage } from '@/lib/errors';
 
 function money(value, currency = 'GBP') {
@@ -27,7 +28,9 @@ function monthlyEquivalent(price, interval) {
 export default function AdminSubscriptions() {
   const { session } = useWorkspace();
   const listFn = useServerFn(listAllSubscriptions);
+  const reportFn = useServerFn(getCommercialReport);
   const q = useQuery({ queryKey: ['admin-subs'], queryFn: () => listFn(), enabled: session === 'yes', retry: false });
+  const report = useQuery({ queryKey: ['admin-commercial-report'], queryFn: () => reportFn(), enabled: session === 'yes', retry: false });
 
   const [filters, setFilters] = useState({ q: '', plan: 'all', status: 'all' });
   const [selected, setSelected] = useState(null);
@@ -80,7 +83,8 @@ export default function AdminSubscriptions() {
   return (
     <>
       <PageHeader eyebrow="Admin" title="Subscription Management" description="Live plan and subscription records — access is restricted to administrators." action={headerAction} />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/[.06] px-3 py-2 text-[11px] text-sky-100/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>MRR is normalised from the persisted plan price and billing interval. Payment method details are not exposed to this admin read endpoint. Plan changes and cancellations are not available from this admin screen yet.</p></div>
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/[.06] px-3 py-2 text-[11px] text-sky-100/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Recognised monthly revenue uses the code price catalogue for active and trialling subscriptions in this server's payment environment. Legacy Explorer is £0. Stripe transfer totals are settlement between Stripe accounts, not a completed bank payout. Plan changes still go through the customer's verified Stripe subscription, not this screen.</p></div>
+      <CommercialReport data={report.data} error={report.error} loading={report.isLoading} />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Configured Plans" value={String(plans.length)} />
@@ -109,6 +113,24 @@ export default function AdminSubscriptions() {
 
       <SubscriptionDetail sub={selected} onClose={() => setSelected(null)} />
     </>
+  );
+}
+
+function CommercialReport({ data, error, loading }) {
+  if (loading) return <div className="mb-4 flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading commercial report…</div>;
+  if (error || !data || data.forbidden) return <p className="mb-4 text-xs text-rose-200">{error ? friendlyMessage(error) : 'Commercial report is restricted to administrators.'}</p>;
+  const moneyPence = (pence) => money(Number(pence ?? 0) / 100, data.currency || 'GBP');
+  return (
+    <div className="mb-4 rounded-2xl border border-white/10 bg-white/[.03] p-4">
+      <p className="text-sm font-semibold text-white">Commercial report · {data.environment}</p>
+      <p className="mt-1 text-[11px] text-zinc-500">{data.payouts?.note}{data.capped ? ' Totals are capped at the first 500 rows in each ledger.' : ''}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Recognised monthly" value={moneyPence(data.subscriptions?.recognisedMonthlyPence)} />
+        <MetricCard label="Past due monthly" value={moneyPence(data.subscriptions?.pastDueMonthlyPence)} />
+        <MetricCard label="Marketplace net" value={moneyPence(data.marketplace?.netSalePence)} />
+        <MetricCard label="Transfer settlement" value={moneyPence(data.payouts?.transferNetPence)} />
+      </div>
+    </div>
   );
 }
 

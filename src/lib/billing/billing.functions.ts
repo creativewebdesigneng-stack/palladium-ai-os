@@ -14,6 +14,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildCommercialReport } from "@/lib/billing/commercial-report";
+import { isPlatformAdmin } from "@/lib/marketplace/marketplace.server";
+import { getServerStripeEnvironment } from "@/lib/stripe.server";
 
 type Sb = { from: (t: string) => any };
 
@@ -70,8 +73,9 @@ export const listBillingEvents = createServerFn({ method: "POST" })
       requestsQuery.eq("user_id", userId),
     ]);
 
-    if(results.some(r=>r.error))throw new Error("Could not load billing events. Try again later.");
-    const [{data:subs},{data:purchases},{data:requests}]=results;
+    if (results.some((r) => r.error))
+      throw new Error("Could not load billing events. Try again later.");
+    const [{ data: subs }, { data: purchases }, { data: requests }] = results;
     const events: Array<{
       id: string;
       kind: "subscription" | "purchase" | "purchase_request";
@@ -118,6 +122,63 @@ export const listBillingEvents = createServerFn({ method: "POST" })
 
     events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return { events };
+  });
+
+const REPORT_LIMIT = 500;
+
+/** Admin commercial totals from recorded subscriptions, orders and settlements. */
+export const getCommercialReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const gate = context.supabase as unknown as {
+      rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown }>;
+    };
+    if (!(await isPlatformAdmin(gate, context.userId))) return { forbidden: true as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin = supabaseAdmin as unknown as Sb;
+    const environment = getServerStripeEnvironment();
+
+    const [subscriptions, orders, settlements] = await Promise.all([
+      admin
+        .from("subscriptions")
+        .select("plan_code,status,stripe_price_id")
+        .eq("environment", environment)
+        .limit(REPORT_LIMIT),
+      admin
+        .from("marketplace_orders")
+        .select(
+          "status,sale_price_pence,platform_fee_pence,seller_net_pence,refunded_pence,currency",
+        )
+        .limit(REPORT_LIMIT),
+      admin
+        .from("marketplace_order_settlements")
+        .select(
+          "transfer_pence,transfer_reversed_pence,application_fee_pence,application_fee_refunded_pence,currency",
+        )
+        .eq("livemode", environment === "live")
+        .limit(REPORT_LIMIT),
+    ]);
+    if (subscriptions.error || orders.error || settlements.error) {
+      throw new Error("Could not load the commercial report.");
+    }
+
+    const subscriptionRows = subscriptions.data ?? [];
+    const orderRows = orders.data ?? [];
+    const settlementRows = settlements.data ?? [];
+    return {
+      forbidden: false as const,
+      environment,
+      ...buildCommercialReport({
+        subscriptions: subscriptionRows,
+        orders: orderRows,
+        settlements: settlementRows,
+        capped:
+          subscriptionRows.length >= REPORT_LIMIT ||
+          orderRows.length >= REPORT_LIMIT ||
+          settlementRows.length >= REPORT_LIMIT,
+      }),
+    };
   });
 
 export const updateMyProfile = createServerFn({ method: "POST" })
