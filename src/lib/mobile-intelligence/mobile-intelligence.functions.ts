@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { normalizeMobilePlatformReport } from "./platforms";
 import { mobilePlatformReportSchema } from "./validation";
@@ -9,7 +9,7 @@ type Sb = { from: (table: string) => any };
 const deviceIdSchema = z.string().uuid();
 
 export const listMobileIntelligenceDevices = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ includeRevoked: z.boolean().optional() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -24,7 +24,7 @@ export const listMobileIntelligenceDevices = createServerFn({ method: "POST" })
   });
 
 export const registerMobileIntelligenceDevice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({
     displayName: z.string().trim().min(1).max(120),
     report: mobilePlatformReportSchema,
@@ -60,7 +60,7 @@ export const registerMobileIntelligenceDevice = createServerFn({ method: "POST" 
   });
 
 export const updateMobileIntelligenceCapabilities = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ deviceId: deviceIdSchema, report: mobilePlatformReportSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -88,7 +88,7 @@ export const updateMobileIntelligenceCapabilities = createServerFn({ method: "PO
   });
 
 export const revokeMobileIntelligenceDevice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ deviceId: deviceIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
