@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 
@@ -42,7 +42,7 @@ export function prepareDiagramGuide(source:string){
 }
 
 export const installDiagramDesignGuide = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .handler(async ({context})=>{
     const sb=context.supabase as unknown as {from:(table:string)=>any};
     const guide=prepareDiagramGuide(await verifiedDiagramGuide());
