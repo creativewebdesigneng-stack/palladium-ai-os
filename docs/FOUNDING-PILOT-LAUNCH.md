@@ -33,7 +33,7 @@ Live: landing, authentication, dashboard.
 
 Beta: onboarding, billing, founding_pilot, agent_runtime, ai_chat, notifications, settings.
 
-Hidden: workforce, mission_control, agent_builder, agent_marketplace, agent_workspaces, ai_hub, ai_models, ai_tools, automation, memory, knowledge, files, research, web_intelligence, integrations, business_hub, crm, marketing, finance, analytics, commerce, shopify, creative_studio, cinema_studio, developer_tools, communications, security, projects.
+Hidden: workforce, mission_control, agent_builder, agent_marketplace, agent_workspaces, ai_hub, ai_models, ai_tools, automation, memory, knowledge, files, research, web_intelligence, integrations, business_hub, crm, marketing, finance, analytics, commerce, shopify, creative_studio, cinema_studio, developer_tools, communications, security, projects, health_fitness.
 
 Any route not mapped in `route-features.ts` is denied in the application shell unless the user is the configured admin. This is intentional fail-closed behaviour, but it is not a substitute for adding server-side feature checks to every related server action and API endpoint.
 
@@ -107,5 +107,6 @@ Optional feature flags:
 - The agent streaming and steering endpoints return 403 when agent runtime is disabled.
 - Public developer API endpoints for agents, tasks, workflows, workforces, marketplace and usage now use the feature-aware API auth middleware and return 403 before handler execution when their feature is unavailable.
 - The app shell, sidebar, command menu, topbar, dashboard quick actions/tiles, and Coming Soon handling are wired to the access snapshot.
-- Other feature-specific server actions, MCP tool invocation, OAuth/integration execution, internal worker queues and communication/retail webhook paths still need their own entitlement checks. Do not expose those features to customers until this route-by-route pass is complete.
+- A feature-aware server-function middleware has been applied to the major agent runtime, workforce, AI, memory, creative/media, cinema, integrations, marketplace, CRM, finance, commerce, security, legal, health/fitness, developer, project, notification, mission and workspace server-function modules.
+- This is not yet a certified exhaustive audit of every server function in the 226-module library, nor does it automatically cover custom middleware or raw server handlers. MCP tool invocation paths, OAuth/integration callbacks, internal worker queues and communication/retail webhook paths still need a dedicated route-by-route verification. Do not expose those execution surfaces until that pass is complete.
 - No production build, typecheck, browser acceptance test or end-to-end Stripe test has been run from this GitHub-only editing session. Do not merge/deploy until CI passes and the remaining server-side protections are completed.
