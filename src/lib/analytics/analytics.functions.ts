@@ -9,7 +9,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -28,7 +28,7 @@ function buildDays(days: number) {
 }
 
 export const getAnalytics = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((data: unknown) =>
     z.object({ range: z.enum(["7d", "30d", "90d"]).default("30d") }).parse(data ?? {}),
   )
