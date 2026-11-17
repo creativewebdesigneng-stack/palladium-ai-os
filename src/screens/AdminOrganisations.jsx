@@ -13,6 +13,13 @@ import {
 } from '@/lib/admin/admin-organisations.functions';
 import { friendlyMessage } from '@/lib/errors';
 
+function withAdminOrganisationTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Organisation administration did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 function moneyFromPence(value, currency = 'GBP') {
   if (value == null) return 'Not available';
   try {
@@ -81,7 +88,7 @@ export default function AdminOrganisations() {
   const queryClient = useQueryClient();
   const listFn = useServerFn(listAdminOrganisationsDetailed);
   const updateFn = useServerFn(updateAdminOrganisation);
-  const q = useQuery({ queryKey: ['admin-orgs-detailed'], queryFn: () => listFn({ data: {} }), enabled: session === 'yes', retry: false });
+  const q = useQuery({ queryKey: ['admin-orgs-detailed'], queryFn: () => withAdminOrganisationTimeout(listFn({ data: {} })), enabled: session === 'yes', retry: false });
 
   const [filters, setFilters] = useState({ q: '', plan: 'all', status: 'all', date: 'all' });
   const [selected, setSelected] = useState(null);
@@ -115,9 +122,12 @@ export default function AdminOrganisations() {
   const forbidden = q.data?.forbidden;
   const headerAction = <span className="flex items-center gap-1.5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] font-medium text-emerald-300"><Lock className="h-3.5 w-3.5" />Admin access verified</span>;
 
-  if (session !== 'yes' || q.isLoading) {
-    return (<><PageHeader eyebrow="Admin" title="Organisation Management" description="Manage all Blackstar organisations — access is restricted to administrators." action={headerAction} />
-      <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Loading organisations…</div></>);
+  if (session === 'no') {
+    return <><PageHeader eyebrow="Admin" title="Organisation Management" description="Manage all Blackstar organisations — access is restricted to administrators." /><div className="rounded-2xl border border-amber-400/20 bg-amber-500/[.05] p-6 text-sm text-amber-200">Sign in with an administrator account to view organisations.</div></>;
+  }
+  if (session === 'unknown' || q.isLoading) {
+    return (<><PageHeader eyebrow="Admin" title="Organisation Management" description="Manage all Blackstar organisations — access is restricted to administrators." />
+      <div role="status" className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Loading organisations…</div></>);
   }
   if (forbidden || q.error) {
     if (q.error) console.error('[AdminOrganisations]', q.error);
