@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
 import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
