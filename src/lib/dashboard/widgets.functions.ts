@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -11,7 +11,7 @@ const urlSchema = z.string().trim().max(4000).refine((value) => {
 }, 'Use a valid HTTP or HTTPS URL.');
 
 export const listDashboardWidgets = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("dashboard")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('dashboard_widgets')
@@ -25,7 +25,7 @@ export const listDashboardWidgets = createServerFn({ method: 'POST' })
   });
 
 export const saveDashboardWidget = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("dashboard")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
     title: z.string().trim().min(1).max(120),
@@ -57,7 +57,7 @@ export const saveDashboardWidget = createServerFn({ method: 'POST' })
   });
 
 export const deleteDashboardWidget = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("dashboard")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
