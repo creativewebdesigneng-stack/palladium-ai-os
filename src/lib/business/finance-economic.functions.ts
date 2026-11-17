@@ -1,7 +1,8 @@
 import{createServerFn}from"@tanstack/react-start";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 const BOE="https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp";
 function csvRows(text:string){return text.trim().split(/\r?\n/).map(r=>r.split(",").map(x=>x.replace(/^"|"$/g,"").trim()));}
-export const getFinanceEconomicData=createServerFn({method:"POST"}).handler(async()=>{
+export const getFinanceEconomicData=createServerFn({method:"POST"}).middleware([requireLaunchFeatureAuth("finance")]).handler(async()=>{
  const now=new Date(),from=new Date(Date.UTC(now.getUTCFullYear()-2,now.getUTCMonth(),1));const fmt=(d:Date)=>`${String(d.getUTCDate()).padStart(2,"0")}/${d.toLocaleString("en-GB",{month:"short",timeZone:"UTC"})}/${d.getUTCFullYear()}`;
  const url=new URL(BOE);url.searchParams.set("csv.x","yes");url.searchParams.set("Datefrom",fmt(from));url.searchParams.set("Dateto","now");url.searchParams.set("SeriesCodes","IUMABEDR");url.searchParams.set("UsingCodes","Y");url.searchParams.set("CSVF","TN");
  const res=await fetch(url,{headers:{"user-agent":"Blackstar-Finance/1.0","accept":"text/csv,text/plain"}});
