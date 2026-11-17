@@ -8,7 +8,7 @@ type Sb = { from: (table: string) => any }
 const ACTIVE_RUN_STATES = ['queued','planning','running','waiting_for_approval']
 
 export const getAutonomousRuntimeControlPlane = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb
     const userId = context.userId
@@ -77,7 +77,7 @@ export const getAutonomousRuntimeControlPlane = createServerFn({ method: 'POST' 
   })
 
 export const setAutonomousRuntimeEnabled = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) => z.object({
     enabled: z.boolean(),
     reason: z.string().trim().max(300).nullable().optional(),
