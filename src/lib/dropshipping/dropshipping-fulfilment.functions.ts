@@ -1,6 +1,6 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {listIntegrationCapabilities,normalizeIntegrationProvider,prepareIntegrationAction} from '@/lib/integrations/agent-integration-runtime.server';
 import {notify} from '@/lib/notifications/notify.server';
 import {buildFulfilmentCapabilityRows,orderHasDropshipProduct,orderLineItemIds,providerCanFulfilDropship} from './dropshipping-fulfilment';
