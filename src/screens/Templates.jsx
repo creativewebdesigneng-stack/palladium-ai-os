@@ -192,7 +192,7 @@ export default function Templates() {
       <TemplatePreview
         t={preview}
         onClose={() => setPreview(null)}
-        onUse={(x) => install.mutate(x)}
+        onUse={() => navigate('/creator-marketplace')}
         onFav={toggleFav}
         favs={favs}
       />
