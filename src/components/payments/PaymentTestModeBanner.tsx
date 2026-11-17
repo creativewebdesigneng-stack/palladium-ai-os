@@ -4,7 +4,7 @@ export function PaymentTestModeBanner() {
   if (!clientToken) {
     return (
       <div className="w-full border-b border-rose-400/20 bg-rose-500/[.07] px-4 py-2 text-center text-xs text-rose-200">
-        Blackstar production checkout is not configured yet. Complete the payments go-live configuration before accepting real payments.
+        Blackstar secure checkout is unavailable until Stripe test credentials, webhook verification and plan prices are configured. Live payments remain disabled until test-mode acceptance passes and the owner explicitly approves go-live.
       </div>
     );
   }
