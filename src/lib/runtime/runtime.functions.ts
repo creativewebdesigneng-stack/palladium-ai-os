@@ -3,7 +3,7 @@
  * identity comes from the verified bearer token, never from request data.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { executeAgentTask } from "./agent-task-execution.server";
 import { resolveAgentRuntimeSnapshot } from "./runtime-snapshot";
 import { TOOL_SLUGS } from "./tools.server";
@@ -13,7 +13,7 @@ type Sb = { from: (t: string) => any };
 
 /** Runs an agent task end to end and returns the finished task row. */
 export const runAgentTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { agent_id: string; input: string; artifact_ids?: string[] }) => {
     if (!input?.agent_id) throw new Error("An agent is required.");
     const rawArtifactIds = Array.isArray(input?.artifact_ids) ? input.artifact_ids : [];
@@ -37,7 +37,7 @@ export const runAgentTask = createServerFn({ method: "POST" })
 
 /** Cancels a run. The runtime notices between turns and closes the task. */
 export const cancelAgentTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { task_id: string }) => ({ task_id: String(input?.task_id ?? "") }))
   .handler(async ({ data, context }) => {
     return cancelOwnedAgentTask(context.supabase as unknown as Sb, context.userId, data.task_id);
@@ -45,7 +45,7 @@ export const cancelAgentTask = createServerFn({ method: "POST" })
 
 /** Agent + recent runs + the tools this workspace can grant. */
 export const getAgentRuntime = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { agent_id: string }) => ({ agent_id: String(input?.agent_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -69,7 +69,7 @@ export const getAgentRuntime = createServerFn({ method: "POST" })
  * run-resume worker; never expose its service-role authority through this API.
  */
 export const reapStuckRuns = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async () => {
     throw new Error("Manual stale-run reaping has been retired. Agent crash recovery runs through Blackstar's scheduled worker.");
   });
