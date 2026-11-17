@@ -29,14 +29,14 @@ export const Route = createFileRoute("/api/launch/webhook")({
         try {
           if (event.type === "checkout.session.completed") {
             const session = event.data.object as Stripe.Checkout.Session;
-            if (session.metadata?.kind !== "blackstar_founding_pilot" || !session.subscription || !session.customer) {
+            if (session.metadata?.["kind"] !== "blackstar_founding_pilot" || !session.subscription || !session.customer) {
               return Response.json({ received: true });
             }
             const subscription = await stripe.subscriptions.retrieve(String(session.subscription));
             await saveEntitlement(db, subscription, String(session.customer), event.livemode ? "live" : "test");
           } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
             const subscription = event.data.object as Stripe.Subscription;
-            if (subscription.metadata?.kind !== "blackstar_founding_pilot") return Response.json({ received: true });
+            if (subscription.metadata?.["kind"] !== "blackstar_founding_pilot") return Response.json({ received: true });
             const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
             await saveEntitlement(db, subscription, customerId, event.livemode ? "live" : "test");
           }
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/api/launch/webhook")({
 });
 
 async function saveEntitlement(db: any, subscription: Stripe.Subscription, customerId: string, environment: "test" | "live") {
-  const userId = subscription.metadata?.userId;
+  const userId = subscription.metadata?.["userId"];
   if (!userId) throw new Error("Founding Pilot subscription is missing userId metadata.");
   const status = subscription.status;
   const { data: existing, error: existingError } = await db.from("blackstar_pilot_access")
