@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { googleShoppingConfigured } from "@/lib/shopping/google-shopping.server";
 import {
@@ -121,7 +121,7 @@ export const submitMissionDiscovery = createServerFn({ method: "POST" })
       timezone: input.timezone?.trim().slice(0, 100) || null,
     };
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
