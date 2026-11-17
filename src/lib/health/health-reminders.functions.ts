@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 type Sb={from:(table:string)=>any};
 const reminder=z.object({reminder_type:z.enum(['workout','nutrition','hydration','sleep','medication','appointment','measurement','habit','other']),title:z.string().trim().min(1).max(180),notes:z.string().trim().max(2000).optional(),scheduled_for:z.string().datetime({offset:true}),recurrence:z.enum(['none','daily','weekly','monthly']).default('none')});
