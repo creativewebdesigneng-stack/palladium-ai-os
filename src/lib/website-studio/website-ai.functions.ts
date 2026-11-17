@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server';
 import { writeAudit } from '@/lib/platform/audit.server';
@@ -41,7 +41,7 @@ function parseJsonPayload(text:string):Omit<WebsiteIterationResult,'provider'|'m
 }
 
 export const generateWebsiteIteration=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>inputSchema.parse(v))
   .handler(async({data,context}):Promise<WebsiteIterationResult>=>{
     const sb=context.supabase as unknown as Sb;
