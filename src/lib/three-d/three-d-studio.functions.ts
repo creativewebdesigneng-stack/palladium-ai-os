@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { assertOwnedModelReferences, parseSceneDocument, type SceneDocument } from "./three-d-scene";
 import { createOwnedUploadUrl, signStoragePath, storeMeshBytes, uploadedByteSize } from "./three-d-storage.server";
