@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { analyseAgentImprovement, type AgentImprovementTask } from "./agent-improvement";
 
 type Sb = { from: (t: string) => any };
 
 /** Returns bounded, evidence-backed improvement recommendations for one owned agent. */
 export const getAgentImprovementInsights = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { agentId: string }) => {
     const agentId = String(input?.agentId ?? "").trim();
     if (!agentId) throw new Error("Agent id is required");
