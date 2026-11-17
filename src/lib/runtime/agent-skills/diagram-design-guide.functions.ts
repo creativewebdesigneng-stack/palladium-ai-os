@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 
