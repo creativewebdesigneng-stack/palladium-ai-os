@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 
@@ -110,7 +110,7 @@ function buildDemandSignals({ catalog, inventory, movements, suppliers }: any) {
 }
 
 export const getRetailAdvancedOperations = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -157,22 +157,22 @@ export const getRetailAdvancedOperations = createServerFn({ method: 'POST' })
   });
 
 export const saveRetailReturn = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => returnSchema.parse(value))
   .handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_returns', context.userId, data));
 
 export const saveRetailPromotion = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => promotionSchema.parse(value))
   .handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_promotions', context.userId, data));
 
 export const saveRetailLoyaltyMember = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => loyaltyMemberSchema.parse(value))
   .handler(async ({ data, context }) => saveOwned(context.supabase as unknown as Sb, 'retail_loyalty_members', context.userId, data));
 
 export const adjustRetailLoyalty = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({
     member_id: uuid, points: z.coerce.number().int().min(-1_000_000_000).max(1_000_000_000).refine((n) => n !== 0, 'Points cannot be zero'),
     event_type: z.enum(['earn','redeem','adjust','expire','refund']), order_id: uuid.nullish(), amount: money, note: optionalText(2000),
@@ -188,7 +188,7 @@ export const adjustRetailLoyalty = createServerFn({ method: 'POST' })
   });
 
 export const saveRetailStockTransfer = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => transferSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -205,7 +205,7 @@ export const saveRetailStockTransfer = createServerFn({ method: 'POST' })
   });
 
 export const completeRetailStockTransfer = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ transfer_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -215,7 +215,7 @@ export const completeRetailStockTransfer = createServerFn({ method: 'POST' })
   });
 
 export const updateRetailReorderProposal = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ id: uuid, status: z.enum(['suggested','approved','ordered','dismissed']), purchase_order_id: uuid.nullish() }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -227,7 +227,7 @@ export const updateRetailReorderProposal = createServerFn({ method: 'POST' })
   });
 
 export const generateRetailReorderProposals = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
