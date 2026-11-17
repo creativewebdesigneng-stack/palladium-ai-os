@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { runWebAutomation, getWebAutomationCapabilities } from './web-intelligence.server';
 import { assertPublicHttpUrl } from './url-policy';
@@ -11,7 +11,7 @@ const providerSchema = z.enum(['firecrawl', 'crawlee']);
 const operationSchema = z.enum(['search', 'scrape', 'crawl']);
 
 export const getWebIntelligenceOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("web_intelligence")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('web_crawl_jobs').select('*').eq('user_id', context.userId).order('created_at', { ascending: false }).limit(30);
@@ -20,7 +20,7 @@ export const getWebIntelligenceOverview = createServerFn({ method: 'POST' })
   });
 
 export const createWebIntelligenceJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("web_intelligence")])
   .inputValidator((input: unknown) => {
     const parsed = z.object({
       provider: providerSchema,

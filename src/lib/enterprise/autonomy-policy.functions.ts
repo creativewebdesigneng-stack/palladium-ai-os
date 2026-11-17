@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -20,7 +20,7 @@ async function requireAccessibleOrg(sb: Sb, orgId: string) {
 }
 
 export const getEnterpriseAutonomyPolicy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((input: unknown) => z.object({ orgId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -35,7 +35,7 @@ export const getEnterpriseAutonomyPolicy = createServerFn({ method: "POST" })
   });
 
 export const saveEnterpriseAutonomyPolicy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((input: unknown) => policyInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

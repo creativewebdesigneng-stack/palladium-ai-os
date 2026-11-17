@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { runFreeLlmJudge } from "@/lib/evals/freellm-evaluator.server";
 import {
@@ -103,7 +103,7 @@ function parseJudgeJson(raw: string): Array<{ index: number; score: number; verd
 }
 
 export const listModelEvalRuns = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({ orgId: z.string().uuid().nullish(), limit: z.number().int().min(1).max(100).optional() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -119,7 +119,7 @@ export const listModelEvalRuns = createServerFn({ method: "POST" })
   });
 
 export const getModelEvalRun = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -138,7 +138,7 @@ export const getModelEvalRun = createServerFn({ method: "POST" })
   });
 
 export const runModelArena = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     name: z.string().trim().min(1).max(160),

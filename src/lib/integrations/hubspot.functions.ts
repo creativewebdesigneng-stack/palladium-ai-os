@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchHubSpotContacts, searchHubSpotDeals } from "./hubspot.server";
 
 function searchInput(input: { query: string; limit?: number }) {
@@ -12,7 +12,7 @@ function searchInput(input: { query: string; limit?: number }) {
 }
 
 export const searchConnectedHubSpotContacts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(searchInput)
   .handler(async ({ data, context }) =>
     searchHubSpotContacts({
@@ -23,7 +23,7 @@ export const searchConnectedHubSpotContacts = createServerFn({ method: "POST" })
   );
 
 export const searchConnectedHubSpotDeals = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(searchInput)
   .handler(async ({ data, context }) =>
     searchHubSpotDeals({

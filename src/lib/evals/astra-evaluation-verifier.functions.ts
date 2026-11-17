@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 
 const taskClassSchema = z.enum(['general', 'reasoning', 'coding', 'tool_use', 'vision', 'agentic'])
@@ -10,7 +11,7 @@ const inputSchema = z.object({
 })
 
 export const getAstraCertificationStatus = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { getAstraEvaluationCertificationStatus } = await import('./astra-evaluation-verifier.server')
@@ -22,7 +23,7 @@ export const getAstraCertificationStatus = createServerFn({ method: 'POST' })
   })
 
 export const certifyAstraTaskClass = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { certifyAstraEvaluation } = await import('./astra-evaluation-verifier.server')

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   isModelProviderConfigured,
   listModelProviderDefinitions,
@@ -13,7 +13,7 @@ import { isPlatformAdmin } from '@/lib/marketplace/marketplace.server';
 type Sb = { from: (t: string) => any };
 
 export const getModelRuntimeOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [{ data: agents, error: agentError }, { data: tasks, error: taskError }, astra, platformAdmin] = await Promise.all([
@@ -150,7 +150,7 @@ export const getModelRuntimeOverview = createServerFn({ method: "POST" })
 
 /** Explicit platform-admin, read-only probe; never generates paid tokens. */
 export const probeNvidiaModelConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
       return { forbidden: true as const };
@@ -165,7 +165,7 @@ export const probeNvidiaModelConnection = createServerFn({ method: "POST" })
  * platform-admin role; no inference happens on page load.
  */
 export const certifyNvidiaModelInference = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
       return { forbidden: true as const };
@@ -178,7 +178,7 @@ export const certifyNvidiaModelInference = createServerFn({ method: "POST" })
  * Uses existing authenticated platform admin and required audit enforcement.
  */
 export const certifyNvidiaModelToolCalling = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     if (!(await isPlatformAdmin(context.supabase as never, context.userId))) {
       return { forbidden: true as const };

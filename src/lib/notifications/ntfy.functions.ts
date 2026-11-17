@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -10,7 +10,7 @@ function baseUrl() { return (process.env['NTFY_BASE_URL']?.trim() || 'https://nt
 function token() { return process.env['NTFY_TOKEN']?.trim() || null; }
 
 export const getNtfyOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('notification_endpoints').select('*').eq('user_id', context.userId).eq('provider', 'ntfy').order('created_at', { ascending: false });
@@ -19,7 +19,7 @@ export const getNtfyOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveNtfyEndpoint = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({ label: z.string().trim().min(1).max(80), topic: topicSchema, enabled: z.boolean().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -31,7 +31,7 @@ export const saveNtfyEndpoint = createServerFn({ method: 'POST' })
   });
 
 export const sendNtfyTest = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

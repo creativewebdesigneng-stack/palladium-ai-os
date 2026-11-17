@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
@@ -21,7 +21,7 @@ function bounded(rows: any[] | null | undefined, maximum: number, label: string)
 }
 
 export const cloneStudioApp = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value: unknown) => input.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

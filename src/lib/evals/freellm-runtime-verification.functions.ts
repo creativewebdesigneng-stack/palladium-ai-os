@@ -1,5 +1,6 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 import { isIndependentFreeLlmRouteProvider } from './astra-certification-judge-policy'
 import { matchesPinnedFreeLlmRoute, resolveFreeLlmEvaluatorConfig, runFreeLlmJudge } from './freellm-evaluator.server'
@@ -45,7 +46,7 @@ function safeFailure(error: unknown, timedOut = false): { code: FailureCode; mes
 }
 
 export const verifyFreeLlmEvaluatorRuntime = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     const config = resolveFreeLlmEvaluatorConfig()
     const started = Date.now()

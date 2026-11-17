@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { resolveCollectiveConsensus, type CollectiveProposal } from "./collective-intelligence";
 
 type Sb = { from: (table: string) => any };
@@ -19,7 +19,7 @@ const collectiveInput = z.object({
 });
 
 export const runCollectiveDeliberation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => collectiveInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -85,7 +85,7 @@ export const runCollectiveDeliberation = createServerFn({ method: "POST" })
   });
 
 export const listCollectiveDeliberations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ limit: z.number().int().min(1).max(100).default(25) }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

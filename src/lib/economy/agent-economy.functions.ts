@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { calculateAgentEconomyBalance, canAffordAgentAction, type EconomyEntry } from "./agent-economy";
 
 type Sb = { from: (table: string) => any };
@@ -14,7 +14,7 @@ async function assertOwnedAgent(sb: Sb, userId: string, agentId: string) {
 }
 
 export const getAgentEconomyBalance = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: unknown) => scopeSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -41,7 +41,7 @@ export const getAgentEconomyBalance = createServerFn({ method: "POST" })
   });
 
 export const checkAgentEconomyBudget = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: unknown) => scopeSchema.extend({ estimatedCostMicros: z.number().int().positive().safe() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

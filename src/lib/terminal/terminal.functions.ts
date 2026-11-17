@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { assertWithinLimit, getEntitlements, recordUsage } from "@/lib/platform/entitlements.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { executeTerminalCommand, terminalConfigured, validateTerminalCommand } from "./terminal.server";
@@ -10,7 +10,7 @@ type Sb = {
 };
 
 export const getTerminalStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async () => ({
     configured: terminalConfigured(),
     provider: terminalConfigured() ? "e2b" : null,
@@ -27,7 +27,7 @@ export const getTerminalStatus = createServerFn({ method: "POST" })
   }));
 
 export const runTerminalCommand = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { command: string }) => ({
     command: validateTerminalCommand(String(input?.command ?? "")),
   }))

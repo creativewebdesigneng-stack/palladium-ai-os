@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { assessWebsiteQuality } from '@/lib/website-studio/website-quality';
 import { assessPublishReadiness } from '@/lib/website-studio/website-publish';
 import { writeAudit } from '@/lib/platform/audit.server';
@@ -99,13 +99,13 @@ async function markDeploymentReady(sb:Sb,projectId:string,target:PublishTarget,d
   if(error)throw new Error(error.message);
 }
 
-export const getWebsiteStudioPublisherStatus=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async()=>{
+export const getWebsiteStudioPublisherStatus=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("developer_tools")]).handler(async()=>{
   const {configured,teamId}=publisherConfig();
   return {configured,provider:'vercel',teamConfigured:Boolean(teamId)};
 });
 
 export const publishWebsiteStudioProject=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>deploySchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -157,7 +157,7 @@ export const publishWebsiteStudioProject=createServerFn({method:'POST'})
   });
 
 export const verifyWebsiteStudioDeployment=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>deploySchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -184,7 +184,7 @@ function domainStateFromPayload(domain:string,payload:Record<string,unknown>){
 }
 
 export const addWebsiteStudioDomain=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>domainSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -204,7 +204,7 @@ export const addWebsiteStudioDomain=createServerFn({method:'POST'})
   });
 
 export const verifyWebsiteStudioDomain=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>verifyDomainSchema.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

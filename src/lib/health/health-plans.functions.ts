@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage, type ToolDef } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
@@ -53,7 +53,7 @@ function json(value:unknown,max=12000){try{return JSON.stringify(value).slice(0,
 function nullify(value?:string){return value?.trim()?value.trim():null;}
 
 export const getHealthPlansRecords=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .handler(async({context})=>{
     const sb=context.supabase as unknown as Sb;
     const [plans,records]=await Promise.all([
@@ -66,7 +66,7 @@ export const getHealthPlansRecords=createServerFn({method:'POST'})
   });
 
 export const generateHealthPlan=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>planInput.parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -113,7 +113,7 @@ export const generateHealthPlan=createServerFn({method:'POST'})
   });
 
 export const setHealthPlanStatus=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>z.object({id:z.string().uuid(),status:z.enum(['draft','active','completed','archived'])}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -123,7 +123,7 @@ export const setHealthPlanStatus=createServerFn({method:'POST'})
   });
 
 export const saveHealthRecord=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>z.object({
     record_type:z.enum(['lab','appointment','vaccination','procedure','diagnosis_record','note','document']),
     title:z.string().trim().min(1).max(240),

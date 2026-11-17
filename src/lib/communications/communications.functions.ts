@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { resolveSelectedCallContext } from './call-context.server';
@@ -89,7 +89,7 @@ async function assertDailyLimit(userId: string, channel: 'sms' | 'voice', limit:
 }
 
 export const getCommunicationsOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .handler(async ({ context }) => {
     const [prefs, recipients, events, endpoints] = await Promise.all([
       loadPreferences(context.userId),
@@ -110,7 +110,7 @@ export const getCommunicationsOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveCommunicationPreferences = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => communicationPreferencesSchema.parse(input))
   .handler(async ({ data, context }) => {
     const row = { user_id: context.userId, ...data, updated_at: new Date().toISOString() };
@@ -121,7 +121,7 @@ export const saveCommunicationPreferences = createServerFn({ method: 'POST' })
   });
 
 export const saveCommunicationRecipient = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => saveRecipientSchema.parse(input))
   .handler(async ({ data, context }) => {
     const now = new Date().toISOString();
@@ -144,7 +144,7 @@ export const saveCommunicationRecipient = createServerFn({ method: 'POST' })
   });
 
 export const beginCommunicationPhoneVerification = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => z.object({ recipient_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const recipient = await loadRecipient(context.userId, data.recipient_id);
@@ -154,7 +154,7 @@ export const beginCommunicationPhoneVerification = createServerFn({ method: 'POS
   });
 
 export const confirmCommunicationPhoneVerification = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => z.object({ recipient_id: z.string().uuid(), code: z.string().trim().regex(/^\d{4,10}$/) }).parse(input))
   .handler(async ({ data, context }) => {
     const recipient = await loadRecipient(context.userId, data.recipient_id);
@@ -169,7 +169,7 @@ export const confirmCommunicationPhoneVerification = createServerFn({ method: 'P
   });
 
 export const sendCommunicationSms = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => sendSmsSchema.parse(input))
   .handler(async ({ data, context }) => {
     const [prefs, recipient] = await Promise.all([
@@ -231,7 +231,7 @@ export const sendCommunicationSms = createServerFn({ method: 'POST' })
   });
 
 export const startCommunicationAiCall = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => startAiCallSchema.parse(input))
   .handler(async ({ data, context }) => {
     const [prefs, recipient] = await Promise.all([
@@ -323,7 +323,7 @@ export const startCommunicationAiCall = createServerFn({ method: 'POST' })
   });
 
 export const sendCommunicationPhonePush = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => z.object({
     title: z.string().trim().min(1).max(160),
     body: z.string().trim().min(1).max(1000),

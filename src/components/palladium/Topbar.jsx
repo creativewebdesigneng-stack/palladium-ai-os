@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
 import { AstraMark } from '@/components/blackstar/AstraMark'
 import { findNavigationItem } from '@/components/palladium/navigationData'
+import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider'
 
 export default function Topbar({ collapsed, toggleSidebar, openMobile, openCommand, openAssistant, unread = 0 }) {
   const toggleTheme = () => document.documentElement.classList.toggle('palladium-dim')
   const { user } = useAuth()
+  const launchAccess = useLaunchAccess()
   const { pathname } = useLocation()
   const current = findNavigationItem(pathname)
   const initials = (user?.full_name || user?.email || 'U').slice(0, 2).toUpperCase()
@@ -38,7 +40,7 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
       </button>
 
       <div className="ml-auto flex items-center gap-1">
-        <button
+        {launchAccess.canAccessPath("/chat") && <button
           onClick={openAssistant}
           aria-label="Open Astra assistant"
           className="group hidden items-center gap-2 rounded-xl border border-violet-300/10 bg-violet-500/[.035] px-2.5 py-2 text-zinc-500 transition hover:border-violet-300/20 hover:bg-violet-500/[.07] hover:text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:flex"
@@ -46,25 +48,25 @@ export default function Topbar({ collapsed, toggleSidebar, openMobile, openComma
           <AstraMark size={16} />
           <span className="hidden text-[10px] font-semibold uppercase tracking-[.15em] lg:block">Astra</span>
           <Sparkles className="h-3.5 w-3.5 text-violet-300/55 transition group-hover:text-violet-200" />
-        </button>
-        <Link to="/help" aria-label="Help" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 lg:block">
+        </button>}
+        {launchAccess.canAccessPath("/help") && <Link to="/help" aria-label="Help" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 lg:block">
           <HelpCircle className="h-5 w-5" />
-        </Link>
+        </Link>}
         <button onClick={toggleTheme} aria-label="Toggle dim theme" className="hidden rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 sm:block">
           <SunMoon className="h-5 w-5" />
         </button>
-        <Link to="/notifications" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
+        {launchAccess.canAccessPath("/notifications") && <Link to="/notifications" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative rounded-lg p-2 text-zinc-500 transition hover:bg-white/[.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
           <Bell className="h-5 w-5" />
           {unread > 0 && (
             <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-violet-500 px-1 text-[9px] font-semibold text-white ring-2 ring-[#050509]">
               {unread > 99 ? '99+' : unread}
             </span>
           )}
-        </Link>
-        <Link to="/settings" aria-label="Profile" className="ml-1 flex items-center gap-2 rounded-full border border-transparent p-1 pr-2 transition hover:border-white/[.06] hover:bg-white/[.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
+        </Link>}
+        {launchAccess.canAccessPath("/settings") ? <Link to="/settings" aria-label="Profile" className="ml-1 flex items-center gap-2 rounded-full border border-transparent p-1 pr-2 transition hover:border-white/[.06] hover:bg-white/[.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
           <span className="grid h-8 w-8 place-items-center rounded-full border border-violet-300/20 bg-gradient-to-br from-[#211536] to-[#08070d] text-xs font-semibold text-violet-100 shadow-[0_0_18px_rgba(124,58,237,.12)]">{initials}</span>
           <ChevronDown className="hidden h-4 w-4 text-zinc-600 lg:block" />
-        </Link>
+        </Link> : <span className="ml-1 grid h-9 w-9 place-items-center rounded-full border border-violet-300/20 bg-[#100c19] text-xs font-semibold text-violet-100">{initials}</span>}
       </div>
     </header>
   )

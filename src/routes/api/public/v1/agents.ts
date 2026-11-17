@@ -13,7 +13,7 @@ const PATH = "/api/public/v1/agents";
 export const Route = createFileRoute("/api/public/v1/agents")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "agents:read", path: PATH }, async (ctx, request) => {
+      GET: withApiAuth({ scope: "agents:read", path: PATH, feature: "agent_runtime" }, async (ctx, request) => {
         const { limit, offset } = pageParams(request);
         const query = ctx.admin
           .from("personal_agents")
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/public/v1/agents")({
         if (error) throw new ApiError(500, "query_failed", error.message);
         return { agents: data ?? [], limit, offset };
       }),
-      POST: withApiAuth({ scope: "agents:write", path: PATH }, async (ctx, request) => {
+      POST: withApiAuth({ scope: "agents:write", path: PATH, feature: "agent_runtime" }, async (ctx, request) => {
         const body = await readJson(request);
         const name = requireString(body, "name", 120);
         const { data, error } = await ctx.admin

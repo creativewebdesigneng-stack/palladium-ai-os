@@ -11,6 +11,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { getEntitlements, assertWithinLimit } from "./entitlements.server";
 import { writeAudit, notify } from "./audit.server";
 
@@ -102,7 +103,7 @@ export const getWorkspace = createServerFn({ method: "POST" })
 /* ----------------------------------------------------------- organisations */
 
 export const createOrganisation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -142,7 +143,7 @@ export const createOrganisation = createServerFn({ method: "POST" })
   });
 
 export const updateOrganisation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -182,7 +183,7 @@ export const updateOrganisation = createServerFn({ method: "POST" })
   });
 
 export const listOrganisationMembers = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) => z.object({ orgId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -207,7 +208,7 @@ export const listOrganisationMembers = createServerFn({ method: "POST" })
   });
 
 export const addOrganisationMember = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -275,7 +276,7 @@ export const addOrganisationMember = createServerFn({ method: "POST" })
   });
 
 export const updateMemberRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -311,7 +312,7 @@ export const updateMemberRole = createServerFn({ method: "POST" })
   });
 
 export const removeMember = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("settings")])
   .inputValidator((input: unknown) =>
     z.object({ orgId: z.string().uuid(), memberId: z.string().uuid() }).parse(input),
   )
@@ -347,7 +348,7 @@ export const removeMember = createServerFn({ method: "POST" })
 /* ----------------------------------------------------------------- teams */
 
 export const listTeams = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ orgId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -362,7 +363,7 @@ export const listTeams = createServerFn({ method: "POST" })
   });
 
 export const saveTeam = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -400,7 +401,7 @@ export const saveTeam = createServerFn({ method: "POST" })
   });
 
 export const deleteTeam = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ orgId: z.string().uuid(), id: z.string().uuid() }).parse(input),
   )
@@ -461,7 +462,7 @@ export const getMyEntitlements = createServerFn({ method: "POST" })
 /* ---------------------------------------------------------------- usage */
 
 export const getUsageSummary = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("billing")])
   .inputValidator((input: unknown) =>
     z.object({ orgId: z.string().uuid().nullish() }).parse(input ?? {}),
   )

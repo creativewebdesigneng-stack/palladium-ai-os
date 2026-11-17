@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
 
 export const getArenaPolicy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from("model_eval_policies")
@@ -21,7 +21,7 @@ export const getArenaPolicy = createServerFn({ method: "POST" })
   });
 
 export const saveArenaPolicy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1).max(120).default("Default evaluation compliance"),
@@ -44,7 +44,7 @@ export const saveArenaPolicy = createServerFn({ method: "POST" })
   });
 
 export const recommendArenaRoute = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({ minimumRuns: z.number().int().min(1).max(100).default(2) }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -72,7 +72,7 @@ export const recommendArenaRoute = createServerFn({ method: "POST" })
   });
 
 export const exportArenaDistillation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({ minimumScore: z.number().min(0).max(100).default(80), limit: z.number().int().min(1).max(1000).default(500) }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

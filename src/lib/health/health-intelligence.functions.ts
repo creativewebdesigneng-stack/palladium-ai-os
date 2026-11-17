@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage, type ToolDef } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
@@ -26,7 +26,7 @@ const sleepRow=z.object({
 }).refine(x=>new Date(x.sleep_end)>new Date(x.sleep_start),'sleep_end must be after sleep_start');
 
 export const getHealthIntelligenceOverview=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .handler(async({context})=>{
     const sb=context.supabase as unknown as Sb;
     const since=new Date(Date.now()-90*86400000).toISOString();
@@ -44,7 +44,7 @@ export const getHealthIntelligenceOverview=createServerFn({method:'POST'})
   });
 
 export const importHealthRows=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>z.object({
     source_type:sourceType,
     filename:z.string().trim().max(240).optional().or(z.literal('')),
@@ -91,7 +91,7 @@ const briefSchema=z.object({
 const briefTool:ToolDef={name:'draft_appointment_brief',description:'Create a non-diagnostic appointment-preparation brief from user-owned records. Do not diagnose or recommend medication changes.',parameters:{type:'object',additionalProperties:false,required:['summary','recent_changes','medications_to_confirm','records_to_discuss','questions','red_flags_for_clinician'],properties:{summary:{type:'string'},recent_changes:{type:'array',items:{type:'string'}},medications_to_confirm:{type:'array',items:{type:'string'}},records_to_discuss:{type:'array',items:{type:'string'}},questions:{type:'array',items:{type:'string'}},red_flags_for_clinician:{type:'array',items:{type:'string'}}}}};
 
 export const generateHealthAppointmentBrief=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>z.object({
     title:z.string().trim().min(1).max(200),
     appointment_date:z.string().date().optional().or(z.literal('')),
@@ -134,7 +134,7 @@ export const generateHealthAppointmentBrief=createServerFn({method:'POST'})
   });
 
 export const setHealthAppointmentBriefStatus=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value:unknown)=>z.object({id:uuid,status:z.enum(['draft','ready','archived'])}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

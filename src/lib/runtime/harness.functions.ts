@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   HARNESS_CAPABILITIES,
   evaluateHarnessPolicy,
@@ -11,7 +11,7 @@ import {
 type Sb = { from: (table: string) => any };
 
 export const getHarnessOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const definitions = [
@@ -102,11 +102,11 @@ export const getHarnessOverview = createServerFn({ method: "POST" })
   });
 
 export const previewHarnessPolicy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .validator((input: HarnessPolicyInput) => input)
   .handler(async ({ data }) => evaluateHarnessPolicy(data));
 
 export const previewSubagentSpawn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .validator((input: SubagentSpawnInput) => input)
   .handler(async ({ data }) => evaluateSubagentSpawn(data));

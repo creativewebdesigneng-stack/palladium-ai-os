@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server'
 import { runChat, type ChatMessage } from '@/lib/runtime/model-gateway.server'
 import { getCinemaCapabilities, submitCinemaRender } from './cinema-runtime.server'
@@ -8,7 +9,7 @@ import { generateCinemaProductionManifest, generateCinemaShotPlan } from './cine
 
 type Sb={from:(table:string)=>any}
 
-export const getCinemaStudioOverview=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
+export const getCinemaStudioOverview=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")]).handler(async({context})=>{
   const sb=context.supabase as unknown as Sb
   const [jobs,projects]=await Promise.all([
     sb.from('media_generation_jobs').select('id,provider,kind,prompt,aspect_ratio,duration_seconds,status,worker_job_id,output_url,error_message,metadata,created_at,updated_at,completed_at').eq('user_id',context.userId).eq('provider','cinema').order('created_at',{ascending:false}).limit(50),
@@ -19,7 +20,7 @@ export const getCinemaStudioOverview=createServerFn({method:'POST'}).middleware(
   return {capabilities:getCinemaCapabilities(),jobs:jobs.data ?? [],projects:projects.data ?? []}
 })
 
-export const planCinemaFilm=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>z.object({
+export const planCinemaFilm=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")]).inputValidator((v:unknown)=>z.object({
   prompt:z.string().trim().min(10).max(8000),durationMinutes:z.number().int().min(1).max(180),genre:z.string().trim().min(2).max(120),rating:z.string().trim().max(40).default('general audience'),
   title:z.string().trim().min(1).max(200).default('Untitled Film'),aspectRatio:z.enum(['16:9','2.39:1','1.85:1','9:16','1:1']).default('2.39:1'),quality:z.enum(['preview','production','cinema']).default('cinema')
 }).parse(v)).handler(async({data,context})=>{
@@ -42,7 +43,7 @@ export const planCinemaFilm=createServerFn({method:'POST'}).middleware([requireS
   return {id:created.data.id,blueprint,provider:result.provider,model:result.model}
 })
 
-export const createCinemaFilm=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown)=>z.object({
+export const createCinemaFilm=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")]).inputValidator((v:unknown)=>z.object({
  title:z.string().trim().min(1).max(200),prompt:z.string().trim().min(10).max(8000),screenplay:z.string().trim().min(100).max(200000),
  durationMinutes:z.number().int().min(1).max(180),aspectRatio:z.enum(['16:9','2.39:1','1.85:1','9:16','1:1']),quality:z.enum(['preview','production','cinema']),
  references:z.array(z.string().url().max(4000)).max(40).default([])
@@ -64,7 +65,7 @@ export const createCinemaFilm=createServerFn({method:'POST'}).middleware([requir
 
 
 export const compileCinemaProduction=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -97,7 +98,7 @@ export const compileCinemaProduction=createServerFn({method:'POST'})
   })
 
 export const compileCinemaSceneShots=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid(),sceneId:z.string().trim().min(1).max(60)}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchSalesforceAccounts, searchSalesforceOpportunities } from "./salesforce.server";
 
 function searchInput(input: { query: string; limit?: number }) {
@@ -12,7 +12,7 @@ function searchInput(input: { query: string; limit?: number }) {
 }
 
 export const searchConnectedSalesforceAccounts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(searchInput)
   .handler(async ({ data, context }) =>
     searchSalesforceAccounts({
@@ -23,7 +23,7 @@ export const searchConnectedSalesforceAccounts = createServerFn({ method: "POST"
   );
 
 export const searchConnectedSalesforceOpportunities = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(searchInput)
   .handler(async ({ data, context }) =>
     searchSalesforceOpportunities({

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   defaultModelFor,
   isProviderConfigured,
@@ -85,7 +85,7 @@ async function runDeskModel(args: { provider: Provider; model: string; messages:
 }
 
 export const runTradingIntelligence = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: { query?: string; symbol?: string; roles?: string[] }) => {
     const query = String(input?.query ?? "").trim();
     if (query.length < 5) throw new Error("Describe the trading research question in a little more detail.");

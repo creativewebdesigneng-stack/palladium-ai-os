@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { assertOwnedModelReferences, parseSceneDocument, type SceneDocument } from "./three-d-scene";
 import { createOwnedUploadUrl, signStoragePath, storeMeshBytes, uploadedByteSize } from "./three-d-storage.server";
@@ -17,7 +17,7 @@ function validateThreeDWorkerEvidence(worker: any) {
 }
 
 export const getThreeDStudioOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const result = await sb.from("three_d_jobs").select("id,input_name,source_url,workflow,requested_format,status,worker_job_id,output_url,preview_url,error_message,metadata,created_at,updated_at,completed_at").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(100);
@@ -26,7 +26,7 @@ export const getThreeDStudioOverview = createServerFn({ method: "POST" })
   });
 
 export const certifyThreeDStudio = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [worker, evidence] = await Promise.all([
@@ -73,7 +73,7 @@ export const certifyThreeDStudio = createServerFn({ method: "POST" })
   });
 
 export const createThreeDJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ inputName: z.string().trim().min(1).max(240), sourceUrl: z.string().url().max(4000), outputFormat }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -103,7 +103,7 @@ export const createThreeDJob = createServerFn({ method: "POST" })
   });
 
 export const refreshThreeDJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -152,7 +152,7 @@ async function ownedJobsFor(sb: Sb, userId: string, ids: string[]) {
 }
 
 export const listThreeDScenes = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const result = await sb.from("three_d_scenes").select("id,name,description,document,thumbnail,created_at,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(40);
@@ -161,7 +161,7 @@ export const listThreeDScenes = createServerFn({ method: "POST" })
   });
 
 export const saveThreeDScene = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => sceneInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -181,7 +181,7 @@ export const saveThreeDScene = createServerFn({ method: "POST" })
   });
 
 export const deleteThreeDScene = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -193,7 +193,7 @@ export const deleteThreeDScene = createServerFn({ method: "POST" })
   });
 
 export const renameThreeDJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), inputName: z.string().trim().min(1).max(240) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -245,7 +245,7 @@ async function presentScene(sb: Sb, userId: string, row: any) {
 }
 
 export const createThreeDModelUpload = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ filename: z.string().trim().min(1).max(180) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -259,7 +259,7 @@ export const createThreeDModelUpload = createServerFn({ method: "POST" })
   });
 
 export const finalizeThreeDModelUpload = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

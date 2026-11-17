@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { TRUSTED_MEDIA_MAX_BYTES, TRUSTED_MEDIA_MAX_MB } from "./trusted-media-policy";
 
 const BUCKET = "trusted-media";
@@ -165,7 +165,7 @@ async function verifyMp4(sb: any, objectPath: string): Promise<{ sizeBytes: numb
 }
 
 export const beginTrustedMediaUpload = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: { filename: string; mimeType?: string }) => ({
     filename: safeFilename(input?.filename),
     mimeType: clean(input?.mimeType, 100).toLowerCase() || "video/mp4",
@@ -200,7 +200,7 @@ export const beginTrustedMediaUpload = createServerFn({ method: "POST" })
   });
 
 export const finalizeTrustedMediaUpload = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: { assetId: string }) => ({ assetId: uuid(input?.assetId, "trusted media asset ID") }))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -240,7 +240,7 @@ export const finalizeTrustedMediaUpload = createServerFn({ method: "POST" })
   });
 
 export const listTrustedMediaAssets = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: { limit?: number } = {}) => ({ limit: Math.min(Math.max(Number(input.limit ?? 25) || 25, 1), 100) }))
   .handler(async ({ data, context }) => {
     const { data: assets, error } = await (context.supabase as any).from("trusted_media_assets")

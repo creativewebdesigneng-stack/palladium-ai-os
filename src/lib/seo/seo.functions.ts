@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -28,7 +28,7 @@ const snapshotInput = z.object({
 });
 
 export const listSeoProjects = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from("seo_projects").select("*").eq("user_id", context.userId).order("updated_at", { ascending: false });
@@ -37,7 +37,7 @@ export const listSeoProjects = createServerFn({ method: "POST" })
   });
 
 export const saveSeoProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: unknown) => projectInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -58,7 +58,7 @@ export const saveSeoProject = createServerFn({ method: "POST" })
   });
 
 export const listSeoSnapshots = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { projectId?: string | null; kind?: string; limit?: number } | undefined) => ({
     projectId: input?.projectId ? z.string().uuid().parse(input.projectId) : null,
     kind: String(input?.kind ?? ""),
@@ -75,7 +75,7 @@ export const listSeoSnapshots = createServerFn({ method: "POST" })
   });
 
 export const saveSeoSnapshot = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: unknown) => snapshotInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

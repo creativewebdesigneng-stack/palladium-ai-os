@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { listMissionCalendar } from "./mission.server";
 
 type Sb = { from: (t: string) => any };
@@ -36,7 +36,7 @@ async function resolveCalendarProvider(
 }
 
 export const listConnectedCalendar = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .inputValidator(
     (input: {
       provider?: "google" | "microsoft";

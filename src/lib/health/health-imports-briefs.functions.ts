@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { resolveAssistantModelPreference } from '@/lib/ai/ai-preferences.server';
 import { runChat, type ChatMessage, type ToolDef } from '@/lib/runtime/model-gateway.server';
 import { assertWithinLimit, EntitlementError, getEntitlements, recordUsage } from '@/lib/platform/entitlements.server';
@@ -12,7 +12,7 @@ const sourceSchema=z.enum(['csv','json','apple_health_export','health_connect_ex
 const metricType=z.enum(['weight','resting_heart_rate','heart_rate','hrv','steps','blood_pressure_systolic','blood_pressure_diastolic','blood_glucose','body_fat','waist','temperature','oxygen_saturation','hydration','mood','energy','pain','other']);
 
 export const importHealthMetrics=createServerFn({method:'POST'})
-.middleware([requireSupabaseAuth])
+.middleware([requireLaunchFeatureAuth("health_fitness")])
 .inputValidator((value:unknown)=>z.object({
   source_type:sourceSchema,filename:z.string().trim().max(240).optional(),
   rows:z.array(z.object({
@@ -39,7 +39,7 @@ const briefTool:ToolDef={name:'appointment_brief',description:'Create a factual 
 const briefSchema=z.object({summary:z.string().max(4000),changes:z.array(z.string().max(600)).max(20),questions:z.array(z.string().max(600)).max(20),records_to_bring:z.array(z.string().max(600)).max(20),safety_note:z.string().max(1000)});
 
 export const generateAppointmentBrief=createServerFn({method:'POST'})
-.middleware([requireSupabaseAuth])
+.middleware([requireLaunchFeatureAuth("health_fitness")])
 .inputValidator((value:unknown)=>z.object({title:z.string().trim().min(1).max(200),appointment_date:z.string().date().optional().or(z.literal('')),clinician_or_service:z.string().trim().max(240).optional(),focus:z.string().trim().min(1).max(3000)}).parse(value))
 .handler(async({data,context})=>{
  const sb=context.supabase as unknown as Sb;
@@ -71,7 +71,7 @@ export const generateAppointmentBrief=createServerFn({method:'POST'})
  return row;
 });
 
-export const getHealthImportsBriefs=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
+export const getHealthImportsBriefs=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("health_fitness")]).handler(async({context})=>{
  const sb=context.supabase as unknown as Sb;
  const [imports,briefs]=await Promise.all([
   sb.from('health_import_batches').select('*').eq('user_id',context.userId).order('created_at',{ascending:false}).limit(50),

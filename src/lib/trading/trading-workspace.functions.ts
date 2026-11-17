@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 
 type Sb = { from: (table: string) => any };
 
@@ -75,7 +75,7 @@ const simulationInput = z.object({
 const idInput = z.object({ id: z.string().uuid() });
 
 export const listTradingWorkspace = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [watchlistsResult, itemsResult, journalResult, simulationsResult] = await Promise.all([
@@ -97,7 +97,7 @@ export const listTradingWorkspace = createServerFn({ method: 'POST' })
   });
 
 export const saveTradingWatchlist = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => watchlistInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -119,7 +119,7 @@ export const saveTradingWatchlist = createServerFn({ method: 'POST' })
   });
 
 export const deleteTradingWatchlist = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => idInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -129,7 +129,7 @@ export const deleteTradingWatchlist = createServerFn({ method: 'POST' })
   });
 
 export const saveTradingWatchlistItem = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => watchlistItemInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -159,7 +159,7 @@ export const saveTradingWatchlistItem = createServerFn({ method: 'POST' })
   });
 
 export const deleteTradingWatchlistItem = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => idInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -169,7 +169,7 @@ export const deleteTradingWatchlistItem = createServerFn({ method: 'POST' })
   });
 
 export const saveTradingJournalEntry = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => journalInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -205,7 +205,7 @@ export const saveTradingJournalEntry = createServerFn({ method: 'POST' })
   });
 
 export const deleteTradingJournalEntry = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => idInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -215,7 +215,7 @@ export const deleteTradingJournalEntry = createServerFn({ method: 'POST' })
   });
 
 export const saveTradingSimulation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => simulationInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -253,7 +253,7 @@ export const saveTradingSimulation = createServerFn({ method: 'POST' })
   });
 
 export const deleteTradingSimulation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((value: unknown) => idInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

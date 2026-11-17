@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { planOrchestratedGoal } from "./orchestrator.server";
 import { queueWorkflowRun } from "./workflow-queue.server";
 
@@ -50,7 +50,7 @@ async function persistFleet(sb: Sb, args: { goalId: string; runId: string; userI
 }
 
 export const queueAutonomousGoalNow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { buildShopifyAuthorizeUrl, normalizeShopifyDomain, SHOPIFY_SCOPES, shopifyConfigured } from "./shopify.server";
 
 const input = z.object({
@@ -9,7 +9,7 @@ const input = z.object({
 });
 
 export const startShopifyOAuth = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("shopify")])
   .inputValidator((value: unknown) => input.parse(value))
   .handler(async ({ data, context }) => {
     const shop = normalizeShopifyDomain(data.shop);

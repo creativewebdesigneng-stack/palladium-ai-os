@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { searchPublicWeb } from "@/lib/ai/web-access.server";
 import { recordUsage } from "@/lib/platform/entitlements.server";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 export const searchWeb = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("research")])
   .inputValidator((input: { query: string; limit?: number }) => {
     const query = String(input?.query ?? "").trim();
     if (query.length < 2) throw new Error("Enter a search query.");

@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -52,7 +52,7 @@ function computeBacktest(points: Array<{ date: string; returnPct: number }>, sta
 }
 
 export const getQuantStudioOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const strategies = await sb.from('quant_strategies').select('*').eq('user_id', context.userId).order('updated_at', { ascending: false }).limit(50);
@@ -63,7 +63,7 @@ export const getQuantStudioOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveQuantStrategy = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: unknown) => strategyInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -82,7 +82,7 @@ export const saveQuantStrategy = createServerFn({ method: 'POST' })
   });
 
 export const runQuantBacktest = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: unknown) => z.object({
     strategyId: z.string().uuid(),
     periodStart: z.string().date(),

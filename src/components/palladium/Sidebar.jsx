@@ -2,6 +2,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ChevronDown, Command, CreditCard, Search } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import Brand from '@/components/palladium/Brand'
+import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider'
 import {
   ADMIN_NAV,
   PRIMARY_NAV,
@@ -85,9 +86,10 @@ function AdminGroup({ pathname, closeMobile }) {
 }
 
 export default function Sidebar({ collapsed, mobileOpen, closeMobile, openCommand }) {
-  const { user, entitlements } = useAuth()
+  const { entitlements } = useAuth()
+  const launchAccess = useLaunchAccess()
   const { pathname } = useLocation()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = launchAccess.isAdmin
   const taskLimit = Number(entitlements?.limits?.tasks_per_month ?? 0)
   const tasksUsed = Number(entitlements?.usage?.tasksThisMonth ?? 0)
   const unlimited = taskLimit < 0
@@ -128,7 +130,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile, openComman
           </p>
         )}
         <ul className="space-y-0.5">
-          {PRIMARY_NAV.map((item) => (
+          {PRIMARY_NAV.filter((item) => launchAccess.canAccessPath(item.path)).map((item) => (
             <li key={item.path}>
               <Item item={item} collapsed={collapsed} closeMobile={closeMobile} end={item.path === '/dashboard'} />
             </li>
@@ -142,7 +144,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile, openComman
               <span className="h-px flex-1 bg-gradient-to-r from-white/[.06] to-transparent" />
             </div>
             <div className="space-y-1">
-              {SYSTEM_GROUPS.map((group) => (
+              {SYSTEM_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => launchAccess.canAccessPath(item.path)) })).filter((group) => group.items.length > 0).map((group) => (
                 <SystemGroup key={group.id} group={group} pathname={pathname} closeMobile={closeMobile} />
               ))}
               {isAdmin && <AdminGroup pathname={pathname} closeMobile={closeMobile} />}
@@ -163,7 +165,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile, openComman
         )}
       </nav>
 
-      <Link
+      {launchAccess.canAccessPath("/billing") && <Link
         to="/billing"
         onClick={closeMobile}
         className="blackstar-usage-card m-3 block rounded-2xl border border-white/[.07] p-3 text-xs text-zinc-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
@@ -185,7 +187,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile, openComman
             </div>
           </>
         )}
-      </Link>
+      </Link>}
     </aside>
   )
 }

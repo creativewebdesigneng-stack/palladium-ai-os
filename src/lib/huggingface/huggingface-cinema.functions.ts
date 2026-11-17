@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 import {
   generateHuggingFaceCinemaPreview,
@@ -18,7 +19,7 @@ const createInput = z.object({
 })
 
 export const getHuggingFaceCinemaExecutionOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("cinema_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb
     const { data, error } = await sb.from('media_generation_jobs')
@@ -41,7 +42,7 @@ export const getHuggingFaceCinemaExecutionOverview = createServerFn({ method: 'P
   })
 
 export const createHuggingFaceCinemaPreview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((input: unknown) => createInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb

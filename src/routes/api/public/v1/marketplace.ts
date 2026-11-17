@@ -8,7 +8,7 @@ const PATH = "/api/public/v1/marketplace";
 export const Route = createFileRoute("/api/public/v1/marketplace")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "marketplace:read", path: PATH }, async (ctx, request) => {
+      GET: withApiAuth({ scope: "marketplace:read", path: PATH, feature: "agent_marketplace" }, async (ctx, request) => {
         const { limit, offset } = pageParams(request);
         const url = new URL(request.url);
         const category = url.searchParams.get("category");

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { googleShoppingConfigured } from "./google-shopping.server";
 
 type Sb = { from: (table: string) => any };
@@ -62,7 +62,7 @@ function readProviderDiagnostic(value: unknown): ProviderDiagnostic | null {
  * Google Shopping rows and retailer-page-verified rows share this same contract.
  */
 export const getLatestVerifiedExplorerResults = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;

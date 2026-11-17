@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import {
   buildOpportunityActionCards,
   buildOwnerCapabilities,
@@ -13,7 +14,7 @@ const inputSchema = z.object({
 })
 
 export const recommendBlackstarOpportunityActions = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => inputSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const [goalsRes, runsRes, agentsRes, workflowsRes] = await Promise.all([

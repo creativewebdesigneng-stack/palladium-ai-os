@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createVercelPreviewDeployment, getVercelDeployment, promoteVercelDeployment } from "./builder-deploy-vercel.server";
 import {writeAuditRequired} from '@/lib/platform/audit.server';
 
@@ -32,7 +32,7 @@ function mapDeployment(row: any) {
 }
 
 export const listBuilderDeployments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from("builder_deployments").select(deploymentColumns).eq("user_id", context.userId).order("created_at", { ascending: false }).limit(50);
@@ -41,7 +41,7 @@ export const listBuilderDeployments = createServerFn({ method: "POST" })
   });
 
 export const createBuilderPreviewDeployment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => jobInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -76,7 +76,7 @@ export const createBuilderPreviewDeployment = createServerFn({ method: "POST" })
   });
 
 export const refreshBuilderDeployment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => deploymentInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -98,7 +98,7 @@ export const refreshBuilderDeployment = createServerFn({ method: "POST" })
   });
 
 export const queueBuilderProductionApproval = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => deploymentInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -139,7 +139,7 @@ export const queueBuilderProductionApproval = createServerFn({ method: "POST" })
   });
 
 export const refreshBuilderProductionApproval = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => deploymentInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -158,7 +158,7 @@ export const refreshBuilderProductionApproval = createServerFn({ method: "POST" 
   });
 
 export const promoteBuilderDeploymentToProduction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => deploymentInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

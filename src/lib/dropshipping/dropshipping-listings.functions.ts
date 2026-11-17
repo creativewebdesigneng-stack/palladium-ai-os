@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {listIntegrationCapabilities,prepareIntegrationAction,normalizeIntegrationProvider} from '@/lib/integrations/agent-integration-runtime.server';
 import {notify} from '@/lib/notifications/notify.server';
 import {DROPSHIP_CHANNELS,type DropshipChannel} from './dropshipping';
@@ -45,7 +46,7 @@ async function loadOwnedDropshipItem(sb:Sb,userId:string,input:{workspace_id:str
 }
 
 export const saveDropshippingListingDraft=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({
     workspace_id:z.string().uuid(),
     item_id:z.string().uuid(),
@@ -84,7 +85,7 @@ export const saveDropshippingListingDraft=createServerFn({method:'POST'})
   });
 
 export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({channel:z.enum(channelIds)}).parse(value))
   .handler(async({data,context})=>{
     const target=DROPSHIP_CHANNEL_TARGETS.find(row=>row.id===data.channel);
@@ -102,7 +103,7 @@ export const getDropshippingListingCapabilities=createServerFn({method:'POST'})
   });
 
 export const queueDropshippingListingApproval=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({
     workspace_id:z.string().uuid(),
     item_id:z.string().uuid(),

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { nextAutonomousRunAt } from "./autonomous-schedule";
 
 type Sb = { from: (table: string) => any };
@@ -50,7 +50,7 @@ function initialNextRun(trigger: z.infer<typeof triggerType>, cron: string | nul
 }
 
 export const listAutonomousGoals = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -63,7 +63,7 @@ export const listAutonomousGoals = createServerFn({ method: "GET" })
   });
 
 export const listAutonomousGoalRuns = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -77,7 +77,7 @@ export const listAutonomousGoalRuns = createServerFn({ method: "GET" })
   });
 
 export const listAutonomousFleetAssignments = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -91,7 +91,7 @@ export const listAutonomousFleetAssignments = createServerFn({ method: "GET" })
   });
 
 export const listAutonomousGoalEvents = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -105,7 +105,7 @@ export const listAutonomousGoalEvents = createServerFn({ method: "GET" })
   });
 
 export const getAutonomousOperationsHealth = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [goalsResult, runsResult, eventsResult] = await Promise.all([
@@ -192,7 +192,7 @@ export const getAutonomousOperationsHealth = createServerFn({ method: "GET" })
   });
 
 export const emergencyStopAutonomousWork = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) => z.object({
     confirm: z.literal(true),
   }).parse(input))
@@ -257,7 +257,7 @@ export const emergencyStopAutonomousWork = createServerFn({ method: "POST" })
   });
 
 export const createAutonomousGoal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) => createGoalInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -295,7 +295,7 @@ export const createAutonomousGoal = createServerFn({ method: "POST" })
   });
 
 export const updateAutonomousGoal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) =>
     z.object({
       id: z.string().uuid(),
@@ -325,7 +325,7 @@ export const updateAutonomousGoal = createServerFn({ method: "POST" })
   });
 
 export const controlAutonomousGoal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid(), action: z.enum(["pause", "resume", "cancel"]) }).parse(input),
   )

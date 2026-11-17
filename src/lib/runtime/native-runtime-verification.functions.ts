@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { runChatPinned } from "./model-gateway.server";
 import {
@@ -12,7 +12,7 @@ import {
 } from "./native-runtime-verification";
 
 export const verifyBlackstarNativeRuntime = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const target = resolveNativeVerificationTarget();
     if (!target.configured || !target.model) {

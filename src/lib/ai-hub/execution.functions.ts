@@ -1,5 +1,6 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { executeWorkflow } from '@/lib/runtime/workforce.server'
 import { executeAgentTask } from '@/lib/runtime/agent-task-execution.server'
 import { callExternalMcpTool, listExternalMcpTools } from '@/lib/mcp/external-mcp.server'
@@ -35,7 +36,7 @@ function validate(input: unknown): Input {
 }
 
 export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
@@ -103,7 +104,7 @@ export const executeAiHubWorkflow = createServerFn({ method: 'POST' })
   })
 
 export const executeAiHubAgent = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
@@ -159,7 +160,7 @@ function validateMcp(input: unknown): McpInput {
 }
 
 export const executeAiHubExternalMcp = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateMcp)
   .handler(async ({ data, context }) => {
     const separator = data.resourceId.indexOf(':')

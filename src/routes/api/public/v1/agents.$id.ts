@@ -6,7 +6,7 @@ const PATH = "/api/public/v1/agents/$id";
 export const Route = createFileRoute("/api/public/v1/agents/$id")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "agents:read", path: PATH }, async (ctx, _request, params) => {
+      GET: withApiAuth({ scope: "agents:read", path: PATH, feature: "agent_runtime" }, async (ctx, _request, params) => {
         const query = ctx.admin.from("personal_agents").select("*").eq("id", String(params.id));
         const { data, error } = await scoped(query, ctx).maybeSingle();
         if (error) throw new ApiError(500, "query_failed", error.message);

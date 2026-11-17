@@ -4,7 +4,7 @@ import { assessGtaVehicleInspection } from "./gta-vehicle-inspection";
 import { gtaVehicleInspectorConfigured, requestGtaVehicleInspection } from "./gta-vehicle-inspector.server";
 import { z } from "zod";
 import { open3dHealth } from "./game-foundry-open3d.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
@@ -154,7 +154,7 @@ const outputFormat = z.enum(["glb","gltf","fbx","obj","usd","ply","stl","vox"]);
 const generationModel = z.enum(["auto","shap-e","triposr","trellis","fal"]).default("auto");
 
 export const getGameFoundryOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [projects, assets] = await Promise.all([
@@ -176,7 +176,7 @@ export const getGameFoundryOverview = createServerFn({ method: "POST" })
   });
 
 export const createGameFoundryProject = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     name:z.string().trim().min(1).max(160),
     prompt:z.string().trim().min(1).max(20_000),
@@ -201,7 +201,7 @@ export const createGameFoundryProject = createServerFn({ method:"POST" })
   });
 
 export const planGameFoundryProject = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -245,7 +245,7 @@ export const planGameFoundryProject = createServerFn({ method:"POST" })
   });
 
 export const generateGameFoundryProject = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -311,7 +311,7 @@ export const generateGameFoundryProject = createServerFn({ method:"POST" })
   });
 
 export const createGameFoundryAsset = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     projectId:z.string().uuid().nullable().optional(),
     inputName:z.string().trim().min(1).max(240),
@@ -396,7 +396,7 @@ export const createGameFoundryAsset = createServerFn({ method:"POST" })
 
 
 export const generateGameFoundryRequiredAssets = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid(),limit:z.number().int().min(1).max(8).default(6)}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -492,7 +492,7 @@ const gameReadyProfile = z.object({
 });
 
 export const processGameFoundryAsset = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({
     id:z.string().uuid(),
     profile:gameReadyProfile,
@@ -552,7 +552,7 @@ export const processGameFoundryAsset = createServerFn({ method:"POST" })
 
 
 export const prepareGameFoundryEngineHandoff = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -586,7 +586,7 @@ export const prepareGameFoundryEngineHandoff = createServerFn({ method:"POST" })
   });
 
 export const sendGameFoundryEngineHandoff = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -631,7 +631,7 @@ export const sendGameFoundryEngineHandoff = createServerFn({ method:"POST" })
 
 
 export const generateGameFoundryContentManifest = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb=context.supabase as unknown as Sb;
@@ -678,7 +678,7 @@ export const generateGameFoundryContentManifest = createServerFn({ method:"POST"
   });
 
 export const generateGameFoundrySource = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb=context.supabase as unknown as Sb;
@@ -726,7 +726,7 @@ export const generateGameFoundrySource = createServerFn({ method:"POST" })
 
 
 export const prepareGameFoundryProjectPackage = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input: unknown) => z.object({ id:z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb=context.supabase as unknown as Sb;
@@ -763,7 +763,7 @@ export const prepareGameFoundryProjectPackage = createServerFn({ method:"POST" }
 
 
 export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -812,7 +812,7 @@ export const refreshGameFoundryAsset = createServerFn({ method:"POST" })
   });
 
 export const refreshGameFoundryProjectBuild = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -838,7 +838,7 @@ export const refreshGameFoundryProjectBuild = createServerFn({ method:"POST" })
   });
 
 export const refreshGameFoundryEngineHandoff = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -861,7 +861,7 @@ export const refreshGameFoundryEngineHandoff = createServerFn({ method:"POST" })
 
 
 export const auditGameFoundryProjectReadiness = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -882,14 +882,14 @@ export const auditGameFoundryProjectReadiness = createServerFn({ method:"POST" }
 
 
 export const checkGameFoundryConnections = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async()=>{
     return probeGameFoundryConnections();
   });
 
 
 export const certifyGameFoundryProject = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({id:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -944,7 +944,7 @@ export const certifyGameFoundryProject = createServerFn({ method:"POST" })
  * Worker metadata is not accepted as proof of native conversion.
  */
 export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({assetId:z.string().uuid()}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -998,7 +998,7 @@ export const assessGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" }
  * Does not authorize native GTA V conversion or export.
  */
 export const inspectGameFoundryGtaVehicleAsset = createServerFn({ method:"POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .inputValidator((input:unknown)=>z.object({assetId:z.string().uuid(),category:z.enum(["car","motorcycle","truck","prop"])}).parse(input))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

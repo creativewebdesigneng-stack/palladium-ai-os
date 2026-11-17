@@ -6,7 +6,7 @@
  * caller.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { apiLimitsFor, API_SCOPES, WEBHOOK_EVENT_TYPES } from "./plans";
 import { generateApiKey, generateWebhookSecret, maskKey } from "./keys.server";
 import { validateWebhookUrl } from "./webhook-url";
@@ -51,7 +51,7 @@ function shapeKey(row: any) {
 
 /** Lists the caller's API keys (hashes are never returned). */
 export const listApiKeysFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const planCode = await resolvePlan(sb, context.userId);
@@ -71,7 +71,7 @@ export const listApiKeysFn = createServerFn({ method: "POST" })
 
 /** Creates a key. The raw secret is returned once and never persisted. */
 export const createApiKeyFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator(
     (input: {
       name: string;
@@ -120,7 +120,7 @@ export const createApiKeyFn = createServerFn({ method: "POST" })
 
 /** Revokes the old key and issues a replacement in one step. */
 export const rotateApiKeyFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { key_id: string }) => ({ key_id: String(input?.key_id ?? "") }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -157,7 +157,7 @@ export const rotateApiKeyFn = createServerFn({ method: "POST" })
 
 /** Revokes a key immediately — the hash stops authenticating requests. */
 export const revokeApiKeyFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { key_id: string }) => ({ key_id: String(input?.key_id ?? "") }))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -188,7 +188,7 @@ function shapeHook(row: any) {
 
 /** Webhook subscriptions plus recent delivery attempts. */
 export const listWebhooksFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [{ data: hooks }, { data: deliveries }] = await Promise.all([
@@ -221,7 +221,7 @@ export const listWebhooksFn = createServerFn({ method: "POST" })
 
 /** Creates a subscription and returns the signing secret once. */
 export const createWebhookFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { url: string; events?: string[]; description?: string }) => {
     const url = validateWebhookUrl(String(input?.url ?? ""));
     const events = (input?.events ?? []).filter((e) => EVENTS.has(e));
@@ -264,7 +264,7 @@ export const createWebhookFn = createServerFn({ method: "POST" })
 
 /** Pauses, resumes or re-targets a webhook. */
 export const updateWebhookFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator(
     (input: { webhook_id: string; status?: string; events?: string[]; url?: string }) => ({
       webhook_id: String(input?.webhook_id ?? ""),
@@ -285,7 +285,7 @@ export const updateWebhookFn = createServerFn({ method: "POST" })
   });
 
 export const deleteWebhookFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { webhook_id: string }) => ({
     webhook_id: String(input?.webhook_id ?? ""),
   }))
@@ -298,7 +298,7 @@ export const deleteWebhookFn = createServerFn({ method: "POST" })
 
 /** Sends a signed test event to one of the caller's endpoints. */
 export const testWebhookFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { webhook_id: string }) => ({
     webhook_id: String(input?.webhook_id ?? ""),
   }))
@@ -319,7 +319,7 @@ export const testWebhookFn = createServerFn({ method: "POST" })
 
 /** Aggregated API usage, top keys and the recent request log. */
 export const getApiUsageFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const planCode = await resolvePlan(sb, context.userId);
@@ -386,7 +386,7 @@ export const getApiUsageFn = createServerFn({ method: "POST" })
 
 /** Issues a new signing secret for a webhook. Returned once, then hashed only. */
 export const rotateWebhookSecretFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { webhook_id: string }) => ({
     webhook_id: String(input?.webhook_id ?? ""),
   }))
@@ -418,7 +418,7 @@ export const rotateWebhookSecretFn = createServerFn({ method: "POST" })
  * an unsigned payload must never leave the platform.
  */
 export const revokeWebhookSecretFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { webhook_id: string }) => ({
     webhook_id: String(input?.webhook_id ?? ""),
   }))

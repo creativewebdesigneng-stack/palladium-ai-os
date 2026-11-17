@@ -1,13 +1,13 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 
 type Sb = { from: (table: string) => any; rpc: (name: string, args?: Record<string, unknown>) => any };
 const uuid = z.string().uuid();
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 
 export const getRetailExecutionState = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -26,7 +26,7 @@ export const getRetailExecutionState = createServerFn({ method: 'POST' })
   });
 
 export const completeRetailStocktake = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ stocktake_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -36,7 +36,7 @@ export const completeRetailStocktake = createServerFn({ method: 'POST' })
   });
 
 export const issueRetailGiftCard = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({
     workspace_id: uuid,
     code: z.string().trim().min(1).max(160),
@@ -64,7 +64,7 @@ export const issueRetailGiftCard = createServerFn({ method: 'POST' })
   });
 
 export const adjustRetailGiftCard = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({
     gift_card_id: uuid,
     amount: z.coerce.number().min(-1_000_000_000).max(1_000_000_000).refine((n) => n !== 0, 'Amount cannot be zero'),

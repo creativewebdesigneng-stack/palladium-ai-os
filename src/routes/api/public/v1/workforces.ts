@@ -6,7 +6,7 @@ const PATH = "/api/public/v1/workforces";
 export const Route = createFileRoute("/api/public/v1/workforces")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "workforces:read", path: PATH }, async (ctx, request) => {
+      GET: withApiAuth({ scope: "workforces:read", path: PATH, feature: "workforce" }, async (ctx, request) => {
         const { limit, offset } = pageParams(request);
         const query = ctx.admin
           .from("workforces")

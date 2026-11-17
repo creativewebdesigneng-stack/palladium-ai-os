@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import {
   rankCounterfactuals,
   selectCounterfactual,
@@ -73,7 +74,7 @@ function normalizePolicy(policy: z.infer<typeof policySchema> | undefined): Coun
  * execute through the existing AI Hub / Agent Runtime approval boundary.
  */
 export const planBlackstarCounterfactualDecision = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateCounterfactualRequest)
   .handler(async ({ data }) => {
     const scenarios = data.scenarios.map(normalizeScenario)

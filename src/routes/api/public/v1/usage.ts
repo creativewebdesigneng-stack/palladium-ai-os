@@ -6,7 +6,7 @@ const PATH = "/api/public/v1/usage";
 export const Route = createFileRoute("/api/public/v1/usage")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "usage:read", path: PATH }, async (ctx) => {
+      GET: withApiAuth({ scope: "usage:read", path: PATH, feature: "agent_runtime" }, async (ctx) => {
         const monthStart = (() => {
           const now = new Date();
           return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
