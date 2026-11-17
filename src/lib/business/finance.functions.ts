@@ -7,7 +7,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -16,7 +16,7 @@ function monthKey(date: string) {
 }
 
 export const listFinance = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [txRes, usageRes] = await Promise.all([
@@ -78,7 +78,7 @@ export const listFinance = createServerFn({ method: "POST" })
   });
 
 export const saveTransaction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((data: unknown) =>
     z
       .object({
@@ -124,7 +124,7 @@ export const saveTransaction = createServerFn({ method: "POST" })
   });
 
 export const deleteTransaction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
