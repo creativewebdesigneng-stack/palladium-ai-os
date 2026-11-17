@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 type Sb={from:(t:string)=>any};
 const item=z.object({
  id:z.string().uuid().optional(), name:z.string().trim().min(1).max(120), industry:z.string().trim().min(1).max(120),
