@@ -106,7 +106,7 @@ function AppShellContent() {
         </div>
         {mobileOpen && <button className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm md:hidden" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
         <CommandMenu open={command} onClose={() => setCommand(false)} />
-        <GlobalAIAssistant open={assistantPanel} onOpenChange={setAssistantPanel} />
+        {launchAccess.canAccessPath('/chat') && <GlobalAIAssistant open={assistantPanel} onOpenChange={setAssistantPanel} />}
         <UpgradeModal />
       </div>
     </UpgradeProvider>
