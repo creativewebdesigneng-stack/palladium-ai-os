@@ -97,7 +97,7 @@ function AppShellContent() {
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-left" />
             <div aria-hidden className="blackstar-depth-rail blackstar-depth-rail-right" />
             <div className="relative z-10">
-              <PageConnectorGuide pathname={pathname} />
+              {launchAccess.canAccessPath('/integrations') && <PageConnectorGuide pathname={pathname} />}
               <BlackstarRouteErrorBoundary resetKey={pathname}>
                 <PageTransition>{gatedStage}</PageTransition>
               </BlackstarRouteErrorBoundary>
