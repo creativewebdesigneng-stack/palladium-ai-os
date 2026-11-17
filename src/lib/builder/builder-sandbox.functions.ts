@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { runBuilderSandboxValidation } from "./builder-sandbox.server";
 import {writeAuditRequired} from '@/lib/platform/audit.server';
 
@@ -24,7 +24,7 @@ function mapState(row: any) {
 }
 
 export const listBuilderSandboxStates = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -38,7 +38,7 @@ export const listBuilderSandboxStates = createServerFn({ method: "POST" })
   });
 
 export const runBuilderSandboxJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => jobInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
