@@ -1,75 +1,110 @@
 # Blackstar Founding Pilot launch controls
 
-## Current implementation boundary
+## Implementation in this branch
 
-The launch feature registry and pure access-policy helpers are introduced in
-`src/lib/launch/`. They are deliberately not a substitute for wiring the
-policy into every route, navigation source, API handler, and agent tool executor.
-Do not expose this branch to paying customers until that integration and its
-end-to-end tests are complete.
+- Central feature registry: `src/lib/launch/feature-registry.ts`
+- Per-user feature policy: `src/lib/launch/feature-access.ts`
+- App route ownership map: `src/lib/launch/route-features.ts`
+- Browser access provider and Coming Soon screen: `src/lib/launch/LaunchAccessProvider.jsx`
+- Access snapshot API: `GET /api/launch/access`
+- Admin beta grants API: `POST /api/launch/grants`
+- Stripe Checkout: `POST /api/launch/checkout`
+- Stripe Customer Portal: `POST /api/launch/portal`
+- Founding Pilot webhook: `POST /api/launch/webhook`
+- Supabase entitlement table: `supabase/migrations/20261117170000_blackstar_pilot_access.sql`
+
+The new Founding Pilot payment flow is separate from the existing Lovable-gateway billing system. It uses direct Stripe credentials and a dedicated entitlement table so existing billing flows and historical subscriptions are not rewritten.
 
 ## Feature status overrides
 
-Set one of these server-side Vercel environment variables per feature:
+Set server-side Vercel environment variables per feature:
 
 - `BLACKSTAR_FEATURE_DASHBOARD=live`
 - `BLACKSTAR_FEATURE_BILLING=beta`
 - `BLACKSTAR_FEATURE_MISSION_CONTROL=hidden`
 
-Accepted values are `live`, `beta`, and `hidden`. Invalid values fall back
-to the registry default. Redeploy after changing environment variables.
+Accepted values are `live`, `beta`, and `hidden`. Invalid values fall back to the registry default. Redeploy after changing an environment variable.
 
-Set `BLACKSTAR_ADMIN_EMAIL` to the owner's exact account email. Never put the
-email in source code. Admin access is evaluated case-insensitively.
+Set `BLACKSTAR_ADMIN_EMAIL` to the owner's exact account email. Never put the email in source code. Admin access is evaluated case-insensitively against the verified Supabase JWT email claim.
 
-The access policy expects a trusted server-side actor containing the verified
-email, a server-verified active pilot subscription flag, and beta feature IDs
-explicitly enabled for that account. Never accept these fields from a browser
-request.
-
-## Initial recommended statuses
+## Default statuses
 
 Live: landing, authentication, dashboard.
 
-Beta: onboarding, billing, founding_pilot, agent_runtime, ai_chat,
-notifications, settings.
+Beta: onboarding, billing, founding_pilot, agent_runtime, ai_chat, notifications, settings.
 
-Hidden: all other registry entries. Any unregistered feature must be treated
-as hidden until it is added to the registry and explicitly reviewed.
+Hidden: workforce, mission_control, agent_builder, agent_marketplace, agent_workspaces, ai_hub, ai_models, ai_tools, automation, memory, knowledge, files, research, web_intelligence, integrations, business_hub, crm, marketing, finance, analytics, commerce, shopify, creative_studio, cinema_studio, developer_tools, communications, security, projects.
 
-## Stripe configuration plan
+Any route not mapped in `route-features.ts` is denied in the application shell unless the user is the configured admin. This is intentional fail-closed behaviour, but it is not a substitute for adding server-side feature checks to every related server action and API endpoint.
 
-The existing application already has Stripe sandbox/live handling and a
-payments webhook under `src/routes/api/public/payments/webhook.ts`. Its server
-client currently uses the Lovable Stripe connection gateway and
-`STRIPE_SANDBOX_API_KEY` / `PAYMENTS_SANDBOX_WEBHOOK_SECRET`, not the direct
-`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` requested for the Founding
-Pilot. Reconcile the existing billing flow and subscription schema before
-adding a second checkout or changing webhook routing. No keys belong in Git.
+## Pilot beta grants
 
-## Required release gates
+A paid pilot receives the `billing` beta grant by default so the customer can manage their subscription. Other beta features require an explicit per-account grant.
 
-1. Wire registry access to navigation and dashboard tile generation.
-2. Add a route guard for every feature page, including dynamic nested routes.
-3. Add server-side checks to every API route, server action, MCP tool and
-   agent executor before side effects.
-4. Verify pilot status and enabled beta feature IDs from trusted database
-   records; never trust client-supplied role claims.
-5. Implement direct Stripe Checkout with a one-off setup line item and monthly
-   recurring line item, plus signed webhook reconciliation and Customer Portal.
-6. Add webhook idempotency, subscription ownership checks, cancellation
-   revocation and test/live environment separation.
-7. Run typecheck, tests, production build and browser/API acceptance tests.
+Admin endpoint:
 
-## Environment variables still required for the complete payment integration
+`POST /api/launch/grants`
 
-- `BLACKSTAR_ADMIN_EMAIL`
-- `STRIPE_SECRET_KEY` (test key initially)
-- `STRIPE_WEBHOOK_SECRET` (test endpoint signing secret)
-- `STRIPE_FOUNDING_PILOT_SETUP_PRICE_ID`
-- `STRIPE_FOUNDING_PILOT_MONTHLY_PRICE_ID`
-- `STRIPE_CUSTOMER_PORTAL_CONFIGURATION_ID` (if a non-default portal configuration is used)
-- `APP_BASE_URL`
+Send a verified admin bearer token and JSON:
 
-The payment variables above are documented only; checkout has not yet been
-implemented by this change.
+```json
+{
+  "userId": "SUPABASE_AUTH_USER_UUID",
+  "betaFeatures": ["agent_runtime", "ai_chat"]
+}
+```
+
+Only feature IDs currently configured as `beta` can be granted. To grant a feature, first set its `BLACKSTAR_FEATURE_<FEATURE_ID>=beta` environment variable and redeploy, then call the endpoint. An empty array revokes all beta grants for that pilot. The endpoint only changes an active pilot entitlement in the deployment's configured Stripe mode.
+
+## Stripe Founding Pilot flow
+
+The public page is `/founding-pilot`. Checkout requires a signed-in user whose email is in `BLACKSTAR_PILOT_INVITE_EMAILS` (comma-separated). Checkout runs in subscription mode with both a one-off setup Price and a recurring monthly Price. Stripe's signed webhook writes the authoritative entitlement; the browser's success redirect never grants access.
+
+Webhook endpoint: `/api/launch/webhook`
+
+Subscribe the Stripe test webhook endpoint to:
+- `checkout.session.completed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+The webhook verifies the Stripe signature, enforces test/live mode matching, and upserts the user's Founding Pilot entitlement. Only `active` and `trialing` rows grant access. Cancellation or any other non-active status removes access on the next signed subscription event.
+
+The billing screen has a Founding Pilot Customer Portal action for active pilot accounts. The existing platform billing portal remains unchanged.
+
+## Vercel environment variables
+
+Required for Founding Pilot checkout and access:
+
+- `BLACKSTAR_ADMIN_EMAIL` — your admin login email.
+- `BLACKSTAR_PILOT_INVITE_EMAILS` — comma-separated invited customer email addresses.
+- `STRIPE_MODE=test` — keep this set to test for the pilot staging rollout.
+- `STRIPE_SECRET_KEY` — Stripe test secret key (`sk_test_...`).
+- `STRIPE_WEBHOOK_SECRET` — signing secret for the new webhook endpoint (`whsec_...`).
+- `STRIPE_FOUNDING_PILOT_SETUP_PRICE_ID` — Stripe one-time GBP setup Price ID.
+- `STRIPE_FOUNDING_PILOT_MONTHLY_PRICE_ID` — Stripe recurring monthly GBP Price ID.
+- `APP_BASE_URL` — canonical app origin, e.g. `https://palladium-ai-os.vercel.app`.
+
+The app also needs its existing Supabase server/browser configuration. The migration requires the Supabase server-side admin key already used by the project. Do not put any secret in a `VITE_*` variable or commit it.
+
+Optional feature flags:
+- `BLACKSTAR_FEATURE_<FEATURE_ID>=live|beta|hidden` for any registry ID (uppercase, underscores retained).
+
+## Stripe test procedure
+
+1. Create a one-time setup Price and a monthly recurring Price in Stripe test mode.
+2. Put both Price IDs and the test secret key in Vercel Preview environment variables.
+3. Apply the Supabase migration before deploying this branch.
+4. Add your own test customer email to `BLACKSTAR_PILOT_INVITE_EMAILS`.
+5. Configure the Stripe test webhook URL `https://YOUR-PREVIEW-URL/api/launch/webhook` with the three event types above and copy its signing secret to `STRIPE_WEBHOOK_SECRET`.
+6. Sign in using the invited test account and open `/founding-pilot`.
+7. Complete Checkout using Stripe test card `4242 4242 4242 4242`, any future expiry, any CVC, and a valid test billing postcode.
+8. Confirm the webhook creates an active `blackstar_pilot_access` row. The customer should see the live features and billing only.
+9. As admin, grant beta features through `POST /api/launch/grants` and verify they appear.
+10. Cancel the test subscription in Stripe, ensure the signed `customer.subscription.deleted` or updated event arrives, and verify pilot-only features disappear.
+
+## Release gates still outstanding
+
+- Full server-side feature enforcement is not yet wired into every API route, server action, MCP tool and agent executor. The agent streaming endpoint is protected, but other execution surfaces require a route-by-route pass.
+- The app shell, sidebar, command menu, topbar, dashboard quick actions/tiles, and Coming Soon handling are wired to the access snapshot.
+- Existing integration, agent, memory, creative, automation and business API surfaces still need their own 403 checks before paying customers can be given access.
+- No production build, typecheck, browser acceptance test or end-to-end Stripe test has been run from this GitHub-only editing session. Do not merge/deploy until CI passes and the remaining server-side protections are completed.
