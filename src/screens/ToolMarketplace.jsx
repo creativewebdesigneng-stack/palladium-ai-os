@@ -9,6 +9,13 @@ import PluginCard from '@/components/tool-market/PluginCard';
 import PluginDetailDrawer from '@/components/tool-market/PluginDetailDrawer';
 import { getToolFramework } from '@/lib/tools/tools.functions';
 
+function withMarketplaceTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The tool framework did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export default function ToolMarketplace() {
   const [session, setSession] = useState('unknown');
   const [category, setCategory] = useState('All');
@@ -24,7 +31,7 @@ export default function ToolMarketplace() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tool-marketplace'],
-    queryFn: () => getToolFramework({ data: {} }),
+    queryFn: () => withMarketplaceTimeout(getToolFramework({ data: {} })),
     enabled: session === 'yes',
     retry: false,
   });
@@ -62,6 +69,10 @@ export default function ToolMarketplace() {
         <p>Third-party plugin submissions aren't available yet — this marketplace shows the built-in tools your agents can already be granted.</p>
       </div>
 
+      {session === 'unknown' && (
+        <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[.02] py-14 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Checking your tool access…</div>
+      )}
+
       {session === 'no' && (
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
           <p className="text-sm font-medium text-white">Sign in to view the tool framework</p>
@@ -90,7 +101,7 @@ export default function ToolMarketplace() {
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {filtered.map((t) => <PluginCard key={t.slug} tool={t} onOpen={setOpen} />)}
           </div>
-          {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">No tools match your search.</div>}
+          {filtered.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-zinc-500">{tools.length === 0 ? 'No tools are currently available to this workspace. Connect or enable an integration to populate the registry.' : 'No tools match your search.'}</div>}
         </>
       )}
 
