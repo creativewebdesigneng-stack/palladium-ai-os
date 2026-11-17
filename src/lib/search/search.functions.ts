@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -117,7 +117,7 @@ export function matchWorkspaceRows(
  * syntax and keeps the response bounded.
  */
 export const searchWorkspace = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("web_intelligence")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
