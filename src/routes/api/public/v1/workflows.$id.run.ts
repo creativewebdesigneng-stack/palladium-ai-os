@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/public/v1/workflows/$id/run")({
     handlers: {
       // Execution endpoint — plan gated. Runs the real workforce engine.
       POST: withApiAuth(
-        { scope: "workflows:run", execution: true, path: PATH },
+        { scope: "workflows:run", execution: true, path: PATH, feature: "automation" },
         async (ctx, request, params) => {
           const workflowId = String(params.id);
           const { data: workflow } = await scoped(
