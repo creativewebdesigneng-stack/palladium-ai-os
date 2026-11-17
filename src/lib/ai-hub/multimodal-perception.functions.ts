@@ -68,7 +68,7 @@ export function validateBlackstarPerceptionRequest(input: unknown) {
 }
 
 export const planBlackstarMultimodalPerception = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateBlackstarPerceptionRequest)
   .handler(async ({ data }) => {
     return buildBlackstarPerceptionPlan(
