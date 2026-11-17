@@ -23,6 +23,9 @@ export const Route = createFileRoute("/api/launch/webhook")({
         } catch {
           return Response.json({ error: "Invalid Stripe signature." }, { status: 400 });
         }
+        const configuredMode = process.env["STRIPE_MODE"] ?? "test";
+        if (configuredMode !== "test" && configuredMode !== "live") return Response.json({ error: "Invalid Stripe mode." }, { status: 503 });
+        if (event.livemode !== (configuredMode === "live")) return Response.json({ error: "Stripe event mode does not match this deployment." }, { status: 400 });
         const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
         try {
           if (event.type === "checkout.session.completed") {
