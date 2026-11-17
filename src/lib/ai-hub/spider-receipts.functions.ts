@@ -20,7 +20,7 @@ function validateInput(input: unknown): { limit: number } {
  * This is not an independent execution verifier or live event stream.
  */
 export const listAiHubSpiderReceipts = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
