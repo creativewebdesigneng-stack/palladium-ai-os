@@ -25,6 +25,7 @@ export const Route = createFileRoute("/api/launch/portal")({
         if (!entitlement?.stripe_customer_id) return json({ error: "No active Founding Pilot subscription was found." }, 404);
         const secret = process.env["STRIPE_SECRET_KEY"];
         const mode = process.env["STRIPE_MODE"] ?? "test";
+        if (mode !== "test" && mode !== "live") return json({ error: "STRIPE_MODE must be test or live." }, 503);
         if (mode === "test" && secret && !secret.startsWith("sk_test_")) return json({ error: "Test deployments must use a Stripe test secret key." }, 503);
         const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/$/, "");
         if (!secret || !baseUrl) return json({ error: "Billing portal is not configured." }, 503);
