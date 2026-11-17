@@ -8,7 +8,17 @@ export const Route = createFileRoute("/api/launch/checkout")({
       POST: async ({ request }) => {
         const auth = await authenticatedUser(request);
         if (auth instanceof Response) return auth;
+        const allowedEmails = (process.env["BLACKSTAR_PILOT_INVITE_EMAILS"] ?? "")
+          .split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+        if (!auth.email || !allowedEmails.includes(auth.email.toLowerCase())) {
+          return json({ error: "Founding Pilot access is invite-only. Contact Blackstar for an invitation." }, 403);
+        }
+        const mode = process.env["STRIPE_MODE"] ?? "test";
         const secret = process.env["STRIPE_SECRET_KEY"];
+        if (mode !== "test" && mode !== "live") return json({ error: "STRIPE_MODE must be test or live." }, 503);
+        if (mode === "test" && secret && !secret.startsWith("sk_test_")) {
+          return json({ error: "Test deployments must use a Stripe test secret key." }, 503);
+        }
         const setupPrice = process.env["STRIPE_FOUNDING_PILOT_SETUP_PRICE_ID"];
         const monthlyPrice = process.env["STRIPE_FOUNDING_PILOT_MONTHLY_PRICE_ID"];
         const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/$/, "");
