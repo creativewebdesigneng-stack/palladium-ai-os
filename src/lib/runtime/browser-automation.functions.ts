@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { sealBrowserSecret } from "./browser-credentials.server";
 import { asBrowserDatabase } from "./browser-database.types";
 
@@ -31,7 +31,7 @@ function cleanId(value: unknown, label: string) {
 }
 
 export const listBrowserCredentials = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { domain?: string } = {}) => ({
     domain: input?.domain ? cleanDomain(input.domain) : null,
   }))
@@ -63,7 +63,7 @@ export const listBrowserCredentials = createServerFn({ method: "POST" })
   });
 
 export const createBrowserCredential = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: Record<string, unknown>) => {
     const name = text(input?.["name"], 120);
     const domain = cleanDomain(input?.["domain"]);
@@ -100,7 +100,7 @@ export const createBrowserCredential = createServerFn({ method: "POST" })
   });
 
 export const updateBrowserCredential = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: Record<string, unknown>) => {
     const id = cleanId(input?.["id"], "Credential id");
     const patch: BrowserCredentialPatch = {};
@@ -154,7 +154,7 @@ export const updateBrowserCredential = createServerFn({ method: "POST" })
   });
 
 export const deleteBrowserCredential = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { id: string }) => ({ id: cleanId(input?.id, "Credential id") }))
   .handler(async ({ data, context }) => {
     const db = asBrowserDatabase(context.supabase);
@@ -168,7 +168,7 @@ export const deleteBrowserCredential = createServerFn({ method: "POST" })
   });
 
 export const listBrowserArtifacts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { task_id?: string; limit?: number } = {}) => ({
     task_id: input?.task_id ? cleanId(input.task_id, "Task id") : null,
     limit: Math.min(Math.max(Number(input?.limit ?? 100), 1), 200),
@@ -188,7 +188,7 @@ export const listBrowserArtifacts = createServerFn({ method: "POST" })
   });
 
 export const getBrowserArtifactUrl = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { id: string }) => ({ id: cleanId(input?.id, "Artifact id") }))
   .handler(async ({ data, context }) => {
     const db = asBrowserDatabase(context.supabase);
