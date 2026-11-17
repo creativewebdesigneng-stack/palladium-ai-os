@@ -151,7 +151,7 @@ export function validateCounterfactualDecisionRequest(input: unknown) {
 }
 
 export const planBlackstarOptimizationDecision = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateOptimizationDecisionRequest)
   .handler(async ({ data }) => {
     return buildBlackstarOptimizationPlan(
@@ -162,7 +162,7 @@ export const planBlackstarOptimizationDecision = createServerFn({ method: 'POST'
   })
 
 export const evaluateBlackstarCounterfactuals = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateCounterfactualDecisionRequest)
   .handler(async ({ data }) => {
     const scenarios = data.scenarios.map(normalizeScenario)
