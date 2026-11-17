@@ -11,9 +11,13 @@ create table if not exists public.blackstar_pilot_access (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists blackstar_pilot_access_customer_env_uidx
+drop index if exists public.blackstar_pilot_access_customer_env_uidx;
+create index if not exists blackstar_pilot_access_customer_env_idx
   on public.blackstar_pilot_access(stripe_customer_id, environment)
   where stripe_customer_id is not null;
+create unique index if not exists blackstar_pilot_access_user_env_active_uidx
+  on public.blackstar_pilot_access(user_id, environment)
+  where status in ('active', 'trialing');
 
 alter table public.blackstar_pilot_access enable row level security;
 revoke all on public.blackstar_pilot_access from anon, authenticated;
