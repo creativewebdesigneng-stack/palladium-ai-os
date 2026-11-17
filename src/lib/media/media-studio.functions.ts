@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit, writeAuditRequired } from '@/lib/platform/audit.server';
 import { getAutoEditorJob, getMediaRuntimeCapabilities, submitAutoEditorJob } from '@/lib/media/media-runtime.server';
 
