@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -13,7 +13,7 @@ const exerciseSchema = z.object({
 });
 
 export const getFitnessOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [profile, workouts, weights] = await Promise.all([
@@ -28,7 +28,7 @@ export const getFitnessOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveFitnessProfile = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((input: unknown) => z.object({ goal: z.string().trim().max(500).optional(), units: z.enum(['metric','imperial']) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -38,7 +38,7 @@ export const saveFitnessProfile = createServerFn({ method: 'POST' })
   });
 
 export const createFitnessWorkout = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((input: unknown) => z.object({ name: z.string().trim().min(1).max(120), scheduledFor: z.string().trim().max(20).optional(), notes: z.string().trim().max(2000).optional(), exercises: z.array(exerciseSchema).min(1).max(30) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -50,7 +50,7 @@ export const createFitnessWorkout = createServerFn({ method: 'POST' })
   });
 
 export const recordFitnessWeight = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((input: unknown) => z.object({ weight: z.number().positive().max(2000), recordedOn: z.string().trim().min(8).max(20) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
