@@ -16,14 +16,21 @@ import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
 import '@/components/blackstar/blackstar-astra.css'
+import { LaunchAccessProvider, useLaunchAccess, ComingSoon } from '@/lib/launch/LaunchAccessProvider'
+import { featureForPath } from '@/lib/launch/route-features'
 
 export default function AppShell() {
+  return <LaunchAccessProvider><AppShellContent /></LaunchAccessProvider>
+}
+
+function AppShellContent() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [command, setCommand] = useState(false)
   const [assistantPanel, setAssistantPanel] = useState(false)
   const { unread } = useRealtimeNotifications()
   const { pathname } = useLocation()
+  const launchAccess = useLaunchAccess()
   const room = blackstarRoomForPath(pathname)
   const visualStyle = blackstarVisualStyleForPath(pathname)
   const mission = pathname.startsWith('/mission-control')
@@ -49,6 +56,11 @@ export default function AppShell() {
   ) : (
     <Outlet />
   )
+
+  const featureId = featureForPath(pathname)
+  const gatedStage = launchAccess.loading
+    ? <div className="flex min-h-[50vh] items-center justify-center text-sm text-zinc-400">Verifying launch access…</div>
+    : launchAccess.canAccessPath(pathname) ? stage : <ComingSoon feature={featureId?.replace(/_/g, ' ')} />
 
   return (
     <UpgradeProvider>
@@ -87,7 +99,7 @@ export default function AppShell() {
             <div className="relative z-10">
               <PageConnectorGuide pathname={pathname} />
               <BlackstarRouteErrorBoundary resetKey={pathname}>
-                <PageTransition>{stage}</PageTransition>
+                <PageTransition>{gatedStage}</PageTransition>
               </BlackstarRouteErrorBoundary>
             </div>
           </main>
