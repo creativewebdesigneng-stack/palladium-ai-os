@@ -41,7 +41,7 @@ export default function Analytics() {
       <PageHeader
         eyebrow="Workspace"
         title="Analytics"
-        description="Computed live from your agent runs, workflow executions and metered usage. Empty means no events recorded yet."
+        description="Workspace-scoped agent task runs, workflow executions and metered usage for the selected period. These figures are not platform-wide totals."
         action={<Tabs tabs={RANGES} active={range} onChange={setRange} />}
       />
 
@@ -52,7 +52,7 @@ export default function Analytics() {
       {analytics.isSuccess && (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <Stat label="Agent runs" value={formatNumber(totals.tasks)} />
+            <Stat label="Your agent task runs" value={formatNumber(totals.tasks)} />
             <Stat label="Completed" value={formatNumber(totals.completed)} tone="text-emerald-300" />
             <Stat label="Failed" value={formatNumber(totals.failed)} tone="text-rose-300" />
             <Stat label="Success rate" value={totals.successRate == null ? null : formatPercent(totals.successRate)} />
