@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { normaliseAgentIdentity } from "@/lib/agents/agent-identity";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import {
   aiBriefing,
