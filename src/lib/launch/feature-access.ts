@@ -36,6 +36,9 @@ export function getFeatureAccess(
   if (status === "hidden") return { allowed: false, status, reason: "hidden" };
   if (status === "live") return { allowed: true, status, reason: "live" };
   if (!actor.isPilotCustomer) return { allowed: false, status, reason: "not_pilot" };
+  // Paying pilots must always retain access to billing so they can manage or
+  // cancel the subscription that grants their pilot entitlement.
+  if (featureId === "billing") return { allowed: true, status, reason: "pilot_beta" };
   if (!actor.betaFeatures?.includes(featureId)) {
     return { allowed: false, status, reason: "beta_not_enabled" };
   }
