@@ -19,17 +19,18 @@ export default function BusinessAutomation() {
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Business Automation" description="Automate work across Sales, Marketing, Finance, Operations, HR, Support, and IT." action={
+      <PageHeader eyebrow="Workspace" title="Business Automation" description="Explore example automations across Sales, Marketing, Finance, Operations, HR, Support, and IT." action={
         <div className="hidden gap-3 sm:flex">
           <div className="rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-zinc-300">{counts.active} active</div>
           <div className="rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-zinc-300">{counts.paused} paused</div>
           <div className="rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs text-zinc-300">{AUTOMATIONS.length} total</div>
         </div>
       } />
+      <div role="note" className="mb-4 rounded-xl border border-amber-300/20 bg-amber-300/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80"><strong className="text-amber-100">Illustrative sample data.</strong> The automation names, run counts and success rates on this page are examples for preview purposes. They are not live customer activity, production usage or evidence of commercial traction.</div>
       <AutomationToolbar active={active} setActive={setActive} q={q} setQ={setQ} onCreate={() => flash('Create automation form opened')} />
 
       <div className="mt-4">
-        <div className="mb-3 flex items-center gap-2"><Workflow className="h-4 w-4 text-violet-400" /><h2 className="text-sm font-semibold text-white">Active Automations <span className="text-zinc-500">({filtered.length})</span></h2></div>
+        <div className="mb-3 flex items-center gap-2"><Workflow className="h-4 w-4 text-violet-400" /><h2 className="text-sm font-semibold text-white">Automation examples <span className="text-zinc-500">({filtered.length})</span></h2></div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((a) => <AutomationCard key={a.id} auto={a} onToast={flash} />)}
           {!filtered.length && <p className="text-sm text-zinc-600">No automations match your filters.</p>}
