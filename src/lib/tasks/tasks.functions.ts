@@ -5,7 +5,7 @@
  * changes. Every query is scoped by `requireSupabaseAuth` + RLS.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   assertSupportedWorkflowStepKind,
   normaliseWorkflowStepConfig,
@@ -34,7 +34,7 @@ const EXEC_STATUS_LABEL: Record<string, string> = {
 
 /** Every task the caller can see: personal (Mission Control) + agent-run tasks, normalised for the Tasks screen. */
 export const listTasks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { limit?: number } | undefined) => ({
     limit: Math.min(Math.max(Number(input?.limit ?? 300), 1), 1000),
   }))
@@ -179,7 +179,7 @@ const WF_STATUS_LABEL: Record<string, string> = {
 
 /** Workflows with their steps (as nodes) and recent run stats, for the Workflows screen. */
 export const listWorkflows = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [{ data: workflows }, { data: steps }, { data: runs }] = await Promise.all([
@@ -239,7 +239,7 @@ export const listWorkflows = createServerFn({ method: "POST" })
 
 /** Recent runs for one workflow, normalised for RunHistoryTable. */
 export const listWorkflowRuns = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { workflow_id: string }) => ({
     workflow_id: String(input?.workflow_id ?? ""),
   }))
@@ -286,7 +286,7 @@ export const listWorkflowRuns = createServerFn({ method: "POST" })
 
 /** Flips a workflow's status (active/paused/draft), scoped to its owner. */
 export const setWorkflowStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { id: string; status: string }) => {
     const allowed = ["draft", "active", "paused", "failed", "completed"];
     if (!input?.id) throw new Error("Workflow id is required");
@@ -309,7 +309,7 @@ export const setWorkflowStatus = createServerFn({ method: "POST" })
 
 /** Permanently deletes one of the caller's workflows (steps/runs cascade). */
 export const deleteWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("Workflow id is required");
     return { id: String(input.id) };
@@ -331,7 +331,7 @@ export const deleteWorkflow = createServerFn({ method: "POST" })
  * before any database row is created.
  */
 export const importWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { definition?: unknown }) => {
     const def = (input?.definition ?? {}) as any;
     const name = String(def.name ?? "").trim();
