@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 type Sb={from:(t:string)=>any};
 const schema=z.object({id:z.string().uuid().optional(),name:z.string().trim().min(1).max(120),metric:z.enum(["portfolio_value","cash_reserve","monthly_expense","monthly_revenue"]),operator:z.enum(["above","below"]),threshold:z.coerce.number().min(0).max(1e15),enabled:z.boolean().default(true)});
 export const listFinanceAlerts=createServerFn({method:"POST"}).middleware([requireLaunchFeatureAuth("finance")]).handler(async({context})=>{const sb=context.supabase as unknown as Sb;const {data,error}=await sb.from("finance_alerts").select("*").order("created_at",{ascending:false});if(error)throw new Error(error.message);return data??[];});
