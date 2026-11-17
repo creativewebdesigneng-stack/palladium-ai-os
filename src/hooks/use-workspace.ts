@@ -7,25 +7,20 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { useSessionReady } from "@/lib/useSessionReady";
 import { getWorkspace } from "@/lib/platform/platform.functions";
 
 const ACTIVE_ORG_KEY = "palladium.activeOrg";
 
+function withWorkspaceTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Workspace state did not respond within 15 seconds.")), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export function useSession() {
-  const [state, setState] = useState<"unknown" | "yes" | "no">("unknown");
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (alive) setState(data.session ? "yes" : "no");
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setState(s ? "yes" : "no"));
-    return () => {
-      alive = false;
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
-  return state;
+  return useSessionReady();
 }
 
 export function useActiveOrg() {
@@ -50,7 +45,7 @@ export function useWorkspace() {
 
   const query = useQuery({
     queryKey: ["workspace", orgId],
-    queryFn: () => workspaceFn({ data: { orgId } }),
+    queryFn: () => withWorkspaceTimeout(workspaceFn({ data: { orgId } })),
     enabled: session === "yes",
     retry: false,
     staleTime: 30_000,

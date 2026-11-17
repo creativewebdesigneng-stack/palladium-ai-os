@@ -15,6 +15,7 @@ import PageConnectorGuide from '@/components/integrations/PageConnectorGuide'
 import { UpgradeProvider } from '@/lib/upgradeContext'
 import UpgradeModal from '@/components/UpgradeModal'
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications'
+import { supabase } from '@/integrations/supabase/client'
 import '@/components/blackstar/blackstar-astra.css'
 
 export default function AppShell() {
@@ -36,6 +37,26 @@ export default function AppShell() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    const accents = { violet: '263 70% 58%', cyan: '187 85% 53%', emerald: '158 64% 45%', rose: '347 77% 55%' }
+    const apply = (user) => {
+      if (!alive || !user) return
+      const preferences = user.user_metadata?.blackstar_appearance ?? {}
+      const root = document.documentElement
+      const accent = accents[preferences.accent] ?? accents.violet
+      root.style.setProperty('--primary', accent)
+      root.style.setProperty('--ring', accent)
+      root.style.setProperty('--sidebar-primary', accent)
+      root.style.setProperty('--chart-1', accent)
+      root.style.fontSize = preferences.density === 'compact' ? '14px' : '16px'
+      document.body.classList.toggle('palladium-dim', Boolean(preferences.dim))
+    }
+    supabase.auth.getUser().then(({ data }) => apply(data.user)).catch(() => {})
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, user) => apply(user))
+    return () => { alive = false; authSub?.subscription?.unsubscribe() }
   }, [])
 
   const stage = mission ? (

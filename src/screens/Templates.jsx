@@ -1,21 +1,26 @@
 import { useState, useMemo } from 'react';
 import { Search, Upload, LayoutTemplate } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/palladium/PageHeader';
 import TemplateCard from '@/components/templates/TemplateCard';
 import TemplatePreview from '@/components/templates/TemplatePreview';
-import { listMarketplaceAgents, installMarketplaceAgent } from '@/lib/marketplace/marketplace.functions';
+import { listCreatorMarketplace } from '@/lib/marketplace/creator-commerce.functions';
 import { friendlyMessage } from '@/lib/errors';
 import { useSessionReady } from '@/lib/useSessionReady';
 import { Empty, Loading, Failed } from '@/components/business/live';
-import { useToast } from '@/components/ui/use-toast';
+
+function withTemplateMarketplaceTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The template catalogue did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 const SORTS = [
-  { id: 'popular', label: 'Most used' },
-  { id: 'rating', label: 'Top rated' },
   { id: 'newest', label: 'Newest' },
+  { id: 'name', label: 'A–Z' },
 ];
 
 const GRADS = [
@@ -28,15 +33,15 @@ const GRADS = [
 
 /** Maps a published marketplace listing into the card/preview shape. */
 function toTemplate(listing, index) {
-  const features = Array.isArray(listing.features) ? listing.features : [];
+  const features = Array.isArray(listing.tags) ? listing.tags : [];
   return {
     id: listing.id,
     name: listing.title ?? listing.name ?? 'Untitled template',
     desc: listing.description || 'No description provided by the publisher.',
-    category: listing.category || 'General',
-    creator: listing.creator?.display_name || listing.creator_name || 'Unknown publisher',
-    price: Number(listing.price) > 0 ? `£${Number(listing.price).toFixed(2)}` : 'Free',
-    rating: listing.rating ? Number(listing.rating).toFixed(1) : '—',
+    category: listing.metadata?.category || 'Template',
+    creator: listing.seller_id ? 'Community creator' : 'Blackstar',
+    price: Number(listing.price_pence) > 0 ? `£${(Number(listing.price_pence) / 100).toFixed(2)}` : 'Free',
+    rating: '—',
     uses: null,
     grad: GRADS[index % GRADS.length],
     createdAt: listing.created_at ?? null,
@@ -46,27 +51,24 @@ function toTemplate(listing, index) {
 
 export default function Templates() {
   const session = useSessionReady();
-  const qc = useQueryClient();
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const listFn = useServerFn(listMarketplaceAgents);
-  const installFn = useServerFn(installMarketplaceAgent);
+  const listFn = useServerFn(listCreatorMarketplace);
 
   const [cat, setCat] = useState('all');
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState('popular');
+  const [sort, setSort] = useState('newest');
   const [favs, setFavs] = useState([]);
   const [preview, setPreview] = useState(null);
 
   const listings = useQuery({
     queryKey: ['marketplace-templates'],
-    queryFn: () => listFn({ data: {} }),
+    queryFn: () => withTemplateMarketplaceTimeout(listFn({ data: undefined })),
     enabled: session === 'yes',
     retry: false,
   });
 
   const templates = useMemo(
-    () => (listings.data ?? []).map(toTemplate),
+    () => (listings.data ?? []).filter((listing) => listing.item_type === 'template').map(toTemplate),
     [listings.data],
   );
 
@@ -74,17 +76,6 @@ export default function Templates() {
     () => Array.from(new Set(templates.map((t) => t.category))).sort(),
     [templates],
   );
-
-  const install = useMutation({
-    mutationFn: (t) => installFn({ data: { item_id: t.id } }),
-    onSuccess: (_r, t) => {
-      toast({ title: 'Reference added for review', description: `${t.name} was added paused with no tool permissions.` });
-      qc.invalidateQueries({ queryKey: ['marketplace-templates'] });
-      qc.invalidateQueries({ queryKey: ['agents'] });
-    },
-    onError: (err) =>
-      toast({ variant: 'destructive', title: 'Install failed', description: friendlyMessage(err) }),
-  });
 
   const toggleFav = (id) =>
     setFavs((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -100,13 +91,9 @@ export default function Templates() {
           t.creator.toLowerCase().includes(s),
       );
     }
-    return [...list].sort((a, b) =>
-      sort === 'rating'
-        ? Number(b.rating === '—' ? 0 : b.rating) - Number(a.rating === '—' ? 0 : a.rating)
-        : sort === 'newest'
-          ? String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))
-          : b.uses - a.uses,
-    );
+    return [...list].sort((a, b) => sort === 'newest'
+      ? String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))
+      : a.name.localeCompare(b.name));
   }, [templates, cat, q, sort]);
 
   return (
@@ -114,7 +101,7 @@ export default function Templates() {
       <PageHeader
         eyebrow="Marketplace"
         title="Templates Marketplace"
-        description="Published templates from the live marketplace. Installs are recorded against your account."
+        description="Approved template listings from the Creator Marketplace. Unverified mock inventory and unsupported usage claims are not displayed."
         action={
           <button
             onClick={() => navigate('/creator-hub')}
@@ -125,6 +112,7 @@ export default function Templates() {
         }
       />
 
+      {session === 'unknown' && <Loading label="Checking your marketplace access…" />}
       {session === 'no' && <Failed message="Sign in to browse marketplace templates." />}
       {session === 'yes' && listings.isLoading && <Loading label="Loading published templates…" />}
       {listings.isError && (
@@ -180,7 +168,7 @@ export default function Templates() {
             <Empty
               icon={LayoutTemplate}
               title="No templates published yet"
-              desc="Nothing has been published to the marketplace. Publish your own from the Creator Hub."
+              desc="Pre-launch: no approved community template listings have been published yet. Publish a real template from the Creator Hub; illustrative mock templates are not shown as marketplace inventory."
             />
           ) : filtered.length === 0 ? (
             <Empty title="No matches" desc="No templates match your filters." />
@@ -192,7 +180,7 @@ export default function Templates() {
                   t={t}
                   favs={favs}
                   onPreview={setPreview}
-                  onUse={(x) => install.mutate(x)}
+                  onUse={() => navigate('/creator-marketplace')}
                   onFav={toggleFav}
                 />
               ))}
@@ -204,7 +192,7 @@ export default function Templates() {
       <TemplatePreview
         t={preview}
         onClose={() => setPreview(null)}
-        onUse={(x) => install.mutate(x)}
+        onUse={() => navigate('/creator-marketplace')}
         onFav={toggleFav}
         favs={favs}
       />

@@ -33,6 +33,12 @@ describe("Blackstar registration verification flow", () => {
     expect(verify).toContain("If your Blackstar email contains a confirmation link");
   });
 
+  it("requires Supabase email confirmation instead of silently accepting auto-confirmed signups", () => {
+    expect(auth).toContain("data?.session && data?.user?.email_confirmed_at");
+    expect(auth).toContain("Enable Confirm email in Supabase Authentication settings");
+    expect(auth).toContain('type = "signup"');
+  });
+
   it("retains Supabase signup confirmation redirect handling", () => {
     expect(auth).toContain("supabase.auth.signUp");
     expect(auth).toContain("emailRedirectTo:");

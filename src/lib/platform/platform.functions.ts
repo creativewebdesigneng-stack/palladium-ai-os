@@ -354,7 +354,7 @@ export const listTeams = createServerFn({ method: "POST" })
     await requireOrgRole(sb, data.orgId, context.userId, ORG_ROLES);
     const { data: teams, error } = await sb
       .from("teams")
-      .select("id,name,description,created_at,team_members(id,user_id,role)")
+      .select("id,name,description,lead_agent_id,created_at,team_members(id,user_id,role)")
       .eq("org_id", data.orgId)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -370,6 +370,7 @@ export const saveTeam = createServerFn({ method: "POST" })
         orgId: z.string().uuid(),
         name: z.string().trim().min(2).max(60),
         description: z.string().trim().max(300).optional(),
+        leadAgentId: z.string().uuid().nullable().optional(),
       })
       .parse(input),
   )
@@ -377,15 +378,27 @@ export const saveTeam = createServerFn({ method: "POST" })
     const sb = context.supabase as unknown as Sb;
     await requireOrgRole(sb, data.orgId, context.userId, ["owner", "admin"]);
 
+    if (data.leadAgentId) {
+      const { data: agent, error: agentError } = await sb
+        .from("personal_agents")
+        .select("id,org_id,org_id_fk")
+        .eq("id", data.leadAgentId)
+        .maybeSingle();
+      if (agentError) throw new Error(agentError.message);
+      if (!agent || (agent.org_id !== data.orgId && agent.org_id_fk !== data.orgId)) {
+        throw new Error("The lead agent must belong to this organisation.");
+      }
+    }
+
     const payload = {
       org_id: data.orgId,
       name: data.name,
       description: data.description ?? null,
-      created_by: context.userId,
+      lead_agent_id: data.leadAgentId ?? null,
     };
     const q = data.id
       ? sb.from("teams").update(payload).eq("id", data.id).eq("org_id", data.orgId)
-      : sb.from("teams").insert(payload);
+      : sb.from("teams").insert({ ...payload, created_by: context.userId });
     const { data: team, error } = await q.select("id,name,description").single();
     if (error) throw new Error(error.message);
 

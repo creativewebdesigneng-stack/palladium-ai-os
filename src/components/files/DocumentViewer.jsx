@@ -48,6 +48,7 @@ export default function DocumentViewer({ file, onClose }) {
 
           {/* Content */}
           <div className="p-5">
+            <div role="note" className="mb-4 rounded-xl border border-amber-300/20 bg-amber-300/[.05] px-3 py-2 text-[11px] leading-5 text-amber-100/80"><strong>Sample document only.</strong> This file, its company details and all financial figures are fictional preview content, not verified business results.</div>
             <AnimatePresence mode="wait">
               <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
                 {tab === 'Preview' && (

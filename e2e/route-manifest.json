@@ -1,0 +1,202 @@
+{
+  "description": "Signed-out route render contract for Blackstar. Public routes must return their own document. Authenticated shells must render without a session cookie and must not embed server secrets. Markers are the route head titles committed on main. Includes the investor-facing About page, the legacy Cinema redirect and the XML sitemap.",
+  "signedOutPublic": [
+    {
+      "path": "/about",
+      "file": "src/routes/about.tsx",
+      "marker": "About Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/",
+      "file": "src/routes/index.tsx",
+      "marker": "Blackstar — Intelligence Hub & Infrastructure",
+      "allowNoindex": false
+    },
+    {
+      "path": "/help",
+      "file": "src/routes/help.tsx",
+      "marker": "Help Centre — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/features",
+      "file": "src/routes/features.tsx",
+      "marker": "Features — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/pricing",
+      "file": "src/routes/pricing.tsx",
+      "marker": "Pricing — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/business",
+      "file": "src/routes/business.tsx",
+      "marker": "For Business — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/developers",
+      "file": "src/routes/developers.tsx",
+      "marker": "Developers — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/resources",
+      "file": "src/routes/resources.tsx",
+      "marker": "Resources — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/tools",
+      "file": "src/routes/tools.tsx",
+      "marker": "AI Tools — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/ai-agents",
+      "file": "src/routes/ai-agents.tsx",
+      "marker": "AI Agents — Blackstar",
+      "allowNoindex": false
+    },
+    {
+      "path": "/legal/terms-of-service",
+      "file": "src/routes/legal.$slug.tsx",
+      "marker": "Legal drafts — Blackstar",
+      "allowNoindex": true
+    }
+  ],
+  "signedOutAuth": [
+    {
+      "path": "/login",
+      "file": "src/routes/login.tsx",
+      "marker": "Sign in — Blackstar"
+    },
+    {
+      "path": "/register",
+      "file": "src/routes/register.tsx",
+      "marker": "Create account — Blackstar"
+    },
+    {
+      "path": "/forgot-password",
+      "file": "src/routes/forgot-password.tsx",
+      "marker": "Reset password — Blackstar"
+    },
+    {
+      "path": "/reset-password",
+      "file": "src/routes/reset-password.tsx",
+      "marker": "Choose a new password — Blackstar"
+    },
+    {
+      "path": "/two-factor",
+      "file": "src/routes/two-factor.tsx",
+      "marker": "Two-factor status — Blackstar"
+    },
+    {
+      "path": "/email-verification",
+      "file": "src/routes/email-verification.tsx",
+      "marker": "Verify your email — Blackstar"
+    }
+  ],
+  "protectedShells": [
+    {
+      "path": "/mission-control",
+      "file": "src/routes/_shell/_app/mission-control.tsx",
+      "marker": "Mission Control — Blackstar"
+    },
+    {
+      "path": "/workforce",
+      "file": "src/routes/_shell/_app/workforce.tsx",
+      "marker": "Workforce OS — Blackstar"
+    },
+    {
+      "path": "/ai-hub",
+      "file": "src/routes/_shell/_app/ai-hub.tsx",
+      "marker": "AI Hub — Blackstar"
+    },
+    {
+      "path": "/agent-builder",
+      "file": "src/routes/_shell/_app/agent-builder.tsx",
+      "marker": "Agent builder — Blackstar"
+    },
+    {
+      "path": "/agent-runtime",
+      "file": "src/routes/_shell/_app/agent-runtime.tsx",
+      "marker": "Control Plane — Blackstar"
+    },
+    {
+      "path": "/memory",
+      "file": "src/routes/_shell/_app/memory.tsx",
+      "marker": "Memory — Blackstar"
+    },
+    {
+      "path": "/cinema-studio",
+      "file": "src/routes/_shell/_app/cinema-studio.tsx",
+      "marker": "Cinema Studio — Blackstar"
+    },
+    {
+      "path": "/game-foundry",
+      "file": "src/routes/_shell/_app/game-foundry.tsx",
+      "marker": "Blackstar Game Foundry"
+    },
+    {
+      "path": "/three-d-studio",
+      "file": "src/routes/_shell/_app/three-d-studio.tsx",
+      "marker": "3D Studio — Blackstar"
+    },
+    {
+      "path": "/website-studio",
+      "file": "src/routes/_shell/_app/website-studio.tsx",
+      "marker": "Website Studio — Blackstar"
+    },
+    {
+      "path": "/marketplace",
+      "file": "src/routes/_shell/_app/marketplace.tsx",
+      "marker": "Marketplace — Blackstar"
+    },
+    {
+      "path": "/trading-hub",
+      "file": "src/routes/_shell/_app/trading-hub.tsx",
+      "marker": "Trading Research Hub — Blackstar"
+    },
+    {
+      "path": "/industry-hub",
+      "file": "src/routes/_shell/_app/industry-hub.tsx",
+      "marker": "Industry Intelligence Hub — Blackstar"
+    },
+    {
+      "path": "/company-hub",
+      "file": "src/routes/_shell/_app/company-hub.tsx",
+      "marker": "Company Hub — Blackstar"
+    },
+    {
+      "path": "/retail-hub",
+      "file": "src/routes/_shell/_app/retail-hub.tsx",
+      "marker": "Retail & Local Business Hub — Blackstar"
+    },
+    {
+      "path": "/mcp-hub",
+      "file": "src/routes/_shell/_app/mcp-hub.tsx",
+      "marker": "MCP hub — Blackstar"
+    }
+  ],
+  "signedOutRedirects": [
+    {
+      "path": "/cinema",
+      "file": "src/routes/cinema.tsx",
+      "redirectTo": "/cinema-studio",
+      "marker": "Cinema Studio — Blackstar",
+      "allowNoindex": true
+    }
+  ],
+  "signedOutAssets": [
+    {
+      "path": "/sitemap.xml",
+      "file": "public/sitemap.xml",
+      "contentType": "xml",
+      "marker": "https://palladium-ai-os.vercel.app/about"
+    }
+  ]
+}

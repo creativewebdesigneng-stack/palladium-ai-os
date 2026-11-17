@@ -40,6 +40,13 @@ const control = 'w-full rounded-xl border border-white/10 bg-[#10121a] px-3 py-2
 const engines = ['generic','unity','unreal','godot','web','blender','zmodeler'];
 const projectTypes = ['game','environment','character','prop','vehicle','asset_pack'];
 
+function withFoundryTimeout(promise, label, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within ${Math.round(timeoutMs / 1000)} seconds. Check the database or worker connection and retry.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export default function GameFoundry() {
   const session = useSessionReady();
   const qc = useQueryClient();
@@ -107,7 +114,7 @@ export default function GameFoundry() {
     try { window.localStorage.setItem('blackstar.gameFoundry.autoPrepareJobs',JSON.stringify([...autoPrepareJobs.current])); } catch { /* Storage is optional. */ }
   };
   const workerPollOffset = useRef(0);
-  const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)); if(active.length){ const start=workerPollOffset.current%active.length; const batch=Array.from({length:Math.min(5,active.length)},(_,index)=>active[(start+index)%active.length]); workerPollOffset.current=(start+batch.length)%active.length; const results=await Promise.allSettled(batch.map((job)=>refreshAssetFn({data:{id:job.id}}))); const failures=results.filter((result)=>result.status==='rejected'); if(failures.length) throw new Error(`Could not refresh ${failures.length} of ${batch.length} active Game Foundry worker jobs.`); } else { workerPollOffset.current=0; } return overviewFn(); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>(['queued','running'].includes(job.status)&&Boolean(job.worker_job_id)) || (['queued','running'].includes(job.processing_status)&&Boolean(job.processing_worker_job_id))) ? 10000 : false; } });
+  const overview = useQuery({ queryKey:['game-foundry'], queryFn:async()=>{ const previous=qc.getQueryData(['game-foundry']); const active=(previous?.assets ?? []).filter((job)=>(['queued','running'].includes(job.status)&&job.worker_job_id)||(['queued','running'].includes(job.processing_status)&&job.processing_worker_job_id)); if(active.length){ const start=workerPollOffset.current%active.length; const batch=Array.from({length:Math.min(5,active.length)},(_,index)=>active[(start+index)%active.length]); workerPollOffset.current=(start+batch.length)%active.length; const results=await Promise.allSettled(batch.map((job)=>withFoundryTimeout(refreshAssetFn({data:{id:job.id}}),'Game Foundry worker refresh',12000))); const failures=results.filter((result)=>result.status==='rejected'); if(failures.length) throw new Error(`Could not refresh ${failures.length} of ${batch.length} active Game Foundry worker jobs. ${failures[0]?.reason instanceof Error?failures[0].reason.message:''}`); } else { workerPollOffset.current=0; } return withFoundryTimeout(overviewFn(),'Game Foundry database overview',20000); }, enabled:session==='yes', retry:false, refetchInterval:(query)=>{ const jobs=query.state.data?.assets ?? []; return jobs.some((job)=>(['queued','running'].includes(job.status)&&Boolean(job.worker_job_id)) || (['queued','running'].includes(job.processing_status)&&Boolean(job.processing_worker_job_id))) ? 10000 : false; } });
   const refresh = () => qc.invalidateQueries({queryKey:['game-foundry']});
 
   const checkConnections = useMutation({
@@ -287,7 +294,8 @@ export default function GameFoundry() {
       description="Upload a model or picture, or enter a prompt. Generate a 3D asset, review its worker output, then export a real generated file. Native GTA V export requires a separate licensed converter."
     />
     {session === 'no' && <Failed message="Sign in to use Blackstar Game Foundry." />}
-    {overview.error && <Failed message={friendlyMessage(overview.error)} />}
+    {session === 'unknown' && <div role="status" className="mb-4 rounded-xl border border-white/10 bg-white/[.03] px-4 py-3 text-xs text-zinc-400">Checking your sign-in session before loading Game Foundry…</div>}
+    {overview.error && <div className="mb-4 space-y-2"><Failed message={friendlyMessage(overview.error)} /><button type="button" onClick={()=>overview.refetch()} disabled={overview.isFetching} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 disabled:opacity-50">{overview.isFetching?'Retrying…':'Retry Game Foundry data'}</button></div>}
     <GameFoundryWorld capabilities={caps} projects={projects} assets={assets} integrations={integrations} />
 
     <div className="mb-4"><HuggingFaceModelDiscoveryPanel tasks={['text-to-3d','image-to-3d']} title="Hugging Face game-asset intelligence" description="Discover candidate text/image-to-3D models for future provider lanes while Blackstar's hosted 3D worker remains the authoritative asset execution path."/></div>

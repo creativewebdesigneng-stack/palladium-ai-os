@@ -74,6 +74,9 @@ export const getSecurityCentre = createServerFn({ method: "POST" })
           .gte("created_at", new Date(Date.now() - 30 * DAY).toISOString()),
       ]);
 
+    const readErrors = [keysRes.error, hooksRes.error, deliveriesRes.error, integrationsRes.error, auditRes.error, auditCountRes.error].filter(Boolean);
+    if (readErrors.length) throw new Error("Could not load the complete security posture. Please retry.");
+
     const keys: any[] = (keysRes.data ?? []).map((k: any) => ({
       id: k.id,
       name: k.name,

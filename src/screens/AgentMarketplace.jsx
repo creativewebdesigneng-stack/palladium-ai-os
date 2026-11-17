@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Search, SlidersHorizontal, Rocket, Store, Sparkles } from 'lucide-react';
+import { Search, SlidersHorizontal, Rocket, Store, Sparkles, Loader2, TriangleAlert } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { friendlyMessage } from '@/lib/errors';
 import AgentCard from '@/components/marketplace-agents/AgentCard';
 import AgentDetailDrawer from '@/components/marketplace-agents/AgentDetailDrawer';
 import CreatorPanel from '@/components/marketplace-agents/CreatorPanel';
@@ -10,6 +12,13 @@ import { listPublishedAgents, installMarketplaceAgent, saveMarketplaceAgent } fr
 import { useUpgrade } from '@/lib/upgradeContext';
 import { useToast } from '@/components/ui/use-toast';
 import { CATEGORIES, FILTERS, normalizeAgent } from '@/components/marketplace-agents/marketplaceData';
+
+function withAgentMarketplaceTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The agent catalogue did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 export default function AgentMarketplace() {
   const { gate } = useUpgrade();
@@ -20,18 +29,36 @@ export default function AgentMarketplace() {
   const [view, setView] = useState('discover');
   const [active, setActive] = useState(null);
   const [agents, setAgents] = useState([]);
+  const [session, setSession] = useState('unknown');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reload, setReload] = useState(0);
 
-  // Published listings come from the marketplace API — real records only.
+  // Published listings come from the authenticated marketplace API — real records only.
   useEffect(() => {
-    (async () => {
-      try {
-        const items = await listPublishedAgents(undefined, 60);
-        setAgents((items || []).map(normalizeAgent));
-      } catch {
-        setAgents([]);
-      }
-    })();
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, current) => setSession(current ? 'yes' : 'no'));
+    return () => { alive = false; sub?.subscription?.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (session === 'unknown') return;
+    if (session === 'no') {
+      setAgents([]);
+      setLoading(false);
+      setLoadError('');
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    setLoadError('');
+    withAgentMarketplaceTimeout(listPublishedAgents(undefined, 60))
+      .then((items) => { if (alive) setAgents((items || []).map(normalizeAgent)); })
+      .catch((error) => { if (alive) { setAgents([]); setLoadError(friendlyMessage(error)); } })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [session, reload]);
 
   const toggleFilter = (id) => setActiveFilters((f) => f.includes(id) ? f.filter((x) => x !== id) : [...f, id]);
 
@@ -94,7 +121,13 @@ export default function AgentMarketplace() {
           </div>
         } />
 
-      {view === 'discover' ? (
+      {session === 'no' ? (
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center"><p className="text-sm font-medium text-white">Sign in to browse the agent marketplace</p><p className="mt-1 text-xs text-zinc-500">Only approved, published agent listings are shown.</p></div>
+      ) : session === 'unknown' || loading ? (
+        <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[.02] py-14 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Loading published agents…</div>
+      ) : loadError ? (
+        <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/[.05] px-6 py-14 text-center"><TriangleAlert className="h-5 w-5 text-rose-300" /><p className="text-sm font-medium text-white">Could not load published agents</p><p className="text-xs text-zinc-500">{loadError}</p><button onClick={() => setReload((value) => value + 1)} className="mt-2 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-300">Try again</button></div>
+      ) : view === 'discover' ? (
         <>
           {/* Category chips */}
           <div className="mb-4 flex flex-wrap gap-1.5">
@@ -139,8 +172,9 @@ export default function AgentMarketplace() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
-                <p className="text-sm font-medium text-white">No agents match your filters</p>
-                <p className="mt-1 text-xs text-zinc-500">Try clearing filters or searching for something else.</p>
+                <p className="text-sm font-medium text-white">{agents.length === 0 ? 'No published agents yet' : 'No agents match your filters'}</p>
+                <p className="mt-1 text-xs text-zinc-500">{agents.length === 0 ? 'The community agent marketplace is pre-launch and only shows approved listings. Create a real agent and submit it through the Creator Hub for review; no sample inventory or fake usage counts are shown.' : 'Try clearing filters or searching for something else.'}</p>
+                {agents.length === 0 && <Link to="/creator-hub" className="mt-3 inline-flex rounded-lg border border-violet-300/20 px-3 py-2 text-xs text-violet-200">Open Creator Hub</Link>}
               </div>
             )}
           </section>

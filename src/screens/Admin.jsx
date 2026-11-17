@@ -47,8 +47,8 @@ export default function Admin() {
     { id: 'users', label: 'Total Users', value: o.total_users.toLocaleString(), detail: 'registered profiles', icon: 'Users', tone: 'violet' },
     { id: 'orgs', label: 'Organisations', value: o.total_organisations.toLocaleString(), detail: 'workspaces on platform', icon: 'FolderKanban', tone: 'blue' },
     { id: 'subs', label: 'Active Subscriptions', value: o.active_subscriptions.toLocaleString(), detail: 'billed accounts', icon: 'CreditCard', tone: 'amber' },
-    { id: 'agents', label: 'Intelligence Nodes', value: o.total_agents.toLocaleString(), detail: 'agents across all users', icon: 'Bot', tone: 'fuchsia' },
-    { id: 'runs', label: 'Executions (24h)', value: o.tasks_last_24h.toLocaleString(), detail: 'last 24 hours', icon: 'Activity', tone: 'emerald' },
+    { id: 'agents', label: 'Platform-wide agents', value: o.total_agents.toLocaleString(), detail: 'all users and organisations', icon: 'Bot', tone: 'fuchsia' },
+    { id: 'runs', label: 'Platform executions (24h)', value: o.tasks_last_24h.toLocaleString(), detail: 'all users · last 24 hours', icon: 'Activity', tone: 'emerald' },
     { id: 'errors', label: 'Exceptions (24h)', value: o.errors_last_24h.toLocaleString(), detail: 'runtime and API errors', icon: 'AlertTriangle', tone: 'rose' },
   ];
   const series = analytics.data?.forbidden ? [] : analytics.data?.series ?? [];

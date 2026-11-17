@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2, Search, SlidersHorizontal, TriangleAlert } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
+import { useSessionReady } from '@/lib/useSessionReady';
 import { friendlyMessage } from '@/lib/errors';
 import { useToast } from '@/components/ui/use-toast';
 import { useUpgrade } from '@/lib/upgradeContext';
@@ -10,6 +11,13 @@ import AgentCard from '@/components/marketplace-agents/AgentCard';
 import AgentDetailDrawer from '@/components/marketplace-agents/AgentDetailDrawer';
 import { listPublishedAgents, installMarketplaceAgent } from '@/components/marketplace-agents/api';
 import { CATEGORIES, normalizeAgent } from '@/components/marketplace-agents/marketplaceData';
+
+function withMarketplaceTimeout(promise, label, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within 15 seconds.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 const SORTS = [
   { id: 'popular', label: 'Most installed' },
@@ -25,22 +33,15 @@ export default function ListingBrowser() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { gate } = useUpgrade();
-  const [session, setSession] = useState('unknown');
+  const session = useSessionReady();
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('popular');
   const [active, setActive] = useState(null);
 
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
-    return () => { alive = false; sub?.subscription?.unsubscribe(); };
-  }, []);
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['marketplace-listings'],
-    queryFn: () => listPublishedAgents(undefined, 120),
+    queryFn: () => withMarketplaceTimeout(listPublishedAgents(undefined, 120), 'Marketplace catalogue'),
     enabled: session === 'yes',
     retry: false,
   });
@@ -75,6 +76,10 @@ export default function ListingBrowser() {
     else sorted.sort((a, b) => (b.usage.installs || 0) - (a.usage.installs || 0));
     return sorted;
   }, [agents, category, query, sort]);
+
+  if (session === 'unknown') {
+    return <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[.02] py-14 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />Checking your marketplace access…</div>;
+  }
 
   if (session === 'no') {
     return (
@@ -130,8 +135,9 @@ export default function ListingBrowser() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-14 text-center">
-            <p className="text-sm font-medium text-white">No listings match your filters</p>
-            <p className="mt-1 text-xs text-zinc-500">Try a different category or search term.</p>
+            <p className="text-sm font-medium text-white">{agents.length === 0 ? 'Pre-launch: no approved community listings yet' : 'No listings match your filters'}</p>
+            <p className="mt-1 text-xs text-zinc-500">{agents.length === 0 ? 'The community marketplace is pre-launch and only shows approved, published listings. Submit a real agent from the Creator Hub for review; sample inventory and fake usage counts are not shown.' : 'Try a different category or search term.'}</p>
+            {agents.length === 0 && <Link to="/creator-hub" className="mt-3 inline-flex rounded-lg border border-violet-300/20 px-3 py-2 text-xs text-violet-200">Open Creator Hub</Link>}
           </div>
         )
       )}

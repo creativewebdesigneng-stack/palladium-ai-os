@@ -1,3 +1,10 @@
+/**
+ * LEGACY ILLUSTRATIVE FIXTURES ONLY.
+ * The ratings, prices and usage figures below are fictional examples, not live
+ * marketplace inventory, customer activity or commercial traction. Do not
+ * import this file into product screens. Marketplace pages must use approved
+ * server-published listings from creator-commerce.functions.ts.
+ */
 // Mock data for the PalladiumAI Templates Marketplace — illustrative, backend-ready.
 
 export const CATEGORIES = ['Websites','Web Apps','SaaS','Dashboards','CRM','E-commerce','AI Agents','Workflows','Business','Marketing','Developer'];

@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://palladium-ai-os.vercel.app/sitemap.xml

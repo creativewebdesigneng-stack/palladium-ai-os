@@ -13,6 +13,13 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { friendlyMessage } from '@/lib/errors';
 import { getModelRuntimeOverview, probeNvidiaModelConnection, certifyNvidiaModelInference, certifyNvidiaModelToolCalling } from '@/lib/runtime/model-management.functions';
 
+function withModelOverviewTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Runtime model overview did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 function moneyFromPence(value) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value ?? 0) / 100);
 }
@@ -60,7 +67,7 @@ export default function Models() {
 
   const q = useQuery({
     queryKey: ['model-runtime-overview'],
-    queryFn: () => overviewFn({ data: {} }),
+    queryFn: () => withModelOverviewTimeout(overviewFn({ data: {} })),
     enabled: session === 'yes',
     retry: false,
     refetchInterval: 30_000,
@@ -90,7 +97,11 @@ export default function Models() {
     </div>
   );
 
-  if (session !== 'yes' || q.isLoading) {
+  if (session === 'no') {
+    return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your Blackstar agents." action={headerAction} /><div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-400">Sign in to view your runtime model configuration and usage.</div></>);
+  }
+
+  if (session === 'unknown' || q.isLoading) {
     return (<><PageHeader eyebrow="AI" title="Runtime Models" description="Providers and models actually used by your Blackstar agents." action={headerAction} />
       <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Loading runtime model state…</div></>);
   }

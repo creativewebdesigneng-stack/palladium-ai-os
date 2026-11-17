@@ -4,7 +4,9 @@ import { Sparkline } from './shared';
 
 export default function FilesOverviewCards() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+    <div className="space-y-3">
+      <div role="note" className="rounded-xl border border-amber-300/20 bg-amber-300/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80"><strong className="text-amber-100">Illustrative preview data.</strong> File totals, storage usage, collection counts and activity metrics below are examples only; they are not live storage telemetry or customer data.</div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
       {OVERVIEW_METRICS.map((m, i) => (
         <motion.div
           key={m.label}
@@ -25,6 +27,7 @@ export default function FilesOverviewCards() {
           <div className="mt-2"><Sparkline data={m.trend} grad={m.grad} /></div>
         </motion.div>
       ))}
+      </div>
     </div>
   );
 }

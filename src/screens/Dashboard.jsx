@@ -122,8 +122,8 @@ export default function Dashboard() {
         ) : (
           <>
             <MetricCard label="Intelligence requests" value={metrics ? metrics.aiRequestsToday.toLocaleString() : '—'} detail={pctChange} icon={Zap} />
-            <MetricCard label="Agents online" value={metrics ? metrics.activeAgents : '—'} detail={metrics ? `${metrics.totalAgents} deployed` : ''} icon={Bot} />
-            <MetricCard label="Tasks executing" value={metrics ? metrics.runningTasks : '—'} detail={metrics ? `${metrics.queuedTasks} queued` : ''} icon={Workflow} />
+            <MetricCard label="Your agents online" value={metrics ? metrics.activeAgents : '—'} detail={metrics ? `${metrics.totalAgents} in your workspace` : ''} icon={Bot} />
+            <MetricCard label="Your tasks executing" value={metrics ? metrics.runningTasks : '—'} detail={metrics ? `${metrics.queuedTasks} queued` : ''} icon={Workflow} />
             <MetricCard label="Models connected" value={metrics ? metrics.connectedModels : '—'} detail="Across active intelligence" icon={Cpu} />
           </>
         )}

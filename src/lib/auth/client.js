@@ -73,9 +73,13 @@ export const auth = {
       },
     });
     if (error) throw error;
+    if (data?.session && data?.user?.email_confirmed_at) {
+      await supabase.auth.signOut();
+      throw new Error("Email confirmation is disabled on this Supabase project. Enable Confirm email in Supabase Authentication settings before accepting registrations.");
+    }
     return data;
   },
-  async verifyOtp({ email, otpCode, otp, type = "email" } = {}) {
+  async verifyOtp({ email, otpCode, otp, type = "signup" } = {}) {
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: otpCode ?? otp,

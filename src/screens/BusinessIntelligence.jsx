@@ -12,6 +12,13 @@ import {
   formatMoney, formatNumber, formatPercent,
 } from '@/components/business/live';
 
+function withAnalyticsTimeout(promise, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Business Intelligence did not respond within 15 seconds.')), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 const RANGES = [
   { id: '7d', label: 'Last 7 days' },
   { id: '30d', label: 'Last 30 days' },
@@ -25,7 +32,7 @@ export default function BusinessIntelligence() {
 
   const bi = useQuery({
     queryKey: ['bi', range],
-    queryFn: () => analyticsFn({ data: { range } }),
+    queryFn: () => withAnalyticsTimeout(analyticsFn({ data: { range } })),
     enabled: session === 'yes',
     retry: false,
   });
@@ -43,6 +50,7 @@ export default function BusinessIntelligence() {
         action={<Tabs tabs={RANGES} active={range} onChange={setRange} />}
       />
 
+      {session === 'unknown' && <Loading label="Checking your session…" />}
       {session === 'no' && <Failed message="Sign in to view your business intelligence." />}
       {session === 'yes' && bi.isLoading && <Loading label="Aggregating your records…" />}
       {bi.isError && <Failed message={friendlyMessage(bi.error)} onRetry={() => bi.refetch()} />}

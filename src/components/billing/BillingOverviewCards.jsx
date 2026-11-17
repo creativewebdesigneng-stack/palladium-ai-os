@@ -69,8 +69,8 @@ export default function BillingOverviewCards() {
     },
     {
       label: 'Billing environment',
-      value: isPlatformAdmin ? 'Internal' : sub?.environment ?? '—',
-      detail: isPlatformAdmin ? 'No Stripe subscription required' : sub ? `Seats on this plan: ${sub.seats}` : 'Choose a plan to get started',
+      value: isPlatformAdmin ? 'Internal' : sub?.environment ?? 'Not recorded',
+      detail: isPlatformAdmin ? 'No Stripe subscription required' : sub ? 'Environment is not stored on the current subscription record' : 'Choose a plan to get started',
       grad: 'from-sky-500 to-cyan-500',
     },
   ];

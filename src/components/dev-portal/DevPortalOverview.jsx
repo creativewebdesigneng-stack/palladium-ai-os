@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Activity, TrendingUp, Clock, AlertTriangle, Loader2, KeyRound, Webhook } from 'lucide-react';
+import { ArrowUpRight, Activity, TrendingUp, Clock, AlertTriangle, Loader2, KeyRound, Webhook, RefreshCw } from 'lucide-react';
 import { getApiUsage, listApiKeys, listWebhooks } from './api';
 import { friendlyMessage } from '@/lib/errors';
+
+function withTimeout(promise, label, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within 15 seconds.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 export default function DevPortalOverview({ onNav }) {
   const [usage, setUsage] = useState(null);
@@ -9,21 +16,30 @@ export default function DevPortalOverview({ onNav }) {
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([getApiUsage(), listApiKeys(), listWebhooks()])
+    setError(null);
+    Promise.all([
+      withTimeout(getApiUsage(), 'API usage'),
+      withTimeout(listApiKeys(), 'API keys'),
+      withTimeout(listWebhooks(), 'Webhooks'),
+    ])
       .then(([u, k, w]) => {
         if (cancelled) return;
         setUsage(u);
         setKeys(k?.keys ?? (Array.isArray(k) ? k : []));
         setWebhooks(w?.webhooks ?? (Array.isArray(w) ? w : []));
       })
-      .catch((e) => { console.error('[dev-portal]', e); if (!cancelled) setError(friendlyMessage(e, 'Could not load developer portal data.')); })
+      .catch((e) => {
+        console.error('[dev-portal]', e);
+        if (!cancelled) setError(friendlyMessage(e, 'Could not load developer portal data.'));
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [retry]);
 
   const STATS = usage ? [
     { label: 'Total requests (24h)', value: (usage.requests ?? 0).toLocaleString(), delta: `${usage.error_rate ?? 0}% errors`, icon: Activity, tone: 'from-violet-600/40 to-indigo-600/40' },
@@ -40,11 +56,14 @@ export default function DevPortalOverview({ onNav }) {
       </div>
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div role="status" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl border border-white/10 bg-white/[.03]" />)}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-xs text-rose-200">{error}</div>
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-xs text-rose-200">
+          <span>{error}</span>
+          <button onClick={() => setRetry((value) => value + 1)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-zinc-100 hover:bg-white/5"><RefreshCw className="h-3.5 w-3.5" />Retry</button>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {STATS.map((s) => { const I = s.icon; return (
@@ -65,11 +84,7 @@ export default function DevPortalOverview({ onNav }) {
           <h3 className="text-sm font-semibold text-white">Quickstart</h3>
           <ol className="mt-3 space-y-2.5 text-[12px] text-zinc-300">
             {[['Create an API key', 'api-keys'], ['Send your first request', 'explorer'], ['Subscribe to webhooks', 'webhooks'], ['Install an SDK', 'sdks']].map(([label, id]) => (
-              <li key={id}>
-                <button onClick={() => onNav(id)} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-white/5">
-                  <span>{label}</span><ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
-                </button>
-              </li>
+              <li key={id}><button onClick={() => onNav(id)} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-white/5"><span>{label}</span><ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" /></button></li>
             ))}
           </ol>
         </div>
@@ -79,17 +94,9 @@ export default function DevPortalOverview({ onNav }) {
             <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…</div>
           ) : (
             <div className="mt-3 space-y-2 text-[12px]">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-zinc-300"><KeyRound className="h-3.5 w-3.5 text-zinc-500" />API keys</span>
-                <span className="text-zinc-400">{keys.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-zinc-300"><Webhook className="h-3.5 w-3.5 text-zinc-500" />Webhooks</span>
-                <span className="text-zinc-400">{webhooks.length}</span>
-              </div>
-              {keys.length === 0 && webhooks.length === 0 && (
-                <p className="pt-2 text-[11px] text-zinc-600">Nothing set up yet — create your first API key to get started.</p>
-              )}
+              <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-zinc-300"><KeyRound className="h-3.5 w-3.5 text-zinc-500" />API keys</span><span className="text-zinc-400">{keys.length}</span></div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-zinc-300"><Webhook className="h-3.5 w-3.5 text-zinc-500" />Webhooks</span><span className="text-zinc-400">{webhooks.length}</span></div>
+              {keys.length === 0 && webhooks.length === 0 && <p className="pt-2 text-[11px] text-zinc-600">Nothing set up yet — create your first API key to get started.</p>}
             </div>
           )}
         </div>

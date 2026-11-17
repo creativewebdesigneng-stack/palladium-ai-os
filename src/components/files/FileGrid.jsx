@@ -16,6 +16,8 @@ export default function FileGrid({ onOpen, activeFilter }) {
   });
 
   return (
+    <div className="space-y-3">
+    <div role="note" className="rounded-xl border border-amber-300/20 bg-amber-300/[.05] px-4 py-3 text-xs leading-5 text-amber-100/80"><strong className="text-amber-100">Illustrative sample files.</strong> Names, owners, activity, document summaries and financial figures in this preview are fictional examples, not company records or verified results.</div>
     <div className="rounded-2xl border border-white/10 bg-white/[.035] p-4">
       <SectionHead icon={LayoutGrid} title="All Files" count={filtered.length} grad="from-violet-500 to-indigo-500"
         action={
@@ -58,6 +60,7 @@ export default function FileGrid({ onOpen, activeFilter }) {
           </div>
         )}
       </AnimatePresence>
+    </div>
     </div>
   );
 }

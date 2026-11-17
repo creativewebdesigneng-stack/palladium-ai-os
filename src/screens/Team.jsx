@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { UserPlus, Network, Settings2, Users, ShieldAlert } from 'lucide-react';
 import PageHeader from '@/components/palladium/PageHeader';
-import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { toast } from '@/components/ui/use-toast';
 import { friendlyMessage } from '@/lib/errors';
 import {
-  getWorkspace, listOrganisationMembers, listTeams, addOrganisationMember,
+  listOrganisationMembers, listTeams, addOrganisationMember,
   updateMemberRole, removeMember, saveTeam, deleteTeam, updateOrganisation,
 } from '@/lib/platform/platform.functions';
 import TeamOverviewCards from '@/components/team/TeamOverviewCards';
@@ -31,20 +31,19 @@ const HEADER_ACTIONS = [
 
 const TABS = ['Overview', 'Members', 'Team Structure', 'Roles & Permissions', 'Member Access', 'AI Agents', 'Collaboration', 'Organisation', 'Audit'];
 
+function withTeamTimeout(promise, label, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within 15 seconds.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 export default function Team() {
   const qc = useQueryClient();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('Overview');
-  const [session, setSession] = useState('unknown');
-
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session ? 'yes' : 'no'); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ? 'yes' : 'no'));
-    return () => { alive = false; sub?.subscription?.unsubscribe(); };
-  }, []);
-
-  const workspaceFn = useServerFn(getWorkspace);
+  const workspace = useWorkspace();
+  const session = workspace.session;
   const membersFn = useServerFn(listOrganisationMembers);
   const teamsFn = useServerFn(listTeams);
   const addMemberFn = useServerFn(addOrganisationMember);
@@ -54,27 +53,21 @@ export default function Team() {
   const deleteTeamFn = useServerFn(deleteTeam);
   const updateOrgFn = useServerFn(updateOrganisation);
 
-  const workspace = useQuery({
-    queryKey: ['team-workspace'],
-    queryFn: () => workspaceFn({ data: {} }),
-    enabled: session === 'yes',
-    retry: false,
-  });
-
-  const orgId = workspace.data?.organisations?.[0]?.id ?? null;
-  const myRole = workspace.data?.organisations?.[0]?.role ?? null;
+  const orgId = workspace.activeOrgId ?? workspace.organisations[0]?.id ?? null;
+  const currentOrganisation = workspace.organisations.find((organisation) => organisation.id === orgId) ?? null;
+  const myRole = currentOrganisation?.role ?? null;
   const canManage = myRole === 'owner' || myRole === 'admin';
 
   const members = useQuery({
     queryKey: ['team-members', orgId],
-    queryFn: () => membersFn({ data: { orgId } }),
+    queryFn: () => withTeamTimeout(membersFn({ data: { orgId } }), 'Team members'),
     enabled: session === 'yes' && !!orgId,
     retry: false,
   });
 
   const teams = useQuery({
     queryKey: ['team-teams', orgId],
-    queryFn: () => teamsFn({ data: { orgId } }),
+    queryFn: () => withTeamTimeout(teamsFn({ data: { orgId } }), 'Team list'),
     enabled: session === 'yes' && !!orgId,
     retry: false,
   });
@@ -149,6 +142,14 @@ export default function Team() {
   const resultCount = activeTab === 'Members' ? filteredMembers.length : activeTab === 'Team Structure' ? teamList.length : null;
   const showRight = ['Overview', 'Members', 'Team Structure', 'Roles & Permissions', 'Collaboration'].includes(activeTab);
 
+  if (session === 'unknown' || workspace.isLoading) {
+    return <><PageHeader eyebrow="Workspace" title="Team & Organisation" description="Manage your people, teams and permissions." /><div role="status" className="rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400">Loading organisation workspace…</div></>;
+  }
+
+  if (workspace.error) {
+    return <><PageHeader eyebrow="Workspace" title="Team & Organisation" description="Manage your people, teams and permissions." /><div role="alert" className="rounded-2xl border border-rose-400/20 bg-rose-500/[.05] p-4 text-sm text-rose-200">{workspace.error.message}<button onClick={() => workspace.refetch()} className="ml-3 underline">Retry</button></div></>;
+  }
+
   if (session === 'no') {
     return (
       <>
@@ -209,7 +210,7 @@ export default function Team() {
           {activeTab === 'Collaboration' && <CollaborationPanel members={memberList} />}
           {activeTab === 'Organisation' && (
             <OrgSettings
-              org={workspace.data?.organisations?.[0] ?? null}
+              org={currentOrganisation}
               canManage={canManage}
               onSave={(vars) => updateOrgMutation.mutate(vars)}
               busy={updateOrgMutation.isPending}

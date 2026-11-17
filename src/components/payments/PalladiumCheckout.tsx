@@ -22,6 +22,22 @@ export default function PalladiumCheckout({
   // so mounting it without a bearer token throws "No authorization header".
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stripeEnvironment, setStripeEnvironment] = useState<"sandbox" | "live" | null>(null);
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof getStripe> | null>(null);
+  const [stripeConfigError, setStripeConfigError] = useState<string | null>(null);
+  const [stripeConfigChecked, setStripeConfigChecked] = useState(false);
+
+  useEffect(() => {
+    try {
+      const environment = getStripeEnvironment();
+      setStripeEnvironment(environment);
+      setStripePromise(getStripe());
+    } catch (e) {
+      setStripeConfigError(e instanceof Error ? e.message : "Stripe checkout is not configured for this deployment.");
+    } finally {
+      setStripeConfigChecked(true);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -47,7 +63,7 @@ export default function PalladiumCheckout({
           returnUrl:
             returnUrl ||
             `${window.location.origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-          environment: getStripeEnvironment(),
+          environment: stripeEnvironment ?? getStripeEnvironment(),
         },
       });
       if ("error" in result) throw new Error(result.error);
@@ -78,6 +94,20 @@ export default function PalladiumCheckout({
     );
   }
 
+  if (!stripeConfigChecked) {
+    return <p role="status" className="p-4 text-xs text-zinc-500">Checking secure checkout configuration…</p>;
+  }
+
+  if (stripeConfigError || !stripePromise) {
+    return (
+      <div role="status" className="rounded-2xl border border-amber-400/20 bg-amber-500/[.07] p-4 text-sm text-amber-100">
+        <p className="font-semibold">Secure checkout is not configured yet.</p>
+        <p className="mt-1 text-xs leading-5 text-amber-100/75">{stripeConfigError || "The Stripe client could not be initialised."}</p>
+        <p className="mt-2 text-xs leading-5 text-zinc-400">An administrator must configure the Stripe publishable key, matching server-side test credentials, webhook secret and plan prices before checkout can be tested. Live payments must only be enabled after explicit owner approval and a successful test-mode acceptance run.</p>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="rounded-2xl border border-rose-400/20 bg-rose-500/[.08] p-4 text-sm text-rose-200">
@@ -91,7 +121,7 @@ export default function PalladiumCheckout({
       id="checkout"
       className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.02] p-2"
     >
-      <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>
+      <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
         <EmbeddedCheckout />
       </EmbeddedCheckoutProvider>
     </div>
