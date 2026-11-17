@@ -4,7 +4,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -21,7 +21,7 @@ const campaignInput = z.object({
 });
 
 export const listCampaigns = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -56,7 +56,7 @@ export const listCampaigns = createServerFn({ method: "POST" })
   });
 
 export const saveCampaign = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((data: unknown) => campaignInput.parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -85,7 +85,7 @@ export const saveCampaign = createServerFn({ method: "POST" })
   });
 
 export const setCampaignStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((data: unknown) =>
     z
       .object({
@@ -110,7 +110,7 @@ export const setCampaignStatus = createServerFn({ method: "POST" })
   });
 
 export const deleteCampaign = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
