@@ -12,6 +12,13 @@ import {
   listTeams, saveTeam, deleteTeam,
 } from '@/lib/platform/platform.functions';
 
+function withOrganisationTimeout(promise, label, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within 15 seconds.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 const ROLE_STYLE = {
   owner: 'border-amber-400/30 bg-amber-500/10 text-amber-200',
   admin: 'border-violet-400/30 bg-violet-500/10 text-violet-200',
@@ -20,7 +27,7 @@ const ROLE_STYLE = {
 
 export default function Organisation() {
   const qc = useQueryClient();
-  const { session, organisations, activeOrgId, selectOrg, entitlements, isLoading } = useWorkspace();
+  const { session, organisations, activeOrgId, selectOrg, entitlements, isLoading, error: workspaceError, refetch: refetchWorkspace } = useWorkspace();
   const [orgId, setOrgId] = useState(activeOrgId);
   const [newOrg, setNewOrg] = useState('');
   const [invite, setInvite] = useState({ email: '', role: 'member' });
@@ -45,14 +52,14 @@ export default function Organisation() {
 
   const members = useQuery({
     queryKey: ['org-members', orgId],
-    queryFn: () => membersFn({ data: { orgId } }),
+    queryFn: () => withOrganisationTimeout(membersFn({ data: { orgId } }), 'Organisation members'),
     enabled: Boolean(orgId) && session === 'yes',
     retry: false,
   });
 
   const teams = useQuery({
     queryKey: ['org-teams', orgId],
-    queryFn: () => teamsFn({ data: { orgId } }),
+    queryFn: () => withOrganisationTimeout(teamsFn({ data: { orgId } }), 'Organisation teams'),
     enabled: Boolean(orgId) && session === 'yes',
     retry: false,
   });
@@ -118,6 +125,14 @@ export default function Organisation() {
         </div>
       </>
     );
+  }
+
+  if (session === 'unknown' || isLoading) {
+    return <><PageHeader eyebrow="Workspace" title="Organisations" description="Shared workspaces, roles and teams." /><div role="status" className="mt-4 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-sm text-zinc-400">Loading your organisation memberships…</div></>;
+  }
+
+  if (workspaceError) {
+    return <><PageHeader eyebrow="Workspace" title="Organisations" description="Shared workspaces, roles and teams." /><div role="alert" className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-500/[.05] p-4 text-sm text-rose-200">{workspaceError.message || 'Could not load your organisations.'}<button onClick={() => refetchWorkspace()} className="ml-3 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-200">Retry</button></div></>;
   }
 
   return (
