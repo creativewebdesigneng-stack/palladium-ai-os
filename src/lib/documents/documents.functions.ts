@@ -11,7 +11,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   assertWithinLimit,
   EntitlementError,
@@ -147,7 +147,7 @@ export function documentMetrics(rows: Array<Record<string, any>>) {
 }
 
 export const listDocuments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const res = await sb
@@ -162,7 +162,7 @@ export const listDocuments = createServerFn({ method: "POST" })
   });
 
 export const getDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -178,7 +178,7 @@ export const getDocument = createServerFn({ method: "POST" })
   });
 
 export const saveDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .inputValidator((input: unknown) => writeInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -224,7 +224,7 @@ export const saveDocument = createServerFn({ method: "POST" })
   });
 
 export const deleteDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -249,7 +249,7 @@ export const deleteDocument = createServerFn({ method: "POST" })
 
 /** Real AI generation. The row is written only after the model returns content. */
 export const generateDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .inputValidator((input: unknown) => generateInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -329,7 +329,7 @@ export const generateDocument = createServerFn({ method: "POST" })
 
 /** Real summarise / rewrite / translate / analyse against a persisted document. */
 export const transformDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("knowledge")])
   .inputValidator((input: unknown) => transformInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
