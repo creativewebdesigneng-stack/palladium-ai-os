@@ -64,7 +64,7 @@ async function authenticatedUser(request: Request): Promise<{ userId: string; em
   const { data, error } = await supabase.auth.getClaims(token);
   const claims = data?.claims as Record<string, unknown> | undefined;
   if (error || typeof claims?.["sub"] !== "string") return json({ error: "Unauthorized" }, 401);
-  return { userId: claims.sub, email: typeof claims["email"] === "string" ? claims.email : null };
+  return { userId: claims["sub"], email: typeof claims["email"] === "string" ? claims["email"] : null };
 }
 function json(payload: unknown, status: number) {
   return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
