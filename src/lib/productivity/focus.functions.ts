@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -11,7 +11,7 @@ const startInput = z.object({
 });
 
 export const listFocusSessions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: { limit?: number } | undefined) => ({ limit: Math.min(Math.max(Number(input?.limit ?? 50) || 50, 1), 200) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -32,7 +32,7 @@ export const listFocusSessions = createServerFn({ method: "POST" })
   });
 
 export const startFocusSession = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => startInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -51,7 +51,7 @@ export const startFocusSession = createServerFn({ method: "POST" })
   });
 
 export const stopFocusSession = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), notes: z.string().max(5000).default("") }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
