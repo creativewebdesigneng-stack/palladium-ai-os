@@ -1,6 +1,6 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {executeIntegrationAction,listIntegrationCapabilities,prepareIntegrationAction} from '@/lib/integrations/agent-integration-runtime.server';
 import {assertNoCatalogCredentials,extractDropshippingCatalogCandidates,isDropshippingCatalogReadCapability} from './dropshipping-catalog';
 
