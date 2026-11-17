@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (table: string) => any };
 
@@ -18,7 +18,7 @@ const updateSchema = z.object({
 });
 
 export const getPersonalAssistantPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [profileRes, prefsRes] = await Promise.all([
@@ -49,7 +49,7 @@ export const getPersonalAssistantPreferences = createServerFn({ method: "POST" }
   });
 
 export const updatePersonalAssistantPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => updateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
