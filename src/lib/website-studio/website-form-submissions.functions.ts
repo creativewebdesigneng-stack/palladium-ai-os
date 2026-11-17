@@ -1,6 +1,6 @@
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 
 type Sb={from:(table:string)=>any};
 const statusSchema=z.enum(['new','reviewed','archived','spam']);
