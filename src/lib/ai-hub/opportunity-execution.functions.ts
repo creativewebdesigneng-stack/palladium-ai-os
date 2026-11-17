@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import {
   AI_HUB_CAPABILITY_KINDS,
   type AiHubCapabilityKind,
