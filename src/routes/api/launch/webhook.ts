@@ -1,0 +1,64 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
+
+export const Route = createFileRoute("/api/launch/webhook")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const secretKey = process.env["STRIPE_SECRET_KEY"];
+        const webhookSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+        const supabaseUrl = process.env["SUPABASE_URL"];
+        const serviceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["SUPABASE_SECRET_KEY"];
+        if (!secretKey || !webhookSecret || !supabaseUrl || !serviceKey) {
+          return Response.json({ error: "Webhook is not configured." }, { status: 503 });
+        }
+        const signature = request.headers.get("stripe-signature");
+        if (!signature) return Response.json({ error: "Missing Stripe signature." }, { status: 400 });
+        const rawBody = await request.text();
+        const stripe = new Stripe(secretKey);
+        let event: Stripe.Event;
+        try {
+          event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+        } catch {
+          return Response.json({ error: "Invalid Stripe signature." }, { status: 400 });
+        }
+        const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        try {
+          if (event.type === "checkout.session.completed") {
+            const session = event.data.object as Stripe.Checkout.Session;
+            if (session.metadata?.kind !== "blackstar_founding_pilot" || !session.subscription || !session.customer) {
+              return Response.json({ received: true });
+            }
+            const subscription = await stripe.subscriptions.retrieve(String(session.subscription));
+            await saveEntitlement(db, subscription, String(session.customer), event.livemode ? "live" : "test");
+          } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+            const subscription = event.data.object as Stripe.Subscription;
+            if (subscription.metadata?.kind !== "blackstar_founding_pilot") return Response.json({ received: true });
+            const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+            await saveEntitlement(db, subscription, customerId, event.livemode ? "live" : "test");
+          }
+          return Response.json({ received: true });
+        } catch (error) {
+          console.error("[founding-pilot-webhook]", error);
+          return Response.json({ error: "Entitlement reconciliation failed." }, { status: 503 });
+        }
+      },
+    },
+  },
+});
+
+async function saveEntitlement(db: any, subscription: Stripe.Subscription, customerId: string, environment: "test" | "live") {
+  const userId = subscription.metadata?.userId;
+  if (!userId) throw new Error("Founding Pilot subscription is missing userId metadata.");
+  const status = subscription.status;
+  const { error } = await db.from("blackstar_pilot_access").upsert({
+    user_id: userId,
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subscription.id,
+    status,
+    environment,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "stripe_subscription_id" });
+  if (error) throw new Error("Could not persist Founding Pilot entitlement.");
+}
