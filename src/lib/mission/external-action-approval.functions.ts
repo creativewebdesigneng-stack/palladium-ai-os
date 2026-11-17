@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import {
   executeApprovedAction,
@@ -144,7 +144,7 @@ export const decideExternalActionApproval = createServerFn({ method: "POST" })
       note: typeof input.note === "string" ? input.note.slice(0, 1000) : null,
     };
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
@@ -314,7 +314,7 @@ export const retryExternalApprovedAction = createServerFn({ method: "POST" })
     if (!id) throw new Error("Approval request id is required");
     return { id };
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
