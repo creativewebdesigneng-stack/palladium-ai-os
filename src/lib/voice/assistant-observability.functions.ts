@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { getVoiceRuntimeCapabilities } from "./voice-runtime.server";
 
 type Sb = { from: (table: string) => any };
