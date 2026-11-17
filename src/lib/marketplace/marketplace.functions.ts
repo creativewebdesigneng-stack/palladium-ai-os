@@ -1,7 +1,7 @@
 /** Legacy agent-catalogue RPCs backed by the canonical marketplace and its governance. */
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {writeAuditRequired} from '@/lib/platform/audit.server';
 import {slugify,toListingDTO,withCreators,UI_TO_DB_STATUS} from './marketplace.server';
 import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
