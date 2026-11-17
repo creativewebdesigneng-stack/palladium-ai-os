@@ -1,5 +1,6 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+export { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getFeatureAccess } from "@/lib/launch/feature-access";
 import type { FeatureId } from "@/lib/launch/feature-registry";
 
