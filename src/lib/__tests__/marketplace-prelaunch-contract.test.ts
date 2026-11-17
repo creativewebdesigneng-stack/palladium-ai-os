@@ -30,6 +30,7 @@ describe("marketplace loading and honest pre-launch states", () => {
     expect(templates).toContain("listing.item_type === 'template'");
     expect(templates).not.toContain("listMarketplaceAgents");
     expect(templates).not.toContain("installMarketplaceAgent");
+    expect(templates).not.toContain("install.mutate");
     expect(templates).toContain("illustrative mock templates are not shown as marketplace inventory");
   });
 
