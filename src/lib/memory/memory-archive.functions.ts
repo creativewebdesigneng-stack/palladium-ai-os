@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { buildMemoryArchiveOverview, type ArchiveMemoryRow, type ArchiveDocumentRow } from './memory-archive'
 
 type Sb={from:(table:string)=>any}
@@ -12,7 +13,7 @@ const INPUT=z.object({lens:z.enum(['all','short_term','long_term','organisation'
  * Status is derived from real Supabase rows, not simulated sidecar health.
  */
 export const getMemoryArchive = createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input:unknown)=>INPUT.parse(input??{}))
   .handler(async ({data,context})=>{
     const sb=context.supabase as unknown as Sb

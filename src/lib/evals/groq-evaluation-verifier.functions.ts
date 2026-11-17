@@ -1,13 +1,14 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 
 const taskClassSchema = z.enum(['general','reasoning','coding','tool_use','agentic'])
 const inputSchema = z.object({ orgId: z.string().uuid().nullish(), taskClass: taskClassSchema })
 
 export const getGroqCertificationStatus = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { getGroqCertificationStatus: status } = await import('./groq-evaluation-verifier.server')
@@ -15,7 +16,7 @@ export const getGroqCertificationStatus = createServerFn({ method: 'POST' })
   })
 
 export const certifyGroqTaskClass = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { certifyGroqEvaluation } = await import('./groq-evaluation-verifier.server')

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   assertWithinLimit,
   EntitlementError,
@@ -35,7 +35,7 @@ function normaliseWrite(input: PromptWrite) {
 }
 
 export const getPromptWorkspace = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [prompts, versions, runs] = await Promise.all([
@@ -50,7 +50,7 @@ export const getPromptWorkspace = createServerFn({ method: "POST" })
   });
 
 export const savePrompt = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: PromptWrite) => normaliseWrite(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -113,7 +113,7 @@ export const savePrompt = createServerFn({ method: "POST" })
   });
 
 export const deletePrompt = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: { id: string }) => ({ id: String(input?.id ?? "") }))
   .handler(async ({ data, context }) => {
     if (!data.id) throw new Error("Prompt id is required.");
@@ -138,7 +138,7 @@ export const deletePrompt = createServerFn({ method: "POST" })
   });
 
 export const runSavedPrompt = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: { id: string; input?: string }) => ({
     id: String(input?.id ?? ""),
     input: String(input?.input ?? "").trim().slice(0, 8000),

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   defaultModelFor,
   isProviderConfigured,
@@ -77,7 +77,7 @@ async function runResearchModel(args: {
 }
 
 export const runResearch = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("research")])
   .inputValidator((input: { query: string }) => {
     const query = String(input?.query ?? "").trim();
     if (query.length < 3) throw new Error("Enter a research question.");

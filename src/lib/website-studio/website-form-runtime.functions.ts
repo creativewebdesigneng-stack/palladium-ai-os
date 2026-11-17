@@ -1,12 +1,13 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
 import {createHash,randomBytes} from 'node:crypto';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 
 type Sb={from:(table:string)=>any};
 
 export const ensureWebsiteStudioFormToken=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>z.object({projectId:z.string().uuid()}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

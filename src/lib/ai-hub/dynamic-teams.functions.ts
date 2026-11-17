@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { buildDynamicTeamCandidates, formDynamicAgentTeam } from './dynamic-teams'
 
 type Sb = { from: (table: string) => any }
@@ -23,7 +24,7 @@ const inputSchema = z.object({
 
 export { buildDynamicTeamCandidates }
 export const planDynamicAgentTeam = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb

@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import {
   appendProvenanceEvent,
   traceProvenance,
@@ -57,7 +58,7 @@ const provenanceInput = z.object({
 })
 
 export const getAutonomousRunProvenance = createServerFn({ method: 'GET' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((input: unknown) => provenanceInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { ingestDocument } from "@/lib/memory/memory.server";
 
 type Sb = { from: (table: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => any };
@@ -32,7 +32,7 @@ function safeRows(rows: any[]) {
 }
 
 export const listZenNotes = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { lifecycle?: string; query?: string; limit?: number } = {}) => ({
     lifecycle: ["active", "archived", "trash"].includes(String(input.lifecycle)) ? String(input.lifecycle) : "active",
     query: String(input.query ?? "").trim().slice(0, 160),
@@ -54,7 +54,7 @@ export const listZenNotes = createServerFn({ method: "POST" })
   });
 
 export const saveZenNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: unknown) => noteInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -75,7 +75,7 @@ export const saveZenNote = createServerFn({ method: "POST" })
   });
 
 export const moveZenNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), lifecycle: z.enum(["active", "archived", "trash"]) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -85,7 +85,7 @@ export const moveZenNote = createServerFn({ method: "POST" })
   });
 
 export const deleteZenNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: unknown) => idInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -95,7 +95,7 @@ export const deleteZenNote = createServerFn({ method: "POST" })
   });
 
 export const promoteZenNoteToKnowledge = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: unknown) => idInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

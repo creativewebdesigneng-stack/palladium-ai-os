@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   defaultModelFor,
   getProviderOptions,
@@ -17,7 +17,7 @@ const updateInput = z.object({
 });
 
 export const getAIPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -54,7 +54,7 @@ export const getAIPreferences = createServerFn({ method: "POST" })
   });
 
 export const updateAIPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_chat")])
   .inputValidator((input: unknown) => updateInput.parse(input))
   .handler(async ({ data, context }) => {
     const provider = normaliseProvider(data.provider);

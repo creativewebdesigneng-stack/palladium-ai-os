@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { buildBlackstarSharedWorkspacePlan, type BlackstarWorkspaceActionRequest } from '@/lib/ai-hub/shared-workspace'
 import { buildIntelligenceGraph } from '@/lib/ai-hub/intelligence-graph'
 
@@ -40,7 +41,7 @@ export function validateWorkspaceCollaborationInput(input: unknown) {
 }
 
 export const getWorkspaceIntelligenceGraph = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateWorkspaceGraphInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
@@ -130,7 +131,7 @@ export const getWorkspaceIntelligenceGraph = createServerFn({ method: 'POST' })
   })
 
 export const planWorkspaceCollaboration = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateWorkspaceCollaborationInput)
   .handler(async ({ data, context }) => {
     const members = data.members.filter((member) => member.id !== context.userId)

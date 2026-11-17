@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateBuilderRepairManifest } from "./builder-repair.server";
@@ -33,7 +33,7 @@ async function preference(sb: Sb, userId: string) {
 }
 
 export const listBuilderRepairStates = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from("builder_jobs").select("id,repair_status,repair_manifest,repair_last_error,repair_attempt,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(25);
@@ -42,7 +42,7 @@ export const listBuilderRepairStates = createServerFn({ method: "POST" })
   });
 
 export const generateBuilderRepair = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => jobInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -91,7 +91,7 @@ export const generateBuilderRepair = createServerFn({ method: "POST" })
   });
 
 export const acceptBuilderRepair = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => jobInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

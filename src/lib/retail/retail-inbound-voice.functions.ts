@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { writeAudit } from '@/lib/platform/audit.server';
 import {
@@ -75,7 +75,7 @@ async function releasePairingClaim(pairingId: string, userId: string, claimedAt:
 }
 
 export const getRetailInboundVoiceConfig = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -104,7 +104,7 @@ export const getRetailInboundVoiceConfig = createServerFn({ method: 'POST' })
   });
 
 export const beginRetailInboundVoicePairing = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((value: unknown) => z.object({
     workspace_id: uuid,
     profile_id: uuid,
@@ -161,7 +161,7 @@ export const beginRetailInboundVoicePairing = createServerFn({ method: 'POST' })
   });
 
 export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((value: unknown) => z.object({ pairing_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -281,7 +281,7 @@ export const connectRetailInboundVoice = createServerFn({ method: 'POST' })
   });
 
 export const disconnectRetailInboundVoice = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((value: unknown) => z.object({ endpoint_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

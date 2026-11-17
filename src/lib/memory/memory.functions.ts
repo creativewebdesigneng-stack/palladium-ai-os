@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { retrieveGovernedAgentMemory } from "./agent-memory-context.server";
 import { promoteReviewedShortTermMemory } from "./reviewed-memory.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import type { MemorySearchStatus } from './recall-status';
 import {
   deleteDocument,
@@ -34,7 +34,7 @@ const asId = (v: unknown) => (typeof v === "string" && v ? v : null);
 
 /** Lists memories the caller can see, newest first, with light filtering. */
 export const listMemories = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator(
     (input: { memory_type?: string; scope?: string; agent_id?: string; limit?: number } = {}) =>
       input ?? {},
@@ -62,7 +62,7 @@ export const listMemories = createServerFn({ method: "POST" })
 
 /** storeMemory */
 export const createMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: Record<string, unknown>) => {
     const content = asString(input?.["content"]).trim();
     if (!content) throw new Error("Memory content cannot be empty.");
@@ -99,7 +99,7 @@ export const createMemory = createServerFn({ method: "POST" })
 
 /** updateMemory */
 export const editMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { id: string; patch: Record<string, unknown> }) => {
     if (!input?.id) throw new Error("A memory id is required.");
     return { id: String(input.id), patch: input.patch ?? {} };
@@ -121,7 +121,7 @@ export const editMemory = createServerFn({ method: "POST" })
 
 /** Explicit, owner-reviewed retention; this never makes a private memory shared. */
 export const retainReviewedAgentMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { id: string; expectedUpdatedAt: string; reviewed: boolean }) => ({
     id: asString(input?.id),
     expectedUpdatedAt: asString(input?.expectedUpdatedAt),
@@ -144,7 +144,7 @@ export const retainReviewedAgentMemory = createServerFn({ method: "POST" })
 
 /** deleteMemory */
 export const removeMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { id: string }) => {
     if (!input?.id) throw new Error("A memory id is required.");
     return { id: String(input.id) };
@@ -163,7 +163,7 @@ export const removeMemory = createServerFn({ method: "POST" })
 
 /** searchMemory — semantic search with keyword fallback. */
 export const searchMemories = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator(
     (input: { query: string; limit?: number; agent_id?: string; types?: string[] }) => ({
       query: asString(input?.query),
@@ -192,7 +192,7 @@ export const searchMemories = createServerFn({ method: "POST" })
 
 /** retrieveRelevantMemory — the exact block the runtime injects before execution. */
 export const previewAgentMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { query: string; agent_id?: string }) => {
     const query = asString(input?.query).trim();
     if (query.length < 3 || query.length > 500) throw new MemoryError("Enter a memory recall question between 3 and 500 characters.");
@@ -230,7 +230,7 @@ export const previewAgentMemory = createServerFn({ method: "POST" })
 
 /** Re-embeds a memory into the active (or requested) vector store. */
 export const reindexMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { id: string; provider?: string }) => ({
     id: String(input?.id ?? ""),
     provider: asString(input?.provider) || null,
@@ -262,7 +262,7 @@ export const reindexMemory = createServerFn({ method: "POST" })
 
 /** Document memory: register + chunk + embed uploaded text. */
 export const ingestKnowledgeDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: Record<string, unknown>) => {
     const text = asString(input?.["text"]);
     if (!text.trim()) throw new Error("The document has no readable text.");
@@ -291,7 +291,7 @@ export const ingestKnowledgeDocument = createServerFn({ method: "POST" })
   });
 
 export const removeKnowledgeDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { document_id: string }) => ({
     document_id: String(input?.document_id ?? ""),
   }))
@@ -309,7 +309,7 @@ export const removeKnowledgeDocument = createServerFn({ method: "POST" })
 
 /** Clears the caller's expired short-term memory. */
 export const pruneMemory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .handler(async ({ context }) => {
     try {
       return await pruneExpiredMemory(context.supabase as unknown as Sb);
@@ -322,7 +322,7 @@ export const pruneMemory = createServerFn({ method: "POST" })
 
 /** The caller's memory preferences (safe defaults when never configured). */
 export const getMemoryPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .handler(async ({ context }) => {
     const { loadMemoryPreferences } = await import("./preferences.server");
     try {
@@ -335,7 +335,7 @@ export const getMemoryPreferences = createServerFn({ method: "POST" })
   });
 
 export const updateMemoryPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: Record<string, unknown>) => input ?? {})
   .handler(async ({ data, context }) => {
     const { saveMemoryPreferences } = await import("./preferences.server");
@@ -360,7 +360,7 @@ export const updateMemoryPreferences = createServerFn({ method: "POST" })
  * the document row can mint a link.
  */
 export const getDocumentUrl = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { document_id: string }) => ({
     document_id: String(input?.document_id ?? ""),
   }))
@@ -385,7 +385,7 @@ export const getDocumentUrl = createServerFn({ method: "POST" })
 
 /** Chunk preview for a document, so users can see exactly what was indexed. */
 export const getDocumentChunks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { document_id: string; limit?: number }) => ({
     document_id: String(input?.document_id ?? ""),
     limit: Math.min(Math.max(Number(input?.limit ?? 20), 1), 100),
@@ -409,7 +409,7 @@ export const getDocumentChunks = createServerFn({ method: "POST" })
  * scoped to the caller, and vectors are removed alongside each row.
  */
 export const removeMemories = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("memory")])
   .inputValidator((input: { ids?: string[]; memory_type?: string; all?: boolean }) => ({
     ids: Array.isArray(input?.ids) ? input.ids.map(String).slice(0, 500) : [],
     memory_type: asString(input?.memory_type) || null,

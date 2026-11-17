@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   executeIntegrationAction,
   listIntegrationCapabilities,
@@ -203,7 +203,7 @@ async function reconcileSocialTarget(sb: any, userId: string, target: any): Prom
 }
 
 export const listSocialPosts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { limit?: number } = {}) => ({ limit: Math.min(Math.max(Number(input.limit ?? 50) || 50, 1), 100) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
@@ -219,7 +219,7 @@ export const listSocialPosts = createServerFn({ method: "POST" })
   });
 
 export const createSocialPost = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { title?: string; content: string; campaign?: string; labels?: string[]; media?: unknown; metadata?: unknown; scheduledFor?: string | null }) => {
     const content = cleanText(input?.content, 20_000);
     if (!content) throw new Error("Post content is required.");
@@ -243,7 +243,7 @@ export const createSocialPost = createServerFn({ method: "POST" })
   });
 
 export const rescheduleSocialPost = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { postId: string; scheduledFor?: string | null }) => ({ postId: postId(input?.postId), scheduledFor: isoOrNull(input?.scheduledFor) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
@@ -256,7 +256,7 @@ export const rescheduleSocialPost = createServerFn({ method: "POST" })
 
 /** Publish/mutation capabilities only. Read-only social capabilities remain global for agents/workflows. */
 export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const capabilities = await listIntegrationCapabilities(context.userId);
@@ -270,7 +270,7 @@ export const listLiveSocialCapabilities = createServerFn({ method: "POST" })
   });
 
 export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { discoverMetaAssets } = await import("@/lib/integrations/meta-social.server");
     const assets = await discoverMetaAssets(context.userId);
@@ -286,7 +286,7 @@ export const listNativeMetaSocialAssets = createServerFn({ method: "POST" })
   });
 
 export const listNativeYouTubeChannels = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { discoverYouTubeChannels } = await import("@/lib/integrations/youtube-social.server");
     const channels = await discoverYouTubeChannels(context.userId);
@@ -299,7 +299,7 @@ export const listNativeYouTubeChannels = createServerFn({ method: "POST" })
   });
 
 export const listNativePinterestBoards = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { discoverPinterestBoards } = await import("@/lib/integrations/pinterest-social.server");
     const boards = await discoverPinterestBoards(context.userId);
@@ -313,7 +313,7 @@ export const listNativePinterestBoards = createServerFn({ method: "POST" })
 
 /** Safe creator controls required by TikTok before every Direct Post. */
 export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { queryTikTokCreatorInfo } = await import("@/lib/integrations/tiktok-social.server");
     const creator = await queryTikTokCreatorInfo(context.userId);
@@ -330,7 +330,7 @@ export const getNativeTikTokCreatorInfo = createServerFn({ method: "POST" })
 
 /** Safe TikTok publish-status polling for a publish ID returned by Direct Post. */
 export const getNativeTikTokPublishStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { publishId: string }) => ({ publishId: cleanText(input?.publishId, 100) }))
   .handler(async ({ data, context }) => {
     const { fetchTikTokPublishStatus } = await import("@/lib/integrations/tiktok-social.server");
@@ -346,7 +346,7 @@ export const getNativeTikTokPublishStatus = createServerFn({ method: "POST" })
 
 /** Safe X account identity for destination confirmation; no credentials leave the server. */
 export const getNativeXAccountInfo = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { getXAccountInfo } = await import("@/lib/integrations/x-social.server");
     const account = await getXAccountInfo(context.userId);
@@ -359,7 +359,7 @@ export const getNativeXAccountInfo = createServerFn({ method: "POST" })
 
 /** Safe Threads account identity for destination confirmation. */
 export const getNativeThreadsAccountInfo = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(() => ({}))
+  .middleware([requireLaunchFeatureAuth("marketing")]).inputValidator(() => ({}))
   .handler(async ({ context }) => {
     const { getThreadsAccountInfo } = await import("@/lib/integrations/threads-social.server");
     const account = await getThreadsAccountInfo(context.userId);
@@ -370,7 +370,7 @@ export const getNativeThreadsAccountInfo = createServerFn({ method: "POST" })
   });
 
 export const addSocialPostTarget = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { postId: string; provider: string; action: string; actionInput?: Record<string, unknown> }) => {
     const provider = normalizeIntegrationProvider(input?.provider);
     if (!SOCIAL_PROVIDERS.has(provider)) throw new Error("This provider is not a supported social destination.");
@@ -458,7 +458,7 @@ export const addSocialPostTarget = createServerFn({ method: "POST" })
   });
 
 export const refreshSocialPostTarget = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("marketing")])
   .inputValidator((input: { targetId: string }) => ({ targetId: targetId(input?.targetId) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;

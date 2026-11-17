@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 import { safeAstraCandidateModelId } from './astra-candidate-route-probe-diagnostics'
 import { readAstraCertificationFailureStage, safeAstraCertificationStageFailure } from './astra-certification-stage-diagnostics'
@@ -85,7 +86,7 @@ async function addSafeCredentialFingerprint<T extends { code: string; message: s
 }
 
 export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: taskClassSchema,
@@ -103,7 +104,7 @@ export const getAstraCertificationBenchmark = createServerFn({ method: 'POST' })
   })
 
 export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: textTaskClassSchema,
@@ -159,7 +160,7 @@ export const runAstraTextCertificationCase = createServerFn({ method: 'POST' })
   })
 
 export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     caseId: z.string().trim().min(1).max(120),
@@ -178,7 +179,7 @@ export const runAstraVisionCertificationCase = createServerFn({ method: 'POST' }
   })
 
 export const attestAstraCertificationRun = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     orgId: z.string().uuid().nullish(),
     taskClass: taskClassSchema,

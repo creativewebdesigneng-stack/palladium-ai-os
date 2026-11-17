@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { computeCommuteRoutes, type CommuteRoute } from "./commute-routing.server";
 
 type Sb = { from: (table: string) => any };
@@ -36,7 +36,7 @@ export const getLiveCommuteRoute = createServerFn({ method: "POST" })
     if (!taskId || taskId.length > 128) throw new Error("A valid task id is required");
     return { taskId };
   })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;

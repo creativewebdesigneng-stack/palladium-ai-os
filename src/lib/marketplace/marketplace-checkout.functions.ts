@@ -1,7 +1,8 @@
-import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
+import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';import {MARKETPLACE_LISTING_FEE_PENCE} from './fees';
 import {requireUnpaidListingFee,quoteRecordedPurchase,requireRecordedStripeSession} from './checkout-safety';import {marketplaceBaseUrl,marketplaceStripe} from './stripe.server';type Sb={from:(t:string)=>any};
 export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_marketplace")])
   .inputValidator((v:unknown)=>z.object({listing_id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     // The user's own session establishes listing ownership before any
@@ -38,7 +39,7 @@ export const createMarketplaceListingFeeCheckout=createServerFn({method:'POST'})
     return{url:session.url};
   });
 export const createMarketplacePurchaseCheckout=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_marketplace")])
   .inputValidator((v:unknown)=>z.object({listing_id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

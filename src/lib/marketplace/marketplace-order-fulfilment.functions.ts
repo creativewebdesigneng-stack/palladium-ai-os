@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 
 type Sb = {
   from: (table: string) => any;
@@ -16,7 +16,7 @@ const fulfilInput = z.object({
 });
 
 export const getSellerMarketplaceOrders = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_marketplace")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -31,7 +31,7 @@ export const getSellerMarketplaceOrders = createServerFn({ method: "POST" })
   });
 
 export const fulfilMarketplaceOrder = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_marketplace")])
   .inputValidator((value: unknown) => fulfilInput.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

@@ -6,7 +6,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -14,7 +14,7 @@ const STATUSES = ["open", "pending", "resolved", "closed"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 export const listSupport = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -60,7 +60,7 @@ export const listSupport = createServerFn({ method: "POST" })
   });
 
 export const listTicketMessages = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((data: unknown) => z.object({ ticketId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -75,7 +75,7 @@ export const listTicketMessages = createServerFn({ method: "POST" })
   });
 
 export const createTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((data: unknown) =>
     z
       .object({
@@ -109,7 +109,7 @@ export const createTicket = createServerFn({ method: "POST" })
   });
 
 export const updateTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((data: unknown) =>
     z
       .object({
@@ -146,7 +146,7 @@ export const updateTicket = createServerFn({ method: "POST" })
   });
 
 export const addTicketMessage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((data: unknown) =>
     z
       .object({
@@ -187,7 +187,7 @@ export const addTicketMessage = createServerFn({ method: "POST" })
   });
 
 export const deleteTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("notifications")])
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

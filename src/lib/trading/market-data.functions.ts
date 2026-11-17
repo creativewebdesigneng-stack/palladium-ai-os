@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { normaliseTradingSymbol, type TradingMarketKind } from "./market-data";
 import { loadTradingMarketSeriesFromProvider } from "./market-data.server";
@@ -7,7 +7,7 @@ import { loadTradingMarketSeriesFromProvider } from "./market-data.server";
 const KINDS = new Set<TradingMarketKind>(["equity", "fx", "crypto"]);
 
 export const getTradingMarketSeries = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("finance")])
   .inputValidator((input: { kind?: string; symbol?: string }) => {
     const kind = String(input?.kind ?? "equity") as TradingMarketKind;
     if (!KINDS.has(kind)) throw new Error("Unsupported market type.");

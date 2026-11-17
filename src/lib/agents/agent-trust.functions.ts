@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAuditRequired } from "@/lib/platform/audit.server";
 import { canonicalBlackstarAgentId } from "./agent-trust";
 
@@ -40,7 +40,7 @@ async function ownedAgent(sb: Sb, userId: string, agentId: string) {
 }
 
 export const listAgentPassports = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -53,7 +53,7 @@ export const listAgentPassports = createServerFn({ method: "GET" })
   });
 
 export const upsertAgentPassport = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => passportInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -101,7 +101,7 @@ export const upsertAgentPassport = createServerFn({ method: "POST" })
   });
 
 export const listAgentDelegationGrants = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -114,7 +114,7 @@ export const listAgentDelegationGrants = createServerFn({ method: "GET" })
   });
 
 export const createAgentDelegationGrant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => grantInput.parse(input))
   .handler(async ({ data, context }) => {
     if (data.grantor_agent_id === data.grantee_agent_id) throw new Error("An agent cannot delegate to itself.");
@@ -156,7 +156,7 @@ export const createAgentDelegationGrant = createServerFn({ method: "POST" })
   });
 
 export const revokeAgentDelegationGrant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

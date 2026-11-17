@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { listIntegrationCapabilities, normalizeIntegrationProvider } from "@/lib/integrations/agent-integration-runtime.server";
 
 type Sb = { from: (table: string) => any };
@@ -33,7 +33,7 @@ function isWhatsAppProvider(value: unknown) {
 }
 
 export const listWhatsAppWorkspace = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: { limit?: number } = {}) => ({ limit: Math.min(Math.max(Number(input.limit ?? 100) || 100, 1), 200) }))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -47,7 +47,7 @@ export const listWhatsAppWorkspace = createServerFn({ method: "POST" })
   });
 
 export const listWhatsAppCapabilities = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .handler(async ({ context }) => {
     const rows = await listIntegrationCapabilities(context.userId);
     return rows.filter((row) => isWhatsAppProvider(row.provider)).map((row) => ({
@@ -63,7 +63,7 @@ export const listWhatsAppCapabilities = createServerFn({ method: "POST" })
   });
 
 export const openWhatsAppConversation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({ contactId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -76,7 +76,7 @@ export const openWhatsAppConversation = createServerFn({ method: "POST" })
   });
 
 export const saveWhatsAppDraft = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({
     conversationId: z.string().uuid(),
     text: z.string().trim().min(1).max(10000),
@@ -94,7 +94,7 @@ export const saveWhatsAppDraft = createServerFn({ method: "POST" })
   });
 
 export const updateWhatsAppConversationStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), status: z.enum(["open", "pending", "closed"]) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -104,7 +104,7 @@ export const updateWhatsAppConversationStatus = createServerFn({ method: "POST" 
   });
 
 export const createWhatsAppBroadcastDraft = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("crm")])
   .inputValidator((input: unknown) => z.object({
     name: z.string().trim().min(1).max(160),
     templateName: z.string().trim().max(160).optional(),

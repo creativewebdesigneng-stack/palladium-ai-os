@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { getEntitlements } from "@/lib/platform/entitlements.server";
 
 type Sb = { from: (t: string) => any };
@@ -26,7 +26,7 @@ function rangeStart(range: string) {
  * counts, API request volume, and the plan limits to compare against.
  */
 export const getUsageBreakdown = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) =>
     z
       .object({

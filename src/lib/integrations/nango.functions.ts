@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { findNangoProvider, isSafeNangoProviderId, NANGO_PROVIDERS } from "./nango-providers";
 import { nangoConnectionReady } from "./nango-connection-state";
 
@@ -9,7 +9,7 @@ const providerInput = z.object({
 });
 
 export const listNangoConnections = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const server = await import("./nango.server");
     let providers: Awaited<ReturnType<typeof server.listNangoProviderCatalogue>>;
@@ -65,7 +65,7 @@ export const listNangoConnections = createServerFn({ method: "POST" })
   });
 
 export const startNangoConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const { createNangoConnectSession } = await import("./nango.server");
@@ -74,7 +74,7 @@ export const startNangoConnection = createServerFn({ method: "POST" })
   });
 
 export const testNangoConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const { testOwnedNangoConnection } = await import("./nango.server");
@@ -90,7 +90,7 @@ export const testNangoConnection = createServerFn({ method: "POST" })
   });
 
 export const disconnectNangoConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator((input: unknown) => providerInput.parse(input))
   .handler(async ({ data, context }) => {
     const { disconnectOwnedNangoConnection } = await import("./nango.server");
@@ -99,7 +99,7 @@ export const disconnectNangoConnection = createServerFn({ method: "POST" })
 
 // Compatibility aliases for the original GitHub pilot.
 export const getNangoGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const server = await import("./nango.server");
     if (!server.nangoProviderConfigured("github"))
@@ -122,7 +122,7 @@ export const getNangoGitHubConnection = createServerFn({ method: "POST" })
     };
   });
 export const startNangoGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { createNangoConnectSession } = await import("./nango.server");
     return createNangoConnectSession(
@@ -134,7 +134,7 @@ export const startNangoGitHubConnection = createServerFn({ method: "POST" })
     );
   });
 export const testNangoGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { testOwnedNangoConnection } = await import("./nango.server");
     const result = await testOwnedNangoConnection(context.userId, "github");
@@ -147,7 +147,7 @@ export const testNangoGitHubConnection = createServerFn({ method: "POST" })
     };
   });
 export const disconnectNangoGitHubConnection = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async ({ context }) => {
     const { disconnectOwnedNangoConnection } = await import("./nango.server");
     return disconnectOwnedNangoConnection(context.userId, "github");

@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { getGenerativeMediaCapabilities } from '@/lib/media/generative-media.server'
 import { getMediaRuntimeCapabilities } from '@/lib/media/media-runtime.server'
 import { PALLADIUM_MCP_SERVER, PALLADIUM_MCP_TOOLS } from '@/lib/mcp/catalog'
@@ -70,7 +71,7 @@ function listModelResources(
 
 /** Tenant-safe live Hub inventory projected from existing authoritative systems. */
 export const listAiHubResources = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateAiHubResourceInput)
   .handler(async ({ data, context }) => {
     const limit = data?.limit ?? 100

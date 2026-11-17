@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import {
   getRetailExternalDeliveryCapabilities,
@@ -98,7 +98,7 @@ function cleanJsonObject(value: Record<string, unknown> | undefined) {
 }
 
 export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ workspace_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -136,7 +136,7 @@ export const getRetailServiceAutomation = createServerFn({ method: 'POST' })
   });
 
 export const saveRetailReceptionProfile = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => profileSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -180,7 +180,7 @@ export const saveRetailReceptionProfile = createServerFn({ method: 'POST' })
   });
 
 export const queueRetailReceptionAction = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => actionSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -202,7 +202,7 @@ export const queueRetailReceptionAction = createServerFn({ method: 'POST' })
   });
 
 export const reviewRetailReceptionAction = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ id: uuid, decision: z.enum(['approved','dismissed']) }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -218,7 +218,7 @@ export const reviewRetailReceptionAction = createServerFn({ method: 'POST' })
   });
 
 export const executeRetailReceptionAction = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const connected = await tryExecuteRetailConnectedCommunication(context.userId, data.id);
@@ -250,7 +250,7 @@ export const executeRetailReceptionAction = createServerFn({ method: 'POST' })
   });
 
 export const retryRetailReceptionAction = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -311,7 +311,7 @@ export const retryRetailReceptionAction = createServerFn({ method: 'POST' })
   });
 
 export const saveRetailCustomerCommunication = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => communicationSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -344,7 +344,7 @@ export const saveRetailCustomerCommunication = createServerFn({ method: 'POST' }
   });
 
 export const saveRetailReturnItem = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => returnItemSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -378,7 +378,7 @@ export const saveRetailReturnItem = createServerFn({ method: 'POST' })
   });
 
 export const deleteRetailReturnItem = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -392,7 +392,7 @@ export const deleteRetailReturnItem = createServerFn({ method: 'POST' })
   });
 
 export const processRetailReturnRestock = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value: unknown) => z.object({ return_id: uuid }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

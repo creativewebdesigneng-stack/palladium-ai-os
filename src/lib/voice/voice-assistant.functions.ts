@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { transcribeOpenAiSpeech } from "@/lib/voice/voice-runtime.server";
 
 type Sb = { from: (t: string) => any };
@@ -47,7 +47,7 @@ const assistantAudioMime = z.enum([
 ]);
 
 export const getVoiceAssistantPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .handler(async ({ context }): Promise<VoiceAssistantPreferences> => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -69,7 +69,7 @@ export const getVoiceAssistantPreferences = createServerFn({ method: "POST" })
   });
 
 export const saveVoiceAssistantPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => preferenceSchema.parse(input))
   .handler(async ({ data, context }): Promise<VoiceAssistantPreferences> => {
     const sb = context.supabase as unknown as Sb;
@@ -91,7 +91,7 @@ export const saveVoiceAssistantPreferences = createServerFn({ method: "POST" })
  * never inserted into Voice Studio jobs or persisted by Blackstar.
  */
 export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .inputValidator((input: unknown) => z.object({
     audioBase64: z.string().min(100).max(8_000_000),
     filename: z.string().trim().min(1).max(120).default("assistant.webm"),
@@ -122,7 +122,7 @@ export const transcribeVoiceAssistantAudio = createServerFn({ method: "POST" })
   });
 
 export const getVoiceWorkspaceBrief = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;

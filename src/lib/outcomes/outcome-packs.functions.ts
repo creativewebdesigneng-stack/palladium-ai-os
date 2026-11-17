@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { getEntitlements, recordUsage } from '@/lib/platform/entitlements.server'
 import { writeAudit } from '@/lib/platform/audit.server'
 import { getOutcomePack, OUTCOME_PACKS } from './outcome-packs'
@@ -20,7 +21,7 @@ function executableTools(labels: string[]) {
 }
 
 export const getOutcomePackOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb
     const entitlements = await getEntitlements(sb, context.userId)
@@ -38,7 +39,7 @@ export const getOutcomePackOverview = createServerFn({ method: 'POST' })
   })
 
 export const launchOutcomePack = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({
     packId: z.string().trim().min(2).max(120),
     context: z.string().trim().max(4000).optional().default(''),

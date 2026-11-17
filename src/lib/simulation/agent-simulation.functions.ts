@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { simulateAgentPlan } from "./agent-simulation";
 
 type Sb = { from: (table: string) => any };
@@ -33,7 +33,7 @@ async function assertOwnedAgent(sb: Sb, userId: string, agentId: string | null |
 }
 
 export const runAgentSimulation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => simulationSchema.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -57,7 +57,7 @@ export const runAgentSimulation = createServerFn({ method: "POST" })
   });
 
 export const listAgentSimulations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => z.object({ agentId: z.string().uuid().nullish(), limit: z.number().int().min(1).max(100).default(25) }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

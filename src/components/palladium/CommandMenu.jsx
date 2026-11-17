@@ -7,9 +7,9 @@ import {
   ListChecks, Loader2, Search, Store, Users, Workflow, Zap,
 } from 'lucide-react'
 import { searchWorkspace } from '@/lib/search/search.functions'
-import { useAuth } from '@/lib/AuthContext'
 import { ADMIN_NAV, ALL_NAV_ITEMS, PRIMARY_NAV } from '@/components/palladium/navigationData'
 import { AstraMark } from '@/components/blackstar/AstraMark'
+import { useLaunchAccess } from '@/lib/launch/LaunchAccessProvider'
 
 const QUICK_ACTIONS = [
   { title: 'Open Fast Track', href: '/fast-track', icon: Zap, subtitle: 'Start from a goal and let Blackstar route the work' },
@@ -37,7 +37,7 @@ function match(item, q) {
 export default function CommandMenu({ open, onClose }) {
   const navigate = useNavigate()
   const searchFn = useServerFn(searchWorkspace)
-  const { user } = useAuth()
+  const launchAccess = useLaunchAccess()
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
   const [resources, setResources] = useState([])
@@ -46,7 +46,7 @@ export default function CommandMenu({ open, onClose }) {
   const inputRef = useRef(null)
   const listRef = useRef(null)
   const requestRef = useRef(0)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = launchAccess.isAdmin
 
   useEffect(() => {
     if (open) {
@@ -101,6 +101,7 @@ export default function CommandMenu({ open, onClose }) {
     const source = q ? ALL_NAV_ITEMS : PRIMARY_NAV
     const pages = source
       .filter((item) => isAdmin || !adminPaths.has(item.path))
+      .filter((item) => launchAccess.canAccessPath(item.path))
       .filter((item) => match(item, q))
       .map((item) => ({
         title: item.label,
@@ -111,6 +112,7 @@ export default function CommandMenu({ open, onClose }) {
       }))
 
     const actions = QUICK_ACTIONS
+      .filter((item) => launchAccess.canAccessPath(item.href))
       .filter((item) => match(item, q))
       .map((item) => ({ ...item, group: 'Actions' }))
 
@@ -119,7 +121,7 @@ export default function CommandMenu({ open, onClose }) {
       resources: q.length >= 2 ? resources : [],
       actions: q ? actions : actions.slice(0, 5),
     }
-  }, [query, resources, isAdmin])
+  }, [query, resources, isAdmin, launchAccess])
 
   const flat = useMemo(() => [...groups.pages, ...groups.resources, ...groups.actions], [groups])
 

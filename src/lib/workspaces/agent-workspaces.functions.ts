@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { ingestDocument } from "@/lib/memory/memory.server";
 
 type Sb = {
@@ -68,7 +68,7 @@ function cardDto(row: any) {
 }
 
 export const listAgentWorkspaces = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_workspaces")])
   .inputValidator((input: { status?: string; limit?: number } = {}) => ({
     status: String(input.status ?? "").trim(),
     limit: Math.min(Math.max(Number(input.limit ?? 100) || 100, 1), 300),
@@ -83,7 +83,7 @@ export const listAgentWorkspaces = createServerFn({ method: "POST" })
   });
 
 export const saveAgentWorkspace = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_workspaces")])
   .inputValidator((input: unknown) => workspaceInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -106,7 +106,7 @@ export const saveAgentWorkspace = createServerFn({ method: "POST" })
   });
 
 export const listContextTimeline = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_workspaces")])
   .inputValidator((input: { workspaceId?: string | null; query?: string; limit?: number } = {}) => ({
     workspaceId: input.workspaceId ? z.string().uuid().parse(input.workspaceId) : null,
     query: String(input.query ?? "").trim().slice(0, 160),
@@ -126,7 +126,7 @@ export const listContextTimeline = createServerFn({ method: "POST" })
   });
 
 export const saveContextCard = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_workspaces")])
   .inputValidator((input: unknown) => cardInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -150,7 +150,7 @@ export const saveContextCard = createServerFn({ method: "POST" })
   });
 
 export const promoteContextCardToKnowledge = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_workspaces")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

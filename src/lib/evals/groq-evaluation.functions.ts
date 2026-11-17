@@ -1,6 +1,7 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import {
   GROQ_TASK_CLASSES,
   configuredModelCostUsd,
@@ -97,7 +98,7 @@ async function buildGroqEvaluationStatus(args: {
 }
 
 export const getGroqEvaluationStatus = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     taskClass: taskClassSchema.optional(),
     limit: z.number().int().min(10).max(500).optional().default(200),
@@ -123,7 +124,7 @@ function isRetiredGroqModel(id: string) {
 }
 
 export const getGroqRuntimeIntelligence = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_models")])
   .inputValidator((input: unknown) => z.object({
     limit: z.number().int().min(10).max(500).optional().default(200),
   }).parse(input ?? {}))

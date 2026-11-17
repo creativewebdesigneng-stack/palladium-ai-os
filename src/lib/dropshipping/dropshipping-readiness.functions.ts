@@ -1,10 +1,11 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';
-import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
+import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';
 import {listIntegrationCapabilities} from '@/lib/integrations/agent-integration-runtime.server';
 import {buildDropshippingReadiness} from './dropshipping-readiness';
 
 export const getDropshippingReadiness=createServerFn({method:'GET'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async({context})=>{
     const capabilities=await listIntegrationCapabilities(context.userId);
     return buildDropshippingReadiness(capabilities);

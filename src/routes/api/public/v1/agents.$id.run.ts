@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/public/v1/agents/$id/run")({
     handlers: {
       // Execution endpoint — plan gated (Explorer has no execution API).
       POST: withApiAuth(
-        { scope: "agents:run", execution: true, path: PATH },
+        { scope: "agents:run", execution: true, path: PATH, feature: "agent_runtime" },
         async (ctx, request, params) => {
           const body = await readJson(request);
           const input = requireString(body, "input", 20_000);

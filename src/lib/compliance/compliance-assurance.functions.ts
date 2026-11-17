@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 
 type Sb = { from: (table: string) => any };
 
@@ -83,7 +83,7 @@ async function insertOrUpdateOwned(sb: Sb, table: string, userId: string, id: st
 }
 
 export const listComplianceApplicability = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -96,7 +96,7 @@ export const listComplianceApplicability = createServerFn({ method: 'POST' })
   });
 
 export const saveComplianceApplicability = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => applicabilitySchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -116,7 +116,7 @@ export const saveComplianceApplicability = createServerFn({ method: 'POST' })
   });
 
 export const listComplianceAssessments = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -129,7 +129,7 @@ export const listComplianceAssessments = createServerFn({ method: 'POST' })
   });
 
 export const saveComplianceAssessment = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => assessmentSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -149,7 +149,7 @@ export const saveComplianceAssessment = createServerFn({ method: 'POST' })
   });
 
 export const listComplianceEvidence = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -162,7 +162,7 @@ export const listComplianceEvidence = createServerFn({ method: 'POST' })
   });
 
 export const saveComplianceEvidence = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => evidenceSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -186,7 +186,7 @@ export const saveComplianceEvidence = createServerFn({ method: 'POST' })
   });
 
 export const listComplianceControlMappings = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -199,7 +199,7 @@ export const listComplianceControlMappings = createServerFn({ method: 'POST' })
   });
 
 export const saveComplianceControlMapping = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => mappingSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -216,7 +216,7 @@ export const saveComplianceControlMapping = createServerFn({ method: 'POST' })
   });
 
 export const deleteComplianceAssuranceRecord = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => z.object({
     table: z.enum(['compliance_applicability', 'compliance_assessments', 'compliance_evidence', 'compliance_control_mappings']),
     id: z.string().uuid(),
@@ -229,7 +229,7 @@ export const deleteComplianceAssuranceRecord = createServerFn({ method: 'POST' }
   });
 
 export const getComplianceAssuranceReport = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;

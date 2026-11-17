@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { createApprovedMissionEmailDraft } from "./mission.server";
 import { notify } from "@/lib/notifications/notify.server";
@@ -56,7 +56,7 @@ export const decideEmailApproval = createServerFn({ method: "POST" })
       };
     },
   )
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("mission_control")])
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { getExternalAutomationStatus } from './external-automation-status.server';
 
 function configured(...names: string[]) {
@@ -7,7 +7,7 @@ function configured(...names: string[]) {
 }
 
 export const getAutomationProviderStatus = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .handler(async () => ({
     ...getExternalAutomationStatus(),
     coolify: {

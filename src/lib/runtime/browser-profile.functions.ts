@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { asBrowserDatabase } from "./browser-database.types";
 
 const cleanId = (value: unknown) => {
@@ -9,7 +9,7 @@ const cleanId = (value: unknown) => {
 };
 
 export const listBrowserProfiles = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const db = asBrowserDatabase(context.supabase);
     const { data, error } = await db
@@ -23,7 +23,7 @@ export const listBrowserProfiles = createServerFn({ method: "POST" })
   });
 
 export const deleteBrowserProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: { id: string }) => ({ id: cleanId(input?.id) }))
   .handler(async ({ data, context }) => {
     const db = asBrowserDatabase(context.supabase);

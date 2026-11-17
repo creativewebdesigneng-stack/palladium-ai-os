@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -31,7 +31,7 @@ const exerciseSchema = z.object({
 function nullify(value?: string) { return value?.trim() ? value.trim() : null; }
 
 export const getHealthOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const [profile, goals, metrics, workouts, nutrition, sleep, medications] = await Promise.all([
@@ -75,7 +75,7 @@ export const getHealthOverview = createServerFn({ method: 'POST' })
   });
 
 export const saveHealthProfile = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => profileSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -98,7 +98,7 @@ export const saveHealthProfile = createServerFn({ method: 'POST' })
   });
 
 export const saveHealthGoal = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     category: z.enum(['fitness','strength','cardio','mobility','nutrition','sleep','recovery','weight','habit','general_health']),
     title: z.string().trim().min(1).max(160),
@@ -119,7 +119,7 @@ export const saveHealthGoal = createServerFn({ method: 'POST' })
   });
 
 export const recordHealthMetric = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     metric_type: z.enum(['weight','resting_heart_rate','heart_rate','hrv','steps','blood_pressure_systolic','blood_pressure_diastolic','blood_glucose','body_fat','waist','temperature','oxygen_saturation','hydration','mood','energy','pain','other']),
     value: z.number().finite(),
@@ -138,7 +138,7 @@ export const recordHealthMetric = createServerFn({ method: 'POST' })
   });
 
 export const createHealthWorkout = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     name: z.string().trim().min(1).max(120),
     workout_type: z.enum(['strength','cardio','mobility','sport','recovery','mixed','other']).default('strength'),
@@ -160,7 +160,7 @@ export const createHealthWorkout = createServerFn({ method: 'POST' })
   });
 
 export const logHealthNutrition = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     meal_type: z.enum(['breakfast','lunch','dinner','snack','drink','meal']).default('meal'),
     name: z.string().trim().min(1).max(240),
@@ -183,7 +183,7 @@ export const logHealthNutrition = createServerFn({ method: 'POST' })
   });
 
 export const logHealthSleep = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     sleep_start: z.string().datetime({ offset: true }),
     sleep_end: z.string().datetime({ offset: true }),
@@ -204,7 +204,7 @@ export const logHealthSleep = createServerFn({ method: 'POST' })
   });
 
 export const saveHealthMedication = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("health_fitness")])
   .inputValidator((value: unknown) => z.object({
     name: z.string().trim().min(1).max(240),
     dose: optionalText(160), schedule: optionalText(240), purpose: optionalText(500),

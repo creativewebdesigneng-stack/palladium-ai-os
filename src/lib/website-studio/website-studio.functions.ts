@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 
 type Sb={from:(t:string)=>any};
 const statuses=['draft','ready','published','archived'] as const;
@@ -27,7 +27,7 @@ const projectSchema=z.object({
 });
 
 export const listWebsiteStudioProjects=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async({context})=>{
     const sb=context.supabase as unknown as Sb;
     const {data,error}=await sb.from('website_studio_projects').select('*').order('updated_at',{ascending:false});
@@ -36,7 +36,7 @@ export const listWebsiteStudioProjects=createServerFn({method:'POST'})
   });
 
 export const saveWebsiteStudioProject=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>projectSchema.parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -72,7 +72,7 @@ export const saveWebsiteStudioProject=createServerFn({method:'POST'})
   });
 
 export const deleteWebsiteStudioProject=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -100,7 +100,7 @@ const revisionSnapshot=z.object({
 });
 
 export const listWebsiteStudioRevisions=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -110,7 +110,7 @@ export const listWebsiteStudioRevisions=createServerFn({method:'POST'})
   });
 
 export const createWebsiteStudioRevision=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({
     projectId:z.string().uuid(),
     label:z.string().trim().min(1).max(160),
@@ -126,7 +126,7 @@ export const createWebsiteStudioRevision=createServerFn({method:'POST'})
   });
 
 export const deleteWebsiteStudioRevision=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -149,7 +149,7 @@ const assetSchema=z.object({
 }).refine((value)=>Boolean(value.sourceUrl||value.storagePath),{message:'Asset needs a source URL or storage path.'});
 
 export const listWebsiteStudioAssets=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -159,7 +159,7 @@ export const listWebsiteStudioAssets=createServerFn({method:'POST'})
   });
 
 export const saveWebsiteStudioAsset=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>assetSchema.parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -175,7 +175,7 @@ export const saveWebsiteStudioAsset=createServerFn({method:'POST'})
   });
 
 export const deleteWebsiteStudioAsset=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;

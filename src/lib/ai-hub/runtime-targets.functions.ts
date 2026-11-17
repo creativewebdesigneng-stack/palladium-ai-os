@@ -1,7 +1,8 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createHash, randomBytes } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { writeAudit } from '@/lib/platform/audit.server'
 
 type Sb = { from: (table: string) => any }
@@ -28,7 +29,7 @@ function heartbeatUrl() {
 }
 
 export const listAiHubRuntimeTargets = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb
     const [targets, organisations] = await Promise.all([
@@ -49,7 +50,7 @@ export const listAiHubRuntimeTargets = createServerFn({ method: 'POST' })
   })
 
 export const registerAiHubRuntimeTarget = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({
     name: z.string().trim().min(1).max(120),
     deploymentTarget: deploymentTargetSchema,
@@ -96,7 +97,7 @@ export const registerAiHubRuntimeTarget = createServerFn({ method: 'POST' })
   })
 
 export const rotateAiHubRuntimeTargetToken = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ targetId: targetIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
@@ -132,7 +133,7 @@ export const rotateAiHubRuntimeTargetToken = createServerFn({ method: 'POST' })
   })
 
 export const revokeAiHubRuntimeTarget = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator((input: unknown) => z.object({ targetId: targetIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb

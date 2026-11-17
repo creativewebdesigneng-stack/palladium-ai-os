@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   assertWithinLimit,
   EntitlementError,
@@ -103,7 +103,7 @@ async function resolveModel(sb: Sb, userId: string) {
 }
 
 export const analyseLegalDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => input.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

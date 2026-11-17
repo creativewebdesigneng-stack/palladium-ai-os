@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { assertPublicHttpUrl } from './url-policy';
 
 type Sb = { from: (table: string) => any };
 
 export const listWebIntelligenceSnapshots = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("web_intelligence")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const result = await sb.from('web_intelligence_snapshots').select('*').eq('user_id', context.userId).order('created_at', { ascending: false }).limit(100);
@@ -17,7 +17,7 @@ export const listWebIntelligenceSnapshots = createServerFn({ method: 'POST' })
   });
 
 export const snapshotWebIntelligenceJob = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("web_intelligence")])
   .inputValidator((input: unknown) => z.object({ jobId: z.string().uuid(), selectors: z.object({ include: z.array(z.string().max(180)).max(20).optional(), exclude: z.array(z.string().max(180)).max(20).optional() }).optional() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

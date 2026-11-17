@@ -1,5 +1,6 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { toAiHubSpiderReceipts } from './spider-receipts'
 
 type Sb = { from: (table: string) => any }
@@ -20,7 +21,7 @@ function validateInput(input: unknown): { limit: number } {
  * This is not an independent execution verifier or live event stream.
  */
 export const listAiHubSpiderReceipts = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb

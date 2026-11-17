@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { prepareAgentSkillPackage } from './skill-package';
 import { AGENT_PROCEDURE_PLAYBOOKS_160 } from './agent-procedure-playbooks';
 import { writeAudit } from '@/lib/platform/audit.server';
@@ -13,7 +13,7 @@ const BATCH_SIZE = 20;
  * Re-running a batch preserves any prior user-disabled state.
  */
 export const installAgentProcedurePack160 = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: { cursor?: number }) => {
     const cursor = input?.cursor ?? 0;
     if (!Number.isInteger(cursor) || cursor < 0 || cursor >= 160 || cursor % BATCH_SIZE !== 0) {

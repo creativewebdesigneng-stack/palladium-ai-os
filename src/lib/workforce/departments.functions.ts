@@ -7,7 +7,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -15,7 +15,7 @@ const uuid = z.string().uuid();
 
 /** Departments for an organisation, with their member agent ids. */
 export const listDepartments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .validator((input: unknown) => z.object({ orgId: uuid.nullish() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
     if (!data.orgId) return { departments: [] };
@@ -40,7 +40,7 @@ export const listDepartments = createServerFn({ method: "POST" })
 
 /** Creates or updates a department and re-files the agents assigned to it. */
 export const saveDepartment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .validator((input: unknown) =>
     z
       .object({
@@ -97,7 +97,7 @@ export const saveDepartment = createServerFn({ method: "POST" })
 
 /** Recent agent-to-agent messages produced by workforce runs (read-only). */
 export const listAgentMessages = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("workforce")])
   .validator((input: unknown) =>
     z.object({ limit: z.number().int().min(1).max(200).optional().default(100) }).parse(input ?? {}),
   )

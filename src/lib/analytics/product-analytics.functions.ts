@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -25,7 +25,7 @@ function rangeStart(range: '7d' | '30d' | '90d') {
 }
 
 export const listProductAnalyticsProjects = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('product_analytics_projects')
@@ -37,7 +37,7 @@ export const listProductAnalyticsProjects = createServerFn({ method: 'POST' })
   });
 
 export const createProductAnalyticsProject = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) => z.object({
     name: z.string().trim().min(1).max(160),
     domain: z.string().trim().max(500).nullish(),
@@ -57,7 +57,7 @@ export const createProductAnalyticsProject = createServerFn({ method: 'POST' })
   });
 
 export const recordProductAnalyticsEvent = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     visitorId: z.string().trim().max(240).nullish(),
@@ -89,7 +89,7 @@ export const recordProductAnalyticsEvent = createServerFn({ method: 'POST' })
   });
 
 export const getProductAnalyticsOverview = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) => z.object({ projectId: uuid, range: z.enum(['7d', '30d', '90d']).default('30d') }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -136,7 +136,7 @@ export const getProductAnalyticsOverview = createServerFn({ method: 'POST' })
   });
 
 export const createProductFunnel = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     name: z.string().trim().min(1).max(160),
@@ -151,7 +151,7 @@ export const createProductFunnel = createServerFn({ method: 'POST' })
   });
 
 export const createProductExperiment = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("analytics")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     name: z.string().trim().min(1).max(160),

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { writeAuditRequired } from "@/lib/platform/audit.server";
 import { resolveAgentNetworkRoute, type AgentNetworkPassport } from "./a2a-network";
 import type { AgentDelegationGrant } from "./agent-trust";
@@ -62,7 +62,7 @@ async function networkState(sb: Sb, userId: string) {
 }
 
 export const listAgentNetworkDirectory = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { passports } = await networkState(sb, context.userId);
@@ -70,7 +70,7 @@ export const listAgentNetworkDirectory = createServerFn({ method: "GET" })
   });
 
 export const resolveAgentNetworkCapability = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => routeInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -91,7 +91,7 @@ export const resolveAgentNetworkCapability = createServerFn({ method: "POST" })
   });
 
 export const queueAgentNetworkMessage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("agent_runtime")])
   .inputValidator((input: unknown) => messageInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;

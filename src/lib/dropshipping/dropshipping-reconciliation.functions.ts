@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';
 import {z} from 'zod';
 import {requireSupabaseAuth} from '@/integrations/supabase/auth-middleware';
@@ -30,7 +31,7 @@ async function loadOwnedDropshipOrder(sb:Sb,userId:string,input:{workspace_id:st
 }
 
 export const getDropshippingReconciliationCapabilities=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .handler(async({context})=>{
     const rows=await listIntegrationCapabilities(context.userId);
     return rows
@@ -40,7 +41,7 @@ export const getDropshippingReconciliationCapabilities=createServerFn({method:'P
   });
 
 export const readDropshippingFulfilmentEvidence=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({
     workspace_id:uuid,
     order_id:uuid,
@@ -90,7 +91,7 @@ export const readDropshippingFulfilmentEvidence=createServerFn({method:'POST'})
   });
 
 export const reconcileDropshippingFulfilmentEvidence=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("commerce")])
   .inputValidator((value:unknown)=>z.object({
     workspace_id:uuid,
     order_id:uuid,
