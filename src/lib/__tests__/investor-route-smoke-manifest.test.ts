@@ -50,7 +50,9 @@ describe("investor-facing route acceptance manifest", () => {
       marker: "https://palladium-ai-os.vercel.app/about",
     });
     expect(existsSync(new URL("../../../public/sitemap.xml", import.meta.url))).toBe(true);
-    expect(readFileSync(new URL("../../../public/sitemap.xml", import.meta.url), "utf8")).toContain("<urlset");
+    const sitemapContent = readFileSync(new URL("../../../public/sitemap.xml", import.meta.url), "utf8");
+    expect(sitemapContent).toContain("<urlset");
+    expect(sitemapContent).not.toContain("/cinema-studio");
   });
 
   it("keeps the sitemap discoverable from robots.txt", () => {
