@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
@@ -42,7 +42,7 @@ async function activity(sb: Sb, userId: string, projectId: string, kind: string,
 }
 
 export const listProjectWorkOS = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -59,7 +59,7 @@ export const listProjectWorkOS = createServerFn({ method: "POST" })
   });
 
 export const createProjectCycle = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     name: z.string().trim().min(1).max(120),
@@ -87,7 +87,7 @@ export const createProjectCycle = createServerFn({ method: "POST" })
   });
 
 export const createProjectModule = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     name: z.string().trim().min(1).max(120),
@@ -113,7 +113,7 @@ export const createProjectModule = createServerFn({ method: "POST" })
   });
 
 export const createProjectWorkItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({
     projectId: uuid,
     title: z.string().trim().min(1).max(240),
@@ -161,7 +161,7 @@ export const createProjectWorkItem = createServerFn({ method: "POST" })
   });
 
 export const updateProjectWorkItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({
     id: uuid,
     projectId: uuid,
