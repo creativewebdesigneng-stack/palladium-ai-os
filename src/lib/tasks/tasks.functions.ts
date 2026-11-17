@@ -5,7 +5,7 @@
  * changes. Every query is scoped by `requireSupabaseAuth` + RLS.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   assertSupportedWorkflowStepKind,
   normaliseWorkflowStepConfig,
