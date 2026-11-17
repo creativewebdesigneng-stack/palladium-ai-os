@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { readNotionPage, searchNotionPages } from "./notion.server";
 
 function searchInput(input: { query: string; limit?: number }) {
@@ -18,7 +18,7 @@ function pageInput(input: { pageId: string }) {
 }
 
 export const searchConnectedNotionPages = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(searchInput)
   .handler(async ({ data, context }) =>
     searchNotionPages({
@@ -29,7 +29,7 @@ export const searchConnectedNotionPages = createServerFn({ method: "POST" })
   );
 
 export const readConnectedNotionPage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("integrations")])
   .inputValidator(pageInput)
   .handler(async ({ data, context }) =>
     readNotionPage({
