@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { z } from "zod";
 import { writeAudit, writeAuditRequired } from "@/lib/platform/audit.server";
 import { encryptToken } from "@/lib/integrations/oauth.server";
