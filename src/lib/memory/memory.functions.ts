@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { retrieveGovernedAgentMemory } from "./agent-memory-context.server";
 import { promoteReviewedShortTermMemory } from "./reviewed-memory.server";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import type { MemorySearchStatus } from './recall-status';
 import {
   deleteDocument,
