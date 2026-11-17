@@ -1,6 +1,6 @@
 /** Authenticated Palladium Orchestrator API. */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import { orchestrateGoal, OrchestratorError } from "./orchestrator.server";
 
 type Sb = { from: (table: string) => any };
