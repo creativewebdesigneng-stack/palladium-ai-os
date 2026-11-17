@@ -8,6 +8,14 @@ import ListingsManager from '@/components/marketplace-agents/ListingsManager';
 import CreatorAnalytics from '@/components/marketplace-agents/CreatorAnalytics';
 import EditListing from '@/components/marketplace-agents/EditListing';
 import { submitMarketplaceAgent, removeMarketplaceAgent, getCreatorProfile, listOwnListings } from '@/components/marketplace-agents/api';
+import { friendlyMessage } from '@/lib/errors';
+
+function withCreatorHubTimeout(promise, label, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not respond within 15 seconds.`)), timeoutMs);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 // Creator Hub — the creator's home base. Onboards a user into a Creator, then
 // exposes three tabs: Listings (manage + edit + submit + remove), Analytics
@@ -18,19 +26,24 @@ export default function CreatorHub() {
   const [profile, setProfile] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [tab, setTab] = useState('listings');
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    setLoadError('');
     try {
-      const p = await getCreatorProfile();
+      const p = await withCreatorHubTimeout(getCreatorProfile(), 'Creator profile');
       setProfile(p);
-      if (p) setItems(await listOwnListings());
-    } catch {
-      setProfile(null);
+      if (p) setItems(await withCreatorHubTimeout(listOwnListings(), 'Creator listings'));
+      else setItems([]);
+    } catch (error) {
+      setLoadError(friendlyMessage(error));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
@@ -44,7 +57,8 @@ export default function CreatorHub() {
     catch (e) { toast({ title: 'Remove failed', description: e.message, variant: 'destructive' }); }
   };
 
-  if (loading) return <div className="text-sm text-zinc-500">Loading…</div>;
+  if (loading) return <div role="status" className="text-sm text-zinc-500">Loading Creator Hub…</div>;
+  if (loadError) return <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-500/[.05] p-4 text-sm text-rose-200">{loadError}<button onClick={load} className="ml-3 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-200">Retry</button></div>;
   if (!profile) return <CreatorOnboarding onCreated={load} />;
 
   const TABS = [['listings', 'Listings', LayoutList], ['analytics', 'Analytics', BarChart3], ['profile', 'Profile', UserCircle]];
