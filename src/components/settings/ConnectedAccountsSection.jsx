@@ -48,15 +48,15 @@ export default function ConnectedAccountsSection() {
             <div className="space-y-2">
               {catalogue.map((provider) => {
                 const connection = provider.connection;
-                const connected = connection?.status === 'connected' && connection?.health?.status !== 'needs_reauth';
-                const needsAuth = connection?.status === 'connected' && connection?.health?.status === 'needs_reauth';
+                const connected = connection?.status === 'connected' && connection?.health?.state === 'healthy';
+                const needsAuth = connection?.health?.reconnectRequired === true;
                 const busy = connect.isPending || disconnect.isPending;
                 return (
                   <div key={provider.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-xs font-semibold text-white">{provider.name}</p>
-                        <span className={`rounded-full border px-2 py-0.5 text-[9px] ${connected ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : needsAuth ? 'border-amber-400/20 bg-amber-400/10 text-amber-200' : 'border-white/10 bg-white/[.03] text-zinc-500'}`}>{connected ? 'Connected' : needsAuth ? 'Re-authorisation required' : provider.configured ? 'Not connected' : 'Owner setup required'}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[9px] ${connected ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : needsAuth ? 'border-amber-400/20 bg-amber-400/10 text-amber-200' : 'border-white/10 bg-white/[.03] text-zinc-500'}`}>{connected ? 'Connected' : needsAuth ? 'Re-authorisation required' : connection?.status === 'pending' ? 'Authorisation pending' : provider.configured ? 'Not connected' : 'Owner setup required'}</span>
                       </div>
                       <p className="mt-1 text-[11px] leading-5 text-zinc-500">{provider.summary}</p>
                       {connection?.account_label && <p className="mt-1 text-[10px] text-zinc-400">Account: {connection.account_label}</p>}
