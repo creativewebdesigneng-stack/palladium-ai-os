@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware'
+import { requireSupabaseAuth } from '@/lib/launch/launch-auth-middleware'
 import { executeWorkflow } from '@/lib/runtime/workforce.server'
 import { executeAgentTask } from '@/lib/runtime/agent-task-execution.server'
 import { callExternalMcpTool, listExternalMcpTools } from '@/lib/mcp/external-mcp.server'
