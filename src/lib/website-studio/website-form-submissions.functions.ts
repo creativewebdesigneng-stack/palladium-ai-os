@@ -6,7 +6,7 @@ type Sb={from:(table:string)=>any};
 const statusSchema=z.enum(['new','reviewed','archived','spam']);
 
 export const listWebsiteStudioFormSubmissions=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>z.object({projectId:z.string().uuid(),limit:z.number().int().min(1).max(200).default(100)}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
@@ -20,7 +20,7 @@ export const listWebsiteStudioFormSubmissions=createServerFn({method:'POST'})
   });
 
 export const updateWebsiteStudioFormSubmission=createServerFn({method:'POST'})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((value:unknown)=>z.object({id:z.string().uuid(),status:statusSchema}).parse(value))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb;
