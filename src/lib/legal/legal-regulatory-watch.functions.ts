@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import {
   assessRegulatoryEvidenceChange,
   fingerprintRegulatoryEvidence,
@@ -37,7 +37,7 @@ const automationSchema = z.object({
 });
 
 export const listLegalRegulatoryWatches = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb
@@ -50,7 +50,7 @@ export const listLegalRegulatoryWatches = createServerFn({ method: "POST" })
   });
 
 export const saveLegalRegulatoryWatch = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => schema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -75,7 +75,7 @@ export const saveLegalRegulatoryWatch = createServerFn({ method: "POST" })
   });
 
 export const updateLegalRegulatoryWatchAutomation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => automationSchema.parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -104,7 +104,7 @@ export const updateLegalRegulatoryWatchAutomation = createServerFn({ method: "PO
   });
 
 export const checkLegalRegulatoryWatch = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((value: unknown) => z.object({ id: z.string().uuid() }).parse(value))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
