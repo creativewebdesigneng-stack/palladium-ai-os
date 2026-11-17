@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const session = read("../useSessionReady.js");
 const workspace = read("../../hooks/use-workspace.ts");
 const listingBrowser = read("../../components/marketplace/ListingBrowser.jsx");
