@@ -27,7 +27,7 @@ export default function WebIntelligence() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!source.trim() || busy) return;
+    if (!source.trim() || busy || caps?.[provider]?.configured !== true) return;
     setBusy(true); setError(null);
     try {
       await createWebIntelligenceJob({ data: { provider, operation, source: source.trim(), limit: 20 } });
@@ -39,6 +39,12 @@ export default function WebIntelligence() {
 
   const caps = overview?.capabilities;
   const jobs = overview?.jobs ?? [];
+  const providerReady = caps?.[provider]?.configured === true;
+
+  if (session === 'no') return <><PageHeader eyebrow="Discovery" title="Web Intelligence" description="Search, scrape and crawl through Blackstar's authenticated web automation layer." /><div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-zinc-400">Sign in to view web intelligence jobs and provider readiness.</div></>;
+  if (session === 'unknown' || overviewState === 'loading') return <><PageHeader eyebrow="Discovery" title="Web Intelligence" description="Search, scrape and crawl through Blackstar's authenticated web automation layer." /><div role="status" className="rounded-2xl border border-white/10 p-6 text-sm text-zinc-400">Checking your session and web provider configuration…</div></>;
+  if (overviewState === 'error') return <><PageHeader eyebrow="Discovery" title="Web Intelligence" description="Search, scrape and crawl through Blackstar's authenticated web automation layer." /><div role="alert" className="rounded-2xl border border-rose-400/20 bg-rose-500/[.05] p-4 text-sm text-rose-200">{friendlyMessage(error)} <button onClick={load} className="ml-2 underline">Retry</button></div></>;
+
   return <>
     <PageHeader eyebrow="Discovery" title="Web Intelligence" description="Search, scrape, crawl and content-change tracking through Blackstar's authenticated, audited web automation layer." />
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -48,8 +54,9 @@ export default function WebIntelligence() {
           <form onSubmit={submit} className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2"><Field label="Provider"><select value={provider} onChange={(e) => { setProvider(e.target.value); if (e.target.value === 'crawlee' && operation === 'search') setOperation('scrape'); }} className="field"><option value="firecrawl">Firecrawl</option><option value="crawlee">Crawlee worker</option></select></Field><Field label="Operation"><select value={operation} onChange={(e) => setOperation(e.target.value)} className="field">{provider === 'firecrawl' && <option value="search">Search</option>}<option value="scrape">Scrape</option><option value="crawl">Crawl</option></select></Field></div>
             <Field label={operation === 'search' ? 'Search query' : 'Public target URL'}><input value={source} onChange={(e)=>setSource(e.target.value)} className="field" placeholder={operation === 'search' ? 'AI agent commerce trends' : 'https://example.com/docs'} /></Field>
-            <button disabled={busy || !source.trim()} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-medium text-white disabled:opacity-40">{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : operation === 'search' ? <Search className="h-4 w-4"/> : <Globe2 className="h-4 w-4"/>}Run real job</button>
+            <button disabled={busy || !source.trim() || !providerReady} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-medium text-white disabled:opacity-40">{busy ? <Loader2 className="h-4 w-4 animate-spin"/> : operation === 'search' ? <Search className="h-4 w-4"/> : <Globe2 className="h-4 w-4"/>}Run real job</button>
           </form>
+          {!providerReady && <p role="status" className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/[.05] p-3 text-[11px] leading-5 text-amber-100">{provider === 'firecrawl' ? 'Firecrawl is not configured on this deployment. Add the server-side FIRECRAWL_API_KEY and, if needed, FIRECRAWL_API_URL before running jobs.' : 'The Crawlee worker is not configured on this deployment. Add the server-side CRAWLEE worker URL and token before running jobs.'}</p>}
           {error && <p className="mt-3 rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{friendlyMessage(error)}</p>}
         </section>
         <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-sm font-semibold text-white">Recent web jobs</h2><div className="mt-3 space-y-2">{jobs.length === 0 ? <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-xs text-zinc-500">No web automation jobs yet.</p> : jobs.map((job) => <div key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-white">{job.operation} · {job.provider}</span><span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400">{job.status}</span><span className="ml-auto text-[10px] text-zinc-600">{new Date(job.created_at).toLocaleString()}</span></div><p className="mt-2 truncate text-[11px] text-zinc-500">{job.source}</p>{job.error && <p className="mt-1 text-[10px] text-rose-300">{job.error}</p>}</div>)}</div></section>
