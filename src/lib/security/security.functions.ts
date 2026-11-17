@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 
 type Sb = { from: (t: string) => any };
 
@@ -30,7 +30,7 @@ function keyStatus(row: any): "active" | "expiring" | "expired" | "revoked" {
 }
 
 export const getSecurityCentre = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const claims = context.claims as Record<string, any>;
