@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/launch/grants")({
         });
         const { data, error } = await supabase.auth.getClaims(token);
         const claims = data?.claims as Record<string, unknown> | undefined;
-        const email = typeof claims?.["email"] === "string" ? claims.email : "";
+        const email = typeof claims?.["email"] === "string" ? claims["email"] : "";
         if (error || typeof claims?.["sub"] !== "string") return json({ error: "Unauthorized" }, 401);
         if (!process.env["BLACKSTAR_ADMIN_EMAIL"] ||
           email.trim().toLowerCase() !== process.env["BLACKSTAR_ADMIN_EMAIL"].trim().toLowerCase()) {
