@@ -29,18 +29,22 @@ export const Route = createFileRoute("/api/agents/run")({
         const email = claims?.claims?.email;
         if (claimsError || !userId) return json({ error: "Unauthorized" }, 401);
 
-        const { data: pilotAccess, error: pilotAccessError } = await supabase
-          .from("blackstar_pilot_access")
+        const actor = { email: typeof email === "string" ? email : null };
+        let access = getFeatureAccess("agent_runtime", actor, process.env as Record<string, string | undefined>);
+        if (!access.allowed) {
+          const { data: pilotAccess, error: pilotAccessError } = await supabase
+            .from("blackstar_pilot_access")
           .select("status,beta_features")
           .eq("user_id", userId)
           .in("status", ["active", "trialing"])
           .maybeSingle();
-        if (pilotAccessError) return json({ error: "Launch access could not be verified." }, 503);
-        const access = getFeatureAccess("agent_runtime", {
-          email: typeof email === "string" ? email : null,
-          isPilotCustomer: Boolean(pilotAccess),
-          betaFeatures: Array.isArray(pilotAccess?.beta_features) ? pilotAccess.beta_features : [],
-        }, process.env as Record<string, string | undefined>);
+          if (pilotAccessError) return json({ error: "Launch access could not be verified." }, 503);
+          access = getFeatureAccess("agent_runtime", {
+            ...actor,
+            isPilotCustomer: Boolean(pilotAccess),
+            betaFeatures: Array.isArray(pilotAccess?.beta_features) ? pilotAccess.beta_features : [],
+          }, process.env as Record<string, string | undefined>);
+        }
         if (!access.allowed) return json({ error: "This feature is not available for your account yet.", code: "FEATURE_NOT_ENABLED" }, 403);
 
         let body: { agent_id?: string; input?: string };
