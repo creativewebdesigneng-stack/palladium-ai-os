@@ -13,7 +13,7 @@ const PATH = "/api/public/v1/tasks";
 export const Route = createFileRoute("/api/public/v1/tasks")({
   server: {
     handlers: {
-      GET: withApiAuth({ scope: "tasks:read", path: PATH }, async (ctx, request) => {
+      GET: withApiAuth({ scope: "tasks:read", path: PATH, feature: "projects" }, async (ctx, request) => {
         const { limit, offset } = pageParams(request);
         const url = new URL(request.url);
         const status = url.searchParams.get("status");
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/public/v1/tasks")({
         if (error) throw new ApiError(500, "query_failed", error.message);
         return { tasks: data ?? [], limit, offset };
       }),
-      POST: withApiAuth({ scope: "tasks:write", path: PATH }, async (ctx, request) => {
+      POST: withApiAuth({ scope: "tasks:write", path: PATH, feature: "projects" }, async (ctx, request) => {
         const body = await readJson(request);
         const requestText = requireString(body, "request", 8000);
         const { data, error } = await ctx.admin
