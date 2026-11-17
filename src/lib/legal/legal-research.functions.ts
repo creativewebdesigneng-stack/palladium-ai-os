@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { searchPublicWeb, type WebSource } from "@/lib/ai/web-access.server";
 import { runChat } from "@/lib/runtime/model-gateway.server";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
@@ -143,7 +143,7 @@ export function rankLegalSources(sources: WebSource[], jurisdiction?: string) {
 }
 
 export const runLegalResearch = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("security")])
   .inputValidator((v: unknown) => input.parse(v))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
