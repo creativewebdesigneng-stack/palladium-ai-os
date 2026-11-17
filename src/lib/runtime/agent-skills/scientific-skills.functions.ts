@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/lib/launch/launch-auth-middleware';
 import { writeAuditRequired } from '@/lib/platform/audit.server';
 import { SCIENTIFIC_SKILL_SOURCES, SCIENTIFIC_SKILLS_COMMIT } from './scientific-skill-sources';
 import { fetchPinnedScientificSkill } from './scientific-skills-import.server';
