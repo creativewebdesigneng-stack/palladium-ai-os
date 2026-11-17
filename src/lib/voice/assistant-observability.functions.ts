@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { getVoiceRuntimeCapabilities } from "./voice-runtime.server";
 
 type Sb = { from: (table: string) => any };
@@ -10,7 +10,7 @@ function safeNumber(value: unknown) {
 }
 
 export const getAssistantObservability = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("communications")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const userId = context.userId;
