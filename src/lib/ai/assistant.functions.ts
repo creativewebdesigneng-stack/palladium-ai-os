@@ -3,7 +3,7 @@
  * personal identity and optional live-web grounding for time-sensitive questions.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {
   assertWithinLimit,
   EntitlementError,
