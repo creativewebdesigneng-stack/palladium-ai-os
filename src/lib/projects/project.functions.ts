@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = { from: (table: string) => any };
@@ -102,7 +102,7 @@ async function resolveScopedResource(
 }
 
 export const listProjects = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     scopeSchema.extend({ includeArchived: z.boolean().optional() }).parse(input ?? {}),
   )
@@ -123,7 +123,7 @@ export const listProjects = createServerFn({ method: "POST" })
   });
 
 export const getProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -152,7 +152,7 @@ export const getProject = createServerFn({ method: "POST" })
   });
 
 export const createProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     scopeSchema
       .extend({
@@ -200,7 +200,7 @@ export const createProject = createServerFn({ method: "POST" })
   });
 
 export const updateProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -255,7 +255,7 @@ export const updateProject = createServerFn({ method: "POST" })
   });
 
 export const archiveProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -280,7 +280,7 @@ export const archiveProject = createServerFn({ method: "POST" })
   });
 
 export const listProjectResources = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -333,7 +333,7 @@ export const listProjectResources = createServerFn({ method: "POST" })
   });
 
 export const addProjectResource = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: z.string().uuid(),
@@ -388,7 +388,7 @@ export const addProjectResource = createServerFn({ method: "POST" })
   });
 
 export const removeProjectResource = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid(), linkId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -423,7 +423,7 @@ export const removeProjectResource = createServerFn({ method: "POST" })
 
 
 export const listPublicProjects = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       search: z.string().trim().max(120).optional(),
@@ -466,7 +466,7 @@ export const listPublicProjects = createServerFn({ method: "POST" })
   });
 
 export const setProjectVisibility = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid(), visibility: visibilitySchema }).parse(input),
   )
@@ -500,7 +500,7 @@ export const setProjectVisibility = createServerFn({ method: "POST" })
   });
 
 export const toggleProjectStar = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
