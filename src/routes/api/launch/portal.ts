@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/launch/portal")({
         const secret = process.env["STRIPE_SECRET_KEY"];
         const mode = process.env["STRIPE_MODE"] ?? "test";
         if (mode !== "test" && mode !== "live") return json({ error: "STRIPE_MODE must be test or live." }, 503);
-        if (mode === "test" && secret && !secret.startsWith("sk_test_")) return json({ error: "Test deployments must use a Stripe test secret key." }, 503);
+        if (secret && !secret.startsWith(mode === "test" ? "sk_test_" : "sk_live_")) return json({ error: `STRIPE_SECRET_KEY must match STRIPE_MODE=${mode}.` }, 503);
         const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/$/, "");
         if (!secret || !baseUrl) return json({ error: "Billing portal is not configured." }, 503);
         try {
