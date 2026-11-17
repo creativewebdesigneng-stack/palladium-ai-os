@@ -1,12 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 import { SEEDREAM_PROMPT_COLLECTIONS } from './builtin-seedream-prompts';
 
 type Sb = { from: (table: string) => any };
 
 export const installSeedreamPromptPack = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("creative_studio")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const installed: Array<{ id: string; name: string; version: number }> = [];
