@@ -71,28 +71,7 @@ for (const entry of [
 }
 
 if (staticOnly) {
-  async function renderAsset(entry) {
-  const url = `${baseUrl}${entry.path}`;
-  let response;
-  try {
-    response = await fetch(url, { headers: { accept: "application/xml,text/xml,*/*", "user-agent": "blackstar-signed-out-smoke/1.0" }, signal: AbortSignal.timeout(20000) });
-  } catch (error) {
-    fail(`${entry.path}: request failed (${error instanceof Error ? error.message : String(error)})`);
-    return;
-  }
-  const body = await response.text();
-  const contentType = response.headers.get("content-type") ?? "";
-  console.log(`${response.status} asset ${entry.path} content-type=${JSON.stringify(contentType)}`);
-  if (response.status !== 200) fail(`${entry.path}: expected HTTP 200, received ${response.status}`);
-  if (entry.contentType === "xml" && !contentType.toLowerCase().includes("xml")) fail(`${entry.path}: expected an XML content type, received ${contentType || "none"}`);
-  if (!body.includes(entry.marker)) fail(`${entry.path}: missing expected marker ${JSON.stringify(entry.marker)}`);
-  if (!body.includes("<urlset")) fail(`${entry.path}: missing sitemap urlset root`);
-  for (const secret of secretMarkers) if (body.includes(secret)) fail(`${entry.path}: rendered asset contains ${secret}`);
-}
-
-for (const entry of manifest.signedOutAssets ?? []) await renderAsset(entry);
-
-if (failures.length) {
+  if (failures.length) {
     console.error(`\nStatic route smoke failed: ${failures.length}`);
     process.exit(1);
   }
@@ -163,6 +142,30 @@ async function render(entry, kind) {
   }
 }
 
+async function renderAsset(entry) {
+  const url = `${baseUrl}${entry.path}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: { accept: "application/xml,text/xml,*/*", "user-agent": "blackstar-signed-out-smoke/1.0" },
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (error) {
+    fail(`${entry.path}: request failed (${error instanceof Error ? error.message : String(error)})`);
+    return;
+  }
+  const body = await response.text();
+  const contentType = response.headers.get("content-type") ?? "";
+  console.log(`${response.status} asset ${entry.path} content-type=${JSON.stringify(contentType)}`);
+  if (response.status !== 200) fail(`${entry.path}: expected HTTP 200, received ${response.status}`);
+  if (entry.contentType === "xml" && !contentType.toLowerCase().includes("xml")) {
+    fail(`${entry.path}: expected an XML content type, received ${contentType || "none"}`);
+  }
+  if (!body.includes(entry.marker)) fail(`${entry.path}: missing expected marker ${JSON.stringify(entry.marker)}`);
+  if (!body.includes("<urlset")) fail(`${entry.path}: missing sitemap urlset root`);
+  for (const secret of secretMarkers) if (body.includes(secret)) fail(`${entry.path}: rendered asset contains ${secret}`);
+}
+
 for (const entry of manifest.signedOutPublic) {
   await render(entry, "public");
 }
@@ -174,6 +177,9 @@ for (const entry of manifest.signedOutAuth) {
 }
 for (const entry of manifest.protectedShells) {
   await render(entry, "protected");
+}
+for (const entry of manifest.signedOutAssets ?? []) {
+  await renderAsset(entry);
 }
 
 if (failures.length) {
