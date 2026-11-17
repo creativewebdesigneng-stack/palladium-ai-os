@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveAssistantModelPreference } from "@/lib/ai/ai-preferences.server";
 import { ProviderError } from "@/lib/runtime/model-gateway.server";
 import { generateBuilderPlan } from "@/lib/builder/builder-plan.server";
@@ -61,20 +61,20 @@ async function requireConnectedTarget(userId: string, repository: string) {
   return { installationId, target };
 }
 
-export const listBuilderJobs = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+export const listBuilderJobs = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).handler(async ({ context }) => {
   const sb = context.supabase as unknown as Sb;
   const { data, error } = await sb.from("builder_jobs").select(jobColumns).eq("user_id", context.userId).order("created_at", { ascending: false }).limit(25);
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapJob);
 });
 
-export const listBuilderGitHubRepositories = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+export const listBuilderGitHubRepositories = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).handler(async ({ context }) => {
   const installationId = await getUserGitHubInstallationId(context.userId);
   if (!installationId) throw new Error("GitHub is not connected. Connect GitHub before choosing a Builder repository.");
   return (await listGitHubRepositories(installationId)).map((repo) => ({ fullName: repo.fullName, private: repo.private, defaultBranch: repo.defaultBranch, htmlUrl: repo.htmlUrl }));
 });
 
-export const createBuilderJob = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => createInput.parse(input)).handler(async ({ data, context }) => {
+export const createBuilderJob = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => createInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -83,7 +83,7 @@ export const createBuilderJob = createServerFn({ method: "POST" }).middleware([r
   return mapJob(row);
 });
 
-export const generateBuilderJobPlan = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
+export const generateBuilderJobPlan = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -105,7 +105,7 @@ export const generateBuilderJobPlan = createServerFn({ method: "POST" }).middlew
   }
 });
 
-export const generateBuilderJobSource = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
+export const generateBuilderJobSource = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -127,7 +127,7 @@ export const generateBuilderJobSource = createServerFn({ method: "POST" }).middl
   }
 });
 
-export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => targetRepoInput.parse(input)).handler(async ({ data, context }) => {
+export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => targetRepoInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -152,7 +152,7 @@ export const queueBuilderBranchApproval = createServerFn({ method: "POST" }).mid
   return mapJob(updated);
 });
 
-export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
+export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -225,7 +225,7 @@ export const queueBuilderFileApprovals = createServerFn({ method: "POST" }).midd
   return { ...mapJob(updated), unchangedFiles: unchanged };
 });
 
-export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
+export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
@@ -269,7 +269,7 @@ export const refreshBuilderRepositoryStatus = createServerFn({ method: "POST" })
   return mapJob(ready ?? job);
 });
 
-export const cancelBuilderJob = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
+export const cancelBuilderJob = createServerFn({ method: "POST" }).middleware([requireLaunchFeatureAuth("developer_tools")]).inputValidator((input: unknown) => jobInput.parse(input)).handler(async ({ data, context }) => {
   const sb = context.supabase as unknown as Sb;
     const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
     const admin=supabaseAdmin as unknown as Sb;
