@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 import { executeStudioQuery } from "@/lib/app-studio/app-studio-query.server";
 import { validateStudioBindings, validateStudioEvents } from "@/lib/app-studio/app-studio-bindings";
@@ -87,7 +87,7 @@ async function requireApp(sb: Sb, userId: string, appId: string) {
 }
 
 export const listStudioApps = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const result = await sb.from("app_studio_apps").select("id,name,slug,description,application_type,status,published_release_id,created_at,updated_at").eq("user_id", context.userId).order("updated_at", { ascending: false }).limit(100);
@@ -96,7 +96,7 @@ export const listStudioApps = createServerFn({ method: "POST" })
   });
 
 export const createStudioApp = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => appInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -128,7 +128,7 @@ export const createStudioApp = createServerFn({ method: "POST" })
   });
 
 export const getStudioApp = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ appId: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -147,7 +147,7 @@ export const getStudioApp = createServerFn({ method: "POST" })
   });
 
 export const saveStudioPage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => pageInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -163,7 +163,7 @@ export const saveStudioPage = createServerFn({ method: "POST" })
   });
 
 export const saveStudioWidget = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => widgetInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -180,7 +180,7 @@ export const saveStudioWidget = createServerFn({ method: "POST" })
   });
 
 export const saveStudioDatasource = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => datasourceInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -199,7 +199,7 @@ export const saveStudioDatasource = createServerFn({ method: "POST" })
   });
 
 export const saveStudioQuery = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => queryInput.parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -217,7 +217,7 @@ export const saveStudioQuery = createServerFn({ method: "POST" })
   });
 
 export const createStudioRelease = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ appId: uuid, notes: z.string().max(2000).default(""), publish: z.boolean().default(false) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -245,7 +245,7 @@ export const createStudioRelease = createServerFn({ method: "POST" })
 
 
 export const runStudioQuery = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("developer_tools")])
   .inputValidator((input: unknown) => z.object({ queryId: uuid, input: z.record(z.string(), z.unknown()).default({}) }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
