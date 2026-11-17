@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import {createServerFn} from '@tanstack/react-start';import {z} from 'zod';import {requireSupabaseAuth} from '@/lib/launch/launch-auth-middleware';type Sb={from:(t:string)=>any};
 const profile=z.object({display_name:z.string().trim().min(2).max(80),handle:z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/),bio:z.string().trim().max(2000).default(''),website_url:z.string().url().optional().or(z.literal(''))});
 export const getMyMarketplaceSellerProfile=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("agent_marketplace")]).handler(async({context})=>{const sb=context.supabase as unknown as Sb;const {data,error}=await sb.from('marketplace_seller_profiles').select('*').eq('user_id',context.userId).maybeSingle();if(error)throw new Error(error.message);return data});
