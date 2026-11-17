@@ -83,7 +83,7 @@ function validateMasterResult(result:any){
   return result
 }
 
-export const auditCinemaMasterReadiness=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const auditCinemaMasterReadiness=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -91,7 +91,7 @@ export const auditCinemaMasterReadiness=createServerFn({method:'POST'}).middlewa
     return buildCinemaAssemblyManifest(project,renders)
   })
 
-export const certifyCinemaProject=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const certifyCinemaProject=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -141,7 +141,7 @@ export const certifyCinemaProject=createServerFn({method:'POST'}).middleware([re
     }
   })
 
-export const submitCinemaMaster=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const submitCinemaMaster=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({id:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
@@ -169,7 +169,7 @@ export const submitCinemaMaster=createServerFn({method:'POST'}).middleware([requ
     }
   })
 
-export const refreshCinemaMaster=createServerFn({method:'POST'}).middleware([requireSupabaseAuth])
+export const refreshCinemaMaster=createServerFn({method:'POST'}).middleware([requireLaunchFeatureAuth("cinema_studio")])
   .inputValidator((v:unknown)=>z.object({jobId:z.string().uuid(),projectId:z.string().uuid()}).parse(v))
   .handler(async({data,context})=>{
     const sb=context.supabase as unknown as Sb
