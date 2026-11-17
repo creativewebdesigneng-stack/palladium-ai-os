@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { useSessionReady } from "@/lib/useSessionReady";
 import { getWorkspace } from "@/lib/platform/platform.functions";
 
 const ACTIVE_ORG_KEY = "palladium.activeOrg";
@@ -20,19 +20,7 @@ function withWorkspaceTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promis
 }
 
 export function useSession() {
-  const [state, setState] = useState<"unknown" | "yes" | "no">("unknown");
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (alive) setState(data.session ? "yes" : "no");
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setState(s ? "yes" : "no"));
-    return () => {
-      alive = false;
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
-  return state;
+  return useSessionReady();
 }
 
 export function useActiveOrg() {
