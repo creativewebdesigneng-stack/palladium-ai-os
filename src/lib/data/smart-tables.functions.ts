@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { requireLaunchFeatureAuth } from '@/integrations/supabase/auth-middleware';
 import { writeAudit } from '@/lib/platform/audit.server';
 
 type Sb = { from: (table: string) => any };
@@ -40,7 +40,7 @@ function sanitizeValues(fields: Array<z.infer<typeof fieldSchema>>, raw: Record<
 }
 
 export const listSmartTables = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .handler(async ({ context }) => {
     const sb = context.supabase as unknown as Sb;
     const { data, error } = await sb.from('smart_tables')
@@ -52,7 +52,7 @@ export const listSmartTables = createServerFn({ method: 'POST' })
   });
 
 export const getSmartTable = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -69,7 +69,7 @@ export const getSmartTable = createServerFn({ method: 'POST' })
   });
 
 export const createSmartTable = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: unknown) => z.object({
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(1000).optional().default(''),
@@ -93,7 +93,7 @@ export const createSmartTable = createServerFn({ method: 'POST' })
   });
 
 export const saveSmartTableRecord = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: unknown) => z.object({ tableId: z.string().uuid(), id: z.string().uuid().optional(), values: jsonRecord }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -112,7 +112,7 @@ export const saveSmartTableRecord = createServerFn({ method: 'POST' })
   });
 
 export const deleteSmartTableRecord = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: unknown) => z.object({ tableId: z.string().uuid(), id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -122,7 +122,7 @@ export const deleteSmartTableRecord = createServerFn({ method: 'POST' })
   });
 
 export const createSmartTableView = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_tools")])
   .inputValidator((input: unknown) => z.object({
     tableId: z.string().uuid(),
     name: z.string().trim().min(1).max(120),
