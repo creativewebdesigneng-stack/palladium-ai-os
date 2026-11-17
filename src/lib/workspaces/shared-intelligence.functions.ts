@@ -40,7 +40,7 @@ export function validateWorkspaceCollaborationInput(input: unknown) {
 }
 
 export const getWorkspaceIntelligenceGraph = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateWorkspaceGraphInput)
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb
@@ -130,7 +130,7 @@ export const getWorkspaceIntelligenceGraph = createServerFn({ method: 'POST' })
   })
 
 export const planWorkspaceCollaboration = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("ai_hub")])
   .inputValidator(validateWorkspaceCollaborationInput)
   .handler(async ({ data, context }) => {
     const members = data.members.filter((member) => member.id !== context.userId)
