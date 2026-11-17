@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireLaunchFeatureAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit } from "@/lib/platform/audit.server";
 
 type Sb = {
@@ -40,7 +40,7 @@ async function requireRepositoryManager(sb: Sb, projectId: string, userId: strin
 }
 
 export const getRepositoryOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: projectIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -62,7 +62,7 @@ export const getRepositoryOverview = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryFiles = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -85,7 +85,7 @@ export const listRepositoryFiles = createServerFn({ method: "POST" })
   });
 
 export const readRepositoryFile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ projectId: projectIdSchema, branch: branchSchema, path: pathSchema }).parse(input),
   )
@@ -103,7 +103,7 @@ export const readRepositoryFile = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryCommits = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -125,7 +125,7 @@ export const listRepositoryCommits = createServerFn({ method: "POST" })
   });
 
 export const listCommitChanges = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ projectId: projectIdSchema, commitId: z.string().uuid() }).parse(input),
   )
@@ -141,7 +141,7 @@ export const listCommitChanges = createServerFn({ method: "POST" })
   });
 
 export const commitRepositoryFile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -176,7 +176,7 @@ export const commitRepositoryFile = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryCollaborators = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: projectIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -204,7 +204,7 @@ export const listRepositoryCollaborators = createServerFn({ method: "POST" })
   });
 
 export const addRepositoryCollaborator = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -248,7 +248,7 @@ export const addRepositoryCollaborator = createServerFn({ method: "POST" })
   });
 
 export const updateRepositoryCollaborator = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -278,7 +278,7 @@ export const updateRepositoryCollaborator = createServerFn({ method: "POST" })
   });
 
 export const removeRepositoryCollaborator = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ projectId: projectIdSchema, userId: z.string().uuid() }).parse(input),
   )
@@ -303,7 +303,7 @@ export const removeRepositoryCollaborator = createServerFn({ method: "POST" })
 
 
 export const createRepositoryBranch = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -331,7 +331,7 @@ export const createRepositoryBranch = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryIssues = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -352,7 +352,7 @@ export const listRepositoryIssues = createServerFn({ method: "POST" })
   });
 
 export const createRepositoryIssue = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -378,7 +378,7 @@ export const createRepositoryIssue = createServerFn({ method: "POST" })
   });
 
 export const setRepositoryIssueStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -403,7 +403,7 @@ export const setRepositoryIssueStatus = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryIssueComments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ projectId: projectIdSchema, issueId: z.string().uuid() }).parse(input),
   )
@@ -419,7 +419,7 @@ export const listRepositoryIssueComments = createServerFn({ method: "POST" })
   });
 
 export const addRepositoryIssueComment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -447,7 +447,7 @@ export const addRepositoryIssueComment = createServerFn({ method: "POST" })
   });
 
 export const listRepositoryReleases = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) => z.object({ projectId: projectIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as Sb;
@@ -461,7 +461,7 @@ export const listRepositoryReleases = createServerFn({ method: "POST" })
   });
 
 export const createRepositoryRelease = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -493,7 +493,7 @@ export const createRepositoryRelease = createServerFn({ method: "POST" })
 
 
 export const listRepositoryPullRequests = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -514,7 +514,7 @@ export const listRepositoryPullRequests = createServerFn({ method: "POST" })
   });
 
 export const createRepositoryPullRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -544,7 +544,7 @@ export const createRepositoryPullRequest = createServerFn({ method: "POST" })
   });
 
 export const setRepositoryPullRequestStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({
       projectId: projectIdSchema,
@@ -566,7 +566,7 @@ export const setRepositoryPullRequestStatus = createServerFn({ method: "POST" })
   });
 
 export const mergeRepositoryPullRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireLaunchFeatureAuth("projects")])
   .inputValidator((input: unknown) =>
     z.object({ projectId: projectIdSchema, pullRequestId: z.string().uuid() }).parse(input),
   )
