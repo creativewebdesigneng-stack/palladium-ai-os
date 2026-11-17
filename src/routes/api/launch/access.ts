@@ -24,11 +24,24 @@ export const Route = createFileRoute("/api/launch/access")({
         const email = typeof claims?.email === "string" ? claims.email : null;
         if (error || !userId) return json({ error: "Unauthorized" }, 401);
 
+        const env = process.env as Record<string, string | undefined>;
+        const admin = isLaunchAdmin({ email }, env);
+        if (admin) {
+          return json({
+            isAdmin: true,
+            isPilotCustomer: true,
+            betaFeatures: Object.keys(resolveFeatureStatuses(env)),
+            visibleFeatures: getVisibleFeatures({ email }, env),
+            statuses: resolveFeatureStatuses(env),
+          }, 200);
+        }
+
         const { data: entitlement, error: entitlementError } = await supabase
           .from("blackstar_pilot_access")
           .select("status,beta_features")
           .eq("user_id", userId)
           .in("status", ["active", "trialing"])
+          .eq("environment", process.env["STRIPE_MODE"] === "live" ? "live" : "test")
           .maybeSingle();
         if (entitlementError) {
           console.error("[launch-access] pilot entitlement lookup failed", entitlementError.message);
@@ -40,7 +53,6 @@ export const Route = createFileRoute("/api/launch/access")({
           isPilotCustomer: Boolean(entitlement),
           betaFeatures: Array.isArray(entitlement?.beta_features) ? entitlement.beta_features : [],
         };
-        const env = process.env as Record<string, string | undefined>;
         return json({
           isAdmin: isLaunchAdmin(actor, env),
           isPilotCustomer: actor.isPilotCustomer,
