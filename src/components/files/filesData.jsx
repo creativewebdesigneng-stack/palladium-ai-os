@@ -9,7 +9,7 @@ import {
   Workflow, Bot, FileSearch, Library, Layers3, Server, Zap, FileUp,
 } from 'lucide-react';
 
-// ─── Overview Metrics ─────────────────────────────────
+// DEMO ONLY: all records, identities, metrics and document contents in this module are fictional preview data.\n// They must never be represented as connected files, actual customer activity or company financial results.\n\n// ─── Overview Metrics ─────────────────────────────────
 export const OVERVIEW_METRICS = [
   { label: 'Total Files', value: '12,847', detail: '+124 this week', trend: [42, 44, 46, 48, 50, 52, 54, 56, 58], icon: FileStack, grad: 'from-violet-500 to-indigo-500' },
   { label: 'Knowledge Collections', value: '48', detail: '6 active', trend: [30, 32, 34, 36, 38, 40, 42, 45, 48], icon: Library, grad: 'from-fuchsia-500 to-pink-500' },
