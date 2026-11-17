@@ -1,3 +1,4 @@
+import { requireLaunchFeatureAuth } from "@/lib/launch/launch-auth-middleware";
 import{createServerFn}from"@tanstack/react-start";import{z}from"zod";import{requireSupabaseAuth}from"@/integrations/supabase/auth-middleware";type Sb={from:(t:string)=>any};
 const matter=z.object({id:z.string().uuid().optional(),title:z.string().trim().min(1).max(180),jurisdiction:z.string().trim().min(1).max(120),topic:z.string().trim().max(100).default("general"),question:z.string().trim().min(3).max(4000),status:z.enum(["open","review","closed"]).default("open"),notes:z.string().trim().max(8000).optional()});
 export const listLegalMatters=createServerFn({method:"POST"}).middleware([requireLaunchFeatureAuth("security")]).handler(async({context})=>{const sb=context.supabase as unknown as Sb;const{data,error}=await sb.from("legal_research_matters").select("*").eq("user_id",context.userId).order("updated_at",{ascending:false});if(error)throw new Error(error.message);return data??[];});
