@@ -45,7 +45,7 @@ export default function SystemMonitoring() {
   return (
     <>
       <PageHeader eyebrow="Admin" title="System Monitoring" description="Real-time health of platform infrastructure and services." action={headerAction} />
-      <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>Signals are computed live from API request logs and agent task runs, {d.window}.</p></div>
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-400/20 bg-rose-400/[.06] px-3 py-2 text-[11px] text-rose-200/90"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /><p>These are platform-wide signals from API request logs and agent task runs, {d.window}; they are not workspace-scoped totals.</p></div>
 
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <div className="flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function SystemMonitoring() {
           <p className="mt-2 text-2xl font-semibold text-white">{d.api.avg_latency_ms != null ? `${d.api.avg_latency_ms}ms` : '—'}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
-          <div className="flex items-center gap-2 text-zinc-500"><Bot className="h-4 w-4 text-emerald-400" /><span className="text-[11px] font-medium uppercase tracking-wide">Agent runs</span></div>
+          <div className="flex items-center gap-2 text-zinc-500"><Bot className="h-4 w-4 text-emerald-400" /><span className="text-[11px] font-medium uppercase tracking-wide">Platform agent task runs</span></div>
           <p className="mt-2 text-2xl font-semibold text-white">{d.agents.total_runs.toLocaleString()}</p>
           <p className="text-[11px] text-zinc-500">{d.agents.failed_runs} failed</p>
         </div>
